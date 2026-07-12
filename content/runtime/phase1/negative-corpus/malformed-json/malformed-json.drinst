@@ -1,0 +1,52 @@
+{
+  "schemaName": "drs.instrument",
+  "schemaVersion": 1,
+  "instrumentId": "drs.phase1.invalid-malformed-json",
+  "displayName": "Invalid Malformed Json",
+  "sourceProject": "missing-project.drsproj",
+  "compiledStreamAsset": "missing-stream.drstrm",
+  "defaultLoadProfile": "balanced",
+  "macros": [
+    {
+      "id": "tone",
+      "name": "Tone",
+      "defaultValue": 0.25,
+      "minValue": 0.0,
+      "maxValue": 1.0
+    }
+  ],
+  "articulations": [
+    {
+      "id": "sustain",
+      "name": "Sustain",
+      "isDefault": true
+    }
+  ],
+  "groups": [
+    {
+      "id": "pad-core",
+      "name": "Pad Core",
+      "articulationIds": [
+        "sustain"
+      ]
+    }
+  ],
+  "zones": [
+    {
+      "id": "pad-a3",
+      "groupId": "pad-core",
+      "articulationId": "sustain",
+      "samplePath": "../../../../hise_project/Samples/DRS_Sine_A3.wav",
+      "streamAssetPath": "missing-stream.drstrm",
+      "rootKey": 57,
+      "keyLow": 36,
+      "keyHigh": 76,
+      "velocityLow": 1,
+      "velocityHigh": 127,
+      "streamOffsetBytes": 0,
+      "prefetchBytes": 16384
+    }
+  ],
+  "validationNotes": [
+    "Negative fixture: malformed JSON should fail before semantic validation."
+  ]

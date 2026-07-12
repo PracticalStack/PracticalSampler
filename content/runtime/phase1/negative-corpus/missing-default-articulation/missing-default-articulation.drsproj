@@ -1,0 +1,19 @@
+{
+  "schemaName": "drs.project",
+  "schemaVersion": 1,
+  "projectId": "drs.phase1.invalid-missing-default",
+  "displayName": "Invalid Missing Default Articulation",
+  "contentRoot": "../../../../hise_project",
+  "defaultInstrumentManifest": "missing-default-articulation.drinst",
+  "sampleSources": [
+    {
+      "id": "sine-a3",
+      "path": "../../../../hise_project/Samples/DRS_Sine_A3.wav",
+      "role": "core-sustain"
+    }
+  ],
+  "notes": [
+    "Negative fixture for contract tests.",
+    "All referenced files exist so the missing default articulation is the primary failure."
+  ]
+}

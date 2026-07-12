@@ -1,0 +1,10 @@
+{
+  "schemaName": "drs.streamContainer",
+  "schemaVersion": 1,
+  "containerId": "drs.phase1.invalid-missing-default",
+  "pageSizeBytes": 65536,
+  "sampleCount": 1,
+  "notes": [
+    "Negative fixture stream descriptor."
+  ]
+}

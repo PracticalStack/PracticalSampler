@@ -1,5 +1,7 @@
 #pragma once
 
+#include "drs/engine/RuntimeModel.h"
+
 #include <string>
 #include <vector>
 
@@ -38,5 +40,6 @@ class EngineFacade
 public:
     std::vector<HiseFrontendExportProfile> getFrontendExportProfiles() const;
     EngineStatusSnapshot getStatusSnapshot() const;
+    RuntimeManifestLoadResult loadPhase1ReferenceInstrument() const;
 };
 } // namespace drs::engine

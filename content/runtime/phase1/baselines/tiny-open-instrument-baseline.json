@@ -1,0 +1,28 @@
+{
+  "schemaName": "drs.runtimeBaseline",
+  "schemaVersion": 1,
+  "baselineId": "drs.phase1.tiny-open-instrument",
+  "referenceManifestPath": "content/runtime/phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drinst",
+  "timingUnits": "microseconds",
+  "staticExpectations": {
+    "manifestBytes": 2138,
+    "sourceProjectResolved": true,
+    "compiledStreamAssetResolved": true,
+    "macroCount": 2,
+    "articulationCount": 2,
+    "groupCount": 2,
+    "zoneCount": 2,
+    "referencedSampleCount": 2,
+    "totalPrefetchBytes": 32768
+  },
+  "latestObserved": {
+    "capturedOn": "2026-07-12",
+    "coldLoadMicros": 1253,
+    "warmLoadMicros": 805
+  },
+  "notes": [
+    "This file is the checked-in Sprint 1 baseline snapshot for the tiny open instrument.",
+    "Timing values are observational and may change as the runtime evolves.",
+    "Static expectations should only change when the reference fixture contract changes intentionally."
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "schemaName": "drs.streamContainer",
+  "schemaVersion": 1,
+  "containerId": "drs.phase1.tiny-open-instrument",
+  "pageSizeBytes": 65536,
+  "sampleCount": 2,
+  "notes": [
+    "Sprint 1 placeholder stream-container descriptor.",
+    "Sprint 2 replaces this text fixture with compiler-emitted container output."
+  ]
+}

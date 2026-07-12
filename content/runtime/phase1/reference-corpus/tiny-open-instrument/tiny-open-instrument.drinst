@@ -1,0 +1,88 @@
+{
+  "schemaName": "drs.instrument",
+  "schemaVersion": 1,
+  "instrumentId": "drs.phase1.tiny-open-instrument",
+  "displayName": "DRS Tiny Open Instrument",
+  "sourceProject": "tiny-open-instrument.drsproj",
+  "compiledStreamAsset": "tiny-open-instrument.drstrm",
+  "defaultLoadProfile": "balanced",
+  "macros": [
+    {
+      "id": "tone",
+      "name": "Tone",
+      "defaultValue": 0.35,
+      "minValue": 0.0,
+      "maxValue": 1.0
+    },
+    {
+      "id": "motion",
+      "name": "Motion",
+      "defaultValue": 0.15,
+      "minValue": 0.0,
+      "maxValue": 1.0
+    }
+  ],
+  "articulations": [
+    {
+      "id": "sustain",
+      "name": "Sustain",
+      "isDefault": true
+    },
+    {
+      "id": "lead",
+      "name": "Triangle Lead",
+      "isDefault": false
+    }
+  ],
+  "groups": [
+    {
+      "id": "pad-core",
+      "name": "Pad Core",
+      "articulationIds": [
+        "sustain"
+      ]
+    },
+    {
+      "id": "lead-core",
+      "name": "Lead Core",
+      "articulationIds": [
+        "lead"
+      ]
+    }
+  ],
+  "zones": [
+    {
+      "id": "pad-a3",
+      "groupId": "pad-core",
+      "articulationId": "sustain",
+      "samplePath": "../../../../hise_project/Samples/DRS_Sine_A3.wav",
+      "streamAssetPath": "tiny-open-instrument.drstrm",
+      "rootKey": 57,
+      "keyLow": 36,
+      "keyHigh": 76,
+      "velocityLow": 1,
+      "velocityHigh": 127,
+      "streamOffsetBytes": 0,
+      "prefetchBytes": 16384
+    },
+    {
+      "id": "lead-a4",
+      "groupId": "lead-core",
+      "articulationId": "lead",
+      "samplePath": "../../../../hise_project/Samples/DRS_TriangleLead_A4.wav",
+      "streamAssetPath": "tiny-open-instrument.drstrm",
+      "rootKey": 69,
+      "keyLow": 60,
+      "keyHigh": 96,
+      "velocityLow": 1,
+      "velocityHigh": 127,
+      "streamOffsetBytes": 65536,
+      "prefetchBytes": 16384
+    }
+  ],
+  "validationNotes": [
+    "Uses the existing open HISE sample assets as stand-in sample sources for Sprint 1.",
+    "Exercises two articulations, two groups, and explicit prefetch metadata.",
+    "Acts as the canonical loader fixture until the import compiler lands in Sprint 2."
+  ]
+}

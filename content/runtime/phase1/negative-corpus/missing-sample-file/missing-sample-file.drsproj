@@ -1,0 +1,18 @@
+{
+  "schemaName": "drs.project",
+  "schemaVersion": 1,
+  "projectId": "drs.phase1.invalid-missing-sample",
+  "displayName": "Invalid Missing Sample File",
+  "contentRoot": "../../../../hise_project",
+  "defaultInstrumentManifest": "missing-sample-file.drinst",
+  "sampleSources": [
+    {
+      "id": "ghost-sample",
+      "path": "../../../../hise_project/Samples/DRS_Ghost_A3.wav",
+      "role": "missing-file-check"
+    }
+  ],
+  "notes": [
+    "Negative fixture for missing sample-path validation."
+  ]
+}

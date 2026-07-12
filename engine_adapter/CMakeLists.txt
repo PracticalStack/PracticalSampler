@@ -129,12 +129,16 @@ target_compile_features(drs_hise_frontend_bridge PUBLIC cxx_std_17)
 add_library(drs_engine_adapter STATIC
     src/EngineFacade.cpp
     src/HiseProjectContent.cpp
+    src/Phase1Baseline.cpp
+    src/RuntimeLoader.cpp
 )
 
 target_include_directories(drs_engine_adapter
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${DRS_ENGINE_ADAPTER_GENERATED_DIR}
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
 )
 
 target_compile_features(drs_engine_adapter PUBLIC cxx_std_17)
@@ -165,9 +169,14 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     src/HiseFrontendBridge.cpp
     src/HiseFrontendPluginProbe.cpp
     src/HiseProjectContent.cpp
+    src/Phase1Baseline.cpp
+    src/RuntimeLoader.cpp
     include/drs/engine/EngineFacade.h
+    include/drs/engine/Phase1Baseline.h
     include/drs/engine/HiseFrontendBridge.h
     include/drs/engine/HiseProjectContent.h
+    include/drs/engine/RuntimeLoader.h
+    include/drs/engine/RuntimeModel.h
 )
 
 set_target_properties(drs_hise_frontend_bridge PROPERTIES

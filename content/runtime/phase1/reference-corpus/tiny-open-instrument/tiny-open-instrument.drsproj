@@ -1,0 +1,24 @@
+{
+  "schemaName": "drs.project",
+  "schemaVersion": 1,
+  "projectId": "drs.phase1.tiny-open-project",
+  "displayName": "DRS Tiny Open Project",
+  "contentRoot": "../../../../hise_project",
+  "defaultInstrumentManifest": "tiny-open-instrument.drinst",
+  "sampleSources": [
+    {
+      "id": "sine-a3",
+      "path": "../../../../hise_project/Samples/DRS_Sine_A3.wav",
+      "role": "core-sustain"
+    },
+    {
+      "id": "triangle-a4",
+      "path": "../../../../hise_project/Samples/DRS_TriangleLead_A4.wav",
+      "role": "core-lead"
+    }
+  ],
+  "notes": [
+    "Sprint 1 project fixture used to validate the product-owned runtime model and loader seam.",
+    "The native importer and compiled stream writer are intentionally deferred to Sprint 2."
+  ]
+}

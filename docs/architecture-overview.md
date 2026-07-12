@@ -25,6 +25,12 @@ Current Phase 0 responsibilities:
 - resolve the product-owned HISE content root under `content/hise_project/`
 - present a stable `EngineFacade` surface to the shell
 
+Early Phase 1 responsibilities now started in the same seam:
+
+- define the first product-owned runtime manifest model
+- load a versioned reference `.drinst` fixture into an in-memory runtime object graph
+- validate the reference corpus paths and expose loader metrics to the shell
+
 Future HISE-backed runtime objects, preset loading orchestration, and processor-construction boundaries should be introduced here first.
 
 ### `content/`

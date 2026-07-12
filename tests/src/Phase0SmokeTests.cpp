@@ -1,5 +1,6 @@
 #include "drs/engine/EngineFacade.h"
 #include "drs/engine/HiseProjectContent.h"
+#include "drs/engine/RuntimeLoader.h"
 #include "plugin/PluginProcessor.h"
 #include "standalone/MainComponent.h"
 
@@ -65,7 +66,30 @@ int main()
         require(!statusSnapshot.integrationState.empty(), "Engine snapshot integration state must not be empty.");
         require(statusSnapshot.detail.find("Repo HISE content root:") != std::string::npos,
                 "Engine snapshot detail must describe the product-owned HISE content seam.");
+        require(statusSnapshot.detail.find("Phase 1 runtime bootstrap:") != std::string::npos,
+                "Engine snapshot detail must describe the Phase 1 runtime bootstrap seam.");
         require(!statusSnapshot.nextSteps.empty(), "Engine snapshot must expose at least one Phase 0 next step.");
+
+        const auto runtimeManifest = engineFacade.loadPhase1ReferenceInstrument();
+        require(runtimeManifest.manifestFound, "Phase 1 reference manifest must exist.");
+        require(runtimeManifest.loaded, "Phase 1 reference manifest must load cleanly.");
+        require(runtimeManifest.instrument.schemaName == "drs.instrument",
+                "Phase 1 runtime manifest schema name did not match the Sprint 1 contract.");
+        require(runtimeManifest.instrument.schemaVersion == 1,
+                "Phase 1 runtime manifest schema version did not match the Sprint 1 contract.");
+        require(runtimeManifest.instrument.groups.size() == 2, "Expected exactly two runtime groups in the reference manifest.");
+        require(runtimeManifest.instrument.articulations.size() == 2,
+                "Expected exactly two articulations in the reference manifest.");
+        require(runtimeManifest.instrument.zones.size() == 2, "Expected exactly two runtime zones in the reference manifest.");
+        require(runtimeManifest.metrics.totalPrefetchBytes == 32768,
+                "Reference manifest prefetch budget changed unexpectedly.");
+        require(runtimeManifest.metrics.usesStreaming,
+                "Reference manifest must point at a stream-container asset to keep the seam explicit.");
+        require(runtimeManifest.issues.empty(), "Reference manifest should load without validation issues.");
+
+        const auto referenceCorpusIndex = juce::File(drs::engine::getPhase1ReferenceCorpusIndexPath());
+        require(referenceCorpusIndex.existsAsFile(),
+                "Phase 1 reference corpus index must exist next to the runtime fixtures.");
 
         const auto contentSnapshot = drs::engine::getHiseProjectContentSnapshot();
 
@@ -117,12 +141,12 @@ int main()
         require(foundTypes[0]->name == "Decent Rhapsody Studio", "Scanned VST3 plugin name did not match the built product name.");
         require(foundTypes[0]->pluginFormatName == "VST3", "Scanned plugin format did not resolve as VST3.");
 
-        std::cout << "Phase 0 smoke test passed." << std::endl;
+        std::cout << "Phase 0 and Sprint 1 bootstrap smoke test passed." << std::endl;
         return 0;
     }
     catch (const std::exception& exception)
     {
-        std::cerr << "Phase 0 smoke test failed: " << exception.what() << std::endl;
+        std::cerr << "Phase 0 and Sprint 1 bootstrap smoke test failed: " << exception.what() << std::endl;
         return 1;
     }
 }

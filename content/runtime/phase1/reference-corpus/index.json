@@ -1,0 +1,76 @@
+{
+  "schemaName": "drs.referenceCorpus",
+  "schemaVersion": 1,
+  "phase": "Phase 1 Sprint 1",
+  "entries": [
+    {
+      "id": "tiny-open-instrument",
+      "tier": "public",
+      "status": "ready",
+      "projectPath": "tiny-open-instrument/tiny-open-instrument.drsproj",
+      "instrumentManifestPath": "tiny-open-instrument/tiny-open-instrument.drinst",
+      "streamAssetPath": "tiny-open-instrument/tiny-open-instrument.drstrm",
+      "notes": [
+        "This is the canonical Sprint 1 loader fixture.",
+        "It reuses the existing open HISE sample assets until the native compiler lands in Sprint 2."
+      ]
+    },
+    {
+      "id": "medium-internal-streaming",
+      "tier": "internal",
+      "status": "planned",
+      "projectPath": "",
+      "instrumentManifestPath": "",
+      "streamAssetPath": "",
+      "notes": [
+        "Reserved for the first realistic multi-zone streaming benchmark.",
+        "Should be added before Sprint 3 starts."
+      ]
+    },
+    {
+      "id": "synthetic-stress-manifest",
+      "tier": "synthetic",
+      "status": "planned",
+      "projectPath": "",
+      "instrumentManifestPath": "",
+      "streamAssetPath": "",
+      "notes": [
+        "Reserved for stress-testing voice allocation, purge policy, and stream paging decisions.",
+        "May use generated sample references and exaggerated zone counts."
+      ]
+    },
+    {
+      "id": "negative-missing-default-articulation",
+      "tier": "negative",
+      "status": "ready",
+      "projectPath": "../negative-corpus/missing-default-articulation/missing-default-articulation.drsproj",
+      "instrumentManifestPath": "../negative-corpus/missing-default-articulation/missing-default-articulation.drinst",
+      "streamAssetPath": "../negative-corpus/missing-default-articulation/missing-default-articulation.drstrm",
+      "notes": [
+        "Contract test fixture for missing default articulation handling."
+      ]
+    },
+    {
+      "id": "negative-missing-sample-file",
+      "tier": "negative",
+      "status": "ready",
+      "projectPath": "../negative-corpus/missing-sample-file/missing-sample-file.drsproj",
+      "instrumentManifestPath": "../negative-corpus/missing-sample-file/missing-sample-file.drinst",
+      "streamAssetPath": "../negative-corpus/missing-sample-file/missing-sample-file.drstrm",
+      "notes": [
+        "Contract test fixture for missing zone sample-path handling."
+      ]
+    },
+    {
+      "id": "corrupt-malformed-json",
+      "tier": "corrupt",
+      "status": "ready",
+      "projectPath": "",
+      "instrumentManifestPath": "../negative-corpus/malformed-json/malformed-json.drinst",
+      "streamAssetPath": "",
+      "notes": [
+        "Contract test fixture for parse-failure handling on malformed JSON manifests."
+      ]
+    }
+  ]
+}

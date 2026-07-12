@@ -1,0 +1,53 @@
+{
+  "schemaName": "drs.instrument",
+  "schemaVersion": 1,
+  "instrumentId": "drs.phase1.invalid-missing-sample",
+  "displayName": "Invalid Missing Sample File",
+  "sourceProject": "missing-sample-file.drsproj",
+  "compiledStreamAsset": "missing-sample-file.drstrm",
+  "defaultLoadProfile": "balanced",
+  "macros": [
+    {
+      "id": "tone",
+      "name": "Tone",
+      "defaultValue": 0.25,
+      "minValue": 0.0,
+      "maxValue": 1.0
+    }
+  ],
+  "articulations": [
+    {
+      "id": "sustain",
+      "name": "Sustain",
+      "isDefault": true
+    }
+  ],
+  "groups": [
+    {
+      "id": "pad-core",
+      "name": "Pad Core",
+      "articulationIds": [
+        "sustain"
+      ]
+    }
+  ],
+  "zones": [
+    {
+      "id": "ghost-a3",
+      "groupId": "pad-core",
+      "articulationId": "sustain",
+      "samplePath": "../../../../hise_project/Samples/DRS_Ghost_A3.wav",
+      "streamAssetPath": "missing-sample-file.drstrm",
+      "rootKey": 57,
+      "keyLow": 36,
+      "keyHigh": 76,
+      "velocityLow": 1,
+      "velocityHigh": 127,
+      "streamOffsetBytes": 0,
+      "prefetchBytes": 16384
+    }
+  ],
+  "validationNotes": [
+    "Negative fixture: zone sample path points at a missing file."
+  ]
+}

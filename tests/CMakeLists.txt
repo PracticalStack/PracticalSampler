@@ -31,6 +31,103 @@ add_test(
     COMMAND drs_phase0_smoke_tests
 )
 
+juce_add_console_app(drs_phase1_runtime_contract_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Runtime Contract Tests"
+)
+
+target_sources(drs_phase1_runtime_contract_tests
+    PRIVATE
+        src/Phase1RuntimeContractTests.cpp
+)
+
+target_link_libraries(drs_phase1_runtime_contract_tests
+    PRIVATE
+        drs_engine_adapter
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase1_runtime_contract_tests PRIVATE cxx_std_17)
+
+target_include_directories(drs_phase1_runtime_contract_tests
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
+)
+
+add_test(
+    NAME drs.phase1.runtime_contract
+    COMMAND drs_phase1_runtime_contract_tests
+)
+
+juce_add_console_app(drs_phase1_runtime_baseline_report
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Runtime Baseline Report"
+)
+
+target_sources(drs_phase1_runtime_baseline_report
+    PRIVATE
+        src/Phase1RuntimeBaselineReport.cpp
+)
+
+target_link_libraries(drs_phase1_runtime_baseline_report
+    PRIVATE
+        drs_engine_adapter
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase1_runtime_baseline_report PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase1.runtime_baseline_report
+    COMMAND drs_phase1_runtime_baseline_report "${CMAKE_CURRENT_BINARY_DIR}/phase1-runtime-baseline.json"
+)
+
+juce_add_console_app(drs_phase1_runtime_fixture_tool
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Runtime Fixture Tool"
+)
+
+target_sources(drs_phase1_runtime_fixture_tool
+    PRIVATE
+        src/Phase1RuntimeFixtureTool.cpp
+)
+
+target_link_libraries(drs_phase1_runtime_fixture_tool
+    PRIVATE
+        drs_engine_adapter
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase1_runtime_fixture_tool PRIVATE cxx_std_17)
+
+target_include_directories(drs_phase1_runtime_fixture_tool
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
+)
+
+add_test(
+    NAME drs.phase1.fixture_tool_verify
+    COMMAND drs_phase1_runtime_fixture_tool --verify
+)
+
 set_target_properties(drs_phase0_smoke_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_phase1_runtime_contract_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_phase1_runtime_baseline_report PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_phase1_runtime_fixture_tool PROPERTIES
     FOLDER "Tests"
 )

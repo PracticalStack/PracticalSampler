@@ -30,7 +30,7 @@ StatusPanel::StatusPanel(drs::engine::EngineFacade& facade)
     detailEditor.setCaretVisible(false);
     detailEditor.setPopupMenuEnabled(false);
 
-    nextStepsLabel.setText("Phase 0 next steps", juce::dontSendNotification);
+    nextStepsLabel.setText("Current next steps", juce::dontSendNotification);
     nextStepsLabel.setFont(juce::FontOptions(18.0f, juce::Font::bold));
 
     nextStepsEditor.setMultiLine(true);

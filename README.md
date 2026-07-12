@@ -61,3 +61,11 @@ The Windows-first bootstrap lives at:
 The current automated baseline runs on GitHub Actions through:
 
 - `.github/workflows/windows-phase0.yml`
+
+Sprint 1 bootstrap work has now started in the product-owned runtime seam:
+
+- `engine_adapter/include/drs/engine/RuntimeModel.h`
+- `engine_adapter/include/drs/engine/RuntimeLoader.h`
+- `content/runtime/phase1/reference-corpus/`
+- `docs/phase1-runtime-contract.md`
+- `docs/phase1-reference-corpus.md`

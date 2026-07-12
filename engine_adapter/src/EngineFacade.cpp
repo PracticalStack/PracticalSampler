@@ -1,6 +1,7 @@
 #include "drs/engine/EngineFacade.h"
 #include "drs/engine/HiseFrontendBridge.h"
 #include "drs/engine/HiseProjectContent.h"
+#include "drs/engine/RuntimeLoader.h"
 #include "drs/engine/HiseVendorInfo.generated.h"
 
 #include <sstream>
@@ -45,6 +46,7 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
     const auto profiles = getFrontendExportProfiles();
     const auto linkedFrontend = getLinkedHiseFrontendSnapshot();
     const auto contentSnapshot = getHiseProjectContentSnapshot();
+    const auto runtimeManifest = loadPhase1ReferenceInstrument();
 
     detail << "HISE root: " << hiseVendorRoot << "\n";
     detail << "Pinned HISE commit: " << hiseCurrentGitHash << "\n";
@@ -126,6 +128,42 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
         detail << "  summary: " << profile.summary << "\n";
     }
 
+    detail << "\nPhase 1 runtime bootstrap:\n";
+    detail << "Runtime fixture root: " << getPhase1RuntimeRootPath() << "\n";
+    detail << "Reference corpus index: " << getPhase1ReferenceCorpusIndexPath() << "\n";
+    detail << "Reference manifest: " << runtimeManifest.manifestPath
+           << " (" << (runtimeManifest.manifestFound ? "present" : "missing") << ")\n";
+    detail << "Reference load state: " << runtimeManifest.state << "\n";
+
+    if (runtimeManifest.loaded)
+    {
+        detail << "Loaded instrument: " << runtimeManifest.instrument.displayName
+               << " [" << runtimeManifest.instrument.instrumentId << "]\n";
+        detail << "Schema: " << runtimeManifest.instrument.schemaName
+               << " v" << runtimeManifest.instrument.schemaVersion << "\n";
+        detail << "Source project: " << runtimeManifest.instrument.sourceProjectPath << "\n";
+        detail << "Compiled stream asset: " << runtimeManifest.instrument.compiledStreamAssetPath << "\n";
+        detail << "Load profile: " << runtimeManifest.instrument.defaultLoadProfile << "\n";
+        detail << "Counts: macros=" << runtimeManifest.metrics.macroCount
+               << ", articulations=" << runtimeManifest.metrics.articulationCount
+               << ", groups=" << runtimeManifest.metrics.groupCount
+               << ", zones=" << runtimeManifest.metrics.zoneCount << "\n";
+        detail << "Streaming seam: " << (runtimeManifest.metrics.usesStreaming ? "present" : "missing")
+               << ", total prefetch bytes=" << runtimeManifest.metrics.totalPrefetchBytes << "\n";
+        detail << "Baseline metrics: manifest bytes=" << runtimeManifest.metrics.manifestSizeBytes
+               << ", load micros=" << runtimeManifest.metrics.loadDurationMicros
+               << ", source project resolved=" << (runtimeManifest.metrics.sourceProjectResolved ? "yes" : "no")
+               << ", stream asset resolved=" << (runtimeManifest.metrics.compiledStreamAssetResolved ? "yes" : "no") << "\n";
+    }
+
+    if (!runtimeManifest.issues.empty())
+    {
+        detail << "Runtime manifest issues:\n";
+
+        for (const auto& issue : runtimeManifest.issues)
+            detail << "- " << issue << "\n";
+    }
+
     std::vector<std::string> nextSteps;
 
     if (!hiseProjucerWindowsPresent)
@@ -149,6 +187,15 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
     if (hiseProjectTemplatePresent)
         nextSteps.emplace_back("Compare the generated product-owned AppConfig against HISE's frontend export templates to close any remaining macro or include-path gaps.");
 
+    if (!runtimeManifest.manifestFound)
+        nextSteps.emplace_back("Create and commit the Phase 1 reference instrument manifest under content/runtime/phase1/reference-corpus so the runtime model has a product-owned load target.");
+    else if (!runtimeManifest.loaded)
+        nextSteps.emplace_back("Fix the Phase 1 reference instrument manifest issues so the minimal loader can become the hand-off point for the import compiler in Sprint 2.");
+    else
+        nextSteps.emplace_back("Promote the Phase 1 reference instrument loader from fixture-backed manifest parsing to compiled content emitted by the Sprint 2 import pipeline.");
+
+    nextSteps.emplace_back("Prepare the medium internal streaming case and synthetic stress manifest described by the Phase 1 reference corpus plan before Sprint 3 streaming work begins.");
+
     if (nextSteps.empty())
         nextSteps.emplace_back("Promote the adapter from metadata probe to a minimal compiled HISE-backed runtime object.");
 
@@ -164,5 +211,10 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
         detail.str(),
         nextSteps
     };
+}
+
+RuntimeManifestLoadResult EngineFacade::loadPhase1ReferenceInstrument() const
+{
+    return loadPhase1ReferenceInstrumentManifest();
 }
 } // namespace drs::engine
