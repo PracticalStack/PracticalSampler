@@ -161,6 +161,12 @@ void verifyCheckedInBaseline(const drs::engine::RuntimeManifestLoadResult& coldR
             "Checked-in baseline coldLoadMicros must be positive.");
     require(latestObserved.at("warmLoadMicros").get<std::uint64_t>() > 0,
             "Checked-in baseline warmLoadMicros must be positive.");
+
+    const auto& driftPolicy = baselineJson.at("driftPolicy");
+    require(driftPolicy.at("allowedPositiveDriftMicros").get<std::uint64_t>() > 0,
+            "Checked-in baseline allowedPositiveDriftMicros must be positive.");
+    require(driftPolicy.at("allowedNegativeDriftMicros").get<std::uint64_t>() > 0,
+            "Checked-in baseline allowedNegativeDriftMicros must be positive so faster timing drift is tolerated within the reviewed window.");
 }
 
 void rewriteReferenceFixtures(const drs::engine::RuntimeProjectLoadResult& referenceProject,

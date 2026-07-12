@@ -8,7 +8,7 @@
     "manifestBytes": 2138,
     "sourceProjectResolved": true,
     "compiledStreamAssetResolved": true,
-    "macroCount": 3,
+    "macroCount": 2,
     "articulationCount": 2,
     "groupCount": 2,
     "zoneCount": 2,
@@ -19,6 +19,10 @@
     "capturedOn": "2026-07-12",
     "coldLoadMicros": 1253,
     "warmLoadMicros": 805
+  },
+  "driftPolicy": {
+    "allowedPositiveDriftMicros": 5000,
+    "allowedNegativeDriftMicros": 5000
   },
   "notes": [
     "This file is the checked-in Sprint 1 baseline snapshot for the tiny open instrument.",

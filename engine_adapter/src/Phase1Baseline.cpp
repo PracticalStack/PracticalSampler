@@ -66,6 +66,11 @@ std::string buildPhase1CheckedInBaselineSnapshotJson(const RuntimeManifestLoadRe
     latestObserved["warmLoadMicros"] = warmResult.metrics.loadDurationMicros;
     snapshot["latestObserved"] = std::move(latestObserved);
 
+    ordered_json driftPolicy;
+    driftPolicy["allowedPositiveDriftMicros"] = 5000;
+    driftPolicy["allowedNegativeDriftMicros"] = 5000;
+    snapshot["driftPolicy"] = std::move(driftPolicy);
+
     snapshot["notes"] = {
         "This file is the checked-in Sprint 1 baseline snapshot for the tiny open instrument.",
         "Timing values are observational and may change as the runtime evolves.",

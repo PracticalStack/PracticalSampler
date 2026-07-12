@@ -86,6 +86,40 @@ add_test(
     COMMAND drs_phase1_runtime_baseline_report "${CMAKE_CURRENT_BINARY_DIR}/phase1-runtime-baseline.json"
 )
 
+juce_add_console_app(drs_phase1_runtime_baseline_guard
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Runtime Baseline Guard"
+)
+
+target_sources(drs_phase1_runtime_baseline_guard
+    PRIVATE
+        src/Phase1RuntimeBaselineGuard.cpp
+)
+
+target_link_libraries(drs_phase1_runtime_baseline_guard
+    PRIVATE
+        drs_engine_adapter
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase1_runtime_baseline_guard PRIVATE cxx_std_17)
+
+target_include_directories(drs_phase1_runtime_baseline_guard
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
+)
+
+add_test(
+    NAME drs.phase1.runtime_baseline_guard
+    COMMAND drs_phase1_runtime_baseline_guard "${CMAKE_CURRENT_BINARY_DIR}/phase1-runtime-baseline.json"
+)
+
+set_tests_properties(drs.phase1.runtime_baseline_guard PROPERTIES
+    DEPENDS drs.phase1.runtime_baseline_report
+)
+
 juce_add_console_app(drs_phase1_runtime_fixture_tool
     PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Runtime Fixture Tool"
 )
@@ -125,6 +159,10 @@ set_target_properties(drs_phase1_runtime_contract_tests PROPERTIES
 )
 
 set_target_properties(drs_phase1_runtime_baseline_report PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_phase1_runtime_baseline_guard PROPERTIES
     FOLDER "Tests"
 )
 
