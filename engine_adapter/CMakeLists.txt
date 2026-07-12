@@ -130,6 +130,7 @@ add_library(drs_engine_adapter STATIC
     src/EngineFacade.cpp
     src/HiseProjectContent.cpp
     src/Phase1Baseline.cpp
+    src/RuntimeCompiler.cpp
     src/RuntimeLoader.cpp
 )
 
@@ -170,13 +171,17 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     src/HiseFrontendPluginProbe.cpp
     src/HiseProjectContent.cpp
     src/Phase1Baseline.cpp
+    src/RuntimeCompiler.cpp
     src/RuntimeLoader.cpp
+    src/SampleImport.cpp
     include/drs/engine/EngineFacade.h
     include/drs/engine/Phase1Baseline.h
     include/drs/engine/HiseFrontendBridge.h
     include/drs/engine/HiseProjectContent.h
+    include/drs/engine/RuntimeCompiler.h
     include/drs/engine/RuntimeLoader.h
     include/drs/engine/RuntimeModel.h
+    include/drs/engine/SampleImport.h
 )
 
 set_target_properties(drs_hise_frontend_bridge PROPERTIES

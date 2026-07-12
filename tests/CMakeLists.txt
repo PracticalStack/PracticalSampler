@@ -86,6 +86,104 @@ add_test(
     COMMAND drs_phase1_runtime_baseline_report "${CMAKE_CURRENT_BINARY_DIR}/phase1-runtime-baseline.json"
 )
 
+juce_add_console_app(drs_phase1_sample_import_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Sample Import Tests"
+)
+
+target_sources(drs_phase1_sample_import_tests
+    PRIVATE
+        src/Phase1SampleImportTests.cpp
+        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
+)
+
+target_link_libraries(drs_phase1_sample_import_tests
+    PRIVATE
+        drs_engine_adapter
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase1_sample_import_tests PRIVATE cxx_std_17)
+
+target_include_directories(drs_phase1_sample_import_tests
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/third_party/juce/modules
+)
+
+add_test(
+    NAME drs.phase1.sample_import
+    COMMAND drs_phase1_sample_import_tests
+)
+
+juce_add_console_app(drs_phase1_compile_path_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Compile Path Tests"
+)
+
+target_sources(drs_phase1_compile_path_tests
+    PRIVATE
+        src/Phase1CompilePathTests.cpp
+        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
+)
+
+target_link_libraries(drs_phase1_compile_path_tests
+    PRIVATE
+        drs_engine_adapter
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase1_compile_path_tests PRIVATE cxx_std_17)
+
+target_include_directories(drs_phase1_compile_path_tests
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/third_party/juce/modules
+        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
+)
+
+add_test(
+    NAME drs.phase1.compile_path
+    COMMAND drs_phase1_compile_path_tests
+)
+
+juce_add_console_app(drs_phase1_pipeline_report
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Pipeline Report"
+)
+
+target_sources(drs_phase1_pipeline_report
+    PRIVATE
+        src/Phase1PipelineReport.cpp
+        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
+)
+
+target_link_libraries(drs_phase1_pipeline_report
+    PRIVATE
+        drs_engine_adapter
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase1_pipeline_report PRIVATE cxx_std_17)
+
+target_include_directories(drs_phase1_pipeline_report
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/third_party/juce/modules
+        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
+)
+
+add_test(
+    NAME drs.phase1.pipeline_report
+    COMMAND drs_phase1_pipeline_report "${CMAKE_CURRENT_BINARY_DIR}/phase1-pipeline-report.json"
+)
+
 juce_add_console_app(drs_phase1_runtime_baseline_guard
     PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Runtime Baseline Guard"
 )
@@ -159,6 +257,18 @@ set_target_properties(drs_phase1_runtime_contract_tests PROPERTIES
 )
 
 set_target_properties(drs_phase1_runtime_baseline_report PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_phase1_sample_import_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_phase1_compile_path_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_phase1_pipeline_report PROPERTIES
     FOLDER "Tests"
 )
 

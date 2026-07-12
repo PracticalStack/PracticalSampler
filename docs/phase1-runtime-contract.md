@@ -68,16 +68,18 @@ Each zone must include:
 
 ### `.drstrm`
 
-Sprint 1 only requires a placeholder stream-container descriptor so the loader can validate that a stream asset exists and is referenced explicitly.
+Sprint 2 now emits a prototype stream-container descriptor so the loader and compiler tests can validate that a stream asset exists, is referenced explicitly, and carries deterministic paging metadata.
 
-The Sprint 1 placeholder still establishes:
+The prototype descriptor currently establishes:
 
 - stream container identity
 - schema version
 - page size intent
 - sample count intent
-
-Sprint 2 will replace the text placeholder with compiler-emitted container data.
+- payload encoding
+- per-sample source metadata
+- payload offsets and sizes
+- page-table placeholder entries beyond the prefetch head
 
 ## Product-owned runtime model
 

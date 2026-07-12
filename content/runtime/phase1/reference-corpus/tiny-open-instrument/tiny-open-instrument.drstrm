@@ -4,8 +4,102 @@
   "containerId": "drs.phase1.tiny-open-instrument",
   "pageSizeBytes": 65536,
   "sampleCount": 2,
+  "payloadEncoding": "f32-interleaved-little-endian",
+  "totalPayloadBytes": 705600,
+  "samples": [
+    {
+      "sampleId": "sine-a3",
+      "sourcePath": "../../../../hise_project/Samples/DRS_Sine_A3.wav",
+      "sourceChecksumHex": "bc13c2d71c12fce6",
+      "formatName": "WAV file",
+      "role": "core-sustain",
+      "sampleRate": 44100.0,
+      "frameCount": 88200,
+      "channelCount": 1,
+      "payloadOffsetBytes": 0,
+      "payloadSizeBytes": 352800,
+      "prefetchBytes": 16384,
+      "pages": [
+        {
+          "pageIndex": 0,
+          "offsetBytes": 16384,
+          "sizeBytes": 65536
+        },
+        {
+          "pageIndex": 1,
+          "offsetBytes": 81920,
+          "sizeBytes": 65536
+        },
+        {
+          "pageIndex": 2,
+          "offsetBytes": 147456,
+          "sizeBytes": 65536
+        },
+        {
+          "pageIndex": 3,
+          "offsetBytes": 212992,
+          "sizeBytes": 65536
+        },
+        {
+          "pageIndex": 4,
+          "offsetBytes": 278528,
+          "sizeBytes": 65536
+        },
+        {
+          "pageIndex": 5,
+          "offsetBytes": 344064,
+          "sizeBytes": 8736
+        }
+      ]
+    },
+    {
+      "sampleId": "triangle-a4",
+      "sourcePath": "../../../../hise_project/Samples/DRS_TriangleLead_A4.wav",
+      "sourceChecksumHex": "0481fa2ca766debe",
+      "formatName": "WAV file",
+      "role": "core-lead",
+      "sampleRate": 44100.0,
+      "frameCount": 44100,
+      "channelCount": 2,
+      "payloadOffsetBytes": 393216,
+      "payloadSizeBytes": 352800,
+      "prefetchBytes": 16384,
+      "pages": [
+        {
+          "pageIndex": 0,
+          "offsetBytes": 409600,
+          "sizeBytes": 65536
+        },
+        {
+          "pageIndex": 1,
+          "offsetBytes": 475136,
+          "sizeBytes": 65536
+        },
+        {
+          "pageIndex": 2,
+          "offsetBytes": 540672,
+          "sizeBytes": 65536
+        },
+        {
+          "pageIndex": 3,
+          "offsetBytes": 606208,
+          "sizeBytes": 65536
+        },
+        {
+          "pageIndex": 4,
+          "offsetBytes": 671744,
+          "sizeBytes": 65536
+        },
+        {
+          "pageIndex": 5,
+          "offsetBytes": 737280,
+          "sizeBytes": 8736
+        }
+      ]
+    }
+  ],
   "notes": [
-    "Sprint 1 placeholder stream-container descriptor.",
-    "Sprint 2 replaces this text fixture with compiler-emitted container output."
+    "Sprint 2 compiler-emitted prototype stream-container descriptor.",
+    "Carries deterministic payload offsets, prefetch heads, and page-table placeholders for the reference instrument."
   ]
 }

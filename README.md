@@ -69,3 +69,15 @@ Sprint 1 bootstrap work has now started in the product-owned runtime seam:
 - `content/runtime/phase1/reference-corpus/`
 - `docs/phase1-runtime-contract.md`
 - `docs/phase1-reference-corpus.md`
+
+Sprint 2 import-pipeline work has now started in the same seam:
+
+- `engine_adapter/include/drs/engine/SampleImport.h`
+- `engine_adapter/include/drs/engine/RuntimeCompiler.h`
+- `engine_adapter/src/SampleImport.cpp`
+- `engine_adapter/src/RuntimeCompiler.cpp`
+- `docs/phase1-import-policy.md`
+- `docs/phase1-pipeline-report.md`
+- `tests/src/Phase1SampleImportTests.cpp`
+- `tests/src/Phase1CompilePathTests.cpp`
+- `tests/src/Phase1PipelineReport.cpp`

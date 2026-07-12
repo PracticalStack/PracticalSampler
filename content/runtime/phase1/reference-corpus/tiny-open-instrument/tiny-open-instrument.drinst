@@ -76,7 +76,7 @@
       "keyHigh": 96,
       "velocityLow": 1,
       "velocityHigh": 127,
-      "streamOffsetBytes": 65536,
+      "streamOffsetBytes": 393216,
       "prefetchBytes": 16384
     }
   ],
