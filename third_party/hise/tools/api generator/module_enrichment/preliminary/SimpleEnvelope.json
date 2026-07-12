@@ -1,0 +1,145 @@
+{
+  "moduleId": "SimpleEnvelope",
+  "prettyName": "Simple Envelope",
+  "type": "Modulator",
+  "subtype": "EnvelopeModulator",
+  "category": "generator",
+
+  "io": {
+    "midiIn": "noteOn+noteOff",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": true,
+    "fxChain": null
+  },
+
+  "voiceContext": "per-voice",
+
+  "interfaces": [],
+
+  "parameterGroups": [
+    {
+      "label": "Playback Control",
+      "rationale": "Toggle parameters controlling voice allocation and retriggering behavior",
+      "parameters": [
+        {
+          "id": "Monophonic",
+          "name": "Monophonic",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": "dynamic",
+          "description": "Enables monophonic mode where only one voice is rendered",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Retrigger",
+          "name": "Retrigger",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Restarts the envelope when a new note is triggered in monophonic mode",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Envelope Stages",
+      "rationale": "The two time parameters defining this simple attack-release envelope",
+      "parameters": [
+        {
+          "id": "Attack",
+          "name": "Attack",
+          "range": { "min": 0.0, "max": 20000.0, "step": 0.0 },
+          "default": 5.0,
+          "description": "The attack time in milliseconds",
+          "composite": {
+            "type": "modMultiply",
+            "chainName": "AttackTimeModulation",
+            "chainIndex": 0,
+            "constrainer": "VoiceStartModulator"
+          },
+          "modChain": {
+            "name": "AttackTimeModulation",
+            "chainIndex": 0,
+            "constrainer": "VoiceStartModulator",
+            "modulationMode": "gain"
+          }
+        },
+        {
+          "id": "Release",
+          "name": "Release",
+          "range": { "min": 0.0, "max": 20000.0, "step": 0.0 },
+          "default": 10.0,
+          "description": "The release time in milliseconds",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Curve Shape",
+      "rationale": "Controls the mathematical shape of the envelope curves",
+      "parameters": [
+        {
+          "id": "LinearMode",
+          "name": "LinearMode",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Toggles between linear and exponential envelope curves",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "compositeBlocks": [
+    {
+      "type": "modMultiply",
+      "param": "Attack",
+      "details": {
+        "chainName": "AttackTimeModulation",
+        "chainIndex": 0,
+        "constrainer": "VoiceStartModulator"
+      }
+    }
+  ],
+
+  "gaps": [
+    {
+      "id": "signal-path-stage-order",
+      "category": "signal_path",
+      "question": "What is the exact calculation in renderNextBlock/calculateBlock? With only Attack and Release stages, how does the envelope transition? Is there an implicit sustain at 1.0 while the note is held, or does the envelope immediately begin releasing after reaching peak?",
+      "context": "Need to confirm the implicit sustain behavior since there is no Sustain parameter"
+    },
+    {
+      "id": "linear-mode-curve-shape",
+      "category": "parameter_behavior",
+      "question": "What exactly does LinearMode toggle? When LinearMode=On (default), is the envelope truly linear (straight line), and when Off, what exponential curve is used? What is the mathematical formula for each mode?",
+      "context": "The default is LinearMode=On, so users see linear curves by default. Need to document what exponential mode provides"
+    },
+    {
+      "id": "monophonic-retrigger-interaction",
+      "category": "conditional_logic",
+      "question": "How do Monophonic and Retrigger interact? Same question as AHDSR - does the envelope restart from zero or current value on retrigger?",
+      "context": "Legato behavior documentation for this simpler envelope"
+    },
+    {
+      "id": "release-no-modchain",
+      "category": "parameter_behavior",
+      "question": "Release has no modulation chain (only Attack does). Is this intentional? Can the release time not be modulated per-voice?",
+      "context": "Users may expect to modulate release time; important to document this limitation"
+    },
+    {
+      "id": "performance-vs-ahdsr",
+      "category": "performance",
+      "question": "How lightweight is SimpleEnvelope compared to AHDSR? Is it per-sample or per-block? Does the simplicity translate to measurable CPU savings, or is it primarily a UI simplification?",
+      "context": "The name 'Simple' and description 'lightweight' suggest this is a CPU-efficient alternative to AHDSR"
+    }
+  ],
+
+  "notes": "SimpleEnvelope is a minimal two-stage (attack + release) envelope. Key observations: (1) Only Attack has a modulation chain - Release cannot be modulated per-voice. (2) LinearMode defaults to On (1.0), unlike AHDSR which uses curve parameters. (3) No Hold, Decay, or Sustain stages - this is effectively an AR envelope with implicit sustain at unity while the note is held (to be confirmed in C++). (4) Monophonic default is 'dynamic'. (5) Release range starts at 0.0 (vs 1.0 in AHDSR and TableEnvelope), suggesting zero release is valid. (6) middlePosition is 1000ms for both Attack and Release, different from AHDSR's 100ms/300ms, suggesting this envelope is intended for longer, smoother shapes."
+}

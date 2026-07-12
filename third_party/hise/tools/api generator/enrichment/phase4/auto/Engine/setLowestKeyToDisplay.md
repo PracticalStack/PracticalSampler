@@ -1,0 +1,1 @@
+Sets the lowest visible key on the on-screen MIDI keyboard, scrolling the display to start at the given note number.

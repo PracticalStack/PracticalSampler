@@ -1,0 +1,16 @@
+{
+  "factoryPath": "core.smoother",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input signal (channel 0 is smoothed)" },
+    { "id": "filter", "label": "One-pole LP", "type": "process", "importance": 1.0, "description": "Exponential smoothing on channel 0" },
+    { "id": "time", "label": "SmoothingTime", "type": "parameter", "importance": 1.0, "description": "Filter time constant (ms)" },
+    { "id": "default", "label": "DefaultValue", "type": "parameter", "importance": 0.7, "description": "Initial state on voice start" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Smoothed signal on ch0; other channels unchanged" }
+  ],
+  "edges": [
+    { "from": "in", "to": "filter", "type": "signal", "label": "ch0 only" },
+    { "from": "time", "to": "filter", "type": "control", "label": null },
+    { "from": "default", "to": "filter", "type": "control", "label": "reset value" },
+    { "from": "filter", "to": "out", "type": "signal", "label": null }
+  ]
+}

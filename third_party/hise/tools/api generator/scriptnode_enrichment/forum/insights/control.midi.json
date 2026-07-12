@@ -1,0 +1,80 @@
+{
+  "targetId": "control.midi",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [7122, 11363, 8215, 1422, 2970, 1469, 13798, 12580],
+  "insights": [
+    {
+      "type": "BUG",
+      "title": "Assigning the same MIDI CC to multiple controls silently dropped assignments",
+      "summary": "A regression introduced around June 2022 caused only the first MIDI-learned control to respond when the same CC was assigned to two or more knobs. The second and subsequent assignments were silently ignored. Fixed by Christoph in January 2023.",
+      "evidence": "Casey Kolb [trusted]: 'I'm having an issue where I can't assign the same MIDI CC to two different controls. If you assign CC1 to two knobs, only the first knob you assigned will respond.' David Healey [expert]: 'Definitely a bug, and a major one.' Christoph Hart [author]: 'I think I've found and fixed the problem.'",
+      "topicId": 7122,
+      "confidence": "high"
+    },
+    {
+      "type": "API",
+      "title": "MIDI channel filtering for automation requires a compile-time preprocessor opt-in",
+      "summary": "HISE's MidiAutomationHandler does not filter by MIDI channel by default. To enable per-channel CC automation (e.g. separate knobs responding to CC1 on channels 1 and 2), add `HISE_USE_MIDI_CHANNELS_FOR_AUTOMATION=1` to the project's Extra Definitions. This feature was added April 2025. With it enabled the automation object's JSON can include a channel property. Using C++ automation is always faster than a scripted branch in `onController`.",
+      "evidence": "Christoph Hart [author]: 'I've pushed the channel filter feature. You have to add HISE_USE_MIDI_CHANNELS_FOR_AUTOMATION=1 to your extra definitions to enable this, otherwise it will retain the old functionality. I've also updated the docs for the MidiAutomationHandler object.' Also: 'Not relying on the script and doing stuff in C++ is always faster.'",
+      "topicId": 11363,
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "MIDI-learned CC controls are consumed synchronously, bypassing deferCallbacks",
+      "summary": "When `Synth.deferCallbacks(true)` is active, the MIDI script callbacks are deferred to the UI thread, but MIDI-learned (CC-assigned) controls still fire their callbacks synchronously on the audio thread. This means MIDI-learn assignments are not affected by deferCallbacks — they always run inline regardless of that setting.",
+      "evidence": "Christoph Hart [author]: 'the deferred callbacks are only the MIDI callbacks (onNoteOn etc) — if you assign a MIDI CC to a UI control using the learn popup, it will \"consume\" the MIDI CC event and call the UI control callback synchronously.'",
+      "topicId": 8215,
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "MIDI-learned CC assignment consumes the CC event — other listeners will not receive it",
+      "summary": "If a CC is assigned to a knob via MIDI learn, that CC is consumed by the knob and will not propagate further. A CC modulator that listens to the same CC number will stop working once that CC is MIDI-learned to a UI control. This is intentional, mirroring Ableton Live's behaviour.",
+      "evidence": "Christoph Hart [author]: 'Yes this is intended behaviour. If you assign a CC to a knob, it will be \"consumed\" by it. Ableton Live (and a few other hosts / plugins) also work that way.'",
+      "topicId": 1422,
+      "confidence": "high"
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Use a dummy CC to keep a CC modulator alive alongside a MIDI-learned knob on the same CC",
+      "summary": "Because MIDI-learning a CC to a knob consumes that CC, any CC modulator assigned to the same number will go silent. The workaround is to assign the CC modulator to an unused CC (e.g. CC94) and then forward the original CC (e.g. CC1) to it inside the `onController` callback. This keeps both the MIDI-learned knob and the modulator functional.",
+      "evidence": "David Healey [expert]: 'Assign CC94 (or another rarely used CC) to your modulator and forward CC1 messages to it in the on controller callback.' Christoph Hart [author]: 'We use the exact same setup in HEXERACT (MIDI learnable knobs plus a CC modulator that won't work if the CC is consumed). Nobody ever complained about this.'",
+      "topicId": 1422,
+      "confidence": "high"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Separate MIDI processors for UI logic vs realtime MIDI processing",
+      "summary": "Best practice is to use at least two MIDI processors: one deferred interface script for all UI interactions, and a separate non-deferred script for realtime MIDI operations such as setting velocity or transpose. This avoids audio-thread violations and keeps concerns modular. UI components in the interface script can be connected to controls in the MIDI processor via `processorId`/`parameterId` attributes or `setAttribute()` scripting, without needing global variables.",
+      "evidence": "David Healey [expert]: 'Ideally this should be done using two MIDI processors. The Interface script should be deferred — which means you won't be able to use setVelocity there. A second MIDI processor should be used.' Also: 'You can connect your UI components to other modules using the parameter id and processor id settings in the property editor. Or you can use .setAttribute() to do it through scripting.'",
+      "topicId": 13798,
+      "confidence": "high"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use deferCallbacks by default in interface scripts as a guard against audio-thread mistakes",
+      "summary": "Adding `Synth.deferCallbacks(true)` to the interface script's onInit is recommended as a default practice. It defers MIDI callbacks to the UI thread and causes HISE to emit a warning if any realtime-unsafe operations are accidentally added to those callbacks, acting as a built-in safety net during development.",
+      "evidence": "David Healey [expert]: 'I always add it by default. That way if I add something to one of the realtime callbacks that shouldn't be there I'll get a warning message.' Christoph Hart [author]: 'I found it a rather good nudge into keeping functionality modular and separate.'",
+      "topicId": 8215,
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Global variables for inter-processor MIDI communication create fragile, non-portable scripts",
+      "summary": "Using global variables to pass state between a MIDI script processor and the main UI script works inside a single project but breaks when scripts are reused in other projects where those globals are not set up. The correct approach is to use UI component connections via `processorId`/`parameterId` or `setAttribute()` to keep each processor self-contained.",
+      "evidence": "David Healey [expert]: 'Think of every midi processor as a self-contained island... Avoid global variables if you can — and I've never \"had\" to use them yet. Yesterday someone sent me a link to a script I posted on github many years ago. They wanted to use this script in their project but it wasn't working... it was relying on various global variables existing and being set in other midi processors that weren't present in their project.'",
+      "topicId": 12580,
+      "confidence": "high"
+    },
+    {
+      "type": "API",
+      "title": "HISE can export MIDI FX plugins (MIDI in to MIDI out) but cannot add a MIDI output to an instrument plugin",
+      "summary": "HISE supports exporting dedicated MIDI FX plugins that pass MIDI in to MIDI out by processing all MIDI processors in the root container. However, adding an additional MIDI output to a VST instrument plugin (so the instrument sends MIDI to the DAW alongside audio) is not supported. Standalone apps can open a physical MIDI output port; plugins cannot without a virtual driver on Windows.",
+      "evidence": "Christoph Hart [author]: 'You can export a MIDI plugin already... You just can't add an additional MIDI output to a VST instrument.' And: 'In that case it just processes all midi processors of the root container.' And: 'it's trivial on macOS but impossible without actually writing a virtual device driver on Windows.'",
+      "topicId": 2970,
+      "confidence": "high"
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "targetId": "core.gain",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [8006, 11532, 6324, 1904, 11289, 10721, 1524, 11255, 10619],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Setting gain to -100 dB produces silence, not -inf",
+      "summary": "The core.gain node treats -100 dB as a special silence threshold and clears the output buffer completely at that point. This is by design, but it means you cannot achieve true -inf (zero) digitally through the gain node alone. For pure mathematical zero, use a math node combined with a smoothed_parameter node to avoid clicks.",
+      "sources": ["tid:11289"],
+      "verify": true,
+      "verify_hint": "Check C++ source for the -100 dB threshold shortcut in the gain node processing."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use cable_expr to remap a gain parameter to a sub-range",
+      "summary": "When you need the gain to respond only to a portion of a knob's travel (e.g. 0 dB to +3 dB for the upper half of a knob), use a `cable_expr` node to apply a custom formula. This requires the network to be compiled. Alternatively, adjusting the skew factor of the connected UI knob can achieve a similar effect without SNEX compilation.",
+      "sources": ["tid:8006"],
+      "verify": false,
+      "verify_hint": "Demonstrate cable_expr remapping gain range in a compiled scriptnode network."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Expose compressor gain reduction via DisplayBuffer",
+      "summary": "To display gain reduction from a scriptnode compressor on the UI, set the compressor's display buffer to 'External', then use `Synth.getDisplayBufferSource()` to fetch a reference and read `buffer.getMagnitude()` inside a timer callback. This is the canonical pattern for all scriptnode modulation output visualisation.",
+      "sources": ["tid:6324", "tid:1904"],
+      "verify": true,
+      "verify_hint": "Verify the API: Synth.getDisplayBufferSource(), getDisplayBuffer(index), setRingBufferProperties(), getReadBuffer()."
+    },
+    {
+      "type": "API",
+      "title": "Fetch node modulation output without a global cable using DSPNetwork API",
+      "summary": "It is not necessary to route a global cable out of a scriptnode network just to read a node's parameter or modulation value on the UI side. The DSPNetwork and Node scripting APIs can be used to directly query any node's parameter value from HiseScript, enabling more direct gain-reduction metering without extra wiring.",
+      "sources": ["tid:11255"],
+      "verify": true,
+      "verify_hint": "Check DSPNetwork and Node scripting API methods for reading parameter values at runtime."
+    },
+    {
+      "type": "API",
+      "title": "Faust vbargraph translates to a scriptnode modulation output",
+      "summary": "When using a Faust node inside scriptnode, any `vbargraph` primitive declared in the Faust code becomes a modulation output of the faust node. This can be connected to a `core.peak` node or wired to a global cable to expose values like gain reduction to the UI layer.",
+      "sources": ["tid:10619"],
+      "verify": true,
+      "verify_hint": "Confirm vbargraph -> modulation output mapping in the Faust integration code."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use RMS mode on dry_wet_mixer for automatic gain matching",
+      "summary": "The `dry_wet_mixer` node has a dropdown to select RMS mode which applies equal-power (RMS-based) gain compensation automatically. This is the simplest way to achieve a gain-matched dry/wet blend without manually calculating compensation values.",
+      "sources": ["tid:10721"],
+      "verify": true,
+      "verify_hint": "Confirm the RMS dropdown option exists in the dry_wet_mixer node."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "The Width parameter of core.gain operates on the mid/side signal",
+      "summary": "The Width parameter does not apply pseudo-stereo or additional processing; it amplifies or attenuates the side (L-R) signal. Setting Width beyond 100% continues to amplify the side channel, which can cause the output to exceed the original level.",
+      "sources": ["tid:1524"],
+      "verify": true,
+      "verify_hint": "Review source code for the Width parameter implementation in the SimpleGain/gain node."
+    }
+  ]
+}

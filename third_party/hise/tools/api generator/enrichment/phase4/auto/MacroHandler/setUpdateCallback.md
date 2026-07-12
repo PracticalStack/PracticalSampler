@@ -1,0 +1,3 @@
+Registers a callback that fires whenever macro connections change. The callback receives the full connection array (same format as `MacroHandler.getMacroDataObject()` output) as its argument. Only one callback can be active at a time - calling this again replaces the previous one. You can pass a Broadcaster instead of a plain function to fan out change notifications to multiple independent listeners.
+
+> [!Warning:Fires immediately on registration] The callback fires immediately on registration with the current macro state. If you call this during `onInit`, the callback body runs synchronously before the next line of init code executes.

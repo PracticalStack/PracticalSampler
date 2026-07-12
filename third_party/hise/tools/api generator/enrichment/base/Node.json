@@ -1,0 +1,167 @@
+{
+  "className": "Node",
+  "category": "scriptnode",
+  "description": "A node in the DSP network.",
+  "methods": {
+    "connectTo": {
+      "signature": "var connectTo(var parameterTarget, var sourceInfo)",
+      "returnType": "var",
+      "description": "Connects this node to the given parameter target. sourceInfo is either the parameter name (String) or output slot (integer).",
+      "parameters": [
+        {
+          "name": "parameterTarget",
+          "type": "var"
+        },
+        {
+          "name": "sourceInfo",
+          "type": "var"
+        }
+      ]
+    },
+    "connectToBypass": {
+      "signature": "void connectToBypass(var sourceInfo)",
+      "returnType": "void",
+      "description": "Connects the bypass button of this node to the given source info (\"NodeId.ParameterId\").",
+      "parameters": [
+        {
+          "name": "sourceInfo",
+          "type": "var"
+        }
+      ]
+    },
+    "get": {
+      "signature": "var get(var id)",
+      "returnType": "var",
+      "description": "Returns a property of the node.",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "var"
+        }
+      ]
+    },
+    "getChildNodes": {
+      "signature": "var getChildNodes(bool recursive)",
+      "returnType": "var",
+      "description": "Returns a list of child nodes if this node is a container.",
+      "parameters": [
+        {
+          "name": "recursive",
+          "type": "bool"
+        }
+      ]
+    },
+    "getIndexInParent": {
+      "signature": "int getIndexInParent()",
+      "returnType": "int",
+      "description": "Returns the index in the parent.",
+      "parameters": []
+    },
+    "getNodeHolder": {
+      "signature": "NodeBase::Holder * getNodeHolder()",
+      "returnType": "NodeBase::Holder *",
+      "description": "Not necessarily the DSP network.",
+      "parameters": []
+    },
+    "getNumParameters": {
+      "signature": "int getNumParameters()",
+      "returnType": "int",
+      "description": "Returns the number of parameters.",
+      "parameters": []
+    },
+    "getOrCreateParameter": {
+      "signature": "var getOrCreateParameter(var indexOrId)",
+      "returnType": "var",
+      "description": "Returns a reference to a parameter or creates a parameter (if non existent and possible).",
+      "parameters": [
+        {
+          "name": "indexOrId",
+          "type": "var"
+        }
+      ]
+    },
+    "isActive": {
+      "signature": "bool isActive(bool checkRecursively)",
+      "returnType": "bool",
+      "description": "Checks if the node is inserted into the signal path.",
+      "parameters": [
+        {
+          "name": "checkRecursively",
+          "type": "bool"
+        }
+      ]
+    },
+    "isBypassed": {
+      "signature": "bool isBypassed()",
+      "returnType": "bool",
+      "description": "Checks if the node is bypassed.",
+      "parameters": []
+    },
+    "reset": {
+      "signature": "void reset()",
+      "returnType": "void",
+      "description": "Reset the node's internal state (eg. at voice start).",
+      "parameters": []
+    },
+    "set": {
+      "signature": "void set(var id, var value)",
+      "returnType": "void",
+      "description": "Sets the property of the node.",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "var"
+        },
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "setBypassed": {
+      "signature": "void setBypassed(bool shouldBeBypassed)",
+      "returnType": "void",
+      "description": "Bypasses the node.",
+      "parameters": [
+        {
+          "name": "shouldBeBypassed",
+          "type": "bool"
+        }
+      ]
+    },
+    "setComplexDataIndex": {
+      "signature": "bool setComplexDataIndex(String dataType, int dataSlot, int indexValue)",
+      "returnType": "bool",
+      "description": "Sets the complex data type at the dataSlot to the given index and data (if embedded).",
+      "parameters": [
+        {
+          "name": "dataType",
+          "type": "String"
+        },
+        {
+          "name": "dataSlot",
+          "type": "int"
+        },
+        {
+          "name": "indexValue",
+          "type": "int"
+        }
+      ]
+    },
+    "setParent": {
+      "signature": "void setParent(var parentNode, int indexInParent)",
+      "returnType": "void",
+      "description": "Inserts the node into the given parent container.",
+      "parameters": [
+        {
+          "name": "parentNode",
+          "type": "var"
+        },
+        {
+          "name": "indexInParent",
+          "type": "int"
+        }
+      ]
+    }
+  }
+}

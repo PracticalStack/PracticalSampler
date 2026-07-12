@@ -1,0 +1,215 @@
+{
+  "className": "Buffer",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "applyMedianFilter": {
+      "signature": "var applyMedianFilter(int windowSize)",
+      "returnType": "var",
+      "description": "Applies a median filter with zero padding to the buffer and returns the filtered median values.",
+      "parameters": [
+        {
+          "name": "windowSize",
+          "type": "int"
+        }
+      ]
+    },
+    "decompose": {
+      "signature": "var decompose(double sampleRate, var configData)",
+      "returnType": "var",
+      "description": "Analyses the sample and splits it into sinusoidal, transient & residual noise components.",
+      "parameters": [
+        {
+          "name": "sampleRate",
+          "type": "double"
+        },
+        {
+          "name": "configData",
+          "type": "var"
+        }
+      ]
+    },
+    "detectPitch": {
+      "signature": "double detectPitch(double sampleRate, int startSample, int numSamples)",
+      "returnType": "double",
+      "description": "Detects the pitch of the given buffer.",
+      "parameters": [
+        {
+          "name": "sampleRate",
+          "type": "double"
+        },
+        {
+          "name": "startSample",
+          "type": "int"
+        },
+        {
+          "name": "numSamples",
+          "type": "int"
+        }
+      ]
+    },
+    "fromBase64": {
+      "signature": "void fromBase64(String b64String)",
+      "returnType": "void",
+      "description": "Loads the content from the Base64 string (and resizes the buffer if necessary).",
+      "parameters": [
+        {
+          "name": "b64String",
+          "type": "String"
+        }
+      ]
+    },
+    "getMagnitude": {
+      "signature": "float getMagnitude(int startSample, int numSamples)",
+      "returnType": "float",
+      "description": "Returns the magnitude in the given range.",
+      "parameters": [
+        {
+          "name": "startSample",
+          "type": "int"
+        },
+        {
+          "name": "numSamples",
+          "type": "int"
+        }
+      ]
+    },
+    "getNextZeroCrossing": {
+      "signature": "var getNextZeroCrossing(int index)",
+      "returnType": "var",
+      "description": "Returns the next zero crossing at the position.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "getPeakRange": {
+      "signature": "var getPeakRange(int startSample, int numSamples)",
+      "returnType": "var",
+      "description": "Returns an array with the min and max value in the given range.",
+      "parameters": [
+        {
+          "name": "startSample",
+          "type": "int"
+        },
+        {
+          "name": "numSamples",
+          "type": "int"
+        }
+      ]
+    },
+    "getRMSLevel": {
+      "signature": "float getRMSLevel(int startSample, int numSamples)",
+      "returnType": "float",
+      "description": "Returns the RMS value in the given range.",
+      "parameters": [
+        {
+          "name": "startSample",
+          "type": "int"
+        },
+        {
+          "name": "numSamples",
+          "type": "int"
+        }
+      ]
+    },
+    "getSlice": {
+      "signature": "var getSlice(int offsetInBuffer, int numSamples)",
+      "returnType": "var",
+      "description": "Returns a new buffer that contains a reference to a slice of this buffer.",
+      "parameters": [
+        {
+          "name": "offsetInBuffer",
+          "type": "int"
+        },
+        {
+          "name": "numSamples",
+          "type": "int"
+        }
+      ]
+    },
+    "indexOfPeak": {
+      "signature": "int indexOfPeak(int startSample, int numSamples)",
+      "returnType": "int",
+      "description": "Returns the sample index with the highest peak.",
+      "parameters": [
+        {
+          "name": "startSample",
+          "type": "int"
+        },
+        {
+          "name": "numSamples",
+          "type": "int"
+        }
+      ]
+    },
+    "normalise": {
+      "signature": "void normalise(float gainInDecibels)",
+      "returnType": "void",
+      "description": "Normalises the buffer to the given decibel value.",
+      "parameters": [
+        {
+          "name": "gainInDecibels",
+          "type": "float"
+        }
+      ]
+    },
+    "resample": {
+      "signature": "var resample(double ratio, String interpolationType, bool wrapAround)",
+      "returnType": "var",
+      "description": "Returns a resampled buffer using the given resample ratio and interpolation type.",
+      "parameters": [
+        {
+          "name": "ratio",
+          "type": "double"
+        },
+        {
+          "name": "interpolationType",
+          "type": "String"
+        },
+        {
+          "name": "wrapAround",
+          "type": "bool"
+        }
+      ]
+    },
+    "toBase64": {
+      "signature": "String toBase64()",
+      "returnType": "String",
+      "description": "Converts a buffer with up to 44100 samples to a Base64 string.",
+      "parameters": []
+    },
+    "toCharString": {
+      "signature": "var toCharString(int numChars, var range)",
+      "returnType": "var",
+      "description": "Returns a char from 0 to 255 with the given length and input range.",
+      "parameters": [
+        {
+          "name": "numChars",
+          "type": "int"
+        },
+        {
+          "name": "range",
+          "type": "var"
+        }
+      ]
+    },
+    "trim": {
+      "signature": "var trim(int trimFromStart, int trimFromEnd)",
+      "returnType": "var",
+      "description": "Trims a buffer at the start and end and returns a copy of it.",
+      "parameters": [
+        {
+          "name": "trimFromStart",
+          "type": "int"
+        },
+        {
+          "name": "trimFromEnd",
+          "type": "int"
+        }
+      ]
+    }
+  }
+}

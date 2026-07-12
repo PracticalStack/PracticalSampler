@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="520" viewBox="0 0 940 520" role="img" aria-label="Matrix Target Data Flow">
+  <defs>
+    <marker id="arrowA" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#CCCCCC"/>
+    </marker>
+  </defs>
+
+  <rect x="12" y="12" width="280" height="496" rx="6" fill="#7E60B1" fill-opacity="0.05" stroke="#7E60B1" stroke-opacity="0.25"/>
+  <rect x="326" y="12" width="288" height="496" rx="6" fill="#90FFB1" fill-opacity="0.05" stroke="#90FFB1" stroke-opacity="0.25"/>
+  <rect x="648" y="12" width="280" height="496" rx="6" fill="#3F6E6E" fill-opacity="0.05" stroke="#3F6E6E" stroke-opacity="0.25"/>
+
+  <text x="24" y="36" font-family="Lato, sans-serif" font-size="14" fill="#CCCCCC" font-weight="bold">SOURCES</text>
+  <text x="338" y="36" font-family="Lato, sans-serif" font-size="14" fill="#CCCCCC" font-weight="bold">SCRIPTSLIDER HUB</text>
+  <text x="660" y="36" font-family="Lato, sans-serif" font-size="14" fill="#CCCCCC" font-weight="bold">TARGET PATHS</text>
+
+  <rect x="40" y="86" width="226" height="54" rx="6" fill="#161b22" stroke="rgba(0,0,0,0.5)"/>
+  <text x="54" y="108" font-family="Consolas, 'Courier New', monospace" font-size="13" fill="#CCCCCC">GlobalModulatorContainer</text>
+  <text x="54" y="126" font-family="Lato, sans-serif" font-size="12" fill="#808080">matrix ValueTree state</text>
+
+  <rect x="40" y="176" width="226" height="54" rx="6" fill="#161b22" stroke="rgba(0,0,0,0.5)"/>
+  <text x="54" y="198" font-family="Consolas, 'Courier New', monospace" font-size="13" fill="#CCCCCC">GlobalRoutingManager</text>
+  <text x="54" y="216" font-family="Lato, sans-serif" font-size="12" fill="#808080">cable state updates</text>
+
+  <rect x="40" y="266" width="226" height="54" rx="6" fill="#161b22" stroke="rgba(0,0,0,0.5)"/>
+  <text x="54" y="288" font-family="Consolas, 'Courier New', monospace" font-size="13" fill="#CCCCCC">matrixTargetId property</text>
+  <text x="54" y="306" font-family="Lato, sans-serif" font-size="12" fill="#808080">on the ScriptSlider</text>
+
+  <rect x="352" y="120" width="236" height="90" rx="6" fill="#161b22" stroke="rgba(0,0,0,0.5)" stroke-width="2"/>
+  <text x="366" y="146" font-family="Consolas, 'Courier New', monospace" font-size="13" fill="#CCCCCC">MatrixIds target resolver</text>
+  <text x="366" y="166" font-family="Lato, sans-serif" font-size="12" fill="#808080">classifies target as</text>
+  <text x="366" y="184" font-family="Lato, sans-serif" font-size="12" fill="#808080">modulator / parameter / cable</text>
+
+  <rect x="352" y="252" width="236" height="90" rx="6" fill="#161b22" stroke="rgba(0,0,0,0.5)"/>
+  <text x="366" y="278" font-family="Consolas, 'Courier New', monospace" font-size="13" fill="#CCCCCC">ScriptSlider</text>
+  <text x="366" y="298" font-family="Lato, sans-serif" font-size="12" fill="#808080">connectToModulatedParameter()</text>
+  <text x="366" y="316" font-family="Lato, sans-serif" font-size="12" fill="#808080">updateValueFromProcessorConnection()</text>
+
+  <rect x="674" y="104" width="226" height="74" rx="6" fill="#161b22" stroke="rgba(0,0,0,0.5)"/>
+  <text x="688" y="130" font-family="Consolas, 'Courier New', monospace" font-size="13" fill="#CCCCCC">MultiMatrixModulatorConnection</text>
+  <text x="688" y="150" font-family="Lato, sans-serif" font-size="12" fill="#808080">for modulator targets</text>
+
+  <rect x="674" y="204" width="226" height="74" rx="6" fill="#161b22" stroke="rgba(0,0,0,0.5)"/>
+  <text x="688" y="230" font-family="Consolas, 'Courier New', monospace" font-size="13" fill="#CCCCCC">MatrixCableConnection</text>
+  <text x="688" y="250" font-family="Lato, sans-serif" font-size="12" fill="#808080">for parameter/cable targets</text>
+
+  <rect x="674" y="324" width="226" height="100" rx="6" fill="#161b22" stroke="rgba(0,0,0,0.5)"/>
+  <text x="688" y="350" font-family="Consolas, 'Courier New', monospace" font-size="13" fill="#CCCCCC">Script processor control path</text>
+  <text x="688" y="370" font-family="Lato, sans-serif" font-size="12" fill="#808080">value popup / drag display</text>
+  <text x="688" y="388" font-family="Lato, sans-serif" font-size="12" fill="#808080">callback-visible state</text>
+
+  <path d="M 266 113 L 308 113 L 308 145 L 352 145" fill="none" stroke="#CCCCCC" stroke-width="1.5" marker-end="url(#arrowA)"/>
+  <path d="M 266 203 L 318 203 L 318 170 L 352 170" fill="none" stroke="#CCCCCC" stroke-width="1.5" marker-end="url(#arrowA)"/>
+  <path d="M 266 293 L 328 293 L 328 190 L 352 190" fill="none" stroke="#CCCCCC" stroke-width="1.5" marker-end="url(#arrowA)"/>
+
+  <path d="M 588 156 L 628 156 L 628 141 L 674 141" fill="none" stroke="#90FFB1" stroke-width="2" marker-end="url(#arrowA)"/>
+  <path d="M 588 182 L 638 182 L 638 241 L 674 241" fill="none" stroke="#90FFB1" stroke-width="2" marker-end="url(#arrowA)"/>
+
+  <path d="M 588 297 L 630 297 L 630 374 L 674 374" fill="none" stroke="#CCCCCC" stroke-width="1.5" marker-end="url(#arrowA)"/>
+  <path d="M 787 278 L 787 304 L 787 304 L 787 324" fill="none" stroke="#CCCCCC" stroke-width="1.5" marker-end="url(#arrowA)"/>
+  <path d="M 787 178 L 787 304" fill="none" stroke="#CCCCCC" stroke-width="1.5" stroke-dasharray="4,4" marker-end="url(#arrowA)"/>
+
+  <rect x="424" y="66" width="114" height="20" rx="3" fill="#161b22" fill-opacity="0.85"/>
+  <text x="431" y="80" font-family="Lato, sans-serif" font-size="11" fill="#CCCCCC">target classification</text>
+
+  <rect x="716" y="444" width="184" height="44" rx="6" fill="#161b22" stroke="rgba(0,0,0,0.5)"/>
+  <text x="728" y="464" font-family="Lato, sans-serif" font-size="11" fill="#CCCCCC">dashed path = optional route</text>
+  <text x="728" y="480" font-family="Lato, sans-serif" font-size="11" fill="#808080">depends on target type</text>
+</svg>

@@ -1,0 +1,1 @@
+Populates the legacy script selection by matching sample file names against a regex pattern. Use `getNumSelectedSounds()` and `getSoundProperty()` to work with the result. For new code, prefer `createSelection()` which returns `Sample` objects directly.

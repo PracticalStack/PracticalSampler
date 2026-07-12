@@ -1,0 +1,57 @@
+{
+  "className": "MarkdownRenderer",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "getStyleData": {
+      "signature": "var getStyleData()",
+      "returnType": "var",
+      "description": "Returns the current style data.",
+      "parameters": []
+    },
+    "setImageProvider": {
+      "signature": "void setImageProvider(var data)",
+      "returnType": "void",
+      "description": "Creates an image provider from the given JSON data that resolves image links.",
+      "parameters": [
+        {
+          "name": "data",
+          "type": "var"
+        }
+      ]
+    },
+    "setStyleData": {
+      "signature": "void setStyleData(var styleData)",
+      "returnType": "void",
+      "description": "Sets the style data for the markdown renderer.",
+      "parameters": [
+        {
+          "name": "styleData",
+          "type": "var"
+        }
+      ]
+    },
+    "setText": {
+      "signature": "void setText(String markdownText)",
+      "returnType": "void",
+      "description": "Set the markdown text to be displayed.",
+      "parameters": [
+        {
+          "name": "markdownText",
+          "type": "String"
+        }
+      ]
+    },
+    "setTextBounds": {
+      "signature": "float setTextBounds(var area)",
+      "returnType": "float",
+      "description": "Parses the text for the specified area and returns the used height (might be more or less than the height of the area passed in).",
+      "parameters": [
+        {
+          "name": "area",
+          "type": "var"
+        }
+      ]
+    }
+  }
+}

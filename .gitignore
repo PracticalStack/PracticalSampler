@@ -1,0 +1,21 @@
+# Build outputs
+/build/
+/out/
+/bin/
+/lib/
+
+# CMake
+CMakeUserPresets.json
+
+# Visual Studio
+/.vs/
+*.VC.db
+*.VC.opendb
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Test and debug artifacts
+*.log
+*.dmp

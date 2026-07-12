@@ -1,0 +1,140 @@
+{
+  "factoryPath": "jdsp.jchorus",
+  "factory": "jdsp",
+  "nodeId": "jchorus",
+  "description": "",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Modulation",
+      "rationale": "Rate and Depth control the internal LFO that modulates the delay time.",
+      "parameters": [
+        {
+          "id": "Rate",
+          "range": { "min": 0.0, "max": 100.0, "step": 0.0, "skew": 0.3010300099849701 },
+          "default": 1.0,
+          "textConverter": "Frequency",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Depth",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.25,
+          "textConverter": "NormalizedPercentage",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Delay",
+      "rationale": "CentreDelay sets the base delay time around which the LFO modulates.",
+      "parameters": [
+        {
+          "id": "CentreDelay",
+          "range": { "min": 0.0, "max": 100.0, "step": 0.0, "skew": 1.0 },
+          "default": 7.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Character",
+      "rationale": "Feedback and Mix shape the overall chorus character and wet/dry balance.",
+      "parameters": [
+        {
+          "id": "Feedback",
+          "range": { "min": -1.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "NormalizedPercentage",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Mix",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.5,
+          "textConverter": "NormalizedPercentage",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/jdsp/jchorus.md",
+    "tier": "BRIEF",
+    "lines": 15
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-processing",
+      "category": "signal_path",
+      "question": "How does the node wrap JUCE's dsp::Chorus? Does it use process() with an AudioBlock or frame processing? How are stereo channels handled?",
+      "context": "Need to describe the signal flow accurately."
+    },
+    {
+      "id": "feedback-negative-values",
+      "category": "parameter_behaviour",
+      "question": "The Feedback parameter allows negative values (-1 to 1). Does negative feedback invert the delayed signal phase before feeding back?",
+      "context": "Need to explain what negative feedback achieves."
+    },
+    {
+      "id": "missing-description",
+      "category": "description_accuracy",
+      "question": "The base data has an empty description. Confirm from C++ that this is indeed a wrapper around JUCE dsp::Chorus.",
+      "context": "Need to write an accurate description for the reference page."
+    },
+    {
+      "id": "monophonic-confirmation",
+      "category": "signal_path",
+      "question": "No cppProperties are set. Confirm that jchorus is indeed monophonic (no PolyData usage, no polyphonic_base inheritance).",
+      "context": "Empty cppProperties could mean monophonic or could mean properties were not registered."
+    },
+    {
+      "id": "cpu-profile",
+      "category": "performance",
+      "question": "What is the CPU cost? Does it process per-sample or per-block?",
+      "context": "Need to set cpuProfile baseline."
+    }
+  ],
+
+  "notes": "Empty description in base data. No cppProperties set at all, which is unusual -- most audio processors at least have IsPolyphonic. Unused in all surveyed projects (0 occurrences in usage survey). Phase3 doc is BRIEF but contains good information about the JUCE Chorus class."
+}

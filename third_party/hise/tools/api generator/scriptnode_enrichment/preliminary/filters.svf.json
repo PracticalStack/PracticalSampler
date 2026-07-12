@@ -1,0 +1,154 @@
+{
+  "factoryPath": "filters.svf",
+  "factory": "filters",
+  "nodeId": "svf",
+  "description": "A filter node",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Filter Response",
+      "rationale": "These parameters define the filter's frequency response curve: where it acts, how narrow/wide, and gain for peaking/shelving modes.",
+      "parameters": [
+        {
+          "id": "Frequency",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0, "skew": 0.2299045622348785 },
+          "default": 1000.0,
+          "textConverter": "Frequency",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Q",
+          "range": { "min": 0.300000011920929, "max": 9.899999618530273, "step": 0.0, "skew": 0.2647178173065186 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Gain",
+          "range": { "min": -18.0, "max": 18.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Decibel",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Filter Configuration",
+      "rationale": "Mode selects the filter type, Smoothing controls coefficient interpolation speed, Enabled toggles the filter on/off.",
+      "parameters": [
+        {
+          "id": "Mode",
+          "range": { "min": 0.0, "max": 4.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "69.nT6K8CBOgG..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.XT.SPo.RPofPPofSuQ2XnoPPrwFbgM2b.D1XzklckAP.AH..",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Smoothing",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 0.3010300099849701 },
+          "default": 0.009999999776482582,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Enabled",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "filterCoefficients": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/filters/svf.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "filter-base-architecture",
+      "category": "signal_path",
+      "question": "All standard filter nodes share filter_base via data::filter_base. How does the filter_base process() or processFrame() work? Does it iterate per-sample with coefficient smoothing, or recalculate coefficients per block?",
+      "context": "Understanding the shared processing model is essential for documenting all filter nodes accurately. This is the base gap for the entire filter batch."
+    },
+    {
+      "id": "svf-mode-values",
+      "category": "conditional_logic",
+      "question": "Mode parameter has range 0-4 (5 discrete values). What filter types do values 0-4 correspond to? Expected: LP, HP, BP, Notch, Allpass based on standard SVF topology.",
+      "context": "The Mode parameter is the primary differentiator between filter configurations. Users need to know which integer maps to which filter type."
+    },
+    {
+      "id": "svf-topology",
+      "category": "signal_path",
+      "question": "What SVF implementation is used? Is it a textbook Hal Chamberlin/Andy Simper SVF, or a custom topology? How many internal state variables are maintained per voice?",
+      "context": "SVF topology affects stability at high frequencies and self-oscillation behaviour. Important for users choosing between svf and biquad."
+    },
+    {
+      "id": "smoothing-units",
+      "category": "parameter_behaviour",
+      "question": "The Smoothing parameter has range 0-1 with skew 0.301. What unit does this represent? Is it a time in seconds, a coefficient, or a normalized value mapped to a time range internally?",
+      "context": "Users need to know how to set Smoothing appropriately. The skew suggests a logarithmic mapping but the actual unit is unclear."
+    },
+    {
+      "id": "gain-parameter-relevance",
+      "category": "parameter_behaviour",
+      "question": "The Gain parameter (+/-18 dB) is present on all filter nodes. For which Mode values does Gain actually affect the response? Typically only peaking/shelving modes use gain. Is it silently ignored in LP/HP/BP modes?",
+      "context": "Users may set Gain expecting an effect but see no change depending on the selected Mode. This needs to be documented clearly."
+    },
+    {
+      "id": "description-accuracy",
+      "category": "description_accuracy",
+      "question": "The base description is just 'A filter node' which is generic. A more accurate description would be 'State variable filter with LP/HP/BP/Notch/Allpass modes'. Confirm the correct SVF characterisation.",
+      "context": "The vague description does not help users distinguish between the 9 different filter nodes."
+    },
+    {
+      "id": "enabled-bypass-behaviour",
+      "category": "signal_path",
+      "question": "When Enabled=0, does the filter pass audio through unprocessed (bypass), or does it output silence? Is there click-free crossfading when toggling Enabled?",
+      "context": "Important for users who want to toggle filters on/off dynamically without audio artifacts."
+    }
+  ],
+
+  "notes": "filters.svf is part of a family of 9 filter nodes that share identical parameter signatures (Frequency, Q, Gain, Smoothing, Mode, Enabled) and the same filter_base infrastructure. They differ only in the underlying filter algorithm and available Mode values. The SVF is typically the recommended general-purpose filter due to its stability and multi-mode output capability. filters.convolution is the sole outlier in the filters factory with a completely different parameter set and no filter coefficient display."
+}

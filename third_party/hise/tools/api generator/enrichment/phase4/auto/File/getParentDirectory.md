@@ -1,0 +1,1 @@
+Returns a File object representing the parent directory of this file or directory. If this is already the filesystem root, returns a File pointing to the root path. No disk access is performed - this only manipulates the path string.

@@ -1,0 +1,1 @@
+Returns the current output level of the effect for a single channel. Pass `true` for the left channel, `false` for the right. Poll this in a timer callback (typically at 30ms intervals) to drive custom peak meter visualisations on a ScriptPanel. Apply smoothing (e.g. exponential decay) to the raw values for a visually stable display.

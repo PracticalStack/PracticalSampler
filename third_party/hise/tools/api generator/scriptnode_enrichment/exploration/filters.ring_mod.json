@@ -1,0 +1,26 @@
+{
+  "factoryPath": "filters.ring_mod",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "ring_mod", "label": "Ring Modulator", "type": "process", "importance": 1.0, "description": "Multiplies input by internal sine oscillator with wet/dry mix" },
+    { "id": "freq", "label": "Frequency", "type": "parameter", "importance": 1.0, "description": "Sine oscillator frequency (20-20000 Hz), smoothed" },
+    { "id": "q", "label": "Q", "type": "parameter", "importance": 1.0, "description": "Modulation depth / wet-dry mix (0.3-9.9 mapped to 0.0-1.0)" },
+    { "id": "gain", "label": "Gain", "type": "parameter", "importance": 0.2, "description": "Ignored" },
+    { "id": "mode", "label": "Mode", "type": "parameter", "importance": 0.2, "description": "Single mode: RingMod" },
+    { "id": "smoothing", "label": "Smoothing", "type": "parameter", "importance": 0.5, "description": "Parameter interpolation time in seconds" },
+    { "id": "enabled", "label": "Enabled", "type": "parameter", "importance": 0.5, "description": "Hard bypass toggle" },
+    { "id": "coeffs", "label": "Filter Display", "type": "external_data", "importance": 0.3, "description": "Shows flat allpass curve (not meaningful for ring mod)" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Ring-modulated audio signal" }
+  ],
+  "edges": [
+    { "from": "in", "to": "ring_mod", "type": "signal", "label": null },
+    { "from": "freq", "to": "ring_mod", "type": "control", "label": "osc frequency" },
+    { "from": "q", "to": "ring_mod", "type": "control", "label": "mod depth" },
+    { "from": "gain", "to": "ring_mod", "type": "control", "label": "ignored" },
+    { "from": "mode", "to": "ring_mod", "type": "control", "label": "single mode" },
+    { "from": "smoothing", "to": "ring_mod", "type": "control", "label": null },
+    { "from": "enabled", "to": "ring_mod", "type": "control", "label": null },
+    { "from": "ring_mod", "to": "coeffs", "type": "control", "label": "display update" },
+    { "from": "ring_mod", "to": "out", "type": "signal", "label": null }
+  ]
+}

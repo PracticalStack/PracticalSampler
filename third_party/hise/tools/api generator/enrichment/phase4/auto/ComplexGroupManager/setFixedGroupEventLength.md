@@ -1,0 +1,1 @@
+Sets a fixed playback length in samples for voices matching a layer/group combination on the next noteOn. Voices are automatically faded out after the specified number of samples, regardless of when the note-off arrives.

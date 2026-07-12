@@ -1,0 +1,112 @@
+{
+  "className": "Sample",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "deleteSample": {
+      "signature": "void deleteSample()",
+      "returnType": "void",
+      "description": "Deletes the sample from the Sampler (not just this reference!).",
+      "parameters": []
+    },
+    "duplicateSample": {
+      "signature": "ScriptingSamplerSound * duplicateSample()",
+      "returnType": "ScriptingSamplerSound *",
+      "description": "Duplicates the sample.",
+      "parameters": []
+    },
+    "get": {
+      "signature": "var get(int propertyIndex)",
+      "returnType": "var",
+      "description": "Returns the sample property.",
+      "parameters": [
+        {
+          "name": "propertyIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "getCustomProperties": {
+      "signature": "var getCustomProperties()",
+      "returnType": "var",
+      "description": "Returns an object that can hold additional properties.",
+      "parameters": []
+    },
+    "getId": {
+      "signature": "String getId(int id)",
+      "returnType": "String",
+      "description": "Returns the ID of the property (use this with the setFromJSONMethod).",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "int"
+        }
+      ]
+    },
+    "getRange": {
+      "signature": "var getRange(int propertyIndex)",
+      "returnType": "var",
+      "description": "Returns the value range that the given property can have (eg. the loop end might not go beyond the sample end.",
+      "parameters": [
+        {
+          "name": "propertyIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "loadIntoBufferArray": {
+      "signature": "var loadIntoBufferArray()",
+      "returnType": "var",
+      "description": "Loads the sample into a array of buffers for analysis.",
+      "parameters": []
+    },
+    "refersToSameSample": {
+      "signature": "bool refersToSameSample(var otherSample)",
+      "returnType": "bool",
+      "description": "Checks if the otherSample object refers to the same sample as this.",
+      "parameters": [
+        {
+          "name": "otherSample",
+          "type": "var"
+        }
+      ]
+    },
+    "replaceAudioFile": {
+      "signature": "bool replaceAudioFile(var audioData)",
+      "returnType": "bool",
+      "description": "Writes the content of the audio data (array of buffers) into the audio file. This is undoable!.",
+      "parameters": [
+        {
+          "name": "audioData",
+          "type": "var"
+        }
+      ]
+    },
+    "set": {
+      "signature": "void set(int propertyIndex, var newValue)",
+      "returnType": "void",
+      "description": "Sets the sample property.",
+      "parameters": [
+        {
+          "name": "propertyIndex",
+          "type": "int"
+        },
+        {
+          "name": "newValue",
+          "type": "var"
+        }
+      ]
+    },
+    "setFromJSON": {
+      "signature": "void setFromJSON(var object)",
+      "returnType": "void",
+      "description": "Sets the properties from a JSON object.",
+      "parameters": [
+        {
+          "name": "object",
+          "type": "var"
+        }
+      ]
+    }
+  }
+}

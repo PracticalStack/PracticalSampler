@@ -1,0 +1,62 @@
+{
+  "version": "1.0.0",
+  "description": "Test cases for verifying correct argument extraction from user queries",
+  "testCases": [
+    {
+      "id": "ae-001",
+      "input": "Synth.addNoteOn()",
+      "tool": "query_scripting_api",
+      "expectedArg": "Synth.addNoteOn",
+      "notes": "Should strip parentheses"
+    },
+    {
+      "id": "ae-002",
+      "input": "Math.round(value)",
+      "tool": "query_scripting_api",
+      "expectedArg": "Math.round",
+      "notes": "Should strip parentheses with arguments"
+    },
+    {
+      "id": "ae-003",
+      "input": "ScriptButton.filmstripImage",
+      "tool": "query_ui_property",
+      "expectedArg": "ScriptButton.filmstripImage",
+      "notes": "Exact format"
+    },
+    {
+      "id": "ae-004",
+      "input": "the filmstripImage property of ScriptButton",
+      "tool": "query_ui_property",
+      "expectedArg": "ScriptButton.filmstripImage",
+      "notes": "Natural language should be converted to proper format"
+    },
+    {
+      "id": "ae-005",
+      "input": "SimpleEnvelope Attack parameter",
+      "tool": "query_module_parameter",
+      "expectedArg": "SimpleEnvelope.Attack",
+      "notes": "Natural language should be converted to proper format"
+    },
+    {
+      "id": "ae-006",
+      "input": "all Synth methods",
+      "tool": "search_hise",
+      "expectedQuery": "Synth.*",
+      "notes": "Should use wildcard pattern"
+    },
+    {
+      "id": "ae-007",
+      "input": "methods that have setValue",
+      "tool": "search_hise",
+      "expectedQuery": "*.setValue",
+      "notes": "Should use wildcard for cross-namespace search"
+    },
+    {
+      "id": "ae-008",
+      "input": "SYNTH.ADDNOTEON",
+      "tool": "query_scripting_api",
+      "expectedArg": "Synth.addNoteOn",
+      "notes": "Case should be handled (queries are case-insensitive)"
+    }
+  ]
+}

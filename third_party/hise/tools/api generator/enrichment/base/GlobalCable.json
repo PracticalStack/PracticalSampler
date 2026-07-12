@@ -1,0 +1,195 @@
+{
+  "className": "GlobalCable",
+  "category": "object",
+  "description": "A wrapper around a global cable.",
+  "methods": {
+    "connectToGlobalModulator": {
+      "signature": "void connectToGlobalModulator(String lfoId, bool addToMod)",
+      "returnType": "void",
+      "description": "Connects the cable to a global LFO modulation output as source.",
+      "parameters": [
+        {
+          "name": "lfoId",
+          "type": "String"
+        },
+        {
+          "name": "addToMod",
+          "type": "bool"
+        }
+      ]
+    },
+    "connectToMacroControl": {
+      "signature": "void connectToMacroControl(int macroIndex, bool macroIsTarget, bool filterRepetitions)",
+      "returnType": "void",
+      "description": "Connects the cable to a macro control.",
+      "parameters": [
+        {
+          "name": "macroIndex",
+          "type": "int"
+        },
+        {
+          "name": "macroIsTarget",
+          "type": "bool"
+        },
+        {
+          "name": "filterRepetitions",
+          "type": "bool"
+        }
+      ]
+    },
+    "connectToModuleParameter": {
+      "signature": "void connectToModuleParameter(String processorId, var parameterIndexOrId, var targetObject)",
+      "returnType": "void",
+      "description": "Connects the cable to a module parameter using a JSON object for defining the range.",
+      "parameters": [
+        {
+          "name": "processorId",
+          "type": "String"
+        },
+        {
+          "name": "parameterIndexOrId",
+          "type": "var"
+        },
+        {
+          "name": "targetObject",
+          "type": "var"
+        }
+      ]
+    },
+    "deregisterCallback": {
+      "signature": "bool deregisterCallback(var callbackFunction)",
+      "returnType": "bool",
+      "description": "Deregisteres a callback from the cable.",
+      "parameters": [
+        {
+          "name": "callbackFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "getValue": {
+      "signature": "double getValue()",
+      "returnType": "double",
+      "description": "Returns the value (converted to the input range).",
+      "parameters": []
+    },
+    "getValueNormalised": {
+      "signature": "double getValueNormalised()",
+      "returnType": "double",
+      "description": "Returns the normalised value between 0...1",
+      "parameters": []
+    },
+    "registerCallback": {
+      "signature": "void registerCallback(var callbackFunction, var synchronous)",
+      "returnType": "void",
+      "description": "Registers a function that will be executed whenever a value is sent through the cable.",
+      "parameters": [
+        {
+          "name": "callbackFunction",
+          "type": "var"
+        },
+        {
+          "name": "synchronous",
+          "type": "var"
+        }
+      ]
+    },
+    "registerDataCallback": {
+      "signature": "void registerDataCallback(var dataCallbackFunction)",
+      "returnType": "void",
+      "description": "Registers a function that will be executed asynchronously when the data receives a JSON data chunk.",
+      "parameters": [
+        {
+          "name": "dataCallbackFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "sendData": {
+      "signature": "void sendData(var dataToSend)",
+      "returnType": "void",
+      "description": "Sends any type of data (JSON, string, buffers) to the target.",
+      "parameters": [
+        {
+          "name": "dataToSend",
+          "type": "var"
+        }
+      ]
+    },
+    "setRange": {
+      "signature": "void setRange(double min, double max)",
+      "returnType": "void",
+      "description": "Set the input range using a min and max value (no steps / no skew factor).",
+      "parameters": [
+        {
+          "name": "min",
+          "type": "double"
+        },
+        {
+          "name": "max",
+          "type": "double"
+        }
+      ]
+    },
+    "setRangeWithSkew": {
+      "signature": "void setRangeWithSkew(double min, double max, double midPoint)",
+      "returnType": "void",
+      "description": "Set the input range using a min and max value and a mid point for skewing the range.",
+      "parameters": [
+        {
+          "name": "min",
+          "type": "double"
+        },
+        {
+          "name": "max",
+          "type": "double"
+        },
+        {
+          "name": "midPoint",
+          "type": "double"
+        }
+      ]
+    },
+    "setRangeWithStep": {
+      "signature": "void setRangeWithStep(double min, double max, double stepSize)",
+      "returnType": "void",
+      "description": "Set the input range using a min and max value as well as a step size.",
+      "parameters": [
+        {
+          "name": "min",
+          "type": "double"
+        },
+        {
+          "name": "max",
+          "type": "double"
+        },
+        {
+          "name": "stepSize",
+          "type": "double"
+        }
+      ]
+    },
+    "setValue": {
+      "signature": "void setValue(double inputWithinRange)",
+      "returnType": "void",
+      "description": "Sends the value to all targets (after converting it from the input range.",
+      "parameters": [
+        {
+          "name": "inputWithinRange",
+          "type": "double"
+        }
+      ]
+    },
+    "setValueNormalised": {
+      "signature": "void setValueNormalised(double normalisedInput)",
+      "returnType": "void",
+      "description": "Sends the normalised value to all targets.",
+      "parameters": [
+        {
+          "name": "normalisedInput",
+          "type": "double"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "34": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Uses typed inline function syntax (inline function: object) which causes parse error in this HISE runtime version",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "LayoutBuilder namespace uses type annotations (: object, : string, : JSON, : Array) that cause EOF parse error."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "factoryPath": "routing.ms_encode",
+  "nodes": [
+    { "id": "in", "label": "Stereo In (L/R)", "type": "input", "importance": 1.0, "description": "Stereo input signal with Left and Right channels" },
+    { "id": "encode", "label": "MS Encode", "type": "process", "importance": 1.0, "description": "M = (L+R)*0.5, S = (L-R)*0.5" },
+    { "id": "out", "label": "Stereo Out (M/S)", "type": "output", "importance": 1.0, "description": "Channel 0 = Mid, Channel 1 = Side" }
+  ],
+  "edges": [
+    { "from": "in", "to": "encode", "type": "signal", "label": null },
+    { "from": "encode", "to": "out", "type": "signal", "label": null }
+  ]
+}

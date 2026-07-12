@@ -1,0 +1,46 @@
+{
+  "className": "MacroHandler",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "getMacroDataObject": {
+      "signature": "var getMacroDataObject()",
+      "returnType": "var",
+      "description": "Returns an object that contains the macro connection data.",
+      "parameters": []
+    },
+    "setExclusiveMode": {
+      "signature": "void setExclusiveMode(bool shouldBeExclusive)",
+      "returnType": "void",
+      "description": "Enables the \"exclusive\" mode for MIDI automation (only one active parameter for each controller).",
+      "parameters": [
+        {
+          "name": "shouldBeExclusive",
+          "type": "bool"
+        }
+      ]
+    },
+    "setMacroDataFromObject": {
+      "signature": "void setMacroDataFromObject(var jsonData)",
+      "returnType": "void",
+      "description": "Rebuilds the macro connections from the JSON object.",
+      "parameters": [
+        {
+          "name": "jsonData",
+          "type": "var"
+        }
+      ]
+    },
+    "setUpdateCallback": {
+      "signature": "void setUpdateCallback(var callback)",
+      "returnType": "void",
+      "description": "Set a callback to be notified when a macro connection changes.",
+      "parameters": [
+        {
+          "name": "callback",
+          "type": "var"
+        }
+      ]
+    }
+  }
+}

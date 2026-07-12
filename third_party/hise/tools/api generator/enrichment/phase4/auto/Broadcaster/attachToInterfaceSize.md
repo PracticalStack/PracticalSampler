@@ -1,0 +1,1 @@
+Registers the broadcaster as a source that fires whenever the plugin's interface size changes. On attachment, existing listeners immediately receive the current dimensions. This is useful for responsive layouts where components need to reposition when the plugin window is resized.

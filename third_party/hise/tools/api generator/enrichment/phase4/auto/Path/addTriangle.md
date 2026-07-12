@@ -1,0 +1,1 @@
+Adds a triangle defined by three corner points, each as an `[x, y]` array. The points are connected in order and closed automatically. For a regular (equilateral) triangle without specifying individual vertices, `addPolygon` with 3 sides is an alternative.

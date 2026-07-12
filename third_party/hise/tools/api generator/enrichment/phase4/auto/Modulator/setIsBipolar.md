@@ -1,0 +1,1 @@
+Sets whether this modulator operates in bipolar or unipolar mode. In GainMode, unipolar output ranges from 0 to 1 while bipolar output ranges from -1 to 1. This affects how the modulation intensity is applied to the destination signal.

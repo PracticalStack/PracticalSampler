@@ -1,0 +1,1 @@
+Returns the index of the first matching element using the factory's compare function, or -1 if not found. Only searches the used portion of the stack.

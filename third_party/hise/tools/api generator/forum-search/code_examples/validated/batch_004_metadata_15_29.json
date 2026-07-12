@@ -1,0 +1,165 @@
+{
+  "15": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptImage", "id": "Blackoutimg1"},
+      {"type": "ScriptButton", "id": "Powerbtn0"},
+      {"type": "ScriptButton", "id": "Powerbtn1"},
+      {"type": "ScriptButton", "id": "Powerbtn2"},
+      {"type": "ScriptButton", "id": "Powerbtn3"},
+      {"type": "ScriptButton", "id": "SectionPowerbtn1"}
+    ],
+    "verifyScript": null,
+    "notes": "Compile-only, callback toggles power buttons"
+  },
+  "16": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "TransportHandler setup, same as example 8"
+  },
+  "17": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptFloatingTile", "id": "FloatingTile1"}
+    ],
+    "verifyScript": null,
+    "notes": "Old broadcaster creation syntax - may need fix if API changed. Compile-only."
+  },
+  "18": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "MidiPlayer", "name": "MIDI Player1"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Old broadcaster creation syntax. Compile-only."
+  },
+  "19": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "OSC messaging, compile-only"
+  },
+  "20": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptButton", "id": "btnOpenClose"},
+      {"type": "ScriptPanel", "id": "pnlAni"}
+    ],
+    "verifyScript": null,
+    "notes": "Animated panel slide, compile-only"
+  },
+  "21": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": [
+      {"type": "log-output", "values": ["1234abc"]}
+    ],
+    "notes": "RSA encrypt/decrypt round-trip, last Console.print should be decrypted value"
+  },
+  "22": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "References undefined variables (requiredAmount, validSet, encryptedSet, privateK) from a larger project",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "23": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Global routing cable callback, compile-only"
+  },
+  "24": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Rectangle utility namespace, compile-only"
+  },
+  "25": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Creates own panel via Content.addPanel, self-contained"
+  },
+  "26": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "ScriptFX needs scriptnode network to provide AudioSampleProcessor interface with audio file slots",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "27": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "StreamingSampler", "name": "MySampler"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "FadeHandler API, compile-only"
+  },
+  "28": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "StreamingSampler", "name": "Sampler1"}
+    ],
+    "components": [
+      {"type": "ScriptSlider", "id": "SampleStart"},
+      {"type": "ScriptSlider", "id": "SampleEnd"},
+      {"type": "ScriptSlider", "id": "LoopStart"},
+      {"type": "ScriptSlider", "id": "LoopEnd"},
+      {"type": "ScriptComboBox", "id": "Samplescmb"}
+    ],
+    "verifyScript": null,
+    "notes": "Callbacks never fire during compile, sample maps empty but compiles fine"
+  },
+  "29": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "StreamingSampler", "name": "Sampler1"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "isNoteNumberMapped returns false for all (no samples), compiles fine"
+  }
+}

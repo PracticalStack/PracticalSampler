@@ -1,0 +1,3 @@
+Event-mode only. Finds the first event matching the provided MessageHolder using the configured compare function, removes it from the stack, and writes the original stored event back into the holder. This "pop matching" operation is essential when you need the original note-on's metadata (velocity, timestamp) at note-off time - the holder's contents after the call reflect the stored event, not the search key.
+
+> [!Warning:Holder modified with removed event data] The holder is modified in-place with the removed event's data. If you need the search key's properties after the call, save them before calling `removeIfEqual()`.

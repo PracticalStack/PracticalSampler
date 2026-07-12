@@ -1,0 +1,1 @@
+Resets the internal state of the neural network model to its initial values. For NAM models, this runs warmup inference with zero input. Automatically called after `loadWeights`, so you only need to call this manually if you want to clear accumulated state between inference runs.

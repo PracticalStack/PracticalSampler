@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 380" width="900" height="380">
+  <defs>
+    <!-- Arrow markers -->
+    <marker id="arrow-green" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#4E8E35"/>
+    </marker>
+    <marker id="arrow-teal" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#3F6E6E"/>
+    </marker>
+  </defs>
+  
+  <!-- Background removed for transparent rendering -->
+  
+  <!-- Swim lanes -->
+  <!-- Audio thread lane -->
+  <rect x="12" y="60" width="876" height="100" fill="#161b22" stroke="rgba(0,0,0,0.5)" rx="6"/>
+  <text x="24" y="88" font-family="Lato, sans-serif" font-size="14" font-weight="bold" fill="#4E8E35">Audio Thread</text>
+  
+  <!-- UI thread lane -->
+  <rect x="12" y="180" width="876" height="100" fill="#161b22" stroke="rgba(0,0,0,0.5)" rx="6"/>
+  <text x="24" y="208" font-family="Lato, sans-serif" font-size="14" font-weight="bold" fill="#3F6E6E">UI Thread (PooledUIUpdater)</text>
+  
+  <!-- Timeline title -->
+  <text x="12" y="35" font-family="Lato, sans-serif" font-size="16" font-weight="bold" fill="#CCCCCC">Sync vs Async Callback Dispatch</text>
+  
+  <!-- Event: Tempo change -->
+  <circle cx="150" cy="110" r="6" fill="#90FFB1"/>
+  <text x="150" y="138" font-family="Lato, sans-serif" font-size="12" fill="#CCCCCC" text-anchor="middle">Tempo change</text>
+  <text x="150" y="152" font-family="Consolas, monospace" font-size="11" fill="#808080" text-anchor="middle">event</text>
+  
+  <!-- Sync path: immediate execution on audio thread -->
+  <line x1="200" y1="110" x2="350" y2="110" stroke="#4E8E35" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <text x="275" y="102" font-family="Lato, sans-serif" font-size="12" fill="#4E8E35" text-anchor="middle">callSync()</text>
+  
+  <rect x="360" y="85" width="140" height="50" fill="#161b22" stroke="#4E8E35" stroke-width="2" rx="6"/>
+  <text x="430" y="108" font-family="Consolas, monospace" font-size="12" fill="#CCCCCC" text-anchor="middle">inline function</text>
+  <text x="430" y="124" font-family="Lato, sans-serif" font-size="11" fill="#808080" text-anchor="middle">executes immediately</text>
+  
+  <!-- Async path: queue to UI thread -->
+  <line x1="200" y1="110" x2="280" y2="180" stroke="#3F6E6E" stroke-width="1"/>
+  <circle cx="285" cy="186" r="3" fill="#3F6E6E"/>
+  <text x="240" y="148" font-family="Lato, sans-serif" font-size="11" fill="#3F6E6E">sendPooled...</text>
+  
+  <!-- Queued message -->
+  <rect x="300" y="205" width="120" height="40" fill="#161b22" stroke="#3F6E6E" rx="4"/>
+  <text x="360" y="226" font-family="Consolas, monospace" font-size="10" fill="#CCCCCC" text-anchor="middle">queued message</text>
+  
+  <!-- Timer tick -->
+  <circle cx="500" cy="230" r="6" fill="#3F6E6E"/>
+  <text x="500" y="260" font-family="Lato, sans-serif" font-size="11" fill="#808080" text-anchor="middle">Timer tick</text>
+  
+  <!-- Dispatch to callback -->
+  <line x1="550" y1="230" x2="680" y2="230" stroke="#3F6E6E" stroke-width="2" marker-end="url(#arrow-teal)"/>
+  <text x="615" y="222" font-family="Lato, sans-serif" font-size="12" fill="#3F6E6E" text-anchor="middle">callAsync()</text>
+  
+  <rect x="690" y="205" width="140" height="50" fill="#161b22" stroke="#3F6E6E" stroke-width="2" rx="6"/>
+  <text x="760" y="228" font-family="Consolas, monospace" font-size="12" fill="#CCCCCC" text-anchor="middle">any function</text>
+  <text x="760" y="244" font-family="Lato, sans-serif" font-size="11" fill="#808080" text-anchor="middle">high-priority path</text>
+  
+  <!-- Notes -->
+  <text x="12" y="310" font-family="Lato, sans-serif" font-size="12" font-weight="bold" fill="#CCCCCC">Key Points:</text>
+  <text x="12" y="330" font-family="Lato, sans-serif" font-size="12" fill="#CCCCCC">• Sync callbacks execute directly on the audio thread during the TempoListener virtual call</text>
+  <text x="12" y="348" font-family="Lato, sans-serif" font-size="12" fill="#CCCCCC">• Async callbacks queue via sendPooledChangeMessage() and deliver on the UI thread at next timer tick</text>
+  <text x="12" y="366" font-family="Lato, sans-serif" font-size="12" fill="#CCCCCC">• Both paths can coexist if they use different function references</text>
+</svg>

@@ -1,0 +1,107 @@
+{
+  "className": "TableProcessor",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "addTablePoint": {
+      "signature": "void addTablePoint(int tableIndex, float x, float y)",
+      "returnType": "void",
+      "description": "Adds a new table point (x and y are normalized coordinates).",
+      "parameters": [
+        {
+          "name": "tableIndex",
+          "type": "int"
+        },
+        {
+          "name": "x",
+          "type": "float"
+        },
+        {
+          "name": "y",
+          "type": "float"
+        }
+      ]
+    },
+    "exists": {
+      "signature": "bool exists()",
+      "returnType": "bool",
+      "description": "Checks if the Object exists and prints a error message on the console if not.",
+      "parameters": []
+    },
+    "exportAsBase64": {
+      "signature": "String exportAsBase64(int tableIndex)",
+      "returnType": "String",
+      "description": "Exports the state as base64 encoded string.",
+      "parameters": [
+        {
+          "name": "tableIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "getTable": {
+      "signature": "var getTable(int tableIndex)",
+      "returnType": "var",
+      "description": "Creates a ScriptTableData object for the given table.",
+      "parameters": [
+        {
+          "name": "tableIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "reset": {
+      "signature": "void reset(int tableIndex)",
+      "returnType": "void",
+      "description": "Resets the table with the given index to a 0..1 line.",
+      "parameters": [
+        {
+          "name": "tableIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "restoreFromBase64": {
+      "signature": "void restoreFromBase64(int tableIndex, String state)",
+      "returnType": "void",
+      "description": "Restores the state from a base64 encoded string.",
+      "parameters": [
+        {
+          "name": "tableIndex",
+          "type": "int"
+        },
+        {
+          "name": "state",
+          "type": "String"
+        }
+      ]
+    },
+    "setTablePoint": {
+      "signature": "void setTablePoint(int tableIndex, int pointIndex, float x, float y, float curve)",
+      "returnType": "void",
+      "description": "Sets the point with the given index to the values.",
+      "parameters": [
+        {
+          "name": "tableIndex",
+          "type": "int"
+        },
+        {
+          "name": "pointIndex",
+          "type": "int"
+        },
+        {
+          "name": "x",
+          "type": "float"
+        },
+        {
+          "name": "y",
+          "type": "float"
+        },
+        {
+          "name": "curve",
+          "type": "float"
+        }
+      ]
+    }
+  }
+}

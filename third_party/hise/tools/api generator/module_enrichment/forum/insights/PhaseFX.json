@@ -1,0 +1,72 @@
+{
+  "targetId": "PhaseFX",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [12772, 13076, 3019, 8682],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Modulation without frame processing causes zipper noise",
+      "summary": "Any modulator driving the Phase Modulation chain will crackle unless frame processing is used in scriptnode or a smoothed parameter provides per-sample values. Block-based modulation is not smoothed by design in most delay modules.",
+      "sources": ["tid:12772", "tid:3019"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Frequency1 and Frequency2 are sweep range endpoints, not per-stage frequencies",
+      "summary": "All 6 allpass stages are always set to the same frequency coefficient at any given sample. Frequency1 and Frequency2 define the lower and upper bounds of the sweep range that the Phase Modulation chain interpolates between.",
+      "sources": ["tid:12772"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Mix parameter uses plain linear crossfade with no gain skewing",
+      "summary": "The Mix parameter performs a straight linear 50%/50% crossfade between the dry signal and the phaser output. Scriptnode's default RMS-based or skewed gain nodes do not match this behaviour when replicating the effect.",
+      "sources": ["tid:12772"],
+      "verify": true,
+      "verify_hint": "grep applyEffect in hi_core/hi_modules/effects/fx/Phaser.cpp; check mix formula"
+    },
+    {
+      "type": "BUG",
+      "title": "Modulation had no effect when PhaseFX was placed inside a send container (now fixed)",
+      "summary": "Prior to a 2024 fix, PhaseFX (and other effects requiring modulation such as Degrade) did not respond to modulators when placed inside a send container. The fix was confirmed by Christoph Hart in early January 2024.",
+      "sources": ["tid:8682"],
+      "verify": true,
+      "verify_hint": "check git log on hi_core/hi_modules/effects for send container modulation fix around 2024-01"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Scriptnode replication requires exactly 6 phase_delay nodes in series with a feedback loop",
+      "summary": "To replicate PhaseFX in scriptnode, chain 6 phase_delay nodes in series and wrap them in a feedback loop. Both channels must be driven by the same modulation source. Frame processing is required to avoid zipper noise.",
+      "sources": ["tid:12772", "tid:3019"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Feedback coefficient needs to be approximately twice as high in a scriptnode replica",
+      "summary": "When rebuilding PhaseFX in scriptnode, Christoph Hart observed that the feedback value needs to be about twice the value used in the built-in module to sound equivalent. The exact reason is unclear.",
+      "sources": ["tid:12772"],
+      "verify": true,
+      "verify_hint": "compare feedback scaling in Phaser.cpp getNextSample() with scriptnode phase_delay feedback path; check 0.99 safety coefficient"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Routing nodes in scriptnode introduce block-size latency; frame processing eliminates it",
+      "summary": "Using routing (send/receive) nodes in a scriptnode phaser replica introduces a latency equal to the current block size. Switching to frame processing removes this latency.",
+      "sources": ["tid:12772"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "No internal LFO — sweep requires an explicit modulator in the Phase Modulation chain",
+      "summary": "PhaseFX has no built-in LFO. Without a modulator in the Phase Modulation chain, all 6 allpass stages are held at a constant coefficient derived from getConstantModulationValue(), resulting in a static comb filter with no sweep.",
+      "sources": ["tid:12772", "tid:3019"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

@@ -1,0 +1,209 @@
+{
+  "moduleId": "AHDSR",
+  "notes": "EcoMode parameter is vestigial - the setter is a no-op (comment: 'not needed anymore'). Downsampling is now controlled globally by HISE_CONTROL_RATE_DOWNSAMPLING_FACTOR (8x for instruments, 1x for effects). The envelope state machine lives in ahdsr_base::state_base::tick() shared with the scriptnode equivalent. All curve shapes use exponential coefficients, not lookup tables. AttackCurve controls the attack target ratio (concave to convex), DecayCurve controls the decay/release target ratio. The sustain phase in calculateBlock() uses a per-buffer ramp when the sustain value changes (via modulation), avoiding zipper noise. Monophonic mode uses a single shared state with optional retrigger behavior.",
+  "nodes": [
+    {
+      "id": "note_on",
+      "label": "Note-On",
+      "type": "midi_event",
+      "scope": "per_voice",
+      "importance": 0.8
+    },
+    {
+      "id": "note_off",
+      "label": "Note-Off",
+      "type": "midi_event",
+      "scope": "per_voice",
+      "importance": 0.5
+    },
+    {
+      "id": "attack_param",
+      "label": "Attack",
+      "type": "parameter",
+      "scope": "parameter",
+      "importance": 0.9,
+      "parameters": ["Attack"]
+    },
+    {
+      "id": "attack_level_param",
+      "label": "Attack Level",
+      "type": "parameter",
+      "scope": "parameter",
+      "importance": 0.5,
+      "parameters": ["AttackLevel"]
+    },
+    {
+      "id": "hold_param",
+      "label": "Hold",
+      "type": "parameter",
+      "scope": "parameter",
+      "importance": 0.3,
+      "parameters": ["Hold"]
+    },
+    {
+      "id": "decay_param",
+      "label": "Decay",
+      "type": "parameter",
+      "scope": "parameter",
+      "importance": 0.7,
+      "parameters": ["Decay"]
+    },
+    {
+      "id": "sustain_param",
+      "label": "Sustain",
+      "type": "parameter",
+      "scope": "parameter",
+      "importance": 0.8,
+      "parameters": ["Sustain"]
+    },
+    {
+      "id": "release_param",
+      "label": "Release",
+      "type": "parameter",
+      "scope": "parameter",
+      "importance": 0.8,
+      "parameters": ["Release"]
+    },
+    {
+      "id": "attack_curve_param",
+      "label": "Attack Curve",
+      "type": "parameter",
+      "scope": "parameter",
+      "importance": 0.4,
+      "parameters": ["AttackCurve"]
+    },
+    {
+      "id": "decay_curve_param",
+      "label": "Decay Curve",
+      "type": "parameter",
+      "scope": "parameter",
+      "importance": 0.4,
+      "parameters": ["DecayCurve"]
+    },
+    {
+      "id": "attack_time_mod",
+      "label": "Attack Time Mod",
+      "type": "external_input",
+      "detail": "VoiceStartModulator chain, ScaleOnly",
+      "scope": "per_voice",
+      "importance": 0.7
+    },
+    {
+      "id": "attack_level_mod",
+      "label": "Attack Level Mod",
+      "type": "external_input",
+      "detail": "VoiceStartModulator chain, ScaleOnly",
+      "scope": "per_voice",
+      "importance": 0.4
+    },
+    {
+      "id": "decay_time_mod",
+      "label": "Decay Time Mod",
+      "type": "external_input",
+      "detail": "VoiceStartModulator chain, ScaleOnly",
+      "scope": "per_voice",
+      "importance": 0.5
+    },
+    {
+      "id": "sustain_level_mod",
+      "label": "Sustain Level Mod",
+      "type": "external_input",
+      "detail": "VoiceStartModulator chain, ScaleOnly",
+      "scope": "per_voice",
+      "importance": 0.5
+    },
+    {
+      "id": "release_time_mod",
+      "label": "Release Time Mod",
+      "type": "external_input",
+      "detail": "VoiceStartModulator chain, ScaleOnly",
+      "scope": "per_voice",
+      "importance": 0.5
+    },
+    {
+      "id": "attack_phase",
+      "label": "Attack",
+      "type": "modulation",
+      "detail": "Exponential ramp 0 -> attackLevel",
+      "scope": "per_voice",
+      "importance": 1.0
+    },
+    {
+      "id": "hold_phase",
+      "label": "Hold",
+      "type": "modulation",
+      "detail": "Constant at attackLevel for hold duration",
+      "scope": "per_voice",
+      "importance": 0.3
+    },
+    {
+      "id": "decay_phase",
+      "label": "Decay",
+      "type": "modulation",
+      "detail": "Exponential ramp attackLevel -> sustain",
+      "scope": "per_voice",
+      "importance": 0.8
+    },
+    {
+      "id": "sustain_phase",
+      "label": "Sustain",
+      "type": "modulation",
+      "detail": "Constant at sustain level, ramped when value changes",
+      "scope": "per_voice",
+      "importance": 0.9
+    },
+    {
+      "id": "release_phase",
+      "label": "Release",
+      "type": "modulation",
+      "detail": "Exponential ramp sustain -> 0",
+      "scope": "per_voice",
+      "importance": 0.9
+    },
+    {
+      "id": "output",
+      "label": "Mod Output",
+      "type": "modulation",
+      "detail": "Per-voice gain modulation output",
+      "scope": "per_voice",
+      "importance": 1.0
+    }
+  ],
+  "edges": [
+    { "from": "note_on", "to": "attack_phase", "type": "signal" },
+    { "from": "attack_param", "to": "attack_phase", "type": "modulation", "label": "base time" },
+    { "from": "attack_time_mod", "to": "attack_phase", "type": "modulation", "label": "per-voice scale" },
+    { "from": "attack_level_param", "to": "attack_phase", "type": "modulation", "label": "peak level" },
+    { "from": "attack_level_mod", "to": "attack_phase", "type": "modulation", "label": "per-voice scale" },
+    { "from": "attack_curve_param", "to": "attack_phase", "type": "modulation", "label": "curve shape" },
+    { "from": "attack_phase", "to": "hold_phase", "type": "signal" },
+    { "from": "hold_param", "to": "hold_phase", "type": "modulation", "label": "hold time" },
+    { "from": "hold_phase", "to": "decay_phase", "type": "signal" },
+    { "from": "decay_param", "to": "decay_phase", "type": "modulation", "label": "base time" },
+    { "from": "decay_time_mod", "to": "decay_phase", "type": "modulation", "label": "per-voice scale" },
+    { "from": "decay_curve_param", "to": "decay_phase", "type": "modulation", "label": "curve shape" },
+    { "from": "sustain_param", "to": "sustain_phase", "type": "modulation", "label": "base level" },
+    { "from": "sustain_level_mod", "to": "sustain_phase", "type": "modulation", "label": "per-voice scale" },
+    { "from": "decay_phase", "to": "sustain_phase", "type": "signal" },
+    { "from": "note_off", "to": "release_phase", "type": "signal" },
+    { "from": "sustain_phase", "to": "release_phase", "type": "signal" },
+    { "from": "release_param", "to": "release_phase", "type": "modulation", "label": "base time" },
+    { "from": "release_time_mod", "to": "release_phase", "type": "modulation", "label": "per-voice scale" },
+    { "from": "decay_curve_param", "to": "release_phase", "type": "modulation", "label": "curve shape" },
+    { "from": "release_phase", "to": "output", "type": "signal" }
+  ],
+  "groups": [
+    {
+      "id": "params",
+      "label": "Shared Parameters",
+      "nodes": ["attack_param", "attack_level_param", "hold_param", "decay_param", "sustain_param", "release_param", "attack_curve_param", "decay_curve_param"],
+      "style": "shared_region"
+    },
+    {
+      "id": "voice_processing",
+      "label": "Per Voice",
+      "nodes": ["note_on", "note_off", "attack_time_mod", "attack_level_mod", "decay_time_mod", "sustain_level_mod", "release_time_mod", "attack_phase", "hold_phase", "decay_phase", "sustain_phase", "release_phase", "output"],
+      "style": "polyphonic"
+    }
+  ]
+}

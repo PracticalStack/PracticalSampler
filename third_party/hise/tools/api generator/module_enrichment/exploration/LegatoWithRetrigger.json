@@ -1,0 +1,146 @@
+{
+  "moduleId": "LegatoWithRetrigger",
+  "nodes": [
+    {
+      "id": "midi_in",
+      "type": "input",
+      "label": "MIDI In",
+      "importance": 1.0,
+      "description": "Incoming MIDI noteOn/noteOff events"
+    },
+    {
+      "id": "make_artificial",
+      "type": "process",
+      "label": "Make Artificial",
+      "importance": 0.9,
+      "group": "note_on",
+      "description": "Assigns a new artificial event ID to every incoming noteOn via Message.makeArtificial()"
+    },
+    {
+      "id": "note_held_check",
+      "type": "decision",
+      "label": "Note already held?",
+      "importance": 0.9,
+      "group": "note_on",
+      "description": "Checks if lastNote != -1 (a note is currently sounding)"
+    },
+    {
+      "id": "kill_previous",
+      "type": "process",
+      "label": "Kill Previous Note",
+      "importance": 1.0,
+      "group": "note_on",
+      "description": "Sends artificial noteOff for the previous note via Synth.noteOffByEventId(lastEventId)"
+    },
+    {
+      "id": "store_retrigger",
+      "type": "process",
+      "label": "Store Retrigger Candidate",
+      "importance": 1.0,
+      "group": "note_on",
+      "description": "Saves previous note number and channel as the retrigger candidate (1-deep stack)"
+    },
+    {
+      "id": "update_state",
+      "type": "process",
+      "label": "Update Tracking State",
+      "importance": 0.7,
+      "group": "note_on",
+      "description": "Updates lastNote, lastEventId, lastVelo, lastChannel to the new note"
+    },
+    {
+      "id": "noteoff_match_active",
+      "type": "decision",
+      "label": "NoteOff matches active note?",
+      "importance": 0.9,
+      "group": "note_off",
+      "description": "Checks if released note number and channel match the currently sounding note"
+    },
+    {
+      "id": "ignore_and_kill",
+      "type": "process",
+      "label": "Ignore Original + Kill Active",
+      "importance": 0.8,
+      "group": "note_off",
+      "description": "Ignores original noteOff event, sends artificial noteOff via Synth.noteOffByEventId()"
+    },
+    {
+      "id": "noteoff_match_retrigger",
+      "type": "decision",
+      "label": "NoteOff matches retrigger candidate?",
+      "importance": 0.7,
+      "group": "note_off",
+      "description": "Checks if the released note is the stored retrigger candidate"
+    },
+    {
+      "id": "clear_retrigger",
+      "type": "process",
+      "label": "Clear Retrigger Candidate",
+      "importance": 0.6,
+      "group": "note_off",
+      "description": "Removes the retrigger candidate (possibleRetriggerNote = -1)"
+    },
+    {
+      "id": "retrigger_check",
+      "type": "decision",
+      "label": "Retrigger candidate available?",
+      "importance": 1.0,
+      "group": "note_off",
+      "description": "After releasing the active note, checks if a retrigger candidate exists"
+    },
+    {
+      "id": "retrigger_note",
+      "type": "process",
+      "label": "Retrigger Previous Note",
+      "importance": 1.0,
+      "group": "note_off",
+      "description": "Sends new artificial noteOn via Synth.addNoteOn() for the retrigger candidate using lastVelo"
+    },
+    {
+      "id": "go_idle",
+      "type": "process",
+      "label": "Go Idle",
+      "importance": 0.6,
+      "group": "note_off",
+      "description": "Sets lastNote = -1, module returns to idle state"
+    },
+    {
+      "id": "midi_out",
+      "type": "output",
+      "label": "MIDI Out",
+      "importance": 1.0,
+      "description": "Transformed MIDI events (monophonic, with retrigger)"
+    }
+  ],
+  "edges": [
+    { "from": "midi_in", "to": "make_artificial", "type": "signal", "label": "noteOn" },
+    { "from": "make_artificial", "to": "note_held_check", "type": "signal" },
+    { "from": "note_held_check", "to": "update_state", "type": "conditional", "label": "no note held" },
+    { "from": "note_held_check", "to": "kill_previous", "type": "conditional", "label": "note held" },
+    { "from": "kill_previous", "to": "store_retrigger", "type": "signal" },
+    { "from": "store_retrigger", "to": "update_state", "type": "signal" },
+    { "from": "update_state", "to": "midi_out", "type": "signal" },
+
+    { "from": "midi_in", "to": "noteoff_match_active", "type": "signal", "label": "noteOff" },
+    { "from": "noteoff_match_active", "to": "ignore_and_kill", "type": "conditional", "label": "matches" },
+    { "from": "noteoff_match_active", "to": "noteoff_match_retrigger", "type": "conditional", "label": "no match" },
+    { "from": "ignore_and_kill", "to": "noteoff_match_retrigger", "type": "signal" },
+    { "from": "noteoff_match_retrigger", "to": "clear_retrigger", "type": "conditional", "label": "matches retrigger" },
+    { "from": "noteoff_match_retrigger", "to": "retrigger_check", "type": "conditional", "label": "no match" },
+    { "from": "clear_retrigger", "to": "retrigger_check", "type": "signal" },
+    { "from": "retrigger_check", "to": "retrigger_note", "type": "conditional", "label": "candidate available" },
+    { "from": "retrigger_check", "to": "go_idle", "type": "conditional", "label": "no candidate" },
+    { "from": "retrigger_note", "to": "midi_out", "type": "signal" },
+    { "from": "go_idle", "to": "midi_out", "type": "signal" }
+  ],
+  "groups": [
+    {
+      "id": "note_on",
+      "label": "NoteOn Processing"
+    },
+    {
+      "id": "note_off",
+      "label": "NoteOff Processing"
+    }
+  ]
+}

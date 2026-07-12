@@ -1,0 +1,11 @@
+{
+  "15": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Engine.loadUserPreset triggers runtime error with demo project presets during compilation",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  }
+}

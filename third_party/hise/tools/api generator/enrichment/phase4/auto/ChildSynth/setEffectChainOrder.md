@@ -1,0 +1,1 @@
+Changes the processing order of effects within this synth's effect chain. The `slotRange` defines which effect slot indices (as `[start, end]`) are eligible for reordering. The `chainOrder` array specifies the new order using indices within that range. Effects outside the range keep their position; effects present in the chain but absent from the order array are bypassed.

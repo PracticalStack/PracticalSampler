@@ -1,0 +1,1 @@
+Removes all registered listener targets from the broadcaster. Attached sources are not affected - they continue detecting events and sending messages. Use `removeAllSources` to also detach sources, or `reset` to re-dispatch default values without removing anything.

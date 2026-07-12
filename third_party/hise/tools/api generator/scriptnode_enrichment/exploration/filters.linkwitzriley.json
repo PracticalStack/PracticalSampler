@@ -1,0 +1,26 @@
+{
+  "factoryPath": "filters.linkwitzriley",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "lr", "label": "Linkwitz-Riley Filter", "type": "process", "importance": 1.0, "description": "LR4 crossover filter (24 dB/oct), computes LP and HP simultaneously" },
+    { "id": "freq", "label": "Frequency", "type": "parameter", "importance": 1.0, "description": "Crossover frequency (20-20000 Hz), smoothed" },
+    { "id": "q", "label": "Q", "type": "parameter", "importance": 0.2, "description": "Ignored -- LR filters have fixed Q" },
+    { "id": "gain", "label": "Gain", "type": "parameter", "importance": 0.2, "description": "Ignored" },
+    { "id": "mode", "label": "Mode", "type": "parameter", "importance": 1.0, "description": "Output selection: LP, HP, or AP (LP+HP sum)" },
+    { "id": "smoothing", "label": "Smoothing", "type": "parameter", "importance": 0.5, "description": "Parameter interpolation time in seconds" },
+    { "id": "enabled", "label": "Enabled", "type": "parameter", "importance": 0.5, "description": "Hard bypass toggle" },
+    { "id": "coeffs", "label": "Filter Display", "type": "external_data", "importance": 0.4, "description": "FilterCoefficients for display" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Filtered audio signal (LP, HP, or flat allpass)" }
+  ],
+  "edges": [
+    { "from": "in", "to": "lr", "type": "signal", "label": null },
+    { "from": "freq", "to": "lr", "type": "control", "label": null },
+    { "from": "q", "to": "lr", "type": "control", "label": "ignored" },
+    { "from": "gain", "to": "lr", "type": "control", "label": "ignored" },
+    { "from": "mode", "to": "lr", "type": "control", "label": null },
+    { "from": "smoothing", "to": "lr", "type": "control", "label": null },
+    { "from": "enabled", "to": "lr", "type": "control", "label": null },
+    { "from": "lr", "to": "coeffs", "type": "control", "label": "display update" },
+    { "from": "lr", "to": "out", "type": "signal", "label": null }
+  ]
+}

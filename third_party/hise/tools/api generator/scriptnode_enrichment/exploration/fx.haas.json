@@ -1,0 +1,18 @@
+{
+  "factoryPath": "fx.haas",
+  "nodes": [
+    { "id": "in", "label": "Stereo In", "type": "input", "importance": 1.0, "description": "Stereo input signal (2 channels required)" },
+    { "id": "delay_l", "label": "Delay L", "type": "process", "importance": 0.7, "description": "Delay line on left channel" },
+    { "id": "delay_r", "label": "Delay R", "type": "process", "importance": 0.7, "description": "Delay line on right channel" },
+    { "id": "position", "label": "Position", "type": "parameter", "importance": 1.0, "description": "Stereo position: -1=left, 0=center, 1=right. Controls which channel is delayed (0-20ms)" },
+    { "id": "out", "label": "Stereo Out", "type": "output", "importance": 1.0, "description": "Stereo output with Haas-effect panning" }
+  ],
+  "edges": [
+    { "from": "in", "to": "delay_l", "type": "signal", "label": "L" },
+    { "from": "in", "to": "delay_r", "type": "signal", "label": "R" },
+    { "from": "position", "to": "delay_l", "type": "control", "label": null },
+    { "from": "position", "to": "delay_r", "type": "control", "label": null },
+    { "from": "delay_l", "to": "out", "type": "signal", "label": "L" },
+    { "from": "delay_r", "to": "out", "type": "signal", "label": "R" }
+  ]
+}

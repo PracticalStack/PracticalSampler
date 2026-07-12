@@ -1,0 +1,141 @@
+{
+  "factoryPath": "dynamics.gate",
+  "factory": "dynamics",
+  "nodeId": "gate",
+  "description": "A gate effect with the ducking amount as modulation signal",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Dynamics detection",
+      "rationale": "Threshhold sets the level below which the gate attenuates. Attack and Release control how quickly the gate opens and closes.",
+      "parameters": [
+        {
+          "id": "Threshhold",
+          "range": { "min": -100.0, "max": 0.0, "step": 0.0, "skew": 5.42 },
+          "default": 0.0,
+          "textConverter": "Decibel",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Attack",
+          "range": { "min": 0.0, "max": 250.0, "step": 0.0, "skew": 1.0 },
+          "default": 50.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Release",
+          "range": { "min": 0.0, "max": 250.0, "step": 0.0, "skew": 1.0 },
+          "default": 50.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Gate depth",
+      "rationale": "Ratio determines how much the signal below the threshold is attenuated. For a gate, higher ratios approach full muting.",
+      "parameters": [
+        {
+          "id": "Ratio",
+          "range": { "min": 1.0, "max": 32.0, "step": 0.0, "skew": 0.30 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Sidechain routing",
+      "rationale": "Sidechain selects the detection source. The encoded converter indicates 3 discrete options.",
+      "parameters": [
+        {
+          "id": "Sidechain",
+          "range": { "min": 0.0, "max": 2.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "encoded_converter_3_options",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "displayBuffers": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/dynamics/gate.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "gate-vs-comp-algorithm",
+      "category": "signal_path",
+      "question": "How does the gate differ from dynamics.comp in the C++ implementation? A gate typically attenuates signal below the threshold (expander/gate behaviour) while a compressor attenuates above. Does this node invert the detection logic, or does it use a fundamentally different gain computation?",
+      "context": "Core to understanding the difference between comp and gate. They share identical parameters, so the algorithm difference must be in the gain calculation."
+    },
+    {
+      "id": "ducking-modulation-output",
+      "category": "description_accuracy",
+      "question": "The description says 'ducking amount as modulation signal' but ModulationTargets is empty in the base data. Does this node actually produce a modulation output? If so, what value -- the gate gain (0 or 1), the smoothed envelope, or the gain reduction in dB?",
+      "context": "Same discrepancy as dynamics.comp. Need to verify whether modulation output exists."
+    },
+    {
+      "id": "sidechain-modes",
+      "category": "parameter_behaviour",
+      "question": "The Sidechain parameter has 3 options (encoded converter, range 0-2). What are the 3 sidechain modes? Are they identical to dynamics.comp's sidechain options?",
+      "context": "Users need to know how to configure sidechain detection for the gate."
+    },
+    {
+      "id": "display-buffer-content",
+      "category": "signal_path",
+      "question": "The node has 1 DisplayBuffer. What does it display -- the gate state (open/closed), the gain reduction, or the input envelope?",
+      "context": "Determines what visual feedback users see in the scriptnode UI."
+    },
+    {
+      "id": "ratio-meaning-for-gate",
+      "category": "parameter_behaviour",
+      "question": "For a gate, what does Ratio mean? In a compressor, ratio is compression ratio (e.g., 4:1). For a gate/expander, ratio might control the expansion ratio or the depth of attenuation below threshold. At ratio=1 (default), is the gate effectively bypassed?",
+      "context": "Ratio semantics differ between compressors and gates. Need to clarify for accurate documentation."
+    }
+  ],
+
+  "notes": "Shares identical parameters with dynamics.comp and dynamics.limiter. The key difference must be in the gain computation: a gate attenuates below threshold (opposite of a compressor). The 'ducking amount as modulation signal' description has the same ModulationTargets discrepancy as comp and limiter. Ratio default of 1 means no gating by default (1:1 = no expansion). The Threshhold spelling matches the rest of the dynamics factory."
+}

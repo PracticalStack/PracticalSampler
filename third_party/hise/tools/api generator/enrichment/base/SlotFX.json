@@ -1,0 +1,76 @@
+{
+  "className": "SlotFX",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "clear": {
+      "signature": "void clear()",
+      "returnType": "void",
+      "description": "Clears the slot (loads a unity gain module).",
+      "parameters": []
+    },
+    "exists": {
+      "signature": "bool exists()",
+      "returnType": "bool",
+      "description": "Checks if the Object exists and prints a error message on the console if not.",
+      "parameters": []
+    },
+    "getCurrentEffect": {
+      "signature": "var getCurrentEffect()",
+      "returnType": "var",
+      "description": "Returns a reference to the currently loaded effect.",
+      "parameters": []
+    },
+    "getCurrentEffectId": {
+      "signature": "String getCurrentEffectId()",
+      "returnType": "String",
+      "description": "Returns the ID of the effect that is currently loaded.",
+      "parameters": []
+    },
+    "getModuleList": {
+      "signature": "var getModuleList()",
+      "returnType": "var",
+      "description": "Returns the list of all available modules that you can load into the slot (might be empty if there is no compiled dll present).",
+      "parameters": []
+    },
+    "getParameterProperties": {
+      "signature": "var getParameterProperties()",
+      "returnType": "var",
+      "description": "Returns a JSON object containing all parameters with their range properties.",
+      "parameters": []
+    },
+    "setBypassed": {
+      "signature": "void setBypassed(bool shouldBeBypassed)",
+      "returnType": "void",
+      "description": "Bypasses the effect. This uses the soft bypass feature of the SlotFX module.",
+      "parameters": [
+        {
+          "name": "shouldBeBypassed",
+          "type": "bool"
+        }
+      ]
+    },
+    "setEffect": {
+      "signature": "var setEffect(String effectName)",
+      "returnType": "var",
+      "description": "Loads the effect with the given name and returns a reference to it.",
+      "parameters": [
+        {
+          "name": "effectName",
+          "type": "String"
+        }
+      ]
+    },
+    "swap": {
+      "signature": "bool swap(var otherSlot)",
+      "returnType": "bool",
+      "description": "Swaps the effect with the other slot.",
+      "parameters": [
+        {
+          "name": "otherSlot",
+          "type": "var"
+        }
+      ]
+    }
+  }
+}

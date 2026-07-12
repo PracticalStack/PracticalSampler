@@ -1,0 +1,92 @@
+{
+  "moduleId": "Constant",
+  "nodes": [
+    {
+      "id": "note_on",
+      "label": "Note On",
+      "type": "input",
+      "importance": 0.8,
+      "group": null,
+      "description": "Incoming MIDI note-on event triggers voice start value calculation"
+    },
+    {
+      "id": "mode_check",
+      "label": "Mode Check",
+      "type": "decision",
+      "importance": 0.7,
+      "group": null,
+      "description": "Checks if modulation mode is GainMode or another mode (Pitch/Pan/Global)"
+    },
+    {
+      "id": "gain_value",
+      "label": "Return 0.0",
+      "type": "process",
+      "importance": 0.8,
+      "group": null,
+      "description": "In GainMode, returns 0.0 (intensity carries the actual value)"
+    },
+    {
+      "id": "pitch_value",
+      "label": "Return 1.0",
+      "type": "process",
+      "importance": 0.8,
+      "group": null,
+      "description": "In PitchMode and other modes, returns 1.0 (neutral multiplier)"
+    },
+    {
+      "id": "intensity",
+      "label": "Intensity",
+      "type": "parameter",
+      "importance": 1.0,
+      "group": null,
+      "description": "Inherited intensity parameter from Modulation base class. This is the primary control mechanism — set via script with setIntensity()"
+    },
+    {
+      "id": "output",
+      "label": "Modulation Output",
+      "type": "output",
+      "importance": 1.0,
+      "group": null,
+      "description": "Final modulation value after intensity is applied by the modulation chain framework"
+    }
+  ],
+  "edges": [
+    {
+      "from": "note_on",
+      "to": "mode_check",
+      "type": "signal",
+      "label": null
+    },
+    {
+      "from": "mode_check",
+      "to": "gain_value",
+      "type": "conditional",
+      "label": "GainMode"
+    },
+    {
+      "from": "mode_check",
+      "to": "pitch_value",
+      "type": "conditional",
+      "label": "Other modes"
+    },
+    {
+      "from": "gain_value",
+      "to": "output",
+      "type": "signal",
+      "label": null
+    },
+    {
+      "from": "pitch_value",
+      "to": "output",
+      "type": "signal",
+      "label": null
+    },
+    {
+      "from": "intensity",
+      "to": "output",
+      "type": "control",
+      "label": "Applied by chain framework"
+    }
+  ],
+  "groups": []
+}

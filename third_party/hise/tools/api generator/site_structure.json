@@ -1,0 +1,109 @@
+{
+  "contentRoot": "content/v2",
+  "domains": {
+    "API": {
+      "basePath": "/v2/scripting-api",
+      "contentDir": "scripting-api",
+      "description": "Scripting API class and method reference",
+      "registrySource": "enrichment/base",
+      "sources": {
+        "pages": "enrichment/output/preview",
+        "static": "enrichment/resources/static"
+      },
+      "mdcTransform": "api",
+      "pattern": "{className}#{method}",
+      "staticPages": {
+        "Scripting API": ""
+      }
+    },
+    "MODULES": {
+      "basePath": "/v2/reference/audio-modules",
+      "contentDir": "reference/audio-modules",
+      "description": "Audio module reference (sound generators, effects, modulators, MIDI processors)",
+      "registrySource": "module_enrichment/base/moduleList.json",
+      "sources": {
+        "pages": "module_enrichment/pages",
+        "static": "module_enrichment/resources/static"
+      },
+      "mdcTransform": "module",
+      "typeMapping": {
+        "SoundGenerator": "01.sound-generators",
+        "MidiProcessor": "02.midi-processors",
+        "Modulator.EnvelopeModulator": "03.modulators/envelope",
+        "Modulator.TimeVariantModulator": "03.modulators/time-variant",
+        "Modulator.VoiceStartModulator": "03.modulators/voice-start",
+        "Effect.MasterEffect": "04.effects/master",
+        "Effect.MonophonicEffect": "04.effects/monophonic",
+        "Effect.VoiceEffect": "04.effects/polyphonic"
+      },
+      "staticPages": {
+        "Audio Modules": "",
+        "Sound Generators": "01.sound-generators",
+        "MIDI Processors": "02.midi-processors",
+        "Modulators": "03.modulators",
+        "Effects": "04.effects"
+      }
+    },
+    "UI": {
+      "basePath": "/v2/reference/ui-components",
+      "contentDir": "reference/ui-components",
+      "description": "UI component reference (CSS selectors, LAF overrides, usage)",
+      "sources": {
+        "pages": {
+          "components": "ui_enrichment/pages/components",
+          "floating-tiles": "ui_enrichment/pages/floating-tiles"
+        },
+        "static": "ui_enrichment/resources/static"
+      },
+      "mdcTransform": "ui",
+      "subdomains": {
+        "Components": "components",
+        "FloatingTiles": "floating-tiles"
+      },
+      "staticPages": {
+        "UI Components": "",
+        "Plugin Components": "components",
+        "Floating Tiles": "floating-tiles"
+      }
+    },
+    "SN": {
+      "basePath": "/v2/reference/scriptnodes",
+      "contentDir": "reference/scriptnodes",
+      "description": "Scriptnode node reference",
+      "registrySource": "scriptnode_enrichment/base/scriptnodeList.json",
+      "sources": {
+        "pages": "scriptnode_enrichment/output",
+        "static": "scriptnode_enrichment/resources/static"
+      },
+      "mdcTransform": "scriptnode",
+      "pattern": "{factory}/{node}",
+      "staticPages": {
+        "Scriptnode Reference": ""
+      }
+    },
+    "LANG": {
+      "basePath": "/v2/reference/languages",
+      "contentDir": "reference/languages",
+      "description": "Language reference pages (HiseScript, SNEX, CSS, Faust, RNBO, etc.)",
+      "sources": {
+        "pages": "language_enrichment/output",
+        "static": "language_enrichment/resources/static"
+      },
+      "mdcTransform": "language",
+      "pattern": "{language}",
+      "staticPages": {
+        "Language Reference": ""
+      }
+    },
+    "DOC": {
+      "basePath": "/v2",
+      "description": "Manual and architecture documentation",
+      "subdomains": {
+        "Architecture": "architecture",
+        "Guide": "guide",
+        "GettingStarted": "getting-started",
+        "Examples": "examples"
+      }
+    }
+  }
+}

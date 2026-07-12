@@ -1,0 +1,1 @@
+Returns the current BPM from the host DAW, or the value set via `Engine.setHostBpm()` if an override is active. Returns 120.0 if no host BPM is available and no override is set. For callback-based tempo tracking, use `Engine.createTransportHandler()` instead.

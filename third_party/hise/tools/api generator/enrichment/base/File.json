@@ -1,0 +1,410 @@
+{
+  "className": "File",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "copy": {
+      "signature": "bool copy(var target)",
+      "returnType": "bool",
+      "description": "Copies the file. The target isn't the directory to put it in, it's the actual file to create.",
+      "parameters": [
+        {
+          "name": "target",
+          "type": "var"
+        }
+      ]
+    },
+    "copyDirectory": {
+      "signature": "bool copyDirectory(var target)",
+      "returnType": "bool",
+      "description": "Recursively copies the directory. The target is the actual directory to create, not the directory into which the new one should be placed.",
+      "parameters": [
+        {
+          "name": "target",
+          "type": "var"
+        }
+      ]
+    },
+    "createDirectory": {
+      "signature": "var createDirectory(String directoryName)",
+      "returnType": "var",
+      "description": "Returns the new directory created at the file location, if directory doesn't already exist",
+      "parameters": [
+        {
+          "name": "directoryName",
+          "type": "String"
+        }
+      ]
+    },
+    "deleteFileOrDirectory": {
+      "signature": "bool deleteFileOrDirectory()",
+      "returnType": "bool",
+      "description": "Deletes the file or directory WITHOUT confirmation.",
+      "parameters": []
+    },
+    "extractZipFile": {
+      "signature": "void extractZipFile(var targetDirectory, bool overwriteFiles, var callback)",
+      "returnType": "void",
+      "description": "Extracts the ZIP archive if this file is a .zip file.",
+      "parameters": [
+        {
+          "name": "targetDirectory",
+          "type": "var"
+        },
+        {
+          "name": "overwriteFiles",
+          "type": "bool"
+        },
+        {
+          "name": "callback",
+          "type": "var"
+        }
+      ]
+    },
+    "getBytesFreeOnVolume": {
+      "signature": "int64 getBytesFreeOnVolume()",
+      "returnType": "int64",
+      "description": "Returns the number of bytes free on the drive that this file lives on.",
+      "parameters": []
+    },
+    "getChildFile": {
+      "signature": "var getChildFile(String childFileName)",
+      "returnType": "var",
+      "description": "Returns a child file if this is a directory.",
+      "parameters": [
+        {
+          "name": "childFileName",
+          "type": "String"
+        }
+      ]
+    },
+    "getHash": {
+      "signature": "String getHash()",
+      "returnType": "String",
+      "description": "Reads a file and generates the hash of its contents.",
+      "parameters": []
+    },
+    "getNonExistentSibling": {
+      "signature": "var getNonExistentSibling()",
+      "returnType": "var",
+      "description": "Returns a sibling file that doesn't exist.",
+      "parameters": []
+    },
+    "getNumZippedItems": {
+      "signature": "int getNumZippedItems()",
+      "returnType": "int",
+      "description": "Returns the number of items in the zip file.",
+      "parameters": []
+    },
+    "getParentDirectory": {
+      "signature": "var getParentDirectory()",
+      "returnType": "var",
+      "description": "Returns the parent directory as File.",
+      "parameters": []
+    },
+    "getRedirectedFolder": {
+      "signature": "var getRedirectedFolder()",
+      "returnType": "var",
+      "description": "If this file is a folder that contains a HISE redirection file (LinkWindows / LinkOSX file), then it will return the redirection target, otherwise it will return itself.",
+      "parameters": []
+    },
+    "getRelativePathFrom": {
+      "signature": "String getRelativePathFrom(var otherFile)",
+      "returnType": "String",
+      "description": "Returns a relative path from the given other file.",
+      "parameters": [
+        {
+          "name": "otherFile",
+          "type": "var"
+        }
+      ]
+    },
+    "getSize": {
+      "signature": "int64 getSize()",
+      "returnType": "int64",
+      "description": "Returns the size of the file in bytes.",
+      "parameters": []
+    },
+    "hasWriteAccess": {
+      "signature": "bool hasWriteAccess()",
+      "returnType": "bool",
+      "description": "true if it's possible to create and write to this file. If the file doesn't already exist, this will check its parent directory to see if writing is allowed.",
+      "parameters": []
+    },
+    "isChildOf": {
+      "signature": "bool isChildOf(var otherFile, bool checkSubdirectories)",
+      "returnType": "bool",
+      "description": "Checks if this file is a child file of the other file.",
+      "parameters": [
+        {
+          "name": "otherFile",
+          "type": "var"
+        },
+        {
+          "name": "checkSubdirectories",
+          "type": "bool"
+        }
+      ]
+    },
+    "isDirectory": {
+      "signature": "bool isDirectory()",
+      "returnType": "bool",
+      "description": "Checks if this file exists and is a directory.",
+      "parameters": []
+    },
+    "isFile": {
+      "signature": "bool isFile()",
+      "returnType": "bool",
+      "description": "Checks if this file exists and is a file.",
+      "parameters": []
+    },
+    "isSameFileAs": {
+      "signature": "bool isSameFileAs(var otherFile)",
+      "returnType": "bool",
+      "description": "Checks if the file matches the other file (the object comparison might not work reliably).",
+      "parameters": [
+        {
+          "name": "otherFile",
+          "type": "var"
+        }
+      ]
+    },
+    "loadAsAudioFile": {
+      "signature": "var loadAsAudioFile()",
+      "returnType": "var",
+      "description": "Loads the given file as audio file.",
+      "parameters": []
+    },
+    "loadAsBase64String": {
+      "signature": "String loadAsBase64String()",
+      "returnType": "String",
+      "description": "Loads the binary file, compresses it with zstd and returns a Base64 string.",
+      "parameters": []
+    },
+    "loadAsMidiFile": {
+      "signature": "var loadAsMidiFile(int trackIndex)",
+      "returnType": "var",
+      "description": "Loads the track (zero-based) of the MIDI file. If successful, it returns an object containing the time signature and a list of all events.",
+      "parameters": [
+        {
+          "name": "trackIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "loadAsObject": {
+      "signature": "var loadAsObject()",
+      "returnType": "var",
+      "description": "Loads the given file as object.",
+      "parameters": []
+    },
+    "loadAsString": {
+      "signature": "String loadAsString()",
+      "returnType": "String",
+      "description": "Loads the given file as text.",
+      "parameters": []
+    },
+    "loadAudioMetadata": {
+      "signature": "var loadAudioMetadata()",
+      "returnType": "var",
+      "description": "Tries to parse the metadata from the audio file (channel amount, length, samplerate, etc) and returns a JSON object if sucessful.",
+      "parameters": []
+    },
+    "loadEncryptedObject": {
+      "signature": "var loadEncryptedObject(String key)",
+      "returnType": "var",
+      "description": "Loads the encrypted object using the supplied RSA key pair.",
+      "parameters": [
+        {
+          "name": "key",
+          "type": "String"
+        }
+      ]
+    },
+    "loadFromXmlFile": {
+      "signature": "var loadFromXmlFile()",
+      "returnType": "var",
+      "description": "Loads the XML file and tries to parse it as JSON object.",
+      "parameters": []
+    },
+    "loadMidiMetadata": {
+      "signature": "var loadMidiMetadata()",
+      "returnType": "var",
+      "description": "Tries to parse the metadata of the MIDI file and returns a JSON object if successful.",
+      "parameters": []
+    },
+    "move": {
+      "signature": "bool move(var target)",
+      "returnType": "bool",
+      "description": "Moves the file. The target isn't the directory to put it in, it's the actual file to create.",
+      "parameters": [
+        {
+          "name": "target",
+          "type": "var"
+        }
+      ]
+    },
+    "rename": {
+      "signature": "bool rename(String newName)",
+      "returnType": "bool",
+      "description": "Renames the file.",
+      "parameters": [
+        {
+          "name": "newName",
+          "type": "String"
+        }
+      ]
+    },
+    "setExecutePermission": {
+      "signature": "bool setExecutePermission(bool shouldBeExecutable)",
+      "returnType": "bool",
+      "description": "Changes the execute-permissions of a file.",
+      "parameters": [
+        {
+          "name": "shouldBeExecutable",
+          "type": "bool"
+        }
+      ]
+    },
+    "setReadOnly": {
+      "signature": "void setReadOnly(bool shouldBeReadOnly, bool applyRecursively)",
+      "returnType": "void",
+      "description": "Changes the read/write permission for the given file.",
+      "parameters": [
+        {
+          "name": "shouldBeReadOnly",
+          "type": "bool"
+        },
+        {
+          "name": "applyRecursively",
+          "type": "bool"
+        }
+      ]
+    },
+    "show": {
+      "signature": "void show()",
+      "returnType": "void",
+      "description": "Opens a Explorer / Finder window that points to the file.",
+      "parameters": []
+    },
+    "startAsProcess": {
+      "signature": "bool startAsProcess(String parameters)",
+      "returnType": "bool",
+      "description": "Launches the file as a process.",
+      "parameters": [
+        {
+          "name": "parameters",
+          "type": "String"
+        }
+      ]
+    },
+    "toReferenceString": {
+      "signature": "String toReferenceString(String folderType)",
+      "returnType": "String",
+      "description": "Returns a reference string with a wildcard.",
+      "parameters": [
+        {
+          "name": "folderType",
+          "type": "String"
+        }
+      ]
+    },
+    "toString": {
+      "signature": "String toString(int formatType)",
+      "returnType": "String",
+      "description": "Returns a String representation of that file.",
+      "parameters": [
+        {
+          "name": "formatType",
+          "type": "int"
+        }
+      ]
+    },
+    "writeAsXmlFile": {
+      "signature": "bool writeAsXmlFile(var jsonDataToBeXmled, String tagName)",
+      "returnType": "bool",
+      "description": "Replaces the XML file with the JSON content (needs to be convertible).",
+      "parameters": [
+        {
+          "name": "jsonDataToBeXmled",
+          "type": "var"
+        },
+        {
+          "name": "tagName",
+          "type": "String"
+        }
+      ]
+    },
+    "writeAudioFile": {
+      "signature": "bool writeAudioFile(var audioData, double sampleRate, int bitDepth)",
+      "returnType": "bool",
+      "description": "Writes the given data (either a Buffer or Array of Buffers) to a audio file.",
+      "parameters": [
+        {
+          "name": "audioData",
+          "type": "var"
+        },
+        {
+          "name": "sampleRate",
+          "type": "double"
+        },
+        {
+          "name": "bitDepth",
+          "type": "int"
+        }
+      ]
+    },
+    "writeEncryptedObject": {
+      "signature": "bool writeEncryptedObject(var jsonData, String key)",
+      "returnType": "bool",
+      "description": "Encrypts an JSON object using the supplied key.",
+      "parameters": [
+        {
+          "name": "jsonData",
+          "type": "var"
+        },
+        {
+          "name": "key",
+          "type": "String"
+        }
+      ]
+    },
+    "writeMidiFile": {
+      "signature": "bool writeMidiFile(var eventList, var metadataObject)",
+      "returnType": "bool",
+      "description": "Writes the array of MessageHolders as MIDI file using the metadataObject to determine time signature, tempo, etc.",
+      "parameters": [
+        {
+          "name": "eventList",
+          "type": "var"
+        },
+        {
+          "name": "metadataObject",
+          "type": "var"
+        }
+      ]
+    },
+    "writeObject": {
+      "signature": "bool writeObject(var jsonData)",
+      "returnType": "bool",
+      "description": "Replaces the file content with the JSON data.",
+      "parameters": [
+        {
+          "name": "jsonData",
+          "type": "var"
+        }
+      ]
+    },
+    "writeString": {
+      "signature": "bool writeString(String text)",
+      "returnType": "bool",
+      "description": "Replaces the file content with the given text.",
+      "parameters": [
+        {
+          "name": "text",
+          "type": "String"
+        }
+      ]
+    }
+  }
+}

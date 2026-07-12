@@ -1,0 +1,3 @@
+Overrides the default error message for a specific state. The custom message takes highest priority when `getErrorMessage()` resolves text, above both event-supplied messages and built-in defaults. Works for all states, not only the custom message states.
+
+> [!Warning:Custom messages persist across error cycles] If a state is cleared and later re-triggered, the custom message still applies. Pass an empty string to revert to the default message for that state.

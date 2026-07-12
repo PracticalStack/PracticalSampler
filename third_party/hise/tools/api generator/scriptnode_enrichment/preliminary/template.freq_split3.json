@@ -1,0 +1,89 @@
+{
+  "factoryPath": "template.freq_split3",
+  "factory": "template",
+  "nodeId": "freq_split3",
+  "description": "Processes each node independently and sums up the output.",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Crossover Frequencies",
+      "rationale": "Two crossover frequency parameters define the boundaries between three frequency bands. Band 1 is the low-mid crossover, Band 2 is the mid-high crossover. Each parameter routes to three LR filters (one per band) at that crossover point.",
+      "parameters": [
+        {
+          "id": "Band 1",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0, "skew": 0.2299045584686382 },
+          "default": 68.06806806806806,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Band 2",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0, "skew": 0.2299045584686382 },
+          "default": 1000.0,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": true,
+    "groupName": "freq_splitN",
+    "templateParameter": "number of frequency bands (2-5)",
+    "variantValue": "3"
+  },
+
+  "existingDoc": {
+    "path": "phase3/template/freq_split3.md",
+    "tier": "BRIEF",
+    "lines": 10
+  },
+
+  "availableImages": ["lr4_3.png", "split.png"],
+
+  "gaps": [
+    {
+      "id": "variant-difference",
+      "category": "signal_path",
+      "question": "freq_split3 has 3 bands and 2 crossover parameters vs freq_split2's 2 bands and 1 crossover. Each crossover parameter connects to 3 LR filters (lr1_N, lr2_N, lr3_N -- one per band). Is the internal logic identical to freq_split2 except for the additional band and crossover, with the middle band using bandpass behaviour (HP from lower crossover, LP from upper crossover)?",
+      "context": "If identical in structure, the doc can reference the base variant and note only the band count and parameter count difference."
+    },
+    {
+      "id": "mid-band-filter-types",
+      "category": "parameter_behaviour",
+      "question": "In a 3-band split, the middle band needs both a high-pass (from crossover 1) and a low-pass (from crossover 2). What Type values are assigned to the LR filters in band2 to achieve bandpass behaviour?",
+      "context": "Middle bands in multi-way crossovers require two filter stages. Users need to understand how this is implemented."
+    }
+  ],
+
+  "notes": "Variant of freq_splitN with N=3. Adds one band and one crossover parameter vs the base. Each Band parameter now connects to 3 LR filters (one per band). The lr4_3.png image directly depicts this 3-band variant. Band 1 connects to lr1_1, lr2_1, lr3_1; Band 2 connects to lr1_2, lr2_2, lr3_2. The naming pattern suggests lrX_Y where X is the band index and Y is the crossover index."
+}

@@ -1,0 +1,1 @@
+Maps the brightness values of the current layer to a two-colour gradient, producing a duotone colour grading effect. Dark pixels are remapped towards `darkColour` and bright pixels towards `brightColour`.

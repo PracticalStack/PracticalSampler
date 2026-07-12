@@ -1,0 +1,107 @@
+{
+  "factoryPath": "control.clone_pack",
+  "factory": "control",
+  "nodeId": "clone_pack",
+  "description": "control cloned parameters with a slider pack",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Clone configuration",
+      "rationale": "NumClones defines how many clones are addressed; auto-updated from clone container",
+      "parameters": [
+        {
+          "id": "NumClones",
+          "range": { "min": 1.0, "max": 16.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Value multiplier",
+      "rationale": "Global multiplier applied to all slider pack values before sending to clones",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 1,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/clone_pack.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "slider-clone-mapping",
+      "category": "signal_path",
+      "question": "clone_pack multiplies sliderData[i] * lastValue for each clone i. Confirm this formula from the C++ source. What happens when the slider pack has fewer entries than active clones (extra clones get no update) and vice versa (extra slider values ignored)?",
+      "context": "The infrastructure doc describes this behaviour but it should be confirmed directly from CableNodes.h."
+    },
+    {
+      "id": "content-change-optimization",
+      "category": "parameter_behaviour",
+      "question": "When a single slider is edited interactively, does clone_pack only update that specific clone (via the ContentChange listener), or does it resend all values?",
+      "context": "Important for understanding interactive editing performance."
+    },
+    {
+      "id": "normalisation-of-output",
+      "category": "signal_path",
+      "question": "clone_pack does not have UseUnnormalisedModulation in cppProperties. Confirm that output values are normalised and target ranges are applied.",
+      "context": "Determines whether slider pack values (0..1) are scaled through the target parameter range."
+    },
+    {
+      "id": "slider-pack-size-vs-clones",
+      "category": "parameter_behaviour",
+      "question": "Does the slider pack automatically resize to match the clone count, or must the user manually ensure the pack has enough entries?",
+      "context": "Practical guidance for users setting up clone_pack."
+    }
+  ],
+
+  "notes": "clone_pack uses a SliderPack (1 slot) where each slider index maps to a clone index. The Value parameter (default 1.0) acts as a global multiplier. The IsCloneCableNode cppProperty is set. Unlike clone_cable, clone_pack does not have a Mode property or process MIDI events. The infrastructure doc describes a ContentChange optimization where editing a single slider only updates that clone."
+}

@@ -1,0 +1,101 @@
+{
+  "factoryPath": "fx.bitcrush",
+  "factory": "fx",
+  "nodeId": "bitcrush",
+  "description": "A bitcrusher effect node",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Bit reduction",
+      "rationale": "BitDepth controls the quantisation depth; Mode selects the quantisation algorithm. Both determine the character of the distortion.",
+      "parameters": [
+        {
+          "id": "BitDepth",
+          "range": { "min": 4.0, "max": 16.0, "step": 0.1, "skew": 1.0 },
+          "default": 16.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Mode",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "57.nT6K8CBLAF..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.LT.QCofPoA2arElb.D1XzklckAP.AH..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/fx/bitcrush.md",
+    "tier": "GOOD",
+    "lines": 25
+  },
+
+  "availableImages": ["script-fx1.png"],
+
+  "gaps": [
+    {
+      "id": "processing-order",
+      "category": "signal_path",
+      "question": "Does process() iterate per-sample or per-block? Does it use processFrame() or direct channel iteration?",
+      "context": "Needed to describe the signal flow in the reference page and determine CPU profile."
+    },
+    {
+      "id": "bitdepth-quantisation",
+      "category": "parameter_behaviour",
+      "question": "BitDepth has step=0.1, range 4-16. Is fractional bit depth supported (continuous quantisation) or does it snap to integers internally? At 16 bits, is the effect fully transparent (no quantisation)?",
+      "context": "The step size of 0.1 suggests continuous operation, but the existing doc says 'stepped curve'. Need to clarify for accurate parameter description."
+    },
+    {
+      "id": "mode-values",
+      "category": "conditional_logic",
+      "question": "The Mode parameter has range 0-1, step 1 with a TextToValueConverter. The existing doc names 'DC Offset' (0) and 'Bipolar' (1). Confirm these are the two modes and verify the ceil vs floor rounding described in the existing doc.",
+      "context": "The existing doc provides a detailed description of modes. Need C++ confirmation of the rounding logic."
+    },
+    {
+      "id": "polyphonic-state",
+      "category": "signal_path",
+      "question": "IsPolyphonic is true. Does the node maintain per-voice state (e.g. PolyData for the quantisation), or is the polyphonic flag inherited from a base class without per-voice state?",
+      "context": "Determines whether to document per-voice behaviour or just note polyphonic compatibility."
+    }
+  ],
+
+  "notes": "Existing phase3 doc is detailed (GOOD tier) with mode descriptions and a screenshot reference. The Mode parameter uses a TextToValueConverter (encoded enum labels) rather than being a Property - it is a runtime parameter, not a compile-time property. BitDepth step of 0.1 is unusual for a 'bit depth' parameter and suggests continuous (fractional) operation."
+}

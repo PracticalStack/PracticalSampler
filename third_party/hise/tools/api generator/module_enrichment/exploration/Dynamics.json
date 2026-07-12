@@ -1,0 +1,220 @@
+{
+  "moduleId": "Dynamics",
+  "nodes": [
+    {
+      "id": "audio_in",
+      "type": "input",
+      "label": "Audio In (L/R)",
+      "importance": 1.0
+    },
+    {
+      "id": "gate_enabled",
+      "type": "decision",
+      "label": "Gate Enabled?",
+      "importance": 0.8,
+      "group": "gate"
+    },
+    {
+      "id": "gate_process",
+      "type": "process",
+      "label": "Noise Gate",
+      "importance": 0.9,
+      "group": "gate",
+      "description": "Per-sample noise gate that attenuates signal below the threshold"
+    },
+    {
+      "id": "gate_threshold",
+      "type": "parameter",
+      "label": "GateThreshold",
+      "importance": 0.8,
+      "group": "gate"
+    },
+    {
+      "id": "gate_attack",
+      "type": "parameter",
+      "label": "GateAttack",
+      "importance": 0.6,
+      "group": "gate"
+    },
+    {
+      "id": "gate_release",
+      "type": "parameter",
+      "label": "GateRelease",
+      "importance": 0.6,
+      "group": "gate"
+    },
+    {
+      "id": "gate_reduction",
+      "type": "parameter",
+      "label": "GateReduction",
+      "importance": 0.4,
+      "group": "gate",
+      "description": "Read-only gain reduction meter with peak-hold and exponential decay"
+    },
+    {
+      "id": "comp_enabled",
+      "type": "decision",
+      "label": "Compressor Enabled?",
+      "importance": 0.8,
+      "group": "compressor"
+    },
+    {
+      "id": "comp_process",
+      "type": "process",
+      "label": "Compressor",
+      "importance": 0.9,
+      "group": "compressor",
+      "description": "Per-sample downward compressor"
+    },
+    {
+      "id": "comp_threshold",
+      "type": "parameter",
+      "label": "CompressorThreshold",
+      "importance": 0.8,
+      "group": "compressor"
+    },
+    {
+      "id": "comp_ratio",
+      "type": "parameter",
+      "label": "CompressorRatio",
+      "importance": 0.8,
+      "group": "compressor"
+    },
+    {
+      "id": "comp_attack",
+      "type": "parameter",
+      "label": "CompressorAttack",
+      "importance": 0.6,
+      "group": "compressor"
+    },
+    {
+      "id": "comp_release",
+      "type": "parameter",
+      "label": "CompressorRelease",
+      "importance": 0.6,
+      "group": "compressor"
+    },
+    {
+      "id": "comp_reduction",
+      "type": "parameter",
+      "label": "CompressorReduction",
+      "importance": 0.4,
+      "group": "compressor",
+      "description": "Read-only gain reduction meter"
+    },
+    {
+      "id": "comp_makeup",
+      "type": "process",
+      "label": "Compressor Makeup",
+      "importance": 0.7,
+      "group": "compressor",
+      "description": "Auto-calculated gain compensation based on threshold and ratio"
+    },
+    {
+      "id": "comp_makeup_param",
+      "type": "parameter",
+      "label": "CompressorMakeup",
+      "importance": 0.6,
+      "group": "compressor"
+    },
+    {
+      "id": "limiter_enabled",
+      "type": "decision",
+      "label": "Limiter Enabled?",
+      "importance": 0.8,
+      "group": "limiter"
+    },
+    {
+      "id": "limiter_process",
+      "type": "process",
+      "label": "Limiter",
+      "importance": 0.9,
+      "group": "limiter",
+      "description": "Per-sample brick-wall limiter with crossfade on enable/disable"
+    },
+    {
+      "id": "limiter_threshold",
+      "type": "parameter",
+      "label": "LimiterThreshold",
+      "importance": 0.8,
+      "group": "limiter"
+    },
+    {
+      "id": "limiter_attack",
+      "type": "parameter",
+      "label": "LimiterAttack",
+      "importance": 0.6,
+      "group": "limiter"
+    },
+    {
+      "id": "limiter_release",
+      "type": "parameter",
+      "label": "LimiterRelease",
+      "importance": 0.6,
+      "group": "limiter"
+    },
+    {
+      "id": "limiter_reduction",
+      "type": "parameter",
+      "label": "LimiterReduction",
+      "importance": 0.4,
+      "group": "limiter",
+      "description": "Read-only gain reduction meter"
+    },
+    {
+      "id": "limiter_makeup",
+      "type": "process",
+      "label": "Limiter Makeup",
+      "importance": 0.7,
+      "group": "limiter",
+      "description": "Auto-calculated gain compensation based on threshold"
+    },
+    {
+      "id": "limiter_makeup_param",
+      "type": "parameter",
+      "label": "LimiterMakeup",
+      "importance": 0.6,
+      "group": "limiter"
+    },
+    {
+      "id": "audio_out",
+      "type": "output",
+      "label": "Audio Out (L/R)",
+      "importance": 1.0
+    }
+  ],
+  "edges": [
+    { "from": "audio_in", "to": "gate_enabled", "type": "signal" },
+    { "from": "gate_enabled", "to": "gate_process", "type": "conditional", "label": "if On" },
+    { "from": "gate_enabled", "to": "comp_enabled", "type": "conditional", "label": "if Off (bypass)" },
+    { "from": "gate_threshold", "to": "gate_process", "type": "control" },
+    { "from": "gate_attack", "to": "gate_process", "type": "control" },
+    { "from": "gate_release", "to": "gate_process", "type": "control" },
+    { "from": "gate_process", "to": "gate_reduction", "type": "control", "label": "meter output" },
+    { "from": "gate_process", "to": "comp_enabled", "type": "signal" },
+    { "from": "comp_enabled", "to": "comp_process", "type": "conditional", "label": "if On" },
+    { "from": "comp_enabled", "to": "limiter_enabled", "type": "conditional", "label": "if Off (bypass)" },
+    { "from": "comp_threshold", "to": "comp_process", "type": "control" },
+    { "from": "comp_ratio", "to": "comp_process", "type": "control" },
+    { "from": "comp_attack", "to": "comp_process", "type": "control" },
+    { "from": "comp_release", "to": "comp_process", "type": "control" },
+    { "from": "comp_process", "to": "comp_reduction", "type": "control", "label": "meter output" },
+    { "from": "comp_process", "to": "comp_makeup", "type": "signal" },
+    { "from": "comp_makeup_param", "to": "comp_makeup", "type": "conditional", "label": "skip if Off" },
+    { "from": "comp_makeup", "to": "limiter_enabled", "type": "signal" },
+    { "from": "limiter_enabled", "to": "limiter_process", "type": "conditional", "label": "if On (with crossfade)" },
+    { "from": "limiter_enabled", "to": "audio_out", "type": "conditional", "label": "if Off (bypass)" },
+    { "from": "limiter_threshold", "to": "limiter_process", "type": "control" },
+    { "from": "limiter_attack", "to": "limiter_process", "type": "control" },
+    { "from": "limiter_release", "to": "limiter_process", "type": "control" },
+    { "from": "limiter_process", "to": "limiter_reduction", "type": "control", "label": "meter output" },
+    { "from": "limiter_process", "to": "limiter_makeup", "type": "signal" },
+    { "from": "limiter_makeup_param", "to": "limiter_makeup", "type": "conditional", "label": "skip if Off" },
+    { "from": "limiter_makeup", "to": "audio_out", "type": "signal" }
+  ],
+  "groups": [
+    { "id": "gate", "label": "Gate Stage" },
+    { "id": "compressor", "label": "Compressor Stage" },
+    { "id": "limiter", "label": "Limiter Stage" }
+  ]
+}

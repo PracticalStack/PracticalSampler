@@ -1,0 +1,1 @@
+Returns `true` if running as a VST, AU, or AAX plugin, `false` if running as a standalone application. Useful for adjusting behaviour based on the deployment context, such as enabling `Engine.quit()` only in standalone mode.

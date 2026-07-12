@@ -1,0 +1,155 @@
+{
+  "15": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);\nContent.addFloatingTile(\"ft_Keyboard\", 0, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "ft_Keyboard != undefined", "value": 1, "delay": 0}
+    ],
+    "notes": "CSS rotate on FloatingTile. Compile + verify component exists. Visual-only."
+  },
+  "16": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "LAF.loadImage requires PNG files in {PROJECT_FOLDER} which are not available in test environment",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Image-based slider LAF. Requires SliderBackground.png and SliderCap.png project assets."
+  },
+  "17": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "mySliders.length", "value": 4, "delay": 0},
+      {"type": "REPL", "expression": "mySlidersIdArray.length", "value": 4, "delay": 0},
+      {"type": "REPL", "expression": "mySlidersIdArray[0]", "value": "MySlider0", "delay": 0},
+      {"type": "REPL", "expression": "mySlidersIdArray[3]", "value": "MySlider3", "delay": 0}
+    ],
+    "notes": "Self-contained: creates sliders via Content.addKnob in loop. Verify array creation and ID mapping."
+  },
+  "18": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);\nContent.addFloatingTile(\"FloatingTile1\", 0, 0);",
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "CSS preset browser styling. Compile-only, visual-only."
+  },
+  "19": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);\nContent.addLabel(\"PresetNameLabel\", 0, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "PresetNameLabel != undefined", "value": 1, "delay": 0}
+    ],
+    "notes": "UserPresetHandler callback. Compile + verify label exists. Can't trigger preset change via REPL."
+  },
+  "20": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.addLabel(\"Label1\", 0, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "Label1 != undefined", "value": 1, "delay": 0}
+    ],
+    "notes": "Already has makeFrontInterface(200, 50). CSS styled label. Compile + verify."
+  },
+  "21": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);\nContent.addPanel(\"Grid1\", 0, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "Grid1 != undefined", "value": 1, "delay": 0}
+    ],
+    "notes": "Grid paint routine on panel. Compile-only, visual."
+  },
+  "22": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);\nContent.addPanel(\"Panel1\", 0, 0);\nContent.addKnob(\"ChildKnob\", 10, 10);",
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Iterates getAllComponents and checks parentComponent. Console.print output depends on component parenting which we can't easily set up. Compile-only."
+  },
+  "23": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "// MODULE_SETUP: Synth.addEffect(\"SimpleGain\", \"InGain\", -1);\nContent.makeFrontInterface(600, 400);\nContent.addImage(\"Image8\", 0, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "InGain != undefined", "value": 1, "delay": 0},
+      {"type": "REPL", "expression": "Image8 != undefined", "value": 1, "delay": 0}
+    ],
+    "notes": "Timer polls effect level to drive image alpha. Compile + verify objects exist. Timer is visual-only."
+  },
+  "24": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Requires a Sampler module in the module tree which cannot be dynamically added via script",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Synth.getSampler needs a pre-existing Sampler module. Samplers are child synths, not effects."
+  },
+  "25": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);\nContent.addComboBox(\"ComboBox1\", 0, 0);",
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Hybrid script + CSS combobox LAF. Compile-only, visual."
+  },
+  "26": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);",
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Pure function definition (createRotatedPath). Compile-only. Path result is hard to verify via REPL."
+  },
+  "27": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);\nContent.addButton(\"Button2\", 0, 0);\nContent.addLabel(\"Label1\", 100, 0);",
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "CSS cursor styling. Compile-only, visual."
+  },
+  "28": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Requires an Audio Loop Player module in the module tree which cannot be dynamically added via script",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Synth.getAudioSampleProcessor needs a pre-existing Audio Loop Player module."
+  },
+  "29": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);\nContent.addLabel(\"Label1\", 0, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "Label1 != undefined", "value": 1, "delay": 0}
+    ],
+    "notes": "Label key press callback. Compile + verify. Can't trigger key events via REPL."
+  }
+}

@@ -1,0 +1,1 @@
+Returns the MIDI note number (0-127) of the current note-on or note-off event. This is the raw note number without transpose applied. If you need the transposed pitch, add `Message.getTransposeAmount()` to the result.

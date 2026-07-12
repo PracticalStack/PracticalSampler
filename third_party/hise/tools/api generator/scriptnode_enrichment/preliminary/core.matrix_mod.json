@@ -1,0 +1,167 @@
+{
+  "factoryPath": "core.matrix_mod",
+  "factory": "core",
+  "nodeId": "matrix_mod",
+  "description": "A modulator that connects to global modulators with the feature set of the modulation matrix",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": true,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Source Configuration",
+      "rationale": "SourceIndex selects the primary modulation source; Intensity controls the modulation depth; Mode and Inverted shape how the modulation is applied",
+      "parameters": [
+        {
+          "id": "SourceIndex",
+          "range": { "min": -1.0, "max": 64.0, "step": 1.0, "skew": 1.0 },
+          "default": -1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Intensity",
+          "range": { "min": -1.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Mode",
+          "range": { "min": 0.0, "max": 2.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "69.nT6K8CBOgG..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.XTvTiEFakoPUtkFbuwVXxofPoA2arElb.D1XzklckAP.AH..",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Inverted",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "62.nT6K8CRMoF..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.QTfSuIWagwlBI4lckIGckQF.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Auxiliary Source",
+      "rationale": "AuxIndex and AuxIntensity configure a secondary modulation source that dynamically controls the primary modulation intensity",
+      "parameters": [
+        {
+          "id": "AuxIndex",
+          "range": { "min": -1.0, "max": 64.0, "step": 1.0, "skew": 1.0 },
+          "default": -1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "AuxIntensity",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Zero Position",
+      "rationale": "ZeroPosition shifts the modulation center point, affecting how the modulation formula is applied",
+      "parameters": [
+        {
+          "id": "ZeroPosition",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "58.nT6K8CRLIF..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.MT.SkYFcJLTYtQWYxAPXiQWZ1UF.ADf...",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "displayBuffers": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/matrix_mod.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "dual-source-interaction",
+      "category": "signal_path",
+      "question": "matrix_mod uses two internal global_mod instances (source in Raw mode, aux in Aux mode). How do the source and aux signals combine? Does the aux channel multiply the source intensity dynamically?",
+      "context": "The dual-source architecture is the key differentiator from global_mod."
+    },
+    {
+      "id": "mode-variants",
+      "category": "conditional_logic",
+      "question": "Mode has 3 values with the text converter suggesting 'Scale', 'Unipolar', 'Bipolar'. Confirm: 'Scale' is used instead of 'Gain' for matrix_mod. Are the formulas identical to global_mod's Gain/Unipolar/Bipolar?",
+      "context": "The mode naming difference (Scale vs Gain) may or may not indicate a formula difference."
+    },
+    {
+      "id": "inversion-behaviour",
+      "category": "parameter_behaviour",
+      "question": "Inverted is a boolean toggle. The runtime-target.md says it flips the source signal (1 - signal). Confirm: does inversion apply before or after the mode formula?",
+      "context": "The order of operations matters for the final modulation result."
+    },
+    {
+      "id": "zero-position-values",
+      "category": "conditional_logic",
+      "question": "ZeroPosition has step 1 and text converter suggesting 'Left'/'Center'. Confirm: Left=0.0 means zero offset, Center=0.5 means subtract 0.5 before gain modulation and add back after?",
+      "context": "This matches the useMidPositionAsZero flag in the infrastructure docs."
+    },
+    {
+      "id": "source-index-range",
+      "category": "parameter_behaviour",
+      "question": "SourceIndex and AuxIndex range from -1 to 64 (not 0-16 like global_mod). Does -1 mean disconnected? Why is the range larger than global_mod's Index?",
+      "context": "The larger range and -1 default suggest different connection semantics."
+    },
+    {
+      "id": "aux-intensity-mode",
+      "category": "signal_path",
+      "question": "The aux source uses TargetMode::Aux. The formula is (1 - intensity + intensity * signal) * base. How does AuxIntensity control this? Is the aux output used to modulate the main Intensity parameter?",
+      "context": "Understanding the aux signal flow is essential for proper use."
+    },
+    {
+      "id": "envelope-voice-tracking",
+      "category": "signal_path",
+      "question": "The runtime-target.md mentions isPlaying() checks for envelope sources. How does matrix_mod handle voice lifecycle when connected to an envelope modulator?",
+      "context": "Per-voice envelope tracking is important for polyphonic use cases."
+    }
+  ],
+
+  "notes": "matrix_mod is the most complex modulation bridge node. It does NOT inherit from mod_base directly but instead contains two internal global_mod instances (source and aux). The source signal is processed in Raw mode, the aux in Aux mode. The node supports inversion and two zero position options (Left/Center). SourceIndex and AuxIndex have wider range (-1 to 64) than global_mod's Index (0-16), with -1 meaning disconnected. The Mode text converter differs from global_mod (Scale/Unipolar/Bipolar vs Gain/Unipolar/Bipolar). Default Intensity is 0.0 (not 1.0 like global_mod), suggesting the node starts fully bypassed. The Inverted text converter likely contains 'Normal'/'Inverted' labels."
+}

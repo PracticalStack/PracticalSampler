@@ -1,0 +1,1 @@
+Returns the parent ScriptPanel if this panel was created via `addChildPanel()`, or `undefined` for top-level panels. This navigates the child panel hierarchy, not the `parentComponent` property system.

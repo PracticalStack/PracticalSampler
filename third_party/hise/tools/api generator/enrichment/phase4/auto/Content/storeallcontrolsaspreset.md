@@ -1,0 +1,1 @@
+Saves all component control values to an XML preset file. The file path is resolved relative to the UserPresets folder. Pass `undefined` as the second argument to store all controls, or pass automation data to filter which controls are included. This is the counterpart to `Content.restoreAllControlsFromPreset()`.

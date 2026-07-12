@@ -1,0 +1,146 @@
+{
+  "30": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": [
+      {"type": "log-output", "values": ["file NOT THERE....."]}
+    ],
+    "notes": "Fixed: changed 'local' to 'var' at script scope. File won't exist so else branch fires."
+  },
+  "31": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Writes encrypted preferences to Documents folder, acceptable in test env"
+  },
+  "32": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptComboBox", "id": "ComboBox1"}
+    ],
+    "verifyScript": null,
+    "notes": "Local LAF for ComboBox, compile-only"
+  },
+  "33": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "Convolution", "name": "Convolution Reverb1"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Sets FFT type attribute on Convolution effect"
+  },
+  "34": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "Delay", "name": "Delay1"}
+    ],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"},
+      {"type": "ScriptSlider", "id": "Knob2"},
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "Linked delay knobs, callback only fires on user interaction"
+  },
+  "35": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "File paths won't exist, isFile() returns false, no process started. Compile-only."
+  },
+  "36": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "Arpeggiator", "name": "Arpeggiator1"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Console.print outputs attribute names, compile-only"
+  },
+  "37": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "loadImage with {PROJECT_FOLDER} path - file doesn't exist in test environment",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "38": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptButton", "id": "btnRandmonize"}
+    ],
+    "verifyScript": null,
+    "notes": "Callback randomizes all components, compile-only"
+  },
+  "39": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "StreamingSampler", "name": "Sampler1"}
+    ],
+    "components": [
+      {"type": "ScriptComboBox", "id": "ExpansionSelector"},
+      {"type": "ScriptComboBox", "id": "SAMPLEBOX"}
+    ],
+    "verifyScript": null,
+    "notes": "No expansions in test env, getExpansionList returns empty. Compile-only."
+  },
+  "40": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "laf.loadImage with {PROJECT_FOLDER} paths - files don't exist in test environment",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "41": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "StreamingSampler", "name": "Sampler1"}
+    ],
+    "components": [
+      {"type": "ScriptButton", "id": "SAMPLERLOOP"}
+    ],
+    "verifyScript": null,
+    "notes": "createSelection in callback, not during init. Compile-only."
+  },
+  "42": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "loadAudioFilesIntoPool returns empty in test env, but compiles fine"
+  }
+}

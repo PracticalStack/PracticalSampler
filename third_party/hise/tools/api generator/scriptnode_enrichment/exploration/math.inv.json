@@ -1,0 +1,12 @@
+{
+  "factoryPath": "math.inv",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "inv", "label": "Negate", "type": "process", "importance": 1.0, "description": "output = -input (phase inversion)" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Phase-inverted signal" }
+  ],
+  "edges": [
+    { "from": "in", "to": "inv", "type": "signal", "label": null },
+    { "from": "inv", "to": "out", "type": "signal", "label": null }
+  ]
+}

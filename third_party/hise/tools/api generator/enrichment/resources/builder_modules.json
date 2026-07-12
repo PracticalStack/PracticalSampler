@@ -1,0 +1,600 @@
+{
+  "SoundGenerators": {
+    "StreamingSampler": {
+      "prettyName": "Sampler",
+      "type": "SoundGenerator",
+      "interfaces": ["ChildSynth", "Sampler", "RoutingMatrix", "TableProcessor"],
+      "tables": 8,
+      "chains": [
+        [0, "Midi Processor", "MidiProcessor"],
+        [1, "GainModulation", "Modulator", "*", "Gain"],
+        [2, "PitchModulation", "Modulator", "*", "Pitch"],
+        [3, "FX", "FX"],
+        [4, "Sample Start", "Modulator", "VoiceStartModulator", "Gain"],
+        [5, "Group Fade", "Modulator", "*", "Gain"]
+      ]
+    },
+    "SineSynth": {
+      "prettyName": "Sine Wave Generator",
+      "type": "SoundGenerator",
+      "interfaces": ["ChildSynth", "RoutingMatrix"],
+      "chains": [
+        [0, "Midi Processor", "MidiProcessor"],
+        [1, "GainModulation", "Modulator", "*", "Gain"],
+        [2, "PitchModulation", "Modulator", "*", "Pitch"],
+        [3, "FX", "FX"]
+      ]
+    },
+    "SynthChain": {
+      "prettyName": "Container",
+      "type": "SoundGenerator",
+      "interfaces": ["ChildSynth", "RoutingMatrix"],
+      "chains": [
+        [0, "Midi Processor", "MidiProcessor"],
+        [1, "GainModulation", "Modulator", "No voice modulators", "Gain"],
+        [3, "FX", "FX", "No voice modulators"]
+      ]
+    },
+    "GlobalModulatorContainer": {
+      "prettyName": "Global Modulator Container",
+      "type": "SoundGenerator",
+      "interfaces": ["ChildSynth", "RoutingMatrix"],
+      "chains": [
+        [0, "Midi Processor", "MidiProcessor"],
+        [1, "Global Modulators", "Modulator", "No global modulators", "Global"]
+      ]
+    },
+    "WaveSynth": {
+      "prettyName": "Waveform Generator",
+      "type": "SoundGenerator",
+      "interfaces": ["ChildSynth", "RoutingMatrix"],
+      "chains": [
+        [0, "Midi Processor", "MidiProcessor"],
+        [1, "GainModulation", "Modulator", "*", "Gain"],
+        [2, "PitchModulation", "Modulator", "*", "Pitch"],
+        [3, "FX", "FX"],
+        [4, "Mix Modulation", "Modulator", "*", "Combined"],
+        [5, "Osc2 Pitch Modulation", "Modulator", "*", "Pitch"]
+      ]
+    },
+    "Noise": {
+      "prettyName": "Noise Generator",
+      "type": "SoundGenerator",
+      "interfaces": ["ChildSynth", "RoutingMatrix"],
+      "chains": [
+        [0, "Midi Processor", "MidiProcessor"],
+        [1, "GainModulation", "Modulator", "*", "Gain"],
+        [2, "PitchModulation", "Modulator", "*", "Pitch"],
+        [3, "FX", "FX"]
+      ]
+    },
+    "WavetableSynth": {
+      "prettyName": "Wavetable Synthesiser",
+      "type": "SoundGenerator",
+      "interfaces": ["ChildSynth", "RoutingMatrix", "AudioSampleProcessor"],
+      "audioFiles": 1,
+      "chains": [
+        [0, "Midi Processor", "MidiProcessor"],
+        [1, "GainModulation", "Modulator", "*", "Gain"],
+        [2, "PitchModulation", "Modulator", "*", "Pitch"],
+        [3, "FX", "FX"],
+        [4, "Table Index", "Modulator", "*", "Gain"],
+        [5, "Table Index Bipolar", "Modulator", "*", "Pan"]
+      ]
+    },
+    "AudioLooper": {
+      "prettyName": "Audio Loop Player",
+      "type": "SoundGenerator",
+      "interfaces": ["ChildSynth", "RoutingMatrix", "AudioSampleProcessor"],
+      "audioFiles": 1,
+      "chains": [
+        [0, "Midi Processor", "MidiProcessor"],
+        [1, "GainModulation", "Modulator", "*", "Gain"],
+        [2, "PitchModulation", "Modulator", "*", "Pitch"],
+        [3, "FX", "FX"]
+      ]
+    },
+    "SynthGroup": {
+      "prettyName": "Synthesiser Group",
+      "type": "SoundGenerator",
+      "interfaces": ["ChildSynth", "RoutingMatrix"],
+      "chains": [
+        [0, "Midi Processor", "MidiProcessor"],
+        [1, "GainModulation", "Modulator", "*", "Gain"],
+        [2, "PitchModulation", "Modulator", "*", "Pitch"],
+        [3, "FX", "FX"],
+        [4, "Detune Mod", "Modulator", "*", "Gain"],
+        [5, "Spread Mod", "Modulator", "*", "Gain"]
+      ]
+    },
+    "ScriptSynth": {
+      "prettyName": "Scriptnode Synthesiser",
+      "type": "SoundGenerator",
+      "interfaces": ["ChildSynth", "RoutingMatrix"],
+      "slotFXTypes": ["Scriptnode", "Script"],
+      "chains": [
+        [0, "Midi Processor", "MidiProcessor"],
+        [1, "GainModulation", "Modulator", "*", "Gain"],
+        [2, "PitchModulation", "Modulator", "*", "Pitch"],
+        [3, "FX", "FX"],
+        [4, "Extra1", "Modulator", "*", "Combined"],
+        [5, "Extra2", "Modulator", "*", "Combined"]
+      ]
+    },
+    "MacroModulationSource": {
+      "prettyName": "Macro Modulation Source",
+      "type": "SoundGenerator",
+      "interfaces": ["ChildSynth", "RoutingMatrix"],
+      "chains": [
+        [0, "Midi Processor", "MidiProcessor"],
+        [4, "Macro 1", "Modulator", "*", "Gain"],
+        [5, "Macro 2", "Modulator", "*", "Gain"],
+        [6, "Macro 3", "Modulator", "*", "Gain"],
+        [7, "Macro 4", "Modulator", "*", "Gain"],
+        [8, "Macro 5", "Modulator", "*", "Gain"],
+        [9, "Macro 6", "Modulator", "*", "Gain"],
+        [10, "Macro 7", "Modulator", "*", "Gain"],
+        [11, "Macro 8", "Modulator", "*", "Gain"]
+      ]
+    },
+    "SendContainer": {
+      "prettyName": "Send Container",
+      "type": "SoundGenerator",
+      "interfaces": ["ChildSynth", "RoutingMatrix"],
+      "chains": [
+        [0, "Midi Processor", "MidiProcessor"],
+        [1, "GainModulation", "Modulator", "*", "Gain"],
+        [2, "PitchModulation", "Modulator", "*", "Pitch"],
+        [3, "FX", "FX", "No voice modulators"]
+      ]
+    },
+    "SilentSynth": {
+      "prettyName": "Silent Synth",
+      "type": "SoundGenerator",
+      "interfaces": ["ChildSynth", "RoutingMatrix"],
+      "chains": [
+        [0, "Midi Processor", "MidiProcessor"],
+        [1, "GainModulation", "Modulator", "*", "Gain"],
+        [2, "PitchModulation", "Modulator", "*", "Pitch"],
+        [3, "FX", "FX"]
+      ]
+    },
+    "HardcodedSynth": {
+      "prettyName": "Hardcoded Synthesiser",
+      "type": "SoundGenerator",
+      "interfaces": ["ChildSynth", "RoutingMatrix", "SlotFX"],
+      "slotFXTypes": ["Hardcoded"],
+      "chains": [
+        [0, "Midi Processor", "MidiProcessor"],
+        [1, "GainModulation", "Modulator", "*", "Gain"],
+        [2, "PitchModulation", "Modulator", "*", "Pitch"],
+        [3, "FX", "FX"],
+        [4, "Extra1", "Modulator", "*", "Combined"],
+        [5, "Extra2", "Modulator", "*", "Combined"]
+      ]
+    }
+  },
+  "MidiProcessors": {
+    "ScriptProcessor": {
+      "prettyName": "Script Processor",
+      "interfaces": ["MidiProcessor", "RoutingMatrix"],
+      "slotFXTypes": ["Scriptnode", "Script"]
+    },
+    "Transposer": {
+      "prettyName": "Transposer",
+      "interfaces": ["MidiProcessor", "RoutingMatrix"]
+    },
+    "MidiPlayer": {
+      "prettyName": "MIDI Player",
+      "interfaces": ["MidiProcessor", "MidiPlayer", "RoutingMatrix"]
+    },
+    "ChokeGroupProcessor": {
+      "prettyName": "Choke Group Processor",
+      "interfaces": ["MidiProcessor", "RoutingMatrix"]
+    },
+    "LegatoWithRetrigger": {
+      "prettyName": "Legato with Retrigger",
+      "interfaces": ["MidiProcessor", "RoutingMatrix"]
+    },
+    "CCSwapper": {
+      "prettyName": "CC Swapper",
+      "interfaces": ["MidiProcessor", "RoutingMatrix"]
+    },
+    "ReleaseTrigger": {
+      "prettyName": "Release Trigger",
+      "interfaces": ["MidiProcessor", "RoutingMatrix", "TableProcessor"],
+      "tables": 1
+    },
+    "CC2Note": {
+      "prettyName": "MIDI CC to Note Generator",
+      "interfaces": ["MidiProcessor", "RoutingMatrix"]
+    },
+    "ChannelFilter": {
+      "prettyName": "MIDI Channel Filter",
+      "interfaces": ["MidiProcessor", "RoutingMatrix"]
+    },
+    "ChannelSetter": {
+      "prettyName": "MIDI Channel Setter",
+      "interfaces": ["MidiProcessor", "RoutingMatrix"]
+    },
+    "MidiMuter": {
+      "prettyName": "MidiMuter",
+      "interfaces": ["MidiProcessor", "RoutingMatrix"]
+    },
+    "Arpeggiator": {
+      "prettyName": "Arpeggiator",
+      "interfaces": ["MidiProcessor", "RoutingMatrix", "SliderPackProcessor"],
+      "sliderPacks": 3
+    }
+  },
+  "Modulators": {
+    "Constant": {
+      "prettyName": "Constant",
+      "type": "VoiceStartModulator",
+      "interfaces": ["Modulator", "RoutingMatrix"]
+    },
+    "Velocity": {
+      "prettyName": "Velocity Modulator",
+      "type": "VoiceStartModulator",
+      "interfaces": ["Modulator", "RoutingMatrix", "TableProcessor"],
+      "tables": 1
+    },
+    "KeyNumber": {
+      "prettyName": "Notenumber Modulator",
+      "type": "VoiceStartModulator",
+      "interfaces": ["Modulator", "RoutingMatrix", "TableProcessor"],
+      "tables": 1
+    },
+    "Random": {
+      "prettyName": "Random Modulator",
+      "type": "VoiceStartModulator",
+      "interfaces": ["Modulator", "RoutingMatrix", "TableProcessor"],
+      "tables": 1
+    },
+    "GlobalVoiceStartModulator": {
+      "prettyName": "Global Voice Start Modulator",
+      "type": "VoiceStartModulator",
+      "interfaces": ["Modulator", "RoutingMatrix", "TableProcessor"],
+      "tables": 1
+    },
+    "GlobalStaticTimeVariantModulator": {
+      "prettyName": "Global Static Time Variant Modulator",
+      "type": "VoiceStartModulator",
+      "interfaces": ["Modulator", "RoutingMatrix", "TableProcessor"],
+      "tables": 1
+    },
+    "ArrayModulator": {
+      "prettyName": "Array Modulator",
+      "type": "VoiceStartModulator",
+      "interfaces": ["Modulator", "RoutingMatrix", "SliderPackProcessor"],
+      "sliderPacks": 1
+    },
+    "ScriptVoiceStartModulator": {
+      "prettyName": "Script Voice Start Modulator",
+      "type": "VoiceStartModulator",
+      "interfaces": ["Modulator", "RoutingMatrix"],
+      "slotFXTypes": ["Scriptnode", "Script"]
+    },
+    "EventDataModulator": {
+      "prettyName": "Event Data Modulator",
+      "type": "VoiceStartModulator",
+      "interfaces": ["Modulator", "RoutingMatrix"]
+    },
+    "LFO": {
+      "prettyName": "LFO Modulator",
+      "type": "TimeVariantModulator",
+      "interfaces": ["Modulator", "RoutingMatrix", "TableProcessor", "SliderPackProcessor", "DisplayBufferSource"],
+      "tables": 1,
+      "sliderPacks": 1,
+      "displayBuffers": 1,
+      "chains": [
+        [0, "LFO Intensity Mod", "Modulator", "No global modulators", "Gain"],
+        [1, "LFO Frequency Mod", "Modulator", "No global modulators", "Gain"]
+      ]
+    },
+    "MidiController": {
+      "prettyName": "Midi Controller",
+      "type": "TimeVariantModulator",
+      "interfaces": ["Modulator", "RoutingMatrix", "TableProcessor"],
+      "tables": 1
+    },
+    "PitchWheel": {
+      "prettyName": "Pitch Wheel Modulator",
+      "type": "TimeVariantModulator",
+      "interfaces": ["Modulator", "RoutingMatrix", "TableProcessor"],
+      "tables": 1
+    },
+    "MacroModulator": {
+      "prettyName": "Macro Control Modulator",
+      "type": "TimeVariantModulator",
+      "interfaces": ["Modulator", "RoutingMatrix", "TableProcessor"],
+      "tables": 1
+    },
+    "GlobalTimeVariantModulator": {
+      "prettyName": "Global Time Variant Modulator",
+      "type": "TimeVariantModulator",
+      "interfaces": ["Modulator", "RoutingMatrix", "TableProcessor"],
+      "tables": 1
+    },
+    "ScriptTimeVariantModulator": {
+      "prettyName": "Script Time Variant Modulator",
+      "type": "TimeVariantModulator",
+      "interfaces": ["Modulator", "RoutingMatrix"],
+      "slotFXTypes": ["Scriptnode", "Script"]
+    },
+    "HardcodedTimevariantModulator": {
+      "prettyName": "Hardcoded Time Variant Modulator",
+      "type": "TimeVariantModulator",
+      "interfaces": ["Modulator", "RoutingMatrix", "SlotFX"],
+      "slotFXTypes": ["Hardcoded"]
+    },
+    "SimpleEnvelope": {
+      "prettyName": "Simple Envelope",
+      "type": "EnvelopeModulator",
+      "interfaces": ["Modulator", "RoutingMatrix"],
+      "chains": [
+        [0, "Attack Time Modulation", "Modulator", "VoiceStartModulator", "Gain"]
+      ]
+    },
+    "AHDSR": {
+      "prettyName": "AHDSR Envelope",
+      "type": "EnvelopeModulator",
+      "interfaces": ["Modulator", "RoutingMatrix"],
+      "chains": [
+        [0, "Attack Time", "Modulator", "VoiceStartModulator", "Gain"],
+        [1, "Attack Level", "Modulator", "VoiceStartModulator", "Gain"],
+        [2, "Decay Time", "Modulator", "VoiceStartModulator", "Gain"],
+        [3, "Sustain Level", "Modulator", "VoiceStartModulator", "Gain"],
+        [4, "Release Time", "Modulator", "VoiceStartModulator", "Gain"]
+      ]
+    },
+    "TableEnvelope": {
+      "prettyName": "Table Envelope",
+      "type": "EnvelopeModulator",
+      "interfaces": ["Modulator", "RoutingMatrix", "TableProcessor"],
+      "tables": 2,
+      "chains": [
+        [0, "AttackTime Modulation", "Modulator", "VoiceStartModulator", "Gain"],
+        [1, "ReleaseTime Modulation", "Modulator", "VoiceStartModulator", "Gain"]
+      ]
+    },
+    "ScriptEnvelopeModulator": {
+      "prettyName": "Script Envelope Modulator",
+      "type": "EnvelopeModulator",
+      "interfaces": ["Modulator", "RoutingMatrix"],
+      "slotFXTypes": ["Scriptnode", "Script"]
+    },
+    "MPEModulator": {
+      "prettyName": "MPE Modulator",
+      "type": "EnvelopeModulator",
+      "interfaces": ["Modulator", "RoutingMatrix", "TableProcessor"],
+      "tables": 1
+    },
+    "ScriptnodeVoiceKiller": {
+      "prettyName": "Scriptnode Voice Killer",
+      "type": "EnvelopeModulator",
+      "interfaces": ["Modulator", "RoutingMatrix"]
+    },
+    "GlobalEnvelopeModulator": {
+      "prettyName": "Global Envelope Modulator",
+      "type": "EnvelopeModulator",
+      "interfaces": ["Modulator", "RoutingMatrix", "TableProcessor"],
+      "tables": 1
+    },
+    "EventDataEnvelope": {
+      "prettyName": "EventData Envelope",
+      "type": "EnvelopeModulator",
+      "interfaces": ["Modulator", "RoutingMatrix"]
+    },
+    "HardcodedEnvelopeModulator": {
+      "prettyName": "Hardcoded Envelope Modulator",
+      "type": "EnvelopeModulator",
+      "interfaces": ["Modulator", "RoutingMatrix", "SlotFX"],
+      "slotFXTypes": ["Hardcoded"]
+    },
+    "MatrixModulator": {
+      "prettyName": "Matrix Modulator",
+      "type": "EnvelopeModulator",
+      "interfaces": ["Modulator", "RoutingMatrix"]
+    },
+    "FlexAHDSR": {
+      "prettyName": "Flex AHDSR Envelope",
+      "type": "EnvelopeModulator",
+      "interfaces": ["Modulator", "RoutingMatrix", "DisplayBufferSource"],
+      "displayBuffers": 1,
+      "chains": [
+        [0, "Attack Time", "Modulator", "VoiceStartModulator", "Gain"],
+        [1, "Attack Level", "Modulator", "VoiceStartModulator", "Gain"],
+        [2, "Decay Time", "Modulator", "VoiceStartModulator", "Gain"],
+        [3, "Sustain Level", "Modulator", "*", "Gain"],
+        [4, "Release Time", "Modulator", "VoiceStartModulator", "Gain"]
+      ]
+    }
+  },
+  "FX": {
+    "PolyphonicFilter": {
+      "prettyName": "Filter",
+      "type": "VoiceEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix"],
+      "filters": 1,
+      "chains": [
+        [0, "Frequency Modulation", "Modulator", "*", "Gain"],
+        [1, "Gain Modulation", "Modulator", "*", "Gain"],
+        [2, "Bipolar Freq Modulation", "Modulator", "*", "Offset"],
+        [3, "Q Modulation", "Modulator", "*", "Gain"]
+      ]
+    },
+    "HarmonicFilter": {
+      "prettyName": "Harmonic Filter",
+      "type": "VoiceEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix", "SliderPackProcessor"],
+      "sliderPacks": 3,
+      "chains": [
+        [0, "X-Fade Modulation", "Modulator", "*", "Gain"]
+      ]
+    },
+    "HarmonicFilterMono": {
+      "prettyName": "Harmonic Filter Monophonic",
+      "interfaces": ["Effect", "RoutingMatrix", "SliderPackProcessor"],
+      "sliderPacks": 3,
+      "chains": [
+        [0, "X-Fade Modulation", "Modulator", "*", "Gain"]
+      ]
+    },
+    "CurveEq": {
+      "prettyName": "Parametriq EQ",
+      "type": "MasterEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix", "DisplayBufferSource"],
+      "displayBuffers": 1
+    },
+    "StereoFX": {
+      "prettyName": "Stereo FX",
+      "type": "VoiceEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix"],
+      "chains": [
+        [0, "Pan Modulation", "Modulator", "*", "Pan"]
+      ]
+    },
+    "SimpleReverb": {
+      "prettyName": "Simple Reverb",
+      "type": "MasterEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix"]
+    },
+    "SimpleGain": {
+      "prettyName": "Simple Gain",
+      "type": "MasterEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix"],
+      "chains": [
+        [0, "Gain Modulation", "Modulator", "*", "Gain"],
+        [1, "Delay Modulation", "Modulator", "*", "Gain"],
+        [2, "Width Modulation", "Modulator", "*", "Gain"],
+        [3, "Pan Modulation", "Modulator", "*", "Pan"]
+      ]
+    },
+    "Convolution": {
+      "prettyName": "Convolution Reverb",
+      "type": "MasterEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix", "AudioSampleProcessor"],
+      "audioFiles": 1
+    },
+    "Delay": {
+      "prettyName": "Delay",
+      "type": "MasterEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix"]
+    },
+    "Chorus": {
+      "prettyName": "Chorus",
+      "type": "MasterEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix"]
+    },
+    "PhaseFX": {
+      "prettyName": "Phase FX",
+      "type": "MasterEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix"],
+      "chains": [
+        [0, "Phase Modulation", "Modulator", "*", "Combined"]
+      ]
+    },
+    "RouteFX": {
+      "prettyName": "Routing Matrix",
+      "type": "MasterEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix"]
+    },
+    "SendFX": {
+      "prettyName": "Send Effect",
+      "type": "MasterEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix"],
+      "chains": [
+        [0, "Send Modulation", "Modulator", "*", "Gain"]
+      ]
+    },
+    "Saturator": {
+      "prettyName": "Saturator",
+      "type": "MasterEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix"],
+      "chains": [
+        [0, "Saturation Modulation", "Modulator", "*", "Gain"]
+      ]
+    },
+    "ScriptFX": {
+      "prettyName": "Script FX",
+      "type": "MasterEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix"],
+      "slotFXTypes": ["Scriptnode", "Script"]
+    },
+    "PolyScriptFX": {
+      "prettyName": "Polyphonic Script FX",
+      "type": "VoiceEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix"],
+      "slotFXTypes": ["Scriptnode", "Script"]
+    },
+    "SlotFX": {
+      "prettyName": "Effect Slot",
+      "type": "MasterEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix", "SlotFX"],
+      "slotFXTypes": ["SlotFX"],
+      "chains": [
+        [0, "SlotFX_Empty", "EmptyFX"]
+      ]
+    },
+    "EmptyFX": {
+      "prettyName": "Empty",
+      "type": "MasterEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix"]
+    },
+    "Dynamics": {
+      "prettyName": "Dynamics",
+      "type": "MasterEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix"]
+    },
+    "Analyser": {
+      "prettyName": "Analyser",
+      "type": "MasterEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix", "DisplayBufferSource"],
+      "displayBuffers": 1
+    },
+    "ShapeFX": {
+      "prettyName": "Shape FX",
+      "type": "MasterEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix", "TableProcessor"],
+      "tables": 1
+    },
+    "PolyshapeFX": {
+      "prettyName": "Polyshape FX",
+      "type": "VoiceEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix", "TableProcessor", "DisplayBufferSource"],
+      "tables": 2,
+      "displayBuffers": 1,
+      "chains": [
+        [0, "Drive Modulation", "Modulator", "*", "Gain"]
+      ]
+    },
+    "HardcodedMasterFX": {
+      "prettyName": "Hardcoded Master FX",
+      "type": "MasterEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix", "SlotFX"],
+      "slotFXTypes": ["Hardcoded"]
+    },
+    "HardcodedPolyphonicFX": {
+      "prettyName": "Hardcoded Polyphonic FX",
+      "type": "VoiceEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix", "SlotFX"],
+      "slotFXTypes": ["Hardcoded"]
+    },
+    "MidiMetronome": {
+      "prettyName": "MidiMetronome",
+      "type": "MasterEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix"]
+    },
+    "NoiseGrainPlayer": {
+      "prettyName": "Noise Grain Player",
+      "type": "VoiceEffectProcessor",
+      "interfaces": ["Effect", "RoutingMatrix", "AudioSampleProcessor"],
+      "audioFiles": 1,
+      "chains": [
+        [0, "Table Index Modulation", "Modulator", "*", "Gain"],
+        [1, "Table Index Bipolar", "Modulator", "*", "Offset"]
+      ]
+    }
+  }
+}

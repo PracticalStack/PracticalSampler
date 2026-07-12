@@ -1,0 +1,1 @@
+Returns an array of all modulation target IDs. Targets are discovered from two sources: MatrixModulator processors in the module tree (identified by their processor ID or custom target ID) and ScriptSlider components with a non-empty `matrixTargetId` property.

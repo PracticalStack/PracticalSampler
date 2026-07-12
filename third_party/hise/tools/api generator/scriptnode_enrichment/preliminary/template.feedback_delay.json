@@ -1,0 +1,111 @@
+{
+  "factoryPath": "template.feedback_delay",
+  "factory": "template",
+  "nodeId": "feedback_delay",
+  "description": "Split the audio signal into fixed length chunks of 32 samples.",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "UI layout orientation for the root container"
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/template/feedback_delay.md",
+    "tier": "STUB",
+    "lines": 8
+  },
+
+  "availableImages": [],
+
+  "internalStructure": {
+    "rootContainer": "container.fix32_block",
+    "signalFlow": "Serial chain within 32-sample fixed blocks: routing.receive (fb_out) -> core.fix_delay (delay) -> routing.send (fb_in). The send connects back to the receive, creating a feedback loop.",
+    "internalConnections": [
+      "routing.send (fb_in) Connection property = 'fb_out' (routes audio back to routing.receive fb_out)"
+    ],
+    "internalParameters": [
+      { "nodeId": "fb_out", "parameterId": "Feedback", "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 }, "default": 0.0, "value": 0.4, "textConverter": "NormalizedPercentage", "purpose": "Controls the feedback amount -- how much of the delayed signal is fed back into the input" },
+      { "nodeId": "delay", "parameterId": "DelayTime", "range": { "min": 0.0, "max": 1000.0, "step": 0.1, "skew": 0.3010300099849701 }, "default": 100.0, "value": 100.0, "textConverter": "Time", "purpose": "Delay time in milliseconds" },
+      { "nodeId": "delay", "parameterId": "FadeTime", "range": { "min": 0.0, "max": 1024.0, "step": 1.0, "skew": 1.0 }, "default": 512.0, "value": 512.0, "textConverter": "Undefined", "purpose": "Crossfade time in samples when delay time changes, to avoid clicks" }
+    ],
+    "childNodes": [
+      { "id": "fb_out", "factory": "routing.receive", "purpose": "Receives the feedback signal from fb_in (routing.send). The Feedback parameter controls the mix level of the received signal with the incoming audio." },
+      { "id": "delay", "factory": "core.fix_delay", "purpose": "Fixed-length delay line. Delays the signal by DelayTime milliseconds. FadeTime controls crossfade when delay time changes." },
+      { "id": "fb_in", "factory": "routing.send", "purpose": "Sends the delayed signal back to fb_out, completing the feedback loop. Connection property set to 'fb_out'." }
+    ]
+  },
+
+  "gaps": [
+    {
+      "id": "feedback-loop-mechanics",
+      "category": "signal_path",
+      "question": "How does the routing.receive/routing.send feedback loop work within a container.fix32_block? Does the receive node mix the feedback signal with the incoming audio (additive), or does it replace the signal? What role does the Feedback parameter play -- is it a simple gain multiplier on the received signal?",
+      "context": "The feedback loop is the core functionality of this template. Users need to understand whether they get input + feedback*delayed or just feedback*delayed."
+    },
+    {
+      "id": "fix32-block-requirement",
+      "category": "signal_path",
+      "question": "Why is container.fix32_block required for the feedback delay? Is it because routing.send/receive need fixed block sizes to avoid latency issues, or because core.fix_delay requires it? What happens if the user changes the root container type?",
+      "context": "Users need to understand why the template uses fixed 32-sample blocks and whether they can change this."
+    },
+    {
+      "id": "no-exposed-parameters",
+      "category": "parameter_behaviour",
+      "question": "This template has no exposed top-level parameters -- Feedback, DelayTime, and FadeTime are internal to child nodes. Is this intentional, expecting users to expose parameters manually via connections? Or should these be documented as parameters the user should access on the child nodes directly?",
+      "context": "Users need to know how to control the feedback delay -- whether to connect parameters manually or access child nodes."
+    },
+    {
+      "id": "description-accuracy",
+      "category": "description_accuracy",
+      "question": "The base description 'Split the audio signal into fixed length chunks of 32 samples' describes container.fix32_block, not the feedback delay functionality. Should the description reflect the feedback delay loop purpose?",
+      "context": "The description is inherited from container.fix32_block and does not describe the template's actual function."
+    },
+    {
+      "id": "user-processing-insertion",
+      "category": "signal_path",
+      "question": "Can the user insert additional processing nodes between fb_out and fb_in (e.g., a filter in the feedback path)? Is the intended workflow to add nodes between the receive and send, or between the receive and delay?",
+      "context": "Common feedback delay designs include filtering in the feedback path. Documentation should explain where users add processing."
+    }
+  ],
+
+  "notes": "This is a COMPOSITE template node implementing a feedback delay loop. The cppProperties field is empty because template nodes have no direct C++ implementation. The root container.fix32_block processes audio in 32-sample chunks (required for the send/receive feedback routing). The internal chain is: routing.receive (fb_out) mixes feedback signal into input -> core.fix_delay applies delay -> routing.send (fb_in) sends delayed output back to fb_out. Notably, this template exposes NO top-level parameters -- all control is through the internal child nodes' parameters (Feedback on fb_out, DelayTime and FadeTime on delay). The Feedback parameter defaults to 0.4 (40%). Users are expected to either expose these parameters manually or control the child nodes directly. The user can also add processing nodes inside the feedback loop (e.g., filters, saturation) to shape the feedback character."
+}

@@ -1,0 +1,216 @@
+{
+  "moduleId": "SineSynth",
+  "prettyName": "Sine Wave Generator",
+  "type": "SoundGenerator",
+  "subtype": "SoundGenerator",
+  "category": "oscillator",
+
+  "io": {
+    "midiIn": "noteOn+noteOff",
+    "audioIn": null,
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": "*"
+  },
+
+  "voiceContext": "per-voice",
+
+  "interfaces": [
+    {
+      "name": "RoutingMatrix",
+      "signalFlowRole": "skip - inferred from type/subtype"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Tuning (Musical)",
+      "rationale": "Octave and semitone offsets used when UseFreqRatio is Off (musical tuning mode)",
+      "parameters": [
+        {
+          "id": "OctaveTranspose",
+          "name": "Octave Transpose",
+          "range": { "min": -5.0, "max": 5.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Coarse pitch offset in octaves when using musical tuning mode",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "SemiTones",
+          "name": "Semi Tones",
+          "range": { "min": -12.0, "max": 12.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Fine pitch offset in semitones when using musical tuning mode",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Tuning (Ratio)",
+      "rationale": "Coarse and fine frequency ratio controls used when UseFreqRatio is On (harmonic ratio mode)",
+      "parameters": [
+        {
+          "id": "UseFreqRatio",
+          "name": "Use Freq Ratio",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Switches between musical (octave/semitone) and harmonic ratio tuning modes",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "CoarseFreqRatio",
+          "name": "Coarse Freq Ratio",
+          "range": { "min": -5.0, "max": 16.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Harmonic index as a frequency multiplier where 1 is the root frequency",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "FineFreqRatio",
+          "name": "Fine Freq Ratio",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "Fine frequency offset as a fractional multiplier in harmonic tuning mode",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Waveshaping",
+      "rationale": "Saturation control that adds harmonics to the pure sine wave",
+      "parameters": [
+        {
+          "id": "SaturationAmount",
+          "name": "Saturation Amount",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "Amount of waveshaping saturation applied to the sine wave to add harmonics",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Output",
+      "rationale": "Base-class output controls shared by all SoundGenerators",
+      "parameters": [
+        {
+          "id": "Gain",
+          "name": "Gain",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.25,
+          "description": "The output volume as normalised linear gain (0.0 to 1.0), not decibels.",
+          "composite": null,
+          "modChain": {
+            "name": "Gain Modulation",
+            "chainIndex": 1,
+            "constrainer": "*"
+          }
+        },
+        {
+          "id": "Balance",
+          "name": "Balance",
+          "range": { "min": -1.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "The stereo balance",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Voice Management",
+      "rationale": "Base-class voice management parameters shared by all SoundGenerators",
+      "parameters": [
+        {
+          "id": "VoiceLimit",
+          "name": "Voice Limit",
+          "range": { "min": 1.0, "max": 256.0, "step": 1.0 },
+          "default": 256.0,
+          "description": "The maximum number of voices",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "KillFadeTime",
+          "name": "Kill Fade Time",
+          "range": { "min": 0.0, "max": 20000.0, "step": 1.0 },
+          "default": 20.0,
+          "description": "The fade out time in milliseconds when voices are killed by exceeding the voice limit or by a voice killer",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [
+    {
+      "type": "modMultiply",
+      "param": "Gain",
+      "details": {
+        "chainName": "Gain Modulation",
+        "chainIndex": 1,
+        "constrainer": "*"
+      }
+    }
+  ],
+
+  "standaloneModChains": [
+    {
+      "name": "Pitch Modulation",
+      "chainIndex": 2,
+      "modulationMode": "pitch",
+      "constrainer": "*",
+      "note": "Modulates implicit base pitch derived from MIDI note number + tuning parameters"
+    }
+  ],
+
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-order",
+      "category": "signal_path",
+      "question": "What is the exact processing order in calculateBlock()? Specifically: where does pitch modulation apply relative to sine lookup, saturation, and gain?",
+      "context": "Need to author accurate pseudo-code showing the full per-voice signal chain."
+    },
+    {
+      "id": "saturation-formula",
+      "category": "parameter_behavior",
+      "question": "What waveshaping formula does the Saturator use? Is it applied per-sample after the sine lookup?",
+      "context": "Need to describe what SaturationAmount actually does to the sine waveform."
+    },
+    {
+      "id": "freq-ratio-formula",
+      "category": "parameter_behavior",
+      "question": "How exactly is the frequency ratio calculated from CoarseFreqRatio and FineFreqRatio? The C++ in setInternalAttribute shows a non-trivial formula with different branches for positive/negative coarse values.",
+      "context": "Users need to understand what values to set for specific harmonic relationships."
+    },
+    {
+      "id": "tuning-mode-switch",
+      "category": "conditional_logic",
+      "question": "Does UseFreqRatio completely disable OctaveTranspose/SemiTones and vice versa? Are both sets of parameters always applied, or is it a strict either/or?",
+      "context": "Need to describe the interaction between the two tuning modes clearly."
+    },
+    {
+      "id": "stereo-output",
+      "category": "signal_path",
+      "question": "How is the mono sine signal converted to stereo? Is the left channel simply copied to right, or is Balance applied before the copy?",
+      "context": "Need to show the mono-to-stereo step accurately in the signal path."
+    },
+    {
+      "id": "sine-lookup-table",
+      "category": "performance",
+      "question": "What size is the sine lookup table? Is interpolation linear or higher-order?",
+      "context": "Relevant for describing the quality/performance trade-off of this lightweight module."
+    }
+  ],
+
+  "notes": "SineSynth is explicitly described as lightweight in the C++ doc comment - recommended for simple uses, not additive synthesis (per-instance pitch modulation overhead). The module has two mutually exclusive tuning modes controlled by UseFreqRatio toggle. The saturation feature adds harmonics via waveshaping, turning the pure sine into a richer tone. Base-class parameters (Gain, Balance, VoiceLimit, KillFadeTime) are inherited from ModulatorSynth."
+}

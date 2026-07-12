@@ -1,0 +1,304 @@
+{
+  "moduleId": "Arpeggiator",
+  "nodes": [
+    {
+      "id": "midi_in",
+      "type": "input",
+      "label": "MIDI In (Note On/Off)",
+      "importance": 1.0,
+      "description": "Incoming MIDI note events from the parent synth's MIDI chain"
+    },
+    {
+      "id": "bypass_check",
+      "type": "decision",
+      "label": "Bypass?",
+      "importance": 0.7,
+      "group": "input_filter",
+      "description": "If bypassed, pass notes through unchanged"
+    },
+    {
+      "id": "channel_filter",
+      "type": "process",
+      "label": "Channel Filter",
+      "importance": 0.6,
+      "group": "input_filter",
+      "description": "Filters by InputChannel (normal mode) or MPE zone range (MPE mode)"
+    },
+    {
+      "id": "note_capture",
+      "type": "process",
+      "label": "Note Capture",
+      "importance": 0.9,
+      "group": "input_capture",
+      "description": "Adds/removes notes from userHeldKeysArray (insertion order) and userHeldKeysArraySorted (pitch order). Consumes incoming note via ignoreEvent(true)."
+    },
+    {
+      "id": "hold_check",
+      "type": "decision",
+      "label": "Hold Active?",
+      "importance": 0.6,
+      "group": "input_capture",
+      "description": "If Hold is on, note-off keeps notes in held array instead of removing them"
+    },
+    {
+      "id": "timer_clock",
+      "type": "process",
+      "label": "Tempo-Synced Timer",
+      "importance": 0.9,
+      "group": "timing",
+      "description": "Synth.startTimer() fires onTimer at tempo-synced intervals. Timer interval is recalculated each step from host BPM and Tempo parameter."
+    },
+    {
+      "id": "shuffle_mod",
+      "type": "process",
+      "label": "Shuffle Timing",
+      "importance": 0.7,
+      "group": "timing",
+      "description": "Alternates timer interval: even steps longer, odd steps shorter. Shuffle=0 means no swing."
+    },
+    {
+      "id": "sequence_build",
+      "type": "process",
+      "label": "Build Sequence",
+      "importance": 0.9,
+      "group": "sequencing",
+      "description": "Expands held keys by OctaveRange into MidiSequenceArray. Total entries = heldKeys * (|octaveRange| + 1)."
+    },
+    {
+      "id": "direction_select",
+      "type": "decision",
+      "label": "Direction Select",
+      "importance": 1.0,
+      "group": "sequencing",
+      "description": "Selects which note from the expanded sequence to play based on Direction mode (Up/Down/UpDown/DownUp/Random/Chord)"
+    },
+    {
+      "id": "step_reset_check",
+      "type": "decision",
+      "label": "Step Reset?",
+      "importance": 0.5,
+      "group": "sequencing",
+      "description": "If StepReset > 0 and master step count reached, resets step counters and direction"
+    },
+    {
+      "id": "slider_pack_read",
+      "type": "process",
+      "label": "Read Slider Packs",
+      "importance": 1.0,
+      "group": "per_step_data",
+      "description": "Reads semitone offset, velocity, and note length from the three slider packs at currentStep"
+    },
+    {
+      "id": "skip_check",
+      "type": "decision",
+      "label": "Skip Step?",
+      "importance": 0.7,
+      "group": "note_gen",
+      "description": "If length slider value is 0%, skip this step entirely (no note played)"
+    },
+    {
+      "id": "tie_check",
+      "type": "decision",
+      "label": "Tie Note?",
+      "importance": 0.8,
+      "group": "note_gen",
+      "description": "If EnableTieNotes is on and length is 100%, extend note into next step. Multi-note: brief overlap for legato. Single-note: true sustain."
+    },
+    {
+      "id": "note_gen",
+      "type": "process",
+      "label": "Generate Note On/Off",
+      "importance": 1.0,
+      "group": "note_gen",
+      "description": "Synth.addNoteOn() creates artificial note. Synth.noteOffDelayedByEventId() schedules note-off. In Chord mode, sends one note per held key."
+    },
+    {
+      "id": "step_increment",
+      "type": "process",
+      "label": "Increment Step",
+      "importance": 0.8,
+      "group": "sequencing",
+      "description": "Advances currentStep by Stride (wrapping) and curHeldNoteIdx by arpDirMod. These advance independently."
+    },
+    {
+      "id": "midi_out",
+      "type": "output",
+      "label": "MIDI Out (Artificial Notes)",
+      "importance": 1.0,
+      "description": "Generated note-on/note-off events fed to the parent synth"
+    },
+    {
+      "id": "bypass_param",
+      "type": "parameter",
+      "label": "Bypass",
+      "importance": 0.6
+    },
+    {
+      "id": "tempo_param",
+      "type": "parameter",
+      "label": "Tempo",
+      "importance": 0.9
+    },
+    {
+      "id": "shuffle_param",
+      "type": "parameter",
+      "label": "Shuffle",
+      "importance": 0.7
+    },
+    {
+      "id": "direction_param",
+      "type": "parameter",
+      "label": "Direction",
+      "importance": 0.9
+    },
+    {
+      "id": "octave_param",
+      "type": "parameter",
+      "label": "OctaveRange",
+      "importance": 0.8
+    },
+    {
+      "id": "sort_keys_param",
+      "type": "parameter",
+      "label": "SortKeys",
+      "importance": 0.6
+    },
+    {
+      "id": "num_steps_param",
+      "type": "parameter",
+      "label": "NumSteps",
+      "importance": 0.7
+    },
+    {
+      "id": "stride_param",
+      "type": "parameter",
+      "label": "Stride",
+      "importance": 0.7
+    },
+    {
+      "id": "step_reset_param",
+      "type": "parameter",
+      "label": "StepReset",
+      "importance": 0.5
+    },
+    {
+      "id": "hold_param",
+      "type": "parameter",
+      "label": "Hold",
+      "importance": 0.6
+    },
+    {
+      "id": "enable_tie_param",
+      "type": "parameter",
+      "label": "EnableTieNotes",
+      "importance": 0.7
+    },
+    {
+      "id": "input_channel_param",
+      "type": "parameter",
+      "label": "InputChannel",
+      "importance": 0.5
+    },
+    {
+      "id": "output_channel_param",
+      "type": "parameter",
+      "label": "OutputChannel",
+      "importance": 0.5
+    },
+    {
+      "id": "semitone_sp",
+      "type": "external",
+      "label": "SemiTone SliderPack",
+      "importance": 0.9,
+      "group": "per_step_data",
+      "description": "Per-step semitone offset (-24 to +24). Complex data index 0."
+    },
+    {
+      "id": "velocity_sp",
+      "type": "external",
+      "label": "Velocity SliderPack",
+      "importance": 0.9,
+      "group": "per_step_data",
+      "description": "Per-step velocity (1-127). Complex data index 1."
+    },
+    {
+      "id": "length_sp",
+      "type": "external",
+      "label": "Length SliderPack",
+      "importance": 0.9,
+      "group": "per_step_data",
+      "description": "Per-step note length as % of step duration (0-100). 0=skip, 100=tie. Complex data index 2."
+    },
+    {
+      "id": "host_bpm",
+      "type": "external",
+      "label": "Host BPM",
+      "importance": 0.8,
+      "description": "Host tempo used for timer interval calculation"
+    }
+  ],
+  "edges": [
+    { "from": "midi_in", "to": "bypass_check", "type": "signal" },
+    { "from": "bypass_param", "to": "bypass_check", "type": "control" },
+    { "from": "bypass_check", "to": "midi_out", "type": "conditional", "label": "bypassed (passthrough)" },
+    { "from": "bypass_check", "to": "channel_filter", "type": "conditional", "label": "active" },
+    { "from": "input_channel_param", "to": "channel_filter", "type": "control" },
+    { "from": "channel_filter", "to": "note_capture", "type": "signal" },
+    { "from": "hold_param", "to": "hold_check", "type": "control" },
+    { "from": "note_capture", "to": "hold_check", "type": "signal", "label": "note-off path" },
+    { "from": "hold_check", "to": "timer_clock", "type": "signal", "label": "first note starts timer" },
+    { "from": "host_bpm", "to": "timer_clock", "type": "control" },
+    { "from": "tempo_param", "to": "timer_clock", "type": "control" },
+    { "from": "shuffle_param", "to": "shuffle_mod", "type": "control" },
+    { "from": "timer_clock", "to": "shuffle_mod", "type": "signal" },
+    { "from": "shuffle_mod", "to": "sequence_build", "type": "signal", "label": "timer tick" },
+    { "from": "note_capture", "to": "sequence_build", "type": "signal", "label": "held keys" },
+    { "from": "octave_param", "to": "sequence_build", "type": "control" },
+    { "from": "sequence_build", "to": "direction_select", "type": "signal" },
+    { "from": "direction_param", "to": "direction_select", "type": "control" },
+    { "from": "sort_keys_param", "to": "direction_select", "type": "control" },
+    { "from": "direction_select", "to": "step_reset_check", "type": "signal" },
+    { "from": "step_reset_param", "to": "step_reset_check", "type": "control" },
+    { "from": "step_reset_check", "to": "slider_pack_read", "type": "signal" },
+    { "from": "semitone_sp", "to": "slider_pack_read", "type": "control" },
+    { "from": "velocity_sp", "to": "slider_pack_read", "type": "control" },
+    { "from": "length_sp", "to": "slider_pack_read", "type": "control" },
+    { "from": "num_steps_param", "to": "slider_pack_read", "type": "control", "label": "pack size" },
+    { "from": "slider_pack_read", "to": "skip_check", "type": "signal" },
+    { "from": "skip_check", "to": "step_increment", "type": "conditional", "label": "length=0 (skip)" },
+    { "from": "skip_check", "to": "tie_check", "type": "conditional", "label": "length>0" },
+    { "from": "enable_tie_param", "to": "tie_check", "type": "control" },
+    { "from": "tie_check", "to": "note_gen", "type": "signal" },
+    { "from": "output_channel_param", "to": "note_gen", "type": "control" },
+    { "from": "note_gen", "to": "midi_out", "type": "signal" },
+    { "from": "note_gen", "to": "step_increment", "type": "signal" },
+    { "from": "stride_param", "to": "step_increment", "type": "control" },
+    { "from": "step_increment", "to": "timer_clock", "type": "feedback", "label": "next timer tick" }
+  ],
+  "groups": [
+    {
+      "id": "input_filter",
+      "label": "Input Filtering"
+    },
+    {
+      "id": "input_capture",
+      "label": "Note Capture"
+    },
+    {
+      "id": "timing",
+      "label": "Tempo & Shuffle"
+    },
+    {
+      "id": "sequencing",
+      "label": "Sequence & Direction"
+    },
+    {
+      "id": "per_step_data",
+      "label": "Per-Step Data (Slider Packs)"
+    },
+    {
+      "id": "note_gen",
+      "label": "Note Generation"
+    }
+  ]
+}

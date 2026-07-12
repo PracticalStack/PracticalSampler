@@ -1,0 +1,1 @@
+Returns the index of a child among this component's direct children. Accepts either a string ID or a ContainerChild reference. Returns -1 if the child is not found. Only searches direct children, not descendants.

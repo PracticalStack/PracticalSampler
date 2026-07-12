@@ -1,0 +1,88 @@
+{
+  "factoryPath": "control.change",
+  "factory": "control",
+  "nodeId": "change",
+  "description": "Filters out repetitions of the same value",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input Signal",
+      "rationale": "Value is the sole input. Marked as unscaled -- receives raw values. The node only forwards the value to the output when it changes.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": true
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": true,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/change.md",
+    "tier": "BRIEF",
+    "lines": 14
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "change-comparison-method",
+      "category": "signal_path",
+      "question": "In multilogic::change, how is 'same value' determined? Is it exact floating-point equality, or is there an epsilon/tolerance? Does it use the dirty flag pattern from multi_parameter, or does it override with its own change detection?",
+      "context": "The precision of change detection affects whether near-identical values are filtered or passed through."
+    },
+    {
+      "id": "change-initial-value",
+      "category": "parameter_behaviour",
+      "question": "What happens on the first value received? Is the initial state considered 'no previous value' so the first value always passes through, or is there a default comparison value (e.g., 0.0)?",
+      "context": "Users need to know whether the first modulation value after node creation is always forwarded."
+    },
+    {
+      "id": "change-unscaled-passthrough",
+      "category": "signal_path",
+      "question": "Since both input and output are unnormalised, does change simply pass through the raw value when it differs from the last value? Is there any transformation beyond the duplicate filtering?",
+      "context": "Confirm that change is purely a gate/filter and does not modify the value itself."
+    }
+  ],
+
+  "notes": "change is a duplicate-value filter. It only forwards values to the output when they differ from the last sent value. Both input and output are unnormalised. This is useful for reducing unnecessary parameter updates in modulation chains -- preventing redundant callbacks when a source repeatedly sends the same value. Uses the multi_parameter template with multilogic::change."
+}

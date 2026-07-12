@@ -1,0 +1,32 @@
+{
+  "targetId": "container.branch",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [12946, 11223, 10949],
+  "insights": [
+    {
+      "type": "API",
+      "title": "Branch container hard-bypasses all non-selected child nodes automatically",
+      "body": "Whatever value is set as the Index parameter causes only the child node at that position to be processed; all other children are hard-bypassed. There is no need to add container.soft_bypass nodes inside a branch container — the bypass is handled internally and is instantaneous with no ramp.",
+      "source": "tid:12946",
+      "author": "Christoph Hart [author], aaronventure [trusted]",
+      "confidence": "high"
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Prefer container.branch over chained soft_bypass nodes for glitch-free switching",
+      "body": "Chaining two or more container.soft_bypass nodes in series produces audible bumps on switch. Using container.branch instead avoids these artefacts entirely. It is cleaner, bump-free, and scales to any number of alternatives simply by adding more child nodes.",
+      "source": "tid:11223",
+      "author": "aaronventure [trusted]",
+      "confidence": "high"
+    },
+    {
+      "type": "PATTERN",
+      "title": "container.clone can be used as an alternative to branch for switching between parallel networks",
+      "body": "When the goal is to switch between two signal paths that run in parallel (e.g. two chain nodes), container.clone can serve as an alternative to branch. Branch is simpler for selecting a single active path; clone is better when the paths need to coexist or be blended.",
+      "source": "tid:10949",
+      "author": "orange [trusted]",
+      "confidence": "medium"
+    }
+  ]
+}

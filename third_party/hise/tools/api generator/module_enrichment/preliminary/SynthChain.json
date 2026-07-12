@@ -1,0 +1,154 @@
+{
+  "moduleId": "SynthChain",
+  "prettyName": "Container",
+  "type": "SoundGenerator",
+  "subtype": "SoundGenerator",
+  "category": "container",
+
+  "io": {
+    "midiIn": "noteOn+noteOff",
+    "audioIn": null,
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": "MasterEffect"
+  },
+
+  "voiceContext": "per-voice",
+
+  "interfaces": [
+    {
+      "name": "RoutingMatrix",
+      "signalFlowRole": "skip - inferred from type/subtype"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Output",
+      "rationale": "Base-class output controls shared by all SoundGenerators",
+      "parameters": [
+        {
+          "id": "Gain",
+          "name": "Gain",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 1.0,
+          "description": "The output volume as normalised linear gain (0.0 to 1.0), not decibels. Use a SimpleGain effect in the FX chain for decibel-scaled volume control.",
+          "composite": {
+            "type": "modMultiply",
+            "chainName": "Gain Modulation",
+            "chainIndex": 1,
+            "constrainer": "TimeVariantModulator"
+          },
+          "modChain": {
+            "name": "Gain Modulation",
+            "chainIndex": 1,
+            "constrainer": "TimeVariantModulator",
+            "modulationMode": "gain"
+          }
+        },
+        {
+          "id": "Balance",
+          "name": "Balance",
+          "range": { "min": -1.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "The stereo balance",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Voice Management",
+      "rationale": "Controls how voices are allocated and killed across all child sound generators",
+      "parameters": [
+        {
+          "id": "VoiceLimit",
+          "name": "Voice Limit",
+          "range": { "min": 1.0, "max": 256.0, "step": 1.0 },
+          "default": 256.0,
+          "description": "The maximum number of voices",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "KillFadeTime",
+          "name": "Kill Fade Time",
+          "range": { "min": 0.0, "max": 20000.0, "step": 1.0 },
+          "default": 20.0,
+          "description": "The fade out time in milliseconds when voices are killed by exceeding the voice limit or by a voice killer",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [
+    {
+      "type": "modMultiply",
+      "param": "Gain",
+      "details": {
+        "chainName": "Gain Modulation",
+        "chainIndex": 1,
+        "constrainer": "TimeVariantModulator"
+      }
+    }
+  ],
+
+  "standaloneModChains": [],
+
+  "disabledModChains": [
+    {
+      "name": "Pitch Modulation",
+      "chainIndex": 2,
+      "note": "Disabled in base data. Pitch modulation at the container level is not exposed - child synths have their own pitch modulation chains."
+    }
+  ],
+
+  "gaps": [
+    {
+      "id": "container-rendering",
+      "category": "signal_path",
+      "question": "How does SynthChain render its children? Does renderNextBlock iterate child synths and sum their outputs, or does it delegate to a different mechanism? What is the mixing order?",
+      "context": "Need to understand the container's role: is it a simple mixer of children, or does it do additional processing beyond summing?"
+    },
+    {
+      "id": "gain-modulation-scope",
+      "category": "parameter_behavior",
+      "question": "The Gain Modulation chain constrainer is 'TimeVariantModulator' - meaning only monophonic modulators are allowed. Is this because the gain is applied to the summed output (post-mix) rather than per-voice?",
+      "context": "Important for users to understand that this is a master gain, not a per-voice gain."
+    },
+    {
+      "id": "child-constrainer",
+      "category": "signal_path",
+      "question": "The constrainer is '*' meaning any SoundGenerator can be a child. Is there a practical limit on nesting depth (e.g. SynthChain inside SynthChain)?",
+      "context": "Users need to know if deep nesting is supported or if there are gotchas."
+    },
+    {
+      "id": "fx-chain-placement",
+      "category": "signal_path",
+      "question": "Where does the FX chain (constrained to MasterEffect) apply in the signal path? After summing all children and applying gain, or between children and gain?",
+      "context": "Need to show correct signal flow order in pseudo-code."
+    },
+    {
+      "id": "voice-limit-distribution",
+      "category": "parameter_behavior",
+      "question": "Does VoiceLimit apply globally across all children, or per child? When the limit is reached, which voices get killed first?",
+      "context": "Critical for users managing polyphony in complex patches."
+    },
+    {
+      "id": "root-chain-special",
+      "category": "signal_path",
+      "question": "Is the root SynthChain (master container) treated differently from nested SynthChains? Does it handle the final output routing, sample rate setup, or other global responsibilities?",
+      "context": "The root SynthChain is always present in every HISE project - need to clarify if it has special behaviour."
+    },
+    {
+      "id": "ui-components",
+      "category": "description_accuracy",
+      "question": "Does SynthChain have a custom editor or FloatingTile content type?",
+      "context": "For seeAlso ui_component entries."
+    }
+  ],
+
+  "notes": "SynthChain is the fundamental container in HISE's module tree. Every HISE project has a root SynthChain ('Master Chain'). It sums the audio output of its child SoundGenerators, applies gain modulation (monophonic only - TimeVariantModulator constrainer), and routes through a MasterEffect FX chain. The Pitch Modulation chain is disabled at the container level. The constrainer '*' means any SoundGenerator type can be added as a child, including nested SynthChains and SynthGroups. SynthChain differs from SynthGroup in that it does not share modulation between children and has no FM or unison capabilities."
+}

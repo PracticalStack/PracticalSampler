@@ -1,0 +1,95 @@
+{
+  "factoryPath": "dynamics.comp",
+  "nodes": [
+    {
+      "id": "in",
+      "label": "Audio In",
+      "type": "input",
+      "importance": 1.0,
+      "description": "Input audio signal (stereo or mono)"
+    },
+    {
+      "id": "sidechain_in",
+      "label": "Sidechain In",
+      "type": "input",
+      "importance": 0.6,
+      "description": "External sidechain input (when Sidechain mode enabled, uses extra channels)"
+    },
+    {
+      "id": "detect",
+      "label": "Peak Detect",
+      "type": "process",
+      "importance": 0.8,
+      "description": "Detects peak level from input or sidechain signal"
+    },
+    {
+      "id": "compress",
+      "label": "Compress",
+      "type": "process",
+      "importance": 1.0,
+      "description": "Applies gain reduction based on threshold, ratio, attack, and release"
+    },
+    {
+      "id": "threshold",
+      "label": "Threshhold",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Compression threshold in dB (-100 to 0)"
+    },
+    {
+      "id": "attack",
+      "label": "Attack",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Attack time in ms (0 to 250)"
+    },
+    {
+      "id": "release",
+      "label": "Release",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Release time in ms (0 to 250)"
+    },
+    {
+      "id": "ratio",
+      "label": "Ratio",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Compression ratio (1:1 to 32:1, inverted internally)"
+    },
+    {
+      "id": "sidechain",
+      "label": "Sidechain",
+      "type": "parameter",
+      "importance": 0.8,
+      "description": "Sidechain source: Disabled, Original, or Sidechain"
+    },
+    {
+      "id": "out",
+      "label": "Audio Out",
+      "type": "output",
+      "importance": 1.0,
+      "description": "Gain-reduced audio output"
+    },
+    {
+      "id": "mod_out",
+      "label": "Gain Reduction",
+      "type": "modulation_out",
+      "importance": 0.8,
+      "description": "Inverse gain reduction (1.0 = no compression, 0.0 = full compression)"
+    }
+  ],
+  "edges": [
+    { "from": "in", "to": "detect", "type": "signal", "label": null },
+    { "from": "sidechain_in", "to": "detect", "type": "signal", "label": "when Sidechain enabled" },
+    { "from": "detect", "to": "compress", "type": "signal", "label": null },
+    { "from": "in", "to": "compress", "type": "signal", "label": null },
+    { "from": "threshold", "to": "compress", "type": "control", "label": null },
+    { "from": "attack", "to": "compress", "type": "control", "label": null },
+    { "from": "release", "to": "compress", "type": "control", "label": null },
+    { "from": "ratio", "to": "compress", "type": "control", "label": null },
+    { "from": "sidechain", "to": "detect", "type": "control", "label": null },
+    { "from": "compress", "to": "out", "type": "signal", "label": null },
+    { "from": "compress", "to": "mod_out", "type": "signal", "label": "1.0 - GR" }
+  ]
+}

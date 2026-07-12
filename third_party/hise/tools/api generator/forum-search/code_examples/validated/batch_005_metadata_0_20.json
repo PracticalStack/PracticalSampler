@@ -1,0 +1,217 @@
+{
+  "0": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Sampler.createSelection as static call - may need instance. Compile-only."
+  },
+  "1": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "getIdList returns empty with no EQ modules, loop body skipped. Compile-only."
+  },
+  "2": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "File listing from AppData, empty results in test env. Compile-only."
+  },
+  "3": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Creates own panel, loads path from numeric data. Self-contained."
+  },
+  "4": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Value popup styling configuration"
+  },
+  "5": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "Convolution", "name": "Convolution Reverb"}
+    ],
+    "components": [
+      {"type": "ScriptButton", "id": "Button1"},
+      {"type": "ScriptButton", "id": "Button2"}
+    ],
+    "verifyScript": null,
+    "notes": "Fixed: moved inline function before setControlCallback call. IR files don't exist but callback won't fire during compile."
+  },
+  "6": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Engine.createDspNetwork - may fail without scriptnode setup"
+  },
+  "7": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "SimpleGain", "name": "SimpleGain1"}
+    ],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"}
+    ],
+    "verifyScript": null,
+    "notes": "Timer reads modulator level, compile-only"
+  },
+  "8": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Bulk property change on all components. May need API check for getComponentList vs getAllComponents."
+  },
+  "9": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Collects script processor IDs, Interface will be found"
+  },
+  "10": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "loadImage with {PROJECT_FOLDER} path - file doesn't exist in test environment",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "11": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "loadImage with {PROJECT_FOLDER} path - file doesn't exist in test environment",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "12": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "MidiPlayer", "name": "MIDI Player1"}
+    ],
+    "components": [
+      {"type": "ScriptButton", "id": "Buttonran"}
+    ],
+    "verifyScript": null,
+    "notes": "Callback won't fire during compile. Compile-only."
+  },
+  "13": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "MidiPlayer", "name": "MIDI Player1"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Post-loading callback won't fire without MIDI file. Compile-only."
+  },
+  "14": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Creates own knobs via Content.addKnob. MIDI callbacks. Compile-only."
+  },
+  "15": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "SineSynth", "name": "master"}
+    ],
+    "components": [
+      {"type": "ScriptComboBox", "id": "cmbOutput0"},
+      {"type": "ScriptComboBox", "id": "cmbOutput1"}
+    ],
+    "verifyScript": null,
+    "notes": "Routing matrix, callbacks won't fire during compile. Compile-only."
+  },
+  "16": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "MidiPlayer", "name": "MIDI Player1"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "MIDI callback, compile-only"
+  },
+  "17": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "Button callback plays MIDI note, compile-only"
+  },
+  "18": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Requires AHDSR Envelope1 modulator in sub-chain - cannot be set up via Builder API",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "19": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "MIDI callbacks, compile-only"
+  },
+  "20": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "LinkPanel"}
+    ],
+    "verifyScript": null,
+    "notes": "Clickable panel with mouse callback, compile-only"
+  }
+}

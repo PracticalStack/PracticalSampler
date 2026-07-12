@@ -1,0 +1,32 @@
+{
+  "targetId": "container.sidechain",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [8165, 2072, 7678],
+  "insights": [
+    {
+      "type": "PATTERN",
+      "title": "Use container.sidechain with dynamics nodes to build a sidechain compressor or limiter",
+      "body": "A typical sidechain compressor or limiter setup in scriptnode uses a container.sidechain node to route a separate signal path into the dynamics node's detection stage. The author provided a verified snippet for a limiter sidechain (tid:8165) and a filter-based sidechain EQ for dynamics (tid:2072). Both use the sidechain container to separate the key signal from the main signal.",
+      "source": "tid:8165, tid:2072",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "API",
+      "title": "Sidechain compressor requires the master container to have 4 channels (2 main + 2 sidechain)",
+      "body": "To use external sidechain input in scriptnode, the master container must be configured for 4 channels. Channels 1+2 carry the main signal, channels 3+4 carry the sidechain source. The dynamics.compressor node's sidechain mode must be set to 'Sidechain' to use the second channel pair for gain reduction. The Script FX wrapping the network also needs all 4 channels enabled.",
+      "source": "tid:7678",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Native VST sidechain input required core engine modifications before the official multi-output feature was added",
+      "body": "Before Christoph added official multi-output/sidechain support (tid:7457), getting a true external sidechain input into HISE required manual edits to MainController.cpp, LibConfig.h, routing.cpp and PluginParameterProcessor.h to expose 4-channel VST3 I/O. These workarounds are obsolete since the HISE_NUM_FX_PLUGIN_CHANNELS feature was introduced — use the official preprocessor approach instead.",
+      "source": "tid:2002",
+      "author": "giftlift",
+      "confidence": "medium"
+    }
+  ]
+}

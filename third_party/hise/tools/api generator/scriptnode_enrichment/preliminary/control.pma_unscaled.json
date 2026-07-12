@@ -1,0 +1,108 @@
+{
+  "factoryPath": "control.pma_unscaled",
+  "factory": "control",
+  "nodeId": "pma_unscaled",
+  "description": "multiplies and adds an offset to an unscaled modulation signal",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input Signal",
+      "rationale": "Value is the primary input that receives the raw (unnormalised) modulation signal. Marked as unscaled input -- incoming values bypass range conversion.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": true
+        }
+      ]
+    },
+    {
+      "label": "Transformation",
+      "rationale": "Multiply and Add define the affine transformation. Add is also marked as unscaled, so it receives raw values without range conversion.",
+      "parameters": [
+        {
+          "id": "Multiply",
+          "range": { "min": -1.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Add",
+          "range": { "min": -1.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": true
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": true,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/pma_unscaled.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "pma-unscaled-formula",
+      "category": "signal_path",
+      "question": "In multilogic::pma_unscaled::getValue(), is the formula value * mulValue + addValue WITHOUT clamping (unlike normalised pma which clamps to 0..1)?",
+      "context": "The key difference from pma is the absence of clamping and normalisation. Need to confirm whether the output is truly unclamped."
+    },
+    {
+      "id": "pma-unscaled-range-passthrough",
+      "category": "parameter_behaviour",
+      "question": "Since both Value and Add are marked as unscaled inputs, do they receive raw values from connected sources? What happens if Multiply is connected -- does it still receive a normalised 0..1 value?",
+      "context": "Understanding the mix of scaled and unscaled inputs is critical for users connecting multiple sources."
+    },
+    {
+      "id": "pma-unscaled-output-range",
+      "category": "parameter_behaviour",
+      "question": "What is the practical output range? Since input and add are unscaled and there is no clamping, the output range depends entirely on the connected sources. Is there any overflow protection?",
+      "context": "Users need to understand that unscaled output passes raw values directly to target parameters without range mapping."
+    }
+  ],
+
+  "notes": "pma_unscaled is the unnormalised counterpart to pma. Key differences: (1) output is unnormalised so target parameter ranges are NOT applied by the connection system, (2) Value and Add inputs are marked as unscaled so they receive raw values, (3) likely no jlimit clamping in getValue(). Disambiguation with pma is critical for documentation."
+}

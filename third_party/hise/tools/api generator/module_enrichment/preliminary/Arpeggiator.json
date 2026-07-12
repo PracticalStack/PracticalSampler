@@ -1,0 +1,303 @@
+{
+  "moduleId": "Arpeggiator",
+  "prettyName": "Arpeggiator",
+  "type": "MidiProcessor",
+  "subtype": "MidiProcessor",
+  "category": "sequencing, generator",
+
+  "io": {
+    "midiIn": "MIDI in",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "SliderPackProcessor",
+      "signalFlowRole": "Slider pack / step sequencer data source - provides per-step velocity/length data for the arpeggiator sequence"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Control",
+      "rationale": "Operational controls: Bypass gates the processor, Reset restarts the sequence, Hold sustains via sustain pedal",
+      "parameters": [
+        {
+          "id": "Bypass",
+          "name": "Bypass",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Bypasses the arpeggiator and passes input notes through",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Reset",
+          "name": "Reset",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Resets the current sequence when pressed",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Hold",
+          "name": "Hold",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Holds the sequence while the sustain pedal is pressed",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Sequence Structure",
+      "rationale": "Parameters that define the shape and length of the step sequence: how many steps, where it resets, and the stride between steps",
+      "parameters": [
+        {
+          "id": "NumSteps",
+          "name": "Num Steps",
+          "range": { "min": 1.0, "max": 128.0, "step": 1.0 },
+          "default": 4.0,
+          "description": "Number of steps in the sequence",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "StepReset",
+          "name": "Step Reset",
+          "range": { "min": 0.0, "max": 128.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Step index that resets the sequence",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Stride",
+          "name": "Stride",
+          "range": { "min": -12.0, "max": 12.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Stride offset applied when stepping through the sequence",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Playback",
+      "rationale": "Controls how held notes are traversed: direction of arpeggiation, octave range extension, and whether keys are sorted before sequencing",
+      "parameters": [
+        {
+          "id": "Direction",
+          "name": "Direction",
+          "range": { "min": 1.0, "max": 6.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Playback direction for the arpeggiator",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "OctaveRange",
+          "name": "Octave Range",
+          "range": { "min": -2.0, "max": 4.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Octave range added to the sequence",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "SortKeys",
+          "name": "Sort Keys",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Sorts held keys before arpeggiating",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Timing",
+      "rationale": "Controls the temporal behavior of the arpeggiator: speed (tempo-synced), shuffle swing, and note tie behavior",
+      "parameters": [
+        {
+          "id": "Tempo",
+          "name": "Tempo",
+          "range": { "min": 0.0, "max": 18.0, "step": 1.0 },
+          "default": 11.0,
+          "description": "Arpeggiator speed as a tempo-synced note value",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Shuffle",
+          "name": "Shuffle",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "Shuffle amount for timing variation between steps",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "EnableTieNotes",
+          "name": "Enable Tie Notes",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Ties steps with full length to the next note",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "MIDI Routing",
+      "rationale": "Channel filtering and routing: which MIDI channels are accepted as input, which channel is used for generated notes, and MPE channel range",
+      "parameters": [
+        {
+          "id": "InputChannel",
+          "name": "Input Channel",
+          "range": { "min": 1.0, "max": 17.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "MIDI channel accepted by the arpeggiator",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "OutputChannel",
+          "name": "Output Channel",
+          "range": { "min": 1.0, "max": 17.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "MIDI channel used for generated notes",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "MPEStartChannel",
+          "name": "MPE Start Channel",
+          "range": { "min": 1.0, "max": 16.0, "step": 1.0 },
+          "default": 2.0,
+          "description": "Start channel for the MPE note range",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "MPEEndChannel",
+          "name": "MPE End Channel",
+          "range": { "min": 1.0, "max": 16.0, "step": 1.0 },
+          "default": 16.0,
+          "description": "End channel for the MPE note range",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Display",
+      "rationale": "Read-only parameter showing the current playback position in the sequence",
+      "parameters": [
+        {
+          "id": "CurrentStep",
+          "name": "Current Step",
+          "range": { "min": 0.0, "max": 128.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Displays the current step index",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "event-processing-logic",
+      "category": "signal_path",
+      "question": "What is the core event processing logic in processHiseEvent()? How does the arpeggiator collect held notes, schedule output events, and manage note-on/note-off pairs?",
+      "context": "The reference page needs to describe the MIDI event transformation pipeline: input capture, step scheduling, and output generation."
+    },
+    {
+      "id": "slider-pack-usage",
+      "category": "interface_usage",
+      "question": "How does the SliderPackProcessor interface feed into the arpeggiator? How many slider packs are there, and what does each one control (velocity per step, note length per step, semitone offset per step)?",
+      "context": "The SliderPackProcessor interface is the primary data source for per-step control. Users need to know what each slider pack represents and how values map to note properties."
+    },
+    {
+      "id": "missing-parameters-12-15",
+      "category": "description_accuracy",
+      "question": "Parameter indices 12-15 are missing from the base data. What are these parameters? Are they internal/hidden, or were they omitted in error?",
+      "context": "Four consecutive parameter indices are absent. These may correspond to slider pack selections or internal state. Need to determine if they should be documented."
+    },
+    {
+      "id": "direction-modes",
+      "category": "conditional_logic",
+      "question": "How does each Direction mode (Up, Down, Up-Down, Down-Up, Random, Chords) change the note traversal algorithm? Does 'Chords' play all held notes simultaneously?",
+      "context": "The Direction parameter has 6 modes that fundamentally change behavior. The reference page needs to describe each mode."
+    },
+    {
+      "id": "stride-behavior",
+      "category": "parameter_behavior",
+      "question": "How does Stride interact with Direction? Does Stride=2 skip every other note in the held-note list, or does it add a semitone offset? How do negative stride values work?",
+      "context": "Stride is unusual (range -12 to 12, default 1). Its interaction with Direction and the note list is not obvious from the description alone."
+    },
+    {
+      "id": "step-reset-behavior",
+      "category": "parameter_behavior",
+      "question": "How does StepReset work? When the sequence reaches the StepReset index, does it wrap back to step 0? What does StepReset=0 mean (disabled, or reset at step 0)?",
+      "context": "StepReset default is 0 with range 0-128. Need to clarify whether 0 means 'no reset' or 'reset immediately'."
+    },
+    {
+      "id": "octave-range-traversal",
+      "category": "parameter_behavior",
+      "question": "How does OctaveRange extend the sequence? Are octave transpositions appended after the base note cycle, or interleaved? How do negative octave values work?",
+      "context": "OctaveRange has range -2 to 4. Users need to understand how octave expansion affects the total sequence length and note order."
+    },
+    {
+      "id": "shuffle-implementation",
+      "category": "parameter_behavior",
+      "question": "How is Shuffle implemented? Does it delay even-numbered steps (standard swing), or does it use a different timing offset pattern?",
+      "context": "Shuffle is a normalized percentage. Users need to know the swing feel it produces."
+    },
+    {
+      "id": "tie-notes-behavior",
+      "category": "conditional_logic",
+      "question": "How does EnableTieNotes work? When a step's slider pack value is at maximum (full length), does it suppress the note-off and extend into the next step? How does this interact with legato playing?",
+      "context": "Tie behavior affects articulation. Users need to understand the threshold and how tied notes connect."
+    },
+    {
+      "id": "hold-sustain-interaction",
+      "category": "parameter_behavior",
+      "question": "How does the Hold parameter interact with the sustain pedal? Does it latch the current note set when sustain CC64 is received, or does it use a different mechanism?",
+      "context": "Hold behavior is important for live performance use cases."
+    },
+    {
+      "id": "tempo-sync-values",
+      "category": "parameter_behavior",
+      "question": "What are the tempo sync note value mappings for the Tempo parameter (index 0-18)? The default is 11 - what note value does that correspond to?",
+      "context": "Users need to know the actual note values (1/4, 1/8, 1/16, etc.) that the integer indices map to."
+    },
+    {
+      "id": "mpe-channel-handling",
+      "category": "conditional_logic",
+      "question": "How do MPEStartChannel and MPEEndChannel affect arpeggiator behavior? Does it filter input by MPE zone, or does it assign output notes to MPE channels?",
+      "context": "MPE support is not common in arpeggiators. Need to clarify whether this is input filtering, output routing, or both."
+    },
+    {
+      "id": "current-step-read-only",
+      "category": "parameter_behavior",
+      "question": "Is CurrentStep truly read-only (display only), or can it be set externally to jump to a specific step? Is it updated per-buffer or per-step-event?",
+      "context": "If CurrentStep is writable, it enables external sequence control via scripting."
+    }
+  ],
+
+  "notes": "Parameter indices 12-15 are missing from the base data - these likely correspond to SliderPack indices or internal parameters. The Tempo parameter uses mode 'TempoSync' which means it inherently maps integer indices to tempo-synced note values (no separate sync toggle, so no tempoSyncMux composite). The arpeggiator is a MIDI event generator: it consumes held note-on/note-off events, builds a note list, and emits new MIDI events on a tempo-synced clock. The SliderPackProcessor interface likely provides multiple slider packs for per-step velocity, length, and possibly semitone offset. The 'Chords' direction mode may bypass step sequencing entirely and play all held notes simultaneously. No modulation chains are present, which is typical for MidiProcessors."
+}

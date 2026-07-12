@@ -1,0 +1,43 @@
+{
+  "moduleId": "Delay",
+  "nodes": [
+    { "id": "audio_in", "type": "input", "label": "Audio In (L/R)", "importance": 1.0 },
+    { "id": "host_bpm", "type": "external", "label": "Host BPM", "importance": 0.6, "group": "tempo" },
+    { "id": "tempo_sync_param", "type": "parameter", "label": "TempoSync", "importance": 0.7, "group": "tempo" },
+    { "id": "tempo_mux", "type": "decision", "label": "Tempo Sync?", "importance": 0.7, "description": "ms or note value based on TempoSync toggle", "group": "tempo" },
+    { "id": "delay_time_left_param", "type": "parameter", "label": "DelayTimeLeft", "importance": 0.9, "group": "delay_left" },
+    { "id": "delay_time_right_param", "type": "parameter", "label": "DelayTimeRight", "importance": 0.9, "group": "delay_right" },
+    { "id": "feedback_left_param", "type": "parameter", "label": "FeedbackLeft", "importance": 0.8, "group": "delay_left" },
+    { "id": "feedback_right_param", "type": "parameter", "label": "FeedbackRight", "importance": 0.8, "group": "delay_right" },
+    { "id": "delay_left", "type": "process", "label": "Left Delay Line", "importance": 1.0, "description": "input + lastOutput * feedback -> delay -> read", "group": "delay_left" },
+    { "id": "delay_right", "type": "process", "label": "Right Delay Line", "importance": 1.0, "description": "input + lastOutput * feedback -> delay -> read", "group": "delay_right" },
+    { "id": "mix_param", "type": "parameter", "label": "Mix", "importance": 0.8, "group": "output" },
+    { "id": "overlap_mix", "type": "process", "label": "Overlap Fader Mix", "importance": 0.9, "description": "Overlap fader dry/wet (not linear crossfade)", "group": "output" },
+    { "id": "audio_out", "type": "output", "label": "Audio Out (L/R)", "importance": 1.0 }
+  ],
+  "edges": [
+    { "from": "host_bpm", "to": "tempo_mux", "type": "control" },
+    { "from": "tempo_sync_param", "to": "tempo_mux", "type": "control" },
+    { "from": "delay_time_left_param", "to": "tempo_mux", "type": "control" },
+    { "from": "delay_time_right_param", "to": "tempo_mux", "type": "control" },
+    { "from": "tempo_mux", "to": "delay_left", "type": "control" },
+    { "from": "tempo_mux", "to": "delay_right", "type": "control" },
+    { "from": "audio_in", "to": "delay_left", "type": "signal" },
+    { "from": "audio_in", "to": "delay_right", "type": "signal" },
+    { "from": "feedback_left_param", "to": "delay_left", "type": "control" },
+    { "from": "feedback_right_param", "to": "delay_right", "type": "control" },
+    { "from": "delay_left", "to": "delay_left", "type": "feedback", "label": "feedback" },
+    { "from": "delay_right", "to": "delay_right", "type": "feedback", "label": "feedback" },
+    { "from": "audio_in", "to": "overlap_mix", "type": "signal" },
+    { "from": "delay_left", "to": "overlap_mix", "type": "signal" },
+    { "from": "delay_right", "to": "overlap_mix", "type": "signal" },
+    { "from": "mix_param", "to": "overlap_mix", "type": "control" },
+    { "from": "overlap_mix", "to": "audio_out", "type": "signal" }
+  ],
+  "groups": [
+    { "id": "tempo", "label": "Tempo Sync" },
+    { "id": "delay_left", "label": "Left Channel" },
+    { "id": "delay_right", "label": "Right Channel" },
+    { "id": "output", "label": "Output Mix" }
+  ]
+}

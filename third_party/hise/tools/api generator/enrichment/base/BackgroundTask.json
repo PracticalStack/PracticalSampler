@@ -1,0 +1,158 @@
+{
+  "className": "BackgroundTask",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "callOnBackgroundThread": {
+      "signature": "void callOnBackgroundThread(var backgroundTaskFunction)",
+      "returnType": "void",
+      "description": "Call a function on the background thread.",
+      "parameters": [
+        {
+          "name": "backgroundTaskFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "getProgress": {
+      "signature": "double getProgress()",
+      "returnType": "double",
+      "description": "Get the progress for this task.",
+      "parameters": []
+    },
+    "getProperty": {
+      "signature": "var getProperty(String id)",
+      "returnType": "var",
+      "description": "Retrieve a property through a thread safe container.",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "String"
+        }
+      ]
+    },
+    "getStatusMessage": {
+      "signature": "String getStatusMessage()",
+      "returnType": "String",
+      "description": "Returns the current status message.",
+      "parameters": []
+    },
+    "killVoicesAndCall": {
+      "signature": "bool killVoicesAndCall(var loadingFunction)",
+      "returnType": "bool",
+      "description": "Kills all voices and calls the given function on the sample loading thread.",
+      "parameters": [
+        {
+          "name": "loadingFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "runProcess": {
+      "signature": "void runProcess(var command, var args, var logFunction)",
+      "returnType": "void",
+      "description": "Spawns a OS process and executes it with the given command line arguments.",
+      "parameters": [
+        {
+          "name": "command",
+          "type": "var"
+        },
+        {
+          "name": "args",
+          "type": "var"
+        },
+        {
+          "name": "logFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "sendAbortSignal": {
+      "signature": "void sendAbortSignal(bool blockUntilStopped)",
+      "returnType": "void",
+      "description": "Signal that this thread should exit.",
+      "parameters": [
+        {
+          "name": "blockUntilStopped",
+          "type": "bool"
+        }
+      ]
+    },
+    "setFinishCallback": {
+      "signature": "void setFinishCallback(var newFinishCallback)",
+      "returnType": "void",
+      "description": "Set a function that will be called when the task has started / stopped.",
+      "parameters": [
+        {
+          "name": "newFinishCallback",
+          "type": "var"
+        }
+      ]
+    },
+    "setForwardStatusToLoadingThread": {
+      "signature": "void setForwardStatusToLoadingThread(bool shouldForward)",
+      "returnType": "void",
+      "description": "Forward the state of this thread to the sample loading thread notification system.",
+      "parameters": [
+        {
+          "name": "shouldForward",
+          "type": "bool"
+        }
+      ]
+    },
+    "setProgress": {
+      "signature": "void setProgress(double p)",
+      "returnType": "void",
+      "description": "Set a progress for this task.",
+      "parameters": [
+        {
+          "name": "p",
+          "type": "double"
+        }
+      ]
+    },
+    "setProperty": {
+      "signature": "void setProperty(String id, var value)",
+      "returnType": "void",
+      "description": "Set a property to a thread safe container.",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "setStatusMessage": {
+      "signature": "void setStatusMessage(String m)",
+      "returnType": "void",
+      "description": "Sets a status message.",
+      "parameters": [
+        {
+          "name": "m",
+          "type": "String"
+        }
+      ]
+    },
+    "setTimeOut": {
+      "signature": "void setTimeOut(int ms)",
+      "returnType": "void",
+      "description": "Set timeout.",
+      "parameters": [
+        {
+          "name": "ms",
+          "type": "int"
+        }
+      ]
+    },
+    "shouldAbort": {
+      "signature": "bool shouldAbort()",
+      "returnType": "bool",
+      "description": "Checks whether the task should be aborted (either because of recompilation or when you called abort().",
+      "parameters": []
+    }
+  }
+}

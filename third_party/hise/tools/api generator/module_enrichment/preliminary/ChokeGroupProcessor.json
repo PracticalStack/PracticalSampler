@@ -1,0 +1,115 @@
+{
+  "moduleId": "ChokeGroupProcessor",
+  "prettyName": "Choke Group Processor",
+  "type": "MidiProcessor",
+  "subtype": "MidiProcessor",
+  "category": "note_processing",
+
+  "io": {
+    "midiIn": "MIDI in",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [],
+
+  "parameterGroups": [
+    {
+      "label": "Group Assignment",
+      "rationale": "ChokeGroup, LoKey, and HiKey together define which choke group this processor belongs to and which incoming notes activate it",
+      "parameters": [
+        {
+          "id": "ChokeGroup",
+          "name": "Choke Group",
+          "range": { "min": 0.0, "max": 16.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "The choke group index (0 = disabled, 1-16 = active group)",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "LoKey",
+          "name": "Lo Key",
+          "range": { "min": 0.0, "max": 127.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "The lowest MIDI note number that triggers this choke group",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "HiKey",
+          "name": "Hi Key",
+          "range": { "min": 0.0, "max": 127.0, "step": 1.0 },
+          "default": 127.0,
+          "description": "The highest MIDI note number that triggers this choke group",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Kill Behavior",
+      "rationale": "KillVoice controls how active voices are terminated when a choke is triggered",
+      "parameters": [
+        {
+          "id": "KillVoice",
+          "name": "Kill Voice",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "When enabled, kills voices instantly; when disabled, sends note-off for a natural release",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "choke-matching-mechanism",
+      "category": "signal_path",
+      "question": "How does the processor find and choke other ChokeGroupProcessors in the same group? Does it walk the module tree, use a registry, or communicate through the parent SynthChain?",
+      "context": "Users need to understand the scope of choke group matching - whether it works across nested containers or only within siblings."
+    },
+    {
+      "id": "event-processing-logic",
+      "category": "signal_path",
+      "question": "What exactly happens in processHiseEvent()? On a note-on within the key range, does the processor kill voices on other processors in the same group, or does it kill its own voices when another processor triggers?",
+      "context": "The directionality of the choke mechanism is critical for users to place these processors correctly."
+    },
+    {
+      "id": "kill-voice-vs-note-off",
+      "category": "conditional_logic",
+      "question": "When KillVoice is off (sends note-off), how is the note-off delivered? Is it a synthetic MIDI note-off event injected into the event buffer, or a direct voice kill with fade-out? What is the audible difference?",
+      "context": "Users choosing between instant kill and natural release need to understand the sonic implications."
+    },
+    {
+      "id": "key-range-filtering",
+      "category": "parameter_behavior",
+      "question": "Does the LoKey/HiKey range filter incoming note-ons only, or does it also affect which voices get killed? Can two processors in the same group have different key ranges to create partial choke behavior?",
+      "context": "Key range filtering determines whether this can be used for advanced hi-hat setups with zone-specific choking."
+    },
+    {
+      "id": "chokegroup-zero-behavior",
+      "category": "parameter_behavior",
+      "question": "When ChokeGroup is 0 (disabled), does the processor pass MIDI through unchanged, or is it fully bypassed? Does it still consume any processing?",
+      "context": "Users need to know if group 0 is a safe default that has no side effects."
+    },
+    {
+      "id": "note-passthrough",
+      "category": "signal_path",
+      "question": "Does the processor pass the original note-on through to downstream processors, or does it consume/block certain events?",
+      "context": "Users need to know if placing this processor affects normal note flow beyond the choking behavior."
+    }
+  ],
+
+  "notes": "ChokeGroupProcessor is designed for hi-hat and mute group behavior common in drum instruments. Multiple instances with the same group index should choke each other. The key range parameters suggest it can be scoped to specific note zones, which is useful for drum maps where different MIDI notes trigger different articulations. No modulation chains or interfaces - this is a pure MIDI event processor with no DSP component. The 'builderPath' confirms it lives under MidiProcessors. The 'metadataType: static' and absence of mod chains means this is a simple, parameter-driven processor."
+}

@@ -1,0 +1,80 @@
+{
+  "factoryPath": "container.split",
+  "factory": "container",
+  "nodeId": "split",
+  "description": "Processes each node independently and sums up the output.",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/container/split.md",
+    "tier": "BRIEF",
+    "lines": 17
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "parallel-dispatch-and-summing",
+      "category": "signal_path",
+      "question": "Confirm the split processing model: (1) original input is saved, (2) first child processes the original in-place, (3) each subsequent child processes a copy of the original and its output is ADDED to the main buffer via FloatVectorOperations::add(). Is the single-child optimization confirmed (no copy when only one child)?",
+      "context": "The copy-process-sum pattern is the core behavior. Understanding whether the first child is special (no copy) matters for documentation accuracy."
+    },
+    {
+      "id": "bypass-behavior",
+      "category": "signal_path",
+      "question": "How does SplitNode handle bypass? The infrastructure doc says it checks isBypassed() at process entry and returns immediately. Are individually bypassed children skipped in the processing loop while non-bypassed children still process?",
+      "context": "Users need to know whether bypassing the entire split passes audio through, and whether individual child bypass works."
+    },
+    {
+      "id": "event-handling-interpreted",
+      "category": "signal_path",
+      "question": "The infrastructure doc notes that SplitNode creates a HiseEvent copy but passes the original reference, meaning the first child can modify the event for subsequent children. Confirm this is the actual behavior (event sharing, not isolation).",
+      "context": "This is a subtle difference from the expected 'each child gets independent events' behavior. Important for MIDI-processing nodes inside splits."
+    },
+    {
+      "id": "buffer-allocation",
+      "category": "performance",
+      "question": "Confirm that originalBuffer and workBuffer are heap-allocated during prepare() (not per-block). What is the memory cost for a stereo split with N children?",
+      "context": "Users should know that split containers have memory overhead from the extra buffers, unlike chain which processes in-place."
+    }
+  ],
+
+  "notes": "Split is a parallel container that sums child outputs. The compiled version uses splitprocessor::Block/Frame functors. The interpreted version extends ParallelNode. No properties are exposed in the base data. The existing phase3 doc includes a dry/wet mixer example with a HiseSnippet."
+}

@@ -1,0 +1,70 @@
+{
+  "moduleId": "SendContainer",
+  "nodes": [
+    {
+      "id": "send_effects",
+      "type": "external",
+      "label": "Send Effects",
+      "importance": 1,
+      "detail": "One or more SendEffect instances route audio into this container"
+    },
+    {
+      "id": "internal_buffer",
+      "type": "process",
+      "label": "Internal Buffer (Sum)",
+      "importance": 1,
+      "detail": "Accumulates send signals additively from all connected SendEffects, with per-send gain and channel offset"
+    },
+    {
+      "id": "fx_chain",
+      "type": "process",
+      "label": "Effect Chain",
+      "importance": 1,
+      "detail": "MasterEffect-only FX chain processes the accumulated buffer monophonically"
+    },
+    {
+      "id": "routing_matrix",
+      "type": "process",
+      "label": "Routing Matrix",
+      "importance": 1,
+      "detail": "Maps internal buffer channels to output channels via additive copy"
+    },
+    {
+      "id": "audio_out",
+      "type": "output",
+      "label": "Audio Out",
+      "importance": 1
+    },
+    {
+      "id": "clear",
+      "type": "process",
+      "label": "Clear Buffer",
+      "importance": 3,
+      "detail": "Internal buffer cleared after each render cycle"
+    }
+  ],
+  "edges": [
+    { "from": "send_effects", "to": "internal_buffer" },
+    { "from": "internal_buffer", "to": "fx_chain" },
+    { "from": "fx_chain", "to": "routing_matrix" },
+    { "from": "routing_matrix", "to": "audio_out" },
+    { "from": "audio_out", "to": "clear" }
+  ],
+  "groups": [
+    {
+      "id": "receive",
+      "label": "Receive",
+      "nodes": ["send_effects", "internal_buffer"]
+    },
+    {
+      "id": "processing",
+      "label": "Processing",
+      "nodes": ["fx_chain"]
+    },
+    {
+      "id": "output",
+      "label": "Output",
+      "nodes": ["routing_matrix", "audio_out", "clear"]
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "targetId": "core.faust",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [6505, 7024, 7236, 7343, 11160, 6512, 6607, 7734, 10348, 8265, 8196, 8332],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Faust JIT compiler is not included in exported plugins — must compile to C++",
+      "summary": "The Faust JIT compiler (`libfaust`) is not part of the exported plugin binary. A Faust node used in an exported plugin without prior C++ compilation will produce silence (the node is replaced by a dummy). The workflow is: write Faust code -> JIT-test in HISE -> export the DSP network to a C++ DLL -> the compiled version replaces the Faust node in the plugin.",
+      "sources": ["tid:6505", "tid:8196"],
+      "verify": true,
+      "verify_hint": "Confirm that exported plugins with a non-compiled Faust node produce silence (or an error) rather than audio."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Faust mono processes must be duplicated with a comma to handle stereo",
+      "summary": "Faust is a mono-first language. If a HISE scriptnode network has two channels and the Faust process only handles one channel, a channel mismatch error occurs. The fix is to duplicate the process call with a comma separator: `process = myProcess, myProcess;` to produce two independent output channels.",
+      "sources": ["tid:7024"],
+      "verify": true,
+      "verify_hint": "Test that a mono Faust process causes a channel mismatch inside a stereo scriptnode network."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Faust compressor nodes output a gain reduction value, not an attenuated signal",
+      "summary": "Many compressors in the Faust standard library (e.g. `co.RMS_compression_gain_N_chan`) output a gain control signal (0–1), not the compressed audio. You must manually multiply the input signal by this output. The correct pattern is: `process = input, input : co.RMS_compression_gain_N_chan(...) : *(left), *(right);`",
+      "sources": ["tid:7236"],
+      "verify": true,
+      "verify_hint": "Verify that co.compressor and co.RMS_compression_gain_N_chan output gain factor not processed audio."
+    },
+    {
+      "type": "API",
+      "title": "Faust MIDI synthesis requires freq, gain, and gate parameters by convention",
+      "summary": "For a Faust node to respond to MIDI note events, define `hslider` or `button` primitives named `freq`, `gain`, and `gate` exactly. These are the only MIDI convention keywords recognised. For additional MIDI control (CC, pitch bend, etc.), use a scriptnode MIDI node and modulate a custom Faust parameter from it. The sustain pedal support (keeping gate open) was added as a HISE patch.",
+      "sources": ["tid:7734", "tid:6622"],
+      "verify": true,
+      "verify_hint": "Confirm the exact spelling requirements for freq/gain/gate and verify sustain pedal support is in current HISE."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "HISE ignores the Faust vgroup construct — flatten parameters to avoid them disappearing",
+      "summary": "Parameters wrapped in a `vgroup` in Faust code do not appear in the scriptnode parameter list because HISE does not interpret the Faust group hierarchy. To expose all parameters, declare `hslider` items at the top level of the Faust program without wrapping them in vgroup/hgroup containers.",
+      "sources": ["tid:11160"],
+      "verify": true,
+      "verify_hint": "Confirm that vgroup-wrapped parameters are suppressed in the HISE scriptnode UI."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Faust nodes with a prime number of parameters (e.g. 11) caused a layout crash",
+      "summary": "A scriptnode-level bug caused the parameter knob layout to malfunction when a node had exactly 11 parameters (a prime number). The knob grid calculation went out of bounds. This was fixed in HISE. If you encounter this with any unusual parameter count, update HISE.",
+      "sources": ["tid:6512"],
+      "verify": true,
+      "verify_hint": "Check if the prime-parameter-count layout bug fix is present in current HISE builds."
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Use two separate knobs for tempo-free and tempo-synced Faust delay time",
+      "summary": "There is no built-in toggle-and-remap mechanism to switch a Faust delay parameter between free milliseconds and tempo-synced values inside a single knob. The recommended workaround is to have two separate parameter knobs (one for each mode) and hide the inactive one using scripting, or to use a `cable_expr` node to convert the tempo-sync value to milliseconds before routing to the Faust parameter.",
+      "sources": ["tid:8254"],
+      "verify": false,
+      "verify_hint": "Described in Christoph Hart's post in tid:8254 as the standard approach."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use hbargraph in Faust to create a modulation output readable by other nodes",
+      "summary": "Declaring an `hbargraph` primitive in Faust code turns it into a modulation source on the `core.faust` node. This output can then be connected to any target parameter in the scriptnode graph, or forwarded to the UI via a `core.peak` node or global cable. Currently limited to a single modulation output.",
+      "sources": ["tid:6505"],
+      "verify": true,
+      "verify_hint": "Confirm hbargraph -> single modulation output limitation and connection mechanism."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Faust needs a new project folder — old projects may lack required subfolders",
+      "summary": "When enabling Faust for the first time, HISE creates required subdirectories in the project. Loading an existing project that was created before Faust support was added may fail with errors because these folders are missing. The fix is to create a new HISE project, then copy your assets across.",
+      "sources": ["tid:6607"],
+      "verify": false,
+      "verify_hint": "Reported by hisefilo in tid:6607 — HISE should auto-create the folders but reportedly does not for legacy projects."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Faust polyphony requires the node to be placed inside a Scriptnode Synthesiser, not a ScriptFX",
+      "summary": "To use Faust for polyphonic synthesis responding to MIDI note events, the `core.faust` node must be inside a `Scriptnode Synthesiser` module (not a `Script FX`). Christoph added polyphony and MIDI support as a post-launch feature; the initial release was audio-effects only.",
+      "sources": ["tid:6505"],
+      "verify": true,
+      "verify_hint": "Confirm that Faust MIDI/polyphony only works in Scriptnode Synthesiser context."
+    }
+  ]
+}

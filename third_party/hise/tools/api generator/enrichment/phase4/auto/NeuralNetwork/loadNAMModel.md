@@ -1,0 +1,1 @@
+Loads a Neural Amp Modeler (NAM) wavenet model from JSON data. NAM models use a fixed wavenet topology and are always mono (1 input, 1 output), designed for guitar amp simulation. The JSON contains the wavenet weights directly - no separate `build` or `loadWeights` step is needed.

@@ -1,0 +1,1 @@
+Creates a ScriptTableData and registers it at the given slot index in the ExternalData system. The data holds a lookup table curve that can be visualised and edited as a table UI component. Other modules can access this data through the same slot index.

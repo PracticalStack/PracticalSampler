@@ -1,0 +1,83 @@
+{
+  "factoryPath": "template.softbypass_switch6",
+  "factory": "template",
+  "nodeId": "softbypass_switch6",
+  "description": "A container for serial processing of nodes",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Switch Control",
+      "rationale": "Single parameter selecting which of 6 soft-bypassed signal paths is active. Routes to control.xfader Value parameter.",
+      "parameters": [
+        {
+          "id": "Switch",
+          "range": { "min": 0.0, "max": 5.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "Controls the UI layout orientation of the container."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": true,
+    "groupName": "softbypass_switchN",
+    "templateParameter": "number of switch targets (2-8)",
+    "variantValue": "6"
+  },
+
+  "existingDoc": {
+    "path": "phase3/template/softbypass_switch6.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "variant-difference",
+      "category": "signal_path",
+      "question": "softbypass_switch6 has 6 soft_bypass children and Switch max=5 vs softbypass_switch2's 2 children and max=1. Is the internal logic identical except for the additional switch targets?",
+      "context": "If identical in structure, the doc can reference the base variant and note only the switch target count difference."
+    }
+  ],
+
+  "notes": "Variant of softbypass_switchN with N=6. Switch parameter max=5 (values 0-5). Six container.soft_bypass children. Structure otherwise identical to base variant."
+}

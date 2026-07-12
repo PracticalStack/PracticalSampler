@@ -1,0 +1,258 @@
+{
+  "className": "String",
+  "category": "namespace",
+  "description": "Doxy functions for String operations.",
+  "methods": {
+    "capitalize": {
+      "signature": "String capitalize()",
+      "returnType": "String",
+      "description": "Converts a string to start case (first letter of every word is uppercase).",
+      "parameters": []
+    },
+    "charAt": {
+      "signature": "String charAt(int index)",
+      "returnType": "String",
+      "description": "Returns the character at the given index.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "charCodeAt": {
+      "signature": "int charCodeAt(var index)",
+      "returnType": "int",
+      "description": "Returns the character at the given position as ASCII number.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "var"
+        }
+      ]
+    },
+    "concat": {
+      "signature": "String concat(var stringlist)",
+      "returnType": "String",
+      "description": "Joins two or more strings, and returns a new joined strings.",
+      "parameters": [
+        {
+          "name": "stringlist",
+          "type": "var"
+        }
+      ]
+    },
+    "contains": {
+      "signature": "bool contains(String otherString)",
+      "returnType": "bool",
+      "description": "Checks if the string contains the given substring.",
+      "parameters": [
+        {
+          "name": "otherString",
+          "type": "String"
+        }
+      ]
+    },
+    "decrypt": {
+      "signature": "String decrypt(var key)",
+      "returnType": "String",
+      "description": "Decrypt a string from Blowfish encryption.",
+      "parameters": [
+        {
+          "name": "key",
+          "type": "var"
+        }
+      ]
+    },
+    "encrypt": {
+      "signature": "String encrypt(var key)",
+      "returnType": "String",
+      "description": "Encrypt a string using Blowfish encryption.",
+      "parameters": [
+        {
+          "name": "key",
+          "type": "var"
+        }
+      ]
+    },
+    "endsWith": {
+      "signature": "bool endsWith(String suffix)",
+      "returnType": "bool",
+      "description": "Checks if the string ends with the given suffix.",
+      "parameters": [
+        {
+          "name": "suffix",
+          "type": "String"
+        }
+      ]
+    },
+    "getIntValue": {
+      "signature": "int getIntValue()",
+      "returnType": "int",
+      "description": "Attempts to parse the string as integer number.",
+      "parameters": []
+    },
+    "getTrailingIntValue": {
+      "signature": "int getTrailingIntValue()",
+      "returnType": "int",
+      "description": "Attempts to parse a integer number at the end of the string.",
+      "parameters": []
+    },
+    "hash": {
+      "signature": "int64 hash()",
+      "returnType": "int64",
+      "description": "Creates a unique hash from the string.",
+      "parameters": []
+    },
+    "includes": {
+      "signature": "bool includes(String substring)",
+      "returnType": "bool",
+      "description": "Checks if the string contains the given substring (JS-compatible alias for contains).",
+      "parameters": [
+        {
+          "name": "substring",
+          "type": "String"
+        }
+      ]
+    },
+    "indexOf": {
+      "signature": "int indexOf(var substring)",
+      "returnType": "int",
+      "description": "Returns the position of the first found occurrence of a specified value in a string.",
+      "parameters": [
+        {
+          "name": "substring",
+          "type": "var"
+        }
+      ]
+    },
+    "lastIndexOf": {
+      "signature": "int lastIndexOf(var substring)",
+      "returnType": "int",
+      "description": "Returns the position of the last found occurrence of a specified value in a string.",
+      "parameters": [
+        {
+          "name": "substring",
+          "type": "var"
+        }
+      ]
+    },
+    "match": {
+      "signature": "Array match(String regex)",
+      "returnType": "Array",
+      "description": "Returns an array of regex matches from the string.",
+      "parameters": [
+        {
+          "name": "regex",
+          "type": "String"
+        }
+      ]
+    },
+    "replace": {
+      "signature": "String replace(var substringToLookFor, var replacement)",
+      "returnType": "String",
+      "description": "Returns a copy of the string and replaces all occurences of `a` with `b`.",
+      "parameters": [
+        {
+          "name": "substringToLookFor",
+          "type": "var"
+        },
+        {
+          "name": "replacement",
+          "type": "var"
+        }
+      ]
+    },
+    "replaceAll": {
+      "signature": "String replaceAll(var substringToLookFor, var replacement)",
+      "returnType": "String",
+      "description": "Returns a copy of the string with all occurrences replaced (alias for replace).",
+      "parameters": [
+        {
+          "name": "substringToLookFor",
+          "type": "var"
+        },
+        {
+          "name": "replacement",
+          "type": "var"
+        }
+      ]
+    },
+    "slice": {
+      "signature": "String slice(int startIndex, int endIndex)",
+      "returnType": "String",
+      "description": "Returns a section of the string (alias for substring).",
+      "parameters": [
+        {
+          "name": "startIndex",
+          "type": "int"
+        },
+        {
+          "name": "endIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "split": {
+      "signature": "Array split(var separatorString)",
+      "returnType": "Array",
+      "description": "Splits the string into an array with the given separator.",
+      "parameters": [
+        {
+          "name": "separatorString",
+          "type": "var"
+        }
+      ]
+    },
+    "splitCamelCase": {
+      "signature": "Array splitCamelCase()",
+      "returnType": "Array",
+      "description": "Splits the string at uppercase characters (so MyValue becomes [\"My\", \"Value\"].",
+      "parameters": []
+    },
+    "startsWith": {
+      "signature": "bool startsWith(String prefix)",
+      "returnType": "bool",
+      "description": "Checks if the string starts with the given prefix.",
+      "parameters": [
+        {
+          "name": "prefix",
+          "type": "String"
+        }
+      ]
+    },
+    "substring": {
+      "signature": "String substring(int startIndex, int endIndex)",
+      "returnType": "String",
+      "description": "Returns the substring in the given range.",
+      "parameters": [
+        {
+          "name": "startIndex",
+          "type": "int"
+        },
+        {
+          "name": "endIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "toLowerCase": {
+      "signature": "String toLowerCase()",
+      "returnType": "String",
+      "description": "Converts a string to lowercase letters.",
+      "parameters": []
+    },
+    "toUpperCase": {
+      "signature": "String toUpperCase()",
+      "returnType": "String",
+      "description": "Converts a string to uppercase letters.",
+      "parameters": []
+    },
+    "trim": {
+      "signature": "String trim()",
+      "returnType": "String",
+      "description": "Returns a copy of this string with any whitespace characters removed from the start and end.",
+      "parameters": []
+    }
+  }
+}

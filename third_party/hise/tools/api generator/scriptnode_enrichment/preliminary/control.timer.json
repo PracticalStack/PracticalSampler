@@ -1,0 +1,114 @@
+{
+  "factoryPath": "control.timer",
+  "factory": "control",
+  "nodeId": "timer",
+  "description": "Create a periodic modulation signal if active",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Timer Control",
+      "rationale": "Active toggle and interval together define the periodic trigger behaviour.",
+      "parameters": [
+        {
+          "id": "Active",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Interval",
+          "range": { "min": 0.0, "max": 2000.0, "step": 0.1, "skew": 1.0 },
+          "default": 500.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "ClassId",
+      "defaultValue": "",
+      "type": "string",
+      "note": "Optional SNEX class identifier for custom timer logic (IsOptionalSnexNode is true)."
+    },
+    {
+      "id": "Mode",
+      "defaultValue": "Ping",
+      "type": "enum",
+      "note": "Selects the timer output pattern. Maps to C++ template argument (HasModeTemplateArgument). Default 'Ping' likely outputs a single impulse per interval."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/timer.md",
+    "tier": "STUB",
+    "lines": 6
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "mode-variants",
+      "category": "conditional_logic",
+      "question": "What Mode values are available? 'Ping' is the default. What other modes exist and what output pattern does each produce (e.g., toggle, ramp, random)?",
+      "context": "The Mode property is a template argument. Users need to know all available modes."
+    },
+    {
+      "id": "processing-pattern",
+      "category": "signal_path",
+      "question": "timer does NOT have OutsideSignalPath or IsControlNode. It presumably uses wrap::mod pattern and runs in process() to count samples against the Interval. Confirm that it sits in the signal path and advances a counter per sample/block.",
+      "context": "Unlike most control nodes, timer runs during audio processing."
+    },
+    {
+      "id": "snex-custom-logic",
+      "category": "conditional_logic",
+      "question": "The ClassId property and IsOptionalSnexNode flag suggest users can provide custom SNEX code for the timer callback. What is the SNEX interface? What methods must the custom class implement?",
+      "context": "Custom SNEX timer logic is an advanced feature that needs documentation."
+    },
+    {
+      "id": "interval-units",
+      "category": "parameter_behaviour",
+      "question": "Interval is in milliseconds (TextToValueConverter=Time). Is the timer sample-accurate (counts samples) or block-accurate (checks once per block)?",
+      "context": "Timer precision affects use cases like step sequencers."
+    }
+  ],
+
+  "notes": "IMPORTANT: timer does NOT have OutsideSignalPath or IsControlNode. It sits in the signal path using wrap::mod pattern. IsPolyphonic and TemplateArgumentIsPolyphonic are true. IsOptionalSnexNode allows custom SNEX timer logic. The ComplexData section exists but has no actual slots (Tables/SliderPacks/AudioFiles/Filters/DisplayBuffers all empty)."
+}

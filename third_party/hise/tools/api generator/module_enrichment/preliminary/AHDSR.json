@@ -1,0 +1,299 @@
+{
+  "moduleId": "AHDSR",
+  "prettyName": "AHDSR Envelope",
+  "type": "Modulator",
+  "subtype": "EnvelopeModulator",
+  "category": "generator",
+
+  "io": {
+    "midiIn": "noteOn+noteOff",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": true,
+    "fxChain": null
+  },
+
+  "voiceContext": "per-voice",
+
+  "interfaces": [],
+
+  "parameterGroups": [
+    {
+      "label": "Playback Control",
+      "rationale": "Toggle parameters that control voice allocation and retriggering behavior, independent of envelope shape",
+      "parameters": [
+        {
+          "id": "Monophonic",
+          "name": "Monophonic",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": "dynamic",
+          "description": "Enables monophonic mode where only one voice is rendered",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Retrigger",
+          "name": "Retrigger",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Restarts the envelope when a new note is triggered in monophonic mode",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Envelope Stages",
+      "rationale": "Time and level parameters defining the five AHDSR stages, each potentially modulated per-voice",
+      "parameters": [
+        {
+          "id": "Attack",
+          "name": "Attack",
+          "range": { "min": 0.0, "max": 20000.0, "step": 0.0 },
+          "default": 20.0,
+          "description": "Controls how long the envelope takes to reach full level after a note-on",
+          "composite": {
+            "type": "modMultiply",
+            "chainName": "AttackTimeModulation",
+            "chainIndex": 0,
+            "constrainer": "VoiceStartModulator"
+          },
+          "modChain": {
+            "name": "AttackTimeModulation",
+            "chainIndex": 0,
+            "constrainer": "VoiceStartModulator",
+            "modulationMode": "gain"
+          }
+        },
+        {
+          "id": "AttackLevel",
+          "name": "AttackLevel",
+          "range": { "min": -100.0, "max": 0.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "The peak level reached at the end of the attack phase",
+          "composite": {
+            "type": "modMultiply",
+            "chainName": "AttackLevelModulation",
+            "chainIndex": 1,
+            "constrainer": "VoiceStartModulator"
+          },
+          "modChain": {
+            "name": "AttackLevelModulation",
+            "chainIndex": 1,
+            "constrainer": "VoiceStartModulator",
+            "modulationMode": "gain"
+          }
+        },
+        {
+          "id": "Hold",
+          "name": "Hold",
+          "range": { "min": 0.0, "max": 20000.0, "step": 0.0 },
+          "default": 10.0,
+          "description": "The time the envelope stays at the attack level before decaying",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Decay",
+          "name": "Decay",
+          "range": { "min": 1.0, "max": 20000.0, "step": 0.0 },
+          "default": 300.0,
+          "description": "The time the envelope takes to fall from the attack level to the sustain level",
+          "composite": {
+            "type": "modMultiply",
+            "chainName": "DecayTimeModulation",
+            "chainIndex": 2,
+            "constrainer": "VoiceStartModulator"
+          },
+          "modChain": {
+            "name": "DecayTimeModulation",
+            "chainIndex": 2,
+            "constrainer": "VoiceStartModulator",
+            "modulationMode": "gain"
+          }
+        },
+        {
+          "id": "Sustain",
+          "name": "Sustain",
+          "range": { "min": -100.0, "max": 0.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "The level maintained while the note is held",
+          "composite": {
+            "type": "modMultiply",
+            "chainName": "SustainLevelModulation",
+            "chainIndex": 3,
+            "constrainer": "VoiceStartModulator"
+          },
+          "modChain": {
+            "name": "SustainLevelModulation",
+            "chainIndex": 3,
+            "constrainer": "VoiceStartModulator",
+            "modulationMode": "gain"
+          }
+        },
+        {
+          "id": "Release",
+          "name": "Release",
+          "range": { "min": 1.0, "max": 20000.0, "step": 0.0 },
+          "default": 20.0,
+          "description": "The time the envelope takes to fall from the sustain level to zero after note-off",
+          "composite": {
+            "type": "modMultiply",
+            "chainName": "ReleaseTimeModulation",
+            "chainIndex": 4,
+            "constrainer": "VoiceStartModulator"
+          },
+          "modChain": {
+            "name": "ReleaseTimeModulation",
+            "chainIndex": 4,
+            "constrainer": "VoiceStartModulator",
+            "modulationMode": "gain"
+          }
+        }
+      ]
+    },
+    {
+      "label": "Curve Shapes",
+      "rationale": "Parameters controlling the curvature of attack and decay/release transitions",
+      "parameters": [
+        {
+          "id": "AttackCurve",
+          "name": "AttackCurve",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "Controls the curvature of the attack phase (0.0 = concave, 1.0 = convex)",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "DecayCurve",
+          "name": "DecayCurve",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "Controls the curvature of the decay and release phases",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Performance",
+      "rationale": "CPU optimization toggle that trades accuracy for performance",
+      "parameters": [
+        {
+          "id": "EcoMode",
+          "name": "EcoMode",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Enables 16x downsampling for reduced CPU usage",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "compositeBlocks": [
+    {
+      "type": "modMultiply",
+      "param": "Attack",
+      "details": {
+        "chainName": "AttackTimeModulation",
+        "chainIndex": 0,
+        "constrainer": "VoiceStartModulator"
+      }
+    },
+    {
+      "type": "modMultiply",
+      "param": "AttackLevel",
+      "details": {
+        "chainName": "AttackLevelModulation",
+        "chainIndex": 1,
+        "constrainer": "VoiceStartModulator"
+      }
+    },
+    {
+      "type": "modMultiply",
+      "param": "Decay",
+      "details": {
+        "chainName": "DecayTimeModulation",
+        "chainIndex": 2,
+        "constrainer": "VoiceStartModulator"
+      }
+    },
+    {
+      "type": "modMultiply",
+      "param": "Sustain",
+      "details": {
+        "chainName": "SustainLevelModulation",
+        "chainIndex": 3,
+        "constrainer": "VoiceStartModulator"
+      }
+    },
+    {
+      "type": "modMultiply",
+      "param": "Release",
+      "details": {
+        "chainName": "ReleaseTimeModulation",
+        "chainIndex": 4,
+        "constrainer": "VoiceStartModulator"
+      }
+    }
+  ],
+
+  "gaps": [
+    {
+      "id": "signal-path-stage-order",
+      "category": "signal_path",
+      "question": "What is the exact stage calculation order in renderNextBlock/calculateBlock? How does the envelope transition between A->H->D->S->R states, and what is the per-sample calculation formula for each stage?",
+      "context": "The reference page pseudo-code needs to show the correct state machine and per-sample computation for each stage"
+    },
+    {
+      "id": "curve-shape-implementation",
+      "category": "parameter_behavior",
+      "question": "What do AttackCurve and DecayCurve values actually produce? Is this an exponential coefficient, a power curve, or some other interpolation? What curve does 0.0 vs 0.5 vs 1.0 produce?",
+      "context": "Users need to understand how the curve knobs affect the envelope shape to design sounds accurately"
+    },
+    {
+      "id": "attack-level-decibel-scaling",
+      "category": "parameter_behavior",
+      "question": "AttackLevel and Sustain are in Decibel mode (-100 to 0 dB). How is the dB-to-linear conversion applied? Is -100 dB treated as true silence (0.0) or a very small value?",
+      "context": "Determines whether 0 dB sustain means unity gain and whether -100 dB is effectively zero"
+    },
+    {
+      "id": "monophonic-retrigger-interaction",
+      "category": "conditional_logic",
+      "question": "How do Monophonic and Retrigger interact? When Monophonic=On and Retrigger=On, does the envelope restart from zero or from its current value? What happens when Retrigger=Off - does the envelope continue from its current position?",
+      "context": "Critical for legato playing behavior documentation"
+    },
+    {
+      "id": "decay-curve-shared",
+      "category": "parameter_behavior",
+      "question": "The DecayCurve description says it controls 'the curvature of the decay and release phases'. Does a single DecayCurve value truly apply to both decay and release identically, or are there differences?",
+      "context": "Users need to know if they can independently shape decay vs release curves (they cannot in AHDSR, unlike FlexAHDSR)"
+    },
+    {
+      "id": "ecomode-downsampling",
+      "category": "performance",
+      "question": "How does EcoMode's 16x downsampling work? Does it calculate one sample and hold for 16, or does it interpolate? What artifacts can this introduce (e.g., zipper noise on fast attacks)?",
+      "context": "Users need to understand the CPU/quality tradeoff to decide when EcoMode is appropriate"
+    },
+    {
+      "id": "hold-no-modchain",
+      "category": "parameter_behavior",
+      "question": "Hold has no modulation chain unlike the other time parameters. Is this intentional? Is there a technical reason Hold cannot be modulated per-voice?",
+      "context": "Worth noting in the reference page if Hold is deliberately unmodulatable"
+    },
+    {
+      "id": "mod-chain-gain-mode-semantics",
+      "category": "parameter_behavior",
+      "question": "All modulation chains use gain mode. For time parameters (Attack, Decay, Release), does gain mode mean the modulator value multiplies the time directly (e.g., mod=0.5 halves the time)? For level parameters (AttackLevel, Sustain in dB), how does gain-mode multiplication interact with the decibel scale?",
+      "context": "Users adding velocity modulators to these chains need to know the scaling behavior"
+    }
+  ],
+
+  "notes": "AHDSR is the most commonly used envelope in HISE. Key observations: (1) Sustain and AttackLevel use Decibel mode (-100 to 0 dB) while time parameters use milliseconds. (2) DecayCurve is shared between decay and release phases - FlexAHDSR separates these. (3) Hold has no modulation chain, unlike Attack/Decay/Sustain/Release. (4) EcoMode defaults to On (1.0), suggesting downsampling is the recommended default. (5) Monophonic default is 'dynamic' (likely determined by parent context). (6) All five mod chains are VoiceStartModulator-constrained with gain mode, meaning they scale parameter values at note-on time. Cross-reference: FlexAHDSR is the enhanced version with separate ReleaseCurve, NormalizedPercentage sustain, and DisplayBufferSource interface."
+}

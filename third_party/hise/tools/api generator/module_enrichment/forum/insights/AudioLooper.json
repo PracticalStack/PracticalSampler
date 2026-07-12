@@ -1,0 +1,131 @@
+{
+  "targetId": "AudioLooper",
+  "domain": "modules",
+  "generatedAt": "2026-04-08",
+  "topicIds": [12169, 3525, 7947, 5293, 3227, 12901, 6120, 14553, 1530, 12116, 4212, 4048, 1280, 1635, 750, 12719, 14124, 4317, 4531, 5587, 5856, 8741, 9026, 12889, 10733, 14523, 12087],
+  "insights": [
+    {
+      "type": "BUG",
+      "title": "Tempo sync now auto-updates when host BPM changes",
+      "summary": "The AudioLooper implements TempoListener and recalculates the sync factor when the host tempo changes. Earlier versions lacked this, requiring a TransportHandler workaround.",
+      "sources": ["tid:3525"],
+      "verify": false,
+      "verify_hint": null,
+      "verified": "fixed - AudioLooper.h:86 inherits TempoListener, tempoChanged calls setSyncMode"
+    },
+    {
+      "type": "BUG",
+      "title": "Overlapping notes sync bug has been fixed",
+      "summary": "The syncFactor is now calculated per-voice in a loop, not just for voice 0. Earlier versions applied the same sync factor to all voices, causing double-speed playback when notes overlapped.",
+      "sources": ["tid:5293"],
+      "verify": false,
+      "verify_hint": null,
+      "verified": "fixed - AudioLooper.cpp:545-576 iterates all voices for syncFactor"
+    },
+    {
+      "type": "BUG",
+      "title": "Pitch detection on load is unreliable and often wrong by 10 semitones",
+      "summary": "The automatic root-note pitch detection that runs when a file is loaded frequently produces wrong results. David Healey reported a consistent 10-semitone offset. One user worked around it by commenting out the PitchDetection block in AudioLooper.cpp.",
+      "sources": ["tid:5587", "tid:8741", "tid:4531"],
+      "verify": true,
+      "verify_hint": "grep PitchDetection::detectPitch in AudioLooper.cpp"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "RootNote stops auto-updating after first manual change",
+      "summary": "Once the RootNote parameter has been set to a value other than the default (64), the auto-detection on file load stops updating it. This appears to be intentional protection against overwriting preset values, but it surprises users who want detection to always run.",
+      "sources": ["tid:8741"],
+      "verify": true,
+      "verify_hint": "grep RootNote in AudioLooper.cpp; look for conditional around setAttribute call in pitch detection path"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "SyncMode max was 4 bars; 8/12/16 bar options added later",
+      "summary": "The original SyncMode enum only went up to 4 bars. Users with 8-bar and longer loops had no matching sync option. David Healey added 8, 12, and 16 bar options in a pull request. Older builds will not have these options.",
+      "sources": ["tid:3525"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "AudioLooper is a sound generator, not an effect — cannot be used in an FX plugin without enabling sound generators",
+      "summary": "Users trying to build an FX plugin with a loop player find the output is silent. The fix is to enable 'Enable Sound Generators FX' in Project Settings before building. David Healey also noted that a loop player plays audio rather than processing incoming audio, so an instrument plugin is the correct plugin type.",
+      "sources": ["tid:14553"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Loop range and LoopEnabled are now saved in presets",
+      "summary": "The LoopEnabled state and loop start/end range are serialised in exportAsValueTree and restored in restoreFromValueTree. Earlier versions did not persist these values.",
+      "sources": ["tid:4317"],
+      "verify": false,
+      "verify_hint": null,
+      "verified": "fixed - AudioLooper.cpp:389 saveAttribute(LoopEnabled); ProcessorInterfaces.cpp:776-777 saves loopStart/loopEnd"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Crash when SampleStartMod exceeds sample length for short files",
+      "summary": "If the SampleStartMod or manually set start position exceeds the number of samples in a file shorter than 44100 samples, HISE can crash. Users should clamp the start value or ensure loaded files meet a minimum length.",
+      "sources": ["tid:4317"],
+      "verify": true,
+      "verify_hint": "grep SampleStartMod or setStartOffset in AudioLooper.cpp; check bounds on short buffers"
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Use TransportHandler to fix tempo-sync drift on BPM change",
+      "summary": "Because the AudioLooper has no TempoListener, a TransportHandler callback can be used to re-apply the SyncMode attribute whenever the tempo changes, forcing the looper to recalculate its sync factor.",
+      "sources": ["tid:3525"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Use Sampler instead of AudioLooper for complex sample-start control",
+      "summary": "Multiple trusted posters recommend switching from AudioLooper to the Sampler when fine-grained sample-start control is needed. The Sampler's SampleStart modulator maps 0-1 to the configured sample range and avoids several AudioLooper limitations around looping, preset saving, and pitch detection.",
+      "sources": ["tid:12901", "tid:8741", "tid:5293"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "setFile() works for loading external files, but path must be resolvable",
+      "summary": "AudioSampleProcessor.setFile() can load files from outside the project folder. Early confusion on the forum was resolved when David Healey confirmed it works correctly — the initial reports of failure were user error, not an API bug.",
+      "sources": ["tid:6120"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "getSampleLength() can be used to detect whether a file is loaded",
+      "summary": "Christoph Hart confirmed that getSampleLength() returns 0 when no file is loaded (with the edge case of a zero-length file also returning 0). It is the recommended way to check load status from script.",
+      "sources": ["tid:1530"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "setContentCallback fires on setFile(), but 'event' may be undefined",
+      "summary": "AudioFile.setContentCallback() does fire when a file is loaded via setFile(), but the event argument is not always defined. Guard with isDefined(event) before reading the new root note. David Healey confirmed this behaviour in 2023.",
+      "sources": ["tid:5587"],
+      "verify": true,
+      "verify_hint": "grep setContentCallback in AudioSampleProcessor scripting; check when event is populated"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Trigger AudioLooper via Synth.playNote() from a script inside the module's MIDI chain",
+      "summary": "To create a play/stop button for an AudioLooper, place a ScriptProcessor inside the loop player's MIDI Processor chain and use Synth.playNote() / Synth.noteOffByEventId(). Events generated in a child chain only affect that generator, so no note filtering is needed.",
+      "sources": ["tid:12169"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use a Broadcaster attached to the RootNote parameter to react to auto-detection",
+      "summary": "Attach a Broadcaster to the AudioLooper's RootNote module parameter with bc.attachToModuleParameter() to receive callbacks when the pitch detector updates the value on file load. This is more reliable than polling.",
+      "sources": ["tid:8741"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

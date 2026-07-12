@@ -1,0 +1,14 @@
+{
+  "factoryPath": "control.delay_cable",
+  "nodes": [
+    { "id": "value_in", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Input value to be delayed" },
+    { "id": "delay_time", "label": "DelayTimeSamples", "type": "parameter", "importance": 0.8, "description": "Number of samples to wait before forwarding" },
+    { "id": "wait_counter", "label": "Sample Counter", "type": "process", "importance": 1.0, "description": "Counts samples in process()/processFrame() until delay time elapsed" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Forwards stored value after delay elapses (unnormalised)" }
+  ],
+  "edges": [
+    { "from": "value_in", "to": "wait_counter", "type": "control", "label": "stores value, resets counter" },
+    { "from": "delay_time", "to": "wait_counter", "type": "control", "label": "sets threshold" },
+    { "from": "wait_counter", "to": "mod_out", "type": "signal", "label": "when uptime >= delay" }
+  ]
+}

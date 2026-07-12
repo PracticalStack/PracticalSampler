@@ -1,0 +1,3 @@
+Updates the row data for the table. Pass an array of JSON objects whose property keys match the column `ID` values defined in `setTableColumns()`. The data is cloned internally - the original array is preserved for `getOriginalRowIndex()` lookups. If sorting is active, the new data is automatically re-sorted. Can be called at any time (not restricted to onInit).
+
+> [!Warning:Data cloned internally, re-call to update] The data is cloned internally when passed to `setTableRowData()`. Modifying the original array afterwards has no effect on the displayed table. Always call `setTableRowData()` again after changing the data.

@@ -1,0 +1,102 @@
+{
+  "moduleId": "GlobalModulatorContainer",
+  "nodes": [
+    {
+      "id": "midi_input",
+      "type": "input",
+      "label": "MIDI Input",
+      "importance": 1,
+      "detail": "noteOn/noteOff events trigger phantom voice allocation for polyphonic modulator context"
+    },
+    {
+      "id": "voice_allocation",
+      "type": "process",
+      "label": "Phantom Voice Allocation",
+      "importance": 1,
+      "detail": "Allocates voices so hosted polyphonic modulators get per-voice state. No audio produced."
+    },
+    {
+      "id": "global_modulators_chain",
+      "type": "process",
+      "label": "Global Modulators Chain",
+      "importance": 1,
+      "detail": "GainChain repurposed in GlobalMode. Hosts any modulator type except Global*Modulator consumers (NoGlobalsConstrainer)."
+    },
+    {
+      "id": "voice_start_data",
+      "type": "output",
+      "label": "VoiceStart Data Arrays",
+      "importance": 1,
+      "detail": "128-element per-note-number arrays. Populated in preStartVoice(). Consumers read via getConstantVoiceValue()."
+    },
+    {
+      "id": "time_variant_data",
+      "type": "output",
+      "label": "TimeVariant Data Buffers",
+      "importance": 1,
+      "detail": "Per-block shared buffers. Rendered in preVoiceRendering(). Consumers read via getModulationValuesForModulator()."
+    },
+    {
+      "id": "envelope_data",
+      "type": "output",
+      "label": "Envelope Data Buffers",
+      "importance": 1,
+      "detail": "Per-voice event-indexed buffers. Consumers read via getEnvelopeValuesForModulator(). Two-phase clear state prevents premature cutoff."
+    },
+    {
+      "id": "audio_output",
+      "type": "output",
+      "label": "Audio Output (silence)",
+      "importance": 0,
+      "detail": "calculateBlock() fills with zeros. No audio produced."
+    },
+    {
+      "id": "gain_param",
+      "type": "parameter",
+      "label": "Gain (vestigial)",
+      "importance": 0
+    },
+    {
+      "id": "balance_param",
+      "type": "parameter",
+      "label": "Balance (vestigial)",
+      "importance": 0
+    },
+    {
+      "id": "voice_limit_param",
+      "type": "parameter",
+      "label": "VoiceLimit",
+      "importance": 0,
+      "detail": "Functional for phantom voice count but not for audio."
+    },
+    {
+      "id": "kill_fade_param",
+      "type": "parameter",
+      "label": "KillFadeTime",
+      "importance": 0,
+      "detail": "Functional for phantom voice fade but not for audio."
+    }
+  ],
+  "edges": [
+    { "from": "midi_input", "to": "voice_allocation" },
+    { "from": "voice_allocation", "to": "global_modulators_chain" },
+    { "from": "global_modulators_chain", "to": "voice_start_data" },
+    { "from": "global_modulators_chain", "to": "time_variant_data" },
+    { "from": "global_modulators_chain", "to": "envelope_data" },
+    { "from": "voice_allocation", "to": "audio_output" },
+    { "from": "voice_limit_param", "to": "voice_allocation", "type": "control" },
+    { "from": "kill_fade_param", "to": "voice_allocation", "type": "control" }
+  ],
+  "groups": [
+    {
+      "id": "shared_data",
+      "label": "Shared Data Outputs",
+      "nodes": ["voice_start_data", "time_variant_data", "envelope_data"]
+    },
+    {
+      "id": "vestigial_params",
+      "label": "Vestigial Parameters",
+      "nodes": ["gain_param", "balance_param"]
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "moduleId": "SynthChain",
+  "nodes": [
+    {
+      "id": "midi_in",
+      "label": "MIDI Input",
+      "type": "input",
+      "importance": 0.8,
+      "group": "input",
+      "description": "Incoming MIDI events (noteOn, noteOff, controllers, pitchwheel)"
+    },
+    {
+      "id": "channel_filter",
+      "label": "Channel Filter",
+      "type": "decision",
+      "importance": 0.3,
+      "group": "input",
+      "description": "Root chain only: filters MIDI events by active channel mask"
+    },
+    {
+      "id": "midi_processor_chain",
+      "label": "MIDI Processor Chain",
+      "type": "process",
+      "importance": 0.6,
+      "group": "input",
+      "description": "Runs all MIDI processors in the chain (transpose, arpeggiator, etc.)"
+    },
+    {
+      "id": "child_render",
+      "label": "Render Children",
+      "type": "process",
+      "importance": 1.0,
+      "group": "rendering",
+      "description": "Each non-bypassed child SoundGenerator renders additively into the shared buffer"
+    },
+    {
+      "id": "gain_mod",
+      "label": "Gain Modulation",
+      "type": "modulation",
+      "importance": 0.8,
+      "group": "output",
+      "description": "Monophonic gain modulation (TimeVariantModulator only) applied post-mix"
+    },
+    {
+      "id": "gain_param",
+      "label": "Gain",
+      "type": "parameter",
+      "importance": 0.7,
+      "group": "output",
+      "description": "Static output volume as normalised linear gain (0.0 to 1.0)"
+    },
+    {
+      "id": "balance_param",
+      "label": "Balance",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": "output",
+      "description": "Stereo balance (-1.0 left to +1.0 right)"
+    },
+    {
+      "id": "fx_chain",
+      "label": "FX Chain",
+      "type": "process",
+      "importance": 0.8,
+      "group": "effects",
+      "description": "Voice-level effects (forced monophonic) followed by master effects"
+    },
+    {
+      "id": "output_routing",
+      "label": "Output Routing",
+      "type": "process",
+      "importance": 0.7,
+      "group": "output",
+      "description": "Apply static Gain * Balance and copy to output buffer"
+    },
+    {
+      "id": "audio_out",
+      "label": "Audio Output",
+      "type": "output",
+      "importance": 0.8,
+      "group": "output",
+      "description": "Stereo audio output (L/R)"
+    }
+  ],
+  "edges": [
+    { "from": "midi_in", "to": "channel_filter", "type": "signal", "label": null },
+    { "from": "channel_filter", "to": "midi_processor_chain", "type": "signal", "label": null },
+    { "from": "midi_processor_chain", "to": "child_render", "type": "signal", "label": "MIDI events" },
+    { "from": "child_render", "to": "gain_mod", "type": "signal", "label": "summed audio" },
+    { "from": "gain_mod", "to": "fx_chain", "type": "signal", "label": null },
+    { "from": "fx_chain", "to": "output_routing", "type": "signal", "label": null },
+    { "from": "gain_param", "to": "output_routing", "type": "control", "label": null },
+    { "from": "balance_param", "to": "output_routing", "type": "control", "label": null },
+    { "from": "output_routing", "to": "audio_out", "type": "signal", "label": null }
+  ],
+  "groups": [
+    { "id": "input", "label": "Input Processing" },
+    { "id": "rendering", "label": "Child Rendering" },
+    { "id": "effects", "label": "Effects Processing" },
+    { "id": "output", "label": "Output" }
+  ]
+}

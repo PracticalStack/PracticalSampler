@@ -1,0 +1,1 @@
+Adds a closed rectangle where each corner can be independently rounded or sharp. The `cornerSizeXY` array specifies the radius as `[radiusX, radiusY]`, allowing elliptical corners when the values differ. The `boolCurves` array controls which corners are rounded: `[topLeft, topRight, bottomLeft, bottomRight]`, where `true` rounds and `false` keeps sharp.

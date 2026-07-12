@@ -1,0 +1,1 @@
+Returns the loop range as a `[start, end]` array in samples. When `subtractStart` is true, the positions are relative to the current sample range start; when false, they are absolute within the audio file.

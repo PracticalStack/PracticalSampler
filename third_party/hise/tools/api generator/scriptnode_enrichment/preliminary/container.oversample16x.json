@@ -1,0 +1,83 @@
+{
+  "factoryPath": "container.oversample16x",
+  "factory": "container",
+  "nodeId": "oversample16x",
+  "description": "Processes the child nodes with a higher samplerate",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Oversampling Configuration",
+      "rationale": "Single parameter configuring the anti-aliasing filter. The oversampling factor is fixed at 16x and not exposed as a parameter.",
+      "parameters": [
+        {
+          "id": "FilterType",
+          "range": { "min": 0, "max": 1, "step": 1, "skew": 1.0 },
+          "default": 0,
+          "textConverter": "60.nT6K8CxLYF..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.OT.TuwVdvgVXyUlBFkjT.D1XzklckAP.AH..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "UI-only: controls whether the container is displayed vertically or horizontally in the scriptnode graph editor. No effect on signal processing."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": true,
+    "groupName": "oversampleNx",
+    "templateParameter": "oversampling factor",
+    "variantValue": "16"
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/container/oversample16x.md",
+    "tier": "STUB",
+    "lines": 6
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "variant-difference-16x",
+      "category": "signal_path",
+      "question": "oversample16x uses wrap::oversample<16, T> with the factor fixed at compile time. Is the processing logic identical to the dynamic container.oversample when set to factor 16, except that no Oversampling parameter is exposed and no runtime factor switching occurs?",
+      "context": "If identical, the doc can reference the base variant and note only the difference: fixed factor, no Oversampling parameter, potentially lower overhead from avoiding the runtime lock on factor changes."
+    }
+  ],
+
+  "notes": "Fixed 16x variant of the oversample group (maximum oversampling factor). References container.oversample as the base variant. Children see sampleRate*16 and blockSize*16. Same constraints: monophonic only, no frame processing, block processing only. At 44.1kHz, children process at 705.6kHz -- extreme CPU impact, use only when necessary (e.g., aggressive waveshaping with harmonics near Nyquist). This is the MaxOversamplingExponent=4 ceiling."
+}

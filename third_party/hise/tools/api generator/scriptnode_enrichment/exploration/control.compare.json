@@ -1,0 +1,16 @@
+{
+  "factoryPath": "control.compare",
+  "nodes": [
+    { "id": "left", "label": "Left", "type": "parameter", "importance": 1.0, "description": "First comparison operand (0..1)" },
+    { "id": "right", "label": "Right", "type": "parameter", "importance": 1.0, "description": "Second comparison operand (0..1)" },
+    { "id": "comparator", "label": "Comparator", "type": "decision", "importance": 1.0, "description": "Selects comparison operation (EQ, NEQ, GT, LT, GTE, LTE, MIN, MAX)" },
+    { "id": "compare_op", "label": "Compare", "type": "process", "importance": 1.0, "description": "Applies selected comparison; returns 1.0/0.0 for boolean ops, or min/max value" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Normalised output (1.0/0.0 for comparisons, continuous for MIN/MAX)" }
+  ],
+  "edges": [
+    { "from": "left", "to": "compare_op", "type": "signal", "label": null },
+    { "from": "right", "to": "compare_op", "type": "signal", "label": null },
+    { "from": "comparator", "to": "compare_op", "type": "conditional", "label": "selects operation" },
+    { "from": "compare_op", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

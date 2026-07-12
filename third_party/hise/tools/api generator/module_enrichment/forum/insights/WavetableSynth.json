@@ -1,0 +1,128 @@
+{
+  "targetId": "WavetableSynth",
+  "domain": "modules",
+  "generatedAt": "2026-04-08",
+  "topicIds": [14027, 1876, 5666, 4751, 5747, 5714, 12065, 13895, 9214, 8235, 8275, 9126, 9251, 646, 5240, 7860, 8188, 2505, 7479, 7923, 9126, 8911, 13787, 13052, 7983, 14054, 13337, 14087, 12770],
+  "insights": [
+    {
+      "type": "API",
+      "title": "HWT files must be manually deployed to the AppData AudioFiles folder",
+      "summary": "HWT wavetable files are not embedded in the compiled plugin and are not installed automatically. They must be explicitly copied to the user's AppData/AudioFiles folder, requiring a custom installer script or post-install step.",
+      "sources": ["tid:5714"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Loading a new wavetable file takes 1-2 seconds and kills all voices",
+      "summary": "Calling setFile() on the AudioSampleProcessor reference triggers a full reload and resynthesis of the wavetable, causing an audible gap. There is no way to swap wavetable data without killing active voices - this requires a C++ custom solution.",
+      "sources": ["tid:14027", "tid:13337"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "saveAsHwt() on WavetableController precomputes HWT files from loaded audio",
+      "summary": "After loading an audio file into the Wavetable Synthesiser, Synth.getWavetableController() can be used to call saveAsHwt(file) which writes a precomputed .hwt file, eliminating load-time resynthesis lag for simple wavetables.",
+      "sources": ["tid:14027"],
+      "verify": true,
+      "verify_hint": "grep saveAsHwt in hi_scripting/scripting/ScriptingApiObjects.cpp"
+    },
+    {
+      "type": "API",
+      "title": "Wavetable bank selection uses LoadedBankIndex attribute with numeric 1-based index",
+      "summary": "Wavetable banks are selected via the LoadedBankIndex attribute. When using a ComboBox linked via ProcessorID, the list items must be numeric (1, 2, 3...) matching the alphabetical order of loaded wavetables, not their names. Engine.getWavetableList() returns the available bank names.",
+      "sources": ["tid:5666", "tid:14054"],
+      "verify": true,
+      "verify_hint": "grep LoadedBankIndex in WavetableSynthesiser source; grep getWavetableList in ScriptingApiObjects.cpp"
+    },
+    {
+      "type": "BUG",
+      "title": "Table Index at 100% silences output - workaround: trim SampleEnd in sample editor",
+      "summary": "Setting the Table Index modulator to its maximum value (100%) causes the wavetable output to go silent. Multiple trusted users confirmed this is a conversion bug where the wavetable captures extra empty cycles at the end. Workaround: move the SampleEnd marker a few cycles back from the file end in the sample editor before converting.",
+      "sources": ["tid:9126"],
+      "verify": true,
+      "verify_hint": "grep table index boundary in WavetableSynthesiser render or interpolation code"
+    },
+    {
+      "type": "BUG",
+      "title": "Table Index knob sweeps audibly on first note due to missing reset",
+      "summary": "On the very first note played after loading, the Table Index value sweeps from its previous position to the current value because the knob's internal smoother is not reset on voice start. Christoph confirmed the bug and reported it as fixed in a subsequent commit.",
+      "sources": ["tid:7983"],
+      "verify": true,
+      "verify_hint": "look for tableIndexSmoothing reset in WavetableSynthesiser voice start code"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Wavetable format changed in v3.5 - older HWT files require reconversion or compile flag",
+      "summary": "From v3.5 onwards the wavetable synthesiser requires power-of-two cycle lengths for better performance. Older .hwt files will not play correctly. To use old files, recompile HISE with USE_MOD2_WAVETABLESIZE=0 (performance penalty applies). Otherwise, reconvert using Resample mode.",
+      "sources": ["tid:7923"],
+      "verify": true,
+      "verify_hint": "grep USE_MOD2_WAVETABLESIZE in HISE source"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Hard sync is not supported and cannot be added without aliasing artifacts",
+      "summary": "The WavetableSynth uses band-limited mip maps per octave to eliminate aliasing; hard sync destroys this band-limiting and produces severe artifacts. Christoph confirmed this is an architectural constraint, not a missing feature.",
+      "sources": ["tid:7479"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Unison + detune produces phaser/flanger artifacts because sample start cannot be modulated",
+      "summary": "The wavetable synth does not support per-voice sample start randomisation. When using unison with detune, all voices start from the same wavetable phase, producing a flanger-like comb filtering effect instead of the expected detuned unison spread.",
+      "sources": ["tid:5747"],
+      "verify": true,
+      "verify_hint": "check if WavetableSynth voice start allows random phase offset"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use 64 keyframes for velocity-stacked wavetables for smooth index modulation",
+      "summary": "Christoph recommends mapping up to 64 velocity-layer wavetables per note rather than 128. With 64 keyframes the synthesiser interpolates one frame between each pair, producing smooth transitions. Beyond 64 frames provides no audible improvement when modulating with MIDI controllers.",
+      "sources": ["tid:5747"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use Constant Modulator on Table Index chain to expose wavetable position as a knob",
+      "summary": "To give users a morphable wavetable position control, add a Constant Modulator to the Table Index modulation chain and connect its Intensity to a GUI slider. This is the recommended workflow for simple wavetable morphing without scripting.",
+      "sources": ["tid:5747"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Wavetable cycle length must be exactly 2048 samples and total file must be a multiple",
+      "summary": "Each wavetable cycle in the source audio file must be exactly 2048 samples long. The converter derives the number of wavetables using fileLength / cycleLength (no AI involved). Files that are not exact multiples will produce incorrect results.",
+      "sources": ["tid:12065"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use WavetableWaterfall component to visualise the loaded wavetable",
+      "summary": "A built-in WavetableWaterfall UI component is available for displaying wavetable content. The WavetableWaterfall index must be set to 0. It shows the waveform of the currently playing frame.",
+      "sources": ["tid:8188", "tid:12770"],
+      "verify": true,
+      "verify_hint": "grep WavetableWaterfall in HISE UI components; verify index=0 requirement"
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Simulate instant wavetable switching by modulating Table Index offset in a concatenated file",
+      "summary": "To switch between multiple wavetables instantly (avoiding setFile() reload latency), concatenate them into one file and control which section plays by changing the Table Index start offset via setAttribute(6, offsetValue). An LFO in bipolar mode via the Table Index Bipolar mod source can sweep the desired 0-25% section.",
+      "sources": ["tid:14027"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Interpolation artifacts increase sharply above 2-8 velocity layers per note",
+      "summary": "Using too many velocity layers (e.g. 16+) per note during wavetable morphing produces audible artifacts on the crossfade points. Trusted users found that limiting to 2-8 frames per note and relying on HISE interpolation between them produces smooth results.",
+      "sources": ["tid:5747"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

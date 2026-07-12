@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 250 140" width="250" height="140">
+  <defs>
+    <marker id="arr" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
+      <polygon points="0 0, 6 2.5, 0 5" fill="#808080"/>
+    </marker>
+  </defs>
+
+  <!-- Left: original rectangle (unmodified - solid outline) -->
+  <rect x="10" y="15" width="80" height="100" rx="3"
+        fill="none" stroke="#808080" stroke-width="1"/>
+  <text x="50" y="52" font-family="Lato, sans-serif" font-size="11"
+        fill="#808080" text-anchor="middle">rect</text>
+  <!-- Centre point -->
+  <circle cx="50" cy="65" r="2.5" fill="#808080"/>
+
+  <!-- Arrow -->
+  <line x1="103" y1="65" x2="127" y2="65"
+        stroke="#808080" stroke-width="1" marker-end="url(#arr)"/>
+
+  <!-- Right: ghost of original (dashed, dimmed) -->
+  <rect x="140" y="15" width="80" height="100" rx="3"
+        fill="none" stroke="#808080" stroke-width="1" stroke-dasharray="4,3" stroke-opacity="0.4"/>
+
+  <!-- Right: new smaller rectangle, centred -->
+  <rect x="155" y="35" width="50" height="60" rx="3"
+        fill="#90FFB1" fill-opacity="0.12" stroke="#90FFB1" stroke-width="1.5"/>
+  <text x="180" y="56" font-family="Lato, sans-serif" font-size="11"
+        fill="#90FFB1" text-anchor="middle">result</text>
+
+  <!-- Centre point (same position as left) -->
+  <circle cx="180" cy="65" r="2.5" fill="#90FFB1"/>
+
+  <!-- Dimension: new width -->
+  <line x1="155" y1="105" x2="205" y2="105" stroke="#808080" stroke-width="1"/>
+  <line x1="155" y1="101" x2="155" y2="109" stroke="#808080" stroke-width="1"/>
+  <line x1="205" y1="101" x2="205" y2="109" stroke="#808080" stroke-width="1"/>
+  <text x="180" y="120" font-family="Consolas, 'Courier New', monospace" font-size="10"
+        fill="#808080" text-anchor="middle">w, h</text>
+</svg>

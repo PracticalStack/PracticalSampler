@@ -1,0 +1,18 @@
+{
+  "className": "DisplayBufferSource",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "getDisplayBuffer": {
+      "signature": "var getDisplayBuffer(int index)",
+      "returnType": "var",
+      "description": "Returns a reference to the display buffer at the given index.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    }
+  }
+}

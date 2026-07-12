@@ -1,0 +1,3 @@
+Applies a pitch fade to an active voice identified by its event ID. The fade transitions smoothly from the current pitch to the target over the specified time. The target is specified in two components: `targetCoarsePitch` (semitones) and `targetFinePitch` (cents, 0-100). For legato glide effects, use the two-phase pattern: first apply an instant offset equal to the note interval, then fade back to zero over the glide time.
+
+> [!Warning:No negative semitones, unsigned bytes] Both pitch parameters are stored as unsigned bytes internally. Negative semitone values will not behave as expected - use the two-phase pattern (instant offset then fade to 0) instead.

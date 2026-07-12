@@ -1,0 +1,86 @@
+{
+  "factoryPath": "math.table",
+  "factory": "math",
+  "nodeId": "table",
+  "description": "Processes the signal with the table as LUT function",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 1,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/math/table.md",
+    "tier": "STUB",
+    "lines": 6
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "input-to-index-mapping",
+      "category": "signal_path",
+      "question": "How is the input signal value mapped to a table index? The hmath.md says 'normalized input 0-1' -- is the input clamped to [0,1] before lookup, or wrapped, or does it use an index type with specific boundary logic?",
+      "context": "Users need to know the expected input range and what happens with out-of-range values (e.g., negative audio signals or values > 1)."
+    },
+    {
+      "id": "table-interpolation",
+      "category": "signal_path",
+      "question": "What interpolation method is used between table entries? Linear interpolation, cubic, or nearest-neighbour? The table has 512 samples so interpolation quality matters for smooth waveshaping.",
+      "context": "Interpolation quality affects output smoothness and aliasing characteristics when used as a waveshaper."
+    },
+    {
+      "id": "processing-granularity",
+      "category": "performance",
+      "question": "Does math.table process per-sample (frame-based with processFrame) or per-block? Is there SIMD acceleration for the table lookup?",
+      "context": "Table lookups are typically per-sample operations. Confirms CPU cost expectations."
+    },
+    {
+      "id": "table-size-fixed",
+      "category": "signal_path",
+      "question": "Is the table size always 512 samples, or can it be resized? The hmath.md states 512 but this should be confirmed in the C++ source.",
+      "context": "Determines whether the 512-sample resolution is a hard constraint or configurable."
+    },
+    {
+      "id": "external-data-usage",
+      "category": "signal_path",
+      "question": "How does the node interact with the Table ComplexData? Does it use data::base directly? Is the table read with a DataTryReadLock on the audio thread?",
+      "context": "Important for understanding thread safety and whether table edits cause glitches during playback."
+    }
+  ],
+
+  "notes": "math.table is a LUT (lookup table) node that uses HISE Table external data. It has no parameters -- the signal is shaped entirely by the table contents. Not based on the OpNode template. Uses data::base for external data access. The existing doc is a STUB with only a placeholder description. The table has 512 samples with normalized 0-1 input. No cppProperties are set, so it is monophonic only."
+}

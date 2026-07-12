@@ -1,0 +1,1 @@
+Toggles the bypass state of this modulator. When bypassed, the modulator's output is not applied to its target. A common pattern is using bypass to enable or disable optional modulators from UI toggle buttons, where `!value` maps a button's on-state to unbypassed.

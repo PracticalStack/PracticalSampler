@@ -1,0 +1,56 @@
+{
+  "targetId": "container.clone",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [12012, 11905, 7840, 11866, 9277],
+  "insights": [
+    {
+      "type": "BUG",
+      "title": "Compiling an empty or polyphonic clone container fails on Mac and Windows with isPolyphonic() error",
+      "body": "Compiling a clone container that is empty, or that contains only core::empty nodes, produces a compiler error: 'has no member named isPolyphonic'. This was reproducible on both macOS and Windows with recent HISE commits. The workaround is to ensure the clone container has actual processing nodes inside it, and that NumClones is specified as the first macro control before attempting compilation.",
+      "source": "tid:12012",
+      "author": "David Healey [expert], HISEnberg [trusted]",
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "NumClones is a compile-time constant; dynamically-processed count is controlled at runtime",
+      "body": "The maximum number of clones is fixed at compile time. However, the number of clones that are actively processed can be changed dynamically via the NumClones parameter — all clone cables connected to that parameter will also adapt to the dynamic count. This means you build headroom at compile time but can efficiently reduce active processing at runtime.",
+      "source": "tid:11905",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "API",
+      "title": "Use control.clone_pack to assign different values to each clone",
+      "body": "All clones in a container share the same parameter connections by default. To give each clone an individually controllable value (e.g. different EQ frequencies), use the control.clone_pack node, which reads from a sliderpack and distributes one value per clone. Values are in the 0..1 normalized range. This pattern is the standard approach for per-clone independent parameter control.",
+      "source": "tid:7840",
+      "author": "Matt_SF [trusted]",
+      "confidence": "high"
+    },
+    {
+      "type": "API",
+      "title": "clone_forward connects to the first node only; one clone_forward per target container",
+      "body": "When using control.clone_forward to forward a value into clone containers, connect it to the first node inside the container — the propagation to the other clones happens automatically. If you have multiple separate containers that each need forwarding, you need one clone_forward node per container.",
+      "source": "tid:11866",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "NumClones must be the first macro control and its range must match across all connected nodes",
+      "body": "A common pitfall with clone containers is not setting NumClones as the first macro parameter, or having mismatched ranges on nodes it controls. Both cause silent failures or compilation errors. Best practice: set NumClones first, ensure all controlled nodes have matching min/max ranges, and precompile processing logic in a separate scriptnode network loaded into the clone container to keep it organised.",
+      "source": "tid:12012",
+      "author": "HISEnberg [trusted]",
+      "confidence": "high"
+    },
+    {
+      "type": "BUG",
+      "title": "Wrapping an oscillator in container.soft_bypass inside a clone container crashes",
+      "body": "Placing a container.soft_bypass node around an oscillator node inside a clone container caused a crash. This was reported and confirmed with a snippet. Avoid soft_bypass wrappers around oscillator-type nodes within clone containers.",
+      "source": "tid:9277",
+      "author": "David Healey [expert]",
+      "confidence": "medium"
+    }
+  ]
+}

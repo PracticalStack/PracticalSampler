@@ -1,0 +1,1 @@
+Returns the reference string for the currently loaded file. For files in the project's AudioFiles folder, this uses the `{PROJECT_FOLDER}` placeholder (e.g. `{PROJECT_FOLDER}loop.wav`). For files loaded from outside the project, the return value is an absolute filesystem path. Pass the result to `FileSystem.fromReferenceString()` to obtain a File object for disk operations.

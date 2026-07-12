@@ -1,0 +1,12 @@
+{
+  "factoryPath": "math.rect",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Normalised input signal" },
+    { "id": "rect", "label": "Rectify", "type": "process", "importance": 1.0, "description": "output = (input >= 0.5) ? 1.0 : 0.0" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Binary gate signal (0.0 or 1.0)" }
+  ],
+  "edges": [
+    { "from": "in", "to": "rect", "type": "signal", "label": null },
+    { "from": "rect", "to": "out", "type": "signal", "label": null }
+  ]
+}

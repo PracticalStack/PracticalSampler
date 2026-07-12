@@ -1,0 +1,104 @@
+{
+  "targetId": "GlobalTimeVariantModulator",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [5298, 1558, 1583, 4440, 5255, 6813, 7925, 10191, 8542, 7177, 13523, 14031, 2150, 378, 617, 1015, 7693, 11824, 9641, 9370, 6390, 11851, 10304],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Global Modulator Container must be placed above all consumers in the module tree",
+      "summary": "The GlobalModulatorContainer must appear before any module that uses a GlobalTimeVariantModulator in the HISE module tree (top-down processing order). Placing it below consumers results in silent modulation with no error.",
+      "sources": ["tid:1015", "tid:5255"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Sampler requires GlobalModulatorContainer to appear before it; other generators are more permissive",
+      "summary": "When driving a Sampler with a GlobalTimeVariantModulator, the GlobalModulatorContainer must strictly precede the Sampler in the chain. WavetableSynth and WaveformGenerator are less sensitive to ordering, but correct ordering is always required.",
+      "sources": ["tid:7177"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "Global LFO runs approximately 4x too fast in Scriptnode (clock-sync path)",
+      "summary": "Multiple trusted users confirmed that a tempo-synced Global LFO connected via the global_mod scriptnode node runs at roughly 4x the expected speed. A fix was pushed for the clock-synced path; the note-on sync hack was removed at the same time.",
+      "sources": ["tid:5298", "tid:7925"],
+      "verify": true,
+      "verify_hint": "grep clock sync LFO fix in GlobalModulators.cpp; check if note-on sync hack removal is present in calculateBlock"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Global modulators are not available in FX-plugin master chain by default",
+      "summary": "In FX plugin mode, GlobalTimeVariantModulators do not appear in the connection dropdown for effects placed in the master chain. A fix was added; enabling 'Sound Generator' in the FX plugin export settings and placing the GlobalModulatorContainer correctly resolves the issue.",
+      "sources": ["tid:1583", "tid:5255"],
+      "verify": true,
+      "verify_hint": "search for FX plugin global modulator dropdown visibility in GlobalModulatorEditor.h or GlobalModulators.cpp"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "setNoteNumber() in MIDI scripts breaks global modulator lookup; use setTransposeAmount() instead",
+      "summary": "Global modulators identify events by note number and event ID. If a MIDI script calls setNoteNumber() to remap a note, the global modulator loses the event association and ignores that note. setTransposeAmount() preserves the original note number and avoids this problem.",
+      "sources": ["tid:6390"],
+      "verify": true,
+      "verify_hint": "grep getEventIdForNoteNumber or event lookup in GlobalModulators.cpp"
+    },
+    {
+      "type": "API",
+      "title": "Envelopes cannot be placed inside a GlobalModulatorContainer",
+      "summary": "Envelope modulators extend voice lifetime, which conflicts with the global modulation system's voice management. Only TimeVariantModulators (LFO, etc.) are permitted as sources inside the container.",
+      "sources": ["tid:1015"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Use a global cable and callback to read the current modulator value from script",
+      "summary": "Polling a GlobalTimeVariantModulator's output value from HiseScript is not supported directly. The recommended approach is to attach a GlobalCable to the modulator and register a callback, which moves the polling to the C++ side and supports both synchronous and async execution.",
+      "sources": ["tid:9641"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Table popup label shows 'Not assigned' inside a global modulator",
+      "summary": "When a TableEditor control is connected to a GlobalTimeVariantModulator's table via the processor ID dropdown, the table's y-axis popup label displays 'Not assigned' because the global modulator has no fixed modulation target. Use setTablePopupFunction() to provide a custom label.",
+      "sources": ["tid:2150"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use setTablePopupFunction() to provide a meaningful table popup label",
+      "summary": "Call Table.setTablePopupFunction(function(x, y) { return ... }) on the global modulator's table reference to replace the default 'Not assigned' y-axis label with a percentage or other context-appropriate string.",
+      "sources": ["tid:2150"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Build free-running LFO in scriptnode to avoid note-on dependency",
+      "summary": "A GlobalTimeVariantModulator wrapping an LFO will restart on each note-on. For a free-running LFO that does not retrigger, implement the oscillator as a scriptnode network inside a Script FX module instead.",
+      "sources": ["tid:7693", "tid:6813"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "Using GlobalModulator with global_mod scriptnode node can crash HISE on quit",
+      "summary": "A crash-on-quit was reported when combining a GlobalModulator with a global_mod scriptnode node. The issue was filed but not confirmed resolved at time of reporting.",
+      "sources": ["tid:13523"],
+      "verify": true,
+      "verify_hint": "check GlobalModulator teardown in GlobalModulators.cpp and global_mod node destructor in scriptnode"
+    },
+    {
+      "type": "API",
+      "title": "Multiple GlobalModulatorContainers are possible but not fully supported; place private container second",
+      "summary": "HISE supports adding a second GlobalModulatorContainer for 'private' modulators that should not appear in the mod matrix. However, the system was not designed for this: internal code uses getFirstModulatorContainer(), so always place the private container second to avoid unexpected behaviour.",
+      "sources": ["tid:14031"],
+      "verify": true,
+      "verify_hint": "grep getFirstModulatorContainer in HISE source to identify affected call sites"
+    }
+  ]
+}

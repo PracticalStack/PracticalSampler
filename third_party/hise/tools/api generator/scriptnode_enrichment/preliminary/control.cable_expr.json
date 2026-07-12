@@ -1,0 +1,107 @@
+{
+  "factoryPath": "control.cable_expr",
+  "factory": "control",
+  "nodeId": "cable_expr",
+  "description": "evaluates an expression for the control value",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input value",
+      "rationale": "The value that is passed as 'input' to the SNEX expression. Marked as unscaled, so it receives raw values without range conversion.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": true
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "Code",
+      "defaultValue": "input",
+      "type": "string",
+      "note": "The SNEX expression to evaluate. The variable 'input' refers to the incoming Value parameter. Must be a valid SNEX expression that returns a double. Default 'input' is a passthrough."
+    },
+    {
+      "id": "Debug",
+      "defaultValue": false,
+      "type": "boolean",
+      "note": "Enables debug output for the expression evaluation. Likely prints the result to the console."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": true,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/cable_expr.md",
+    "tier": "GOOD",
+    "lines": 22
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "expr-available-functions",
+      "category": "parameter_behaviour",
+      "question": "The SNEX overview confirms Math.* functions are available. Are there any additional functions or variables beyond 'input' and Math.*? Can the expression access multiple variables?",
+      "context": "Users need a definitive list of what can be used in the expression."
+    },
+    {
+      "id": "expr-compilation-failure",
+      "category": "conditional_logic",
+      "question": "When the expression fails to compile, does cable_expr pass through the input value unchanged (as documented for JitExpression), or does it output zero?",
+      "context": "Users need to know the fallback behaviour when they enter an invalid expression."
+    },
+    {
+      "id": "expr-debug-property",
+      "category": "conditional_logic",
+      "question": "What exactly does the Debug property do? Does it print the expression result to the HISE console on each evaluation, or does it enable a different debug view?",
+      "context": "The Debug property is undocumented and users may not discover it."
+    },
+    {
+      "id": "expr-compilation-requirement",
+      "category": "description_accuracy",
+      "question": "The existing doc states 'you will have to compile your network in order to use it in an exported plugin'. Is this still accurate? Does cable_expr use JIT at runtime, or is it interpreted?",
+      "context": "Important deployment consideration for users building plugins."
+    }
+  ],
+
+  "notes": "cable_expr is a value transformation node (Pattern 2 from control-infrastructure) that uses SNEX JIT to evaluate a user-defined expression. The expression receives the input as 'input' variable and returns a double. Both input and output are unnormalised. The Code property defaults to 'input' (passthrough). The existing phase3 doc is the most detailed in this batch (GOOD tier, 22 lines) and already explains the basic concept well. The SNEX overview confirms the expression is wrapped as: double get(double input){ return <EXPRESSION>; }"
+}

@@ -1,0 +1,94 @@
+{
+  "factoryPath": "container.branch",
+  "factory": "container",
+  "nodeId": "branch",
+  "description": "Processes a single child based on the branch index",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Branch Selection",
+      "rationale": "Single parameter controlling which child processes audio.",
+      "parameters": [
+        {
+          "id": "Index",
+          "range": { "min": 0.0, "max": 10.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/container/branch.md",
+    "tier": "GOOD",
+    "lines": 27
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "index-clamping-behavior",
+      "category": "signal_path",
+      "question": "Compiled branch uses jmin(NumElements-1, idx) to clamp out-of-range indices to the last child. Does the interpreted BranchNode also clamp, or does it ignore out-of-range index values? What happens with floating-point Index values -- are they truncated or rounded?",
+      "context": "Users need to know the safe range for the Index parameter and what happens at boundaries."
+    },
+    {
+      "id": "inactive-children-state",
+      "category": "signal_path",
+      "question": "Confirm that all children are prepared and reset (even inactive ones), but only the currently selected child receives process() and handleHiseEvent() calls. Does switching Index mid-buffer cause a click?",
+      "context": "The 'all prepared, one processes' model is important. Switching behavior affects whether users need soft_bypass for click-free transitions."
+    },
+    {
+      "id": "max-children-limit",
+      "category": "signal_path",
+      "question": "The compiled version has a static_assert limiting to 16 children (CASE_16 macro). Does the interpreted BranchNode have a similar limit, or is it unlimited? The parameter max is 10 by default -- does updateIndexLimit() adjust this when children are added?",
+      "context": "Users need to know the maximum number of branches supported."
+    },
+    {
+      "id": "bypass-behavior",
+      "category": "signal_path",
+      "question": "The infrastructure doc says BranchNode checks isBypassed() at process entry and returns immediately. Confirm: when bypassed, audio passes through unmodified (none of the children process)?",
+      "context": "Bypass behavior documentation."
+    }
+  ],
+
+  "notes": "Branch has HasFixedParameters=true in cppProperties, meaning parameters cannot be added/removed at runtime. The Index parameter's max value of 10 is a default -- the interpreted BranchNode adjusts this via updateIndexLimit() when children are added/removed. Compiled version limited to 16 children via switch/case macro."
+}

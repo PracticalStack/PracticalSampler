@@ -1,0 +1,1 @@
+Sets the opacity of the displayed image, where 0.0 is fully transparent and 1.0 is fully opaque. The value is clamped to the 0.0-1.0 range during rendering. This is equivalent to `set("alpha", value)` and triggers a UI repaint.

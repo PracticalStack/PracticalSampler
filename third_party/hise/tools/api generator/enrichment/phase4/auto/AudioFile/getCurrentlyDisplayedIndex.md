@@ -1,0 +1,1 @@
+Returns the current playback position as a sample index. For live playback tracking, registering a callback with `setDisplayCallback()` or using `Broadcaster.attachToComplexData()` with `AudioFile.DisplayIndex` mode is more efficient than polling this method.

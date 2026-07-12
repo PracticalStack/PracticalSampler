@@ -1,0 +1,1 @@
+Sets CSS class selectors on this component for stylesheet-based styling. The component's type class (`.scriptdynamiccontainer`) is automatically prepended, so passing `".primary"` results in the selector `.scriptdynamiccontainer .primary`. Use `setStyleSheetProperty()` instead when you only need to change a single CSS variable rather than switching the entire class.

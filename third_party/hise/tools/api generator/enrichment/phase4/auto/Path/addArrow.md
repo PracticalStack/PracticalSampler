@@ -1,0 +1,1 @@
+Adds an arrow shape from a start point to an end point. The arrow consists of a line shaft with the given thickness and a triangular arrowhead at the end point, with independently controllable head width and length.

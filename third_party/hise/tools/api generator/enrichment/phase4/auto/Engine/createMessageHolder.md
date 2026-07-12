@@ -1,0 +1,1 @@
+Creates a persistent MIDI message storage object. Unlike the implicit `Message` object in MIDI callbacks, a message holder persists across callbacks and can be stored in variables or arrays. Message holders are used to construct MIDI events for `Engine.renderAudio()` and to pass structured MIDI data between different parts of a script.

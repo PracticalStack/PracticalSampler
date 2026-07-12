@@ -1,0 +1,1 @@
+Sets the interface width in pixels. Can be called after onInit to dynamically resize the interface. Use `Broadcaster.attachToInterfaceSize()` to respond to size changes. For setting both dimensions at once during initialisation, prefer `Content.makeFrontInterface()`.

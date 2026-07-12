@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 380" font-family="Consolas, monospace" font-size="12">
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#888"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  
+  <!-- Script FX outer box -->
+  <rect x="10" y="32" width="680" height="290" rx="6" fill="#333" stroke="#888" stroke-width="1.2"/>
+  <text x="30" y="52" fill="#ccc" font-size="13" font-weight="bold">Script FX</text>
+  <text x="130" y="52" fill="#888" font-size="10">(host module)</text>
+
+  <!-- DspNetwork box -->
+  <rect x="30" y="64" width="640" height="244" rx="5" fill="none" stroke="#4a9eff" stroke-width="1.5"/>
+  <text x="50" y="84" fill="#4a9eff" font-size="13" font-weight="bold">DspNetwork</text>
+  <text x="190" y="84" fill="#7ab8ff" font-size="10">Engine.createDspNetwork()</text>
+
+  <!-- Node 1 -->
+  <rect x="50" y="100" width="180" height="180" rx="4" fill="#2d3a4a" stroke="#5588aa"/>
+  <text x="140" y="120" text-anchor="middle" fill="#8cf" font-size="12" font-weight="bold">Node</text>
+  <text x="140" y="136" text-anchor="middle" fill="#6aa8cc" font-size="9">DspNetwork.create()</text>
+
+  <!-- Node 1 Parameter 1 -->
+  <rect x="70" y="152" width="140" height="40" rx="3" fill="#3a2a3a" stroke="#a5a"/>
+  <text x="140" y="170" text-anchor="middle" fill="#daf" font-size="11">Parameter</text>
+  <text x="140" y="184" text-anchor="middle" fill="#a8a" font-size="8">getOrCreateParameter()</text>
+
+  <!-- Node 2 -->
+  <rect x="460" y="100" width="180" height="180" rx="4" fill="#2d3a4a" stroke="#5588aa"/>
+  <text x="550" y="120" text-anchor="middle" fill="#8cf" font-size="12" font-weight="bold">Node</text>
+  <text x="550" y="136" text-anchor="middle" fill="#6aa8cc" font-size="9">DspNetwork.create()</text>
+
+  <!-- Node 2 Parameter 2 -->
+  <rect x="480" y="152" width="140" height="40" rx="3" fill="#3a2a3a" stroke="#a5a"/>
+  <text x="550" y="170" text-anchor="middle" fill="#daf" font-size="11">Parameter</text>
+  <text x="550" y="184" text-anchor="middle" fill="#a8a" font-size="8">getOrCreateParameter()</text>
+
+  <!-- Connection box between Node 1 Param 2 and Node 2 Param 1 -->
+  <rect x="285" y="152" width="130" height="40" rx="3" fill="#2a3a2a" stroke="#5a5"/>
+  <text x="350" y="170" text-anchor="middle" fill="#afa" font-size="11">Connection</text>
+  <text x="350" y="184" text-anchor="middle" fill="#8a8" font-size="8">addConnectionFrom()</text>
+
+  <!-- Wire: Node 1 Param 2 down to Connection -->
+  <line x1="210" y1="170" x2="285" y2="170" stroke="#5a5" stroke-dasharray="4" marker-end="url(#arr)"/>
+
+  <!-- Wire: Connection to Node 2 Param 1 -->
+  <line x1="415" y1="170" x2="480" y2="170" stroke="#5a5" stroke-dasharray="4" marker-end="url(#arr)"/>
+  
+</svg>

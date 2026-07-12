@@ -1,0 +1,96 @@
+[
+  {
+    "target": "container.fix32_block",
+    "type": "gotcha",
+    "summary": "Send/receive feedback routing introduces exactly one processing chunk of latency, not a fixed sample count",
+    "detail": "Christoph Hart clarified: the delay nodes themselves are block-size agnostic and deliver the requested delay time regardless of block size. The latency issue in feedback loops comes specifically from send/receive connections where the receive node precedes the send node in signal flow. This 'backwards' routing is inherently delayed by one full processing chunk (e.g., 256 samples at a 256-sample block size). The only way to minimize this is to use frame processing inside the feedback loop, which reduces the delay to one sample — the theoretical minimum in the digital domain. A block-size-compensation node could partially correct the first chunk, but introduces a trade-off between first-delay accuracy and steady-state accuracy.",
+    "verify": false,
+    "sources": [10420],
+    "placement": "B"
+  },
+  {
+    "target": "container.fix32_block",
+    "type": "bug",
+    "summary": "Delay time does not recalculate when block size or oversampling changes; displayed value becomes incorrect",
+    "detail": "Changing the host block size or the oversampling factor does not trigger a recalculation of delay node timing. The delay time parameter retains its previously computed internal value, making the actual delay incorrect relative to the displayed millisecond value. The output also shifts permanently after an oversampling round-trip (none -> 2x -> none does not return to the original state). Moving the delay time parameter manually forces a recalculation and corrects the value. Reported by aaronventure (trusted) with a visual comb-filter demonstration.",
+    "verify": true,
+    "verify_hint": "Check delay node prepareToPlay / sampleRateChanged callback; look for whether delay time in samples is recomputed when blockSize or sampleRate changes in hi_dsp_library",
+    "sources": [10420],
+    "placement": "B"
+  },
+  {
+    "target": "container.frame2_block",
+    "type": "gotcha",
+    "summary": "SNEX templated processFrame generates overloads for all channel counts; direct index access fails in the mono overload",
+    "detail": "When a SNEX node defines `template <int C> void processFrame(span<float, C>& data)`, the compiler expands this into separate overloads for every channel count up to the network maximum (e.g., mono and stereo). If the node accesses `data[1]` inside the template, the mono overload (`span<float, 1>`) produces a compile-time constant-out-of-bounds error. This is expected but unintentional per Christoph Hart. The fix is to replace the template with explicit per-channel overloads: implement a no-op `processFrame(span<float, 1>&)` body and the real logic in `processFrame(span<float, 2>&)`. This also applies when the node is dragged into a `container.multi`, where it is called with a reduced channel count.",
+    "verify": false,
+    "sources": [7576],
+    "placement": "B"
+  },
+  {
+    "target": "container.modchain",
+    "type": "gotcha",
+    "summary": "Deleting a modulating node can leave its connection active on the target",
+    "detail": "Reported by ustk (trusted): when a node inside a modchain is deleted, the modulation connection it drove can persist on the destination node. The target parameter then behaves as if it is still being modulated — it ignores manual input and cannot be set freely. The fix is to manually remove the connection on the target node after the source has been deleted. Whether this is resolved in recent builds is unknown.",
+    "verify": true,
+    "verify_hint": "Test: add a mod connection from a node inside modchain to a parameter, delete the source node, check if the target parameter still shows a modulation connection",
+    "sources": [4978],
+    "placement": "B"
+  },
+  {
+    "target": "container.modchain",
+    "type": "gotcha",
+    "summary": "Modulation connection range must be set on both source and target; source-only editing no longer works",
+    "detail": "Matt_SF (trusted) reported that as of the new_layout / develop branch, both the source node's range and the target parameter's range must be explicitly configured for a modulation connection to function. Previously, editing only the source range was sufficient. Connections configured under the old convention may silently fail after updating to a newer HISE build without visible error.",
+    "verify": true,
+    "verify_hint": "Test: create a modchain with a core.peak, connect to a parameter, set range only on the source — check if modulation is applied; then also set range on target and compare",
+    "sources": [4978],
+    "placement": "B"
+  },
+  {
+    "target": "container.modchain",
+    "type": "workflow",
+    "summary": "Use a split node plus a peak node to sum multiple mod signals into one output",
+    "detail": "Christoph Hart recommended: to combine several modulation signals into a single output value inside a modchain, place a `container.split` node and route each signal branch through it. Then position a `core.peak` node after the split to capture the combined peak. Avoid overusing send/receive nodes for this purpose — they should be reserved for feedback loops and non-linear routing. The split + peak pattern keeps the signal flow linear and is more efficient.",
+    "verify": false,
+    "sources": [4978],
+    "placement": "C"
+  },
+  {
+    "target": "container.repitch",
+    "type": "workflow",
+    "summary": "Primary use case is shifting the frequency response of SR-dependent effects without touching their coefficients",
+    "detail": "Christoph Hart (author, +3): repitch is not a realtime pitch shifter. It resamples the input buffer to a different virtual sample rate before processing, then resamples back to the original rate at the output. The effect: any SR-dependent algorithm inside (filters, convolution reverbs, resonators, neural network models trained at a fixed SR) processes as if running at the shifted rate, shifting its frequency response proportionally. A factor of 0.5 halves the virtual SR, moving a filter's cutoff one octave down. A factor of 2.0 doubles the virtual SR, moving it one octave up. This allows frequency-response manipulation without modifying filter coefficients.",
+    "verify": false,
+    "sources": [8722],
+    "placement": "A"
+  },
+  {
+    "target": "container.repitch",
+    "type": "gotcha",
+    "summary": "Frequency response shift is inverted when the repitch container holds only effects, not a sound generator",
+    "detail": "Christoph Hart noted: when repitch wraps only effects (e.g., a filter with no oscillator), the frequency response shift appears inverted relative to the pitch factor — increasing the factor shifts the response downward. If a sound generator is placed inside the repitch container along with the effects, the shift direction is correct. Developers building filter-only repitch patches should account for this inversion or place a silent generator inside to normalize behavior.",
+    "verify": true,
+    "verify_hint": "Test: place a filter inside repitch with no sound generator; measure frequency response at factor 0.5 and 2.0; check if cutoff shifts in the expected direction",
+    "sources": [8722],
+    "placement": "B"
+  },
+  {
+    "target": "container.repitch",
+    "type": "edge-case",
+    "summary": "SR-independent effects inside repitch produce identical output regardless of pitch factor",
+    "detail": "Ustk (trusted, +2): nodes that do not depend on sample rate — such as simple gain stages, waveshapers, or static lookup tables — are unaffected by repitch and will produce identical output at any factor. Only algorithms whose behavior is tied to the sample rate (filters whose coefficients are computed from SR, convolution reverbs whose IR pitch depends on SR, distortion circuits with SR-dependent time constants) will change. Neural network models trained for a specific sample rate are a primary use case.",
+    "verify": false,
+    "sources": [13966],
+    "placement": "C"
+  },
+  {
+    "target": "container.multi",
+    "type": "workflow",
+    "summary": "Multichannel output routing cannot be heard or verified in the standalone HISE IDE; the compiled plugin is required",
+    "detail": "Multiple users confirmed: multichannel output routing configured via `RoutingMatrix.addConnection()` produces no audible difference in the standalone HISE application because standalone mode does not expose individual output channels. To test multichannel routing, compile the plugin build and load it in a DAW that supports multi-output instruments. Forcing the routing via script at init (`for (i = 0; i < N; i++) Matrix.addConnection(i, i)`) is the standard approach, but verification requires the plugin.",
+    "verify": false,
+    "sources": [7488],
+    "placement": "B"
+  }
+]

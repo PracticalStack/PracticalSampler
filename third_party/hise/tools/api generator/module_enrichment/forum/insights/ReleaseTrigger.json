@@ -1,0 +1,80 @@
+{
+  "targetId": "ReleaseTrigger",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [10531, 13205, 11871, 4225, 1411, 11217, 6214, 1956, 143],
+  "insights": [
+    {
+      "type": "BUG",
+      "title": "Editing the attenuation table in the built-in ReleaseTrigger crashes HISE",
+      "summary": "Attempting to edit the TimeTable curve editor in the hardcoded ReleaseTrigger module caused an instant crash. The fix was confirmed by the HISE author. If instability is observed, update to a recent HISE build.",
+      "sources": ["tid:10531"],
+      "verify": true,
+      "verify_hint": "check git log around 2024-09-22 in hi_scripting/scripting/HardcodedScriptProcessor.h for the table crash fix"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "MPE mode can break release triggering; disabling MPE by default is a safe workaround",
+      "summary": "Users reported that having an MPE Modulator active disrupts release trigger behaviour. The recommended workaround is to keep MPE disabled by default in presets and only enable it when explicitly needed.",
+      "sources": ["tid:11871"],
+      "verify": true,
+      "verify_hint": "grep MPEData::Listener in HardcodedScriptProcessor.h; check how MPE mode switches the velocity source in ReleaseTrigger"
+    },
+    {
+      "type": "API",
+      "title": "Time parameter is in seconds, not milliseconds, despite the slider label",
+      "summary": "The Time knob displays with a 'ms' suffix due to the HiSlider::Time mode, but the underlying value and all internal calculations use seconds. Custom scripted variants should use Engine.getUptime() (which returns seconds) for consistency.",
+      "sources": ["tid:6214"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Release-triggered samples require a dedicated second sampler",
+      "summary": "In HISE, release trigger sample layers cannot share a single Sampler with normal samples the way some other samplers allow. Use two separate Sampler modules: one for normal notes and one for release-triggered notes, with the ReleaseTrigger MidiProcessor on the second sampler's MIDI chain.",
+      "sources": ["tid:4225"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Time attenuation can be inconsistent when the table curve is fully maxed out",
+      "summary": "A user reported that the stock ReleaseTrigger's time attenuation gave inconsistent velocity values when the table curve reached its maximum. The issue appeared as the attenuation reporting the value at position 0 instead of 0.5 at mid-hold times. A scripted custom implementation avoided this.",
+      "sources": ["tid:1956"],
+      "verify": true,
+      "verify_hint": "check table->getTableValue() normalisation path in HardcodedScriptProcessor ReleaseTrigger; compare timeIndex clamping between C++ and the script version in tid:1956"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use per-note sample analysis to derive precise release velocity for realistic piano behaviour",
+      "summary": "For high-quality pianos, rather than a fixed time/table curve, use downsampled versions of each note's sustain sample to dynamically estimate the actual level at the moment of release. This accounts for differences in decay length between low and high notes.",
+      "sources": ["tid:6214"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Engine.createMidiList() causes timing inconsistencies in custom release trigger scripts",
+      "summary": "In scripted release trigger implementations, using Engine.createMidiList() to track note-on timing produces unreliable elapsed-time calculations. Replacing the MidiList with a plain array resolves the inconsistency.",
+      "sources": ["tid:1956"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Add sustain pedal support with a custom scripted release trigger",
+      "summary": "The built-in ReleaseTrigger does not handle MIDI CC64 (sustain pedal): release samples fire immediately on key-up even when the pedal is held. A custom scripted implementation that tracks held pedal state and defers release sample playback until pedal release is the recommended approach.",
+      "sources": ["tid:13205"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Overlapping notes on the same pitch overwrite stored noteOn data",
+      "summary": "The module tracks incoming noteOn events per MIDI note number using a 128-slot array. If the same note number fires a second noteOn before the first noteOff (e.g., from MPE or layered instruments), the first noteOn's velocity and timestamp are silently overwritten.",
+      "sources": ["tid:11871"],
+      "verify": true,
+      "verify_hint": "grep messageHolders in HardcodedScriptProcessor.h ReleaseTrigger; verify the array is indexed by note number and not keyed by event ID"
+    }
+  ]
+}

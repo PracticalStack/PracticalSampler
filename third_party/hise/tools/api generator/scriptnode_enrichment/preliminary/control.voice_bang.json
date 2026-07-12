@@ -1,0 +1,88 @@
+{
+  "factoryPath": "control.voice_bang",
+  "factory": "control",
+  "nodeId": "voice_bang",
+  "description": "sends out the current value when a voice is started (note-on is received)",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input",
+      "rationale": "The value to send when triggered by a voice start event.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/voice_bang.md",
+    "tier": "BRIEF",
+    "lines": 9
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "trigger-mechanism",
+      "category": "signal_path",
+      "question": "voice_bang does not have IsProcessingHiseEvent. From control-infrastructure Pattern 5, it fires on note-on via handleHiseEvent. How does it receive MIDI events without IsProcessingHiseEvent? Does it use a different trigger mechanism (e.g., reset() callback on voice start)?",
+      "context": "The trigger mechanism determines when the output fires -- on MIDI note-on or on voice reset."
+    },
+    {
+      "id": "value-at-trigger",
+      "category": "parameter_behaviour",
+      "question": "Does it send the current Value at the moment of the trigger, or a fixed 1.0 bang signal? The description says 'sends out the current value' suggesting Value is the payload.",
+      "context": "Users need to know whether the Value parameter is the payload or just a trigger threshold."
+    },
+    {
+      "id": "polyphonic-context",
+      "category": "parameter_behaviour",
+      "question": "IsPolyphonic is false in cppProperties, but the description mentions 'when a voice is started'. Does it work in polyphonic containers? Does it fire once per voice or once globally?",
+      "context": "Polyphonic behaviour is critical for understanding voice-start use cases."
+    }
+  ],
+
+  "notes": "voice_bang sends its current Value when a voice starts. Despite describing voice-aware behaviour, IsPolyphonic is false in cppProperties. It also lacks IsProcessingHiseEvent, suggesting it may use the reset() callback (which fires on voice start) rather than handleHiseEvent. Pattern 5 from control-infrastructure shows it checking isNoteOn() in handleHiseEvent, so there may be a discrepancy."
+}

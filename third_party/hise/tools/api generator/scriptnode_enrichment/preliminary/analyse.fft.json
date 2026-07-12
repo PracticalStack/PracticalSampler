@@ -1,0 +1,87 @@
+{
+  "factoryPath": "analyse.fft",
+  "factory": "analyse",
+  "nodeId": "fft",
+  "description": "A FFT analyser",
+
+  "classification": {
+    "signalPathRole": "analysis",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "displayBuffers": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/analyse/fft.md",
+    "tier": "GOOD",
+    "lines": 30
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-passthrough",
+      "category": "signal_path",
+      "question": "Does the FFT node pass audio through unmodified (pure analysis) or does it consume/modify the signal?",
+      "context": "Users need to know if inserting this node affects their audio chain."
+    },
+    {
+      "id": "display-buffer-mechanism",
+      "category": "signal_path",
+      "question": "How does the node fill the display buffer -- does it use a ring buffer, and what is the default buffer size? Is the FFT computed per-block or accumulated over multiple blocks?",
+      "context": "Needed to explain the relationship between audio buffer and FFT display resolution."
+    },
+    {
+      "id": "fft-properties-from-cpp",
+      "category": "conditional_logic",
+      "question": "What FFT properties are configurable from the C++ side (window type, size, decay, etc.)? The existing doc mentions a JSON properties object -- is this handled in the node class or in the display buffer base?",
+      "context": "The existing phase3 doc lists configurable properties. Need to confirm these are part of the display buffer infrastructure rather than the node itself."
+    },
+    {
+      "id": "channel-handling",
+      "category": "signal_path",
+      "question": "How does the FFT node handle stereo input -- does it analyse left channel only, sum to mono, or analyse both channels?",
+      "context": "Important for users working with stereo signals."
+    },
+    {
+      "id": "cpu-profile",
+      "category": "performance",
+      "question": "Is the FFT computed on the audio thread or deferred? What is the approximate CPU cost relative to other analyse nodes?",
+      "context": "FFT can be expensive; users need to know if this is safe for real-time use."
+    }
+  ],
+
+  "notes": "No parameters. All configuration happens via the DisplayBuffer properties JSON (documented in existing phase3 doc). The node uses display_buffer_base from the core infrastructure. Existing phase3 doc is the richest of the analyse nodes."
+}

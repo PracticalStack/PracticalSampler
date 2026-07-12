@@ -1,0 +1,36 @@
+{
+  "moduleId": "ScriptSynth",
+  "nodes": [
+    { "id": "note_on", "label": "Note On", "type": "input", "importance": 0.9, "group": "io", "description": "MIDI note-on triggers voice allocation" },
+    { "id": "voice_init", "label": "Initialise Voice", "type": "process", "importance": 0.8, "group": "voice", "description": "Initialises the network's voice state for the new voice index" },
+    { "id": "network_process", "label": "Network Process", "type": "process", "importance": 1.0, "group": "voice", "description": "Processes audio through the network for this voice" },
+    { "id": "mod_chains", "label": "Extra Modulation Chains", "type": "modulation", "importance": 0.7, "group": "modulation", "description": "Optional modulation chains that modulate network parameters" },
+    { "id": "gain_mod", "label": "Gain Modulation", "type": "modulation", "importance": 0.8, "group": "modulation", "description": "Scales voice output by the gain modulation value" },
+    { "id": "pitch_mod", "label": "Pitch Modulation", "type": "modulation", "importance": 0.7, "group": "modulation", "description": "Modulates the pitch of the voice via runtime targets" },
+    { "id": "gain_multiply", "label": "Apply Gain", "type": "process", "importance": 0.8, "group": "output", "description": "Multiplies voice buffer by gain modulation values" },
+    { "id": "fx_chain", "label": "FX Chain", "type": "process", "importance": 0.7, "group": "output", "description": "Processes voice through the effect chain" },
+    { "id": "param_gain", "label": "Gain", "type": "parameter", "importance": 0.7, "group": "params", "description": "Output volume as normalised linear gain" },
+    { "id": "param_balance", "label": "Balance", "type": "parameter", "importance": 0.5, "group": "params", "description": "Stereo balance" },
+    { "id": "param_voicelimit", "label": "VoiceLimit", "type": "parameter", "importance": 0.5, "group": "params", "description": "Maximum number of simultaneous voices" },
+    { "id": "param_killfade", "label": "KillFadeTime", "type": "parameter", "importance": 0.5, "group": "params", "description": "Fade-out time when voices are killed" },
+    { "id": "audio_out", "label": "Audio Out (L/R)", "type": "output", "importance": 0.9, "group": "io", "description": "Mixed stereo audio output" }
+  ],
+  "edges": [
+    { "from": "note_on", "to": "voice_init", "type": "signal", "label": null },
+    { "from": "voice_init", "to": "network_process", "type": "signal", "label": null },
+    { "from": "mod_chains", "to": "network_process", "type": "control", "label": "parameter modulation" },
+    { "from": "pitch_mod", "to": "network_process", "type": "control", "label": "pitch" },
+    { "from": "network_process", "to": "gain_multiply", "type": "signal", "label": null },
+    { "from": "gain_mod", "to": "gain_multiply", "type": "control", "label": null },
+    { "from": "param_gain", "to": "gain_multiply", "type": "control", "label": null },
+    { "from": "gain_multiply", "to": "fx_chain", "type": "signal", "label": null },
+    { "from": "fx_chain", "to": "audio_out", "type": "signal", "label": null }
+  ],
+  "groups": [
+    { "id": "io", "label": "I/O" },
+    { "id": "voice", "label": "Per-Voice Processing" },
+    { "id": "modulation", "label": "Modulation" },
+    { "id": "output", "label": "Output Stage" },
+    { "id": "params", "label": "Parameters" }
+  ]
+}

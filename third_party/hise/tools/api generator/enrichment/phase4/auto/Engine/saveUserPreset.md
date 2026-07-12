@@ -1,0 +1,1 @@
+Saves the current plugin state as a user preset. Pass a preset name as a string, a ScriptFile object for the target path, or an empty string to prompt the user for a name.

@@ -1,0 +1,82 @@
+{
+  "factoryPath": "control.random",
+  "factory": "control",
+  "nodeId": "random",
+  "description": "creates a random value",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input",
+      "rationale": "Trigger input -- when Value changes, a new random value is generated and sent.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/random.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "random-trigger",
+      "category": "signal_path",
+      "question": "When does the random value get generated? On every setValue() call (every time Value changes), or only on a rising edge (0->1 transition)? Is the input Value used as a seed or just as a trigger?",
+      "context": "Users need to know what triggers new random output and whether the input value matters."
+    },
+    {
+      "id": "random-distribution",
+      "category": "parameter_behaviour",
+      "question": "What random distribution is used? Uniform 0..1? Is it the JUCE Random class or a different PRNG?",
+      "context": "Affects the output characteristics users can expect."
+    }
+  ],
+
+  "notes": "Simple single-parameter control node. No IsPolyphonic flag. The description is very terse ('creates a random value'). It likely generates a random 0..1 value whenever triggered, making it useful for randomising parameters on each trigger event."
+}

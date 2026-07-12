@@ -1,0 +1,1 @@
+Applies a vignette effect (darkened corners) to the current layer. The `amount` parameter controls the intensity of darkening, `radius` controls the size of the unaffected centre area (larger values produce a smaller vignette), and `falloff` controls the transition curve from the clear centre to the darkened edges.

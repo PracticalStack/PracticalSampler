@@ -1,0 +1,1 @@
+Converts a thread constant to its human-readable name (e.g. `Threads.Audio` returns `"Audio Thread"`, `Threads.Loading` returns `"Sample Thread"`). Use `Threads.getCurrentThreadName()` to get the name of the current thread directly without an intermediate constant.

@@ -1,0 +1,62 @@
+{
+  "className": "Graphics",
+  "generatedAt": "2026-03-30",
+  "examples": [
+    {
+      "code": "Content.makeFrontInterface(150, 150);\n\nconst var Panel1 = Content.getComponent(\"Panel1\");\nPanel1.setValue(1);\n\nconst var circlePath = Content.createPath();\ncirclePath.addArc([0.0, 0.0, 1.0, 1.0], 0.0, Math.PI * 2);\n\nPanel1.setPaintRoutine(function(g)\n{\n    g.beginLayer(true);\n    g.setColour(Colours.white);\n    \n    var area = [1, 1, this.getWidth() - 2, this.getHeight() - 2];\n    \n    g.drawEllipse(area, 2);\n    \n    var radius = this.getWidth() / 2 * this.getValue();\n    var diameter;\n    var pos;\n\n    for (i = 1; i < 4; i++)\n    {\n        diameter = (radius * 2 / 4 * i);\n        pos = this.getWidth() / 2 - diameter / 2;\n        if (pos > 0)\n            g.drawEllipse([pos + 1, pos + 1, diameter - 2, diameter - 2], 2);\n    } \n    \n    g.gaussianBlur(1.0 / this.getValue() * 12.0);\n    g.addNoise(0.2);\n    g.applyMask(circlePath, area, false);\n    g.endLayer();\n});",
+      "methods": ["Graphics.beginLayer", "Graphics.drawEllipse", "Graphics.gaussianBlur", "Graphics.addNoise", "Graphics.applyMask", "Graphics.endLayer", "Graphics.setColour", "ScriptPanel.setPaintRoutine", "ScriptPanel.getValue", "ScriptPanel.getWidth", "ScriptPanel.getHeight", "Content.createPath", "Path.addArc"],
+      "description": "Layer-based post-processing effects: gaussian blur, noise, and path mask applied as a complete visual effect chain",
+      "source": "tid:3507",
+      "quality": "good"
+    },
+    {
+      "code": "const var mask = Content.createPath();\nconst var Panel1 = Content.getComponent(\"Panel1\");\nPanel1.loadImage(\"{PROJECT_FOLDER}img.jpg\", \"img\");\nPanel1.data.upt = 0.0;\n\nPanel1.setPaintRoutine(function(g)\n{\n    g.beginLayer(false);\n    g.drawImage(\"img\", this.getLocalBounds(0.0), 0, 0);\n    \n    mask.clear();\n    mask.addRoundedRectangle(this.getLocalBounds(0.0), this.getWidth()/4.0 + this.getWidth()/4.0 * Math.sin(this.data.upt));\n    g.applyMask(mask, this.getLocalBounds(0.0), false);\n    \n    g.endLayer();\n});\n\nPanel1.setTimerCallback(function()\n{\n    this.data.upt = (this.data.upt > 2*Math.PI) ? 0.0 : this.data.upt + 0.05;\n    this.repaint();\n});\n\nPanel1.startTimer(30);",
+      "methods": ["Graphics.beginLayer", "Graphics.drawImage", "Graphics.applyMask", "Graphics.endLayer", "ScriptPanel.setPaintRoutine", "ScriptPanel.loadImage", "ScriptPanel.getLocalBounds", "ScriptPanel.getWidth", "ScriptPanel.setTimerCallback", "ScriptPanel.startTimer", "ScriptPanel.repaint", "Content.createPath", "Path.clear", "Path.addRoundedRectangle"],
+      "description": "Animated image mask using a path to clip a loaded image to a rounded rectangle shape with timer-driven animation",
+      "source": "tid:10292",
+      "quality": "good"
+    },
+    {
+      "code": "const var Panel1 = Content.getComponent(\"Panel1\");\n\nPanel1.setPaintRoutine(function(g)\n{\n    g.setColour(Colours.red);\n    g.setFont(\"Lato Bold\", 24.0);\n    g.drawAlignedText(\"FUNKY\", this.getLocalBounds(0), \"centred\");\n    g.addDropShadowFromAlpha(Colours.red, 15);\n    g.setColour(Colours.white);\n    g.drawAlignedText(\"FUNKY\", this.getLocalBounds(0), \"centred\");\n});",
+      "methods": ["Graphics.setColour", "Graphics.setFont", "Graphics.drawAlignedText", "Graphics.addDropShadowFromAlpha", "ScriptPanel.setPaintRoutine", "ScriptPanel.getLocalBounds"],
+      "description": "Drop shadow on text by drawing a coloured version first, applying addDropShadowFromAlpha, then drawing the final text on top",
+      "source": "tid:9522",
+      "quality": "good"
+    },
+    {
+      "code": "const var myCorners = {CornerSize: 20, Rounded: [1, 1, 0, 0]};\n\ng.fillRoundedRectangle(a, myCorners);",
+      "methods": ["Graphics.fillRoundedRectangle"],
+      "description": "Per-corner border radius using the object syntax for fillRoundedRectangle, rounding only the top two corners",
+      "source": "tid:13236",
+      "quality": "good"
+    },
+    {
+      "code": "laf.registerFunction(\"drawRotarySlider\", function(g, obj)\n{\n    var a = obj.area;\n    var width = obj.area[2];\n    var height = obj.area[3];\n    var stroke = 3;\n    var range = obj.max - obj.min;\n    var startOffset = Math.PI * 0.25;\n    var fullArc = Math.PI * 1.5;\n    var arcPos = startOffset + fullArc * (obj.value - obj.min) / range;\n    var intend = width * 0.25;\n    \n    g.setColour(obj.itemColour1);\n    g.fillEllipse(a);\n    g.setColour(obj.itemColour2);\n    g.drawEllipse([stroke / 2, stroke / 2, width - stroke, height - stroke], stroke);\n    \n    var p = Content.createPath();\n    p.addArc([0, 0, 1.0, 1.0], Math.PI + startOffset + fullArc, Math.PI + startOffset);\n    \n    g.setColour(0x22FFFFFF);\n    \n    var magicScaler = 1.4;\n    g.drawPath(p, [intend/2 + stroke, \n                   intend/2 + stroke, \n                   width - intend - 2 * stroke, \n                   height - magicScaler * intend - 2 * stroke], \n               intend);\n    \n    g.rotate(arcPos, [a[2] / 2, a[3] / 2]);\n    g.setColour(obj.textColour);\n    g.drawLine(width/2, height/2, intend - stroke + width/2, height - stroke, 4.0);\n});",
+      "methods": ["Graphics.setColour", "Graphics.fillEllipse", "Graphics.drawEllipse", "Graphics.drawPath", "Graphics.rotate", "Graphics.drawLine", "Content.createPath", "Path.addArc"],
+      "description": "Complete custom rotary slider LAF function using arc path, rotation, and line drawing to render a knob with a value indicator",
+      "source": "tid:3630",
+      "quality": "good"
+    },
+    {
+      "code": "var area = Content.addPanel(\"area\", 0, 0);\narea.set(\"width\", 150);\narea.set(\"height\", 150);\n\narea.setPaintRoutine(function(g)\n{\n    g.setColour(4294901730);\n    g.drawEllipse([10, 10, 100, 100], 5);\n    g.drawEllipse([30, 40, 20, 20], 5);\n    g.drawEllipse([70, 40, 20, 20], 5);\n    g.drawTriangle([55, 60, 10, 10], 0, 3);\n    g.drawLine(45, 75, 90, 90, 5);\n});",
+      "methods": ["Graphics.setColour", "Graphics.drawEllipse", "Graphics.drawTriangle", "Graphics.drawLine", "ScriptPanel.setPaintRoutine"],
+      "description": "Basic shape drawing in a paint routine: ellipses, triangle, and line using raw ARGB colour values",
+      "source": "tid:169",
+      "quality": "good"
+    },
+    {
+      "code": "Synth.deferCallbacks(true);\n\nconst var ModwheelDisplay = Content.addPanel(\"ModwheelDisplay\", 38, 60);\nContent.setPropertiesFromJSON(\"ModwheelDisplay\", {\"width\": 50, \"height\": 180});\n\nconst var PitchWheelDisplay = Content.addPanel(\"PitchWheelDisplay\", 110, 60);\nContent.setPropertiesFromJSON(\"PitchWheelDisplay\", {\"width\": 50, \"height\": 180});\n\nModwheelDisplay.setPaintRoutine(function(g)\n{\n    g.fillAll(0xFF222222);\n    g.setColour(0xFF666666);\n    var h = this.getValue() * this.getHeight();\n    g.fillRect([0, this.getHeight() - h, this.getWidth(), h]);\n});\n\nPitchWheelDisplay.setPaintRoutine(function(g)\n{\n    g.fillAll(0xFF222222);\n    g.setColour(0xFF666666);\n    var h = 0.5 - this.getValue();\n    var offset = Math.min(1.0 - this.getValue(), 0.5) * this.getHeight();\n    g.fillRect([0, offset, this.getWidth(), Math.abs(h) * this.getHeight()]);\n});",
+      "methods": ["Graphics.fillAll", "Graphics.setColour", "Graphics.fillRect", "ScriptPanel.setPaintRoutine", "ScriptPanel.getValue", "ScriptPanel.getWidth", "ScriptPanel.getHeight", "Synth.deferCallbacks"],
+      "description": "Real-time MIDI controller visualizer (modwheel and pitchwheel) updated from onController, with deferred callbacks",
+      "source": "tid:445",
+      "quality": "good"
+    },
+    {
+      "code": "const var Panel1 = Content.getComponent(\"Panel1\");\nvar yOffset = 0;\nconst var names = [\"Name1\", \"Name2\", \"Name3\", \"Name4\"];\n\nPanel1.setPaintRoutine(function(g)\n{\n    g.setColour(Colours.lightgrey);\n    g.drawRoundedRectangle([0, 0, this.getWidth(), this.getHeight()], 6.0, 2.0);\n    g.setFont(\"Arial\", 14.0);\n    for (n = 0; n < names.length; n++)\n        g.drawAlignedText(names[n], [0, (this.getHeight() / names.length * n) + yOffset, this.getWidth(), 20], \"centred\");\n});\n\nconst var textTimer = Engine.createTimerObject();\ntextTimer.setTimerCallback(function()\n{\n    yOffset -= 1;\n    Panel1.repaint();\n});\ntextTimer.startTimer(100);",
+      "methods": ["Graphics.setColour", "Graphics.drawRoundedRectangle", "Graphics.setFont", "Graphics.drawAlignedText", "ScriptPanel.setPaintRoutine", "ScriptPanel.getWidth", "ScriptPanel.getHeight", "ScriptPanel.repaint", "Engine.createTimerObject"],
+      "description": "Scrolling text animation using a timer to shift a yOffset each tick and trigger repaint",
+      "source": "tid:4245",
+      "quality": "fair"
+    }
+  ]
+}

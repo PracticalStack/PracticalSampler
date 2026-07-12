@@ -1,0 +1,26 @@
+{
+  "factoryPath": "filters.biquad",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "biquad", "label": "Biquad Filter", "type": "process", "importance": 1.0, "description": "JUCE IIRFilter (Direct Form II) with mode-dependent coefficients" },
+    { "id": "freq", "label": "Frequency", "type": "parameter", "importance": 1.0, "description": "Cutoff/center frequency (20-20000 Hz), smoothed" },
+    { "id": "q", "label": "Q", "type": "parameter", "importance": 1.0, "description": "Resonance/bandwidth (0.3-9.9), used by Shelf/Peak/ResoLow modes" },
+    { "id": "gain", "label": "Gain", "type": "parameter", "importance": 0.8, "description": "Boost/cut in dB for LowShelf, HighShelf, Peak modes" },
+    { "id": "mode", "label": "Mode", "type": "parameter", "importance": 1.0, "description": "Filter type: LowPass, HighPass, LowShelf, HighShelf, Peak, ResoLow" },
+    { "id": "smoothing", "label": "Smoothing", "type": "parameter", "importance": 0.5, "description": "Parameter interpolation time in seconds" },
+    { "id": "enabled", "label": "Enabled", "type": "parameter", "importance": 0.5, "description": "Hard bypass toggle" },
+    { "id": "coeffs", "label": "Filter Display", "type": "external_data", "importance": 0.4, "description": "FilterCoefficients for frequency response display" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Filtered audio signal" }
+  ],
+  "edges": [
+    { "from": "in", "to": "biquad", "type": "signal", "label": null },
+    { "from": "freq", "to": "biquad", "type": "control", "label": null },
+    { "from": "q", "to": "biquad", "type": "control", "label": null },
+    { "from": "gain", "to": "biquad", "type": "control", "label": "Shelf/Peak only" },
+    { "from": "mode", "to": "biquad", "type": "control", "label": null },
+    { "from": "smoothing", "to": "biquad", "type": "control", "label": null },
+    { "from": "enabled", "to": "biquad", "type": "control", "label": null },
+    { "from": "biquad", "to": "coeffs", "type": "control", "label": "display update" },
+    { "from": "biquad", "to": "out", "type": "signal", "label": null }
+  ]
+}

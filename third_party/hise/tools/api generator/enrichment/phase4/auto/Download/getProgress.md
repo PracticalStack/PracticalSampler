@@ -1,0 +1,1 @@
+Returns the download progress as a value from 0.0 to 1.0. When resuming a partial download, the progress reflects the total transfer including previously downloaded bytes. Returns 0.0 when the total size is unknown.

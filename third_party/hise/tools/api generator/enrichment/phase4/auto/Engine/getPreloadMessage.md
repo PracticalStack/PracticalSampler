@@ -1,0 +1,1 @@
+Returns the current sample preload status message. During loading, this contains a description of what is being loaded. Returns an empty string when no preload operation is active. Typically polled from a timer alongside `Engine.getPreloadProgress()` to display loading status.

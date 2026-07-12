@@ -1,0 +1,1 @@
+Returns a File object pointing to a path that does not yet exist on disk. If this file does not exist, returns the same path. If it does, appends a numeric suffix before the extension (e.g. `file (2).wav`). Use this before `writeAudioFile` or other write operations to avoid silently overwriting existing files.

@@ -1,0 +1,1 @@
+Converts a sample count to quarter beats using the current host BPM. This is the inverse of `Engine.getSamplesForQuarterBeats()`.

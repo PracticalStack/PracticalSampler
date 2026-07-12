@@ -1,0 +1,12 @@
+{
+  "factoryPath": "control.locked_mod_unscaled",
+  "nodes": [
+    { "id": "value_in", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Raw unscaled input value" },
+    { "id": "pass", "label": "Passthrough", "type": "process", "importance": 0.8, "description": "Forwards value unchanged" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Unnormalised output (no range conversion)" }
+  ],
+  "edges": [
+    { "from": "value_in", "to": "pass", "type": "control", "label": null },
+    { "from": "pass", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

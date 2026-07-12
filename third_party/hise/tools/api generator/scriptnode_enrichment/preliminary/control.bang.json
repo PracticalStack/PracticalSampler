@@ -1,0 +1,101 @@
+{
+  "factoryPath": "control.bang",
+  "factory": "control",
+  "nodeId": "bang",
+  "description": "send the value when the bang input changes",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Value to send",
+      "rationale": "The stored value that is forwarded when the bang triggers.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": true
+        }
+      ]
+    },
+    {
+      "label": "Trigger",
+      "rationale": "The trigger input that causes the stored Value to be sent to the output.",
+      "parameters": [
+        {
+          "id": "Bang",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": true,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/bang.md",
+    "tier": "BRIEF",
+    "lines": 14
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "bang-trigger-edge",
+      "category": "parameter_behaviour",
+      "question": "Does the Bang parameter trigger on any change (0->1 and 1->0), only on rising edge (0->1), or on every call to setParameter regardless of value?",
+      "context": "Users need to know whether connecting a toggle to Bang fires once or twice per toggle cycle."
+    },
+    {
+      "id": "value-passthrough-behaviour",
+      "category": "signal_path",
+      "question": "When the bang fires, does it send the current Value parameter directly via getParameter().call(value), or does it apply any transformation (e.g. clamping)?",
+      "context": "Since the output is unnormalised and Value input is marked unscaled, the raw value should pass through, but this needs confirmation."
+    },
+    {
+      "id": "polyphonic-bang-voice-handling",
+      "category": "parameter_behaviour",
+      "question": "In polyphonic mode, does the bang trigger independently per voice, or does a bang on one voice fire for all voices?",
+      "context": "Determines whether bang can be used for per-voice event-driven parameter updates."
+    }
+  ],
+
+  "notes": "bang is implemented via multi_parameter<NV, PT, multilogic::bang>. The UseUnnormalisedModulation flag with 'Value' as unscaled input means the Value parameter receives raw values and the output is also unnormalised. The Bang parameter has step=1.0 suggesting it acts as a boolean toggle trigger. This node is part of the control (routing) batch alongside blend, input_toggle, branch_cable, xfader, cable_expr, cable_table, cable_pack."
+}

@@ -1,0 +1,142 @@
+{
+  "factoryPath": "filters.allpass",
+  "factory": "filters",
+  "nodeId": "allpass",
+  "description": "A filter node",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Filter Response",
+      "rationale": "Frequency sets the center frequency where maximum phase shift occurs, Q controls the transition width, Gain may be unused for a pure allpass.",
+      "parameters": [
+        {
+          "id": "Frequency",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0, "skew": 0.2299045622348785 },
+          "default": 1000.0,
+          "textConverter": "Frequency",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Q",
+          "range": { "min": 0.300000011920929, "max": 9.899999618530273, "step": 0.0, "skew": 0.2647178173065186 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Gain",
+          "range": { "min": -18.0, "max": 18.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Decibel",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Filter Configuration",
+      "rationale": "Mode selects the allpass variant (max 1.0, step 0.0 - needs C++ verification), Smoothing controls coefficient interpolation speed, Enabled toggles the filter on/off.",
+      "parameters": [
+        {
+          "id": "Mode",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "55.nT6K8ChKwE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.JTPPrwFHPE1byAPXiQWZ1UF.ADf...",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Smoothing",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 0.3010300099849701 },
+          "default": 0.009999999776482582,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Enabled",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "filterCoefficients": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/filters/allpass.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "allpass-mode-values",
+      "category": "conditional_logic",
+      "question": "Mode parameter has range 0-1 with StepSize=0.0. The TextToValueConverter (55 chars) is present. Is this 2 discrete modes despite zero step (like ladder), or a continuous parameter? What do the modes represent - different allpass orders (first-order vs second-order)?",
+      "context": "The allpass order determines the phase shift range (180 degrees for first-order, 360 for second-order). This is the key specification."
+    },
+    {
+      "id": "allpass-phase-behaviour",
+      "category": "signal_path",
+      "question": "An allpass filter passes all frequencies at equal amplitude but shifts phase. What is the phase response? How many degrees of phase shift does it introduce at the center frequency?",
+      "context": "Phase shift is the entire purpose of an allpass filter. Users need to understand the phase response to use it for phaser effects or phase correction."
+    },
+    {
+      "id": "allpass-q-effect",
+      "category": "parameter_behaviour",
+      "question": "For an allpass filter, does Q control the steepness of the phase transition around the center frequency? In a second-order allpass, Q affects how rapidly the phase transitions from 0 to -360 degrees.",
+      "context": "Q behaviour is different for allpass than for LP/HP - it controls phase transition steepness rather than resonance peak height."
+    },
+    {
+      "id": "allpass-gain-effect",
+      "category": "parameter_behaviour",
+      "question": "Does Gain have any effect on the allpass filter? A pure allpass should have unity gain at all frequencies. If Gain is non-functional, this should be documented.",
+      "context": "Users expecting amplitude changes from Gain on an allpass will be confused if it has no effect."
+    },
+    {
+      "id": "description-accuracy",
+      "category": "description_accuracy",
+      "question": "The base description 'A filter node' is generic. Confirm the correct characterisation as an allpass (phase-shifting) filter that preserves amplitude.",
+      "context": "Allpass filters are fundamentally different from other filter types in that they do not attenuate any frequencies."
+    }
+  ],
+
+  "notes": "filters.allpass is unique in the filter factory because it does not attenuate frequencies - it only shifts phase. This makes it useful for phaser effects (cascaded allpass stages) and phase correction. The Mode parameter has the same anomalous pattern as ladder (max=1.0, step=0.0) suggesting 2 discrete modes despite zero step. Gain is likely non-functional. References filter-base-architecture, smoothing-units, and enabled-bypass-behaviour gaps from filters.svf."
+}

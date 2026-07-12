@@ -1,0 +1,99 @@
+{
+  "factoryPath": "container.soft_bypass",
+  "factory": "container",
+  "nodeId": "soft_bypass",
+  "description": "Allows soft bypassing without clicks",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "UI-only layout hint. Does not affect processing."
+    },
+    {
+      "id": "SmoothingTime",
+      "defaultValue": 20,
+      "type": "integer",
+      "note": "Crossfade duration in milliseconds when toggling bypass. Range 0-1000ms. Controls the sfloat ramper's interpolation time. 0ms effectively becomes a hard bypass."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/container/soft_bypass.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "crossfade-algorithm",
+      "category": "signal_path",
+      "question": "Confirm the bypass::smoothed crossfade algorithm: linear ramp with double-ramp on wet signal (wet_input = dry * ramp, then output = dry * invRamp + process(wet_input) * ramp). This creates a slight energy dip at the midpoint (total = 0.75 at ramp=0.5). Is this documented behavior or an implementation detail?",
+      "context": "The crossfade algorithm is the core feature. The double-ramp design prevents artifacts with stateful effects but causes a slight level dip."
+    },
+    {
+      "id": "bypass-parameter-connection",
+      "category": "signal_path",
+      "question": "Confirm that ONLY container.soft_bypass accepts dynamic bypass parameter connections (e.g., from control.xfader). Other containers cannot have their bypass controlled via parameter connections. The threshold is 0.5: values >= 0.5 = active, < 0.5 = bypassed.",
+      "context": "This is a unique capability of soft_bypass that distinguishes it from all other containers."
+    },
+    {
+      "id": "modulation-during-bypass",
+      "category": "signal_path",
+      "question": "Confirm that modulation output from nodes inside a soft-bypassed container is suppressed immediately (no smoothing on modulation output), even though the audio crossfade takes time. MIDI events continue to be forwarded regardless of bypass state.",
+      "context": "Users need to know that modulation and audio have different bypass behaviors."
+    },
+    {
+      "id": "smoothing-time-property-behavior",
+      "category": "parameter_behaviour",
+      "question": "When SmoothingTime property is changed at runtime, the ramper is re-prepared and jumps to current state. Confirm that changing SmoothingTime during an active crossfade cancels the current ramp and resets to the target state.",
+      "context": "Edge case but important for understanding property change behavior."
+    },
+    {
+      "id": "polyphonic-bypass-sharing",
+      "category": "signal_path",
+      "question": "The bypass state is shared across all polyphonic voices (single bool, shared ramper). Confirm that toggling bypass affects all voices simultaneously with the same crossfade. There is no per-voice bypass.",
+      "context": "Important limitation for polyphonic contexts."
+    }
+  ],
+
+  "notes": "Soft_bypass wraps DynamicSerialProcessor in bypass::smoothed<-1, T> where -1 means runtime-configurable smoothing time. The phase3 doc is a STUB with no content -- all information must come from C++ exploration. The bypass.md infrastructure doc has extensive detail on the crossfade algorithm, state machine, and threading. The template.softbypass_switchN nodes use soft_bypass internally for click-free N-way switching."
+}

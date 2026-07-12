@@ -1,0 +1,513 @@
+[
+  {
+    "title": "Custom Value Popup with Broadcaster",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "Engine.createBroadcaster with attachToComponentMouseEvents to show a positioned label as a custom value popup on knob drag. Tracks click, drag, and mouseUp events to position, update text, and hide the popup label dynamically.",
+    "code": "Content.makeFrontInterface(600, 600);\nConsole.clear();\n\nconst var knbs = [Content.getComponent(\"Knob1\"),\n                  Content.getComponent(\"Knob2\"),\n                  Content.getComponent(\"Knob3\")];\n\n\n// the value popup you can customise with your theme\nconst var valuePopupLbl = Content.getComponent(\"valuePopupLbl\");\nvaluePopupLbl.showControl(false);\n\n\n// Broadcaster reacting to mouse events on sliders\nconst var showValuePopup = Engine.createBroadcaster({\n  \"id\": \"showValuePopup\",\n  \"args\": [\"component\", \"event\"],\n  \"tags\": [],\n  \"comment\": \"shows the custom value popup on slider click\"\n});\n\n\nshowValuePopup.attachToComponentMouseEvents(knbs, \"All Callbacks\", \"\");\n\n\nshowValuePopup.addListener(\"\", \"md\", function(component, event)\n{\n\tvar text = Engine.doubleToString(component.getValue(), 2);\n\t\n\t// set the label position, value, and make it visible\n\tif (event.clicked)\n\t{\n\t\tvar x = component.getGlobalPositionX() - (valuePopupLbl.getWidth() - component.getWidth()) / 2.0;\n\t\tvar y = component.getGlobalPositionY() - 25;\n\t\t\n\t\tvaluePopupLbl.set(\"x\", x);\n\t\tvaluePopupLbl.set(\"y\", y);\n\t\tvaluePopupLbl.set(\"text\", text);\n\t\tvaluePopupLbl.showControl(true);\n\t}\n\t\n\tif (event.drag)\n\t{\n\t\tvaluePopupLbl.set(\"text\", text);\n\t}\n\t\n\tif (event.mouseUp)\n\t{\n\t\tvaluePopupLbl.showControl(false);\n\t}\n});",
+    "url": "https://forum.hise.audio/topic/14477",
+    "featured": true,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptSlider",
+          "id": "Knob1"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob2"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob3"
+        },
+        {
+          "type": "ScriptLabel",
+          "id": "valuePopupLbl"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Broadcaster mouse events on knobs, compile-only",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:04:54.038563Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "HSL Image Tinting on Panel",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "Graphics.applyHSL inside a beginLayer/endLayer block to apply hue, saturation, and lightness adjustments to a drawn image. Uses Engine.loadImageIntoPool and panel.loadImage with three knob control callbacks to adjust each HSL parameter.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nEngine.loadImageIntoPool(\"{PROJECT_FOLDER}image.png\");\n\nconst var hueKnb = Content.getComponent(\"hueKnb\");\nconst var satKnb = Content.getComponent(\"satKnb\");\nconst var lightKnb = Content.getComponent(\"lightKnb\");\n\nconst var pnl = Content.getComponent(\"pnl\");\npnl.loadImage(\"{PROJECT_FOLDER}image.png\", \"img\");\n\n\nreg hue = 0.0;\nreg saturation = 0.0;\nreg lightness = 0.0;\n\n\n\n\npnl.setPaintRoutine(function(g)\n{\n\tg.drawImage(\"img\", this.getLocalBounds(0.0), 0, 0);\n\t\n\tg.beginLayer(true);\n\t\n\tg.applyHSL(hue, saturation, lightness);\n\t\n\tg.endLayer();\n});\n\n\n\n\n\n\ninline function onhueKnbControl(component, value)\n{\n\thue = value;\n\tpnl.repaint();\n};\nhueKnb.setControlCallback(onhueKnbControl);\n\n\n\ninline function onsatKnbControl(component, value)\n{\n\tsaturation = value;\n\tpnl.repaint();\n};\nsatKnb.setControlCallback(onsatKnbControl);\n\n\n\ninline function onlightKnbControl(component, value)\n{\n\tlightness = value;\n\tpnl.repaint();\n};\nlightKnb.setControlCallback(onlightKnbControl);",
+    "url": "https://forum.hise.audio/topic/14320",
+    "featured": true,
+    "validation": {
+      "tier": 4,
+      "testable": false,
+      "skipReason": "loadImage with {PROJECT_FOLDER} path - file doesn't exist in test environment",
+      "modules": [],
+      "components": [],
+      "verifyScript": null,
+      "notes": null
+    }
+  },
+  {
+    "title": "Radio Button Toggle with Ctrl Override",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "Content.getAllComponents with a regex pattern to create radio-button behavior across a set of buttons. Uses Content.isCtrlDown() to allow multi-selection when the Ctrl key is held.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var btnDemo = Content.getAllComponents(\"btnDemo\\\\d\");\n\ninline function onbtnDemoControl(component, value)\n{\n\tif (Content.isCtrlDown())\n\t{\n\t\treturn component.setValue(1);\n\t}\n\n\tfor (x in btnDemo)\n\t{\n\t\tx.setValue(x == component);\n\t}\n}\n\nfor (x in btnDemo)\n{\n\tx.setControlCallback(onbtnDemoControl);\n}",
+    "url": "https://forum.hise.audio/topic/13964",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptButton",
+          "id": "btnDemo1"
+        },
+        {
+          "type": "ScriptButton",
+          "id": "btnDemo2"
+        },
+        {
+          "type": "ScriptButton",
+          "id": "btnDemo3"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "getAllComponents('btnDemo\\d') regex match",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:04:55.470515Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Arc Drawing on Panel",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "Content.createPath with addArc and drawPath to draw partial arcs on a panel. Uses getBounds on the path for proper scaling and a pathData object to configure stroke thickness and type.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var Canvas = Content.getComponent(\"Canvas\");\n\nfunction degToRad(deg)\n{\n\treturn deg * (Math.PI / 180);\n}\n\nreg p = Content.createPath();\n\nconst var pathData = {};\npathData.Thickness = 2.0;\npathData.StrokeType = \"Solid\";\n\nCanvas.setPaintRoutine(function(g)\n{\n\tvar a = this.getLocalBounds(2);\n\tg.setColour(Colours.chartreuse);\n\tp.startNewSubPath(0, 0);\n\tp.addArc(a, degToRad(0), degToRad(45));\n\tg.drawPath(p, p.getBounds(1), pathData);\n});",
+    "url": "https://forum.hise.audio/topic/13963",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptPanel",
+          "id": "Canvas"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Arc drawing paint routine, compile-only",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:04:56.896536Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Rotating 3D Cube Renderer",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "Content.createPath with perspective projection math to render and animate a wireframe 3D cube on a panel. Uses setTimerCallback for continuous rotation and inline helper functions for rotation and normalized projection.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nContent.setUseHighResolutionForPanels(true);\n\nconst var CubePanel = Content.addPanel(\"CubePanel\", 10, 10);\nCubePanel.set(\"width\", 380);\nCubePanel.set(\"height\", 380);\nCubePanel.set(\"allowCallbacks\", \"All Callbacks\");\n\nCubePanel.data.angleX = 0.0;\nCubePanel.data.angleY = 0.0;\nCubePanel.data.speedX = 0.015;\nCubePanel.data.speedY = 0.020;\nCubePanel.data.lineThickness = 1.5;\n\nconst var VERTS = [\n\t[-1,-1,-1], [ 1,-1,-1], [ 1, 1,-1], [-1, 1,-1],\n\t[-1,-1, 1], [ 1,-1, 1], [ 1, 1, 1], [-1, 1, 1]\n];\n\nconst var EDGES = [\n\t[0,1],[1,2],[2,3],[3,0],\n\t[4,5],[5,6],[6,7],[7,4],\n\t[0,4],[1,5],[2,6],[3,7]\n];\n\ninline function rotXY(v, ax, ay)\n{\n\tlocal cx = Math.cos(ax);\n\tlocal sx = Math.sin(ax);\n\tlocal x = v[0];\n\tlocal y = v[1]*cx - v[2]*sx;\n\tlocal z = v[1]*sx + v[2]*cx;\n\n\tlocal cy = Math.cos(ay);\n\tlocal sy = Math.sin(ay);\n\tlocal x2 =  x*cy + z*sy;\n\tlocal z2 = -x*sy + z*cy;\n\n\treturn [x2, y, z2];\n}\n\ninline function projectToNorm(p3, w, h, scale)\n{\n\tlocal z = p3[2] + 4.5;\n\tlocal f = scale / z;\n\tlocal px = (w * 0.5) + p3[0]*f;\n\tlocal py = (h * 0.5) - p3[1]*f;\n\treturn [px / w, py / h];\n}\n\nCubePanel.setPaintRoutine(function(g)\n{\n\tvar w = this.getWidth();\n\tvar h = this.getHeight();\n\tvar s = Math.min(w, h) * 1.0;\n\n\tvar ax = this.data.angleX;\n\tvar ay = this.data.angleY;\n\n\tvar RV = [];\n\tfor (var i = 0; i < VERTS.length; i++)\n\t\tRV.push(rotXY(VERTS[i], ax, ay));\n\n\tvar path = Content.createPath();\n\n\tfor (var e = 0; e < EDGES.length; e++)\n\t{\n\t\tvar a = RV[EDGES[e][0]];\n\t\tvar b = RV[EDGES[e][1]];\n\n\t\tvar A2 = projectToNorm(a, w, h, s);\n\t\tvar B2 = projectToNorm(b, w, h, s);\n\n\t\tpath.startNewSubPath(A2[0], A2[1]);\n\t\tpath.lineTo(B2[0], B2[1]);\n\t}\n\n\tg.setColour(Colours.withAlpha(Colours.black, 0.25));\n\tg.fillRect(this.getLocalBounds(0));\n\n\tg.setColour(Colours.withAlpha(Colours.white, 0.9));\n\tg.drawPath(path, this.getLocalBounds(0), this.data.lineThickness);\n});\n\nCubePanel.setTimerCallback(function()\n{\n\tCubePanel.data.angleX += CubePanel.data.speedX;\n\tCubePanel.data.angleY += CubePanel.data.speedY;\n\tCubePanel.repaint();\n});\n\nCubePanel.startTimer(30);",
+    "url": "https://forum.hise.audio/topic/13267",
+    "featured": true,
+    "validation": {
+      "tier": 1,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [],
+      "verifyScript": null,
+      "notes": "Creates own panel, self-contained 3D cube renderer",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:04:58.274948Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Macro Control Knob Array",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "Synth.setMacroControl with Content.getAllComponents to map an array of knobs to HISE macro controls. Uses indexOf to determine the macro index from the component reference.",
+    "code": "Content.makeFrontInterface(1280, 720);\r\n\r\nconst knbMacro = Content.getAllComponents(\"knbMacro\\\\d\");\r\nconst lblMacro = Content.getAllComponents(\"lblMacro\\\\d\");\r\n\r\ninline function onknbMacroControl(component, value)\r\n{\n\tlocal index = knbMacro.indexOf(component);\n\r\n\tSynth.setMacroControl(index + 1, value);\r\n\tlblMacro[index].set(\"text\", Math.round(value));\n}\n\nfor (x in knbMacro)\n\tx.setControlCallback(onknbMacroControl);",
+    "url": "https://forum.hise.audio/topic/13871",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptSlider",
+          "id": "knbMacro1"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "knbMacro2"
+        },
+        {
+          "type": "ScriptLabel",
+          "id": "lblMacro1"
+        },
+        {
+          "type": "ScriptLabel",
+          "id": "lblMacro2"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Fixed: moved inline function before setControlCallback. Macro controls compile-only.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:04:59.653865Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "ModWheel LAF with Gradient Lighting",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "LAF drawRotarySlider function that renders a realistic mod wheel with horizontal scrolling lines, a handle bar, and layered gradient lighting and shading effects. Uses setGradientFill for top/bottom shading and drawHorizontalLine for the wheel texture.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var MODWHEEL_LAF = Content.createLocalLookAndFeel();\n\nMODWHEEL_LAF.registerFunction(\"drawRotarySlider\", function(g, obj)\n{\n\tvar x = 5;\n\tvar wheelWidth = 10;\n\tvar a = obj.area;\n\n\tvar totalTravel = 51;\n\tvar bottomPad = 2;\n\tvar v = (obj.value * totalTravel) + bottomPad;\n\n\tvar numLines = 60;\n\tvar lineSpacing = 2;\n\n\tvar bgColour = 0xFB080910;\n\tvar wheelColour = 0xFF0F7691;\n\tvar shadeColour = 0xFF0B0925;\n\tvar lightColour = 0x38FFFFFF;\n\n\tg.setColour(bgColour);\n\tg.fillRect(obj.area);\n\n\tg.setColour(Colours.black);\n\tg.fillRect([x, 0, wheelWidth, a[3]]);\n\n\tg.setColour(0xFB24252B);\n\tg.drawVerticalLine(3, 0, 60);\n\tg.drawVerticalLine(16, 0, 60);\n\n\tg.setColour(wheelColour);\n\n\tfor (var i = 0; i < numLines; i++)\n\t{\n\t\tvar y = (2 * i) - v;\n\t\tg.drawHorizontalLine(y, x, wheelWidth + x);\n\t}\n\n\tg.setColour(wheelColour);\n\tg.drawHorizontalLine(53 - v, x, wheelWidth + x);\n\tg.drawHorizontalLine(55 - v, x, wheelWidth + x);\n\tg.drawHorizontalLine(57 - v, x, wheelWidth + x);\n\tg.drawHorizontalLine(59 - v, x, wheelWidth + x);\n\n\tg.setGradientFill([0xFF181515, 6, 0, 0x00000000, 6, 15]);\n\tg.fillRect(obj.area);\n\n\tg.setGradientFill([0x00000000, 6, 30, shadeColour, 6, 60]);\n\tg.fillRect(obj.area);\n\n\tg.setGradientFill([0x00000000, 6, 0, lightColour, 6, 15]);\n\tg.fillRect([x, 0, wheelWidth, 15]);\n\n\tg.setGradientFill([lightColour, 6, 15, 0x00000000, 6, 40]);\n\tg.fillRect([x, 15, wheelWidth, 30]);\n\n\tg.setColour(Colours.white);\n\tg.drawHorizontalLine(56 - v, x - 1, wheelWidth + x + 1);\n\n\tg.setColour(Colours.black);\n\tg.drawRect(a, 1);\n});\n\nconst var ModWheel = Content.getComponent(\"ModWheel\");\nModWheel.setLocalLookAndFeel(MODWHEEL_LAF);",
+    "url": "https://forum.hise.audio/topic/13830",
+    "featured": true,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptSlider",
+          "id": "ModWheel"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "ModWheel LAF, compile-only",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:05:01.141712Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "MIDI File Drag to DAW",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "Panel setMouseCallback with startExternalFileDrag and MidiPlayer.saveAsMidiFile to enable dragging a MIDI sequence from HISE into the DAW. Uses FileSystem.getFolder to create a temporary export file in AppData.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var panel_DragPointMIDI = Content.getComponent(\"panel_DragPointMIDI\");\nconst var midiplayer = Synth.getMidiPlayer(\"midiplayer_Playback\");\n\npanel_DragPointMIDI.setMouseCallback(function(event)\n{\n\tif (event.clicked)\n\t{\n\t\tvar midiFilesDirectory = FileSystem.getFolder(FileSystem.AppData);\n\t\tvar fileToExport = midiFilesDirectory.getChildFile(\"temporary_export.mid\");\n\n\t\tmidiplayer.saveAsMidiFile(fileToExport, 1);\n\n\t\tthis.startExternalFileDrag(fileToExport, false, function()\n\t\t{\n\t\t\tConsole.print(\"MIDI drag completed\");\n\t\t});\n\t}\n});",
+    "url": "https://forum.hise.audio/topic/9473",
+    "featured": true,
+    "validation": {
+      "tier": 3,
+      "testable": true,
+      "skipReason": null,
+      "modules": [
+        {
+          "type": "MidiPlayer",
+          "name": "midiplayer_Playback"
+        }
+      ],
+      "components": [
+        {
+          "type": "ScriptPanel",
+          "id": "panel_DragPointMIDI"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Mouse callback won't fire during compile, compile-only",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:05:02.882012Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "SliderPack Radio Button Behavior",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "Two SliderPacks linked to behave like radio buttons — clicking a slider in one pack resets the corresponding slider in the other. Uses setSliderAtIndex and changed() to synchronize mutual exclusion.",
+    "code": "Content.makeFrontInterface(200, 200);\n\nconst var SliderPack1 = Content.getComponent(\"SliderPack1\");\nconst var SliderPack2 = Content.getComponent(\"SliderPack2\");\n\ninline function onSliderPack1Control(component, value)\n{\n\tif (typeof(value) == \"object\")\n\t\treturn;\n\n\tif (!component.getSliderValueAt(value))\n\t\treturn;\n\n\tSliderPack2.setSliderAtIndex(value, 0);\n\tSliderPack2.changed();\n};\n\nSliderPack1.setControlCallback(onSliderPack1Control);\n\ninline function onSliderPack2Control(component, value)\n{\n\tif (typeof(value) == \"object\")\n\t\treturn;\n\n\tif (!component.getSliderValueAt(value))\n\t\treturn;\n\n\tSliderPack1.setSliderAtIndex(value, 0);\n\tSliderPack1.changed();\n};\n\nSliderPack2.setControlCallback(onSliderPack2Control);",
+    "url": "https://forum.hise.audio/topic/13696",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptSliderPack",
+          "id": "SliderPack1"
+        },
+        {
+          "type": "ScriptSliderPack",
+          "id": "SliderPack2"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "SliderPack radio button behavior, compile-only",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:05:04.310357Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Shared SliderPack Data for Two LFOs",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "Engine.createAndRegisterSliderPackData with referToData and linkTo to share a single SliderPack UI across two LFO modulators. Both LFOs read from the same registered data source.",
+    "code": "Content.makeFrontInterface(200, 100);\n\nconst var SliderPack1 = Content.getComponent(\"SliderPack1\");\nconst var LFO1 = Synth.getSliderPackProcessor(\"LFO1\").getSliderPack(0);\nconst var LFO2 = Synth.getSliderPackProcessor(\"LFO2\").getSliderPack(0);\n\nconst var spData = Engine.createAndRegisterSliderPackData(0);\nSliderPack1.referToData(spData);\nLFO1.linkTo(spData);\nLFO2.linkTo(spData);",
+    "url": "https://forum.hise.audio/topic/13560",
+    "featured": false,
+    "validation": {
+      "tier": 3,
+      "testable": true,
+      "skipReason": null,
+      "modules": [
+        {
+          "type": "SineSynth",
+          "name": "SineSynth1"
+        },
+        {
+          "type": "LFO",
+          "name": "LFO1",
+          "parent": "SineSynth1",
+          "chain": 1
+        },
+        {
+          "type": "LFO",
+          "name": "LFO2",
+          "parent": "SineSynth1",
+          "chain": 1
+        }
+      ],
+      "components": [
+        {
+          "type": "ScriptSliderPack",
+          "id": "SliderPack1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "LFOs added to SineSynth1 gain mod chain. Shared SliderPack data.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:05:06.411882Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Background Audio Rendering to File",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "author"
+    ],
+    "description": "AudioSampleProcessor getAudioFile with setContentCallback to capture rendered audio from a file player into a buffer and write it to disk. Uses FileSystem.fromReferenceString and writeAudioFile to save the processed output as a WAV file alongside the source.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var sp = Synth.getAudioSampleProcessor(\"Script FX1\");\n\nconst var source = sp.getAudioFile(0);\n\nconst var target = sp.getAudioFile(1);\n\ntarget.setContentCallback(function(changedIndex)\n{\n\tConsole.print(\"Rendering complete...\");\n\t\n\tvar buffer = target.getContent();\n\t\n\tConsole.print(source.getCurrentlyLoadedFile());\n\tvar sourceFile = FileSystem.fromReferenceString(source.getCurrentlyLoadedFile(), FileSystem.AudioFiles);\n\t\n\tvar sibling = sourceFile.getParentDirectory().getChildFile(\"processed.wav\");\n\t\n\tsibling.writeAudioFile(buffer, Engine.getSampleRate(), 24);\n\t\n\tConsole.print(\"File written to \" + sibling.toString(0));\n\tsource.loadFile(\"\");\n});",
+    "url": "https://forum.hise.audio/topic/13494",
+    "featured": true,
+    "validation": {
+      "tier": 4,
+      "testable": false,
+      "skipReason": "ScriptFX needs scriptnode network to provide AudioSampleProcessor interface with audio file slots",
+      "modules": [],
+      "components": [],
+      "verifyScript": null,
+      "notes": null
+    }
+  },
+  {
+    "title": "SliderPack LAF with Step Grid",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "LAF drawLinearSlider function for a SliderPack with integer step size. Draws a filled rectangle at the current value position and a background grid aligned to the step divisions.",
+    "code": "Content.makeFrontInterface(400, 240);\n\nconst var SliderPack1 = Content.getComponent(\"SliderPack1\");\nSliderPack1.set(\"min\", 0);\nSliderPack1.set(\"max\", 12);\nSliderPack1.set(\"stepSize\", 1.0);\n\nconst var pack_laf = Content.createLocalLookAndFeel();\n\npack_laf.registerFunction(\"drawLinearSlider\", function(g, obj)\n{\n\tg.setColour(obj.itemColour1);\n\n\tvar h = obj.area[3] / (obj.max + 1);\n\tvar x = obj.area[0];\n\tvar y = obj.area[3] - (obj.value * h) - h;\n\tvar w = obj.area[2];\n\n\tg.fillRect([x, y, w, h]);\n\n\tg.setColour(obj.textColour);\n\n\tfor (var i = 0; i <= obj.max; i++)\n\t\tg.fillRect([x + 1, i * h + 1, w - 2, h - 2]);\n});\n\nSliderPack1.setLocalLookAndFeel(pack_laf);",
+    "url": "https://forum.hise.audio/topic/13432",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptSliderPack",
+          "id": "SliderPack1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "SliderPack LAF with step grid, compile-only",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:05:08.856228Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Wavetable Position Mouse Drag",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "Panel setMouseCallback to control a wavetable synthesizer's table position by dragging vertically. Maps the mouse Y coordinate to a 0-1 range and applies it via setAttribute on the wavetable synth.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst pnlWtDraggerLay1 = Content.getComponent(\"pnlWtDraggerLay1\");\npnlWtDraggerLay1.setMouseCursor(\"PointingHandCursor\", Colours.white, 0);\n\nconst WT_SYNTH_LAY1 = Synth.getChildSynth(\"WT_SYNTH_LAY1\");\n\npnlWtDraggerLay1.setMouseCallback(function(event)\n{\n\tif(event.clicked || event.drag)\n\t{\n\t\tif(1 - (event.y / this.getHeight()) >= 0 && 1 - (event.y / this.getHeight()) <= 1)\n\t\t\tWT_SYNTH_LAY1.setAttribute(6, 1 - (event.y / this.getHeight()));\n\t}\n});",
+    "url": "https://forum.hise.audio/topic/13388",
+    "featured": false,
+    "validation": {
+      "tier": 3,
+      "testable": true,
+      "skipReason": null,
+      "modules": [
+        {
+          "type": "WavetableSynth",
+          "name": "WT_SYNTH_LAY1"
+        }
+      ],
+      "components": [
+        {
+          "type": "ScriptPanel",
+          "id": "pnlWtDraggerLay1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Mouse callback won't fire during compile, compile-only",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:05:10.594551Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Viewport Item Name Lookup",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert",
+      "solved"
+    ],
+    "description": "Viewport control callback that splits the items property by newline to convert it to an array, then uses the viewport's selected index to retrieve the corresponding item name.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var Viewport1 = Content.getComponent(\"Viewport1\");\nViewport1.set(\"items\", \"Item1\nItem2\nItem3\");\n\n\ninline function onViewport1Control(component, value)\n{\n\tlocal items = component.get(\"items\").split(\"\\n\");\n\t\n\tConsole.print(items[value]);\n};\n\nContent.getComponent(\"Viewport1\").setControlCallback(onViewport1Control);",
+    "url": "https://forum.hise.audio/topic/13374",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptedViewport",
+          "id": "Viewport1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Fixed: added items to Viewport so callback has valid data",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:05:31.717019Z",
+        "attempts": 2
+      }
+    }
+  }
+]

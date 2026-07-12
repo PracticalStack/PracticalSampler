@@ -1,0 +1,1 @@
+Attaches a scripted look and feel object to this component and all its children. Pass `false` to clear it. Since ScriptWebView renders content through an embedded browser engine, the look and feel primarily affects the component wrapper rather than the web content.

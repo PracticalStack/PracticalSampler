@@ -1,0 +1,1 @@
+Selects the active track within the current sequence. The active track determines which track is read by `getEventList()` and written to by `flushMessageList()`. Switching tracks is less dynamic than switching sequences - prefer using multiple sequences rather than multiple tracks for content that needs to change frequently during playback.

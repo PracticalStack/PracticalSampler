@@ -1,0 +1,1 @@
+Sets the transpose amount in semitones (-128 to 127) for this event. This is the recommended way to shift pitch in HISE because NoteOn and NoteOff events automatically match by their original note number regardless of the transpose amount. The sounding note is `getNoteNumber() + getTransposeAmount()`.

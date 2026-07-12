@@ -1,0 +1,3 @@
+Begins a new sub-path at the given coordinates without drawing anything. This sets the "current position" for subsequent drawing commands (`lineTo`, `quadraticTo`, `cubicTo`). Previously added geometry is preserved - `startNewSubPath` does not clear the path.
+
+Beyond its primary role of starting new geometry segments, `startNewSubPath` is frequently used to anchor the path's bounding box. Calling `startNewSubPath(0, 0)` and `startNewSubPath(1, 1)` before adding an arc in normalised space ensures the bounding box covers the full unit square. The shorthand `setBounds([0, 0, 1, 1])` does the same thing.

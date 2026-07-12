@@ -1,0 +1,1 @@
+Returns an array of all active and completed `Download` objects. Use this to iterate over downloads for progress display or to check completion status. Call `Server.cleanFinishedDownloads()` to remove completed entries from this list.

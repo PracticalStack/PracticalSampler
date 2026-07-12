@@ -1,0 +1,12 @@
+{
+  "13": {
+    "tier": 4,
+    "testable": false,
+    "invalid": true,
+    "skipReason": "API does not exist: ScriptFloatingTile.setChildTooltips — not part of the HISE scripting API (proposed feature from forum post, never implemented)",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  }
+}

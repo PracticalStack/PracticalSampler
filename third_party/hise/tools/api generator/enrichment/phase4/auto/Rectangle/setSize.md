@@ -1,0 +1,1 @@
+Changes this rectangle's width and height, keeping the top-left corner unchanged. This modifies the rectangle in place and returns nothing. For a non-mutating version, use `withSize()` or `withSizeKeepingCentre()`.

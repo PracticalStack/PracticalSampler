@@ -1,0 +1,316 @@
+{
+  "className": "Settings",
+  "category": "namespace",
+  "description": "This class takes over a few of the Engine methods in order to break down this gigantomanic object.",
+  "methods": {
+    "clearMidiLearn": {
+      "signature": "void clearMidiLearn()",
+      "returnType": "void",
+      "description": "Clears all MIDI CC assignments.",
+      "parameters": []
+    },
+    "crashAndBurn": {
+      "signature": "void crashAndBurn()",
+      "returnType": "void",
+      "description": "Calls abort to terminate the program. You can use this to check your crash reporting workflow.",
+      "parameters": []
+    },
+    "getAvailableBufferSizes": {
+      "signature": "var getAvailableBufferSizes()",
+      "returnType": "var",
+      "description": "Returns available buffer sizes for the selected audio device.",
+      "parameters": []
+    },
+    "getAvailableDeviceNames": {
+      "signature": "var getAvailableDeviceNames()",
+      "returnType": "var",
+      "description": "Returns names of available audio devices.",
+      "parameters": []
+    },
+    "getAvailableDeviceTypes": {
+      "signature": "var getAvailableDeviceTypes()",
+      "returnType": "var",
+      "description": "Returns available audio device types.",
+      "parameters": []
+    },
+    "getAvailableOutputChannels": {
+      "signature": "var getAvailableOutputChannels()",
+      "returnType": "var",
+      "description": "Returns array of available output channel pairs.",
+      "parameters": []
+    },
+    "getAvailableSampleRates": {
+      "signature": "var getAvailableSampleRates()",
+      "returnType": "var",
+      "description": "Returns array of available sample rate.",
+      "parameters": []
+    },
+    "getCurrentAudioDevice": {
+      "signature": "String getCurrentAudioDevice()",
+      "returnType": "String",
+      "description": "Gets the current audio device name",
+      "parameters": []
+    },
+    "getCurrentAudioDeviceType": {
+      "signature": "String getCurrentAudioDeviceType()",
+      "returnType": "String",
+      "description": "Returns the current audio device type.",
+      "parameters": []
+    },
+    "getCurrentBufferSize": {
+      "signature": "int getCurrentBufferSize()",
+      "returnType": "int",
+      "description": "Returns the current buffer block size.",
+      "parameters": []
+    },
+    "getCurrentOutputChannel": {
+      "signature": "int getCurrentOutputChannel()",
+      "returnType": "int",
+      "description": "Returns current output channel pair.",
+      "parameters": []
+    },
+    "getCurrentSampleRate": {
+      "signature": "double getCurrentSampleRate()",
+      "returnType": "double",
+      "description": "Returns the current output sample rate (-1 if no audio device selected)",
+      "parameters": []
+    },
+    "getCurrentVoiceMultiplier": {
+      "signature": "int getCurrentVoiceMultiplier()",
+      "returnType": "int",
+      "description": "Returns current voice amount multiplier setting.",
+      "parameters": []
+    },
+    "getDiskMode": {
+      "signature": "int getDiskMode()",
+      "returnType": "int",
+      "description": "Gets the Streaming Mode (0 -> Fast-SSD, 1 -> Slow-HDD)",
+      "parameters": []
+    },
+    "getMidiInputDevices": {
+      "signature": "var getMidiInputDevices()",
+      "returnType": "var",
+      "description": "Returns array of MIDI input device names.",
+      "parameters": []
+    },
+    "getUserDesktopSize": {
+      "signature": "var getUserDesktopSize()",
+      "returnType": "var",
+      "description": "Returns an array of the form [width, height].",
+      "parameters": []
+    },
+    "getZoomLevel": {
+      "signature": "double getZoomLevel()",
+      "returnType": "double",
+      "description": "Returns the UI Zoom factor.",
+      "parameters": []
+    },
+    "isIppEnabled": {
+      "signature": "bool isIppEnabled(bool returnTrueIfMacOS)",
+      "returnType": "bool",
+      "description": "Returns true (on Windows) if IPP is enabled or (optionally) if the plugin is running on macOS.",
+      "parameters": [
+        {
+          "name": "returnTrueIfMacOS",
+          "type": "bool"
+        }
+      ]
+    },
+    "isMidiChannelEnabled": {
+      "signature": "bool isMidiChannelEnabled(int index)",
+      "returnType": "bool",
+      "description": "Returns enabled state of midi channel (0 = All channels).",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "isMidiInputEnabled": {
+      "signature": "bool isMidiInputEnabled(String midiInputName)",
+      "returnType": "bool",
+      "description": "Returns enabled state of midi input device.",
+      "parameters": [
+        {
+          "name": "midiInputName",
+          "type": "String"
+        }
+      ]
+    },
+    "isOpenGLEnabled": {
+      "signature": "bool isOpenGLEnabled()",
+      "returnType": "bool",
+      "description": "Returns whether OpenGL is enabled or not. The return value might be out of sync with the actual state (after you changed this setting until the next reload).",
+      "parameters": []
+    },
+    "setAudioDevice": {
+      "signature": "void setAudioDevice(String name)",
+      "returnType": "void",
+      "description": "Sets the current audio device",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "String"
+        }
+      ]
+    },
+    "setAudioDeviceType": {
+      "signature": "void setAudioDeviceType(String deviceName)",
+      "returnType": "void",
+      "description": "Sets the current audio device type",
+      "parameters": [
+        {
+          "name": "deviceName",
+          "type": "String"
+        }
+      ]
+    },
+    "setBufferSize": {
+      "signature": "void setBufferSize(int newBlockSize)",
+      "returnType": "void",
+      "description": "Sets the buffer block size for the selected audio device.",
+      "parameters": [
+        {
+          "name": "newBlockSize",
+          "type": "int"
+        }
+      ]
+    },
+    "setDiskMode": {
+      "signature": "void setDiskMode(int mode)",
+      "returnType": "void",
+      "description": "Sets the Streaming Mode (0 -> Fast-SSD, 1 -> Slow-HDD)",
+      "parameters": [
+        {
+          "name": "mode",
+          "type": "int"
+        }
+      ]
+    },
+    "setEnableDebugMode": {
+      "signature": "void setEnableDebugMode(bool shouldBeEnabled)",
+      "returnType": "void",
+      "description": "Enables or disables debug logging",
+      "parameters": [
+        {
+          "name": "shouldBeEnabled",
+          "type": "bool"
+        }
+      ]
+    },
+    "setEnableOpenGL": {
+      "signature": "void setEnableOpenGL(bool shouldBeEnabled)",
+      "returnType": "void",
+      "description": "Enable OpenGL. This setting will be applied the next time the interface is rebuild.",
+      "parameters": [
+        {
+          "name": "shouldBeEnabled",
+          "type": "bool"
+        }
+      ]
+    },
+    "setOutputChannel": {
+      "signature": "void setOutputChannel(int index)",
+      "returnType": "void",
+      "description": "Sets the output channel pair",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "setSampleFolder": {
+      "signature": "void setSampleFolder(var sampleFolder)",
+      "returnType": "void",
+      "description": "Changes the sample folder.",
+      "parameters": [
+        {
+          "name": "sampleFolder",
+          "type": "var"
+        }
+      ]
+    },
+    "setSampleRate": {
+      "signature": "void setSampleRate(double sampleRate)",
+      "returnType": "void",
+      "description": "Sets the output sample rate",
+      "parameters": [
+        {
+          "name": "sampleRate",
+          "type": "double"
+        }
+      ]
+    },
+    "setVoiceMultiplier": {
+      "signature": "void setVoiceMultiplier(int newVoiceAmount)",
+      "returnType": "void",
+      "description": "Sets the voice limit multiplier (1, 2, 4, or 8).",
+      "parameters": [
+        {
+          "name": "newVoiceAmount",
+          "type": "int"
+        }
+      ]
+    },
+    "setZoomLevel": {
+      "signature": "void setZoomLevel(double newLevel)",
+      "returnType": "void",
+      "description": "Changes the UI zoom (1.0 = 100%).",
+      "parameters": [
+        {
+          "name": "newLevel",
+          "type": "double"
+        }
+      ]
+    },
+    "startPerfettoTracing": {
+      "signature": "void startPerfettoTracing()",
+      "returnType": "void",
+      "description": "Starts the perfetto profile recording.",
+      "parameters": []
+    },
+    "stopPerfettoTracing": {
+      "signature": "void stopPerfettoTracing(var traceFileToUse)",
+      "returnType": "void",
+      "description": "Stops the perfetto profile recording and dumps the data to the given file.",
+      "parameters": [
+        {
+          "name": "traceFileToUse",
+          "type": "var"
+        }
+      ]
+    },
+    "toggleMidiChannel": {
+      "signature": "void toggleMidiChannel(int index, bool value)",
+      "returnType": "void",
+      "description": "Enables or disables MIDI channel (0 = All channels).",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        },
+        {
+          "name": "value",
+          "type": "bool"
+        }
+      ]
+    },
+    "toggleMidiInput": {
+      "signature": "void toggleMidiInput(String midiInputName, bool enableInput)",
+      "returnType": "void",
+      "description": "Enables or disables named MIDI input device.",
+      "parameters": [
+        {
+          "name": "midiInputName",
+          "type": "String"
+        },
+        {
+          "name": "enableInput",
+          "type": "bool"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "factoryPath": "fx.bitcrush",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "quantise", "label": "Quantise", "type": "process", "importance": 1.0, "description": "Quantises each sample to reduced bit depth using floor/ceil rounding" },
+    { "id": "bitdepth", "label": "BitDepth", "type": "parameter", "importance": 1.0, "description": "Number of quantisation bits (4-16, fractional supported)" },
+    { "id": "mode", "label": "Mode", "type": "parameter", "importance": 0.8, "description": "Rounding mode: DC Offset (ceil + shift) or Bipolar (round toward zero)" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Bit-crushed audio signal" }
+  ],
+  "edges": [
+    { "from": "in", "to": "quantise", "type": "signal", "label": null },
+    { "from": "bitdepth", "to": "quantise", "type": "control", "label": null },
+    { "from": "mode", "to": "quantise", "type": "control", "label": null },
+    { "from": "quantise", "to": "out", "type": "signal", "label": null }
+  ]
+}

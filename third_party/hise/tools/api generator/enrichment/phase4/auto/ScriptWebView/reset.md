@@ -1,0 +1,1 @@
+Clears all cached resources and persistent call data, but preserves the root directory and index file settings. Use this to force a clean reload of web content without re-specifying the content source.

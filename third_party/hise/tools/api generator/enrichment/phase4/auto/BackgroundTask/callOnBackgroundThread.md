@@ -1,0 +1,3 @@
+Starts the given function on a dedicated background thread. The function receives the BackgroundTask as its single argument and should call `shouldAbort()` regularly in loops and `setProgress()` to report progress. The finish callback fires with `(false, false)` when the task starts, then `(true, wasCancelled)` when it completes or is aborted.
+
+> [!Warning:Explicit abort signal avoids blocking] If a previous task is still running, this method blocks the calling thread for up to the configured timeout while the old thread stops. For shared tasks triggered by multiple UI actions, call `sendAbortSignal(true)` explicitly before starting a new task to make cancellation intent clear and avoid unexpected UI freezes.

@@ -1,0 +1,25 @@
+{
+  "moduleId": "ScriptFX",
+  "nodes": [
+    { "id": "audio_in", "label": "Audio In (L/R)", "type": "input", "importance": 0.9, "group": "io", "description": "Stereo audio input" },
+    { "id": "network_check", "label": "Network Loaded?", "type": "decision", "importance": 0.8, "group": "dispatch", "description": "Checks whether a scriptnode network is active" },
+    { "id": "network_process", "label": "Network Process", "type": "process", "importance": 1.0, "group": "processing", "description": "Processes audio through the loaded scriptnode DSP network" },
+    { "id": "script_process", "label": "Script processBlock", "type": "process", "importance": 0.6, "group": "processing", "description": "Fallback: processes audio through HISEScript processBlock callback" },
+    { "id": "mod_chains", "label": "Extra Modulation Chains", "type": "modulation", "importance": 0.7, "group": "modulation", "description": "Optional modulation chains that modulate network parameters at sub-block rate" },
+    { "id": "audio_out", "label": "Audio Out (L/R)", "type": "output", "importance": 0.9, "group": "io", "description": "Stereo audio output" }
+  ],
+  "edges": [
+    { "from": "audio_in", "to": "network_check", "type": "signal", "label": null },
+    { "from": "network_check", "to": "network_process", "type": "conditional", "label": "network active" },
+    { "from": "network_check", "to": "script_process", "type": "conditional", "label": "no network" },
+    { "from": "mod_chains", "to": "network_process", "type": "control", "label": "parameter modulation" },
+    { "from": "network_process", "to": "audio_out", "type": "signal", "label": null },
+    { "from": "script_process", "to": "audio_out", "type": "signal", "label": null }
+  ],
+  "groups": [
+    { "id": "io", "label": "I/O" },
+    { "id": "dispatch", "label": "Mode Selection" },
+    { "id": "processing", "label": "Audio Processing" },
+    { "id": "modulation", "label": "Modulation" }
+  ]
+}

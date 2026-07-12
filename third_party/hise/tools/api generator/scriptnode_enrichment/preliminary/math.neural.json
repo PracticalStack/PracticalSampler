@@ -1,0 +1,117 @@
+{
+  "factoryPath": "math.neural",
+  "factory": "math",
+  "nodeId": "neural",
+  "description": "",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "Model",
+      "defaultValue": "",
+      "type": "string",
+      "note": "Specifies the neural network model to load. Empty string means no model loaded. The expected format (e.g., JSON, binary) needs C++ exploration to determine."
+    },
+    {
+      "id": "HpfFreq",
+      "defaultValue": "Off",
+      "type": "enum",
+      "note": "High-pass filter frequency applied to the output. Default 'Off' disables the filter. Likely provides preset frequency values to remove DC offset introduced by neural network inference."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/math/neural.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "model-format",
+      "category": "signal_path",
+      "question": "What model format does math.neural expect? Is it an RTNeural JSON format, an ONNX file, or a custom binary format? How is the model file referenced -- by filename, path, or embedded data?",
+      "context": "Users need to know how to prepare and load a neural network model for use with this node."
+    },
+    {
+      "id": "hpf-freq-values",
+      "category": "conditional_logic",
+      "question": "What values does the HpfFreq property accept? The default is 'Off'. Is it an enum with preset frequencies (e.g., '5Hz', '10Hz', '20Hz'), or does it accept arbitrary frequency values as strings?",
+      "context": "The HPF is likely there to remove DC offset from neural network output. Users need to know available options."
+    },
+    {
+      "id": "is-fix-runtime-target",
+      "category": "signal_path",
+      "question": "What does the IsFixRuntimeTarget cppProperty mean for this node? Does it connect to a fixed runtime target for model loading, or does it affect how the node is instantiated in the signal graph?",
+      "context": "This is an uncommon cppProperty. Understanding it is needed to accurately describe the node's behaviour and constraints."
+    },
+    {
+      "id": "channel-processing",
+      "category": "signal_path",
+      "question": "How many audio channels does math.neural process? Does the neural network operate on mono input only, or can it handle stereo/multichannel? Is the network applied per-channel or across channels?",
+      "context": "Neural amp modelling typically operates on mono signals. Users need to know channel constraints."
+    },
+    {
+      "id": "no-model-behaviour",
+      "category": "signal_path",
+      "question": "What happens when no model is loaded (Model property is empty string)? Does the node pass audio through, output silence, or bypass itself?",
+      "context": "Important for understanding default state and graceful degradation when model files are missing."
+    },
+    {
+      "id": "empty-description",
+      "category": "description_accuracy",
+      "question": "The base JSON has an empty description string. What is an accurate one-line description of this node's purpose? It appears to be a neural network inference node for audio (likely amp modelling via RTNeural).",
+      "context": "The description field is empty and needs to be filled from C++ exploration for the reference page."
+    },
+    {
+      "id": "rt-neural-dependency",
+      "category": "signal_path",
+      "question": "The node requires HISE_INCLUDE_RT_NEURAL. What version of RTNeural is used? What network architectures are supported (LSTM, GRU, dense, convolutional)?",
+      "context": "Users preparing models need to know which architectures are compatible with this node."
+    },
+    {
+      "id": "unusual-base-json-structure",
+      "category": "description_accuracy",
+      "question": "The base JSON for math.neural has 'ChildId: Properties' at the top level instead of a separate Properties field, and has no Parameters field. Is this a serialisation anomaly, or does the node genuinely have a non-standard structure? Are there hidden parameters not captured in the base JSON?",
+      "context": "The unusual JSON structure may indicate a bug in the base data generator or a genuinely different node architecture."
+    }
+  ],
+
+  "notes": "math.neural is the most unusual node in the math factory. It requires HISE_INCLUDE_RT_NEURAL (conditional compilation), has an empty description, and its base JSON has a non-standard structure with 'ChildId: Properties' at the top level instead of in a nested Properties field. It has no Parameters and no ComplexData, but does have two Properties (Model and HpfFreq). The cppProperties include both IsPolyphonic: true and IsFixRuntimeTarget: true. The IsFixRuntimeTarget flag is uncommon and relates to the runtime_target system described in runtime-target.md. This node likely wraps the RTNeural library for real-time neural network inference, commonly used for guitar amp modelling."
+}

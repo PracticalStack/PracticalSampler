@@ -1,0 +1,1 @@
+Sets the bypass state of the wrapped synth. When bypassed, the synth does not produce audio output. A common pattern is to store an array of ChildSynth references and toggle bypass state in a loop based on a performance mode or articulation availability.

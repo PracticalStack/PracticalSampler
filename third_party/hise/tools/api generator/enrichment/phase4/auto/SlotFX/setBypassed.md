@@ -1,0 +1,1 @@
+Not available. This method is declared but not registered - it cannot be called from HiseScript. To bypass the loaded effect, use the `Effect` handle returned by `setEffect()` or `getCurrentEffect()` and call `Effect.setBypassed()` on it.

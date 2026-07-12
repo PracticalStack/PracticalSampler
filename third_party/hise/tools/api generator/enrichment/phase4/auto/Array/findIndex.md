@@ -1,0 +1,1 @@
+Returns the index of the first element for which the callback returns a truthy value, or `undefined` if no match is found. The callback receives up to three arguments: `element`, `index`, and `array`. Unlike `indexOf()`, this method accepts a test function rather than a value.

@@ -1,0 +1,101 @@
+{
+  "factoryPath": "control.delay_cable",
+  "factory": "control",
+  "nodeId": "delay_cable",
+  "description": "Delays the message by a given amount",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input",
+      "rationale": "The value to be delayed and forwarded to the output.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": true
+        }
+      ]
+    },
+    {
+      "label": "Timing",
+      "rationale": "Controls how long the value is delayed before forwarding.",
+      "parameters": [
+        {
+          "id": "DelayTimeSamples",
+          "range": { "min": 0.0, "max": 44100.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": true,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/delay_cable.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "delay-mechanism",
+      "category": "signal_path",
+      "question": "How does the delay buffer work internally? Is it a sample-accurate ring buffer, or does it defer sending until a future process() call? What happens when DelayTimeSamples is 0?",
+      "context": "Understanding the delay mechanism is critical for documenting whether this node introduces latency in the control signal path and how it interacts with polyphonic voices."
+    },
+    {
+      "id": "delay-time-modulation",
+      "category": "parameter_behaviour",
+      "question": "Can DelayTimeSamples be modulated in real-time? If the delay time changes while a value is buffered, does it affect already-queued values or only new ones?",
+      "context": "Users need to know whether dynamic delay time changes are safe and predictable."
+    },
+    {
+      "id": "multilogic-delay-cable",
+      "category": "signal_path",
+      "question": "The base data shows delay_cable is a multi_parameter<NV, PT, multilogic::delay_cable>. What does the multilogic::delay_cable::getValue() method do? Does needsProcessing() return true (implying it runs in the audio callback)?",
+      "context": "If it needs audio processing, it differs from most control nodes that are purely event-driven."
+    }
+  ],
+
+  "notes": "delay_cable uses UseUnnormalisedModulation with Value as unscaled input. It is a multi_parameter type (like pma, bang, etc). The DelayTimeSamples range goes up to 44100 (1 second at 44.1kHz), suggesting sample-based delay."
+}

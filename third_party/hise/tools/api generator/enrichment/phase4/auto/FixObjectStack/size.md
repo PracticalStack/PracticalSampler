@@ -1,0 +1,1 @@
+Returns the number of currently used elements. This is not the allocated capacity - use the `length` constant for that.

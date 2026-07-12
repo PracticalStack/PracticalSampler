@@ -1,0 +1,16 @@
+{
+  "factoryPath": "fx.pitch_shift",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "resample", "label": "Resample", "type": "process", "importance": 0.8, "description": "Linear interpolation resampling at FreqRatio speed" },
+    { "id": "stretch", "label": "Time Stretch", "type": "process", "importance": 1.0, "description": "Signalsmith time stretcher corrects duration back to original" },
+    { "id": "freqratio", "label": "FreqRatio", "type": "parameter", "importance": 1.0, "description": "Pitch multiplier: 0.25 (-2 oct) to 4.0 (+2 oct), 1.0 = no shift" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Pitch-shifted audio at original tempo" }
+  ],
+  "edges": [
+    { "from": "in", "to": "resample", "type": "signal", "label": null },
+    { "from": "freqratio", "to": "resample", "type": "control", "label": "uptimeDelta" },
+    { "from": "resample", "to": "stretch", "type": "signal", "label": "resampled" },
+    { "from": "stretch", "to": "out", "type": "signal", "label": null }
+  ]
+}

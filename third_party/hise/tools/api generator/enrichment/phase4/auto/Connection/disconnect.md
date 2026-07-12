@@ -1,0 +1,3 @@
+Removes this connection from the scriptnode graph. The source node's parameter chain is rebuilt automatically after removal.
+
+> [!Warning:Connection object is invalidated after removal] After calling `disconnect()`, the Connection object still exists in script but is no longer valid. `isConnected()` returns false and `getSourceNode()` returns undefined. Check `isConnected()` before calling getters if you hold a reference to a connection that may have been removed.

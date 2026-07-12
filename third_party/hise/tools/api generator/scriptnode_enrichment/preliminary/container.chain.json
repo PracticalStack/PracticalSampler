@@ -1,0 +1,81 @@
+{
+  "factoryPath": "container.chain",
+  "factory": "container",
+  "nodeId": "chain",
+  "description": "A container for serial processing of nodes",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "UI-only layout hint. When true, children are arranged top-to-bottom (vertical). When false, children are arranged left-to-right (horizontal). Does not affect processing."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/container/chain.md",
+    "tier": "GOOD",
+    "lines": 29
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "child-dispatch-order",
+      "category": "signal_path",
+      "question": "Confirm that ChainNode/DynamicSerialProcessor iterates children strictly in list order (index 0 first, last child last), passing the same in-place buffer through each child sequentially.",
+      "context": "The serial processing order is the defining characteristic of chain. Need to confirm no reordering or parallel execution occurs."
+    },
+    {
+      "id": "bypass-wrapper-type",
+      "category": "signal_path",
+      "question": "ChainNode wraps DynamicSerialProcessor in bypass::simple. Confirm that when the chain is bypassed, audio passes through unmodified with no crossfade (hard bypass), and that reset() is called on the inner processor on bypass entry.",
+      "context": "Distinguishes chain's hard bypass from soft_bypass's smoothed bypass. Users need to know bypass behavior per container."
+    },
+    {
+      "id": "event-forwarding",
+      "category": "signal_path",
+      "question": "Confirm that all children receive the same HiseEvent reference in list order. Does the first child's event modification affect subsequent children?",
+      "context": "Event handling rules differ between containers (chain shares reference, split copies). Important for MIDI-processing nodes inside chains."
+    }
+  ],
+
+  "notes": "The most fundamental container. Compiled version uses container::chain<ParameterClass, Processors...> with tuple iteration. Interpreted version uses bypass::simple<DynamicSerialProcessor>. All children share the same channel count (determined by the network/parent). The IsVertical property is purely cosmetic."
+}

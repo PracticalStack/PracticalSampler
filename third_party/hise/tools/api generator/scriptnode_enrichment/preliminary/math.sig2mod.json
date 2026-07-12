@@ -1,0 +1,63 @@
+{
+  "factoryPath": "math.sig2mod",
+  "factory": "math",
+  "nodeId": "sig2mod",
+  "description": "Converts a -1...1 signal to a 0...1 signal.",
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+  "parameterGroups": [
+    {
+      "label": "Operation",
+      "rationale": "Single Value parameter controlling the math operation: s = s*0.5 + 0.5",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": {
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.0,
+            "skew": 1.0
+          },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+  "properties": [],
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/math/sig2mod.md",
+    "tier": "BRIEF",
+    "lines": 14
+  },
+  "availableImages": [],
+  "gaps": [],
+  "notes": "Value parameter is ignored in processing. Bipolar to unipolar conversion. Inverse of mod2sig."
+}

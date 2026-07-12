@@ -1,0 +1,72 @@
+{
+  "targetId": "Noise",
+  "domain": "modules",
+  "generatedAt": "2026-04-08",
+  "topicIds": [701, 2206, 4292, 6893, 8522, 12856, 13011, 13220],
+  "insights": [
+    {
+      "type": "API",
+      "title": "Noise grain player is designed exclusively to complement the Wavetable Synthesiser",
+      "summary": "The Noise grain player decomposes a loaded audio file into noise and sinusoidal parts, then uses granular synthesis to play back only the noise component. Its purpose is to restore non-harmonic content (e.g. breath, texture) that is lost when the same file is resynthesised by a Wavetable Synthesiser. Link the audio file slots of both modules and sync Position to the wavetable table index via the modulation slots.",
+      "sources": ["tid:13220"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Noise grain player may be removed in a future cleanup",
+      "summary": "Christoph Hart noted the module has a 'super exotic use case' and may be removed in the next HISE cleanup round. Avoid building core functionality that depends on it.",
+      "sources": ["tid:13220"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Sound generators (including Noise) do not render in exported FX-only plugins by default",
+      "summary": "Normal HISE sound generators are not rendered when the project is exported as an FX plugin. To use a Noise generator for continuous noise in an FX plugin, enable 'Sound Generators FX' in Project Preferences.",
+      "sources": ["tid:701", "tid:12856"],
+      "verify": true,
+      "verify_hint": "grep 'Sound Generators FX' or 'allowSoundGeneratorsInFX' in HISE project preferences / CompileExporter"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use Synth.playNote() to trigger continuous noise from a script",
+      "summary": "To start a noise generator continuously from a script (e.g. for vinyl crackle or ambient noise), call Synth.playNote() with the desired note and velocity from an onInit or UI callback.",
+      "sources": ["tid:2206"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use scriptnode sampleAndHold to convert noise into a stepped random modulator",
+      "summary": "A noise signal fed through a sampleAndHold node in scriptnode produces a stepped random modulation signal. The sampleAndHold update period acts as a 'rate' parameter. A table node can shape the distribution curve to taste.",
+      "sources": ["tid:6893"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Audio-rate noise modulation cannot be routed outside its scriptnode network",
+      "summary": "Audio-rate signals (including noise) generated inside a scriptnode network cannot be routed to HISE modules outside that network. Modulation of external parameters must stay at control rate; audio-rate noise modulation must be applied inside the same network as the target.",
+      "sources": ["tid:8522"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Combine noise with a low waveform into a waveshaper to create fizzly distortion noise",
+      "summary": "Route both a low-frequency waveform and a noise generator into the same waveshaper. Apply a highpass after the waveshaper to remove the low waveform, leaving only the distorted noise component (a technique from DnB/Neurofunk production).",
+      "sources": ["tid:13011"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Perlin noise was removed from HISE due to performance",
+      "summary": "Perlin noise generation was available in an older HISE version but was removed because it was significantly slower than an equivalent GLSL shader implementation. For texture or procedural graphics use cases, use a scriptnode GLSL shader instead.",
+      "sources": ["tid:4292"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "moduleId": "ScriptProcessor",
+  "prettyName": "Script Processor",
+  "type": "MidiProcessor",
+  "subtype": "MidiProcessor",
+  "category": "custom",
+
+  "io": {
+    "midiIn": "MIDI_in",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "TableProcessor",
+      "signalFlowRole": "Lookup table accessible from script via Content.getTable()"
+    },
+    {
+      "name": "SliderPackProcessor",
+      "signalFlowRole": "Slider pack data accessible from script via Content.getSliderPack()"
+    },
+    {
+      "name": "AudioSampleProcessor",
+      "signalFlowRole": "Audio file resource accessible from script via Content.getAudioFile()"
+    }
+  ],
+
+  "parameterGroups": [],
+
+  "standaloneModChains": [],
+
+  "disabledModChains": [],
+
+  "compositeBlocks": [],
+
+  "gaps": [
+    {
+      "id": "callback-list",
+      "category": "signal_path",
+      "question": "What are all the callbacks available in the ScriptProcessor? What are their exact signatures and when does each fire?",
+      "context": "The reference page must document every callback comprehensively."
+    },
+    {
+      "id": "callback-execution-context",
+      "category": "signal_path",
+      "question": "Which callbacks run on the audio thread and which can be deferred to the message thread? How does the deferred mode work?",
+      "context": "Thread safety is critical for user guidance."
+    },
+    {
+      "id": "api-objects-available",
+      "category": "signal_path",
+      "question": "What API objects are registered and available inside callbacks (Message, Synth, Engine, etc.)?",
+      "context": "Users need to know what scripting API objects are accessible."
+    },
+    {
+      "id": "timer-mechanism",
+      "category": "parameter_behavior",
+      "question": "How does the onTimer callback work? Is it sample-accurate? How is it started/stopped?",
+      "context": "Timer is a key callback for periodic tasks."
+    },
+    {
+      "id": "on-control-parameters",
+      "category": "parameter_behavior",
+      "question": "What parameters does the onControl callback receive? How does it interact with UI components?",
+      "context": "onControl is the main UI interaction callback."
+    },
+    {
+      "id": "front-interface",
+      "category": "conditional_logic",
+      "question": "What does the 'front' / interface mode do for the ScriptProcessor? How does it differ from a non-front ScriptProcessor?",
+      "context": "The front interface is a special role for plugin UI."
+    },
+    {
+      "id": "midi-event-types",
+      "category": "signal_path",
+      "question": "What MIDI event types trigger which callbacks? Does onController handle pitch bend, aftertouch, and program change too?",
+      "context": "Users need to know what events route where."
+    },
+    {
+      "id": "dynamic-parameters",
+      "category": "parameter_behavior",
+      "question": "The module has metadataType 'dynamic' and no static parameters. How are parameters defined?",
+      "context": "Parameters are created by the user script via Content API."
+    }
+  ],
+
+  "notes": "ScriptProcessor is the primary HiseScript module. It has no static parameters - all parameters come from Content components defined in onInit. It is in the 'custom' category because its behaviour is entirely defined by the user's script. The module has 6 callbacks: onInit, onNoteOn, onNoteOff, onController, onTimer, onControl. It can operate in deferred mode (message thread) or real-time mode (audio thread). When set as 'front', it becomes the main interface script processor for the plugin."
+}

@@ -1,0 +1,1 @@
+Resets the table to its default state: a straight diagonal line from (0, 0) to (1, 1) with two edge points and a linear curve. All existing graph points are removed. Call this before building a new curve shape with `addTablePoint()` and `setTablePoint()`.

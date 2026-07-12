@@ -1,0 +1,1 @@
+Returns an array of user preset names for this expansion. Unlike the other list methods, this scans the filesystem directly rather than querying a pool. It searches the expansion's UserPresets directory recursively for `.preset` files and returns relative paths with the extension stripped and backslashes normalised to forward slashes.

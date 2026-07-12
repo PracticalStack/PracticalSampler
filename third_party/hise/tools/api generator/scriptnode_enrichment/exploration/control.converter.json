@@ -1,0 +1,14 @@
+{
+  "factoryPath": "control.converter",
+  "nodes": [
+    { "id": "value_in", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Raw input value (unscaled)" },
+    { "id": "mode", "label": "Mode", "type": "decision", "importance": 1.0, "description": "Selects conversion formula (14 modes)" },
+    { "id": "convert", "label": "Convert", "type": "process", "importance": 1.0, "description": "Applies the selected unit conversion formula" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Unnormalised output in target unit domain" }
+  ],
+  "edges": [
+    { "from": "value_in", "to": "convert", "type": "signal", "label": null },
+    { "from": "mode", "to": "convert", "type": "conditional", "label": "selects formula" },
+    { "from": "convert", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

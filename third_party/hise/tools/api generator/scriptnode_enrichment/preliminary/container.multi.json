@@ -1,0 +1,74 @@
+{
+  "factoryPath": "container.multi",
+  "factory": "container",
+  "nodeId": "multi",
+  "description": "Process every channel with a different child node",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/container/multi.md",
+    "tier": "BRIEF",
+    "lines": 11
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "channel-splitting-mechanism",
+      "category": "signal_path",
+      "question": "Confirm the multi container's channel model: total channels = sum of all children's channel counts. Each child receives a slice of the parent's channels via pointer offset (no copying). What happens if the parent has fewer channels than the sum of children? The interpreted version silently skips excess children -- confirm this.",
+      "context": "The channel splitting model is multi's defining behavior. The edge case of insufficient channels is important for user guidance."
+    },
+    {
+      "id": "child-channel-determination",
+      "category": "signal_path",
+      "question": "How does each child's channel count get determined in the interpreted MultiChannelNode? Is it from getCurrentChannelAmount() on each child? Can a child have a different channel count than others (e.g., child 1 = mono, child 2 = stereo)?",
+      "context": "Users need to know whether all children must have the same channel count or if asymmetric splits are possible."
+    },
+    {
+      "id": "event-handling",
+      "category": "signal_path",
+      "question": "Confirm that each child in a multi container receives a copy of the HiseEvent (same as split), not a shared reference.",
+      "context": "Event routing rules differ between container types. Multi should copy events since children process independent channel slices."
+    }
+  ],
+
+  "notes": "Multi is unique among containers: its total channel count is the SUM of children's channels, not the first child's count. Compiled version uses multiprocessor::Block with channelIndex counter and reinterpret_cast for frame processing. Existing phase3 doc mentions MS processing via routing.ms_encode/ms_decode before/after multi."
+}

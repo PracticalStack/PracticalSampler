@@ -1,0 +1,1 @@
+Returns the `[x, y]` coordinates of a point at a given pixel distance along the path from its start. If the distance exceeds the path length, returns the end point. Combine with `getLength()` to sample positions at fractional distances along the path.

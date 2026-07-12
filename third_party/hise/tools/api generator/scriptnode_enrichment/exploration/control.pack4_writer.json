@@ -1,0 +1,18 @@
+{
+  "factoryPath": "control.pack4_writer",
+  "nodes": [
+    { "id": "value1", "label": "Value1", "type": "parameter", "importance": 1.0, "description": "Value written to slider pack index 0" },
+    { "id": "value2", "label": "Value2", "type": "parameter", "importance": 1.0, "description": "Value written to slider pack index 1" },
+    { "id": "value3", "label": "Value3", "type": "parameter", "importance": 1.0, "description": "Value written to slider pack index 2" },
+    { "id": "value4", "label": "Value4", "type": "parameter", "importance": 1.0, "description": "Value written to slider pack index 3" },
+    { "id": "write", "label": "Write to Pack", "type": "process", "importance": 1.0, "description": "Calls SliderPackData::setValue(index, value) for each parameter" },
+    { "id": "sliderpack", "label": "SliderPack", "type": "external_data", "importance": 1.0, "description": "Target slider pack (auto-resized to 4 entries on connect)" }
+  ],
+  "edges": [
+    { "from": "value1", "to": "write", "type": "control", "label": "index 0" },
+    { "from": "value2", "to": "write", "type": "control", "label": "index 1" },
+    { "from": "value3", "to": "write", "type": "control", "label": "index 2" },
+    { "from": "value4", "to": "write", "type": "control", "label": "index 3" },
+    { "from": "write", "to": "sliderpack", "type": "signal", "label": "setValue" }
+  ]
+}

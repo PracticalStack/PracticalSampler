@@ -1,0 +1,142 @@
+{
+  "factoryPath": "filters.moog",
+  "factory": "filters",
+  "nodeId": "moog",
+  "description": "A filter node",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Filter Response",
+      "rationale": "Frequency sets the cutoff, Q controls resonance (self-oscillation possible on Moog-style filters), Gain for shelving/peaking modes if available.",
+      "parameters": [
+        {
+          "id": "Frequency",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0, "skew": 0.2299045622348785 },
+          "default": 1000.0,
+          "textConverter": "Frequency",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Q",
+          "range": { "min": 0.300000011920929, "max": 9.899999618530273, "step": 0.0, "skew": 0.2647178173065186 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Gain",
+          "range": { "min": -18.0, "max": 18.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Decibel",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Filter Configuration",
+      "rationale": "Mode selects the Moog filter variant (3 modes), Smoothing controls coefficient interpolation speed, Enabled toggles the filter on/off.",
+      "parameters": [
+        {
+          "id": "Mode",
+          "range": { "min": 0.0, "max": 2.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "76.nT6K8CxPYH..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.eTvStUFHP8Fako.U28FHP8FakMmBF8VcxABTuwVYyAPXiQWZ1UF.ADf...",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Smoothing",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 0.3010300099849701 },
+          "default": 0.009999999776482582,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Enabled",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "filterCoefficients": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/filters/moog.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "moog-mode-values",
+      "category": "conditional_logic",
+      "question": "Mode parameter has range 0-2 (3 discrete values). The longer TextToValueConverter (76 chars) suggests descriptive names. What do these correspond to? Possible: 24dB LP, 12dB LP, HP, or different Moog ladder tap points.",
+      "context": "The Moog filter is known for its distinctive 24dB/oct ladder topology. The 3 modes may represent different ladder configurations or filter types."
+    },
+    {
+      "id": "moog-vs-ladder",
+      "category": "signal_path",
+      "question": "Both filters.moog and filters.ladder exist. What is the difference between them? Are they different implementations of the Moog ladder filter, or fundamentally different algorithms? The ladder node has only 2 modes vs moog's 3.",
+      "context": "Users need clear guidance on when to choose moog vs ladder. This is a key seeAlso disambiguation."
+    },
+    {
+      "id": "moog-self-oscillation",
+      "category": "parameter_behaviour",
+      "question": "Moog-style ladder filters are known for self-oscillation at high resonance. Does Q at maximum (9.9) cause self-oscillation? Is there any nonlinear saturation to prevent runaway amplitude?",
+      "context": "Self-oscillation behaviour is a defining characteristic of Moog-style filters and important for synthesiser design."
+    },
+    {
+      "id": "moog-gain-effect",
+      "category": "parameter_behaviour",
+      "question": "Does the Gain parameter affect the Moog filter response, or is it ignored? Classic Moog ladder filters do not have a gain parameter.",
+      "context": "Users may waste time adjusting a non-functional parameter if Gain has no effect on Moog filter types."
+    },
+    {
+      "id": "description-accuracy",
+      "category": "description_accuracy",
+      "question": "The base description 'A filter node' is generic. The phase3 doc says 'mimics a classic moog filter'. Confirm the correct characterisation and whether it is a digital model of the Moog transistor ladder.",
+      "context": "The Moog name carries specific expectations about filter character (warm, saturating, 24dB/oct). The description should reflect whether this meets those expectations."
+    }
+  ],
+
+  "notes": "filters.moog and filters.ladder both reference the Moog ladder filter topology, creating potential user confusion. The phase3 doc for moog says 'mimics a classic moog filter' while ladder simply says 'A ladder filter'. C++ exploration must clarify the relationship. The longer TextToValueConverter for Mode (76 chars vs ladder's 51) suggests more descriptive mode names. References filter-base-architecture, smoothing-units, and enabled-bypass-behaviour gaps from filters.svf."
+}

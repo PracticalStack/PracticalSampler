@@ -1,0 +1,1 @@
+Returns the current value of the container itself. This is the container-level ScriptComponent value, not the values of dynamic children. Use the callback registered via `setValueCallback()` or ContainerChild's `getValue()` for child values.

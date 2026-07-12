@@ -1,0 +1,188 @@
+{
+  "factoryPath": "envelope.flex_ahdsr",
+  "factory": "envelope",
+  "nodeId": "flex_ahdsr",
+  "description": "A more advanced AHDSR with draggable curves & more playback modes",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": true,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": true,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Time Stages",
+      "rationale": "Define the duration of each time-based segment. All use the same millisecond range (0-30000ms) with identical skew, giving a wider maximum than the standard ahdsr (30s vs 10s).",
+      "parameters": [
+        {
+          "id": "Attack",
+          "range": { "min": 0.0, "max": 30000.0, "step": 0.0, "skew": 0.2560 },
+          "default": 5.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Hold",
+          "range": { "min": 0.0, "max": 30000.0, "step": 0.0, "skew": 0.2560 },
+          "default": 0.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Decay",
+          "range": { "min": 0.0, "max": 30000.0, "step": 0.0, "skew": 0.2560 },
+          "default": 100.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Release",
+          "range": { "min": 0.0, "max": 30000.0, "step": 0.0, "skew": 0.2560 },
+          "default": 300.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Level Targets",
+      "rationale": "AttackLevel and Sustain define the amplitude levels the envelope reaches at specific stages.",
+      "parameters": [
+        {
+          "id": "AttackLevel",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "NormalizedPercentage",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Sustain",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.5,
+          "textConverter": "NormalizedPercentage",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Curve Shapes",
+      "rationale": "Independent curve controls for attack, decay, and release segments. This is the key differentiator from the standard ahdsr which only has AttackCurve.",
+      "parameters": [
+        {
+          "id": "AttackCurve",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.5,
+          "textConverter": "NormalizedPercentage",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "DecayCurve",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.5,
+          "textConverter": "NormalizedPercentage",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "ReleaseCurve",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.5,
+          "textConverter": "NormalizedPercentage",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Playback Mode",
+      "rationale": "The Mode parameter selects between different envelope playback behaviours. The encoded text converter likely decodes to mode labels.",
+      "parameters": [
+        {
+          "id": "Mode",
+          "range": { "min": 0.0, "max": 2.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "64.nT6K8CxM4F..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.ST.Uxk1YmUlbJ3zazUlBL81avAPXiQWZ1UF.ADf...",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "NumParameters",
+      "defaultValue": 2,
+      "type": "integer",
+      "note": "Number of modulation output parameters (CV + Gate = 2). Set by envelope_base infrastructure."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": ["CV", "Gate"]
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": true,
+    "count": 2
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/envelope/flex_ahdsr.md",
+    "tier": "STUB",
+    "lines": 0
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "flex-envelope-engine",
+      "category": "signal_path",
+      "question": "What is the internal envelope computation engine? Does flex_ahdsr use a different state machine or sample-level algorithm compared to the standard ahdsr?",
+      "context": "The description says 'more advanced' and 'draggable curves' -- need to understand the implementation to describe differences from ahdsr."
+    },
+    {
+      "id": "mode-variants",
+      "category": "conditional_logic",
+      "question": "The Mode parameter has range 0-2 (3 values). What are the three playback modes and how does each change the envelope behaviour? The encoded text converter likely contains the mode labels.",
+      "context": "Mode is a key differentiator. Users need to know what each mode does to choose the right one."
+    },
+    {
+      "id": "curve-parameter-mapping",
+      "category": "parameter_behaviour",
+      "question": "How do the AttackCurve, DecayCurve, and ReleaseCurve parameters (each 0..1) map to the actual curve shape? Is the mapping the same as ahdsr's AttackCurve?",
+      "context": "Having three independent curve controls is the main feature. Users need to understand the curve mapping."
+    },
+    {
+      "id": "draggable-curves-ui",
+      "category": "description_accuracy",
+      "question": "The description mentions 'draggable curves'. Is this a UI feature where the user drags points on the envelope display, or does it refer to the curve parameters?",
+      "context": "If the envelope has a graphical drag editor, this is a significant UI feature that should be documented."
+    },
+    {
+      "id": "no-retrigger-gate-params",
+      "category": "parameter_behaviour",
+      "question": "Unlike the standard ahdsr, flex_ahdsr has no Retrigger or Gate parameters. How is retriggering handled? Is the gate always driven by MIDI note-on/off?",
+      "context": "Users switching from ahdsr may expect Retrigger and Gate controls."
+    }
+  ],
+
+  "notes": "flex_ahdsr is an enhanced version of ahdsr with three independent curve controls (Attack, Decay, Release) vs ahdsr's single AttackCurve. It also adds a Mode parameter with 3 options. The time ranges are larger (30s vs 10s). Like ahdsr, it inherits from envelope_base for dual CV+Gate output. No Retrigger or Gate parameters -- possibly handled differently."
+}

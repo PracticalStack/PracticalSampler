@@ -1,0 +1,1 @@
+Restores the complete modulator state from a base64 string previously obtained from `exportState`. This restores all attributes, bypass state, and child processors in a single call - useful for implementing effect locking or loading saved module configurations from disk.

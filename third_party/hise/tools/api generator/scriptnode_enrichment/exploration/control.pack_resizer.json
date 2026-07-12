@@ -1,0 +1,12 @@
+{
+  "factoryPath": "control.pack_resizer",
+  "nodes": [
+    { "id": "numsliders", "label": "NumSliders", "type": "parameter", "importance": 1.0, "description": "Target size for the slider pack (clamped to 1-128)" },
+    { "id": "resize", "label": "Resize", "type": "process", "importance": 1.0, "description": "Calls SliderPackData::setNumSliders with write lock" },
+    { "id": "sliderpack", "label": "SliderPack", "type": "external_data", "importance": 1.0, "description": "Connected slider pack whose size is modified" }
+  ],
+  "edges": [
+    { "from": "numsliders", "to": "resize", "type": "control", "label": null },
+    { "from": "resize", "to": "sliderpack", "type": "signal", "label": "setNumSliders" }
+  ]
+}

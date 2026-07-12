@@ -1,0 +1,1 @@
+Sets the timestretch playback ratio. A value of 1.0 means original speed, 2.0 means double speed (half duration), 0.5 means half speed (double duration). The ratio is limited to the range 0.5-2.0. A timestretch mode must be enabled via `Sampler.setTimestretchOptions()` before this has any effect.

@@ -1,0 +1,101 @@
+{
+  "className": "Threads",
+  "category": "namespace",
+  "description": "",
+  "methods": {
+    "getCurrentThread": {
+      "signature": "int getCurrentThread()",
+      "returnType": "int",
+      "description": "Returns the thread ID of the thread that is calling this method.",
+      "parameters": []
+    },
+    "getCurrentThreadName": {
+      "signature": "String getCurrentThreadName()",
+      "returnType": "String",
+      "description": "Returns the name of the current thread (for debugging purposes only!).",
+      "parameters": []
+    },
+    "getLockerThread": {
+      "signature": "int getLockerThread(int threadThatIsLocked)",
+      "returnType": "int",
+      "description": "Returns the thread ID of the thread the locks the given thread ID.",
+      "parameters": [
+        {
+          "name": "threadThatIsLocked",
+          "type": "int"
+        }
+      ]
+    },
+    "isAudioRunning": {
+      "signature": "bool isAudioRunning()",
+      "returnType": "bool",
+      "description": "Returns true if the audio callback is running or false if it's suspended during a load operation.",
+      "parameters": []
+    },
+    "isCurrentlyExporting": {
+      "signature": "bool isCurrentlyExporting()",
+      "returnType": "bool",
+      "description": "Returns true if the audio exporter is currently rendering the audio on a background thread.",
+      "parameters": []
+    },
+    "isLocked": {
+      "signature": "bool isLocked(int thread)",
+      "returnType": "bool",
+      "description": "Returns true if the given thread is currently locked.",
+      "parameters": [
+        {
+          "name": "thread",
+          "type": "int"
+        }
+      ]
+    },
+    "isLockedByCurrentThread": {
+      "signature": "bool isLockedByCurrentThread(int thread)",
+      "returnType": "bool",
+      "description": "Returns true if the given thread is currently locked by the current thread.",
+      "parameters": [
+        {
+          "name": "thread",
+          "type": "int"
+        }
+      ]
+    },
+    "killVoicesAndCall": {
+      "signature": "bool killVoicesAndCall(var functionToExecute)",
+      "returnType": "bool",
+      "description": "Kills all voices, suspends the audio processing and calls the given function on the loading thread. Returns true if the function was executed synchronously.",
+      "parameters": [
+        {
+          "name": "functionToExecute",
+          "type": "var"
+        }
+      ]
+    },
+    "startProfiling": {
+      "signature": "void startProfiling(var options, var finishCallback)",
+      "returnType": "void",
+      "description": "Starts a profiling session and calls the finishCallback when ready.",
+      "parameters": [
+        {
+          "name": "options",
+          "type": "var"
+        },
+        {
+          "name": "finishCallback",
+          "type": "var"
+        }
+      ]
+    },
+    "toString": {
+      "signature": "String toString(int thread)",
+      "returnType": "String",
+      "description": "Returns the name of the given string (for debugging purposes only!).",
+      "parameters": [
+        {
+          "name": "thread",
+          "type": "int"
+        }
+      ]
+    }
+  }
+}

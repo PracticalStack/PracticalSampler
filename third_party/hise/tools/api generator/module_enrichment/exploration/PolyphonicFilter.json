@@ -1,0 +1,44 @@
+{
+  "moduleId": "PolyphonicFilter",
+  "nodes": [
+    { "id": "audio_in", "type": "input", "label": "Audio In (per-voice or summed)", "importance": 1.0, "group": null, "description": "Voice audio buffer (poly) or summed buffer (mono)" },
+    { "id": "mode_param", "type": "parameter", "label": "Mode", "importance": 0.9, "group": "filter_config", "description": "Selects filter type (18 modes: LP, HP, shelf, peak, SVF, Moog, ladder, etc.)" },
+    { "id": "freq_param", "type": "parameter", "label": "Frequency", "importance": 0.9, "group": "filter_config", "description": "Cutoff/center frequency in Hz (20-20000, default 20000)" },
+    { "id": "q_param", "type": "parameter", "label": "Q", "importance": 0.8, "group": "filter_config", "description": "Resonance/bandwidth (0.3-8.0, default 1.0)" },
+    { "id": "gain_param", "type": "parameter", "label": "Gain", "importance": 0.7, "group": "filter_config", "description": "Filter gain in dB for shelf/peak modes (-18 to 18, default 0)" },
+    { "id": "freq_mod", "type": "modulation", "label": "Frequency Modulation", "importance": 0.8, "group": "modulation", "description": "Gain-mode chain that scales normalized frequency (0-1)" },
+    { "id": "bipolar_param", "type": "parameter", "label": "Bipolar Intensity", "importance": 0.6, "group": "modulation", "description": "Scales bipolar frequency offset (-1 to 1)" },
+    { "id": "bipolar_mod", "type": "modulation", "label": "Bipolar Freq Modulation", "importance": 0.6, "group": "modulation", "description": "Offset-mode chain for bidirectional frequency shift" },
+    { "id": "gain_mod", "type": "modulation", "label": "Gain Modulation", "importance": 0.5, "group": "modulation", "description": "Gain-mode chain that scales filter gain (shelf/peak only)" },
+    { "id": "q_mod", "type": "modulation", "label": "Q Modulation", "importance": 0.5, "group": "modulation", "description": "Gain-mode chain that scales Q value" },
+    { "id": "poly_decision", "type": "decision", "label": "Poly or Mono?", "importance": 0.7, "group": "routing", "description": "Routes to per-voice or summed processing based on polyMode" },
+    { "id": "freq_combine", "type": "process", "label": "Frequency Modulation Combine", "importance": 0.8, "group": "coefficient_calc", "description": "normalize(freq) + bipolarDelta, then * freqModValue, then denormalize" },
+    { "id": "coeff_update", "type": "process", "label": "Coefficient Update", "importance": 0.7, "group": "coefficient_calc", "description": "Recalculate filter coefficients if freq/gain/Q changed (dirty flag)" },
+    { "id": "filter_process", "type": "process", "label": "Filter Processing", "importance": 1.0, "group": "dsp", "description": "Per-sample filter applied in-place (topology depends on Mode)" },
+    { "id": "audio_out", "type": "output", "label": "Audio Out", "importance": 1.0, "group": null, "description": "Filtered audio output" }
+  ],
+  "edges": [
+    { "from": "audio_in", "to": "poly_decision", "type": "signal" },
+    { "from": "poly_decision", "to": "freq_combine", "type": "conditional", "label": "per-voice or mono sub-block" },
+    { "from": "freq_param", "to": "freq_combine", "type": "control" },
+    { "from": "freq_mod", "to": "freq_combine", "type": "control", "label": "multiply (gain mode)" },
+    { "from": "bipolar_param", "to": "freq_combine", "type": "control", "label": "scales offset" },
+    { "from": "bipolar_mod", "to": "freq_combine", "type": "control", "label": "add (offset mode)" },
+    { "from": "freq_combine", "to": "coeff_update", "type": "signal" },
+    { "from": "gain_param", "to": "coeff_update", "type": "control" },
+    { "from": "gain_mod", "to": "coeff_update", "type": "control", "label": "dB2gain(gain*(mod-1))" },
+    { "from": "q_param", "to": "coeff_update", "type": "control" },
+    { "from": "q_mod", "to": "coeff_update", "type": "control", "label": "multiply Q" },
+    { "from": "mode_param", "to": "filter_process", "type": "control", "label": "selects filter topology" },
+    { "from": "coeff_update", "to": "filter_process", "type": "signal" },
+    { "from": "audio_in", "to": "filter_process", "type": "signal" },
+    { "from": "filter_process", "to": "audio_out", "type": "signal" }
+  ],
+  "groups": [
+    { "id": "filter_config", "label": "Filter Configuration" },
+    { "id": "modulation", "label": "Modulation Chains" },
+    { "id": "routing", "label": "Poly/Mono Routing" },
+    { "id": "coefficient_calc", "label": "Coefficient Calculation" },
+    { "id": "dsp", "label": "Filter DSP" }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "factoryPath": "container.modchain",
+  "factory": "container",
+  "nodeId": "modchain",
+  "description": "a serial chain optimized for modulation sources",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "UI-only layout hint. Does not affect processing."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/container/modchain.md",
+    "tier": "BRIEF",
+    "lines": 13
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "control-rate-downsampling",
+      "category": "signal_path",
+      "question": "Confirm the wrap::fix<1, wrap::control_rate<T>> composition: (1) channels forced to 1 (mono), (2) sampleRate and blockSize divided by HISE_EVENT_RASTER (default 8, or 1 for FX plugins). What effective sample rate and block size do children see for a typical 44100Hz/512 block setup? (Expected: 5512.5Hz / 64 samples.)",
+      "context": "The reduced processing rate is modchain's key optimization. Users need to understand the actual control rate."
+    },
+    {
+      "id": "audio-isolation",
+      "category": "signal_path",
+      "question": "Confirm that modchain does NOT modify the parent's audio signal. The control_rate wrapper creates a separate mono controlBuffer and children process that buffer. The parent's audio passes through unmodified. Is this correct?",
+      "context": "Users must understand that modchain is for generating modulation signals, not processing audio."
+    },
+    {
+      "id": "frame-mode-interaction",
+      "category": "signal_path",
+      "question": "When modchain is nested inside a frame-based container (blockSize=1), the control_rate wrapper skips downsampling and only forces mono. Confirm this behavior and its practical implications -- the modulation chain then runs at full audio rate.",
+      "context": "Important edge case for nested container configurations."
+    },
+    {
+      "id": "hise-event-raster-fx-plugins",
+      "category": "performance",
+      "question": "When FRONTEND_IS_PLUGIN=1 (effect plugins), HISE_EVENT_RASTER=1, meaning no downsampling occurs. Confirm that modchain in an FX context runs at full audio rate (only the mono channel restriction applies).",
+      "context": "Users building FX plugins need to know that modchain's CPU savings are reduced in that context."
+    }
+  ],
+
+  "notes": "Modchain wraps DynamicSerialProcessor in wrap::fix<1, wrap::control_rate<T>>. This is a two-layer composition: fix<1> forces mono, control_rate reduces sample rate by HISE_EVENT_RASTER. The modchain itself is NOT a modulation source (isModulationSource=false); nodes inside it (like core.peak) produce the modulation output. The description in base data uses lowercase 'a' at start, which is a minor style issue. Phase3 doc mentions the typical pattern of using core.peak as the last child."
+}

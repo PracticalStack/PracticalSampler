@@ -1,0 +1,72 @@
+{
+  "targetId": "fx.reverb",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [819, 5975, 11501, 6176, 3050, 2097, 2370, 2992, 8596, 825, 1527, 2906, 3127, 4216, 4465, 14285, 10839, 11538, 10750, 11421, 1507, 2310, 4119, 14573, 14228, 3272],
+  "insights": [
+    {
+      "type": "PATTERN",
+      "title": "Scripting access to convolution node via external audio file slot",
+      "summary": "The filters.convolution node (which wraps the stock Convolution Reverb) cannot be accessed directly from script — this would prevent later C++ compilation of the network. Instead, set the audio file slot to 'External' in the node UI, then use `Synth.getAudioSampleProcessor(\"ScriptFX\")` to get the parent ScriptFX reference and call `getAudioFile(0)` on it. This pattern works identically when the network is compiled to a hardcoded C++ FX module.",
+      "sources": ["tid:14573"],
+      "verify": true,
+      "verify_hint": "Confirm that the external slot button exists in the filters.convolution node UI and that the getAudioFile(index) call propagates correctly to the compiled C++ node."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "IRs must be loaded into pool before export or setFile() calls",
+      "summary": "Calling `AudioSampleProcessor.setFile()` with embedded IR files requires that `Engine.loadAudioFilesIntoPool()` is called first. Without this, embedded audio resources are missing in the exported plugin. HISE now throws a script error to catch this case. Do not use `Engine.findFiles()` — IR files do not exist on the user's system; use references returned from `loadAudioFilesIntoPool()` instead.",
+      "sources": ["tid:819"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Correct scripting path to load an IR into a scriptnode convolution reverb",
+      "summary": "The pattern is: (1) use a `filters.convolution` node, not `core.file_player`; (2) get the audio processor reference via `Synth.getAudioSampleProcessor(\"ScriptFXName\")`; (3) call `setFile(relativePath)` on it. There is no need to call `getAudioFile(1)` as an intermediate step.",
+      "sources": ["tid:11501"],
+      "verify": true,
+      "verify_hint": "Verify that Synth.getAudioSampleProcessor on a ScriptFX node name returns a valid reference and setFile accepts the relative AudioFiles path."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Reverb always spreads a hard-panned signal across the full stereo field",
+      "summary": "The fx.reverb (and the underlying algorithm) always creates a stereo output from a mono or panned input — this is expected diffusion behaviour, not a bug. A hard-panned signal will produce reverb that is spread across the entire stereo field. Confirmed by the author as intentional. Use a goniometer on channels 3+4 to verify the stereo field if in doubt.",
+      "sources": ["tid:4465"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "Clicks on IR change in convolution reverb acknowledged but unresolved",
+      "summary": "Switching impulse responses during playback produces audible clicks. The author acknowledged this was addressed at some point but regressed. Flagged as a known TODO item as of 2020. No built-in crossfade or gapless switch exists; users should plan IR changes during silence if clicks are a problem.",
+      "sources": ["tid:2906"],
+      "verify": true,
+      "verify_hint": "Check if this has been resolved in recent HISE builds by switching IRs during playback."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Reverb room size has no simple mapping to decay time in seconds",
+      "summary": "The Room Size parameter does not have a linear or simple transfer function to decay time in seconds — the actual decay also depends on width and damping. The author's recommended approaches are: (1) run an impulse through the reverb, measure the time to -60 dB in a wave editor for several Room Size values, then interpolate; or (2) build a fantasy transfer function that matches perception.",
+      "sources": ["tid:825"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "getCurrentLevel() on Convolution Reverb does not expose separate wet/dry meters",
+      "summary": "There is no built-in scripting API to read the wet and dry levels independently from the Convolution Reverb. `getCurrentLevel(0/1)` returns the post-mix output, not the wet signal alone. Source inspection confirms: dryMeter = input signal, wetMeter = output signal. A workaround is to subtract the known dry level from the output reading, or to place a meter module before the reverb.",
+      "sources": ["tid:3272"],
+      "verify": true,
+      "verify_hint": "Check whether a wet-only meter was added to the scripting API for Convolution Reverb after 2020."
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Using compressor reduction to drive reverb ducking without a true sidechain",
+      "summary": "Without a proper sidechain implementation in HISE, a reverb duck-on-transient effect can be approximated by: routing the compressor so its audio output goes nowhere, then using the compressor's GainReduction modulation output to drive a `simple_gain` node placed on the reverb's wet path. This was noted by a trusted community member as a workable pattern.",
+      "sources": ["tid:2097"],
+      "verify": true,
+      "verify_hint": "Verify that the compressor modulation output can target a gain on a send/wet chain and that the routing produces the expected pumping effect."
+    }
+  ]
+}

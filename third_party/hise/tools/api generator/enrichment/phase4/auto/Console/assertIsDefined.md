@@ -1,0 +1,1 @@
+Throws a script error if `value` is `undefined` or void. Commonly used after Builder API module creation or module lookups to catch failures immediately rather than letting `undefined` propagate through subsequent method calls.

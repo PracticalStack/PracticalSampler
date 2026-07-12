@@ -1,0 +1,1 @@
+Returns the channel pressure (monophonic aftertouch) value from this event. Only meaningful when the event type is Aftertouch.

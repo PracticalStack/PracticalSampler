@@ -1,0 +1,160 @@
+{
+  "0": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": [
+      {"type": "REPL", "expression": "usedValues.length", "value": 1, "delay": 0},
+      {"type": "REPL", "expression": "values.length", "value": 4, "delay": 0}
+    ],
+    "notes": "After one getNextValue() call, one value moves from values to usedValues"
+  },
+  "1": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": [
+      {"type": "log-output", "values": ["Preset4"]}
+    ],
+    "notes": null
+  },
+  "2": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "LAF paint routine with namespace icon cache, compile-only"
+  },
+  "3": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "SNEX C++ template code, not HiseScript",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "4": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "CurveEq", "name": "Parametriq EQ1"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "CurveEq display buffer source - may need skip if no display buffer available"
+  },
+  "5": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptComboBox", "id": "cmbSamples1"}
+    ],
+    "verifyScript": null,
+    "notes": "getAllComponents('cmbSamples') regex match. No sample maps in test env so items empty."
+  },
+  "6": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "loadImage with {PROJECT_FOLDER} path - file doesn't exist in test environment",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "7": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "AudioLooper", "name": "AudioLoopPlayer1"}
+    ],
+    "components": [
+      {"type": "ScriptLabel", "id": "FileNameLabel"}
+    ],
+    "verifyScript": null,
+    "notes": "Broadcaster watches AudioFile changes, compile-only test"
+  },
+  "8": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": [
+      {"type": "log-output", "values": ["FIRST: 2", "SECOND: 2"]}
+    ],
+    "notes": "Priority 2 fires before priority 1"
+  },
+  "9": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"}
+    ],
+    "verifyScript": null,
+    "notes": "Fixed: added variable declarations for myValue and myKnob to resolve undefined references"
+  },
+  "10": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "StreamingSampler", "name": "Sampler1"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "isNoteNumberMapped returns false for all notes (no samples loaded), but compiles fine"
+  },
+  "11": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "StreamingSampler", "name": "Sampler1"}
+    ],
+    "components": [
+      {"type": "ScriptComboBox", "id": "cmbSampleMap"}
+    ],
+    "verifyScript": null,
+    "notes": "No sample maps in test env but compiles fine"
+  },
+  "12": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Requires 6 Constant modulators in sub-chains of sound generators - cannot be set up via Builder API",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "13": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Builder API creates its own modules. restoreState with base64 may warn but should compile."
+  },
+  "14": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "LAF drawThumbnailRuler paint routine, compile-only"
+  }
+}

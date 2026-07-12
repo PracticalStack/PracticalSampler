@@ -1,0 +1,3 @@
+Returns an array of MessageHolder objects for all MIDI events in the current sequence's current track. Each MessageHolder wraps a note number, velocity, channel, and timestamp. Timestamps are in samples by default or in ticks if `setUseTimestampInTicks(true)` was called. Note-on and note-off events are paired with consecutive event IDs, so you can find the matching note-off for a note-on by comparing `getEventId()`. Call `flushMessageList()` after processing to apply changes.
+
+> [!Warning:Never reorder note-on/note-off pairs] Never reorder note-on/note-off pairs in the event list - if a note-off appears before its matching note-on, playback behaviour will be unpredictable. Use `Engine.getQuarterBeatsForSamples()` and related helpers to convert between timestamp domains.

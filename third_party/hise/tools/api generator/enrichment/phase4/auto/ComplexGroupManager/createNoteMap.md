@@ -1,0 +1,1 @@
+Builds a note-to-group lookup table for the specified layer by scanning all samples in the current sample map. The resulting map is used by `isNoteNumberMapped()` for fast per-note queries. Call this again after loading a new sample map to keep the lookup current.

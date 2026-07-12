@@ -1,0 +1,271 @@
+{
+  "moduleId": "LFO",
+  "prettyName": "LFO Modulator",
+  "type": "Modulator",
+  "subtype": "TimeVariantModulator",
+  "category": "generator, oscillator",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": true,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "TableProcessor",
+      "signalFlowRole": "Lookup table step in signal path - provides user-drawn waveform when WaveformType is Custom"
+    },
+    {
+      "name": "SliderPackProcessor",
+      "signalFlowRole": "Slider pack data source - provides step values when WaveformType is Steps"
+    },
+    {
+      "name": "DisplayBufferSource",
+      "signalFlowRole": "skip - UI communication point for waveform display, not in signal path"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Oscillator",
+      "rationale": "Core waveform generation parameters that determine the LFO shape and speed",
+      "parameters": [
+        {
+          "id": "Frequency",
+          "name": "Frequency",
+          "range": { "min": 0.01, "max": 40.0, "step": 0.0 },
+          "default": "dynamic (3.0 Hz free, Eighth note synced)",
+          "description": "The modulation frequency",
+          "composite": {
+            "type": "tempoSyncMux",
+            "details": {
+              "syncParam": "TempoSync",
+              "externalInput": "HostBPM"
+            }
+          },
+          "modChain": {
+            "name": "LFO Frequency Mod",
+            "chainIndex": 1,
+            "constrainer": "*"
+          }
+        },
+        {
+          "id": "WaveformType",
+          "name": "WaveformType",
+          "range": { "min": 1.0, "max": 7.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "The waveform for the oscillator",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "PhaseOffset",
+          "name": "PhaseOffset",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "The initial phase offset of the LFO",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Tempo & Sync",
+      "rationale": "Parameters controlling tempo synchronisation and clock behaviour",
+      "parameters": [
+        {
+          "id": "TempoSync",
+          "name": "TempoSync",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Enables sync to host tempo",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "SyncToMasterClock",
+          "name": "SyncToMasterClock",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Sync the LFO to the master clock",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Triggering",
+      "rationale": "Parameters controlling how the LFO responds to note events",
+      "parameters": [
+        {
+          "id": "Legato",
+          "name": "Legato",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Disables retriggering of the LFO if multiple keys are pressed",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "IgnoreNoteOn",
+          "name": "IgnoreNoteOn",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Free run mode - does not reset the LFO phase on note on",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Envelope",
+      "rationale": "Fade-in envelope that ramps the LFO intensity after each note trigger",
+      "parameters": [
+        {
+          "id": "FadeIn",
+          "name": "FadeIn",
+          "range": { "min": 0.0, "max": 3000.0, "step": 0.0 },
+          "default": 1000.0,
+          "description": "Fade in time after each key press",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Output",
+      "rationale": "Parameters shaping the final output signal",
+      "parameters": [
+        {
+          "id": "SmoothingTime",
+          "name": "SmoothingTime",
+          "range": { "min": 0.0, "max": 1000.0, "step": 0.0 },
+          "default": 5.0,
+          "description": "Smoothing time in milliseconds to reduce discontinuities in the modulation signal",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "LoopEnabled",
+          "name": "LoopEnabled",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Enables oscillator looping",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Step Sequencer",
+      "rationale": "Parameters specific to the Steps waveform mode",
+      "parameters": [
+        {
+          "id": "NumSteps",
+          "name": "NumSteps",
+          "range": { "min": 1.0, "max": 128.0, "step": 1.0 },
+          "default": 16.0,
+          "description": "Number of steps for the step sequencer",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "standaloneModChains": [
+    {
+      "name": "LFO Intensity Mod",
+      "chainIndex": 0,
+      "modulationMode": "gain",
+      "constrainer": "*",
+      "note": "Scales the LFO output intensity. No linked parameter - applied as a post-processing multiply on the final output."
+    }
+  ],
+
+  "disabledModChains": [],
+
+  "compositeBlocks": [
+    {
+      "type": "modMultiply",
+      "param": "Frequency",
+      "details": {
+        "chainName": "LFO Frequency Mod",
+        "chainIndex": 1,
+        "constrainer": "*"
+      }
+    },
+    {
+      "type": "tempoSyncMux",
+      "param": "Frequency",
+      "details": {
+        "syncParam": "TempoSync",
+        "externalInput": "HostBPM"
+      }
+    }
+  ],
+
+  "gaps": [
+    {
+      "id": "signal-path-order",
+      "category": "signal_path",
+      "question": "What is the complete processing order from waveform generation through to modulation output? Specifically: where does fade-in apply, where does smoothing apply, and where does the intensity chain apply relative to the waveform calculation?",
+      "context": "The pseudo-code must show the correct stage ordering"
+    },
+    {
+      "id": "waveform-generation",
+      "category": "signal_path",
+      "question": "How are the different waveforms generated? Are they lookup tables, computed per-sample, or a mix? How does the Custom waveform use the TableProcessor?",
+      "context": "Determines whether to show waveform generation as a single node or expand per type"
+    },
+    {
+      "id": "mode-dependent-output",
+      "category": "conditional_logic",
+      "question": "How does the modulation mode (Gain/Pitch/Pan/Global) affect the output calculation? Is there bipolar vs unipolar behaviour?",
+      "context": "The LFO output semantics change based on where it is placed in the module tree"
+    },
+    {
+      "id": "tempo-sync-mechanism",
+      "category": "parameter_behavior",
+      "question": "When TempoSync is enabled, how does the Frequency parameter change meaning? How does SyncToMasterClock interact with TempoSync?",
+      "context": "Users need to understand the tempo sync system to set up rhythmic modulation"
+    },
+    {
+      "id": "note-trigger-behaviour",
+      "category": "parameter_behavior",
+      "question": "How do Legato, IgnoreNoteOn, and the fade-in interact? What happens on noteOn and noteOff?",
+      "context": "Triggering behaviour is critical for understanding LFO phase and envelope reset"
+    },
+    {
+      "id": "loop-behaviour",
+      "category": "parameter_behavior",
+      "question": "What happens when LoopEnabled is off? Does the LFO stop at the end of one cycle? Does this differ by waveform type?",
+      "context": "Non-looping LFO is used as a one-shot envelope; behaviour must be documented"
+    },
+    {
+      "id": "steps-mode-detail",
+      "category": "interface_usage",
+      "question": "How does the Steps waveform mode read from the SliderPackProcessor? Is there interpolation between steps?",
+      "context": "Step sequencer mode is a distinct sub-feature that needs separate documentation"
+    },
+    {
+      "id": "frequency-chain-application",
+      "category": "parameter_behavior",
+      "question": "How often is the frequency modulation chain sampled? Is it per-sample or downsampled?",
+      "context": "Affects the accuracy of FM-style modulation"
+    },
+    {
+      "id": "performance",
+      "category": "performance",
+      "question": "Is the LFO calculated at audio rate or at a downsampled control rate? Are there any expensive operations?",
+      "context": "CPU profile baseline tier"
+    }
+  ],
+
+  "notes": "Complex TimeVariantModulator with 7 waveform modes, two modulation chains, tempo sync, and a step sequencer mode. The Frequency parameter has both a tempoSyncMux and a modMultiply composite - one of only three parameters in the entire module set with a tempoSyncIndex. The IntensityChain has no parameterIndex, making it a standalone modulation chain. This module is monophonic - all voices share the same LFO output."
+}

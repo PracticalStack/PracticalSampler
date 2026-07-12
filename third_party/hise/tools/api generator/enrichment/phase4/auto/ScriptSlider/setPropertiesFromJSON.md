@@ -1,0 +1,1 @@
+Applies multiple slider properties from one JSON object. `mode` is applied first for ScriptSlider, then remaining properties are applied in property order, which helps avoid range and format mismatches during restore.

@@ -1,0 +1,149 @@
+{
+  "moduleId": "ChokeGroupProcessor",
+  "nodes": [
+    {
+      "id": "midi_in",
+      "type": "input",
+      "label": "MIDI Event In",
+      "importance": 1.0,
+      "description": "Incoming MIDI event (note-on, note-off, CC, etc.)"
+    },
+    {
+      "id": "all_notes_off",
+      "type": "decision",
+      "label": "All Notes Off?",
+      "importance": 0.5,
+      "description": "Clears active and sustained event stacks on all-notes-off message"
+    },
+    {
+      "id": "sustain_pedal",
+      "type": "process",
+      "label": "Sustain Pedal Tracking",
+      "importance": 0.6,
+      "description": "Tracks CC#64 state; clears sustained events on pedal release"
+    },
+    {
+      "id": "key_range_filter",
+      "type": "decision",
+      "label": "Key Range Filter",
+      "importance": 0.9,
+      "group": "filtering",
+      "description": "Checks note-on note number (including transpose) against LoKey-HiKey range; ignores out-of-range notes"
+    },
+    {
+      "id": "lo_key_param",
+      "type": "parameter",
+      "label": "LoKey",
+      "importance": 0.8,
+      "group": "filtering"
+    },
+    {
+      "id": "hi_key_param",
+      "type": "parameter",
+      "label": "HiKey",
+      "importance": 0.8,
+      "group": "filtering"
+    },
+    {
+      "id": "event_tracker",
+      "type": "process",
+      "label": "Event Tracker",
+      "importance": 0.8,
+      "group": "choke_system",
+      "description": "Maintains activeEvents and sustainedEvents stacks; note-ons added to active, note-offs moved from active to sustained"
+    },
+    {
+      "id": "choke_group_param",
+      "type": "parameter",
+      "label": "ChokeGroup",
+      "importance": 1.0,
+      "group": "choke_system"
+    },
+    {
+      "id": "choke_broadcast",
+      "type": "process",
+      "label": "Choke Broadcast",
+      "importance": 1.0,
+      "group": "choke_system",
+      "description": "Calls EventIdHandler.sendChokeMessage() which notifies all other ChokeListeners in the same group"
+    },
+    {
+      "id": "event_id_handler",
+      "type": "external",
+      "label": "EventIdHandler Registry",
+      "importance": 0.7,
+      "group": "choke_system",
+      "description": "Global listener registry on MainController; matches ChokeListeners by group number"
+    },
+    {
+      "id": "choke_receive",
+      "type": "process",
+      "label": "chokeMessageSent()",
+      "importance": 1.0,
+      "group": "voice_kill",
+      "description": "Called by EventIdHandler when another processor in the same group triggers a choke; kills or releases all tracked voices"
+    },
+    {
+      "id": "kill_voice_param",
+      "type": "parameter",
+      "label": "KillVoice",
+      "importance": 0.9,
+      "group": "voice_kill"
+    },
+    {
+      "id": "kill_decision",
+      "type": "decision",
+      "label": "Kill or Release?",
+      "importance": 0.9,
+      "group": "voice_kill",
+      "description": "KillVoice=on: instant kill via killAllVoicesWithNoteNumber(); KillVoice=off: synthetic note-off via noteOff()"
+    },
+    {
+      "id": "owner_synth",
+      "type": "external",
+      "label": "Owner Synth",
+      "importance": 0.8,
+      "group": "voice_kill",
+      "description": "The parent ModulatorSynth whose voices are killed or released"
+    },
+    {
+      "id": "midi_out",
+      "type": "output",
+      "label": "MIDI Event Out",
+      "importance": 1.0,
+      "description": "Original event passed through (ignored flag set on out-of-range note-ons)"
+    }
+  ],
+  "edges": [
+    { "from": "midi_in", "to": "all_notes_off", "type": "signal" },
+    { "from": "all_notes_off", "to": "midi_out", "type": "conditional", "label": "all-notes-off (clear stacks, return)" },
+    { "from": "all_notes_off", "to": "sustain_pedal", "type": "signal", "label": "not all-notes-off" },
+    { "from": "sustain_pedal", "to": "key_range_filter", "type": "signal" },
+    { "from": "lo_key_param", "to": "key_range_filter", "type": "control" },
+    { "from": "hi_key_param", "to": "key_range_filter", "type": "control" },
+    { "from": "key_range_filter", "to": "midi_out", "type": "conditional", "label": "out-of-range (ignored)" },
+    { "from": "key_range_filter", "to": "event_tracker", "type": "conditional", "label": "in-range" },
+    { "from": "choke_group_param", "to": "event_tracker", "type": "control", "label": "tracking only when group != 0" },
+    { "from": "event_tracker", "to": "choke_broadcast", "type": "signal", "label": "note-on triggers broadcast" },
+    { "from": "choke_broadcast", "to": "event_id_handler", "type": "signal" },
+    { "from": "event_id_handler", "to": "choke_receive", "type": "signal", "label": "notifies matching group listeners" },
+    { "from": "choke_receive", "to": "kill_decision", "type": "signal" },
+    { "from": "kill_voice_param", "to": "kill_decision", "type": "control" },
+    { "from": "kill_decision", "to": "owner_synth", "type": "conditional", "label": "kill or note-off" },
+    { "from": "choke_broadcast", "to": "midi_out", "type": "signal", "label": "event passthrough" }
+  ],
+  "groups": [
+    {
+      "id": "filtering",
+      "label": "Key Range Filtering"
+    },
+    {
+      "id": "choke_system",
+      "label": "Choke Group System"
+    },
+    {
+      "id": "voice_kill",
+      "label": "Voice Kill / Release"
+    }
+  ]
+}

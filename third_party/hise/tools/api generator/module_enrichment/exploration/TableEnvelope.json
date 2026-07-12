@@ -1,0 +1,323 @@
+{
+  "moduleId": "TableEnvelope",
+  "nodes": [
+    {
+      "id": "note_on",
+      "label": "Note On",
+      "type": "input",
+      "importance": 0.8,
+      "group": "lifecycle",
+      "description": "MIDI note-on triggers startVoice(), initializes per-voice state"
+    },
+    {
+      "id": "note_off",
+      "label": "Note Off",
+      "type": "input",
+      "importance": 0.8,
+      "group": "lifecycle",
+      "description": "MIDI note-off triggers stopVoice(), captures releaseGain and transitions to RELEASE"
+    },
+    {
+      "id": "attack_mod_chain",
+      "label": "AttackTimeModulation",
+      "type": "modulation",
+      "importance": 0.6,
+      "group": "modulation",
+      "description": "VoiceStartModulator chain evaluated once at note-on; scales attack time"
+    },
+    {
+      "id": "release_mod_chain",
+      "label": "ReleaseTimeModulation",
+      "type": "modulation",
+      "importance": 0.6,
+      "group": "modulation",
+      "description": "VoiceStartModulator chain evaluated once at note-on; scales release time"
+    },
+    {
+      "id": "attack_time",
+      "label": "Attack",
+      "type": "parameter",
+      "importance": 0.7,
+      "group": "parameters",
+      "description": "Attack time in ms (1-20000). Converted to uptime delta via 512 / (ms * controlRate / 1000)"
+    },
+    {
+      "id": "release_time",
+      "label": "Release",
+      "type": "parameter",
+      "importance": 0.7,
+      "group": "parameters",
+      "description": "Release time in ms (1-20000). Converted to uptime delta via 512 / (ms * controlRate / 1000)"
+    },
+    {
+      "id": "monophonic",
+      "label": "Monophonic",
+      "type": "parameter",
+      "importance": 0.4,
+      "group": "parameters",
+      "description": "Enables monophonic mode with single shared voice state"
+    },
+    {
+      "id": "retrigger",
+      "label": "Retrigger",
+      "type": "parameter",
+      "importance": 0.4,
+      "group": "parameters",
+      "description": "When monophonic, restarts envelope on new notes via RETRIGGER glide state"
+    },
+    {
+      "id": "skip_attack_decision",
+      "label": "Attack ~0?",
+      "type": "decision",
+      "importance": 0.5,
+      "group": "attack_phase",
+      "description": "If attack==0 or modulated attack time near zero (modValue>998), skip to SUSTAIN at 1.0"
+    },
+    {
+      "id": "attack_table_sweep",
+      "label": "Attack Table Sweep",
+      "type": "process",
+      "importance": 0.9,
+      "group": "attack_phase",
+      "description": "Per-sample: uptime += attackDelta * attackModValue; value = attackTable[uptime/512]. Sweeps table left-to-right over Attack time"
+    },
+    {
+      "id": "attack_table",
+      "label": "Attack Table (Table 0)",
+      "type": "external",
+      "importance": 0.8,
+      "group": "attack_phase",
+      "description": "SampleLookupTable with 512 entries, user-drawn attack shape. X=time(0-1), Y=amplitude(0-1)"
+    },
+    {
+      "id": "attack_end_decision",
+      "label": "Attack End Check",
+      "type": "decision",
+      "importance": 0.5,
+      "group": "attack_phase",
+      "description": "When uptime>=512: if lastValue<=0.01 (poly only), go to RELEASE; otherwise go to SUSTAIN"
+    },
+    {
+      "id": "sustain_hold",
+      "label": "Sustain Hold",
+      "type": "process",
+      "importance": 0.7,
+      "group": "sustain_phase",
+      "description": "Holds current_value (last attack table value) unchanged until note-off"
+    },
+    {
+      "id": "retrigger_glide",
+      "label": "Retrigger Glide",
+      "type": "process",
+      "importance": 0.4,
+      "group": "attack_phase",
+      "description": "Monophonic only: glides current_value toward attack table start at 0.005/sample, then enters ATTACK"
+    },
+    {
+      "id": "release_capture",
+      "label": "Capture Release Gain",
+      "type": "process",
+      "importance": 0.7,
+      "group": "release_phase",
+      "description": "On note-off: releaseGain = current_value, uptime reset to 0"
+    },
+    {
+      "id": "release_table_sweep",
+      "label": "Release Table Sweep",
+      "type": "process",
+      "importance": 0.9,
+      "group": "release_phase",
+      "description": "Per-sample: uptime += releaseDelta * releaseModValue; value = releaseGain * releaseTable[uptime/512]"
+    },
+    {
+      "id": "release_table",
+      "label": "Release Table (Table 1)",
+      "type": "external",
+      "importance": 0.8,
+      "group": "release_phase",
+      "description": "SampleLookupTable with 512 entries, user-drawn release shape. Default: (0,1)->(1,0). X=time(0-1), Y=gain multiplier(0-1)"
+    },
+    {
+      "id": "idle",
+      "label": "IDLE (voice off)",
+      "type": "output",
+      "importance": 0.3,
+      "group": "release_phase",
+      "description": "When release uptime>=512: value=0, state=IDLE, voice can be reclaimed"
+    },
+    {
+      "id": "mod_output",
+      "label": "Modulation Output",
+      "type": "output",
+      "importance": 0.8,
+      "group": null,
+      "description": "Per-sample envelope value written to internalBuffer, applied as gain/pitch/pan modulation"
+    }
+  ],
+  "edges": [
+    {
+      "from": "note_on",
+      "to": "attack_mod_chain",
+      "type": "signal",
+      "label": "evaluate mod chains"
+    },
+    {
+      "from": "note_on",
+      "to": "skip_attack_decision",
+      "type": "signal",
+      "label": null
+    },
+    {
+      "from": "attack_mod_chain",
+      "to": "attack_table_sweep",
+      "type": "control",
+      "label": "attackModValue (per-voice)"
+    },
+    {
+      "from": "release_mod_chain",
+      "to": "release_table_sweep",
+      "type": "control",
+      "label": "releaseModValue (per-voice)"
+    },
+    {
+      "from": "attack_time",
+      "to": "attack_table_sweep",
+      "type": "control",
+      "label": "attackUptimeDelta"
+    },
+    {
+      "from": "release_time",
+      "to": "release_table_sweep",
+      "type": "control",
+      "label": "releaseUptimeDelta"
+    },
+    {
+      "from": "skip_attack_decision",
+      "to": "sustain_hold",
+      "type": "conditional",
+      "label": "attack ~0: skip to sustain at 1.0"
+    },
+    {
+      "from": "skip_attack_decision",
+      "to": "attack_table_sweep",
+      "type": "conditional",
+      "label": "attack > 0: begin sweep"
+    },
+    {
+      "from": "attack_table",
+      "to": "attack_table_sweep",
+      "type": "signal",
+      "label": "table lookup"
+    },
+    {
+      "from": "attack_table_sweep",
+      "to": "attack_end_decision",
+      "type": "signal",
+      "label": "uptime >= 512"
+    },
+    {
+      "from": "attack_end_decision",
+      "to": "sustain_hold",
+      "type": "conditional",
+      "label": "lastValue > 0.01 or mono"
+    },
+    {
+      "from": "attack_end_decision",
+      "to": "release_capture",
+      "type": "conditional",
+      "label": "lastValue <= 0.01 (poly): one-shot"
+    },
+    {
+      "from": "sustain_hold",
+      "to": "release_capture",
+      "type": "signal",
+      "label": "note-off received"
+    },
+    {
+      "from": "note_off",
+      "to": "release_capture",
+      "type": "signal",
+      "label": null
+    },
+    {
+      "from": "release_capture",
+      "to": "release_table_sweep",
+      "type": "signal",
+      "label": "releaseGain captured"
+    },
+    {
+      "from": "release_table",
+      "to": "release_table_sweep",
+      "type": "signal",
+      "label": "table lookup"
+    },
+    {
+      "from": "release_table_sweep",
+      "to": "idle",
+      "type": "signal",
+      "label": "uptime >= 512"
+    },
+    {
+      "from": "attack_table_sweep",
+      "to": "mod_output",
+      "type": "signal",
+      "label": "per-sample value"
+    },
+    {
+      "from": "sustain_hold",
+      "to": "mod_output",
+      "type": "signal",
+      "label": "held value"
+    },
+    {
+      "from": "release_table_sweep",
+      "to": "mod_output",
+      "type": "signal",
+      "label": "per-sample value"
+    },
+    {
+      "from": "monophonic",
+      "to": "retrigger_glide",
+      "type": "control",
+      "label": "enables mono state"
+    },
+    {
+      "from": "retrigger",
+      "to": "retrigger_glide",
+      "type": "control",
+      "label": "enables retrigger on legato"
+    },
+    {
+      "from": "retrigger_glide",
+      "to": "attack_table_sweep",
+      "type": "signal",
+      "label": "glide complete, begin attack"
+    }
+  ],
+  "groups": [
+    {
+      "id": "lifecycle",
+      "label": "Voice Lifecycle"
+    },
+    {
+      "id": "modulation",
+      "label": "Time Modulation Chains"
+    },
+    {
+      "id": "parameters",
+      "label": "Parameters"
+    },
+    {
+      "id": "attack_phase",
+      "label": "Attack Phase"
+    },
+    {
+      "id": "sustain_phase",
+      "label": "Sustain Phase"
+    },
+    {
+      "id": "release_phase",
+      "label": "Release Phase"
+    }
+  ]
+}

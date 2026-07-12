@@ -1,0 +1,93 @@
+{
+  "factoryPath": "core.snex_node",
+  "factory": "core",
+  "nodeId": "snex_node",
+  "description": "A generic SNEX node with the complete callback set",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "ClassId",
+      "defaultValue": "",
+      "type": "string",
+      "note": "Selects the SNEX class to compile and run. Maps to a .h file in DspNetworks/code_library/snex_nodes/."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/snex_node.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "callback-set",
+      "category": "signal_path",
+      "question": "The SNEX node provides the 'complete callback set'. Which callbacks are required and which are optional? Confirm: prepare, reset, handleHiseEvent, process, processFrame are required; handleModulation, setExternalData, getPlotValue are optional.",
+      "context": "Users writing SNEX code need to know exactly which functions must be defined."
+    },
+    {
+      "id": "parameter-discovery",
+      "category": "parameter_behaviour",
+      "question": "Parameters are defined dynamically by the SNEX code. How are they discovered -- by the setParameter<P> template method or by naming convention (setXxx)? What is the maximum parameter count?",
+      "context": "Users need to understand how to define parameters in their SNEX class."
+    },
+    {
+      "id": "complex-data-dynamic",
+      "category": "signal_path",
+      "question": "The ComplexData section shows empty slots for Tables, SliderPacks, AudioFiles, Filters, and DisplayBuffers. Are these dynamically allocated based on what the SNEX code requests via setExternalData?",
+      "context": "The base JSON shows zero slots but the SNEX code can use external data."
+    },
+    {
+      "id": "modulation-output",
+      "category": "signal_path",
+      "question": "ModulationTargets is present (empty). Does snex_node support modulation output via handleModulation()? The SNEX overview confirms this is optional. Is the output normalised 0-1?",
+      "context": "Users need to know if they can use snex_node as a modulation source."
+    },
+    {
+      "id": "polyphony-limitation",
+      "category": "description_accuracy",
+      "question": "The SNEX overview states snex_node is monophonic only (isPolyphonic() returns false). Confirm this is correct and that PolyData cannot be used in snex_node SNEX code.",
+      "context": "Important limitation that users must understand before choosing snex_node vs snex_osc for polyphonic use."
+    }
+  ],
+
+  "notes": "snex_node is the most flexible SNEX node type, providing the complete callback set for arbitrary DSP processing. Parameters, external data, and modulation output are all defined dynamically by the user's SNEX code. The node is monophonic (no IsPolyphonic flag). The base JSON shows no parameters because they are defined by the user's code. ModulationTargets is present but empty, indicating optional modulation output support. The ClassId property selects which SNEX class file to load. See snex-overview.md for full callback signatures and code templates."
+}

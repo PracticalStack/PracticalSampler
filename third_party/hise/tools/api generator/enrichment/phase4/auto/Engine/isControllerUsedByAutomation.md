@@ -1,0 +1,1 @@
+Checks if a MIDI CC number is assigned to a parameter automation. Returns the automation index, or -1 if not found. Pass a single integer for any-channel matching, or a `[channel, ccNumber]` array to specify a MIDI channel.

@@ -1,0 +1,73 @@
+{
+  "className": "Download",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "abort": {
+      "signature": "bool abort()",
+      "returnType": "bool",
+      "description": "Aborts the download and deletes the file that was downloaded.",
+      "parameters": []
+    },
+    "getDownloadedTarget": {
+      "signature": "var getDownloadedTarget()",
+      "returnType": "var",
+      "description": "Returns the target file if the download has succeeded.",
+      "parameters": []
+    },
+    "getDownloadSize": {
+      "signature": "double getDownloadSize()",
+      "returnType": "double",
+      "description": "Returns the download size in bytes.",
+      "parameters": []
+    },
+    "getDownloadSpeed": {
+      "signature": "int getDownloadSpeed()",
+      "returnType": "int",
+      "description": "Returns the current download speed in bytes / second.",
+      "parameters": []
+    },
+    "getFullURL": {
+      "signature": "String getFullURL()",
+      "returnType": "String",
+      "description": "Returns the full URL of the download.",
+      "parameters": []
+    },
+    "getNumBytesDownloaded": {
+      "signature": "double getNumBytesDownloaded()",
+      "returnType": "double",
+      "description": "Returns the number of bytes downloaded.",
+      "parameters": []
+    },
+    "getProgress": {
+      "signature": "double getProgress()",
+      "returnType": "double",
+      "description": "Returns the progress ratio from 0 to 1.",
+      "parameters": []
+    },
+    "getStatusText": {
+      "signature": "String getStatusText()",
+      "returnType": "String",
+      "description": "Returns a descriptive text of the current download state (eg. \"Downloading\" or \"Paused\").",
+      "parameters": []
+    },
+    "isRunning": {
+      "signature": "bool isRunning()",
+      "returnType": "bool",
+      "description": "Checks if the download is currently active.",
+      "parameters": []
+    },
+    "resume": {
+      "signature": "bool resume()",
+      "returnType": "bool",
+      "description": "Resumes the download.",
+      "parameters": []
+    },
+    "stop": {
+      "signature": "bool stop()",
+      "returnType": "bool",
+      "description": "Stops the download. The target file will not be deleted and you can resume the download later.",
+      "parameters": []
+    }
+  }
+}

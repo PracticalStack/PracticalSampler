@@ -1,0 +1,27 @@
+{
+  "factoryPath": "template.dry_wet",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Stereo input signal, duplicated to both paths by container.split" },
+    { "id": "split", "label": "Split (copy to paths)", "type": "process", "importance": 0.8, "description": "container.split copies input to dry_path and wet_path" },
+    { "id": "xfader", "label": "dry_wet_mixer (xfader)", "type": "process", "importance": 0.9, "description": "Linear crossfade controller: target[0]=1-x to dry_gain, target[1]=x to wet_gain" },
+    { "id": "dry_gain", "label": "dry_gain", "type": "process", "importance": 0.8, "description": "Applies dry crossfade gain (1-DryWet) to dry signal" },
+    { "id": "dummy", "label": "dummy (user processing)", "type": "process", "importance": 1.0, "description": "Placeholder (math.mul, Value=1.0). User replaces with wet effect processing." },
+    { "id": "wet_gain", "label": "wet_gain", "type": "process", "importance": 0.8, "description": "Applies wet crossfade gain (DryWet) to wet signal" },
+    { "id": "sum", "label": "Sum paths", "type": "process", "importance": 1.0, "description": "container.split sums dry_path and wet_path outputs" },
+    { "id": "drywet_param", "label": "DryWet", "type": "parameter", "importance": 1.0, "description": "Crossfade balance (0=dry, 1=wet). Routes to dry_wet_mixer.Value." },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Mixed dry+wet output signal" }
+  ],
+  "edges": [
+    { "from": "in", "to": "split", "type": "signal", "label": null },
+    { "from": "split", "to": "xfader", "type": "signal", "label": "dry_path" },
+    { "from": "xfader", "to": "dry_gain", "type": "signal", "label": null },
+    { "from": "xfader", "to": "wet_gain", "type": "control", "label": "switch target[1]" },
+    { "from": "xfader", "to": "dry_gain", "type": "control", "label": "switch target[0]" },
+    { "from": "split", "to": "dummy", "type": "signal", "label": "wet_path" },
+    { "from": "dummy", "to": "wet_gain", "type": "signal", "label": null },
+    { "from": "dry_gain", "to": "sum", "type": "signal", "label": null },
+    { "from": "wet_gain", "to": "sum", "type": "signal", "label": null },
+    { "from": "sum", "to": "out", "type": "signal", "label": null },
+    { "from": "drywet_param", "to": "xfader", "type": "control", "label": "-> Value" }
+  ]
+}

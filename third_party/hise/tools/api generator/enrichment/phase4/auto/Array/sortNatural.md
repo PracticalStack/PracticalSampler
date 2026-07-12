@@ -1,0 +1,3 @@
+Sorts the array in-place using natural string comparison and returns the array (enables chaining). All elements are converted to strings, then sorted with awareness of embedded numbers - "Item 2" sorts before "Item 10". HISE-specific method not available in standard JavaScript.
+
+Mixed-type arrays are grouped by type during sorting: arrays appear first (in their original relative order), then a mix of integers, doubles, and strings sorted with number awareness, and JSON objects appear last. For custom sorting logic beyond natural ordering, see `Engine.sortWithFunction()`.

@@ -1,0 +1,20 @@
+{
+  "factoryPath": "core.phasor",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 0.3, "description": "Input signal (channel 0 is overwritten)" },
+    { "id": "ramp", "label": "Phase Ramp", "type": "process", "importance": 1.0, "description": "Generates 0..1 sawtooth ramp via phase accumulator" },
+    { "id": "gate", "label": "Gate", "type": "parameter", "importance": 0.7, "description": "Enables ramp output; rising edge resets phase" },
+    { "id": "freq", "label": "Frequency", "type": "parameter", "importance": 0.9, "description": "Ramp frequency (overridden by MIDI note-on)" },
+    { "id": "ratio", "label": "Freq Ratio", "type": "parameter", "importance": 0.7, "description": "Frequency multiplier" },
+    { "id": "phase", "label": "Phase", "type": "parameter", "importance": 0.5, "description": "Phase offset" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Channel 0 = ramp value (replaces input)" }
+  ],
+  "edges": [
+    { "from": "in", "to": "ramp", "type": "signal", "label": null },
+    { "from": "gate", "to": "ramp", "type": "control", "label": null },
+    { "from": "freq", "to": "ramp", "type": "control", "label": null },
+    { "from": "ratio", "to": "ramp", "type": "control", "label": null },
+    { "from": "phase", "to": "ramp", "type": "control", "label": null },
+    { "from": "ramp", "to": "out", "type": "signal", "label": "replaces ch0" }
+  ]
+}

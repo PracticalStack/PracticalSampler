@@ -1,0 +1,19 @@
+{
+  "factoryPath": "container.dynamic_blocksize",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio block" },
+    { "id": "bs_param", "label": "BlockSize", "type": "parameter", "importance": 1.0, "description": "Index 0-7 selecting block size: 1, 8, 16, 32, 64, 128, 256, 512" },
+    { "id": "dispatch", "label": "Block size dispatch", "type": "decision", "importance": 0.8, "description": "Switch: index 0 uses FrameConverters, indices 1-7 use fix_block<N>" },
+    { "id": "chunk", "label": "Chunk or frame processing", "type": "process", "importance": 1.0, "description": "ChunkableProcessData (block mode) or FrameConverters (frame mode)" },
+    { "id": "serial", "label": "Serial child processing", "type": "process", "importance": 0.8, "description": "Children process each chunk/frame in series" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Reassembled output" }
+  ],
+  "edges": [
+    { "from": "in", "to": "dispatch", "type": "signal", "label": null },
+    { "from": "bs_param", "to": "dispatch", "type": "control", "label": null },
+    { "from": "dispatch", "to": "chunk", "type": "conditional", "label": "block or frame mode" },
+    { "from": "chunk", "to": "serial", "type": "signal", "label": null },
+    { "from": "serial", "to": "chunk", "type": "feedback", "label": "next chunk/frame" },
+    { "from": "chunk", "to": "out", "type": "signal", "label": "done" }
+  ]
+}

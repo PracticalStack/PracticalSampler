@@ -1,0 +1,55 @@
+{
+  "moduleId": "Transposer",
+  "nodes": [
+    {
+      "id": "midi_in",
+      "type": "input",
+      "label": "MIDI Event In",
+      "importance": 1.0,
+      "description": "Incoming HiseEvent from the MIDI chain"
+    },
+    {
+      "id": "noteon_check",
+      "type": "decision",
+      "label": "Is Note-On?",
+      "importance": 0.9,
+      "description": "Checks if the event is a note-on message"
+    },
+    {
+      "id": "transpose_apply",
+      "type": "process",
+      "label": "Add Transpose Offset",
+      "importance": 1.0,
+      "group": "transpose",
+      "description": "Adds TransposeAmount to the event's existing transposeValue via setTransposeAmount(getTransposeAmount() + transposeAmount)"
+    },
+    {
+      "id": "transpose_param",
+      "type": "parameter",
+      "label": "TransposeAmount",
+      "importance": 1.0,
+      "group": "transpose",
+      "description": "Semitone offset (-24 to +24, integer steps)"
+    },
+    {
+      "id": "midi_out",
+      "type": "output",
+      "label": "MIDI Event Out",
+      "importance": 1.0,
+      "description": "Event passed to the next processor in the MIDI chain"
+    }
+  ],
+  "edges": [
+    { "from": "midi_in", "to": "noteon_check", "type": "signal" },
+    { "from": "noteon_check", "to": "midi_out", "type": "conditional", "label": "not note-on (passthrough)" },
+    { "from": "noteon_check", "to": "transpose_apply", "type": "conditional", "label": "note-on" },
+    { "from": "transpose_param", "to": "transpose_apply", "type": "control" },
+    { "from": "transpose_apply", "to": "midi_out", "type": "signal" }
+  ],
+  "groups": [
+    {
+      "id": "transpose",
+      "label": "Transpose Processing"
+    }
+  ]
+}

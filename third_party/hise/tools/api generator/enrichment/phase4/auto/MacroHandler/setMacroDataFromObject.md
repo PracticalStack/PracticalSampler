@@ -1,0 +1,3 @@
+Replaces all macro connections with the contents of the provided array. Each element must follow the connection object format returned by `getMacroDataObject()`, with an additional optional `converter` property (String) for display formatting. Pass an empty array to clear all connections - useful at startup to ensure a clean state before the preset model restores them.
+
+> [!Warning:Clears all connections before applying] This method is destructive - it clears all existing connections before applying the new array. Passing a partial list removes any connections not included. Use the read-modify-write pattern (`getMacroDataObject()` -> modify -> `setMacroDataFromObject()`) to change individual connections without losing others.

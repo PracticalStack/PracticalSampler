@@ -1,0 +1,63 @@
+{
+  "factoryPath": "math.abs",
+  "factory": "math",
+  "nodeId": "abs",
+  "description": "Calculates the absolute signal (folds negative values).",
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+  "parameterGroups": [
+    {
+      "label": "Operation",
+      "rationale": "Single Value parameter controlling the math operation: s = abs(s)",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": {
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.0,
+            "skew": 1.0
+          },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+  "properties": [],
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/math/abs.md",
+    "tier": "BRIEF",
+    "lines": 9
+  },
+  "availableImages": [],
+  "gaps": [],
+  "notes": "Value parameter is ignored in processing. Uses vabs for block path (SIMD). Frame path uses OP_BLOCK2SINGLE macro but abs has a custom block override using vabs."
+}

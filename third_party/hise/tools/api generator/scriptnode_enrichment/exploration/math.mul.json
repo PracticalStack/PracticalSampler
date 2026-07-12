@@ -1,0 +1,14 @@
+{
+  "factoryPath": "math.mul",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "mul", "label": "Multiply", "type": "process", "importance": 1.0, "description": "Multiplies each sample by the Value parameter" },
+    { "id": "value", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Scalar multiplier (default 1.0)" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Scaled output signal" }
+  ],
+  "edges": [
+    { "from": "in", "to": "mul", "type": "signal", "label": null },
+    { "from": "value", "to": "mul", "type": "control", "label": null },
+    { "from": "mul", "to": "out", "type": "signal", "label": null }
+  ]
+}

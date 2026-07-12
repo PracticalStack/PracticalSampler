@@ -1,0 +1,64 @@
+{
+  "targetId": "Delay",
+  "domain": "modules",
+  "generatedAt": "2026-03-31",
+  "topicIds": [12323, 14196, 13091, 11516, 10559, 14356, 12416, 10193, 9931, 2422],
+  "insights": [
+    {
+      "type": "BUG",
+      "title": "LowPassFreq and HiPassFreq parameters have no audio effect",
+      "summary": "The LowPassFreq (parameter index 4) and HiPassFreq (index 5) parameters appear in the module UI with descriptions claiming they filter the delay feedback signal, but no filter objects exist in the implementation. Setting these parameters has zero DSP effect.",
+      "sources": ["exploration:Delay.md"],
+      "verify": true,
+      "verify_hint": "Grep for filter object declarations in hi_core/hi_modules/effects/fx/Delay.h. Look for IIRFilter, SimpleOnePole, or similar. Check applyEffect() in Delay.cpp for any reference to lowPassFreq/hiPassFreq members."
+    },
+    {
+      "type": "BUG",
+      "title": "tempoChanged() applies left channel sync time to right channel internal state",
+      "summary": "In tempoChanged(), the right channel's delay time is calculated using syncTimeLeft instead of syncTimeRight. The immediately following calcDelayTimes() call corrects audio processing, so no audible artifact occurs - but the cached delayTimeRight member briefly holds an incorrect value.",
+      "sources": ["exploration:Delay.md"],
+      "verify": true,
+      "verify_hint": "Check tempoChanged() in hi_core/hi_modules/effects/fx/Delay.cpp around line 76. The right channel assignment should use syncTimeRight."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Delay time resolution is 1ms; use ScriptNode delay node for sub-millisecond precision",
+      "summary": "The module tree Delay effect only accepts integer millisecond values (1ms minimum granularity). For sample-accurate or sub-millisecond delays - such as micro-timing corrections or phase alignment - the ScriptNode delay node must be used instead, as it accepts double-precision millisecond values with two decimal places.",
+      "sources": ["tid:11516"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Maximum achievable delay time is sample-rate dependent and may fall below 3000ms",
+      "summary": "The internal delay line buffer holds HISE_MAX_DELAY_TIME_SAMPLES (typically 131072 samples). At 44.1kHz this limits the actual maximum delay to ~2973ms, and at 48kHz to ~2730ms - despite the parameter range allowing 3000ms. At 96kHz the maximum drops to ~1365ms. Setting the parameter above these limits will clip the actual delay time.",
+      "sources": ["exploration:Delay.md"],
+      "verify": true,
+      "verify_hint": "Find HISE_MAX_DELAY_TIME_SAMPLES definition (likely hi_tools/Macros.h or hi_dsp_library). Calculate limit as value/sampleRate*1000 for 44100, 48000, 96000. Check if DelayLine clamps or wraps on overflow."
+    },
+    {
+      "type": "API",
+      "title": "Dry/wet Mix uses an overlap fader, not a linear crossfade",
+      "summary": "The Mix parameter uses scriptnode::faders::overlap() rather than a linear fade. Both dry and wet signals are boosted near the midpoint, similar to a constant-power crossfade. At 50% Mix, both signals are louder than half their full level - the combined output will be above unity.",
+      "sources": ["exploration:Delay.md"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "First audio buffer after initialization is silenced",
+      "summary": "The Delay module skips processing the very first audio buffer after initialization (skipFirstBuffer flag) to avoid outputting garbage from an uninitialized delay line. This produces one buffer of silence at the start, which is normally inaudible but can matter in precise latency measurements or test scenarios.",
+      "sources": ["exploration:Delay.md"],
+      "verify": true,
+      "verify_hint": "Search for skipFirstBuffer in hi_core/hi_modules/effects/fx/Delay.cpp. Verify it zeros or bypasses the output for the first callback after prepareToPlay."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use Tools > Check latency to measure signal chain delay contribution",
+      "summary": "The HISE IDE includes a Tools > Check latency function (added 2025) that sends a single impulse through the signal chain and measures the delay to the first non-silent sample. Use this to verify the actual delay introduced by a Delay module in context, and to generate the correct plugin latency value to report to the host.",
+      "sources": ["tid:12416"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

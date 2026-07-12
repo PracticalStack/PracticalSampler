@@ -1,0 +1,1 @@
+Returns the identifier of the connected global modulator source in the format `"ContainerName:ModulatorName"`. Only meaningful on global receiver modulator types - returns an empty string for regular modulators.

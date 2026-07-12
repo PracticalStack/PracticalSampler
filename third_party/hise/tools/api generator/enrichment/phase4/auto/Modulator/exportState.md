@@ -1,0 +1,1 @@
+Serialises the complete modulator state - all attributes, bypass state, and child processors - to a base64-encoded string. Pair with `restoreState` to implement features like effect locking (preserving settings across preset changes) or saving module configurations to disk as part of a JSON object.

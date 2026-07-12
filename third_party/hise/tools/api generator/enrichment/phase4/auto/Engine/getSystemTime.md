@@ -1,0 +1,1 @@
+Returns the current system date and time as an ISO-8601 string. Pass `true` for readable format with dividers (`2025-03-19T14:30:00`), or `false` for compact format without dividers.

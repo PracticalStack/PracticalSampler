@@ -1,0 +1,3 @@
+Switches from the default per-player undo manager to the global undo stack shared with `Engine.undo()`. By default each MidiPlayer has its own dedicated undo manager, so `undo()` and `redo()` work without calling this method. Enabling the global manager lets MIDI edits participate in the same undo history as UI parameter changes.
+
+> [!Warning:Shared stack, disabling destroys history] The global undo stack is shared across all MidiPlayer instances and UI actions, so MIDI edits may interleave with parameter changes. Calling this method with `false` after enabling it destroys the per-player undo manager - you must call it with `true` again to re-attach to the global stack, and the previous per-player history is lost.

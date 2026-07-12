@@ -1,0 +1,16 @@
+{
+  "factoryPath": "routing.global_receive",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 0.8, "description": "Existing audio signal in the local chain (receives additive mix)" },
+    { "id": "pop", "label": "Pop from Signal Buffer", "type": "process", "importance": 1.0, "description": "Reads audio from shared GlobalRoutingManager Signal buffer and adds it to local signal (addWithMultiply)" },
+    { "id": "value", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Linear gain multiplier (0..1) for the received signal" },
+    { "id": "spec_check", "label": "Spec Match Check", "type": "decision", "importance": 0.6, "description": "Verifies sample rate, channels, block size match sender" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Original signal + received signal mixed together" }
+  ],
+  "edges": [
+    { "from": "in", "to": "pop", "type": "signal", "label": null },
+    { "from": "spec_check", "to": "pop", "type": "conditional", "label": "specs match" },
+    { "from": "value", "to": "pop", "type": "control", "label": "gain" },
+    { "from": "pop", "to": "out", "type": "signal", "label": "additive mix" }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "factoryPath": "jdsp.jchorus",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "chorus", "label": "Chorus", "type": "process", "importance": 1.0, "description": "LFO-modulated delay line with feedback and wet/dry mixing" },
+    { "id": "centre_delay", "label": "CentreDelay", "type": "parameter", "importance": 0.8, "description": "Base delay time in ms (0-100, default 7)" },
+    { "id": "depth", "label": "Depth", "type": "parameter", "importance": 0.8, "description": "LFO modulation depth (0-1, default 0.25)" },
+    { "id": "feedback", "label": "Feedback", "type": "parameter", "importance": 0.7, "description": "Feedback amount; negative values invert phase (-1 to 1, default 0)" },
+    { "id": "rate", "label": "Rate", "type": "parameter", "importance": 0.8, "description": "LFO rate in Hz (0-100, default 1)" },
+    { "id": "mix", "label": "Mix", "type": "parameter", "importance": 0.8, "description": "Dry/wet balance (0-1, default 0.5)" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Processed audio with chorus effect" }
+  ],
+  "edges": [
+    { "from": "in", "to": "chorus", "type": "signal", "label": null },
+    { "from": "centre_delay", "to": "chorus", "type": "control", "label": null },
+    { "from": "depth", "to": "chorus", "type": "control", "label": null },
+    { "from": "feedback", "to": "chorus", "type": "control", "label": null },
+    { "from": "rate", "to": "chorus", "type": "control", "label": null },
+    { "from": "mix", "to": "chorus", "type": "control", "label": null },
+    { "from": "chorus", "to": "out", "type": "signal", "label": null }
+  ]
+}

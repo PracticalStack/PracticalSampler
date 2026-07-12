@@ -1,0 +1,22 @@
+{
+  "factoryPath": "control.minmax",
+  "nodes": [
+    { "id": "value_in", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Normalised 0..1 input signal" },
+    { "id": "minimum", "label": "Minimum", "type": "parameter", "importance": 1.0, "description": "Output range minimum" },
+    { "id": "maximum", "label": "Maximum", "type": "parameter", "importance": 1.0, "description": "Output range maximum" },
+    { "id": "skew", "label": "Skew", "type": "parameter", "importance": 0.8, "description": "Non-linear mapping curve factor (0.1..10)" },
+    { "id": "step", "label": "Step", "type": "parameter", "importance": 0.7, "description": "Output quantisation interval (0 = off)" },
+    { "id": "polarity", "label": "Polarity", "type": "parameter", "importance": 0.8, "description": "Normal or Inverted input mapping" },
+    { "id": "range_map", "label": "Range Map", "type": "process", "importance": 1.0, "description": "Converts 0..1 input to [Minimum, Maximum] range with skew, inversion, and step quantisation" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Unnormalised output in user-defined range" }
+  ],
+  "edges": [
+    { "from": "value_in", "to": "range_map", "type": "signal", "label": null },
+    { "from": "minimum", "to": "range_map", "type": "control", "label": null },
+    { "from": "maximum", "to": "range_map", "type": "control", "label": null },
+    { "from": "skew", "to": "range_map", "type": "control", "label": null },
+    { "from": "step", "to": "range_map", "type": "control", "label": null },
+    { "from": "polarity", "to": "range_map", "type": "control", "label": null },
+    { "from": "range_map", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

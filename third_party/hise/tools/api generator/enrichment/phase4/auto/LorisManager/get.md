@@ -1,0 +1,1 @@
+Returns the current value of a Loris analysis option as a number. All options return numeric values, including boolean options (`enablecache` returns 0.0 or 1.0) and the `timedomain` option (returns an internal numeric code rather than the string name). See `set()` for the full list of option identifiers and their defaults.

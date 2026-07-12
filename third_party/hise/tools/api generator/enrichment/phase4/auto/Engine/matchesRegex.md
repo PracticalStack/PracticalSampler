@@ -1,0 +1,1 @@
+Tests whether a string contains a match for the given regular expression pattern. Uses partial matching - the regex does not need to cover the entire string. Anchor with `^` and `$` for a full-string match. Returns `false` for invalid patterns.

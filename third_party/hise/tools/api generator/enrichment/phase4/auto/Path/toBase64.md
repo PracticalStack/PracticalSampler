@@ -1,0 +1,1 @@
+Serialises the path to a compact base64-encoded string. The result can be stored in script files and later restored with `loadFromData`. This is the more compact format compared to `toString()`, which produces human-readable text.

@@ -1,0 +1,16 @@
+{
+  "factoryPath": "container.split",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input signal" },
+    { "id": "copy", "label": "Copy to originalBuffer", "type": "process", "importance": 0.8, "description": "Saves a copy of the input before processing" },
+    { "id": "parallel", "label": "Parallel processing", "type": "process", "importance": 1.0, "description": "Each child processes a copy of the original input independently" },
+    { "id": "sum", "label": "Sum outputs", "type": "process", "importance": 1.0, "description": "Child outputs are summed together via FloatVectorOperations::add" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Combined output of all children" }
+  ],
+  "edges": [
+    { "from": "in", "to": "copy", "type": "signal", "label": null },
+    { "from": "copy", "to": "parallel", "type": "signal", "label": "N copies" },
+    { "from": "parallel", "to": "sum", "type": "signal", "label": null },
+    { "from": "sum", "to": "out", "type": "signal", "label": null }
+  ]
+}

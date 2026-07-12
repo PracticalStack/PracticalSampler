@@ -1,0 +1,52 @@
+# ScriptTable -- Method Workbench
+
+## Progress
+- [x] addTablePoint
+- [x] addToMacroControl
+- [x] changed
+- [x] fadeComponent
+- [x] get
+- [x] getAllProperties
+- [x] getChildComponents
+- [x] getGlobalPositionX
+- [x] getGlobalPositionY
+- [x] getHeight
+- [x] getId
+- [x] getLocalBounds
+- [x] getTableValue
+- [x] getValue
+- [x] getValueNormalized
+- [x] getWidth
+- [x] grabFocus
+- [x] loseFocus
+- [x] referToData
+- [x] registerAtParent
+- [x] reset
+- [x] sendRepaintMessage
+- [x] set
+- [x] setConsumedKeyPresses
+- [x] setControlCallback
+- [x] setKeyPressCallback
+- [x] setLocalLookAndFeel
+- [x] setMouseHandlingProperties
+- [x] setPosition
+- [x] setPropertiesFromJSON
+- [x] setSnapValues
+- [x] setStyleSheetClass
+- [x] setStyleSheetProperty
+- [x] setStyleSheetPseudoState
+- [x] setTablePoint
+- [x] setTablePopupFunction
+- [x] setTooltip
+- [x] setValue
+- [x] setValueNormalized
+- [x] setValueWithUndo
+- [x] setZLevel
+- [x] showControl
+- [x] updateValueFromProcessorConnection
+
+## Forced Parameter Types
+| Method | Param 1 | Param 2 | Param 3 | Param 4 | Param 5 |
+|--------|---------|---------|---------|---------|---------|
+| setControlCallback | Function | -- | -- | -- | -- |
+| setKeyPressCallback | Function | -- | -- | -- | -- |

@@ -1,0 +1,82 @@
+{
+  "factoryPath": "control.unscaler",
+  "factory": "control",
+  "nodeId": "unscaler",
+  "description": "forwards the raw parameter value",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input",
+      "rationale": "The raw value to forward without range scaling to the output.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": true
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": true,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/unscaler.md",
+    "tier": "STUB",
+    "lines": 0
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "passthrough-behaviour",
+      "category": "signal_path",
+      "question": "Does unscaler simply pass the raw Value through to the output without any transformation? Is it functionally identical to normaliser but with unnormalised output?",
+      "context": "The node's purpose is to break out of the normalised connection system. Users need to understand when and why to use it."
+    },
+    {
+      "id": "use-case-pattern",
+      "category": "description_accuracy",
+      "question": "The description says 'forwards the raw parameter value'. In practice, when would a user need this? Is it for connecting a knob directly to a parameter that expects raw values (e.g., frequency in Hz)?",
+      "context": "Practical use-case guidance is important since the node's purpose is non-obvious."
+    }
+  ],
+
+  "notes": "unscaler is a simple passthrough node with UseUnnormalisedModulation and Value marked as unscaled input. It is the unnormalised counterpart to control.normaliser. The existing doc has 0 lines (empty file). No IsPolyphonic flag."
+}

@@ -1,0 +1,88 @@
+{
+  "targetId": "Analyser",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [12626, 13231, 13674, 8698, 12441, 11056, 10897, 12442, 5017, 12128, 1951, 5800, 714, 6666, 10883, 6863, 5320, 12968, 13512, 13660, 8272],
+  "insights": [
+    {
+      "type": "API",
+      "title": "FFT display properties must be applied via setRingBufferProperties() from script",
+      "summary": "Properties such as BufferLength, WindowType, DecibelRange, Decay, UseLogarithmicFreqAxis etc. are not persisted when set in the HISE editor. They must be applied each time from script using DisplayBuffer.setRingBufferProperties() with a JSON object. The same property set works for the analyse.fft scriptnode.",
+      "sources": ["tid:6666", "tid:11056"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "AudioAnalyser FloatingTile ignores standard colour properties; use LAF to style",
+      "summary": "Setting colour properties on the AudioAnalyser component directly has no effect. The component must be styled using a LookAndFeel override.",
+      "sources": ["tid:12441", "tid:13660"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Turning the Analyser display on and off should use showControl() or visibility",
+      "summary": "There is no scripting API to bypass or disable the Analyser's ring buffer from script. The recommended workaround for hiding the display is to call showControl(false) on the FloatingTile panel, or toggle component visibility.",
+      "sources": ["tid:1951", "tid:10897"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "BufferSize setAttribute expects sample count values, not an index",
+      "summary": "When setting the BufferSize parameter via setAttribute(), pass the actual sample count (e.g. 4096, 8192, 16384, 32768), not a combo-box index. The C++ implementation passes the value directly to ringBuffer->setRingBufferSize().",
+      "sources": ["tid:5320"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "Changing BufferSize at runtime may break the Analyser display until the project is reloaded",
+      "summary": "An older report (circa 2022) noted that changing BufferSize at runtime caused the Analyser to stop displaying until the project was reopened. The C++ exploration confirms the ring buffer is resized at runtime, so check whether the display reconnects cleanly after a resize.",
+      "sources": ["tid:5320"],
+      "verify": true,
+      "verify_hint": "grep setRingBufferSize in hi_dsp_library/node_api/helpers/RingBuffer.h; check if DisplayBufferSource reconnects after resize"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "EQ built-in analyser freezes on silence due to isSuspendedOnSilence",
+      "summary": "The ParametricEQ (CurveEQ) module implements isSuspendedOnSilence() returning true, so it is suspended when input is silent and the built-in analyser retains the last displayed frame. This behaviour is by design for CPU savings but surprises users. Changing to false requires recompiling HISE from source (CurveEq.h line ~193).",
+      "sources": ["tid:10883", "tid:12968"],
+      "verify": true,
+      "verify_hint": "grep isSuspendedOnSilence in hi_core/hi_modules/effects/fx/CurveEq.h"
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Move custom FFT path generation to a background task to prevent UI lag on Windows",
+      "summary": "Users reported significant UI lag when generating complex FFT paths (many bins, custom frequency mapping) directly in a panel paint routine or timer callback on some Windows systems. Moving the path generation into a background task resolved the issue. The stock HISE FFT display does not require this workaround.",
+      "sources": ["tid:12626"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use Engine.createFFT() for offline spectrum analysis instead of the Analyser module",
+      "summary": "The Analyser module is designed for real-time visualisation. For offline spectrum analysis of audio files or buffers (e.g. generating a 2D spectrogram), use Engine.createFFT() with fft.setEnableSpectrum2D(true) and g.drawFFTSpectrum() in a paint routine instead.",
+      "sources": ["tid:13231"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "Audio mutes after recompiling script when DisplayBuffer references are reassigned",
+      "summary": "A user reported that audio was completely muted after the second script compile when using Synth.getDisplayBufferSource() and assigning display buffers to panel data properties. Restarting HISE restored audio. This may be a use-after-free or dangling reference issue when the ring buffer is reassigned on recompile.",
+      "sources": ["tid:12128"],
+      "verify": true,
+      "verify_hint": "search getDisplayBufferSource recompile behaviour; check if DisplayBuffer reference is invalidated on script recompile"
+    },
+    {
+      "type": "API",
+      "title": "getDisplayBuffer(0) argument is an index ID, not a channel number",
+      "summary": "The numeric argument passed to getDisplayBuffer() is an arbitrary ID used to distinguish multiple display buffers on the same source - it is not a channel index. Numbering buffers 0-9 or any other range is valid.",
+      "sources": ["tid:12442"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

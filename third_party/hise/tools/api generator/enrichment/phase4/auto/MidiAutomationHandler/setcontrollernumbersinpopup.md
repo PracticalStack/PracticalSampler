@@ -1,0 +1,1 @@
+Restricts which CC numbers appear in the right-click MIDI automation popup on UI components. Pass an array of CC numbers (0-127) to show only those controllers. When a filter is set, the popup layout changes from a nested submenu with a "Learn" option to a flat list of the specified CC numbers. Passing an empty array resets the filter to the default full list.

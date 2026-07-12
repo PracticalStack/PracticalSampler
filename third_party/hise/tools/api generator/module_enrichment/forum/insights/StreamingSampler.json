@@ -1,0 +1,130 @@
+{
+  "targetId": "StreamingSampler",
+  "domain": "modules",
+  "generatedAt": "2026-04-08",
+  "topicIds": [277, 466, 710, 834, 874, 895, 898, 1080, 1100, 1121, 1175, 1414, 1933, 1974, 2724, 3073, 3217, 3549, 3598, 3602, 3920, 4142, 4144, 4686, 4689, 4943, 5038, 5146, 6623, 6905, 7177, 7274, 8160, 8558, 9526, 9559, 10182, 11205, 11270, 11398, 12287, 12296, 14187],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Samples shorter than 2048 samples are automatically padded",
+      "summary": "The Sampler enforces a minimum preload buffer of 2048 samples. Earlier versions would crash on very short samples (such as single-cycle waveforms), but a guard now clamps the internal preload size to at least 2048.",
+      "sources": ["tid:6623"],
+      "verify": false,
+      "verify_hint": null,
+      "verified": "fixed - StreamingSamplerSound.cpp:206 internalPreloadSize = jmax(preloadSize, internalPreloadSize, 2048)"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Sample Start Modulation is limited by the preloaded region size",
+      "summary": "The Sample Start modulator only works within the RAM-preloaded region. If the start offset exceeds the preload size, the modulation is clamped to the preload boundary. Increase PreloadSize if you need a larger randomisation range.",
+      "sources": ["tid:9526"],
+      "verify": true,
+      "verify_hint": "grep startMod or sampleStart in hi_sampler; check how preload size caps sample start offset"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Loading a sample map during playback is not supported",
+      "summary": "Swapping sample maps while audio is playing is not a real-time operation and is not designed to be safe during playback. Schedule sample map changes to occur when the sampler is idle.",
+      "sources": ["tid:1414"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Monolith compression cannot be disabled; uncompressed monolith is deprecated",
+      "summary": "The 'Monolith without compression' option is deprecated and has been removed. Always use the HLAC-compressed monolith format. The performance overhead of compression is negligible.",
+      "sources": ["tid:1121"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Monolith format supports only four specific sample rates",
+      "summary": "The monolith format stores sample rate as a 2-bit index, supporting only 44100, 48000, 88200, and 96000 Hz. Samples at other rates (e.g., 27400 Hz) will be misread. Ensure all samples match one of these four rates before building a monolith.",
+      "sources": ["tid:1121"],
+      "verify": true,
+      "verify_hint": "search sampleRates[4] in hi_sampler or HlacMonolithInfo; the four-value array is in the monolith reader"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Global Time Variant Modulator must be placed before the Sampler in the module tree",
+      "summary": "Unlike other synth modules, the Sampler requires the Global Modulator Container to appear before it in the module tree for Global Time Variant Modulators to work. The same constraint does not apply to Wavetable Synth or Waveform Generator.",
+      "sources": ["tid:7177"],
+      "verify": true,
+      "verify_hint": "grep global modulator order or processing order in hi_core/processors; check why Sampler's gain chain processes differently"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Sampler.setActiveGroup() activates only one group at a time",
+      "summary": "setActiveGroup() switches to a single RR group. There is no built-in way to activate multiple groups simultaneously (e.g., always-on group plus a random group). Workaround: map always-on samples into the same group, or use multiple Sampler instances.",
+      "sources": ["tid:3073"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Default AHDSR envelope is created automatically and has non-zero attack by default",
+      "summary": "When a new Sampler is created, HISE automatically adds a required AHDSR envelope to the gain chain. Its attack value is not zero by default, which causes samples to sound dull compared to the dry signal. Set the envelope attack to 0 (attribute index 2) if you want unaltered sample playback.",
+      "sources": ["tid:12287"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Kill Duplicate mode kills older voices on the same key",
+      "summary": "The 'Kill Duplicate' repeat mode kills any older voice playing the same note number when a new note-on arrives, preventing voice accumulation on retriggered notes. Only KillNote, NoteOff, DoNothing, and KillDuplicate are fully implemented.",
+      "sources": ["tid:874"],
+      "verify": false,
+      "verify_hint": null,
+      "verified": "KillThirdOldestNote exists in enum but falls to jassertfalse default - not implemented. KillSecondOldestNote (Kill Duplicate) is implemented."
+    },
+    {
+      "type": "API",
+      "title": "Sampler.ID constant is broken; use index 0 instead",
+      "summary": "The Sampler.ID constant throws a runtime error. Use the integer 0 as a substitute: Sample.get(0) instead of Sample.get(Sampler.ID).",
+      "sources": ["tid:3598"],
+      "verify": true,
+      "verify_hint": "grep Sampler.ID in hi_scripting scripting headers; check if the constant is defined and exported correctly"
+    },
+    {
+      "type": "API",
+      "title": "Use Synth.getSampler() for the Sampler scripting API, not Synth.getModulator()",
+      "summary": "To access Sampler-specific methods (createSelection, setActiveGroup, etc.) you must obtain the reference via Synth.getSampler(). Synth.getModulator() returns a generic Modulator reference that does not expose the Sampler API.",
+      "sources": ["tid:4686"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Toggle loop on all samples in a map using createSelection() and sample.set()",
+      "summary": "Iterate over Sampler.createSelection('.*') and call sample.set(Sampler.LoopEnabled, value) on each sound to toggle loop enable/disable globally from a UI control. This is the idiomatic way to change per-sample properties at runtime.",
+      "sources": ["tid:4686"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use scriptnode for per-voice drum channels instead of many Sampler instances",
+      "summary": "Using dozens of Sampler instances for individual drum channels wastes significant RAM because each Sampler pre-allocates streaming buffers. The author-recommended approach for large multi-channel drum plugins is to create a custom sample player inside a scriptnode network.",
+      "sources": ["tid:9559"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Increasing VoiceAmount (BufferSize) raises streaming memory cost",
+      "summary": "The VoiceAmount parameter directly controls how many streaming buffers are allocated. Setting it much higher than the actual polyphony needed wastes RAM. The default of 16 is deliberately conservative; increase only as needed.",
+      "sources": ["tid:3217"],
+      "verify": true,
+      "verify_hint": "grep VoiceAmount or NUM_POLYPHONIC_VOICES in hi_sampler streaming buffer allocation"
+    },
+    {
+      "type": "API",
+      "title": "ComplexGroupManager requires groups to be created before assigning samples",
+      "summary": "When using the Complex Group Manager (Custom group mode), you must first create the layer and its groups, then assign samples. The 'Assign from file token' right-click option can create groups and assign samples in one step if the filename contains a token matching the group name.",
+      "sources": ["tid:14187"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

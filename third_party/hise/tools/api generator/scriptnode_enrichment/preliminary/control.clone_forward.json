@@ -1,0 +1,95 @@
+{
+  "factoryPath": "control.clone_forward",
+  "factory": "control",
+  "nodeId": "clone_forward",
+  "description": "forwards the unscaled input parameter to all clones",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Clone configuration",
+      "rationale": "NumClones defines how many clones are addressed; auto-updated from clone container",
+      "parameters": [
+        {
+          "id": "NumClones",
+          "range": { "min": 1.0, "max": 16.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Value forwarding",
+      "rationale": "Value is forwarded identically (unscaled) to every clone",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": true
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": true,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/clone_forward.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "unscaled-forwarding-detail",
+      "category": "signal_path",
+      "question": "clone_forward sends the same unscaled value to all active clones. Confirm from C++ that the parameter::cloned isNormalised flag is set to false, meaning no range conversion is applied at the target. How does this interact with the target parameter's own range?",
+      "context": "This is the key distinction from clone_cable -- users need to understand that target parameter ranges are NOT applied."
+    },
+    {
+      "id": "createparameters-copypaste",
+      "category": "description_accuracy",
+      "question": "The infrastructure doc notes that clone_forward's createParameters() uses DEFINE_PARAMETERDATA(clone_cable, ...) instead of clone_forward. Verify this is still the case and confirm it is functionally harmless.",
+      "context": "Worth noting as a minor curiosity; should not cause user-visible issues."
+    }
+  ],
+
+  "notes": "clone_forward is the simplest clone control node. It sends the same raw value to every clone without any distribution logic or range scaling. UseUnnormalisedModulation is set with 'Value' as an unscaled input parameter. The IsCloneCableNode cppProperty is set. Unlike clone_cable, it has no Mode property, no Gamma parameter, and does not process MIDI events. Typical use: forwarding a parameter like filter cutoff or gain identically to all clones."
+}

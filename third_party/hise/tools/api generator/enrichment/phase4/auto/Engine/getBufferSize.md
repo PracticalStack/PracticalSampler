@@ -1,0 +1,1 @@
+Returns the current maximum processing block size in samples. If `Engine.setMaximumBlockSize()` has been called, this returns the reduced block size rather than the host's original buffer size.

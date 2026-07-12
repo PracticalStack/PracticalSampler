@@ -1,0 +1,107 @@
+{
+  "factoryPath": "core.recorder",
+  "factory": "core",
+  "nodeId": "recorder",
+  "description": "Record the signal input into a audio file slot",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Recording",
+      "rationale": "State controls record on/off; RecordingLength sets the duration to record",
+      "parameters": [
+        {
+          "id": "State",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvStovSlYF.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "RecordingLength",
+          "range": { "min": 0.0, "max": 2000.0, "step": 0.1, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/recorder.md",
+    "tier": "BRIEF",
+    "lines": 15
+  },
+
+  "availableImages": ["recorder.png"],
+
+  "gaps": [
+    {
+      "id": "recording-mechanism",
+      "category": "signal_path",
+      "question": "How does recording work? Does core.recorder write incoming audio samples to the AudioFile slot's buffer? Does it pass audio through unchanged while recording?",
+      "context": "Users need to know whether the recorder is transparent (passthrough) or consumes the signal."
+    },
+    {
+      "id": "recording-length-zero",
+      "category": "parameter_behaviour",
+      "question": "RecordingLength defaults to 0. Does 0 mean 'record until stopped' (State=0) or 'do not record'? What happens when the recording reaches the specified length?",
+      "context": "The default of 0ms is unusual and needs clarification."
+    },
+    {
+      "id": "state-values",
+      "category": "conditional_logic",
+      "question": "State has an encoded TextToValueConverter suggesting named values. Is it simply Off/On (0/1), or are there other states like 'armed' or 'overdub'?",
+      "context": "Users need to know the recording state machine."
+    },
+    {
+      "id": "audio-file-interaction",
+      "category": "signal_path",
+      "question": "How does the recorded audio interact with the AudioFile slot? Does it resize the buffer, or must the buffer be pre-allocated? Can the recording be played back via core.file_player?",
+      "context": "The workflow for recording and playback needs to be documented."
+    },
+    {
+      "id": "channel-handling",
+      "category": "signal_path",
+      "question": "Does core.recorder record all input channels or just channel 0? Does it record mono or stereo depending on the input?",
+      "context": "Determines whether stereo recording is supported."
+    }
+  ],
+
+  "notes": "core.recorder writes audio input to an AudioFile slot. The State parameter has an encoded text converter, suggesting named on/off labels. RecordingLength is in milliseconds (Time converter) with a max of 2000ms (2 seconds). The default of 0 for both State and RecordingLength needs C++ exploration to understand the intended workflow. A recorder.png image is available in resources/images/. This is the counterpart to core.file_player."
+}

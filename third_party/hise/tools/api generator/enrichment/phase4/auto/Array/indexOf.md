@@ -1,0 +1,3 @@
+Returns the index of the first occurrence of the specified value, or `-1` if not found. Searches forward from `startOffset` (default `0`). The optional `typeStrictness` parameter controls comparison: `0` (default) uses loose matching where `1 == 1.0`, while `1` requires both type and value to match.
+
+> [!Warning:Loose comparison by default] `indexOf(1)` matches both integer `1` and double `1.0`. Pass `typeStrictness = 1` as the third argument when you need to distinguish numeric types.

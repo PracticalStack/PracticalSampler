@@ -1,0 +1,27 @@
+{
+  "factoryPath": "filters.convolution",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal (mono or stereo)" },
+    { "id": "conv", "label": "FFT Convolution", "type": "process", "importance": 1.0, "description": "Uniform partitioned FFT convolution with impulse response" },
+    { "id": "predelay", "label": "Predelay", "type": "process", "importance": 0.7, "description": "Delay line applied to wet signal before mixing" },
+    { "id": "gate", "label": "Gate", "type": "parameter", "importance": 1.0, "description": "Enable/disable convolution processing with click-free ramp" },
+    { "id": "damping_p", "label": "Damping", "type": "parameter", "importance": 0.8, "description": "Exponential decay applied to IR during loading (-100 to 0 dB)" },
+    { "id": "hicut_p", "label": "HiCut", "type": "parameter", "importance": 0.8, "description": "Frequency-dependent decay applied to IR during loading (20-20000 Hz)" },
+    { "id": "predelay_p", "label": "Predelay", "type": "parameter", "importance": 0.7, "description": "Wet signal delay in milliseconds (0-1000)" },
+    { "id": "multithread", "label": "Multithread", "type": "parameter", "importance": 0.6, "description": "Offload tail FFT to background thread" },
+    { "id": "ir", "label": "Impulse Response", "type": "external_data", "importance": 1.0, "description": "AudioFile slot for impulse response (no SampleMap/SFZ)" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Dry + wet (convolved) audio mixed at ~50%" }
+  ],
+  "edges": [
+    { "from": "in", "to": "conv", "type": "signal", "label": null },
+    { "from": "ir", "to": "conv", "type": "signal", "label": "impulse response" },
+    { "from": "gate", "to": "conv", "type": "control", "label": null },
+    { "from": "damping_p", "to": "ir", "type": "control", "label": "pre-process IR" },
+    { "from": "hicut_p", "to": "ir", "type": "control", "label": "pre-process IR" },
+    { "from": "multithread", "to": "conv", "type": "control", "label": null },
+    { "from": "conv", "to": "predelay", "type": "signal", "label": "wet signal" },
+    { "from": "predelay_p", "to": "predelay", "type": "control", "label": null },
+    { "from": "predelay", "to": "out", "type": "signal", "label": "wet + dry mix" },
+    { "from": "in", "to": "out", "type": "signal", "label": "dry path" }
+  ]
+}

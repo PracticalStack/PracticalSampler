@@ -1,0 +1,1 @@
+Returns the parameter's range properties as a JSON object with five properties: `MinValue`, `MaxValue`, `SkewFactor`, `StepSize`, and `Inverted`. The returned object is a snapshot - modifying it does not affect the parameter's range. Use `setRangeFromObject()` to apply changes back, or `setRangeProperty()` to update individual properties.

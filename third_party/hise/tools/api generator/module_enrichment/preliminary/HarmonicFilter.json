@@ -1,0 +1,170 @@
+{
+  "moduleId": "HarmonicFilter",
+  "prettyName": "Harmonic Filter",
+  "type": "Effect",
+  "subtype": "VoiceEffect",
+  "category": "filter",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "voice",
+    "audioOut": "voice",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "per-voice",
+
+  "interfaces": [
+    {
+      "name": "SliderPackProcessor",
+      "signalFlowRole": "Slider pack data source providing per-band gain values for A and B configurations"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Filter Configuration",
+      "rationale": "NumFilterBands and QFactor together define the filter bank structure - how many harmonic peak filters are active and their resonance width",
+      "parameters": [
+        {
+          "id": "NumFilterBands",
+          "name": "Num Filter Bands",
+          "range": { "min": 1.0, "max": 5.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "The number of harmonic filter bands (1, 2, 4, 8, or 16)",
+          "items": ["1 Filter Band", "2 Filter Bands", "4 Filter Bands", "8 Filter Bands", "16 Filter Bands"],
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "QFactor",
+          "name": "Q Factor",
+          "range": { "min": 4.0, "max": 48.0, "step": 1.0 },
+          "default": 12.0,
+          "description": "The resonance of the harmonic peak filters",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "A/B Crossfade",
+      "rationale": "CrossfadeValue controls the blend between two slider pack configurations (A and B), allowing morphing between timbres. Modulated by the X-Fade Modulation chain.",
+      "parameters": [
+        {
+          "id": "CrossfadeValue",
+          "name": "Crossfade Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.5,
+          "description": "Crossfade position between slider pack A and B configurations (0 = A, 0.5 = mix, 1 = B)",
+          "composite": {
+            "type": "modMultiply",
+            "param": "CrossfadeValue",
+            "details": {
+              "chainName": "X-Fade Modulation",
+              "chainIndex": 0,
+              "constrainer": "*"
+            }
+          },
+          "modChain": {
+            "name": "X-Fade Modulation",
+            "chainIndex": 0,
+            "constrainer": "*",
+            "modulationMode": "gain"
+          }
+        }
+      ]
+    },
+    {
+      "label": "Tuning",
+      "rationale": "SemitoneTranspose shifts the entire harmonic filter bank up or down, allowing the filters to target non-root harmonics or detune relative to the played note",
+      "parameters": [
+        {
+          "id": "SemitoneTranspose",
+          "name": "Semitone Transpose",
+          "range": { "min": -24.0, "max": 24.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Transposes the harmonic filter tuning in semitones",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [
+    {
+      "type": "modMultiply",
+      "param": "CrossfadeValue",
+      "details": {
+        "chainName": "X-Fade Modulation",
+        "chainIndex": 0,
+        "constrainer": "*"
+      }
+    }
+  ],
+
+  "standaloneModChains": [],
+
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-order",
+      "category": "signal_path",
+      "question": "What is the processing order in applyEffect() / renderVoice()? Specifically: how are the peak filters applied to the input signal - in parallel (summed) or in series? Is the output the filtered signal only, or mixed with dry?",
+      "context": "The filter topology (parallel vs series) fundamentally changes the sonic character and determines the pseudo-code structure."
+    },
+    {
+      "id": "harmonic-frequency-calculation",
+      "category": "signal_path",
+      "question": "How are the filter center frequencies derived from the voice's note frequency? Is it strictly integer harmonics (f, 2f, 3f, ...) or some other spacing? How does SemitoneTranspose interact with this calculation?",
+      "context": "Users need to understand what frequencies the filters target to use the module effectively."
+    },
+    {
+      "id": "ab-crossfade-implementation",
+      "category": "parameter_behavior",
+      "question": "How does the A/B crossfade work internally? Are two separate slider packs maintained? Does the crossfade interpolate the per-band gain values before filtering, or does it run two parallel filter banks and crossfade the audio output?",
+      "context": "The crossfade implementation determines whether this is a parameter morph or a signal blend, which affects CPU cost and sonic behavior."
+    },
+    {
+      "id": "sliderpack-usage",
+      "category": "interface_usage",
+      "question": "How does the SliderPackProcessor interface provide data to the filter? What do the slider pack values represent (gain per band? linear or dB?)? How many slider packs are registered (one for A, one for B, or a single pack)?",
+      "context": "The slider pack is the primary user interaction surface for shaping the harmonic profile - need to document what each slider controls."
+    },
+    {
+      "id": "numfilterbands-mapping",
+      "category": "parameter_behavior",
+      "question": "NumFilterBands is a ComboBox with values 1-5 mapping to items '1, 2, 4, 8, 16 Filter Bands'. Is this a power-of-two mapping (2^(n-1))? Does changing the band count reallocate filters or just enable/disable existing ones?",
+      "context": "Need to document whether changing band count causes audio glitches and the actual filter count mapping."
+    },
+    {
+      "id": "qfactor-behavior",
+      "category": "parameter_behavior",
+      "question": "QFactor range is 4-48 (integer steps). Is this the filter Q directly, or is it transformed? Higher Q = narrower peak? Does Q apply uniformly to all bands?",
+      "context": "Q factor is the main tonal control alongside the slider pack gains - users need to understand its effect."
+    },
+    {
+      "id": "crossfade-modulation-resolution",
+      "category": "parameter_behavior",
+      "question": "Is the X-Fade Modulation chain applied per-sample or per-block? Does it multiply the CrossfadeValue parameter, or replace it?",
+      "context": "Determines whether smooth real-time morphing between A/B configurations is possible."
+    },
+    {
+      "id": "voice-frequency-source",
+      "category": "signal_path",
+      "question": "How does the module obtain the voice's root frequency? From the MIDI note number directly, or from the voice's current pitch (including pitch modulation)?",
+      "context": "Determines whether pitch bend and pitch modulation affect the harmonic filter tuning."
+    },
+    {
+      "id": "performance-per-voice",
+      "category": "performance",
+      "question": "With 16 filter bands active, what is the per-voice CPU cost? Are the filters IIR biquads? Is processing per-sample or per-block? Any SIMD optimizations?",
+      "context": "At 16 bands per voice with polyphony, CPU cost could be substantial - users need guidance on band count vs. polyphony tradeoffs."
+    }
+  ],
+
+  "notes": "HarmonicFilter is a VoiceEffect (per-voice processing), which is significant because it tunes peak filters to each voice's note frequency. The A/B crossfade with modulation is the key feature - it enables real-time morphing between two harmonic profiles. NumFilterBands uses a ComboBox with items suggesting powers of two (1, 2, 4, 8, 16) mapped to indices 1-5. The module has no dry/wet parameter, which suggests it may process the signal purely through the peak filters. The constrainer field is empty string (no child processor restrictions, not applicable since hasChildren is false)."
+}

@@ -1,0 +1,1 @@
+Returns the length of the current sample range in samples - the difference between range end and range start, not the total file length. Compare with `getTotalLengthInSamples()` which returns the full file length regardless of range.

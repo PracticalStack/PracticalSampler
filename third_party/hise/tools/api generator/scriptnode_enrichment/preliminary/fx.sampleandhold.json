@@ -1,0 +1,94 @@
+{
+  "factoryPath": "fx.sampleandhold",
+  "factory": "fx",
+  "nodeId": "sampleandhold",
+  "description": "A sample and hold effect node",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Sample rate reduction",
+      "rationale": "Single parameter controlling the decimation factor.",
+      "parameters": [
+        {
+          "id": "Counter",
+          "range": { "min": 1.0, "max": 64.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/fx/sampleandhold.md",
+    "tier": "BRIEF",
+    "lines": 17
+  },
+
+  "availableImages": ["script-fx1.png"],
+
+  "gaps": [
+    {
+      "id": "counter-mechanism",
+      "category": "signal_path",
+      "question": "How does the Counter work exactly? Does it sample every N-th sample and hold the value for the next N-1 samples? Is the counter per-channel or shared across channels?",
+      "context": "The existing doc describes the basic behaviour but need C++ confirmation of the exact mechanism."
+    },
+    {
+      "id": "counter-at-one",
+      "category": "parameter_behaviour",
+      "question": "At Counter=1, the existing doc says 'effectively disabling the hold function'. Confirm that Counter=1 means pass-through (sample every sample = no effect).",
+      "context": "Important edge case for documentation."
+    },
+    {
+      "id": "processing-model",
+      "category": "signal_path",
+      "question": "Is processing per-sample (processFrame) or does it operate on blocks? Does it use PolyData for the held value and counter state?",
+      "context": "Needed for CPU profile and polyphonic behaviour description."
+    },
+    {
+      "id": "existing-doc-error",
+      "category": "description_accuracy",
+      "question": "The existing phase3 doc lists 'Position: The position in the stereo field' as the parameter, but the actual parameter is 'Counter'. This appears to be a copy-paste error from haas.md. Confirm Counter is the only parameter.",
+      "context": "The existing doc has an incorrect parameter description that must not be carried forward."
+    }
+  ],
+
+  "notes": "Existing phase3 doc has a copy-paste error: lists 'Position' parameter from haas.md instead of 'Counter'. The actual parameter is Counter (1-64, integer steps). At Counter=1, the node is a pass-through. Counter=64 means the effective sample rate is reduced by 64x. Simple lo-fi effect."
+}

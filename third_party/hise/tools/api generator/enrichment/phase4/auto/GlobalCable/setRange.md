@@ -1,0 +1,1 @@
+Sets the local input range for this cable reference using a minimum and maximum value with linear mapping. This range is used by `setValue()` and `getValue()` to convert between user-facing values and the internal normalised 0..1 space. Does not affect `setValueNormalised()` or `getValueNormalised()`. Registered value callbacks also receive values converted through this range.

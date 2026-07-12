@@ -1,0 +1,1 @@
+Shows an error message as an overlay on the plugin interface. When `isCritical` is `true`, the Ignore button is disabled, forcing the user to acknowledge the error.

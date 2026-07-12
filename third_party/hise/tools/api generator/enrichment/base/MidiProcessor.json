@@ -1,0 +1,130 @@
+{
+  "className": "MidiProcessor",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "asMidiPlayer": {
+      "signature": "var asMidiPlayer()",
+      "returnType": "var",
+      "description": "Returns a reference of type ScriptedMidiPlayer that can be used to control the playback.",
+      "parameters": []
+    },
+    "exists": {
+      "signature": "bool exists()",
+      "returnType": "bool",
+      "description": "Checks if the Object exists and prints a error message on the console if not.",
+      "parameters": []
+    },
+    "exportScriptControls": {
+      "signature": "String exportScriptControls()",
+      "returnType": "String",
+      "description": "Export the control values (without the script).",
+      "parameters": []
+    },
+    "exportState": {
+      "signature": "String exportState()",
+      "returnType": "String",
+      "description": "Exports the state as base64 string.",
+      "parameters": []
+    },
+    "getAttribute": {
+      "signature": "float getAttribute(int index)",
+      "returnType": "float",
+      "description": "Returns the attribute with the given index.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "getAttributeId": {
+      "signature": "String getAttributeId(int index)",
+      "returnType": "String",
+      "description": "Returns the ID of the attribute with the given index.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "getAttributeIndex": {
+      "signature": "int getAttributeIndex(String id)",
+      "returnType": "int",
+      "description": "Returns the index of the attribute with the given ID.",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "String"
+        }
+      ]
+    },
+    "getId": {
+      "signature": "String getId()",
+      "returnType": "String",
+      "description": "Returns the ID of the MIDI Processor.",
+      "parameters": []
+    },
+    "getNumAttributes": {
+      "signature": "int getNumAttributes()",
+      "returnType": "int",
+      "description": "Returns the number of attributes.",
+      "parameters": []
+    },
+    "isBypassed": {
+      "signature": "bool isBypassed()",
+      "returnType": "bool",
+      "description": "Checks if the MidiProcessor is bypassed.",
+      "parameters": []
+    },
+    "restoreScriptControls": {
+      "signature": "void restoreScriptControls(String base64Controls)",
+      "returnType": "void",
+      "description": "Restores the control values for scripts (without recompiling).",
+      "parameters": [
+        {
+          "name": "base64Controls",
+          "type": "String"
+        }
+      ]
+    },
+    "restoreState": {
+      "signature": "void restoreState(String base64State)",
+      "returnType": "void",
+      "description": "Restores the state from a base64 string.",
+      "parameters": [
+        {
+          "name": "base64State",
+          "type": "String"
+        }
+      ]
+    },
+    "setAttribute": {
+      "signature": "void setAttribute(int index, float value)",
+      "returnType": "void",
+      "description": "Sets the attribute of the MidiProcessor. If it is a script, then the index of the component is used.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        },
+        {
+          "name": "value",
+          "type": "float"
+        }
+      ]
+    },
+    "setBypassed": {
+      "signature": "void setBypassed(bool shouldBeBypassed)",
+      "returnType": "void",
+      "description": "Bypasses the MidiProcessor.",
+      "parameters": [
+        {
+          "name": "shouldBeBypassed",
+          "type": "bool"
+        }
+      ]
+    }
+  }
+}

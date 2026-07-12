@@ -1,0 +1,1 @@
+Returns the pressure value of a monophonic (channel pressure) aftertouch event. Only valid on aftertouch events inside `onController`. Use `Message.isMonophonicAfterTouch()` to check the event type before calling this method.

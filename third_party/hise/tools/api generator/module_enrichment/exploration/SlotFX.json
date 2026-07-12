@@ -1,0 +1,44 @@
+{
+  "moduleId": "SlotFX",
+  "nodes": [
+    {
+      "id": "audio_in",
+      "type": "input",
+      "label": "Audio In (L/R)",
+      "importance": 1.0
+    },
+    {
+      "id": "empty_check",
+      "type": "decision",
+      "label": "Effect Loaded?",
+      "importance": 0.8,
+      "description": "Checks if a child effect is loaded (isClear flag)"
+    },
+    {
+      "id": "child_effect",
+      "type": "process",
+      "label": "Child Effect",
+      "importance": 1.0,
+      "description": "The hosted child effect processes the audio buffer"
+    },
+    {
+      "id": "audio_out",
+      "type": "output",
+      "label": "Audio Out",
+      "importance": 1.0
+    }
+  ],
+  "edges": [
+    { "from": "audio_in", "to": "empty_check", "type": "signal" },
+    { "from": "empty_check", "to": "child_effect", "type": "conditional", "label": "effect loaded" },
+    { "from": "empty_check", "to": "audio_out", "type": "conditional", "label": "empty (passthrough)" },
+    { "from": "child_effect", "to": "audio_out", "type": "signal" }
+  ],
+  "groups": [
+    {
+      "id": "delegation",
+      "label": "Effect Delegation",
+      "nodes": ["empty_check", "child_effect"]
+    }
+  ]
+}

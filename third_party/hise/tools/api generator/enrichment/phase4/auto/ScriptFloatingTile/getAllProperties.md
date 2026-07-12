@@ -1,0 +1,1 @@
+Returns an array of strings containing all active property IDs for this component. ScriptFloatingTile deactivates many inherited properties (saveInPreset, macroControl, min, max, text, tooltip, etc.), so this list will be shorter than for most components.

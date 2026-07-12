@@ -1,0 +1,3 @@
+Appends all elements from the given array (or arrays) to this array. Modifies the array in-place and returns `undefined`. Accepts multiple array arguments. Non-array arguments are silently ignored - use `push()` to append individual values.
+
+> [!Warning:Modifies in-place, unlike JavaScript] Unlike `Array.prototype.concat` in JavaScript, this method modifies the array in-place and returns `undefined`. Writing `var b = a.concat([4, 5])` assigns `undefined` to `b`.

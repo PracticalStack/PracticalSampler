@@ -1,0 +1,1 @@
+Redoes the last undone action from the undo manager. Script undo actions (created via `Engine.performUndoAction()`) execute synchronously; other undo actions are dispatched asynchronously.

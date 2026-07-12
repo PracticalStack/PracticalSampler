@@ -1,0 +1,1 @@
+Returns the destination channel index that the given source is connected to via the primary connection, or -1 if unconnected. Accepts either a single index or an array of indices - array input returns an array of results.

@@ -1,0 +1,3 @@
+Sets the value of a custom automation slot by its zero-based index. The value is clamped to the slot's configured range, snapped to its step size, and dispatched synchronously through all connections (module parameters, meta-connections, cable connections). Use `getAutomationIndex` to convert a string ID to the index. For proper DAW automation recording, bracket value changes with `sendParameterGesture` begin/end pairs.
+
+> [!Warning:Returns false silently on failure] Returns false silently if the custom data model is not active or the index is out of range. No error is thrown, so check the return value to detect failure.

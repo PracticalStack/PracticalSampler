@@ -1,0 +1,187 @@
+{
+  "factoryPath": "envelope.ahdsr",
+  "factory": "envelope",
+  "nodeId": "ahdsr",
+  "description": "The AHDSR envelope from HISE",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": true,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": true,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Time Stages",
+      "rationale": "These four parameters define the duration of each time-based segment of the envelope. All use millisecond ranges with identical skew for consistent feel.",
+      "parameters": [
+        {
+          "id": "Attack",
+          "range": { "min": 0.0, "max": 10000.0, "step": 0.1, "skew": 0.1977 },
+          "default": 10.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Hold",
+          "range": { "min": 0.0, "max": 10000.0, "step": 0.1, "skew": 0.1977 },
+          "default": 20.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Decay",
+          "range": { "min": 0.0, "max": 10000.0, "step": 0.1, "skew": 0.1977 },
+          "default": 300.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Release",
+          "range": { "min": 0.0, "max": 10000.0, "step": 0.1, "skew": 0.1977 },
+          "default": 20.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Level Targets",
+      "rationale": "AttackLevel and Sustain define the amplitude targets the envelope reaches at different stages.",
+      "parameters": [
+        {
+          "id": "AttackLevel",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "NormalizedPercentage",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Sustain",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.5,
+          "textConverter": "NormalizedPercentage",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Shape Control",
+      "rationale": "AttackCurve controls the curvature of the attack segment.",
+      "parameters": [
+        {
+          "id": "AttackCurve",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.5,
+          "textConverter": "NormalizedPercentage",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Behaviour",
+      "rationale": "Retrigger and Gate control voice-start and manual gate behaviour.",
+      "parameters": [
+        {
+          "id": "Retrigger",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Gate",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "NumParameters",
+      "defaultValue": 2,
+      "type": "integer",
+      "note": "Number of modulation output parameters (CV + Gate = 2). Set by envelope_base infrastructure."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": ["CV", "Gate"]
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": true,
+    "count": 2
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/envelope/ahdsr.md",
+    "tier": "GOOD",
+    "lines": 29
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "envelope-state-machine",
+      "category": "signal_path",
+      "question": "What are the exact states in the AHDSR state machine and what triggers transitions between them? How does the envelope value get computed per-sample in each state?",
+      "context": "Needed to accurately describe the envelope shape and document how the Hold stage works (some AHDSR implementations skip Hold)."
+    },
+    {
+      "id": "attack-curve-mapping",
+      "category": "parameter_behaviour",
+      "question": "How does the AttackCurve parameter (0..1) map to the actual curve shape? Is 0.5 linear, <0.5 exponential, >0.5 logarithmic (or similar)?",
+      "context": "Users need to understand what the curve parameter does for precise sound design."
+    },
+    {
+      "id": "retrigger-behaviour",
+      "category": "parameter_behaviour",
+      "question": "What does the Retrigger parameter control? Does it restart the envelope from zero on legato note-on, or from the current level?",
+      "context": "Retrigger behaviour is critical for polyphonic instruments and legato patches."
+    },
+    {
+      "id": "gate-parameter-usage",
+      "category": "parameter_behaviour",
+      "question": "What is the Gate parameter for? Can it be used to manually trigger the envelope via modulation instead of MIDI note-on/off?",
+      "context": "Some users may want to trigger envelopes from non-MIDI sources."
+    },
+    {
+      "id": "display-buffer-ring-properties",
+      "category": "signal_path",
+      "question": "The ComplexData includes a DisplayBuffer. Does the ahdsr_base override registerPropertyObject to provide custom ring buffer drawing (AhdsrRingBufferProperties)?",
+      "context": "The modulation infrastructure doc mentions this custom property object. Confirming it exists affects the UI description."
+    },
+    {
+      "id": "voice-reset-on-release-end",
+      "category": "signal_path",
+      "question": "When the release phase completes (envelope reaches zero), does the AHDSR node send a voice reset/kill signal via the Gate output?",
+      "context": "Voice lifecycle management is a core envelope responsibility. The envelope_base postProcess sends Gate=0 when isActive() flips to false."
+    }
+  ],
+
+  "notes": "The AHDSR is the canonical HISE envelope, ported to scriptnode. It inherits from envelope_base which provides dual CV+Gate modulation outputs and legato/sustain-pedal key handling via handleKeyEvent(). The encoded text converter on Retrigger and Gate likely decodes to Off/On labels. The display buffer uses a custom AhdsrRingBufferProperties for envelope shape visualization."
+}

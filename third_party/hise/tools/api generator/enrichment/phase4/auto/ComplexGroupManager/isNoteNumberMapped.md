@@ -1,0 +1,1 @@
+Returns 1 if any sample in the specified layer covers the given MIDI note number, 0 otherwise. Requires `createNoteMap()` to have been called first for the same layer.

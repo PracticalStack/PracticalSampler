@@ -1,0 +1,1 @@
+Links the BPM source (internal vs external) to the current sync mode. When enabled, the BPM reported by the transport will match the active clock source determined by `setSyncMode()`. Global setting on the MasterClock.

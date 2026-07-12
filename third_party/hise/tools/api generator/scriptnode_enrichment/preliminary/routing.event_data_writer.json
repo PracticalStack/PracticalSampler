@@ -1,0 +1,107 @@
+{
+  "factoryPath": "routing.event_data_writer",
+  "factory": "routing",
+  "nodeId": "event_data_writer",
+  "description": "writes data to the event ID storage of the global routing manager",
+
+  "classification": {
+    "signalPathRole": "utility",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": true,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Slot Configuration",
+      "rationale": "SlotIndex selects which data slot to write to.",
+      "parameters": [
+        {
+          "id": "SlotIndex",
+          "range": { "min": 0, "max": 16, "step": 1, "skew": 1.0 },
+          "default": 0,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Data",
+      "rationale": "The value to write to the event data storage.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0, "max": 1, "step": 0, "skew": 1.0 },
+          "default": 0,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/routing/event_data_writer.md",
+    "tier": "GOOD",
+    "lines": 21
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "write-trigger",
+      "category": "signal_path",
+      "question": "When does the writer write data -- on every process() call, on note-on events (handleHiseEvent), or whenever the Value parameter changes? Is the write associated with the current voice's event ID?",
+      "context": "Determines when and how data gets stored for later reading by event_data_reader."
+    },
+    {
+      "id": "value-range-storage",
+      "category": "parameter_behaviour",
+      "question": "The Value parameter has range 0-1. Is the stored value always 0..1, or can unnormalised values be stored if connected to an unnormalised source?",
+      "context": "If the storage is limited to 0..1, this constrains what data can be passed between writer and reader."
+    },
+    {
+      "id": "polyphonic-write-isolation",
+      "category": "signal_path",
+      "question": "With IsPolyphonic true, does each voice write to storage keyed by its own event ID? Can voice A's write be read by voice B's event_data_reader?",
+      "context": "Per-voice isolation is expected but should be confirmed. Cross-voice data sharing would be a distinct use case."
+    },
+    {
+      "id": "write-persistence",
+      "category": "signal_path",
+      "question": "How long does the written data persist? Until the event ID is recycled (note-off + voice kill)? Or until explicitly overwritten?",
+      "context": "Data lifetime affects whether readers in later parts of the chain can reliably access the data."
+    }
+  ],
+
+  "notes": "routing.event_data_writer is the companion to routing.event_data_reader. It writes a value to a per-event-ID data storage slot. Polyphonic and processes HiseEvents. Has no modulation output (it is a sink, not a source). The SlotIndex and Value parameters suggest a simple key-value write: write Value to slot SlotIndex for the current event. Typical use case: store a computed value (e.g., random number, velocity-derived value) at note-on for retrieval elsewhere in the network."
+}

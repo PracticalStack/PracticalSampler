@@ -1,0 +1,1 @@
+Sets a custom comparator function for column header sorting (requires `Sortable: true`). The function receives two cell values from the sort column and must return an integer: negative if the first value should come before the second, positive if after, and 0 if equal. Passing a non-function reverts to the default alphabetic/numeric sorter.

@@ -1,0 +1,1430 @@
+{
+  "className": "Engine",
+  "category": "namespace",
+  "description": "All scripting methods related to the main engine can be accessed here.",
+  "methods": {
+    "addModuleStateToUserPreset": {
+      "signature": "void addModuleStateToUserPreset(var moduleId)",
+      "returnType": "void",
+      "description": "Adds an entire module to the user preset system.",
+      "parameters": [
+        {
+          "name": "moduleId",
+          "type": "var"
+        }
+      ]
+    },
+    "allNotesOff": {
+      "signature": "void allNotesOff()",
+      "returnType": "void",
+      "description": "Sends an allNotesOff message at the next buffer.",
+      "parameters": []
+    },
+    "clearMidiFilePool": {
+      "signature": "void clearMidiFilePool()",
+      "returnType": "void",
+      "description": "Removes all entries from the MIDi file pool.",
+      "parameters": []
+    },
+    "clearSampleMapPool": {
+      "signature": "void clearSampleMapPool()",
+      "returnType": "void",
+      "description": "Removes all entries from the samplemap pool",
+      "parameters": []
+    },
+    "clearUndoHistory": {
+      "signature": "void clearUndoHistory()",
+      "returnType": "void",
+      "description": "Clears the undo history.",
+      "parameters": []
+    },
+    "compressJSON": {
+      "signature": "String compressJSON(var object)",
+      "returnType": "String",
+      "description": "Compresses a JSON object as Base64 string using zstd.",
+      "parameters": [
+        {
+          "name": "object",
+          "type": "var"
+        }
+      ]
+    },
+    "copyToClipboard": {
+      "signature": "void copyToClipboard(String textToCopy)",
+      "returnType": "void",
+      "description": "Copies the given text to the clipboard.",
+      "parameters": [
+        {
+          "name": "textToCopy",
+          "type": "String"
+        }
+      ]
+    },
+    "createAndRegisterAudioFile": {
+      "signature": "ScriptingObjects::ScriptAudioFile * createAndRegisterAudioFile(int index)",
+      "returnType": "ScriptingObjects::ScriptAudioFile *",
+      "description": "Creates a audio file holder and registers it so you can access it from other modules.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "createAndRegisterRingBuffer": {
+      "signature": "ScriptingObjects::ScriptRingBuffer * createAndRegisterRingBuffer(int index)",
+      "returnType": "ScriptingObjects::ScriptRingBuffer *",
+      "description": "Creates a ring buffer and registers it so you can access it from other modules.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "createAndRegisterSliderPackData": {
+      "signature": "ScriptingObjects::ScriptSliderPackData * createAndRegisterSliderPackData(int index)",
+      "returnType": "ScriptingObjects::ScriptSliderPackData *",
+      "description": "Creates a SliderPack Data object and registers it so you can access it from other modules.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "createAndRegisterTableData": {
+      "signature": "ScriptingObjects::ScriptTableData * createAndRegisterTableData(int index)",
+      "returnType": "ScriptingObjects::ScriptTableData *",
+      "description": "Creates a Table object and registers it so you can access it from other modules.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "createBackgroundTask": {
+      "signature": "var createBackgroundTask(String name)",
+      "returnType": "var",
+      "description": "Creates a background task that can execute heavyweight functions.",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "String"
+        }
+      ]
+    },
+    "createBeatportManager": {
+      "signature": "var createBeatportManager()",
+      "returnType": "var",
+      "description": "Creates a beatport manager object.",
+      "parameters": []
+    },
+    "createBroadcaster": {
+      "signature": "var createBroadcaster(var defaultValues)",
+      "returnType": "var",
+      "description": "Creates a broadcaster that can send messages to attached listeners.",
+      "parameters": [
+        {
+          "name": "defaultValues",
+          "type": "var"
+        }
+      ]
+    },
+    "createBXLicenser": {
+      "signature": "var createBXLicenser()",
+      "returnType": "var",
+      "description": "Creates a BX Licenser object (requires the proprietary SDK).",
+      "parameters": []
+    },
+    "createDspNetwork": {
+      "signature": "var createDspNetwork(String id)",
+      "returnType": "var",
+      "description": "Creates a Dsp node network.",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "String"
+        }
+      ]
+    },
+    "createErrorHandler": {
+      "signature": "var createErrorHandler()",
+      "returnType": "var",
+      "description": "Creates an error handler that reacts on initialisation errors.",
+      "parameters": []
+    },
+    "createExpansionHandler": {
+      "signature": "var createExpansionHandler()",
+      "returnType": "var",
+      "description": "Creates (and activates) the expansion handler.",
+      "parameters": []
+    },
+    "createFFT": {
+      "signature": "var createFFT()",
+      "returnType": "var",
+      "description": "Creates an FFT object.",
+      "parameters": []
+    },
+    "createFixObjectFactory": {
+      "signature": "var createFixObjectFactory(var layoutDescription)",
+      "returnType": "var",
+      "description": "Creates a fix object factory using the data layout.",
+      "parameters": [
+        {
+          "name": "layoutDescription",
+          "type": "var"
+        }
+      ]
+    },
+    "createGlobalScriptLookAndFeel": {
+      "signature": "var createGlobalScriptLookAndFeel()",
+      "returnType": "var",
+      "description": "Creates a (or returns an existing ) script look and feel object.",
+      "parameters": []
+    },
+    "createLicenseUnlocker": {
+      "signature": "var createLicenseUnlocker()",
+      "returnType": "var",
+      "description": "Creates a reference to the script license manager.",
+      "parameters": []
+    },
+    "createMacroHandler": {
+      "signature": "var createMacroHandler()",
+      "returnType": "var",
+      "description": "Creates a macro handler that lets you programmatically change the macro connections.",
+      "parameters": []
+    },
+    "createMessageHolder": {
+      "signature": "ScriptingObjects::ScriptingMessageHolder * createMessageHolder()",
+      "returnType": "ScriptingObjects::ScriptingMessageHolder *",
+      "description": "Creates a storage object for Message events.",
+      "parameters": []
+    },
+    "createMidiAutomationHandler": {
+      "signature": "var createMidiAutomationHandler()",
+      "returnType": "var",
+      "description": "Creates a MIDI Automation handler.",
+      "parameters": []
+    },
+    "createMidiList": {
+      "signature": "ScriptingObjects::MidiList * createMidiList()",
+      "returnType": "ScriptingObjects::MidiList *",
+      "description": "Creates a MIDI List object.",
+      "parameters": []
+    },
+    "createModulationMatrix": {
+      "signature": "var createModulationMatrix(String containerId)",
+      "returnType": "var",
+      "description": "Creates a modulation matrix object that handles dynamic modulation using the given Global Modulator Container as source.",
+      "parameters": [
+        {
+          "name": "containerId",
+          "type": "String"
+        }
+      ]
+    },
+    "createNeuralNetwork": {
+      "signature": "ScriptingObjects::ScriptNeuralNetwork * createNeuralNetwork(String id)",
+      "returnType": "ScriptingObjects::ScriptNeuralNetwork *",
+      "description": "Creates a neural network with the given ID.",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "String"
+        }
+      ]
+    },
+    "createNKSManager": {
+      "signature": "var createNKSManager()",
+      "returnType": "var",
+      "description": "Creates a NKS manager object (requires the proprietary SDK).",
+      "parameters": []
+    },
+    "createThreadSafeStorage": {
+      "signature": "var createThreadSafeStorage()",
+      "returnType": "var",
+      "description": "Creates a thread safe storage container.",
+      "parameters": []
+    },
+    "createTimerObject": {
+      "signature": "ScriptingObjects::TimerObject * createTimerObject()",
+      "returnType": "ScriptingObjects::TimerObject *",
+      "description": "Creates a new timer object.",
+      "parameters": []
+    },
+    "createTransportHandler": {
+      "signature": "var createTransportHandler()",
+      "returnType": "var",
+      "description": "Creates an object that can listen to transport events.",
+      "parameters": []
+    },
+    "createUnorderedStack": {
+      "signature": "ScriptingObjects::ScriptUnorderedStack * createUnorderedStack()",
+      "returnType": "ScriptingObjects::ScriptUnorderedStack *",
+      "description": "Creates a unordered stack that can hold up to 128 float numbers.",
+      "parameters": []
+    },
+    "createUserPresetHandler": {
+      "signature": "var createUserPresetHandler()",
+      "returnType": "var",
+      "description": "Creates an user preset handler.",
+      "parameters": []
+    },
+    "decodeBase64ValueTree": {
+      "signature": "String decodeBase64ValueTree(String b64Data)",
+      "returnType": "String",
+      "description": "Decodes an Base64 encrypted valuetree (eg. HiseSnippets).",
+      "parameters": [
+        {
+          "name": "b64Data",
+          "type": "String"
+        }
+      ]
+    },
+    "doubleToString": {
+      "signature": "String doubleToString(double value, int digits)",
+      "returnType": "String",
+      "description": "Returns a string of the value with the supplied number of digits.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "double"
+        },
+        {
+          "name": "digits",
+          "type": "int"
+        }
+      ]
+    },
+    "dumpAsJSON": {
+      "signature": "void dumpAsJSON(var object, String fileName)",
+      "returnType": "void",
+      "description": "Exports an object as JSON.",
+      "parameters": [
+        {
+          "name": "object",
+          "type": "var"
+        },
+        {
+          "name": "fileName",
+          "type": "String"
+        }
+      ]
+    },
+    "extendTimeOut": {
+      "signature": "void extendTimeOut(int additionalMilliseconds)",
+      "returnType": "void",
+      "description": "Extends the compilation timeout. Use this if you have a long task that would get cancelled otherwise. This is doing nothing in compiled plugins.",
+      "parameters": [
+        {
+          "name": "additionalMilliseconds",
+          "type": "int"
+        }
+      ]
+    },
+    "getBufferSize": {
+      "signature": "int getBufferSize()",
+      "returnType": "int",
+      "description": "Returns the current maximum processing block size.",
+      "parameters": []
+    },
+    "getClipboardContent": {
+      "signature": "String getClipboardContent()",
+      "returnType": "String",
+      "description": "Returns the clipboard content.",
+      "parameters": []
+    },
+    "getComplexDataReference": {
+      "signature": "var getComplexDataReference(String dataType, String moduleId, int index)",
+      "returnType": "var",
+      "description": "Returns a reference to a complex data type from the given module.",
+      "parameters": [
+        {
+          "name": "dataType",
+          "type": "String"
+        },
+        {
+          "name": "moduleId",
+          "type": "String"
+        },
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "getControlRateDownsamplingFactor": {
+      "signature": "double getControlRateDownsamplingFactor()",
+      "returnType": "double",
+      "description": "Returns the downsampling factor for the modulation signal (default is 8).",
+      "parameters": []
+    },
+    "getCpuUsage": {
+      "signature": "double getCpuUsage()",
+      "returnType": "double",
+      "description": "Returns the current CPU usage in percent (0 ... 100)",
+      "parameters": []
+    },
+    "getCurrentUserPresetName": {
+      "signature": "String getCurrentUserPresetName()",
+      "returnType": "String",
+      "description": "Returns the currently loaded user preset (without extension).",
+      "parameters": []
+    },
+    "getDecibelsForGainFactor": {
+      "signature": "double getDecibelsForGainFactor(double gainFactor)",
+      "returnType": "double",
+      "description": "Converts gain factor (0.0 .. 1.0) to decibel (-100.0 ... 0).",
+      "parameters": [
+        {
+          "name": "gainFactor",
+          "type": "double"
+        }
+      ]
+    },
+    "getDeviceResolution": {
+      "signature": "var getDeviceResolution()",
+      "returnType": "var",
+      "description": "Returns the full screen resolution for the current device.",
+      "parameters": []
+    },
+    "getDeviceType": {
+      "signature": "String getDeviceType()",
+      "returnType": "String",
+      "description": "Returns the mobile device that this software is running on.",
+      "parameters": []
+    },
+    "getDspNetworkReference": {
+      "signature": "var getDspNetworkReference(String processorId, String id)",
+      "returnType": "var",
+      "description": "Creates a reference to the DSP network of another script processor.",
+      "parameters": [
+        {
+          "name": "processorId",
+          "type": "String"
+        },
+        {
+          "name": "id",
+          "type": "String"
+        }
+      ]
+    },
+    "getExpansionList": {
+      "signature": "var getExpansionList()",
+      "returnType": "var",
+      "description": "Creates a list of all available expansions.",
+      "parameters": []
+    },
+    "getExtraDefinitionsInBackend": {
+      "signature": "var getExtraDefinitionsInBackend()",
+      "returnType": "var",
+      "description": "Returns the platform specific extra definitions from the Project settings as JSON object.",
+      "parameters": []
+    },
+    "getFilterModeList": {
+      "signature": "var getFilterModeList()",
+      "returnType": "var",
+      "description": "Returns an object that contains all filter modes.",
+      "parameters": []
+    },
+    "getFrequencyForMidiNoteNumber": {
+      "signature": "double getFrequencyForMidiNoteNumber(int midiNumber)",
+      "returnType": "double",
+      "description": "Converts midi note number 0 ... 127 to Frequency 20 ... 20.000.",
+      "parameters": [
+        {
+          "name": "midiNumber",
+          "type": "int"
+        }
+      ]
+    },
+    "getGainFactorForDecibels": {
+      "signature": "double getGainFactorForDecibels(double decibels)",
+      "returnType": "double",
+      "description": "Converts decibel (-100.0 ... 0.0) to gain factor (0.0 ... 1.0).",
+      "parameters": [
+        {
+          "name": "decibels",
+          "type": "double"
+        }
+      ]
+    },
+    "getGlobalPitchFactor": {
+      "signature": "double getGlobalPitchFactor()",
+      "returnType": "double",
+      "description": "Returns the global pitch factor (in semitones).",
+      "parameters": []
+    },
+    "getGlobalRoutingManager": {
+      "signature": "var getGlobalRoutingManager()",
+      "returnType": "var",
+      "description": "Returns a reference to the global routing manager.",
+      "parameters": []
+    },
+    "getHostBpm": {
+      "signature": "double getHostBpm()",
+      "returnType": "double",
+      "description": "Returns the Bpm of the host.",
+      "parameters": []
+    },
+    "getLatencySamples": {
+      "signature": "int getLatencySamples()",
+      "returnType": "int",
+      "description": "Returns the latency of the plugin as reported to the host. Default is 0.",
+      "parameters": []
+    },
+    "getLorisManager": {
+      "signature": "var getLorisManager()",
+      "returnType": "var",
+      "description": "Returns a reference to the global Loris manager.",
+      "parameters": []
+    },
+    "getMacroName": {
+      "signature": "String getMacroName(int index)",
+      "returnType": "String",
+      "description": "Returns the name for the given macro index.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "getMasterPeakLevel": {
+      "signature": "double getMasterPeakLevel(int channel)",
+      "returnType": "double",
+      "description": "Returns the current peak volume (0...1) for the given channel.",
+      "parameters": [
+        {
+          "name": "channel",
+          "type": "int"
+        }
+      ]
+    },
+    "getMemoryUsage": {
+      "signature": "double getMemoryUsage()",
+      "returnType": "double",
+      "description": "Returns the current memory usage in MB.",
+      "parameters": []
+    },
+    "getMidiNoteFromName": {
+      "signature": "int getMidiNoteFromName(String midiNoteName)",
+      "returnType": "int",
+      "description": "Converts MIDI note name to MIDI number (\"C3\" for middle C).",
+      "parameters": [
+        {
+          "name": "midiNoteName",
+          "type": "String"
+        }
+      ]
+    },
+    "getMidiNoteName": {
+      "signature": "String getMidiNoteName(int midiNumber)",
+      "returnType": "String",
+      "description": "Converts MIDI note number to Midi note name (\"C3\" for middle C).",
+      "parameters": [
+        {
+          "name": "midiNumber",
+          "type": "int"
+        }
+      ]
+    },
+    "getMilliSecondsForQuarterBeats": {
+      "signature": "double getMilliSecondsForQuarterBeats(double quarterBeats)",
+      "returnType": "double",
+      "description": "Converts quarter beats to milliseconds using the current tempo.",
+      "parameters": [
+        {
+          "name": "quarterBeats",
+          "type": "double"
+        }
+      ]
+    },
+    "getMilliSecondsForQuarterBeatsWithTempo": {
+      "signature": "double getMilliSecondsForQuarterBeatsWithTempo(double quarterBeats, double bpm)",
+      "returnType": "double",
+      "description": "Converts quarter beats to milliseconds using the given tempo.",
+      "parameters": [
+        {
+          "name": "quarterBeats",
+          "type": "double"
+        },
+        {
+          "name": "bpm",
+          "type": "double"
+        }
+      ]
+    },
+    "getMilliSecondsForSamples": {
+      "signature": "double getMilliSecondsForSamples(double samples)",
+      "returnType": "double",
+      "description": "Converts samples to milli seconds.",
+      "parameters": [
+        {
+          "name": "samples",
+          "type": "double"
+        }
+      ]
+    },
+    "getMilliSecondsForTempo": {
+      "signature": "double getMilliSecondsForTempo(int tempoIndex)",
+      "returnType": "double",
+      "description": "Returns the millisecond value for the supplied tempo (HINT: Use \"TempoSync\" mode from Slider!)",
+      "parameters": [
+        {
+          "name": "tempoIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "getName": {
+      "signature": "String getName()",
+      "returnType": "String",
+      "description": "Returns the product name (not the HISE name!).",
+      "parameters": []
+    },
+    "getNumPluginChannels": {
+      "signature": "int getNumPluginChannels()",
+      "returnType": "int",
+      "description": "Returns the amount of output channels.",
+      "parameters": []
+    },
+    "getNumVoices": {
+      "signature": "int getNumVoices()",
+      "returnType": "int",
+      "description": "Returns the amount of currently active voices.",
+      "parameters": []
+    },
+    "getOS": {
+      "signature": "String getOS()",
+      "returnType": "String",
+      "description": "Returns the current operating system (\"OSX\", \"LINUX\", or (\"WIN\").",
+      "parameters": []
+    },
+    "getPitchRatioFromSemitones": {
+      "signature": "double getPitchRatioFromSemitones(double semiTones)",
+      "returnType": "double",
+      "description": "Converts a semitone value to a pitch ratio (-12 ... 12) -> (0.5 ... 2.0)",
+      "parameters": [
+        {
+          "name": "semiTones",
+          "type": "double"
+        }
+      ]
+    },
+    "getPlayHead": {
+      "signature": "DynamicObject * getPlayHead()",
+      "returnType": "DynamicObject *",
+      "description": "Allows access to the data of the host (playing status, timeline, etc...).",
+      "parameters": []
+    },
+    "getPreloadMessage": {
+      "signature": "String getPreloadMessage()",
+      "returnType": "String",
+      "description": "Returns the current preload message if there is one.",
+      "parameters": []
+    },
+    "getPreloadProgress": {
+      "signature": "double getPreloadProgress()",
+      "returnType": "double",
+      "description": "Returns the preload progress from 0.0 to 1.0. Use this to display some kind of loading icon.",
+      "parameters": []
+    },
+    "getProjectInfo": {
+      "signature": "var getProjectInfo()",
+      "returnType": "var",
+      "description": "Returns project and company info from the Project's preferences.",
+      "parameters": []
+    },
+    "getQuarterBeatsForMilliSeconds": {
+      "signature": "double getQuarterBeatsForMilliSeconds(double milliSeconds)",
+      "returnType": "double",
+      "description": "Converts milliseconds to quarter beats using the current tempo.",
+      "parameters": [
+        {
+          "name": "milliSeconds",
+          "type": "double"
+        }
+      ]
+    },
+    "getQuarterBeatsForMilliSecondsWithTempo": {
+      "signature": "double getQuarterBeatsForMilliSecondsWithTempo(double milliSeconds, double bpm)",
+      "returnType": "double",
+      "description": "Converts milliseconds to quarter beats using the given tempo.",
+      "parameters": [
+        {
+          "name": "milliSeconds",
+          "type": "double"
+        },
+        {
+          "name": "bpm",
+          "type": "double"
+        }
+      ]
+    },
+    "getQuarterBeatsForSamples": {
+      "signature": "double getQuarterBeatsForSamples(double samples)",
+      "returnType": "double",
+      "description": "Converts samples to quarter beats using the current tempo.",
+      "parameters": [
+        {
+          "name": "samples",
+          "type": "double"
+        }
+      ]
+    },
+    "getQuarterBeatsForSamplesWithTempo": {
+      "signature": "double getQuarterBeatsForSamplesWithTempo(double samples, double bpm)",
+      "returnType": "double",
+      "description": "Converts samples to quarter beats using the given tempo.",
+      "parameters": [
+        {
+          "name": "samples",
+          "type": "double"
+        },
+        {
+          "name": "bpm",
+          "type": "double"
+        }
+      ]
+    },
+    "getRegexMatches": {
+      "signature": "var getRegexMatches(String stringToMatch, String regex)",
+      "returnType": "var",
+      "description": "Returns an array with all matches.",
+      "parameters": [
+        {
+          "name": "stringToMatch",
+          "type": "String"
+        },
+        {
+          "name": "regex",
+          "type": "String"
+        }
+      ]
+    },
+    "getSampleFilesFromDirectory": {
+      "signature": "var getSampleFilesFromDirectory(String relativePathFromSampleFolder, bool recursive)",
+      "returnType": "var",
+      "description": "Iterates the given sub-directory of the Samples folder and returns a list with all references to audio files.",
+      "parameters": [
+        {
+          "name": "relativePathFromSampleFolder",
+          "type": "String"
+        },
+        {
+          "name": "recursive",
+          "type": "bool"
+        }
+      ]
+    },
+    "getSampleRate": {
+      "signature": "double getSampleRate()",
+      "returnType": "double",
+      "description": "Returns the current sample rate.",
+      "parameters": []
+    },
+    "getSamplesForMilliSeconds": {
+      "signature": "double getSamplesForMilliSeconds(double milliSeconds)",
+      "returnType": "double",
+      "description": "Converts milli seconds to samples",
+      "parameters": [
+        {
+          "name": "milliSeconds",
+          "type": "double"
+        }
+      ]
+    },
+    "getSamplesForQuarterBeats": {
+      "signature": "double getSamplesForQuarterBeats(double quarterBeats)",
+      "returnType": "double",
+      "description": "Converts quarter beats to samples using the current tempo.",
+      "parameters": [
+        {
+          "name": "quarterBeats",
+          "type": "double"
+        }
+      ]
+    },
+    "getSamplesForQuarterBeatsWithTempo": {
+      "signature": "double getSamplesForQuarterBeatsWithTempo(double quarterBeats, double bpm)",
+      "returnType": "double",
+      "description": "Converts quarter beats to samples using the given tempo.",
+      "parameters": [
+        {
+          "name": "quarterBeats",
+          "type": "double"
+        },
+        {
+          "name": "bpm",
+          "type": "double"
+        }
+      ]
+    },
+    "getSemitonesFromPitchRatio": {
+      "signature": "double getSemitonesFromPitchRatio(double pitchRatio)",
+      "returnType": "double",
+      "description": "Converts a pitch ratio to semitones (0.5 ... 2.0) -> (-12 ... 12)",
+      "parameters": [
+        {
+          "name": "pitchRatio",
+          "type": "double"
+        }
+      ]
+    },
+    "getSettingsWindowObject": {
+      "signature": "var getSettingsWindowObject()",
+      "returnType": "var",
+      "description": "Returns a object that contains the properties for the settings dialog.",
+      "parameters": []
+    },
+    "getStringWidth": {
+      "signature": "float getStringWidth(String text, String fontName, float fontSize, float fontSpacing)",
+      "returnType": "float",
+      "description": "Returns the width of the string for the given font properties.",
+      "parameters": [
+        {
+          "name": "text",
+          "type": "String"
+        },
+        {
+          "name": "fontName",
+          "type": "String"
+        },
+        {
+          "name": "fontSize",
+          "type": "float"
+        },
+        {
+          "name": "fontSpacing",
+          "type": "float"
+        }
+      ]
+    },
+    "getSystemStats": {
+      "signature": "var getSystemStats()",
+      "returnType": "var",
+      "description": "Returns info about the current hardware and OS configuration.",
+      "parameters": []
+    },
+    "getSystemTime": {
+      "signature": "String getSystemTime(bool includeDividerCharacters)",
+      "returnType": "String",
+      "description": "Returns a fully described string of this date and time in ISO-8601 format (using the local timezone) with or without divider characters.",
+      "parameters": [
+        {
+          "name": "includeDividerCharacters",
+          "type": "bool"
+        }
+      ]
+    },
+    "getTempoName": {
+      "signature": "String getTempoName(int tempoIndex)",
+      "returnType": "String",
+      "description": "Returns the tempo name for the given index",
+      "parameters": [
+        {
+          "name": "tempoIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "getTextForValue": {
+      "signature": "String getTextForValue(double value, String converterMode)",
+      "returnType": "String",
+      "description": "Uses one of the inbuilt text converters to prettify a numeric value.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "double"
+        },
+        {
+          "name": "converterMode",
+          "type": "String"
+        }
+      ]
+    },
+    "getUptime": {
+      "signature": "double getUptime()",
+      "returnType": "double",
+      "description": "Returns the uptime of the engine in seconds.",
+      "parameters": []
+    },
+    "getUserPresetList": {
+      "signature": "var getUserPresetList()",
+      "returnType": "var",
+      "description": "Returns a list of all available user presets as relative path.",
+      "parameters": []
+    },
+    "getValueForText": {
+      "signature": "double getValueForText(String text, String convertedMode)",
+      "returnType": "double",
+      "description": "Uses one of the inbuilt text converts to parse a text string to a numeric value.",
+      "parameters": [
+        {
+          "name": "text",
+          "type": "String"
+        },
+        {
+          "name": "convertedMode",
+          "type": "String"
+        }
+      ]
+    },
+    "getVersion": {
+      "signature": "String getVersion()",
+      "returnType": "String",
+      "description": "Returns the product version (not the HISE version!).",
+      "parameters": []
+    },
+    "getWavetableList": {
+      "signature": "var getWavetableList()",
+      "returnType": "var",
+      "description": "Returns the list of wavetables of the current expansion (or factory content).",
+      "parameters": []
+    },
+    "getZoomLevel": {
+      "signature": "var getZoomLevel()",
+      "returnType": "var",
+      "description": "Returns the current Zoom Level.",
+      "parameters": []
+    },
+    "intToHexString": {
+      "signature": "String intToHexString(int value)",
+      "returnType": "String",
+      "description": "Returns a number as string in hexadecimal format (0xFFFFFFFF).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "int"
+        }
+      ]
+    },
+    "isControllerUsedByAutomation": {
+      "signature": "int isControllerUsedByAutomation(var controllerNumber)",
+      "returnType": "int",
+      "description": "Checks if the given CC number (single number) or channel / CC number (JS Array: [channel, CC]) is used for parameter automation and returns the index of the control.",
+      "parameters": [
+        {
+          "name": "controllerNumber",
+          "type": "var"
+        }
+      ]
+    },
+    "isHISE": {
+      "signature": "bool isHISE()",
+      "returnType": "bool",
+      "description": "Returns true if the project is running inside HISE. You can use this during development to simulate different environments.",
+      "parameters": []
+    },
+    "isMpeEnabled": {
+      "signature": "bool isMpeEnabled()",
+      "returnType": "bool",
+      "description": "Checks if the global MPE mode is enabled.",
+      "parameters": []
+    },
+    "isPlugin": {
+      "signature": "bool isPlugin()",
+      "returnType": "bool",
+      "description": "Returns true if running as VST / AU / AAX plugin.",
+      "parameters": []
+    },
+    "isUserPresetReadOnly": {
+      "signature": "bool isUserPresetReadOnly(var optionalFile)",
+      "returnType": "bool",
+      "description": "Checks if the user preset is read only.",
+      "parameters": [
+        {
+          "name": "optionalFile",
+          "type": "var"
+        }
+      ]
+    },
+    "loadAudioFileIntoBufferArray": {
+      "signature": "var loadAudioFileIntoBufferArray(String audioFileReference)",
+      "returnType": "var",
+      "description": "Loads a file and returns its content as array of Buffers.",
+      "parameters": [
+        {
+          "name": "audioFileReference",
+          "type": "String"
+        }
+      ]
+    },
+    "loadAudioFilesIntoPool": {
+      "signature": "var loadAudioFilesIntoPool()",
+      "returnType": "var",
+      "description": "Calling this makes sure that all audio files are loaded into the pool and will be available in the compiled plugin. Returns a list of all references.",
+      "parameters": []
+    },
+    "loadFont": {
+      "signature": "void loadFont(String fileName)",
+      "returnType": "void",
+      "description": "Loads a font file. This is deprecated, because it might result in different names on various OS. Use loadFontAs() instead.",
+      "parameters": [
+        {
+          "name": "fileName",
+          "type": "String"
+        }
+      ]
+    },
+    "loadFontAs": {
+      "signature": "void loadFontAs(String fileName, String fontId)",
+      "returnType": "void",
+      "description": "Loads the font from the given file in the image folder and registers it under the fontId. This is platform agnostic.",
+      "parameters": [
+        {
+          "name": "fileName",
+          "type": "String"
+        },
+        {
+          "name": "fontId",
+          "type": "String"
+        }
+      ]
+    },
+    "loadFromJSON": {
+      "signature": "var loadFromJSON(String fileName)",
+      "returnType": "var",
+      "description": "Imports a JSON file as object.",
+      "parameters": [
+        {
+          "name": "fileName",
+          "type": "String"
+        }
+      ]
+    },
+    "loadImageIntoPool": {
+      "signature": "void loadImageIntoPool(String id)",
+      "returnType": "void",
+      "description": "Loads an image into the pool. You can use a wildcard to load multiple images at once.",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "String"
+        }
+      ]
+    },
+    "loadNextUserPreset": {
+      "signature": "void loadNextUserPreset(bool stayInDirectory)",
+      "returnType": "void",
+      "description": "Loads the next user preset.",
+      "parameters": [
+        {
+          "name": "stayInDirectory",
+          "type": "bool"
+        }
+      ]
+    },
+    "loadPreviousUserPreset": {
+      "signature": "void loadPreviousUserPreset(bool stayInDirectory)",
+      "returnType": "void",
+      "description": "Loads the previous user preset.",
+      "parameters": [
+        {
+          "name": "stayInDirectory",
+          "type": "bool"
+        }
+      ]
+    },
+    "loadUserPreset": {
+      "signature": "void loadUserPreset(var relativePathOrFileObject)",
+      "returnType": "void",
+      "description": "Loads a user preset with the given relative path (use `/` for directory separation) or the given ScriptFile object.",
+      "parameters": [
+        {
+          "name": "relativePathOrFileObject",
+          "type": "var"
+        }
+      ]
+    },
+    "logSettingWarning": {
+      "signature": "void logSettingWarning(String methodName)",
+      "returnType": "void",
+      "description": "This warning will show up in the console so people can migrate in the next years...",
+      "parameters": [
+        {
+          "name": "methodName",
+          "type": "String"
+        }
+      ]
+    },
+    "matchesRegex": {
+      "signature": "bool matchesRegex(String stringToMatch, String regex)",
+      "returnType": "bool",
+      "description": "Matches the string against the regex token.",
+      "parameters": [
+        {
+          "name": "stringToMatch",
+          "type": "String"
+        },
+        {
+          "name": "regex",
+          "type": "String"
+        }
+      ]
+    },
+    "openWebsite": {
+      "signature": "void openWebsite(String url)",
+      "returnType": "void",
+      "description": "launches the given URL in the system's web browser.",
+      "parameters": [
+        {
+          "name": "url",
+          "type": "String"
+        }
+      ]
+    },
+    "performUndoAction": {
+      "signature": "bool performUndoAction(var thisObject, var undoAction)",
+      "returnType": "bool",
+      "description": "Performs an action that can be undone via Engine.undo().",
+      "parameters": [
+        {
+          "name": "thisObject",
+          "type": "var"
+        },
+        {
+          "name": "undoAction",
+          "type": "var"
+        }
+      ]
+    },
+    "playBuffer": {
+      "signature": "void playBuffer(var bufferData, var callback, double fileSampleRate)",
+      "returnType": "void",
+      "description": "Previews a audio buffer with a callback indicating the state.",
+      "parameters": [
+        {
+          "name": "bufferData",
+          "type": "var"
+        },
+        {
+          "name": "callback",
+          "type": "var"
+        },
+        {
+          "name": "fileSampleRate",
+          "type": "double"
+        }
+      ]
+    },
+    "quit": {
+      "signature": "void quit()",
+      "returnType": "void",
+      "description": "Signals that the application should terminate.",
+      "parameters": []
+    },
+    "rebuildCachedPools": {
+      "signature": "void rebuildCachedPools()",
+      "returnType": "void",
+      "description": "Rebuilds the entries for all cached pools (MIDI files and samplemaps).",
+      "parameters": []
+    },
+    "redo": {
+      "signature": "void redo()",
+      "returnType": "void",
+      "description": "Redo the last controller change.",
+      "parameters": []
+    },
+    "reloadAllSamples": {
+      "signature": "void reloadAllSamples()",
+      "returnType": "void",
+      "description": "Forces a full (asynchronous) reload of all samples (eg. after the sample directory has changed).",
+      "parameters": []
+    },
+    "renderAudio": {
+      "signature": "void renderAudio(var eventList, var finishCallback)",
+      "returnType": "void",
+      "description": "Renders a MIDI event list as audio data on a background thread and calls a function when it's ready.",
+      "parameters": [
+        {
+          "name": "eventList",
+          "type": "var"
+        },
+        {
+          "name": "finishCallback",
+          "type": "var"
+        }
+      ]
+    },
+    "saveUserPreset": {
+      "signature": "void saveUserPreset(var presetName)",
+      "returnType": "void",
+      "description": "Asks for a preset name (if presetName is empty) and saves the current user preset.",
+      "parameters": [
+        {
+          "name": "presetName",
+          "type": "var"
+        }
+      ]
+    },
+    "setAllowDuplicateSamples": {
+      "signature": "void setAllowDuplicateSamples(bool shouldAllow)",
+      "returnType": "void",
+      "description": "Sets whether the samples are allowed to be duplicated. Set this to false if you operate on the same samples differently.",
+      "parameters": [
+        {
+          "name": "shouldAllow",
+          "type": "bool"
+        }
+      ]
+    },
+    "setCurrentExpansion": {
+      "signature": "bool setCurrentExpansion(String expansionName)",
+      "returnType": "bool",
+      "description": "Sets the active expansion and updates the preset browser.",
+      "parameters": [
+        {
+          "name": "expansionName",
+          "type": "String"
+        }
+      ]
+    },
+    "setDiskMode": {
+      "signature": "void setDiskMode(int mode)",
+      "returnType": "void",
+      "description": "Sets the Streaming Mode (0 -> Fast-SSD, 1 -> Slow-HDD)",
+      "parameters": [
+        {
+          "name": "mode",
+          "type": "int"
+        }
+      ]
+    },
+    "setFrontendMacros": {
+      "signature": "void setFrontendMacros(var nameList)",
+      "returnType": "void",
+      "description": "Enables the macro system to be used by the end user.",
+      "parameters": [
+        {
+          "name": "nameList",
+          "type": "var"
+        }
+      ]
+    },
+    "setGlobalFont": {
+      "signature": "void setGlobalFont(String fontName)",
+      "returnType": "void",
+      "description": "Sets the font that will be used as default font for various things.",
+      "parameters": [
+        {
+          "name": "fontName",
+          "type": "String"
+        }
+      ]
+    },
+    "setGlobalPitchFactor": {
+      "signature": "void setGlobalPitchFactor(double pitchFactorInSemitones)",
+      "returnType": "void",
+      "description": "Sets the global pitch factor (in semitones).",
+      "parameters": [
+        {
+          "name": "pitchFactorInSemitones",
+          "type": "double"
+        }
+      ]
+    },
+    "setHostBpm": {
+      "signature": "void setHostBpm(double newTempo)",
+      "returnType": "void",
+      "description": "Overwrites the host BPM. Use -1 for sync to host.",
+      "parameters": [
+        {
+          "name": "newTempo",
+          "type": "double"
+        }
+      ]
+    },
+    "setKeyColour": {
+      "signature": "void setKeyColour(int keyNumber, int colourAsHex)",
+      "returnType": "void",
+      "description": "Sets a key of the global keyboard to the specified colour (using the form 0x00FF00 for eg. of the key to the specified colour.",
+      "parameters": [
+        {
+          "name": "keyNumber",
+          "type": "int"
+        },
+        {
+          "name": "colourAsHex",
+          "type": "int"
+        }
+      ]
+    },
+    "setLatencySamples": {
+      "signature": "void setLatencySamples(int latency)",
+      "returnType": "void",
+      "description": "sets the latency of the plugin as reported to the host. Default is 0.",
+      "parameters": [
+        {
+          "name": "latency",
+          "type": "int"
+        }
+      ]
+    },
+    "setLowestKeyToDisplay": {
+      "signature": "void setLowestKeyToDisplay(int keyNumber)",
+      "returnType": "void",
+      "description": "Changes the lowest visible key on the on screen keyboard.",
+      "parameters": [
+        {
+          "name": "keyNumber",
+          "type": "int"
+        }
+      ]
+    },
+    "setMaximumBlockSize": {
+      "signature": "void setMaximumBlockSize(int numSamplesPerBlock)",
+      "returnType": "void",
+      "description": "Sets the maximum buffer size that is processed at once. If the buffer size from the audio driver / host is bigger than this number, it will split up the incoming buffer and call process multiple times.",
+      "parameters": [
+        {
+          "name": "numSamplesPerBlock",
+          "type": "int"
+        }
+      ]
+    },
+    "setMinimumSampleRate": {
+      "signature": "bool setMinimumSampleRate(double minimumSampleRate)",
+      "returnType": "bool",
+      "description": "Sets the minimum sample rate for the global processing (and adds oversampling if the current samplerate is lower).",
+      "parameters": [
+        {
+          "name": "minimumSampleRate",
+          "type": "double"
+        }
+      ]
+    },
+    "setPreloadMessage": {
+      "signature": "void setPreloadMessage(String message)",
+      "returnType": "void",
+      "description": "Sets the preload message.",
+      "parameters": [
+        {
+          "name": "message",
+          "type": "String"
+        }
+      ]
+    },
+    "setUserPresetTagList": {
+      "signature": "void setUserPresetTagList(var listOfTags)",
+      "returnType": "void",
+      "description": "Sets the tags that appear in the user preset browser.",
+      "parameters": [
+        {
+          "name": "listOfTags",
+          "type": "var"
+        }
+      ]
+    },
+    "setZoomLevel": {
+      "signature": "void setZoomLevel(double newLevel)",
+      "returnType": "void",
+      "description": "Sets the new zoom level (1.0 = 100%)",
+      "parameters": [
+        {
+          "name": "newLevel",
+          "type": "double"
+        }
+      ]
+    },
+    "showErrorMessage": {
+      "signature": "void showErrorMessage(String message, bool isCritical)",
+      "returnType": "void",
+      "description": "Shows a error message on the compiled plugin (or prints it on the console). Use isCritical if you want to disable the \"Ignore\" Button.",
+      "parameters": [
+        {
+          "name": "message",
+          "type": "String"
+        },
+        {
+          "name": "isCritical",
+          "type": "bool"
+        }
+      ]
+    },
+    "showMessage": {
+      "signature": "void showMessage(String message)",
+      "returnType": "void",
+      "description": "Shows a message with an overlay on the compiled plugin with an \"OK\" button in order to notify the user about important events.",
+      "parameters": [
+        {
+          "name": "message",
+          "type": "String"
+        }
+      ]
+    },
+    "showMessageBox": {
+      "signature": "void showMessageBox(String title, String markdownMessage, int type)",
+      "returnType": "void",
+      "description": "Shows a message box with an OK button and a icon defined by the type variable.",
+      "parameters": [
+        {
+          "name": "title",
+          "type": "String"
+        },
+        {
+          "name": "markdownMessage",
+          "type": "String"
+        },
+        {
+          "name": "type",
+          "type": "int"
+        }
+      ]
+    },
+    "showYesNoWindow": {
+      "signature": "void showYesNoWindow(String title, String markdownMessage, var callback)",
+      "returnType": "void",
+      "description": "Shows a message with a question and executes the function after the user has selected his choice.",
+      "parameters": [
+        {
+          "name": "title",
+          "type": "String"
+        },
+        {
+          "name": "markdownMessage",
+          "type": "String"
+        },
+        {
+          "name": "callback",
+          "type": "var"
+        }
+      ]
+    },
+    "sortWithFunction": {
+      "signature": "bool sortWithFunction(var arrayToSort, var sortFunction)",
+      "returnType": "bool",
+      "description": "Sorts an array with a given comparison function.",
+      "parameters": [
+        {
+          "name": "arrayToSort",
+          "type": "var"
+        },
+        {
+          "name": "sortFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "uncompressJSON": {
+      "signature": "var uncompressJSON(String b64)",
+      "returnType": "var",
+      "description": "Expands a compressed JSON object.",
+      "parameters": [
+        {
+          "name": "b64",
+          "type": "String"
+        }
+      ]
+    },
+    "undo": {
+      "signature": "void undo()",
+      "returnType": "void",
+      "description": "Reverts the last controller change.",
+      "parameters": []
+    }
+  }
+}

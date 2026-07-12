@@ -1,0 +1,73 @@
+{
+  "moduleId": "ScriptFX",
+  "prettyName": "Script FX",
+  "type": "Effect",
+  "subtype": "MasterEffect",
+  "category": "custom",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "stereo",
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    { "name": "RoutingMatrix", "signalFlowRole": "skip - inferred from MasterEffect type" },
+    { "name": "SlotFX", "signalFlowRole": "network_host - loads and hot-swaps scriptnode DSP networks" },
+    { "name": "TableProcessor", "signalFlowRole": "complex_data - exposes Table objects from the loaded network" },
+    { "name": "SliderPackProcessor", "signalFlowRole": "complex_data - exposes SliderPack objects from the loaded network" },
+    { "name": "AudioSampleProcessor", "signalFlowRole": "complex_data - exposes AudioFile objects from the loaded network" },
+    { "name": "DisplayBufferSource", "signalFlowRole": "skip - UI communication only" }
+  ],
+
+  "parameterGroups": [],
+
+  "standaloneModChains": [],
+  "disabledModChains": [],
+  "compositeBlocks": [],
+
+  "gaps": [
+    {
+      "id": "network-loading-mechanism",
+      "category": "signal_path",
+      "question": "How does the module load a scriptnode network? Is it via the DspNetwork::Holder interface, and does it use the onInit callback or the SlotFX/HotswappableProcessor setEffect method?",
+      "context": "Need to explain to users how to load and switch networks in the reference page."
+    },
+    {
+      "id": "parameter-exposure",
+      "category": "parameter_behavior",
+      "question": "How are parameters declared in the scriptnode network exposed to the module tree? Are they dynamically added when a network is loaded?",
+      "context": "Users need to understand how network parameters become accessible via scripting and the module parameter list."
+    },
+    {
+      "id": "complex-data-routing",
+      "category": "interface_usage",
+      "question": "How are Tables, SliderPacks, and AudioFiles from the loaded network exposed through the module's interfaces? Can they be accessed from HISEScript?",
+      "context": "Complex data type routing is a key user workflow for connecting scriptnode networks to the module tree."
+    },
+    {
+      "id": "modulation-chain-support",
+      "category": "signal_path",
+      "question": "Does ScriptFX support extra modulation chains that can modulate network parameters? How are they configured (HISE_NUM_SCRIPTNODE_FX_MODS)?",
+      "context": "Users need to know whether and how modulation chains connect to scriptnode parameters."
+    },
+    {
+      "id": "dual-mode-operation",
+      "category": "signal_path",
+      "question": "Does ScriptFX support both scriptnode network mode and HISEScript callback mode (processBlock callback)? How does it decide which to use?",
+      "context": "Understanding the dual-mode nature is critical for the reference page signal path description."
+    },
+    {
+      "id": "script-vs-hardcoded-difference",
+      "category": "signal_path",
+      "question": "What is the practical difference between ScriptFX and HardcodedMasterFX from a user perspective?",
+      "context": "Users need to understand when to use each variant."
+    }
+  ],
+
+  "notes": "ScriptFX is the master effect variant of the scriptnode container family. It hosts either a scriptnode DSP network or HISEScript callbacks for audio processing. All parameters come from the loaded network. The C++ class is JavascriptMasterEffect. The Hardcoded equivalent is HardcodedMasterFX."
+}

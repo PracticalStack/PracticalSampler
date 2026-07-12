@@ -1,0 +1,32 @@
+{
+  "targetId": "core.snex_node",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [4364, 13587],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "SNEX nodes must be compiled to C++ for export — JIT compiler is not in the plugin binary",
+      "summary": "Any `core.snex_node` (and also `cable_expr`, `math.expr`, and parameter expression nodes) uses the SNEX JIT compiler, which is not included in exported plugin builds. To export, you must: (1) wrap the SNEX node into a separate DSP network, (2) use the 'Wrap into DSP Network' toolbar action to create an encapsulated sub-network, and (3) run 'Compile DSP Networks' to generate the C++ DLL. The frozen/snowflake icon indicates the compiled version is active.",
+      "sources": ["tid:4364"],
+      "verify": true,
+      "verify_hint": "Confirm the full export workflow: wrap -> compile -> reload with freeze icon visible."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use the 'Wrap into DSP Network' toolbar action to prepare a SNEX node for export",
+      "summary": "Rather than manually creating a wrapper network, use the 'Wrap' icon in the scriptnode toolbar and select 'Wrap into DSP Network'. HISE will automatically create a sub-network, duplicate the node's parameters in the root network, and connect them. After selecting 'Save and Reload', the SNEX node is replaced by a nested DSP network node ready for compilation.",
+      "sources": ["tid:4364"],
+      "verify": true,
+      "verify_hint": "Follow the wrap workflow in the HISE UI and confirm it produces the correct intermediate and final network state."
+    },
+    {
+      "type": "API",
+      "title": "setParameter() in a SNEX node takes a single double value — all branching via template int P",
+      "summary": "The `setParameter()` callback in a SNEX node has the signature `template <int P> void setParameter(double value)`. All parameter branching is done via the template constant `P`, not via function arguments. A common mistake is to add multiple arguments to the function, which prevents it from compiling.",
+      "sources": ["tid:13587"],
+      "verify": true,
+      "verify_hint": "Confirm the exact required signature for setParameter in the SNEX node API documentation."
+    }
+  ]
+}

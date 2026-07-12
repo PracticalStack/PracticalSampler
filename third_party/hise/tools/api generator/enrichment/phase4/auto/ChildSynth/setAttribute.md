@@ -1,0 +1,1 @@
+Sets the value of the attribute at the specified parameter index. Use the dynamic constants on the instance (e.g. `cs.setAttribute(cs.Gain, 0.5)`) rather than raw index numbers. The value range depends on the specific parameter.

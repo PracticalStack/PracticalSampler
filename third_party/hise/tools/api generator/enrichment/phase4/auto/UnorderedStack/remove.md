@@ -1,0 +1,1 @@
+Removes the first matching value and returns true, or false if not found. In float mode, matches by exact float equality. In event mode, uses the configured compare function. The gap is filled by swapping in the last element, so element order changes after removal.

@@ -1,0 +1,16 @@
+{
+  "factoryPath": "core.snex_osc",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 0.3, "description": "Existing signal (oscillator adds to ch0)" },
+    { "id": "osc", "label": "SNEX Oscillator", "type": "process", "importance": 1.0, "description": "User-defined oscillator via tick() and process() callbacks" },
+    { "id": "freq", "label": "Frequency", "type": "parameter", "importance": 0.9, "description": "Base frequency (overridden by MIDI note-on)" },
+    { "id": "mult", "label": "PitchMultiplier", "type": "parameter", "importance": 0.7, "description": "Frequency multiplier (integer steps)" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Input + oscillator output on ch0 (additive)" }
+  ],
+  "edges": [
+    { "from": "in", "to": "osc", "type": "signal", "label": null },
+    { "from": "freq", "to": "osc", "type": "control", "label": null },
+    { "from": "mult", "to": "osc", "type": "control", "label": null },
+    { "from": "osc", "to": "out", "type": "signal", "label": "ch0 += osc" }
+  ]
+}

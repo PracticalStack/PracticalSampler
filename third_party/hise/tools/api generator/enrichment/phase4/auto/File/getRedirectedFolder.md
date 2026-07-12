@@ -1,0 +1,3 @@
+Checks this directory for a HISE link file and returns the redirect target if one exists. HISE uses platform-specific link files (`LinkWindows`, `LinkOSX`, `LinkLinux`) inside directories to redirect folder references to a different location - the same mechanism used for sample folder redirection. If no link file is found, returns this same File object.
+
+> [!Warning:Link files are platform-specific] The link file name is platform-specific. A redirect configured on one platform (e.g. `LinkWindows`) is not followed on another. Calling this on a path that exists as a regular file triggers a script error, but calling it on a non-existent path silently returns the same File object.

@@ -1,0 +1,1 @@
+Returns the current sample map as a compressed, base64-encoded string that captures the complete state including any post-load property edits. Store this string in a user preset and restore it with `Sampler.loadSampleMapFromBase64()`.

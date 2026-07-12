@@ -1,0 +1,1 @@
+Plays an artificial note on channel 1 with no timestamp offset and returns its event ID. This is the simplest note generation method. Store the returned event ID to later stop the note via `noteOffByEventId` or `noteOffDelayedByEventId`. Use `addNoteOn` when you need to specify a MIDI channel or sample-accurate timestamp.

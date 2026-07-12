@@ -1,0 +1,20 @@
+{
+  "factoryPath": "routing.event_data_reader",
+  "nodes": [
+    { "id": "event_in", "label": "HiseEvent (Note-On)", "type": "input", "importance": 1.0, "description": "Note-on event provides the event ID for storage lookup" },
+    { "id": "store_id", "label": "Store Event ID", "type": "process", "importance": 0.8, "description": "Captures event ID per voice on note-on" },
+    { "id": "read", "label": "Read from Event Storage", "type": "process", "importance": 1.0, "description": "Looks up value in AdditionalEventStorage[eventId][slotIndex]" },
+    { "id": "static_mode", "label": "Static Mode", "type": "decision", "importance": 0.7, "description": "Static=On: read once at note-on. Static=Off: read continuously." },
+    { "id": "slot_index", "label": "SlotIndex", "type": "parameter", "importance": 1.0, "description": "Selects which data slot (0-15) to read" },
+    { "id": "static_param", "label": "Static", "type": "parameter", "importance": 0.7, "description": "Toggle: read once at note-on (On) or continuously (Off)" },
+    { "id": "mod_out", "label": "Modulation Output", "type": "modulation_out", "importance": 1.0, "description": "Outputs the read value as normalised modulation signal" }
+  ],
+  "edges": [
+    { "from": "event_in", "to": "store_id", "type": "signal", "label": null },
+    { "from": "store_id", "to": "read", "type": "signal", "label": "eventId" },
+    { "from": "slot_index", "to": "read", "type": "control", "label": null },
+    { "from": "static_param", "to": "static_mode", "type": "control", "label": null },
+    { "from": "static_mode", "to": "read", "type": "conditional", "label": "timing of read" },
+    { "from": "read", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

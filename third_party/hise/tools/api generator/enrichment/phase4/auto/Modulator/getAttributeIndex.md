@@ -1,0 +1,1 @@
+Returns the parameter index for a given attribute name, or -1 if the name is not found. This is the reverse lookup of `getAttributeId` - useful when you have a parameter name as a string variable and need the index for `setAttribute`.

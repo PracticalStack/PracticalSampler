@@ -1,0 +1,82 @@
+{
+  "factoryPath": "control.resetter",
+  "factory": "control",
+  "nodeId": "resetter",
+  "description": "Sends an inverted impulse (0,1) to reset gate-like parameters",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input",
+      "rationale": "Trigger input -- when Value arrives, the node sends a 0 then 1 impulse to reset gate-like targets.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/resetter.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "impulse-mechanism",
+      "category": "signal_path",
+      "question": "The description says 'inverted impulse (0,1)'. Does it send 0 first then 1, or 1 then 0? Is this a two-step sequence within a single setValue() call? What triggers it -- any change to Value, or only specific transitions?",
+      "context": "The exact impulse sequence and trigger condition are essential for users connecting to gate parameters."
+    },
+    {
+      "id": "reset-target-pattern",
+      "category": "parameter_behaviour",
+      "question": "What are 'gate-like parameters'? Is this specifically designed for use with envelope gate inputs or soft_bypass toggles? Does the (0,1) sequence cause a re-trigger?",
+      "context": "Users need practical guidance on what this node is intended to reset."
+    }
+  ],
+
+  "notes": "The description suggests this outputs a 0 followed by 1 to force a reset on gate-style parameters (like envelope triggers). No IsPolyphonic flag. Very simple single-parameter node."
+}

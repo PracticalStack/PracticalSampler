@@ -1,0 +1,153 @@
+{
+  "moduleId": "PolyshapeFX",
+  "nodes": [
+    {
+      "id": "audio_in",
+      "type": "input",
+      "label": "Audio In (L/R per voice)",
+      "importance": 1.0
+    },
+    {
+      "id": "drive_mod_chain",
+      "type": "modulation",
+      "label": "Drive Modulation Chain",
+      "importance": 0.8,
+      "group": "drive_stage",
+      "description": "Audio-rate modulation values (ScaleOnly, 0-1)"
+    },
+    {
+      "id": "drive_buffer",
+      "type": "process",
+      "label": "Drive Buffer",
+      "importance": 0.8,
+      "group": "drive_stage",
+      "description": "scratch = 1 + modValue * smoothed(drive - 1)"
+    },
+    {
+      "id": "drive_param",
+      "type": "parameter",
+      "label": "Drive",
+      "importance": 0.9,
+      "group": "drive_stage"
+    },
+    {
+      "id": "mode_decision",
+      "type": "decision",
+      "label": "Mode == Sin or TanCos?",
+      "importance": 0.7,
+      "group": "input_stage",
+      "description": "Selects between two drive/bias application strategies"
+    },
+    {
+      "id": "drive_bias_sintan",
+      "type": "process",
+      "label": "Drive then Bias (Sin/TanCos)",
+      "importance": 0.7,
+      "group": "input_stage",
+      "description": "signal *= scratch; signal += bias"
+    },
+    {
+      "id": "drive_bias_general",
+      "type": "process",
+      "label": "Bias then Drive (general)",
+      "importance": 0.7,
+      "group": "input_stage",
+      "description": "(signal + bias) * (1 + scratch)"
+    },
+    {
+      "id": "bias_param",
+      "type": "parameter",
+      "label": "Bias",
+      "importance": 0.6,
+      "group": "input_stage"
+    },
+    {
+      "id": "oversampling_up",
+      "type": "process",
+      "label": "Oversample Up (4x)",
+      "importance": 0.5,
+      "group": "shaping",
+      "description": "Per-voice 4x upsampling via half-band polyphase IIR"
+    },
+    {
+      "id": "shaper",
+      "type": "process",
+      "label": "Waveshaper",
+      "importance": 1.0,
+      "group": "shaping",
+      "description": "Per-sample nonlinear shaping function selected by Mode"
+    },
+    {
+      "id": "mode_param",
+      "type": "parameter",
+      "label": "Mode",
+      "importance": 1.0,
+      "group": "shaping"
+    },
+    {
+      "id": "oversampling_down",
+      "type": "process",
+      "label": "Oversample Down (4x)",
+      "importance": 0.5,
+      "group": "shaping",
+      "description": "Per-voice 4x downsampling"
+    },
+    {
+      "id": "oversampling_param",
+      "type": "parameter",
+      "label": "Oversampling",
+      "importance": 0.6,
+      "group": "shaping"
+    },
+    {
+      "id": "attenuation",
+      "type": "process",
+      "label": "Post-Shaping Attenuation",
+      "importance": 0.7,
+      "group": "output_stage",
+      "description": "signal / (0.03162 * scratch + 1) -- drive-dependent output compensation"
+    },
+    {
+      "id": "dc_removal",
+      "type": "process",
+      "label": "DC Removal",
+      "importance": 0.5,
+      "group": "output_stage",
+      "description": "20 Hz SimpleOnePole HP filter, per-voice"
+    },
+    {
+      "id": "audio_out",
+      "type": "output",
+      "label": "Audio Out (L/R per voice)",
+      "importance": 1.0
+    }
+  ],
+  "edges": [
+    { "from": "audio_in", "to": "mode_decision", "type": "signal" },
+    { "from": "drive_param", "to": "drive_buffer", "type": "control" },
+    { "from": "drive_mod_chain", "to": "drive_buffer", "type": "control" },
+    { "from": "drive_buffer", "to": "mode_decision", "type": "signal", "label": "scratch buffer" },
+    { "from": "mode_decision", "to": "drive_bias_sintan", "type": "conditional", "label": "Sin or TanCos" },
+    { "from": "mode_decision", "to": "drive_bias_general", "type": "conditional", "label": "all other modes" },
+    { "from": "bias_param", "to": "drive_bias_sintan", "type": "control" },
+    { "from": "bias_param", "to": "drive_bias_general", "type": "control" },
+    { "from": "drive_bias_sintan", "to": "oversampling_up", "type": "signal" },
+    { "from": "drive_bias_general", "to": "oversampling_up", "type": "signal" },
+    { "from": "oversampling_param", "to": "oversampling_up", "type": "conditional", "label": "skip if Off" },
+    { "from": "oversampling_up", "to": "shaper", "type": "signal" },
+    { "from": "mode_param", "to": "shaper", "type": "control" },
+    { "from": "shaper", "to": "oversampling_down", "type": "signal" },
+    { "from": "oversampling_param", "to": "oversampling_down", "type": "conditional", "label": "skip if Off" },
+    { "from": "oversampling_down", "to": "attenuation", "type": "signal" },
+    { "from": "drive_buffer", "to": "attenuation", "type": "control", "label": "scratch for compensation" },
+    { "from": "attenuation", "to": "dc_removal", "type": "signal" },
+    { "from": "bias_param", "to": "dc_removal", "type": "conditional", "label": "skip if bias == 0 and mode != AsymetricalCurve" },
+    { "from": "dc_removal", "to": "audio_out", "type": "signal" }
+  ],
+  "groups": [
+    { "id": "drive_stage", "label": "Drive Construction" },
+    { "id": "input_stage", "label": "Input Stage (Drive + Bias)" },
+    { "id": "shaping", "label": "Waveshaping" },
+    { "id": "output_stage", "label": "Output Stage" }
+  ]
+}

@@ -1,0 +1,527 @@
+{
+  "25": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptPanel",
+        "id": "Pnl"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Self-contained panel with setPaintRoutine and setMouseCallback. Draws segmented button tabs with active state. Uses setValue/changed for preset-saveable state. The paint routine reads bgColour, itemColour2, itemColour, textColour from the component properties which have sensible defaults."
+  },
+  "26": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptSlider",
+        "id": "Knb"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knb1"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knb2"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knb3"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "LAF drawRotarySlider with per-call reg state using !isDefined guard pattern. Uses Engine.createTimerObject inside the LAF callback to animate a dot tracing the knob border on hover. The reg variable persistence across LAF calls is valid HiseScript."
+  },
+  "27": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptSlider",
+        "id": "Knb"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knb1"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knb2"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knb3"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Speed"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Degrees"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Blur"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Width"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "LAF drawRotarySlider with hover-triggered rotation sweep animation. Uses beginLayer/gaussianBlur/endLayer for glow effect. Speed, Degrees, Blur, Width are control knobs. Set sensible ranges: Speed 1-11, Degrees 1-360, Blur 1-20, Width 2-20."
+  },
+  "28": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptLabel",
+        "id": "Label1"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Uses Engine.matchesRegex with toLowerCase for case-insensitive filtering. Label setControlCallback fires when text is committed. Result printed to console."
+  },
+  "29": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {
+        "type": "SimpleGain",
+        "name": "Simple Gain1",
+        "chain": 3
+      }
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Uses Engine.getGlobalRoutingManager().getCable() which creates cables on demand. Registers both SyncNotification (audio thread, setAttribute) and AsyncNotification (UI thread) callbacks on the same cable. SimpleGain needed for setAttribute calls. Cable value can be tested via REPL: rm.getCable('my_cable').setValue(0.5)."
+  },
+  "30": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Requires a ScriptFX ('Script FX1') with an active scriptnode network containing an external display buffer node. ScriptFX modules without compiled scriptnode networks cannot provide DisplayBuffer interfaces via getDisplayBuffer(0). Cannot be set up via Builder API alone.",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Would need a scriptnode network with a peak node configured as External Display Buffer #1 inside a Script FX. Cannot be created programmatically."
+  },
+  "31": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptPanel",
+        "id": "bgPnl"
+      },
+      {
+        "type": "ScriptPanel",
+        "id": "stickyLabelPnl"
+      },
+      {
+        "type": "ScriptPanel",
+        "id": "modalPnl"
+      },
+      {
+        "type": "ScriptLabel",
+        "id": "stickyTextLbl"
+      },
+      {
+        "type": "ScriptButton",
+        "id": "stickyTextConfirmBtn"
+      },
+      {
+        "type": "ScriptButton",
+        "id": "stickyTextCancelBtn"
+      },
+      {
+        "type": "ScriptButton",
+        "id": "updateStickyLabelBtn"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Sticky note with constrained dragging via setDraggingBounds. Panel value stores an object with 'note' and 'x'/'y' position. Modal overlay panel for text editing. All UI interactions are script-driven with no file system or network calls."
+  },
+  "32": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptSliderPack",
+        "id": "SliderPack1"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Demonstrates all four SliderPack LAF callbacks: drawSliderPackBackground, drawSliderPackFlashOverlay, drawSliderPackRightClickLine, drawSliderPackTextPopup, plus drawLinearSlider for individual slider rendering."
+  },
+  "33": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptSlider",
+        "id": "Knob1"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Simple setValuePopupFunction example. Returns 'OFF' for value==30 and Math.round for all others. Set Knob1 range to 0-60 to make the value 30 reachable mid-range."
+  },
+  "34": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptButton",
+        "id": "snapBtn"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knob1"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knob2"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Broadcaster attachToComponentMouseEvents approach to value snapping. Knob1 is the hidden drag source (rendered invisible by empty drawRotarySlider LAF), Knob2 is the display knob. Set Knob1 and Knob2 range to 75-15000 to match the snap value array."
+  },
+  "35": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptButton",
+        "id": "snapBtn"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knob1"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knob2"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Control callback alternative to the broadcaster snapping approach. Same component layout and snap value array [75, 150, 500, 1040, 3600, 15000]. Set both knob ranges to 75-15000."
+  },
+  "36": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptButton",
+        "id": "snapBtn"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knob1"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Simplest snapping approach: toggles stepSize between 1.0 (discrete) and 0.01 (free). Sets Knob1.max = v.length - 1 = 5 at init. When snap is off, uses linear interpolation across the full range."
+  },
+  "37": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Uses FileSystem.browse() which opens a modal OS file picker dialog. Cannot be tested in headless/automated context.",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Also requires SelectedFilePath (ScriptLabel), Results (ScriptLabel), SelectXMLFile (ScriptButton), RunTest (ScriptButton). The browse callback approach requires user interaction."
+  },
+  "38": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptPanel",
+        "id": "Container"
+      },
+      {
+        "type": "ScriptPanel",
+        "id": "EffectPanel0"
+      },
+      {
+        "type": "ScriptPanel",
+        "id": "EffectPanel1"
+      },
+      {
+        "type": "ScriptPanel",
+        "id": "EffectPanel2"
+      },
+      {
+        "type": "ScriptPanel",
+        "id": "EffectPanel3"
+      },
+      {
+        "type": "ScriptPanel",
+        "id": "EffectPanel4"
+      },
+      {
+        "type": "ScriptButton",
+        "id": "PrevBtn0"
+      },
+      {
+        "type": "ScriptButton",
+        "id": "PrevBtn1"
+      },
+      {
+        "type": "ScriptButton",
+        "id": "PrevBtn2"
+      },
+      {
+        "type": "ScriptButton",
+        "id": "PrevBtn3"
+      },
+      {
+        "type": "ScriptButton",
+        "id": "PrevBtn4"
+      },
+      {
+        "type": "ScriptButton",
+        "id": "NextBtn0"
+      },
+      {
+        "type": "ScriptButton",
+        "id": "NextBtn1"
+      },
+      {
+        "type": "ScriptButton",
+        "id": "NextBtn2"
+      },
+      {
+        "type": "ScriptButton",
+        "id": "NextBtn3"
+      },
+      {
+        "type": "ScriptButton",
+        "id": "NextBtn4"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "State managed via Container panel getValue/setValue with an object. The Container callback fires on preset load/change to restore panel order. Prev/Next buttons swap adjacent items in the state array and reposition panels by setting 'x' property."
+  },
+  "39": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {
+        "type": "CurveEq",
+        "name": "ParaEQ",
+        "chain": 3
+      },
+      {
+        "type": "SimpleGain",
+        "name": "SimpleGainer",
+        "chain": 3
+      },
+      {
+        "type": "SimpleReverb",
+        "name": "Reverberate",
+        "chain": 3
+      }
+    ],
+    "components": [
+      {
+        "type": "ScriptPanel",
+        "id": "Knob1TimerPnl"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knob1"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Uses ParaEQ.BandOffset for indexed CurveEq band access. Uses SimpleGainer.Width and SimpleGainer.Gain \u2014 valid SimpleGain parameters. Uses Reverberate.RoomSize and Reverberate.Damping \u2014 valid SimpleReverb parameters. Panel timer chains three sequential function calls with 30ms and 50ms delays."
+  },
+  "40": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptFloatingTile",
+        "id": "FloatingTile1"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knob1"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Reads FloatingTile Data property as JSON, sets Type to 'Keyboard', modifies LowKey, and writes back using trace(). FloatingTile1 should be configured as a Keyboard type in its Data property. Set Knob1 range to 0-127 for MIDI note range."
+  },
+  "41": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptedViewport",
+        "id": "Viewport1"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Full table mode example with drawTableCell and drawToggleButton LAF, setTableColumns with Text and Button column types, setTableRowData with row objects, and setTableCallback for click/button events."
+  },
+  "42": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptTable",
+        "id": "Table"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Utility function that generates evenly-spaced snap values for a ScriptTable. Generates 20 snaps across 0-1 range."
+  },
+  "43": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptTable",
+        "id": "Table"
+      },
+      {
+        "type": "ScriptPanel",
+        "id": "TableGrid"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Extends snap values example with a panel overlay drawing vertical grid lines. TableGrid panel setValue receives the snap values array and draws proportional grid lines in its paint routine."
+  },
+  "44": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "All components created dynamically via Content.addPanel and Content.addTable with parentComponent set. Factory function createTableWithGrid creates container, grid overlay, and table. No pre-existing components required. The factory uses Content.setPropertiesFromJSON for initial setup."
+  },
+  "45": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptPanel",
+        "id": "pathPnl"
+      },
+      {
+        "type": "ScriptPanel",
+        "id": "Panel1"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knob1"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Draws a bezier path on pathPnl and moves Panel1 along the path based on Knob1 value. Uses Content.createPath with quadraticTo, getPointOnPath, and getLength. Panel1 should be positioned within the pathPnl area and be small (e.g. 20x20px)."
+  },
+  "46": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptPanel",
+        "id": "Panel1"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Uses Math.sqrt distance calculation to detect mouse within a donut/ring shape. Outer radius 250, inner radius 200. Panel must be large enough (at least 500x500) to fit the ring. Sets panel width/height to 600 via makeFrontInterface."
+  },
+  "47": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptButton",
+        "id": "Button1"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Uses FileSystem.getFolder(FileSystem.Samples).show() to open the samples folder in the OS file browser. Unlike FileSystem.browse(), show() is non-blocking and does not require user interaction to complete. The Samples folder will always exist in a HISE project context."
+  },
+  "48": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {
+        "type": "CurveEq",
+        "name": "Parametriq EQ1",
+        "chain": 3
+      }
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "CurveEq modules have built-in display buffers (getDisplayBuffer(0) returns the FFT display). setRingBufferProperties configures FFT analysis parameters: BufferLength, WindowType (Blackman Harris), DecibelRange, UsePeakDecay, UseDecibelScale, YGamma, Decay, UseLogarithmicFreqAxis. No UI components required \u2014 the buffer config is the example."
+  },
+  "49": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptFloatingTile",
+        "id": "fltKeyboard"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "knbLow"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "knbHigh"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Reads and modifies Keyboard FloatingTile Data JSON at runtime. knbLow callback references knbHigh before its const declaration, but since the callback only fires on user interaction (after parse), knbHigh will be defined by then. Set both knobs range to 0-127. FloatingTile1 Data should include Type='Keyboard'."
+  }
+}

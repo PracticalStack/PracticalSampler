@@ -1,0 +1,1 @@
+Exports all slider values as a Base64-encoded string. Use `fromBase64()` to restore the data later. This is the standard approach for serialising step data into custom preset formats, clipboard operations, or cross-pattern data transfer.

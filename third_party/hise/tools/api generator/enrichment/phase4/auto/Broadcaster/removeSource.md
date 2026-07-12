@@ -1,0 +1,1 @@
+Removes the first attached source whose metadata ID matches the given parameter. Pass the same metadata string or JSON object used when the source was attached. The source's upstream registration (e.g. processor attribute listener) is automatically cleaned up on removal. Returns `true` if a match was found, `false` otherwise.

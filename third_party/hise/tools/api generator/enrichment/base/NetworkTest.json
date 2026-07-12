@@ -1,0 +1,162 @@
+{
+  "className": "NetworkTest",
+  "category": "scriptnode",
+  "description": "A test object for a DSP Network.",
+  "methods": {
+    "addRuntimeFunction": {
+      "signature": "void addRuntimeFunction(var f, int timestamp)",
+      "returnType": "void",
+      "description": "Sets a function that will be executed at the given time to simulate live user input.",
+      "parameters": [
+        {
+          "name": "f",
+          "type": "var"
+        },
+        {
+          "name": "timestamp",
+          "type": "int"
+        }
+      ]
+    },
+    "checkCompileHashCodes": {
+      "signature": "var checkCompileHashCodes()",
+      "returnType": "var",
+      "description": "Checks whether the hash code of all compiled nodes match their network file.",
+      "parameters": []
+    },
+    "createAsciiDiff": {
+      "signature": "String createAsciiDiff(var data1, var data2, int numLines)",
+      "returnType": "String",
+      "description": "Creates a ASCII diff with 'X' as error when the datas don't match.",
+      "parameters": [
+        {
+          "name": "data1",
+          "type": "var"
+        },
+        {
+          "name": "data2",
+          "type": "var"
+        },
+        {
+          "name": "numLines",
+          "type": "int"
+        }
+      ]
+    },
+    "createBufferContentAsAsciiArt": {
+      "signature": "String createBufferContentAsAsciiArt(var buffer, int numLines)",
+      "returnType": "String",
+      "description": "Creates a string that vaguely represents the buffer data content.",
+      "parameters": [
+        {
+          "name": "buffer",
+          "type": "var"
+        },
+        {
+          "name": "numLines",
+          "type": "int"
+        }
+      ]
+    },
+    "dumpNetworkAsXml": {
+      "signature": "String dumpNetworkAsXml()",
+      "returnType": "String",
+      "description": "Creates a XML representation of the current network.",
+      "parameters": []
+    },
+    "expectEquals": {
+      "signature": "var expectEquals(var data1, var data2, float errorDb)",
+      "returnType": "var",
+      "description": "Compares the two data types and returns a error message if they don't match.",
+      "parameters": [
+        {
+          "name": "data1",
+          "type": "var"
+        },
+        {
+          "name": "data2",
+          "type": "var"
+        },
+        {
+          "name": "errorDb",
+          "type": "float"
+        }
+      ]
+    },
+    "getDllInfo": {
+      "signature": "var getDllInfo()",
+      "returnType": "var",
+      "description": "Returns an object containing the information about the project dll.",
+      "parameters": []
+    },
+    "getLastTestException": {
+      "signature": "String getLastTestException()",
+      "returnType": "String",
+      "description": "Returns the exception that was caused by the last test run (or empty if fine).",
+      "parameters": []
+    },
+    "getListOfAllCompileableNodes": {
+      "signature": "var getListOfAllCompileableNodes()",
+      "returnType": "var",
+      "description": "Returns the list of all nodes that can be compiled.",
+      "parameters": []
+    },
+    "getListOfCompiledNodes": {
+      "signature": "var getListOfCompiledNodes()",
+      "returnType": "var",
+      "description": "Returns the list of all compiled nodes.",
+      "parameters": []
+    },
+    "runTest": {
+      "signature": "var runTest()",
+      "returnType": "var",
+      "description": "runs the test and returns the buffer.",
+      "parameters": []
+    },
+    "setProcessSpecs": {
+      "signature": "void setProcessSpecs(int numChannels, double sampleRate, int blockSize)",
+      "returnType": "void",
+      "description": "Set the processing specifications for the test run.",
+      "parameters": [
+        {
+          "name": "numChannels",
+          "type": "int"
+        },
+        {
+          "name": "sampleRate",
+          "type": "double"
+        },
+        {
+          "name": "blockSize",
+          "type": "int"
+        }
+      ]
+    },
+    "setTestProperty": {
+      "signature": "void setTestProperty(String id, var value)",
+      "returnType": "void",
+      "description": "Sets a test property.",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "setWaitingTime": {
+      "signature": "void setWaitingTime(int timeToWaitMs)",
+      "returnType": "void",
+      "description": "Sets a time to wait between calling prepare and processing the data.",
+      "parameters": [
+        {
+          "name": "timeToWaitMs",
+          "type": "int"
+        }
+      ]
+    }
+  }
+}

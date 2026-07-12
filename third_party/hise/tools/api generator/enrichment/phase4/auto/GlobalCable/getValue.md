@@ -1,0 +1,1 @@
+Returns the current cable value converted from the internal 0..1 range through the local input range set by `setRange()`, `setRangeWithSkew()`, or `setRangeWithStep()`. Without a configured range, the default 0..1 identity applies and this behaves identically to `getValueNormalised()`.

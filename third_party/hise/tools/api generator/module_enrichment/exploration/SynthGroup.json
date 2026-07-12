@@ -1,0 +1,250 @@
+{
+  "moduleId": "SynthGroup",
+  "nodes": [
+    {
+      "id": "midi_in",
+      "label": "MIDI Input",
+      "type": "input",
+      "importance": 0.7,
+      "group": "input",
+      "description": "Incoming MIDI events forwarded to group and all children's modulation chains"
+    },
+    {
+      "id": "midi_processor_chain",
+      "label": "MIDI Processor Chain",
+      "type": "process",
+      "importance": 0.5,
+      "group": "input",
+      "description": "Group-level MIDI processing before forwarding to children"
+    },
+    {
+      "id": "active_state",
+      "label": "Active State",
+      "type": "decision",
+      "importance": 0.7,
+      "group": "voice_setup",
+      "description": "Determines which children are active based on FM mode and carrier/modulator indices"
+    },
+    {
+      "id": "enable_fm",
+      "label": "EnableFM",
+      "type": "parameter",
+      "importance": 0.8,
+      "group": "voice_setup",
+      "description": "Enables FM synthesis between carrier and modulator children"
+    },
+    {
+      "id": "carrier_index",
+      "label": "CarrierIndex",
+      "type": "parameter",
+      "importance": 0.6,
+      "group": "voice_setup",
+      "description": "Index of the child synth used as FM carrier (-1 = not set)"
+    },
+    {
+      "id": "modulator_index",
+      "label": "ModulatorIndex",
+      "type": "parameter",
+      "importance": 0.6,
+      "group": "voice_setup",
+      "description": "Index of the child synth used as FM modulator (-1 = not set)"
+    },
+    {
+      "id": "pitch_mod",
+      "label": "Pitch Modulation",
+      "type": "modulation",
+      "importance": 0.9,
+      "group": "shared_mod",
+      "description": "Group pitch modulation multiplied onto each child's own pitch values"
+    },
+    {
+      "id": "gain_mod",
+      "label": "Gain Modulation",
+      "type": "modulation",
+      "importance": 0.8,
+      "group": "shared_mod",
+      "description": "Group gain modulation applied to the combined voice output"
+    },
+    {
+      "id": "detune_mod",
+      "label": "Detune Modulation",
+      "type": "modulation",
+      "importance": 0.5,
+      "group": "unison",
+      "description": "Scales the UnisonoDetune parameter (auto-bypassed when unisono = 1)"
+    },
+    {
+      "id": "spread_mod",
+      "label": "Spread Modulation",
+      "type": "modulation",
+      "importance": 0.5,
+      "group": "unison",
+      "description": "Scales the UnisonoSpread parameter (auto-bypassed when unisono = 1)"
+    },
+    {
+      "id": "unisono_amount",
+      "label": "UnisonoVoiceAmount",
+      "type": "parameter",
+      "importance": 0.8,
+      "group": "unison",
+      "description": "Number of unison voices per note (1-16). Direct CPU multiplier."
+    },
+    {
+      "id": "unisono_detune",
+      "label": "UnisonoDetune",
+      "type": "parameter",
+      "importance": 0.7,
+      "group": "unison",
+      "description": "Detune spread in semitones distributed linearly across unison voices"
+    },
+    {
+      "id": "unisono_spread",
+      "label": "UnisonoSpread",
+      "type": "parameter",
+      "importance": 0.7,
+      "group": "unison",
+      "description": "Stereo spread of unison voices (0 = mono, 1 = full width)"
+    },
+    {
+      "id": "detune_calc",
+      "label": "Calculate Detune",
+      "type": "process",
+      "importance": 0.8,
+      "group": "unison",
+      "description": "Calculates per-unisono-voice pitch offset and stereo pan position"
+    },
+    {
+      "id": "fm_mod_render",
+      "label": "Render FM Modulator",
+      "type": "process",
+      "importance": 0.8,
+      "group": "fm",
+      "description": "FM modulator child renders (single voice, no detune). Output * gain + 1.0 -> fmModBuffer"
+    },
+    {
+      "id": "child_render",
+      "label": "Render Children",
+      "type": "process",
+      "importance": 1.0,
+      "group": "rendering",
+      "description": "Each active child renders per unisono voice. Group pitch multiplied in. FM: carrier pitch *= fmModBuffer"
+    },
+    {
+      "id": "force_mono",
+      "label": "ForceMono",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": "rendering",
+      "description": "Collapses child stereo to mono before unison spread"
+    },
+    {
+      "id": "voice_mix",
+      "label": "Voice Mix",
+      "type": "process",
+      "importance": 0.7,
+      "group": "rendering",
+      "description": "Child outputs mixed into voice buffer with gain * balance * detune factors. Equal-power compensation."
+    },
+    {
+      "id": "gain_apply",
+      "label": "Apply Group Gain",
+      "type": "process",
+      "importance": 0.7,
+      "group": "output",
+      "description": "Group Gain Modulation multiplied onto summed voice buffer"
+    },
+    {
+      "id": "voice_fx",
+      "label": "Voice Effects",
+      "type": "process",
+      "importance": 0.6,
+      "group": "effects",
+      "description": "Group-level voice effects applied per voice"
+    },
+    {
+      "id": "voice_sum",
+      "label": "Voice Summation",
+      "type": "process",
+      "importance": 0.5,
+      "group": "output",
+      "description": "All active group voices summed into internal buffer"
+    },
+    {
+      "id": "master_fx",
+      "label": "Master Effects",
+      "type": "process",
+      "importance": 0.6,
+      "group": "effects",
+      "description": "Group-level master effects on summed output"
+    },
+    {
+      "id": "gain_param",
+      "label": "Gain",
+      "type": "parameter",
+      "importance": 0.6,
+      "group": "output",
+      "description": "Static output volume as normalised linear gain"
+    },
+    {
+      "id": "balance_param",
+      "label": "Balance",
+      "type": "parameter",
+      "importance": 0.4,
+      "group": "output",
+      "description": "Stereo balance"
+    },
+    {
+      "id": "kill_second",
+      "label": "KillSecondVoices",
+      "type": "parameter",
+      "importance": 0.4,
+      "group": "voice_setup",
+      "description": "Kills retriggered voices for same MIDI note (prevents voice buildup)"
+    },
+    {
+      "id": "audio_out",
+      "label": "Audio Output",
+      "type": "output",
+      "importance": 0.8,
+      "group": "output",
+      "description": "Stereo audio output"
+    }
+  ],
+  "edges": [
+    { "from": "midi_in", "to": "midi_processor_chain", "type": "signal", "label": null },
+    { "from": "midi_processor_chain", "to": "active_state", "type": "signal", "label": "MIDI events" },
+    { "from": "enable_fm", "to": "active_state", "type": "control", "label": null },
+    { "from": "carrier_index", "to": "active_state", "type": "control", "label": null },
+    { "from": "modulator_index", "to": "active_state", "type": "control", "label": null },
+    { "from": "active_state", "to": "fm_mod_render", "type": "conditional", "label": "FM enabled" },
+    { "from": "active_state", "to": "child_render", "type": "conditional", "label": "normal / carrier" },
+    { "from": "unisono_amount", "to": "detune_calc", "type": "control", "label": null },
+    { "from": "unisono_detune", "to": "detune_calc", "type": "control", "label": null },
+    { "from": "unisono_spread", "to": "detune_calc", "type": "control", "label": null },
+    { "from": "detune_mod", "to": "detune_calc", "type": "control", "label": "scales detune" },
+    { "from": "spread_mod", "to": "detune_calc", "type": "control", "label": "scales spread" },
+    { "from": "detune_calc", "to": "child_render", "type": "control", "label": "pitch offset + pan" },
+    { "from": "pitch_mod", "to": "child_render", "type": "control", "label": "pitch multiply" },
+    { "from": "fm_mod_render", "to": "child_render", "type": "signal", "label": "fmModBuffer" },
+    { "from": "force_mono", "to": "voice_mix", "type": "control", "label": null },
+    { "from": "child_render", "to": "voice_mix", "type": "signal", "label": null },
+    { "from": "voice_mix", "to": "gain_apply", "type": "signal", "label": null },
+    { "from": "gain_mod", "to": "gain_apply", "type": "control", "label": null },
+    { "from": "gain_apply", "to": "voice_fx", "type": "signal", "label": null },
+    { "from": "voice_fx", "to": "voice_sum", "type": "signal", "label": null },
+    { "from": "voice_sum", "to": "master_fx", "type": "signal", "label": null },
+    { "from": "master_fx", "to": "audio_out", "type": "signal", "label": null },
+    { "from": "gain_param", "to": "audio_out", "type": "control", "label": "static gain" },
+    { "from": "balance_param", "to": "audio_out", "type": "control", "label": "stereo balance" }
+  ],
+  "groups": [
+    { "id": "input", "label": "Input" },
+    { "id": "voice_setup", "label": "Voice Configuration" },
+    { "id": "shared_mod", "label": "Shared Modulation" },
+    { "id": "unison", "label": "Unison Processing" },
+    { "id": "fm", "label": "FM Synthesis" },
+    { "id": "rendering", "label": "Voice Rendering" },
+    { "id": "effects", "label": "Effects" },
+    { "id": "output", "label": "Output" }
+  ]
+}

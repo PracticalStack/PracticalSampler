@@ -1,0 +1,80 @@
+{
+  "targetId": "routing.matrix",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [4236, 6347, 6571, 6685, 10199, 12078, 13203, 13091, 14354],
+  "insights": [
+    {
+      "type": "API",
+      "title": "Use Shift+click to create a send (duplicate/blue) connection in the routing matrix",
+      "body": "In the routing matrix editor, a normal click creates a standard routing connection. Holding Shift while clicking creates a send connection (shown in blue), which duplicates the signal to the target channel pair rather than moving it. You can have one send connection per routing matrix; add another matrix to get more.",
+      "source": "tid:2905",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "BUG",
+      "title": "Compiled VST3 FX plugin crashed when channel count exceeded 2",
+      "body": "A commit in late 2022 introduced a crash in compiled multichannel plugins (VST3 and standalone) when the routing matrix used more than 2 channels — the crash occurred at AudioBuffer::setSize. The fix was committed the same day. If building against a develop-branch snapshot from around that date, update to get the fix.",
+      "source": "tid:6685",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Routing matrix is reset automatically when loading a sample map with a different mic count",
+      "body": "By design, loading a sample map resets the routing matrix so it can resize for a different number of multimic positions. For projects where the routing must stay fixed across sample map changes, call setUseStaticMatrix() once in onInit. Without this flag every sample map load will wipe custom routing.",
+      "source": "tid:6571, tid:10199",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Re-apply routing matrix after sample map loads using a Broadcaster",
+      "body": "If setUseStaticMatrix() is not appropriate, attach a Broadcaster to the sampler's SampleMapChanged event and call a function that rebuilds the matrix connections (addConnection) with the correct channel mapping each time a new map is loaded. This keeps routing in sync with dynamic sample map switching.",
+      "source": "tid:10199",
+      "author": "Orvillain [trusted]",
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Standalone HISE always shows only 2 outputs regardless of routing matrix channel count",
+      "body": "In the HISE standalone app the output is limited to the physical audio interface outputs (typically 2). Multichannel routing only becomes visible when the project is compiled as a plugin. For testing multichannel routing during development, add an inner container and treat it as the master output.",
+      "source": "tid:12398, tid:2905",
+      "author": "David Healey [expert]",
+      "confidence": "high"
+    },
+    {
+      "type": "API",
+      "title": "Scripting addConnection() was missing send-connection support; now available",
+      "body": "The scripting API for the routing matrix originally lacked a way to add the 'blue' send-type connections via script. This was added to the develop branch (commit referenced in tid:4236). The function addConnection(sourceChannel, targetChannel) now supports both normal and send connections through the routing matrix scripting object.",
+      "source": "tid:4236",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use container.multi to split multichannel signals instead of a routing matrix",
+      "body": "For splitting a 4-channel (or wider) signal into separate stereo pairs for parallel processing in scriptnode, the container.multi node is preferable to a routing.matrix node — no matrix wiring is required. The routing matrix is better suited to the HISE module tree layer.",
+      "source": "tid:6347",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Sidechain routing within scriptnode is internal only — no true DAW sidechain yet",
+      "body": "The scriptnode routing matrix can produce a 4-channel signal from a stereo source so that channels 3+4 can carry a sidechain signal within the network. However this is purely internal. True DAW-level sidechain input routing to the plugin was not yet implemented at the time of discussion (tid:6347).",
+      "source": "tid:6347",
+      "author": "Christoph Hart [author]",
+      "confidence": "medium"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Routing matrix effect has limited flexibility on its own — stack multiple for complex routing",
+      "body": "The routing matrix FX effect only handles one set of connections at a time and cannot do arbitrary fan-out in a single module. For complex multi-output routing (e.g. 9 samplers to insert and send FX across many channel pairs) you need to stack multiple routing matrix effects or combine them with send containers.",
+      "source": "tid:12078",
+      "author": "David Healey [expert]",
+      "confidence": "high"
+    }
+  ]
+}

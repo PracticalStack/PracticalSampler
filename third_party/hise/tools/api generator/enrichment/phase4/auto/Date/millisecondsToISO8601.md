@@ -1,0 +1,1 @@
+Converts a millisecond timestamp (since the Unix epoch) to an ISO-8601 formatted string. Pass `true` for divider characters or `false` for the compact form. This is the inverse of `Date.ISO8601ToMilliseconds()`.

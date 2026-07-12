@@ -1,0 +1,70 @@
+{
+  "moduleId": "MacroModulator",
+  "nodes": [
+    {
+      "id": "macro_system",
+      "type": "external",
+      "label": "Macro Control System",
+      "importance": 1,
+      "detail": "Sends macro slot value (0-1) when the slot changes"
+    },
+    {
+      "id": "macro_index_param",
+      "type": "parameter",
+      "label": "MacroIndex",
+      "importance": 1
+    },
+    {
+      "id": "table_lookup",
+      "type": "decision",
+      "label": "Table Lookup",
+      "importance": 2,
+      "detail": "Optional response curve. Applied before smoothing. Input and output both 0-1."
+    },
+    {
+      "id": "use_table_param",
+      "type": "parameter",
+      "label": "UseTable",
+      "importance": 2
+    },
+    {
+      "id": "smoother",
+      "type": "process",
+      "label": "Smoother",
+      "importance": 1,
+      "detail": "Per-sample interpolation at control rate. 200ms default. Constant-fill optimization when converged."
+    },
+    {
+      "id": "smooth_time_param",
+      "type": "parameter",
+      "label": "SmoothTime",
+      "importance": 2
+    },
+    {
+      "id": "mod_output",
+      "type": "output",
+      "label": "Modulation Output",
+      "importance": 1
+    }
+  ],
+  "edges": [
+    { "from": "macro_system", "to": "table_lookup" },
+    { "from": "macro_index_param", "to": "macro_system", "type": "control" },
+    { "from": "use_table_param", "to": "table_lookup", "type": "control" },
+    { "from": "table_lookup", "to": "smoother" },
+    { "from": "smooth_time_param", "to": "smoother", "type": "control" },
+    { "from": "smoother", "to": "mod_output" }
+  ],
+  "groups": [
+    {
+      "id": "value_processing",
+      "label": "Value Processing",
+      "nodes": ["table_lookup", "use_table_param", "smoother", "smooth_time_param"]
+    },
+    {
+      "id": "connection",
+      "label": "Macro Connection",
+      "nodes": ["macro_system", "macro_index_param"]
+    }
+  ]
+}

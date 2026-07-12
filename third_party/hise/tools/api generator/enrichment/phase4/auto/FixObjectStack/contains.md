@@ -1,0 +1,1 @@
+Returns `true` if the stack contains an element matching the given object, using the factory's compare function. Only searches the used portion of the stack.

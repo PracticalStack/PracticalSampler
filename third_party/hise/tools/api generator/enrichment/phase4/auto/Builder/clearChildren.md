@@ -1,0 +1,3 @@
+Removes all child processors from a specific chain of the module at the given build index. Use `ChainIndexes` constants to specify which chain to clear: `Gain` (1) for gain modulators, `Pitch` (2) for pitch modulators, `FX` (3) for effects, `Midi` (0) for MIDI processors, or `Direct` (-1) to remove sound generators from a container.
+
+This is useful for selective rebuilding - clearing and repopulating a single chain without affecting the rest of the module tree. A common pattern is removing a default envelope inserted by HISE (e.g. the SimpleEnvelope on a new sampler's gain chain) before adding a custom one.

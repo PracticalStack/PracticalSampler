@@ -1,0 +1,1 @@
+Scans a subdirectory of the project's Samples folder and returns an array of pool reference strings for all audio files found (.wav, .aif, .aiff). Pass 1 for the second argument to search subdirectories recursively. Returns an empty array in exported plugins.

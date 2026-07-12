@@ -1,0 +1,1 @@
+Sets the string that is returned as the response body when a server request times out without a reply. The default is `"{}"` (an empty JSON object). Override this if you want your callbacks to receive a specific fallback structure on timeout, so you can distinguish a timeout from a genuine empty response.

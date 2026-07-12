@@ -1,0 +1,101 @@
+{
+  "factoryPath": "routing.global_receive",
+  "factory": "routing",
+  "nodeId": "global_receive",
+  "description": "Send the signal anywhere in HISE!",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Gain",
+      "rationale": "Controls the amplitude of the signal received from the global signal slot.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0, "max": 1, "step": 0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "Connection",
+      "defaultValue": "",
+      "type": "string",
+      "note": "String ID of the global signal slot to receive from. Must match a slot that has a global_send connected. Multiple global_receive nodes can share the same slot."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/routing/global_receive.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "signal-add-not-replace",
+      "category": "signal_path",
+      "question": "From infrastructure: pop() uses addWithMultiply, meaning the received signal is ADDED to the existing signal at the receive point. Confirm this -- does the node mix into whatever signal is already flowing, or replace it?",
+      "context": "This is a critical distinction. If additive, users must account for existing signal; if replacing, the node acts as a signal source."
+    },
+    {
+      "id": "spec-matching-requirements",
+      "category": "signal_path",
+      "question": "The infrastructure docs state receivers must match sender specs (sample rate, channel count, blockSize <= sender). What error is shown to the user when there is a mismatch?",
+      "context": "Users need to know these constraints and how to diagnose connection failures."
+    },
+    {
+      "id": "description-inaccuracy",
+      "category": "description_accuracy",
+      "question": "The description says 'Send the signal anywhere in HISE!' but this is the RECEIVE node. This is clearly a copy-paste error from global_send. What should the accurate description be?",
+      "context": "The description must be corrected for the reference page."
+    },
+    {
+      "id": "polyphonic-offset-handling",
+      "category": "signal_path",
+      "question": "The infrastructure mentions GlobalReceiveNode is templated on NV for polyphonic voice count, with per-voice offset tracking. But cppProperties does not list IsPolyphonic. Is this node actually polyphonic or monophonic?",
+      "context": "The base data shows no IsPolyphonic flag, but the C++ template suggests polyphonic support exists. Need to clarify."
+    }
+  ],
+
+  "notes": "routing.global_receive is the companion to routing.global_send. The description in the base data is incorrect (says 'Send' instead of 'Receive'). From infrastructure: the received signal is ADDED to the existing signal (addWithMultiply), not replacing it. Value parameter is a gain multiplier. Marked UncompileableNode. Multiple receivers can share one slot. Spec matching (sample rate, channels, block size) is required between sender and receiver."
+}

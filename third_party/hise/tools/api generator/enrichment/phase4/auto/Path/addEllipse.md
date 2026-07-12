@@ -1,0 +1,1 @@
+Adds a closed ellipse fitting the given bounding rectangle. For a circle, pass a square area (equal width and height). This is equivalent to `addArc` with a full 2*PI sweep but reads more clearly when a complete ellipse is intended. Commonly used to create circular paths for shadow effects via `Graphics.drawDropShadowFromPath`.

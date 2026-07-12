@@ -1,0 +1,1 @@
+Returns the total download size in bytes, including any pre-existing bytes from a previous partial download when resuming. Returns 0.0 before the download starts or if the server does not report a content length.

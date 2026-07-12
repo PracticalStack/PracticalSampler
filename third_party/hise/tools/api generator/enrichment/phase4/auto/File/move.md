@@ -1,0 +1,1 @@
+Moves this file to the location specified by the target File object. The target is the full destination path, not a directory to move into. Returns `true` on success. To work with the file at its new location after moving, use the target File object you passed as the argument.

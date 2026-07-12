@@ -1,0 +1,29 @@
+{
+  "moduleId": "ScriptEnvelopeModulator",
+  "nodes": [
+    { "id": "note_on", "label": "Note On", "type": "input", "importance": 0.9, "group": "io", "description": "MIDI note-on starts the envelope for this voice" },
+    { "id": "note_off", "label": "Note Off", "type": "input", "importance": 0.8, "group": "io", "description": "MIDI note-off marks the voice as ringing off" },
+    { "id": "voice_start", "label": "Start Voice", "type": "process", "importance": 0.8, "group": "voice", "description": "Initialises per-voice state and network voice" },
+    { "id": "network_process", "label": "Network Process", "type": "process", "importance": 1.0, "group": "voice", "description": "Processes modulation signal through the network at control rate" },
+    { "id": "voice_stop", "label": "Stop Voice", "type": "process", "importance": 0.7, "group": "voice", "description": "Marks voice as ringing off, network continues processing" },
+    { "id": "voice_kill", "label": "Voice Kill", "type": "process", "importance": 0.8, "group": "voice", "description": "Network gate signal closes, voice is terminated" },
+    { "id": "param_mono", "label": "Monophonic", "type": "parameter", "importance": 0.7, "group": "params", "description": "Shares one envelope across all voices" },
+    { "id": "param_retrigger", "label": "Retrigger", "type": "parameter", "importance": 0.6, "group": "params", "description": "Restarts envelope on new notes in monophonic mode" },
+    { "id": "mod_out", "label": "Modulation Out (0-1)", "type": "output", "importance": 0.9, "group": "io", "description": "Per-voice modulation signal" }
+  ],
+  "edges": [
+    { "from": "note_on", "to": "voice_start", "type": "signal", "label": null },
+    { "from": "voice_start", "to": "network_process", "type": "signal", "label": null },
+    { "from": "network_process", "to": "mod_out", "type": "signal", "label": null },
+    { "from": "note_off", "to": "voice_stop", "type": "signal", "label": null },
+    { "from": "voice_stop", "to": "network_process", "type": "signal", "label": "continues" },
+    { "from": "network_process", "to": "voice_kill", "type": "signal", "label": "gate closes" },
+    { "from": "param_mono", "to": "voice_start", "type": "control", "label": null },
+    { "from": "param_retrigger", "to": "voice_start", "type": "control", "label": null }
+  ],
+  "groups": [
+    { "id": "io", "label": "I/O" },
+    { "id": "voice", "label": "Per-Voice Processing" },
+    { "id": "params", "label": "Parameters" }
+  ]
+}

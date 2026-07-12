@@ -1,0 +1,101 @@
+{
+  "className": "DisplayBuffer",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "copyReadBuffer": {
+      "signature": "void copyReadBuffer(var targetBuffer)",
+      "returnType": "void",
+      "description": "Copies the read buffer into a preallocated target buffer. The target buffer must have the same size.",
+      "parameters": [
+        {
+          "name": "targetBuffer",
+          "type": "var"
+        }
+      ]
+    },
+    "createPath": {
+      "signature": "var createPath(var dstArea, var sourceRange, var normalisedStartValue)",
+      "returnType": "var",
+      "description": "Creates a path objects scaled to the given bounds and sourceRange",
+      "parameters": [
+        {
+          "name": "dstArea",
+          "type": "var"
+        },
+        {
+          "name": "sourceRange",
+          "type": "var"
+        },
+        {
+          "name": "normalisedStartValue",
+          "type": "var"
+        }
+      ]
+    },
+    "fromBase64": {
+      "signature": "void fromBase64(String b64, bool useUndoManager)",
+      "returnType": "void",
+      "description": "Restores the display buffer state from the base64 encoded string.",
+      "parameters": [
+        {
+          "name": "b64",
+          "type": "String"
+        },
+        {
+          "name": "useUndoManager",
+          "type": "bool"
+        }
+      ]
+    },
+    "getReadBuffer": {
+      "signature": "var getReadBuffer()",
+      "returnType": "var",
+      "description": "Returns a reference to the internal read buffer.",
+      "parameters": []
+    },
+    "getResizedBuffer": {
+      "signature": "var getResizedBuffer(int numDestSamples, int resampleMode)",
+      "returnType": "var",
+      "description": "Resamples the buffer to a fixed size.",
+      "parameters": [
+        {
+          "name": "numDestSamples",
+          "type": "int"
+        },
+        {
+          "name": "resampleMode",
+          "type": "int"
+        }
+      ]
+    },
+    "setActive": {
+      "signature": "void setActive(bool shouldBeActive)",
+      "returnType": "void",
+      "description": "Enables or disables the ring buffer.",
+      "parameters": [
+        {
+          "name": "shouldBeActive",
+          "type": "bool"
+        }
+      ]
+    },
+    "setRingBufferProperties": {
+      "signature": "void setRingBufferProperties(var propertyData)",
+      "returnType": "void",
+      "description": "Sets the ring buffer properties from an object (Use the JSON from the Edit Properties popup).",
+      "parameters": [
+        {
+          "name": "propertyData",
+          "type": "var"
+        }
+      ]
+    },
+    "toBase64": {
+      "signature": "String toBase64()",
+      "returnType": "String",
+      "description": "Exports the display buffer state as base64 encoded string.",
+      "parameters": []
+    }
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "factoryPath": "analyse.specs",
+  "factory": "analyse",
+  "nodeId": "specs",
+  "description": "",
+
+  "classification": {
+    "signalPathRole": "utility",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "displayBuffers": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/analyse/specs.md",
+    "tier": "BRIEF",
+    "lines": 11
+  },
+
+  "availableImages": ["signal_specs.png", "specs.png"],
+
+  "gaps": [
+    {
+      "id": "description-accuracy",
+      "category": "description_accuracy",
+      "question": "The base data description is empty. The existing phase3 doc says it shows sample rate, block size, channel amount, MIDI processing status, and polyphony. Confirm what information is displayed.",
+      "context": "Need an accurate description for the reference page."
+    },
+    {
+      "id": "signal-path-passthrough",
+      "category": "signal_path",
+      "question": "Does specs pass audio through or is it purely a display node? The existing doc says it is a 'debug tool' ignored in C++ export (UncompileableNode: true).",
+      "context": "Users need to know this has no effect on audio and is removed in compiled output."
+    },
+    {
+      "id": "what-is-displayed",
+      "category": "signal_path",
+      "question": "What exact information does the specs node read from PrepareSpecs or the processing context? Does it also show voice count or other runtime info?",
+      "context": "Need a complete list of displayed information for the reference page."
+    },
+    {
+      "id": "uncompileable-implications",
+      "category": "conditional_logic",
+      "question": "The cppProperties has UncompileableNode: true. Confirm this means the node is skipped during C++ export. Are there any other implications (e.g., does it affect the network in any way)?",
+      "context": "Important caveat for users who plan to compile their networks."
+    }
+  ],
+
+  "notes": "Empty description in base data -- needs fixing. Has UncompileableNode: true which is unique among analyse nodes. No display buffer in the base data (unlike fft/goniometer/oscilloscope) -- it renders its own UI directly. Two screenshots available."
+}

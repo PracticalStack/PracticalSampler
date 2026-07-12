@@ -1,0 +1,3 @@
+Creates a dynamic component tree from JSON data. Pass a single JSON object for one component or an array for multiple. Returns a `ContainerChild` reference to the root of the created tree (or to the single child if one object was passed). Each JSON object should have at minimum an `id` and `type` property, plus any layout and behaviour properties for that component type (position, colours, slider range, combo items, etc.).
+
+> [!Warning:Previous ContainerChild references invalidated] All previously returned ContainerChild references become invalid after calling `setData()`. Store references in variables that you reassign after each call, or check `ref.isValid()` before use.

@@ -1,0 +1,97 @@
+{
+  "factoryPath": "template.freq_split5",
+  "factory": "template",
+  "nodeId": "freq_split5",
+  "description": "Processes each node independently and sums up the output.",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Crossover Frequencies",
+      "rationale": "Four crossover frequency parameters define the boundaries between five frequency bands. Each parameter routes to five LR filters (one per band) at that crossover point.",
+      "parameters": [
+        {
+          "id": "Band 1",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0, "skew": 0.2299045584686382 },
+          "default": 28.23995166396726,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Band 2",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0, "skew": 0.2299045584686382 },
+          "default": 187.9941165776182,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Band 3",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0, "skew": 0.2299045584686382 },
+          "default": 1000.0,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Band 4",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0, "skew": 0.2299045584686382 },
+          "default": 3445.022907368176,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": true,
+    "groupName": "freq_splitN",
+    "templateParameter": "number of frequency bands (2-5)",
+    "variantValue": "5"
+  },
+
+  "existingDoc": {
+    "path": "phase3/template/freq_split5.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": ["lr4_3.png", "split.png"],
+
+  "gaps": [
+    {
+      "id": "variant-difference",
+      "category": "signal_path",
+      "question": "freq_split5 has 5 bands and 4 crossover parameters vs freq_split2's 2 bands and 1 crossover. Each crossover parameter connects to 5 LR filters (lr1_N through lr5_N). Is the internal logic identical to freq_split2 except for additional bands and crossovers?",
+      "context": "If identical in structure, the doc can reference the base variant and note only the band count and parameter count difference."
+    }
+  ],
+
+  "notes": "Variant of freq_splitN with N=5 (maximum). Four crossover parameters (Band 1 through Band 4) each connect to 5 LR filters. Default crossover frequencies: ~28 Hz, ~188 Hz, 1000 Hz, ~3445 Hz. This is the largest freq_split variant."
+}

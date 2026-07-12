@@ -1,0 +1,1 @@
+Loads the default user preset as defined in the project settings. This triggers the full preset load lifecycle including pre/post callbacks. The default preset must be configured in the project settings - if none is set, a script error is thrown.

@@ -1,0 +1,1 @@
+Returns the product name as defined in the project settings. Use `Engine.getVersion()` for the version string or `Engine.getProjectInfo()` for the full project metadata.

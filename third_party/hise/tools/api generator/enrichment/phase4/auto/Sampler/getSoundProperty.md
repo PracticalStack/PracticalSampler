@@ -1,0 +1,1 @@
+Returns the value of a sound property for a specific sound in the legacy script selection. Use `Sampler.*` constants for the property index (e.g. `Sampler.Root`, `Sampler.LoKey`). Part of the legacy selection API - prefer `Sample` objects from `createSelection()` for new code.

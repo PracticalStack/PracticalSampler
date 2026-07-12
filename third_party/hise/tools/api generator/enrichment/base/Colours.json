@@ -1,0 +1,175 @@
+{
+  "className": "Colours",
+  "category": "namespace",
+  "description": "",
+  "methods": {
+    "fromHsl": {
+      "signature": "int fromHsl(var hsl)",
+      "returnType": "int",
+      "description": "Converts a colour from a [h, s, l, a] float array to a uint32 value.",
+      "parameters": [
+        {
+          "name": "hsl",
+          "type": "var"
+        }
+      ]
+    },
+    "fromVec4": {
+      "signature": "int fromVec4(var vec4)",
+      "returnType": "int",
+      "description": "Converts a colour from a [r, g, b, a] float array to a uint32 value.",
+      "parameters": [
+        {
+          "name": "vec4",
+          "type": "var"
+        }
+      ]
+    },
+    "mix": {
+      "signature": "int mix(var colour1, var colour2, float alpha)",
+      "returnType": "int",
+      "description": "Linear interpolation between two colours.",
+      "parameters": [
+        {
+          "name": "colour1",
+          "type": "var"
+        },
+        {
+          "name": "colour2",
+          "type": "var"
+        },
+        {
+          "name": "alpha",
+          "type": "float"
+        }
+      ]
+    },
+    "toHsl": {
+      "signature": "var toHsl(var colour)",
+      "returnType": "var",
+      "description": "Converts a colour to a [h, s, l, a] array.",
+      "parameters": [
+        {
+          "name": "colour",
+          "type": "var"
+        }
+      ]
+    },
+    "toVec4": {
+      "signature": "var toVec4(var colour)",
+      "returnType": "var",
+      "description": "Converts a colour to a [r, g, b, a] array that can be passed to GLSL as vec4.",
+      "parameters": [
+        {
+          "name": "colour",
+          "type": "var"
+        }
+      ]
+    },
+    "withAlpha": {
+      "signature": "int withAlpha(var colour, float alpha)",
+      "returnType": "int",
+      "description": "Returns a colour value with the specified alpha value.",
+      "parameters": [
+        {
+          "name": "colour",
+          "type": "var"
+        },
+        {
+          "name": "alpha",
+          "type": "float"
+        }
+      ]
+    },
+    "withBrightness": {
+      "signature": "int withBrightness(var colour, float brightness)",
+      "returnType": "int",
+      "description": "Returns a colour with the specified brightness.",
+      "parameters": [
+        {
+          "name": "colour",
+          "type": "var"
+        },
+        {
+          "name": "brightness",
+          "type": "float"
+        }
+      ]
+    },
+    "withHue": {
+      "signature": "int withHue(var colour, float hue)",
+      "returnType": "int",
+      "description": "Returns a colour with the specified hue.",
+      "parameters": [
+        {
+          "name": "colour",
+          "type": "var"
+        },
+        {
+          "name": "hue",
+          "type": "float"
+        }
+      ]
+    },
+    "withMultipliedAlpha": {
+      "signature": "int withMultipliedAlpha(var colour, float factor)",
+      "returnType": "int",
+      "description": "Returns a colour with a multiplied alpha value.",
+      "parameters": [
+        {
+          "name": "colour",
+          "type": "var"
+        },
+        {
+          "name": "factor",
+          "type": "float"
+        }
+      ]
+    },
+    "withMultipliedBrightness": {
+      "signature": "int withMultipliedBrightness(var colour, float factor)",
+      "returnType": "int",
+      "description": "Returns a colour with a multiplied brightness value.",
+      "parameters": [
+        {
+          "name": "colour",
+          "type": "var"
+        },
+        {
+          "name": "factor",
+          "type": "float"
+        }
+      ]
+    },
+    "withMultipliedSaturation": {
+      "signature": "int withMultipliedSaturation(var colour, float factor)",
+      "returnType": "int",
+      "description": "Returns a colour with a multiplied saturation value.",
+      "parameters": [
+        {
+          "name": "colour",
+          "type": "var"
+        },
+        {
+          "name": "factor",
+          "type": "float"
+        }
+      ]
+    },
+    "withSaturation": {
+      "signature": "int withSaturation(var colour, float saturation)",
+      "returnType": "int",
+      "description": "Returns a colour with the specified saturation.",
+      "parameters": [
+        {
+          "name": "colour",
+          "type": "var"
+        },
+        {
+          "name": "saturation",
+          "type": "float"
+        }
+      ]
+    }
+  }
+}

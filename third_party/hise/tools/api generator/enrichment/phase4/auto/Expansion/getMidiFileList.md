@@ -1,0 +1,1 @@
+Returns an array of pool reference strings for all MIDI files in this expansion. Does not scan the filesystem - returns files already known to the pool from initialisation. Each string can be passed to `MidiPlayer.setFile()` to load a MIDI sequence.

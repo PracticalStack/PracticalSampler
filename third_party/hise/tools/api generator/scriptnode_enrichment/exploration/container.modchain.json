@@ -1,0 +1,15 @@
+{
+  "factoryPath": "container.modchain",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 0.5, "description": "Parent audio (passes through unmodified)" },
+    { "id": "controlbuf", "label": "Control buffer", "type": "process", "importance": 0.8, "description": "Internal mono buffer at reduced sample rate (SR/8)" },
+    { "id": "serial", "label": "Serial dispatch", "type": "process", "importance": 1.0, "description": "Children process the control buffer serially" },
+    { "id": "modout", "label": "Modulation outputs", "type": "modulation_out", "importance": 1.0, "description": "Child nodes send modulation values to parameter targets" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 0.5, "description": "Parent audio unchanged" }
+  ],
+  "edges": [
+    { "from": "in", "to": "out", "type": "signal", "label": "passthrough" },
+    { "from": "controlbuf", "to": "serial", "type": "signal", "label": "mono, control rate" },
+    { "from": "serial", "to": "modout", "type": "signal", "label": null }
+  ]
+}

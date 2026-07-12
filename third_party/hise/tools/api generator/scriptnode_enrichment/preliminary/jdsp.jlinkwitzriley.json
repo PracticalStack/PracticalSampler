@@ -1,0 +1,114 @@
+{
+  "factoryPath": "jdsp.jlinkwitzriley",
+  "factory": "jdsp",
+  "nodeId": "jlinkwitzriley",
+  "description": "",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Filter",
+      "rationale": "Frequency sets the crossover point, Type selects the filter mode.",
+      "parameters": [
+        {
+          "id": "Frequency",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0, "skew": 0.2299045622348785 },
+          "default": 2000.0,
+          "textConverter": "Frequency",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Type",
+          "range": { "min": 0.0, "max": 2.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "55.nT6K8ChKwE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.JT.SPo.RPoPPPAPXiQWZ1UF.ADf...",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "filters": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/jdsp/jlinkwitzriley.md",
+    "tier": "BRIEF",
+    "lines": 18
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-processing",
+      "category": "signal_path",
+      "question": "How does the node wrap JUCE's dsp::LinkwitzRileyFilter? Does it use processSample or process with AudioBlock?",
+      "context": "Need to describe the signal flow accurately."
+    },
+    {
+      "id": "type-parameter-values",
+      "category": "conditional_logic",
+      "question": "The Type parameter has range 0-2 with step 1 and an encoded TextToValueConverter. What are the three modes? Phase3 doc says LP, HP, AP. Confirm from C++.",
+      "context": "Need to list the exact mode values and their behaviour."
+    },
+    {
+      "id": "filter-order",
+      "category": "signal_path",
+      "question": "What is the filter order? JUCE LinkwitzRileyFilter is typically 4th order (24 dB/octave). Confirm.",
+      "context": "Need to document the slope characteristic."
+    },
+    {
+      "id": "filter-display",
+      "category": "signal_path",
+      "question": "The node has a Filter ComplexData slot. Does it provide filter coefficient display? How are coefficients calculated for the display?",
+      "context": "Need to document the filter display feature."
+    },
+    {
+      "id": "frequency-modulation-stability",
+      "category": "parameter_behaviour",
+      "question": "Phase3 doc mentions the deprecated filters.linkwitzriley has 'stability issues when modulating the frequency'. Does jlinkwitzriley handle frequency modulation correctly?",
+      "context": "Key advantage over the deprecated alternative -- need to confirm."
+    },
+    {
+      "id": "monophonic-confirmation",
+      "category": "signal_path",
+      "question": "No cppProperties are set. Confirm that jlinkwitzriley is indeed monophonic.",
+      "context": "Empty cppProperties needs verification."
+    }
+  ],
+
+  "notes": "Empty description in base data. Has a Filter ComplexData slot for display. Phase3 doc is informative -- mentions it is the preferred replacement for filters.linkwitzriley and references the freq_split templates. The encoded TextToValueConverter for Type likely decodes to LP/HP/AP labels. Used in 14 surveyed projects, making it the second most popular jdsp node."
+}

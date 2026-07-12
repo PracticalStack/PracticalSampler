@@ -1,0 +1,1 @@
+Returns whether the timer is currently active. This is commonly used as a debounce guard - check `isTimerRunning()` before triggering an expensive operation, and use the running timer as a cooldown gate to block rapid re-triggering.

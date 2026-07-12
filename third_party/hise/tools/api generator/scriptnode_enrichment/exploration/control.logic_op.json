@@ -1,0 +1,16 @@
+{
+  "factoryPath": "control.logic_op",
+  "nodes": [
+    { "id": "left", "label": "Left", "type": "parameter", "importance": 1.0, "description": "First logic input (0..1, threshold > 0.5 for true)" },
+    { "id": "right", "label": "Right", "type": "parameter", "importance": 1.0, "description": "Second logic input (0..1, threshold > 0.5 for true)" },
+    { "id": "operator", "label": "Operator", "type": "decision", "importance": 1.0, "description": "Selects logic operation (AND, OR, XOR)" },
+    { "id": "logic_op", "label": "Logic Operation", "type": "process", "importance": 1.0, "description": "Applies selected boolean operation on thresholded inputs" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Normalised binary output (1.0 or 0.0)" }
+  ],
+  "edges": [
+    { "from": "left", "to": "logic_op", "type": "signal", "label": null },
+    { "from": "right", "to": "logic_op", "type": "signal", "label": null },
+    { "from": "operator", "to": "logic_op", "type": "conditional", "label": "selects operation" },
+    { "from": "logic_op", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

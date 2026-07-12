@@ -1,0 +1,108 @@
+{
+  "moduleId": "CC2Note",
+  "nodes": [
+    {
+      "id": "midi_in",
+      "type": "input",
+      "label": "MIDI In",
+      "importance": 1.0
+    },
+    {
+      "id": "note_capture",
+      "type": "process",
+      "label": "Note Capture & Suppress",
+      "importance": 0.9,
+      "group": "note_handling",
+      "description": "onNoteOn stores note number as lastNote, onNoteOff clears it if matching. Both events are ignored (suppressed from output)."
+    },
+    {
+      "id": "cc_match",
+      "type": "decision",
+      "label": "CC matches selector?",
+      "importance": 0.9,
+      "group": "cc_processing",
+      "description": "Checks if incoming CC number equals selectorValue AND lastNote != -1"
+    },
+    {
+      "id": "cc_selector_param",
+      "type": "parameter",
+      "label": "CC Selector",
+      "importance": 0.8,
+      "group": "cc_processing"
+    },
+    {
+      "id": "bypass_check",
+      "type": "decision",
+      "label": "Bypass OFF?",
+      "importance": 0.7,
+      "group": "rr_group",
+      "description": "Checks if bypassButton value < 0.5 to enable custom round-robin"
+    },
+    {
+      "id": "bypass_param",
+      "type": "parameter",
+      "label": "Bypass",
+      "importance": 0.7,
+      "group": "rr_group"
+    },
+    {
+      "id": "rr_group_select",
+      "type": "process",
+      "label": "Round-Robin Group Select",
+      "importance": 0.8,
+      "group": "rr_group",
+      "description": "Alternates up/down state, randomly selects non-repeating group pair, calls Sampler.setActiveGroup()"
+    },
+    {
+      "id": "sampler_groups",
+      "type": "external",
+      "label": "Sampler Groups",
+      "importance": 0.7,
+      "group": "rr_group",
+      "description": "Parent Sampler's group system - receives setActiveGroup() calls and provides group count via getAttribute(7)"
+    },
+    {
+      "id": "note_gen",
+      "type": "process",
+      "label": "Synth.playNote(lastNote, ccValue)",
+      "importance": 1.0,
+      "group": "cc_processing",
+      "description": "Generates artificial noteOn using captured note number and CC value as velocity. Always executes when CC matches, regardless of bypass."
+    },
+    {
+      "id": "midi_out",
+      "type": "output",
+      "label": "MIDI Out",
+      "importance": 1.0
+    }
+  ],
+  "edges": [
+    { "from": "midi_in", "to": "note_capture", "type": "signal", "label": "noteOn/noteOff events" },
+    { "from": "midi_in", "to": "cc_match", "type": "signal", "label": "CC events" },
+    { "from": "cc_selector_param", "to": "cc_match", "type": "control" },
+    { "from": "cc_match", "to": "midi_out", "type": "conditional", "label": "no match (passthrough)" },
+    { "from": "cc_match", "to": "bypass_check", "type": "conditional", "label": "match" },
+    { "from": "bypass_param", "to": "bypass_check", "type": "control" },
+    { "from": "bypass_check", "to": "rr_group_select", "type": "conditional", "label": "bypass OFF" },
+    { "from": "bypass_check", "to": "note_gen", "type": "conditional", "label": "bypass ON (skip RR)" },
+    { "from": "rr_group_select", "to": "sampler_groups", "type": "control", "label": "setActiveGroup()" },
+    { "from": "sampler_groups", "to": "rr_group_select", "type": "control", "label": "group count" },
+    { "from": "rr_group_select", "to": "note_gen", "type": "signal" },
+    { "from": "note_gen", "to": "midi_out", "type": "signal", "label": "artificial noteOn" },
+    { "from": "note_capture", "to": "cc_match", "type": "control", "label": "lastNote state" }
+  ],
+  "groups": [
+    {
+      "id": "note_handling",
+      "label": "Note Input Handling"
+    },
+    {
+      "id": "cc_processing",
+      "label": "CC-to-Note Conversion"
+    },
+    {
+      "id": "rr_group",
+      "label": "Round-Robin Group Cycling"
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+Sets the current font with an additional character spacing (kerning) factor. Behaves identically to `setFont` except that the `spacing` parameter adds extra space between characters. A spacing of `0.0` produces the same result as `setFont`. Positive values increase spacing; negative values tighten it. Typical values for small uppercase labels range from `0.03` to `0.07`.

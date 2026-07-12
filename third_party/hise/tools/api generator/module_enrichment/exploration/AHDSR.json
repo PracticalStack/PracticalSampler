@@ -1,0 +1,320 @@
+{
+  "moduleId": "AHDSR",
+  "nodes": [
+    {
+      "id": "note_on",
+      "label": "Note On",
+      "type": "input",
+      "importance": 0.9,
+      "group": "voice_lifecycle",
+      "description": "MIDI note-on triggers startVoice(), captures mod chain values, computes per-voice coefficients"
+    },
+    {
+      "id": "note_off",
+      "label": "Note Off",
+      "type": "input",
+      "importance": 0.8,
+      "group": "voice_lifecycle",
+      "description": "MIDI note-off sets state to RELEASE (polyphonic) or checked via keymap (monophonic)"
+    },
+    {
+      "id": "mod_capture",
+      "label": "Mod Chain Capture",
+      "type": "process",
+      "importance": 0.7,
+      "group": "voice_lifecycle",
+      "description": "Reads all 5 mod chain values via getConstantVoiceValue() at note-on time"
+    },
+    {
+      "id": "coeff_calc",
+      "label": "Coefficient Calculation",
+      "type": "process",
+      "importance": 0.6,
+      "group": "voice_lifecycle",
+      "description": "Computes per-voice attack/decay/release coefficients from parameters * mod values"
+    },
+    {
+      "id": "state_attack",
+      "label": "ATTACK",
+      "type": "process",
+      "importance": 0.9,
+      "group": "state_machine",
+      "description": "current_value = attackBase + current_value * attackCoef; exponential curve shaped by AttackCurve"
+    },
+    {
+      "id": "state_hold",
+      "label": "HOLD",
+      "type": "process",
+      "importance": 0.6,
+      "group": "state_machine",
+      "description": "Holds current_value at attackLevel for holdTimeSamples"
+    },
+    {
+      "id": "state_decay",
+      "label": "DECAY",
+      "type": "process",
+      "importance": 0.8,
+      "group": "state_machine",
+      "description": "current_value = decayBase + current_value * decayCoef; shaped by DecayCurve via targetRatioDR"
+    },
+    {
+      "id": "state_sustain",
+      "label": "SUSTAIN",
+      "type": "process",
+      "importance": 0.8,
+      "group": "state_machine",
+      "description": "current_value = sustain * modValues[SustainLevelChain]; fast-path with linear ramp in calculateBlock"
+    },
+    {
+      "id": "state_release",
+      "label": "RELEASE",
+      "type": "process",
+      "importance": 0.8,
+      "group": "state_machine",
+      "description": "current_value = releaseBase + current_value * releaseCoef; same curve as DECAY (shared targetRatioDR)"
+    },
+    {
+      "id": "state_retrigger",
+      "label": "RETRIGGER",
+      "type": "process",
+      "importance": 0.5,
+      "group": "state_machine",
+      "description": "Monophonic only: default immediately transitions to ATTACK from current value"
+    },
+    {
+      "id": "state_idle",
+      "label": "IDLE",
+      "type": "process",
+      "importance": 0.5,
+      "group": "state_machine",
+      "description": "Envelope inactive; voice can be killed (polyphonic) or continues (monophonic)"
+    },
+    {
+      "id": "decision_mono",
+      "label": "Monophonic?",
+      "type": "decision",
+      "importance": 0.7,
+      "group": "voice_lifecycle",
+      "description": "Switches between shared monophonic state and per-voice state"
+    },
+    {
+      "id": "decision_retrigger",
+      "label": "Retrigger?",
+      "type": "decision",
+      "importance": 0.6,
+      "group": "voice_lifecycle",
+      "description": "In monophonic mode: restart envelope or continue from current position"
+    },
+    {
+      "id": "decision_attack_vs_sustain",
+      "label": "AttackLevel > Sustain?",
+      "type": "decision",
+      "importance": 0.5,
+      "group": "state_machine",
+      "description": "If attackLevel <= sustain, ATTACK transitions directly to SUSTAIN, skipping HOLD and DECAY"
+    },
+    {
+      "id": "internal_buffer",
+      "label": "Internal Buffer",
+      "type": "process",
+      "importance": 0.7,
+      "group": "output",
+      "description": "Per-sample envelope values written at control rate"
+    },
+    {
+      "id": "apply_modulation",
+      "label": "Apply to Voice Buffer",
+      "type": "output",
+      "importance": 0.8,
+      "group": "output",
+      "description": "applyTimeModulation() multiplies envelope values into the voice audio buffer"
+    },
+    {
+      "id": "param_attack",
+      "label": "Attack",
+      "type": "parameter",
+      "importance": 0.8,
+      "group": "params_time",
+      "description": "Attack time in ms (0-20000); converted to coefficient via calcCoef at control rate"
+    },
+    {
+      "id": "param_attack_level",
+      "label": "AttackLevel",
+      "type": "parameter",
+      "importance": 0.7,
+      "group": "params_level",
+      "description": "Peak level in dB (-100 to 0); stored as linear gain internally"
+    },
+    {
+      "id": "param_hold",
+      "label": "Hold",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": "params_time",
+      "description": "Hold time in ms (0-20000); converted to samples at control rate; no modulation chain"
+    },
+    {
+      "id": "param_decay",
+      "label": "Decay",
+      "type": "parameter",
+      "importance": 0.7,
+      "group": "params_time",
+      "description": "Decay time in ms (1-20000); converted to coefficient via calcCoef"
+    },
+    {
+      "id": "param_sustain",
+      "label": "Sustain",
+      "type": "parameter",
+      "importance": 0.8,
+      "group": "params_level",
+      "description": "Sustain level in dB (-100 to 0); stored as linear gain; 0 dB = unity, -100 dB = silence"
+    },
+    {
+      "id": "param_release",
+      "label": "Release",
+      "type": "parameter",
+      "importance": 0.7,
+      "group": "params_time",
+      "description": "Release time in ms (1-20000); converted to coefficient; shares DecayCurve shaping"
+    },
+    {
+      "id": "param_attack_curve",
+      "label": "AttackCurve",
+      "type": "parameter",
+      "importance": 0.6,
+      "group": "params_curve",
+      "description": "0.0=concave (log), 0.5=linear, 1.0=convex (exp); controls attackBase power curve coefficient"
+    },
+    {
+      "id": "param_decay_curve",
+      "label": "DecayCurve",
+      "type": "parameter",
+      "importance": 0.6,
+      "group": "params_curve",
+      "description": "0.0=steep exponential, 1.0=gentler; controls targetRatioDR for both decay and release"
+    },
+    {
+      "id": "param_monophonic",
+      "label": "Monophonic",
+      "type": "parameter",
+      "importance": 0.6,
+      "group": "params_control",
+      "description": "Toggle: shared envelope state for all voices; disables voice killing"
+    },
+    {
+      "id": "param_retrigger",
+      "label": "Retrigger",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": "params_control",
+      "description": "Toggle (monophonic only): restart envelope on new note or continue from current state"
+    },
+    {
+      "id": "param_ecomode",
+      "label": "EcoMode (vestigial)",
+      "type": "parameter",
+      "importance": 0.1,
+      "group": "params_control",
+      "description": "Vestigial: returns hardcoded 1.0, setter is a no-op. Downsampling is global."
+    },
+    {
+      "id": "mod_attack_time",
+      "label": "AttackTimeModulation",
+      "type": "modulation",
+      "importance": 0.6,
+      "group": "mod_chains",
+      "description": "VoiceStartModulator chain; multiplies attack time (gain mode on ms value)"
+    },
+    {
+      "id": "mod_attack_level",
+      "label": "AttackLevelModulation",
+      "type": "modulation",
+      "importance": 0.6,
+      "group": "mod_chains",
+      "description": "VoiceStartModulator chain; multiplies attack level (gain mode on linear gain)"
+    },
+    {
+      "id": "mod_decay_time",
+      "label": "DecayTimeModulation",
+      "type": "modulation",
+      "importance": 0.6,
+      "group": "mod_chains",
+      "description": "VoiceStartModulator chain; multiplies decay time (gain mode on ms value)"
+    },
+    {
+      "id": "mod_sustain_level",
+      "label": "SustainLevelModulation",
+      "type": "modulation",
+      "importance": 0.6,
+      "group": "mod_chains",
+      "description": "VoiceStartModulator chain; multiplies sustain level (gain mode on linear gain)"
+    },
+    {
+      "id": "mod_release_time",
+      "label": "ReleaseTimeModulation",
+      "type": "modulation",
+      "importance": 0.6,
+      "group": "mod_chains",
+      "description": "VoiceStartModulator chain; multiplies release time (gain mode on ms value)"
+    }
+  ],
+  "edges": [
+    { "from": "note_on", "to": "decision_mono", "type": "signal", "label": null },
+    { "from": "decision_mono", "to": "mod_capture", "type": "conditional", "label": "polyphonic: per-voice state" },
+    { "from": "decision_mono", "to": "decision_retrigger", "type": "conditional", "label": "monophonic: shared state" },
+    { "from": "decision_retrigger", "to": "mod_capture", "type": "conditional", "label": "retrigger=on or first note" },
+    { "from": "decision_retrigger", "to": "state_sustain", "type": "conditional", "label": "retrigger=off, not first note (continue)" },
+    { "from": "mod_capture", "to": "coeff_calc", "type": "signal", "label": null },
+    { "from": "coeff_calc", "to": "state_attack", "type": "signal", "label": null },
+
+    { "from": "state_attack", "to": "decision_attack_vs_sustain", "type": "signal", "label": "value reaches threshold" },
+    { "from": "decision_attack_vs_sustain", "to": "state_hold", "type": "conditional", "label": "attackLevel > sustain" },
+    { "from": "decision_attack_vs_sustain", "to": "state_sustain", "type": "conditional", "label": "attackLevel <= sustain" },
+    { "from": "state_hold", "to": "state_decay", "type": "signal", "label": "holdCounter >= holdTimeSamples" },
+    { "from": "state_decay", "to": "state_sustain", "type": "signal", "label": "value near sustain" },
+    { "from": "state_decay", "to": "state_idle", "type": "signal", "label": "sustain == 0" },
+
+    { "from": "note_off", "to": "state_release", "type": "signal", "label": null },
+    { "from": "state_sustain", "to": "state_release", "type": "signal", "label": "note off" },
+    { "from": "state_release", "to": "state_idle", "type": "signal", "label": "value near zero" },
+
+    { "from": "state_retrigger", "to": "state_attack", "type": "signal", "label": "immediate (default)" },
+
+    { "from": "state_attack", "to": "internal_buffer", "type": "signal", "label": null },
+    { "from": "state_hold", "to": "internal_buffer", "type": "signal", "label": null },
+    { "from": "state_decay", "to": "internal_buffer", "type": "signal", "label": null },
+    { "from": "state_sustain", "to": "internal_buffer", "type": "signal", "label": null },
+    { "from": "state_release", "to": "internal_buffer", "type": "signal", "label": null },
+    { "from": "internal_buffer", "to": "apply_modulation", "type": "signal", "label": null },
+
+    { "from": "param_attack", "to": "coeff_calc", "type": "control", "label": null },
+    { "from": "param_attack_level", "to": "coeff_calc", "type": "control", "label": null },
+    { "from": "param_hold", "to": "state_hold", "type": "control", "label": null },
+    { "from": "param_decay", "to": "coeff_calc", "type": "control", "label": null },
+    { "from": "param_sustain", "to": "state_sustain", "type": "control", "label": null },
+    { "from": "param_sustain", "to": "state_decay", "type": "control", "label": "decay target" },
+    { "from": "param_release", "to": "coeff_calc", "type": "control", "label": null },
+    { "from": "param_attack_curve", "to": "state_attack", "type": "control", "label": "attackBase power curve" },
+    { "from": "param_decay_curve", "to": "state_decay", "type": "control", "label": "targetRatioDR" },
+    { "from": "param_decay_curve", "to": "state_release", "type": "control", "label": "shared targetRatioDR" },
+    { "from": "param_monophonic", "to": "decision_mono", "type": "control", "label": null },
+    { "from": "param_retrigger", "to": "decision_retrigger", "type": "control", "label": null },
+
+    { "from": "mod_attack_time", "to": "coeff_calc", "type": "control", "label": "multiplies attack ms" },
+    { "from": "mod_attack_level", "to": "coeff_calc", "type": "control", "label": "multiplies attack level (linear)" },
+    { "from": "mod_decay_time", "to": "coeff_calc", "type": "control", "label": "multiplies decay ms" },
+    { "from": "mod_sustain_level", "to": "state_sustain", "type": "control", "label": "multiplies sustain (linear)" },
+    { "from": "mod_sustain_level", "to": "state_decay", "type": "control", "label": "affects decay target" },
+    { "from": "mod_release_time", "to": "coeff_calc", "type": "control", "label": "multiplies release ms" }
+  ],
+  "groups": [
+    { "id": "voice_lifecycle", "label": "Voice Lifecycle" },
+    { "id": "state_machine", "label": "Envelope State Machine" },
+    { "id": "output", "label": "Output" },
+    { "id": "params_time", "label": "Time Parameters" },
+    { "id": "params_level", "label": "Level Parameters" },
+    { "id": "params_curve", "label": "Curve Parameters" },
+    { "id": "params_control", "label": "Playback Control Parameters" },
+    { "id": "mod_chains", "label": "Modulation Chains" }
+  ]
+}

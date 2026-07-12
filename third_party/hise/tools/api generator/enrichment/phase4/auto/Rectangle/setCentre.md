@@ -1,0 +1,1 @@
+Moves this rectangle so its centre is at the given coordinates, keeping its size unchanged. This modifies the rectangle in place and returns nothing. For a non-mutating version, use `withCentre()`.

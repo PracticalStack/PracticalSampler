@@ -1,0 +1,97 @@
+{
+  "factoryPath": "routing.public_mod",
+  "factory": "routing",
+  "nodeId": "public_mod",
+  "description": "Creates a modulation signal slot in the compiled node / nested network",
+
+  "classification": {
+    "signalPathRole": "utility",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Value",
+      "rationale": "The input value that is exposed as a public modulation output from the containing network.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0, "max": 1, "step": 0, "skew": 1.0 },
+          "default": 0,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/routing/public_mod.md",
+    "tier": "BRIEF",
+    "lines": 20
+  },
+
+  "availableImages": [
+    "public1.png",
+    "public2.png"
+  ],
+
+  "gaps": [
+    {
+      "id": "public-mod-mechanism",
+      "category": "signal_path",
+      "question": "How does public_mod expose its Value as a modulation output on the parent network? Does it write to the DllBoundaryTempoSyncer::publicModValue or use a different mechanism?",
+      "context": "Understanding the mechanism determines how the value becomes accessible outside the nested network."
+    },
+    {
+      "id": "value-update-timing",
+      "category": "parameter_behaviour",
+      "question": "When Value changes, is the public modulation output updated immediately, on the next audio callback, or at some other point?",
+      "context": "Timing matters for modulation accuracy, especially in real-time contexts."
+    },
+    {
+      "id": "multiple-public-mods",
+      "category": "signal_path",
+      "question": "Can a nested network contain multiple public_mod nodes? If so, how are they differentiated -- by node ID, by index, or by some naming convention?",
+      "context": "Users building complex nested networks may need multiple modulation outputs."
+    },
+    {
+      "id": "normalised-range",
+      "category": "parameter_behaviour",
+      "question": "Is the public modulation output always normalised 0..1, or can it carry unnormalised values?",
+      "context": "The Value parameter range is 0..1, suggesting normalised output, but this should be confirmed."
+    }
+  ],
+
+  "notes": "routing.public_mod is marked OutsideSignalPath and IsPublicMod. It is NOT a control node (IsControlNode is not set) and has no modulation output targets in the base data (ModulationTargets is absent). Its purpose is to bridge a value from inside a nested network to the parent network's modulation system. Two images available (public1.png, public2.png) likely showing the node in context. The node does not appear to have a standard modulation output -- the IsPublicMod flag likely triggers special handling in the C++ export system."
+}

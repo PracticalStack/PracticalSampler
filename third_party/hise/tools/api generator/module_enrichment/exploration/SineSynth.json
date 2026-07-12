@@ -1,0 +1,163 @@
+{
+  "moduleId": "SineSynth",
+  "nodes": [
+    {
+      "id": "midi_in",
+      "type": "input",
+      "label": "MIDI Note",
+      "importance": 1
+    },
+    {
+      "id": "pitch_calc",
+      "type": "process",
+      "label": "Pitch Calculation",
+      "importance": 1,
+      "detail": "Converts MIDI note number to phase increment using tuning factor and sample rate"
+    },
+    {
+      "id": "tuning_factor",
+      "type": "decision",
+      "label": "Tuning Mode",
+      "importance": 2,
+      "detail": "UseFreqRatio selects between musical (octave/semitone) and ratio (coarse/fine) tuning"
+    },
+    {
+      "id": "pitch_mod",
+      "type": "modulation",
+      "label": "Pitch Modulation",
+      "importance": 2,
+      "detail": "Per-sample pitch modulation multiplied into phase increment"
+    },
+    {
+      "id": "phase_acc",
+      "type": "process",
+      "label": "Phase Accumulator",
+      "importance": 1,
+      "detail": "Advances phase by uptimeDelta each sample, wraps via bitmask"
+    },
+    {
+      "id": "sine_lookup",
+      "type": "process",
+      "label": "Sine Table Lookup",
+      "importance": 1,
+      "detail": "2048-sample sine table with linear interpolation"
+    },
+    {
+      "id": "saturation",
+      "type": "process",
+      "label": "Saturation",
+      "importance": 2,
+      "detail": "Soft-clipping waveshaper: (1+k)*x / (1+k*|x|)"
+    },
+    {
+      "id": "saturation_param",
+      "type": "parameter",
+      "label": "SaturationAmount",
+      "importance": 2
+    },
+    {
+      "id": "gain_mod",
+      "type": "modulation",
+      "label": "Gain Modulation",
+      "importance": 1,
+      "detail": "Per-voice gain modulation chain output multiplied into signal"
+    },
+    {
+      "id": "gain_param",
+      "type": "parameter",
+      "label": "Gain",
+      "importance": 1
+    },
+    {
+      "id": "mono_to_stereo",
+      "type": "process",
+      "label": "Mono to Stereo",
+      "importance": 3,
+      "detail": "Left channel copied to right channel"
+    },
+    {
+      "id": "fx_chain",
+      "type": "process",
+      "label": "Effect Chain",
+      "importance": 2,
+      "detail": "Per-voice effect chain rendering"
+    },
+    {
+      "id": "audio_out",
+      "type": "output",
+      "label": "Audio L/R",
+      "importance": 1
+    },
+    {
+      "id": "octave_param",
+      "type": "parameter",
+      "label": "OctaveTranspose",
+      "importance": 2
+    },
+    {
+      "id": "semi_param",
+      "type": "parameter",
+      "label": "SemiTones",
+      "importance": 2
+    },
+    {
+      "id": "coarse_param",
+      "type": "parameter",
+      "label": "CoarseFreqRatio",
+      "importance": 2
+    },
+    {
+      "id": "fine_param",
+      "type": "parameter",
+      "label": "FineFreqRatio",
+      "importance": 2
+    },
+    {
+      "id": "use_ratio_param",
+      "type": "parameter",
+      "label": "UseFreqRatio",
+      "importance": 2
+    }
+  ],
+  "edges": [
+    { "from": "midi_in", "to": "pitch_calc" },
+    { "from": "tuning_factor", "to": "pitch_calc" },
+    { "from": "use_ratio_param", "to": "tuning_factor" },
+    { "from": "octave_param", "to": "tuning_factor", "condition": "UseFreqRatio Off" },
+    { "from": "semi_param", "to": "tuning_factor", "condition": "UseFreqRatio Off" },
+    { "from": "coarse_param", "to": "tuning_factor", "condition": "UseFreqRatio On" },
+    { "from": "fine_param", "to": "tuning_factor", "condition": "UseFreqRatio On" },
+    { "from": "pitch_calc", "to": "phase_acc" },
+    { "from": "pitch_mod", "to": "phase_acc" },
+    { "from": "phase_acc", "to": "sine_lookup" },
+    { "from": "sine_lookup", "to": "saturation" },
+    { "from": "saturation_param", "to": "saturation" },
+    { "from": "saturation", "to": "gain_mod" },
+    { "from": "gain_param", "to": "gain_mod" },
+    { "from": "gain_mod", "to": "mono_to_stereo" },
+    { "from": "mono_to_stereo", "to": "fx_chain" },
+    { "from": "fx_chain", "to": "audio_out" }
+  ],
+  "groups": [
+    {
+      "id": "tuning",
+      "label": "Tuning",
+      "nodes": ["tuning_factor", "octave_param", "semi_param", "coarse_param", "fine_param", "use_ratio_param"]
+    },
+    {
+      "id": "oscillator",
+      "label": "Oscillator",
+      "nodes": ["pitch_calc", "phase_acc", "sine_lookup"]
+    },
+    {
+      "id": "waveshaping",
+      "label": "Waveshaping",
+      "nodes": ["saturation", "saturation_param"]
+    },
+    {
+      "id": "output",
+      "label": "Output",
+      "nodes": ["gain_mod", "gain_param", "mono_to_stereo", "fx_chain"]
+    }
+  ]
+}

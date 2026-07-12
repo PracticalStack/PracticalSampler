@@ -1,0 +1,35 @@
+{
+  "19": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptLabel", "id": "PresetNameLabel"}
+    ],
+    "verifyScript": null,
+    "notes": "Fixed: added Engine.createUserPresetHandler() — original called setPostCallback as static method"
+  },
+  "34": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Fixed: added missing closing brace for namespace LayoutBuilder"
+  },
+  "51": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "MidiPlayer", "name": "myMidiPlayer1"},
+      {"type": "MidiPlayer", "name": "myMidiPlayer2"},
+      {"type": "MidiPlayer", "name": "myMidiPlayer3"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Fixed: setSyncToMasterClock and setUseTimestampInTicks both require a boolean argument"
+  }
+}

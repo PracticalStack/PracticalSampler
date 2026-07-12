@@ -1,0 +1,25 @@
+{
+  "factoryPath": "math.map",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "subtract", "label": "Subtract InputStart", "type": "process", "importance": 0.8, "description": "Shifts input so that InputStart maps to zero" },
+    { "id": "clamp", "label": "Clamp", "type": "process", "importance": 0.8, "description": "Clamps shifted value to [0, abs(InputEnd - InputStart)]" },
+    { "id": "scale", "label": "Scale + Offset", "type": "process", "importance": 1.0, "description": "Multiplies by rangeFactor and adds OutputStart" },
+    { "id": "input_start", "label": "InputStart", "type": "parameter", "importance": 0.8, "description": "Start of input range" },
+    { "id": "input_end", "label": "InputEnd", "type": "parameter", "importance": 0.8, "description": "End of input range" },
+    { "id": "output_start", "label": "OutputStart", "type": "parameter", "importance": 0.8, "description": "Start of output range" },
+    { "id": "output_end", "label": "OutputEnd", "type": "parameter", "importance": 0.8, "description": "End of output range" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Mapped output signal" }
+  ],
+  "edges": [
+    { "from": "in", "to": "subtract", "type": "signal", "label": null },
+    { "from": "subtract", "to": "clamp", "type": "signal", "label": null },
+    { "from": "clamp", "to": "scale", "type": "signal", "label": null },
+    { "from": "scale", "to": "out", "type": "signal", "label": null },
+    { "from": "input_start", "to": "subtract", "type": "control", "label": null },
+    { "from": "input_end", "to": "clamp", "type": "control", "label": "clipMax" },
+    { "from": "input_start", "to": "clamp", "type": "control", "label": null },
+    { "from": "output_start", "to": "scale", "type": "control", "label": "offset" },
+    { "from": "output_end", "to": "scale", "type": "control", "label": "rangeFactor" }
+  ]
+}

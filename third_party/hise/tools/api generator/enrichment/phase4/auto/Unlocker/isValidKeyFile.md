@@ -1,0 +1,1 @@
+Checks whether the given string looks like a valid key file by verifying it starts with `"Keyfile for "`. This is a format check only - it does not perform RSA signature validation. Use this to pre-validate user-provided key data before passing it to `writeKeyFile()`.

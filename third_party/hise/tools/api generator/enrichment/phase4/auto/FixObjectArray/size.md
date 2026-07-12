@@ -1,0 +1,1 @@
+Returns the fixed number of elements in the array, which always equals the `length` constant set at creation time. For code that needs to work with both FixObjectArray and `FixObjectStack`, `size()` is the portable choice - on a stack it returns the current occupancy rather than the total capacity.

@@ -1,0 +1,1 @@
+Returns an Array of `File` objects representing all root drives on the current machine. On Windows this typically returns one entry per mounted drive (e.g. `C:\`, `D:\`); on macOS it returns a single entry (`/`).

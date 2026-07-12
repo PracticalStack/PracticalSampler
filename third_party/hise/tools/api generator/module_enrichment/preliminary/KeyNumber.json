@@ -1,0 +1,65 @@
+{
+  "moduleId": "KeyNumber",
+  "prettyName": "Notenumber Modulator",
+  "type": "Modulator",
+  "subtype": "VoiceStartModulator",
+  "category": "input, note_processing",
+
+  "io": {
+    "midiIn": "noteOn",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": true,
+    "fxChain": null
+  },
+
+  "voiceContext": "per-voice",
+
+  "interfaces": [
+    {
+      "name": "TableProcessor",
+      "signalFlowRole": "Lookup table step in signal path"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Note Number Response",
+      "rationale": "No parameters exist in the base JSON. The module likely has a UseTable parameter (like Velocity and Random), but this needs C++ verification.",
+      "parameters": []
+    }
+  ],
+
+  "standaloneModChains": [],
+  "disabledModChains": [],
+  "compositeBlocks": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-order",
+      "category": "signal_path",
+      "question": "What is the exact processing order in calculateVoiceStartValue()? How is the MIDI note number (0-127) mapped to the 0-1 modulation output range? Is it a simple division by 127?",
+      "context": "The pseudo-code must show the correct transformation from raw note number to final modulation value"
+    },
+    {
+      "id": "table-lookup-position",
+      "category": "interface_usage",
+      "question": "Where does the TableProcessor lookup occur? Does the table receive the normalized note number (0-1) as its X position? Is the table always active or gated by a UseTable parameter?",
+      "context": "Users need to know what the table X axis represents and whether the table is optional"
+    },
+    {
+      "id": "usetable-parameter-existence",
+      "category": "parameter_behavior",
+      "question": "Does KeyNumber have a UseTable parameter like Velocity and Random? If so, what is its default value and does it gate the TableProcessor lookup?",
+      "context": "The base JSON has no parameters listed but the TableProcessor interface suggests a UseTable toggle should exist"
+    },
+    {
+      "id": "note-number-range",
+      "category": "parameter_behavior",
+      "question": "Does the module use the full 0-127 MIDI note range for normalization? Are note numbers outside a typical range (e.g. very low or very high) handled specially?",
+      "context": "Users need to understand the mapping domain to set up table curves correctly"
+    }
+  ],
+
+  "notes": "Very simple VoiceStartModulator that converts MIDI note number to a modulation value. No parameters in base JSON but likely has a UseTable parameter (gap noted). The TableProcessor interface suggests the note number can be remapped through a user-defined curve. Natural seeAlso candidates: Velocity, ArrayModulator, Random."
+}

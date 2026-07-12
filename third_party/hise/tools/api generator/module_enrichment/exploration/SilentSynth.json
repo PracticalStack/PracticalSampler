@@ -1,0 +1,92 @@
+{
+  "moduleId": "SilentSynth",
+  "nodes": [
+    {
+      "id": "note_on",
+      "label": "Note On",
+      "type": "input",
+      "importance": 0.5,
+      "group": "voice",
+      "description": "Incoming note event starts a voice"
+    },
+    {
+      "id": "clear_buffer",
+      "label": "Clear Buffer (Silence)",
+      "type": "process",
+      "importance": 0.8,
+      "group": "voice",
+      "description": "Voice buffer is cleared to zero - no audio generated"
+    },
+    {
+      "id": "fx_chain",
+      "label": "FX Chain",
+      "type": "process",
+      "importance": 0.9,
+      "group": "fx",
+      "description": "Effect chain processes the voice buffer"
+    },
+    {
+      "id": "gain_apply",
+      "label": "Gain / Balance",
+      "type": "process",
+      "importance": 0.6,
+      "group": "output",
+      "description": "Standard output gain and balance applied"
+    },
+    {
+      "id": "audio_out",
+      "label": "Audio Output",
+      "type": "output",
+      "importance": 0.7,
+      "group": "output",
+      "description": "Mixed stereo output"
+    },
+    {
+      "id": "gain_param",
+      "label": "Gain",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": "output",
+      "description": "Output volume as normalised linear gain"
+    },
+    {
+      "id": "balance_param",
+      "label": "Balance",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": "output",
+      "description": "Stereo balance"
+    },
+    {
+      "id": "voice_limit",
+      "label": "VoiceLimit",
+      "type": "parameter",
+      "importance": 0.4,
+      "group": "voice",
+      "description": "Maximum number of simultaneous voices"
+    },
+    {
+      "id": "kill_fade",
+      "label": "KillFadeTime",
+      "type": "parameter",
+      "importance": 0.4,
+      "group": "voice",
+      "description": "Fade out time when voices are killed"
+    }
+  ],
+  "edges": [
+    { "from": "note_on", "to": "clear_buffer", "type": "signal", "label": null },
+    { "from": "clear_buffer", "to": "fx_chain", "type": "signal", "label": "silent buffer" },
+    { "from": "fx_chain", "to": "gain_apply", "type": "signal", "label": null },
+    { "from": "gain_apply", "to": "audio_out", "type": "signal", "label": null },
+    { "from": "gain_param", "to": "gain_apply", "type": "control", "label": null },
+    { "from": "balance_param", "to": "gain_apply", "type": "control", "label": null },
+    { "from": "voice_limit", "to": "note_on", "type": "control", "label": null },
+    { "from": "kill_fade", "to": "audio_out", "type": "control", "label": null }
+  ],
+  "groups": [
+    { "id": "voice", "label": "Voice Rendering" },
+    { "id": "fx", "label": "Effect Processing" },
+    { "id": "output", "label": "Output" }
+  ]
+}

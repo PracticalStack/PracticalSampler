@@ -1,0 +1,1 @@
+Returns a new colour with the hue replaced by the given value (0.0-1.0, clamped), where 0.0 and 1.0 are red, 0.333 is green, and 0.667 is blue. Saturation, brightness, and alpha are preserved. This sets an absolute hue rather than shifting it. To cycle through evenly spaced hues for a palette (e.g., one colour per channel or category), use `withHue(Colours.red, index / count)`.

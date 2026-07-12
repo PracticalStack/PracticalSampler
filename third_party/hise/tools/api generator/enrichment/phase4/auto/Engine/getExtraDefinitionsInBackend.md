@@ -1,0 +1,1 @@
+Returns the platform-specific extra preprocessor definitions from the Project settings as a JSON object. Each key-value pair corresponds to one definition entry. Returns an empty object in exported plugins.

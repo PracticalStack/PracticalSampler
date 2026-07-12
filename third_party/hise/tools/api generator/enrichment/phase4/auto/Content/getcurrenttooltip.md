@@ -1,0 +1,3 @@
+Returns the tooltip text of the component currently under the mouse cursor, or an empty string if the mouse is not over a tooltip-capable component. This returns the raw tooltip with no delay - for most applications you will want to build a custom delay mechanism so that tooltips persist briefly after the mouse moves away.
+
+A common pattern is to poll this method from a timer object and use `resetCounter()` / `getMilliSecondsSinceCounterReset()` to implement a "sticky" tooltip that clears after a set delay (e.g. one second) when the mouse leaves the component. See the examples for a complete implementation using a `TimerObject`, an `isPending` flag, and a `resetCounter` pattern.

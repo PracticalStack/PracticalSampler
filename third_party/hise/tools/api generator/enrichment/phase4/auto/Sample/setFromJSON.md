@@ -1,0 +1,1 @@
+Sets multiple properties from a JSON object in a single call. Keys must be string identifier names (e.g. `"Root"`, `"HiKey"`, `"LoVel"`), not integer constants. Use `getId()` to look up the string name for a constant programmatically. Each property is set individually, so cascading range adjustments apply per property in iteration order.

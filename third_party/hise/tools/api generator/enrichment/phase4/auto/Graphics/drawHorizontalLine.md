@@ -1,0 +1,1 @@
+Draws a pixel-snapped horizontal line at the specified y-coordinate from `x1` to `x2` using the current colour. The y-coordinate is an integer for pixel-perfect alignment; the x positions are floats. The line width is always 1 pixel - for thicker horizontal lines, use `drawLine` instead.

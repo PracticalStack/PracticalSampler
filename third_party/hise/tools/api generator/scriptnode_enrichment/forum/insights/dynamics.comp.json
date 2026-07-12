@@ -1,0 +1,80 @@
+{
+  "targetId": "dynamics.comp",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [13755, 1965, 3655, 5775, 7557, 3626, 3559, 3466, 2857, 11869, 12740],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Compressor modulation output is a ducking amount — must be inverted for gain control",
+      "summary": "The modulation signal exported by the dynamics.comp node represents gain reduction (a value that grows as more compression is applied). To use it to drive a gain target node, the range must be inverted: right-click the modulation connection and swap the minimum and maximum values. Connecting it directly to a gain node without inverting will increase gain when compression increases.",
+      "sources": ["tid:3626"],
+      "verify": true,
+      "verify_hint": "Confirm the direction of the modulation output (0 = no reduction, 1 = full reduction, or vice versa) and document the correct way to invert the range in the connection dialog."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use math.mul instead of gain node as compressor modulation target",
+      "summary": "When routing the compressor's sidechain modulation to control gain, the author recommends using `math.mul` rather than the `gain` node. The `gain` node applies decibel conversion and smoothing — two features that are counterproductive here. `math.clear` should be used at the end of the analysis (sidechain) chain to discard the signal without it reaching the output.",
+      "sources": ["tid:3626"],
+      "verify": true,
+      "verify_hint": "Check whether math.mul is the correct target for linear gain reduction modulation from the compressor output."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Compressor update rate is limited by buffer size — use fix32/fix64 containers for snappy response",
+      "summary": "By default, the compressor only updates its gain factor once per audio buffer (e.g. every 512 samples). This makes it sluggish. Wrapping the split container in a `fix32` or `fix64` sub-buffer container dramatically improves responsiveness. For the most accurate envelope following (e.g. transient shaping), a frame processing container is needed, but it carries performance overhead and the network should then be compiled to C++.",
+      "sources": ["tid:3626", "tid:3655"],
+      "verify": true,
+      "verify_hint": "Verify that fix32/fix64 containers actually change the compressor update rate and confirm whether frame processing is strictly required for transient-level accuracy."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Dynamic EQ via compressor sidechain: wrap compressor in chain with math.clear",
+      "summary": "To use the dynamics.comp node as a dynamic EQ sidechain (where the compressor controls a filter gain rather than the signal directly), wrap it in a container chain with a `math.clear` node after it. This prevents the compressor from passing its audio output to the mix while still emitting its gain reduction modulation. Combine with an `svf_eq` or `biquad` bell filter as the controlled element.",
+      "sources": ["tid:3655"],
+      "verify": true,
+      "verify_hint": "Confirm that math.clear is the correct approach to silence the compressor's audio path while preserving its modulation output."
+    },
+    {
+      "type": "BUG",
+      "title": "Auto makeup gain on dynamics.comp can be excessively hot",
+      "summary": "The auto makeup gain calculation in the Dynamics module (compressor makeup) was reported as producing too much gain for typical compression settings. Community members (Dan Korneff, trusted) investigated the source code in `Dynamics.cpp` and proposed replacement formulas that produce more manageable results. The fix requires modifying and recompiling HISE from source. The stock formula applies gain that scales aggressively with threshold and ratio.",
+      "sources": ["tid:1965"],
+      "verify": true,
+      "verify_hint": "Check whether the makeup gain formula was updated in HISE source since 2019 (hi_modules/effects/fx/Dynamics.cpp, compressorMakeupGain calculation)."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Routing compressor to control a second module: use scriptnode, not a script timer",
+      "summary": "Attempting to use a scripting timer to poll `Dynamics.CompressionReduction` and drive another module creates timing problems (30ms minimum period, UI-thread only). The correct approach is to do this entirely within scriptnode using the compressor's modulation output connection, which operates on the DSP thread at buffer or sub-buffer granularity.",
+      "sources": ["tid:3559"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Displaying the comp meter in a FloatingTile: use external slot index",
+      "summary": "To display the gain reduction meter from a dynamics.comp inside a plugin GUI FloatingTile, enable the 'external slot' for the node, then set the FloatingTile's processor ID to the ScriptFX name and the index to 0 for the first comp, 1 for the second, etc. The index corresponds to the order of comp nodes that have external slots enabled.",
+      "sources": ["tid:13755"],
+      "verify": true,
+      "verify_hint": "Confirm that a VU meter or gain reduction FloatingTile type can be pointed at a scriptnode comp via processor ID + slot index."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "The dynamics.comp uses a hard-knee design based on chunkware SimpleComp",
+      "summary": "The compressor algorithm behind dynamics.comp is the chunkware SimpleComp (source: hi_modules/effects/fx/chunkware_simple_dynamics). It uses a hard knee — there is no built-in soft-knee parameter. The attack/release knob ranges use a skew factor of 50.0 for centering. For a soft knee, custom Faust or C++ nodes are required.",
+      "sources": ["tid:3466"],
+      "verify": true,
+      "verify_hint": "Confirm that the chunkware SimpleComp is still the underlying implementation and that no knee parameter has been added since 2021."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Upwards compression / expansion: use dynamics.updown_comp or Faust expansion",
+      "summary": "The standard dynamics.comp node does not support upward compression (expanding signals below threshold). Two alternatives exist: (1) the `dynamics.updown_comp` node added in a later HISE version (confirmed by Lindon, trusted, 2024); (2) Faust nodes using `peak_expansion_gain_N_chan_db` or similar expansion primitives for more control.",
+      "sources": ["tid:5775"],
+      "verify": true,
+      "verify_hint": "Verify that dynamics.updown_comp exists as a built-in scriptnode and document its parameters."
+    }
+  ]
+}

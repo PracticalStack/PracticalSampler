@@ -1,0 +1,180 @@
+{
+  "factoryPath": "template.softbypass_switch7",
+  "nodes": [
+    {
+      "id": "in",
+      "label": "Audio In",
+      "type": "input",
+      "importance": 1.0,
+      "description": "Input audio signal"
+    },
+    {
+      "id": "switch_param",
+      "label": "Switch",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Selects which signal path is active (0-6)"
+    },
+    {
+      "id": "xfader",
+      "label": "control.xfader (Switch mode)",
+      "type": "process",
+      "importance": 0.8,
+      "description": "Converts integer Switch value to binary bypass states for 7 soft_bypass containers"
+    },
+    {
+      "id": "sb1",
+      "label": "soft_bypass sb1",
+      "type": "process",
+      "importance": 1.0,
+      "description": "Soft-bypassed container for signal path 0"
+    },
+    {
+      "id": "sb2",
+      "label": "soft_bypass sb2",
+      "type": "process",
+      "importance": 1.0,
+      "description": "Soft-bypassed container for signal path 1"
+    },
+    {
+      "id": "sb3",
+      "label": "soft_bypass sb3",
+      "type": "process",
+      "importance": 1.0,
+      "description": "Soft-bypassed container for signal path 2"
+    },
+    {
+      "id": "sb4",
+      "label": "soft_bypass sb4",
+      "type": "process",
+      "importance": 1.0,
+      "description": "Soft-bypassed container for signal path 3"
+    },
+    {
+      "id": "sb5",
+      "label": "soft_bypass sb5",
+      "type": "process",
+      "importance": 1.0,
+      "description": "Soft-bypassed container for signal path 4"
+    },
+    {
+      "id": "sb6",
+      "label": "soft_bypass sb6",
+      "type": "process",
+      "importance": 1.0,
+      "description": "Soft-bypassed container for signal path 5"
+    },
+    {
+      "id": "sb7",
+      "label": "soft_bypass sb7",
+      "type": "process",
+      "importance": 1.0,
+      "description": "Soft-bypassed container for signal path 6"
+    },
+    {
+      "id": "out",
+      "label": "Audio Out",
+      "type": "output",
+      "importance": 1.0,
+      "description": "Output signal with only the selected path's processing applied"
+    }
+  ],
+  "edges": [
+    {
+      "from": "switch_param",
+      "to": "xfader",
+      "type": "control",
+      "label": "Switch -> Value"
+    },
+    {
+      "from": "xfader",
+      "to": "sb1",
+      "type": "control",
+      "label": "SwitchTarget[0] -> Bypassed"
+    },
+    {
+      "from": "xfader",
+      "to": "sb2",
+      "type": "control",
+      "label": "SwitchTarget[1] -> Bypassed"
+    },
+    {
+      "from": "xfader",
+      "to": "sb3",
+      "type": "control",
+      "label": "SwitchTarget[2] -> Bypassed"
+    },
+    {
+      "from": "xfader",
+      "to": "sb4",
+      "type": "control",
+      "label": "SwitchTarget[3] -> Bypassed"
+    },
+    {
+      "from": "xfader",
+      "to": "sb5",
+      "type": "control",
+      "label": "SwitchTarget[4] -> Bypassed"
+    },
+    {
+      "from": "xfader",
+      "to": "sb6",
+      "type": "control",
+      "label": "SwitchTarget[5] -> Bypassed"
+    },
+    {
+      "from": "xfader",
+      "to": "sb7",
+      "type": "control",
+      "label": "SwitchTarget[6] -> Bypassed"
+    },
+    {
+      "from": "in",
+      "to": "sb1",
+      "type": "signal",
+      "label": null
+    },
+    {
+      "from": "sb1",
+      "to": "sb2",
+      "type": "signal",
+      "label": "serial chain"
+    },
+    {
+      "from": "sb2",
+      "to": "sb3",
+      "type": "signal",
+      "label": "serial chain"
+    },
+    {
+      "from": "sb3",
+      "to": "sb4",
+      "type": "signal",
+      "label": "serial chain"
+    },
+    {
+      "from": "sb4",
+      "to": "sb5",
+      "type": "signal",
+      "label": "serial chain"
+    },
+    {
+      "from": "sb5",
+      "to": "sb6",
+      "type": "signal",
+      "label": "serial chain"
+    },
+    {
+      "from": "sb6",
+      "to": "sb7",
+      "type": "signal",
+      "label": "serial chain"
+    },
+    {
+      "from": "sb7",
+      "to": "out",
+      "type": "signal",
+      "label": null
+    }
+  ]
+}

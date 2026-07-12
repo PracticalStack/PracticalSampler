@@ -1,0 +1,81 @@
+{
+  "factoryPath": "routing.send",
+  "factory": "routing",
+  "nodeId": "send",
+  "description": "Send the signal to one or more targets",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "Connection",
+      "defaultValue": "",
+      "type": "string",
+      "note": "Selects the target receive node(s) within the same network. String identifier linking this send to one or more routing.receive nodes."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/routing/send.md",
+    "tier": "BRIEF",
+    "lines": 12
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "signal-copy-or-passthrough",
+      "category": "signal_path",
+      "question": "Does routing.send copy the audio buffer to the receive target's buffer, or does it pass a reference? Does the signal continue through the chain after the send node, or is it consumed?",
+      "context": "Users need to know whether the signal is tapped (copy, original continues) or redirected (moved, original is silent after send)."
+    },
+    {
+      "id": "multiple-targets-behaviour",
+      "category": "signal_path",
+      "question": "When Connection targets multiple receive nodes, is the signal copied to each independently? Is there any gain compensation for multiple targets?",
+      "context": "Determines whether splitting to multiple receives changes signal level."
+    },
+    {
+      "id": "polyphonic-voice-routing",
+      "category": "signal_path",
+      "question": "With IsPolyphonic true, does each voice's send independently route to the corresponding voice's receive? Or is the send aggregated across voices?",
+      "context": "Critical for understanding polyphonic signal routing patterns."
+    }
+  ],
+
+  "notes": "routing.send has no parameters -- it is a pure signal tap. Marked IsRoutingNode. The Connection property links it to routing.receive nodes within the same DspNetwork. Unlike global_send, this is compileable to C++. Companion node: routing.receive."
+}

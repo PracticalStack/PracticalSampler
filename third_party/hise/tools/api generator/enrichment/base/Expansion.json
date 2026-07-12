@@ -1,0 +1,138 @@
+{
+  "className": "Expansion",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "getAudioFileList": {
+      "signature": "var getAudioFileList()",
+      "returnType": "var",
+      "description": "Returns a list of all available audio files in the expansion.",
+      "parameters": []
+    },
+    "getDataFileList": {
+      "signature": "var getDataFileList()",
+      "returnType": "var",
+      "description": "Returns a list of all available data files in the expansion.",
+      "parameters": []
+    },
+    "getExpansionType": {
+      "signature": "int getExpansionType()",
+      "returnType": "int",
+      "description": "returns the expansion type. Use the constants of ExpansionHandler to resolve the integer number.",
+      "parameters": []
+    },
+    "getImageList": {
+      "signature": "var getImageList()",
+      "returnType": "var",
+      "description": "Returns a list of all available images in the expansion.",
+      "parameters": []
+    },
+    "getMidiFileList": {
+      "signature": "var getMidiFileList()",
+      "returnType": "var",
+      "description": "Returns a list of all available MIDI files in the expansion.",
+      "parameters": []
+    },
+    "getProperties": {
+      "signature": "var getProperties()",
+      "returnType": "var",
+      "description": "Returns an object containing all properties of the expansion.",
+      "parameters": []
+    },
+    "getRootFolder": {
+      "signature": "var getRootFolder()",
+      "returnType": "var",
+      "description": "Returns the root folder for this expansion.",
+      "parameters": []
+    },
+    "getSampleFolder": {
+      "signature": "var getSampleFolder()",
+      "returnType": "var",
+      "description": "Returns the folder where this expansion looks for samples.",
+      "parameters": []
+    },
+    "getSampleMapList": {
+      "signature": "var getSampleMapList()",
+      "returnType": "var",
+      "description": "Returns a list of all available sample maps in the expansion.",
+      "parameters": []
+    },
+    "getUserPresetList": {
+      "signature": "var getUserPresetList()",
+      "returnType": "var",
+      "description": "Returns a list of all available user presets in the expansion.",
+      "parameters": []
+    },
+    "getWildcardReference": {
+      "signature": "String getWildcardReference(var relativePath)",
+      "returnType": "String",
+      "description": "Returns a valid wildcard reference ((`{EXP::Name}relativePath`) for the expansion.",
+      "parameters": [
+        {
+          "name": "relativePath",
+          "type": "var"
+        }
+      ]
+    },
+    "loadDataFile": {
+      "signature": "var loadDataFile(var relativePath)",
+      "returnType": "var",
+      "description": "Attempts to parse a JSON file in the AdditionalSourceCode directory of the expansion.",
+      "parameters": [
+        {
+          "name": "relativePath",
+          "type": "var"
+        }
+      ]
+    },
+    "rebuildUserPresets": {
+      "signature": "bool rebuildUserPresets()",
+      "returnType": "bool",
+      "description": "Reextracts (and overrides) the user presets from the given expansion. Only works with intermediate / encrypted expansions.",
+      "parameters": []
+    },
+    "setAllowDuplicateSamples": {
+      "signature": "void setAllowDuplicateSamples(bool shouldAllowDuplicates)",
+      "returnType": "void",
+      "description": "Sets whether the samples are allowed to be duplicated for this expansion. Set this to false if you operate on the same samples differently.",
+      "parameters": [
+        {
+          "name": "shouldAllowDuplicates",
+          "type": "bool"
+        }
+      ]
+    },
+    "setSampleFolder": {
+      "signature": "bool setSampleFolder(var newSampleFolder)",
+      "returnType": "bool",
+      "description": "Changes the sample folder of that particular expansion.",
+      "parameters": [
+        {
+          "name": "newSampleFolder",
+          "type": "var"
+        }
+      ]
+    },
+    "unloadExpansion": {
+      "signature": "void unloadExpansion()",
+      "returnType": "void",
+      "description": "Unloads this expansion so it will not show up in the list of expansions until the next restart.",
+      "parameters": []
+    },
+    "writeDataFile": {
+      "signature": "bool writeDataFile(var relativePath, var dataToWrite)",
+      "returnType": "bool",
+      "description": "Writes the given data into the file in the AdditionalSourceCode directory of the expansion.",
+      "parameters": [
+        {
+          "name": "relativePath",
+          "type": "var"
+        },
+        {
+          "name": "dataToWrite",
+          "type": "var"
+        }
+      ]
+    }
+  }
+}

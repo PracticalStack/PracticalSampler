@@ -1,0 +1,1 @@
+Returns a Modulator handle for the modulator chain at the specified index (1 = Gain, 2 = Pitch). The chain itself is a Modulator, so the returned handle can control the chain's overall intensity and bypass state.

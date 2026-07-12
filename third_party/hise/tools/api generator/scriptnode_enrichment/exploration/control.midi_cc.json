@@ -1,0 +1,17 @@
+{
+  "factoryPath": "control.midi_cc",
+  "nodes": [
+    { "id": "midi_event", "label": "MIDI Event", "type": "input", "importance": 1.0, "description": "Incoming MIDI CC, pitchbend, aftertouch, note-on, or note-off event" },
+    { "id": "cc_number", "label": "CCNumber", "type": "parameter", "importance": 0.9, "description": "Selects which CC/event type to listen for (0-131)" },
+    { "id": "enable_mpe", "label": "EnableMPE", "type": "parameter", "importance": 0.4, "description": "MPE toggle (currently vestigial in event handler)" },
+    { "id": "default_val", "label": "DefaultValue", "type": "parameter", "importance": 0.7, "description": "Fallback value sent immediately when set" },
+    { "id": "filter", "label": "Event Filter", "type": "process", "importance": 1.0, "description": "Checks event type and CC number, normalises value to 0..1" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Normalised 0..1 CC value" }
+  ],
+  "edges": [
+    { "from": "midi_event", "to": "filter", "type": "signal", "label": null },
+    { "from": "cc_number", "to": "filter", "type": "control", "label": "sets expected type" },
+    { "from": "default_val", "to": "mod_out", "type": "control", "label": "immediate send" },
+    { "from": "filter", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

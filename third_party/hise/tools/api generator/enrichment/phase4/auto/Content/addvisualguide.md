@@ -1,0 +1,3 @@
+Adds a visual overlay line or rectangle to the interface for layout debugging. Pass a 2-element array to draw a line: `[0, y]` for horizontal, `[x, 0]` for vertical. Pass a 4-element array `[x, y, w, h]` for a rectangle. Pass any non-array value (e.g. `0`) as the first argument to clear all guides.
+
+The guides render on top of all UI elements and are automatically hidden when `Content.createScreenshot()` captures the interface. They do not appear in exported plugins.

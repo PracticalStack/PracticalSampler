@@ -1,0 +1,1 @@
+Undoes the last action in the network's undo history. Operations are grouped into transactions every 1500ms. Returns `true` if an action was successfully undone. Undo is enabled by default in the HISE IDE but disabled in exported plugins.

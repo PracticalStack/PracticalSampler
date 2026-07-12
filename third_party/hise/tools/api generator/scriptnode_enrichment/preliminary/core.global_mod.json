@@ -1,0 +1,147 @@
+{
+  "factoryPath": "core.global_mod",
+  "factory": "core",
+  "nodeId": "global_mod",
+  "description": "",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": true,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Source Selection",
+      "rationale": "Index selects which modulator in the GlobalModulatorContainer to read from",
+      "parameters": [
+        {
+          "id": "Index",
+          "range": { "min": 0.0, "max": 16.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Modulation Configuration",
+      "rationale": "Value, Mode, and Intensity work together to define how the modulation signal is applied to the target",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Mode",
+          "range": { "min": 0.0, "max": 2.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "68.nT6K8CxNYG..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.WTvQgklaJTkaoA2arElbJHTZv8FagIG.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Intensity",
+          "range": { "min": -1.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Output Configuration",
+      "rationale": "ProcessSignal controls whether the modulation value is written to the audio output",
+      "parameters": [
+        {
+          "id": "ProcessSignal",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "63.nT6K8ChMwF..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.RT.QoMWXhwVYjoPQtElXrUFY.D1XzklckAP.AH..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "displayBuffers": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/global_mod.md",
+    "tier": "BRIEF",
+    "lines": 17
+  },
+
+  "availableImages": ["global_mod.png"],
+
+  "gaps": [
+    {
+      "id": "mode-formulas",
+      "category": "conditional_logic",
+      "question": "Mode has 3 values (0=Gain, 1=Unipolar, 2=Bipolar per runtime-target.md). Confirm the exact formula for each mode as documented in the infrastructure: Gain = base - intensity + intensity * signal * base; Unipolar = base + signal * intensity; Bipolar = base + (2*signal - 1) * intensity.",
+      "context": "Users need to understand the mathematical difference between modes to choose correctly."
+    },
+    {
+      "id": "value-parameter-role",
+      "category": "parameter_behaviour",
+      "question": "Value (0-1, default 1.0) is described as the 'base value' for the modulation formula. Confirm: in Gain mode, Value=1 means full modulation depth, and in Unipolar/Bipolar modes, Value is the center point?",
+      "context": "The Value parameter's role changes depending on Mode."
+    },
+    {
+      "id": "intensity-negative",
+      "category": "parameter_behaviour",
+      "question": "Intensity range is -1 to 1. What does negative intensity do? Does it invert the modulation signal?",
+      "context": "Negative intensity is a powerful feature that users may not discover without documentation."
+    },
+    {
+      "id": "index-to-modulator-mapping",
+      "category": "parameter_behaviour",
+      "question": "Index 0-16 selects a modulator in the GlobalModulatorContainer. How do the indices map to the container's children? Is index 0 the first child in the gain chain?",
+      "context": "Users need to know how to identify the correct Index for their target modulator."
+    },
+    {
+      "id": "description-missing",
+      "category": "description_accuracy",
+      "question": "The base JSON has an empty description. What is the correct short description for global_mod?",
+      "context": "Every node needs a description for the reference page."
+    },
+    {
+      "id": "signal-rate-interpolation",
+      "category": "signal_path",
+      "question": "The runtime-target.md describes linear interpolation when upsampling from control rate to audio rate. How does this affect the signal quality? Is there audible stepping at low control rates?",
+      "context": "Performance and quality trade-off that users should understand."
+    }
+  ],
+
+  "notes": "global_mod is the primary bridge node for bringing GlobalModulatorContainer signals into scriptnode. It is more configurable than extra_mod (has Mode, Value, Intensity) and more straightforward than matrix_mod (single source, no aux). The Mode text converter is encoded and likely contains 'Gain', 'Unipolar', 'Bipolar' labels. The runtime-target infrastructure uses a dynamic indexer, allowing runtime selection of the modulator slot. The node uses NeedsModConfig and IsFixRuntimeTarget properties. The display buffer shows the processed modulation signal."
+}

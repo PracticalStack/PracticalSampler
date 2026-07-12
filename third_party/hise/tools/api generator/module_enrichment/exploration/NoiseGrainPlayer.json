@@ -1,0 +1,45 @@
+{
+  "moduleId": "NoiseGrainPlayer",
+  "nodes": [
+    { "id": "audio_in", "type": "input", "label": "Voice Audio In", "importance": 1.0 },
+    { "id": "audio_file", "type": "external", "label": "Audio File (AudioSampleProcessor)", "importance": 0.9, "group": "offline", "description": "Source audio file loaded via AudioSampleProcessor" },
+    { "id": "sitrano", "type": "process", "label": "SiTraNo Decomposition", "importance": 0.8, "group": "offline", "description": "FFT-based sinusoidal-transient-noise separation; extracts noise grains (Hann-windowed IFFT frames)" },
+    { "id": "grain_collection", "type": "process", "label": "Noise Grain Collection", "importance": 0.7, "group": "offline", "description": "Pre-computed vector of Hann-windowed noise grains, one per FFT frame" },
+    { "id": "grain_size_param", "type": "parameter", "label": "GrainSize", "importance": 0.7, "group": "offline", "description": "FFT order = 7 + GrainSize; determines grain length (256-8192 samples)" },
+    { "id": "position_param", "type": "parameter", "label": "Position", "importance": 0.9, "group": "modulation", "description": "Normalized position (0-1) selecting which grain to play" },
+    { "id": "position_gain_mod", "type": "modulation", "label": "Table Index Modulation (Gain)", "importance": 0.7, "group": "modulation", "description": "Multiplicative scaling of Position (per-block)" },
+    { "id": "position_bipolar_mod", "type": "modulation", "label": "Table Index Bipolar (Offset)", "importance": 0.7, "group": "modulation", "description": "Bipolar additive offset to Position (per-block)" },
+    { "id": "position_combine", "type": "process", "label": "Position = (Base * Gain) + Offset", "importance": 0.8, "group": "modulation", "description": "Final modulated position computation" },
+    { "id": "mix_param", "type": "parameter", "label": "Mix", "importance": 0.8, "group": "mix", "description": "Overlap fader crossfade (0=dry, 0.5=both full, 1=wet)" },
+    { "id": "dry_scale", "type": "process", "label": "Dry Gain (overlap fader)", "importance": 0.7, "group": "mix", "description": "Input scaled by jlimit(0,1, 2-2*mix)" },
+    { "id": "grain_scheduler", "type": "process", "label": "Grain Scheduler", "importance": 0.8, "group": "playback", "description": "Starts new grain every hopSize samples; selects grain by modulated position with anti-repeat jitter" },
+    { "id": "white_noise_param", "type": "parameter", "label": "WhiteNoise", "importance": 0.6, "group": "playback", "description": "Position-domain noise amplitude (noiseAmp = value * 10)" },
+    { "id": "grain_render", "type": "process", "label": "Grain Render (8 slots)", "importance": 1.0, "group": "playback", "description": "Per-sample linear interpolation with position noise; 4x overlap; addSample to output" },
+    { "id": "wet_scale", "type": "process", "label": "Wet Gain (overlap fader)", "importance": 0.7, "group": "mix", "description": "Grain output scaled by jlimit(0,1, 2*mix)" },
+    { "id": "audio_out", "type": "output", "label": "Voice Audio Out", "importance": 1.0 }
+  ],
+  "edges": [
+    { "from": "audio_file", "to": "sitrano", "type": "signal", "label": "full file" },
+    { "from": "grain_size_param", "to": "sitrano", "type": "control", "label": "FFT order" },
+    { "from": "sitrano", "to": "grain_collection", "type": "signal", "label": "noise component" },
+    { "from": "position_param", "to": "position_combine", "type": "control" },
+    { "from": "position_gain_mod", "to": "position_combine", "type": "control", "label": "multiply" },
+    { "from": "position_bipolar_mod", "to": "position_combine", "type": "control", "label": "add" },
+    { "from": "position_combine", "to": "grain_scheduler", "type": "control", "label": "grain index" },
+    { "from": "grain_collection", "to": "grain_scheduler", "type": "signal", "label": "grain data" },
+    { "from": "grain_scheduler", "to": "grain_render", "type": "signal", "label": "active grains" },
+    { "from": "white_noise_param", "to": "grain_render", "type": "control", "label": "position jitter" },
+    { "from": "audio_in", "to": "dry_scale", "type": "signal" },
+    { "from": "mix_param", "to": "dry_scale", "type": "control" },
+    { "from": "mix_param", "to": "wet_scale", "type": "control" },
+    { "from": "grain_render", "to": "wet_scale", "type": "signal" },
+    { "from": "dry_scale", "to": "audio_out", "type": "signal" },
+    { "from": "wet_scale", "to": "audio_out", "type": "signal" }
+  ],
+  "groups": [
+    { "id": "offline", "label": "Offline Analysis (SiTraNo)" },
+    { "id": "modulation", "label": "Position Modulation" },
+    { "id": "playback", "label": "Grain Playback (per-voice)" },
+    { "id": "mix", "label": "Dry/Wet Mix (overlap fader)" }
+  ]
+}

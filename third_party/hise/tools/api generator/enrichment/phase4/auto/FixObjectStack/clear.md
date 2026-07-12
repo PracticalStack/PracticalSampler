@@ -1,0 +1,1 @@
+Resets the stack to its initial state by writing default values into every allocated slot and setting the used count to zero. This touches the full `length` capacity. Use `clearQuick()` instead when the stack will be repopulated immediately and the extra write cost is unnecessary.

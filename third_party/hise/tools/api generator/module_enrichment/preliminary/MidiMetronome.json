@@ -1,0 +1,105 @@
+{
+  "moduleId": "MidiMetronome",
+  "prettyName": "MidiMetronome",
+  "type": "Effect",
+  "subtype": "MasterEffect",
+  "category": "utility, sequencing",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "stereo",
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "RoutingMatrix",
+      "signalFlowRole": "skip - inferred from type/subtype"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Click Control",
+      "rationale": "All three parameters control the metronome click output: Enabled gates it, Volume and NoiseAmount shape the sound",
+      "parameters": [
+        {
+          "id": "Enabled",
+          "name": "Enabled",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Enables the metronome click output",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Volume",
+          "name": "Volume",
+          "range": { "min": -100.0, "max": 0.0, "step": 0.0 },
+          "default": -12.0,
+          "description": "The volume of the metronome click in decibels",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "NoiseAmount",
+          "name": "Noise Amount",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.5,
+          "description": "Blend between sine wave and noise for the click sound, where 0 is pure sine and 1 is pure noise",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "click-generation",
+      "category": "signal_path",
+      "question": "How does MidiMetronome generate the click sound? What is the synthesis algorithm (sine + noise mix with envelope)?",
+      "context": "Need to describe the sound generation for the reference page."
+    },
+    {
+      "id": "beat-detection",
+      "category": "signal_path",
+      "question": "How does the metronome detect beat positions? How does it connect to the MidiPlayer and read the playback position?",
+      "context": "Users need to understand the MidiPlayer dependency and how beats are tracked."
+    },
+    {
+      "id": "downbeat-accent",
+      "category": "conditional_logic",
+      "question": "Does the metronome accent downbeats differently from other beats? How does time signature affect the click?",
+      "context": "Users need to know if the metronome distinguishes downbeats."
+    },
+    {
+      "id": "audio-passthrough",
+      "category": "signal_path",
+      "question": "Does MidiMetronome pass the input audio through unchanged and add the click on top, or does it replace the input?",
+      "context": "Need to clarify whether this is additive (mix) or generative (replace)."
+    },
+    {
+      "id": "player-connection",
+      "category": "parameter_behavior",
+      "question": "How is the MidiPlayer connection established? Is it via a parameter or a separate mechanism?",
+      "context": "The MidiPlayer connection is not exposed as a standard parameter - users need to know how to set it up."
+    },
+    {
+      "id": "click-envelope",
+      "category": "parameter_behavior",
+      "question": "What is the decay envelope of the click? How long does each click last?",
+      "context": "Users may want to know the click character for mixing purposes."
+    }
+  ],
+
+  "notes": "MidiMetronome is unusual among MasterEffects - it generates audio (click sounds) rather than processing the input. It requires a connected MidiPlayer to function. The connection is stored as a WeakReference and serialised as 'PlayerID'. The RoutingMatrix interface is the only one listed but the module's primary dependency is on MidiPlayer (not exposed as an interface in moduleList.json). No modulation chains."
+}

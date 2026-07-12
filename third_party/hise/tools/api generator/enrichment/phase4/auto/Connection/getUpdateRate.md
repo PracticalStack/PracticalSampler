@@ -1,0 +1,1 @@
+Returns the block size of the lowest common container ancestor of the source and target nodes. This value reflects how often the modulation value is updated - containers with smaller block sizes update more frequently. Returns 0 if the connection is disconnected or the common container could not be resolved.

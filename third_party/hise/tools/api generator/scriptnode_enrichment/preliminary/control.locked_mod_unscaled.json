@@ -1,0 +1,82 @@
+{
+  "factoryPath": "control.locked_mod_unscaled",
+  "factory": "control",
+  "nodeId": "locked_mod_unscaled",
+  "description": "Adds a unscaled modulation dragger to its immediate locked node container parent",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input",
+      "rationale": "The raw input value to be forwarded without range scaling.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": true
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": true,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/locked_mod_unscaled.md",
+    "tier": "BRIEF",
+    "lines": 9
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "locked-container-interaction",
+      "category": "signal_path",
+      "question": "Does locked_mod_unscaled use the same container discovery mechanism as locked_mod? Is the only difference the normalisation behaviour?",
+      "context": "If identical except for normalisation, the doc can reference locked_mod and note only the scaling difference."
+    },
+    {
+      "id": "unscaled-value-range",
+      "category": "parameter_behaviour",
+      "question": "Since Value input is marked as unscaled, what range of values can actually flow through? Is it truly arbitrary or still 0..1 on input?",
+      "context": "Users connecting from unnormalised sources need to know the expected input range."
+    }
+  ],
+
+  "notes": "Disambiguation pair with control.locked_mod. The only structural difference is UseUnnormalisedModulation with Value as unscaled input parameter. No IsPolyphonic flag."
+}

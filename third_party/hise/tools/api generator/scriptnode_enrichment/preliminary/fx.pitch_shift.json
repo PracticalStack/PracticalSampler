@@ -1,0 +1,100 @@
+{
+  "factoryPath": "fx.pitch_shift",
+  "factory": "fx",
+  "nodeId": "pitch_shift",
+  "description": "A pitch shifting node using the signalsmith timestretcher",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Pitch control",
+      "rationale": "Single parameter controlling the pitch shift ratio.",
+      "parameters": [
+        {
+          "id": "FreqRatio",
+          "range": { "min": 0.25, "max": 4.0, "step": 0.0, "skew": 0.4307 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/fx/pitch_shift.md",
+    "tier": "STUB",
+    "lines": 0
+  },
+
+  "availableImages": ["script-fx1.png"],
+
+  "gaps": [
+    {
+      "id": "signalsmith-integration",
+      "category": "signal_path",
+      "question": "How is the Signalsmith timestretcher integrated? Is the full library included or a subset? What processing model does it use (overlap-add, phase vocoder, etc.)?",
+      "context": "The description names the specific library. Need to understand the algorithm class for accurate documentation."
+    },
+    {
+      "id": "freqratio-semantics",
+      "category": "parameter_behaviour",
+      "question": "FreqRatio range is 0.25-4.0. Does 0.25 mean two octaves down and 4.0 mean two octaves up? Is the ratio applied multiplicatively to pitch? At 1.0, is the signal passed through unmodified?",
+      "context": "The skew of 0.43 makes the knob logarithmic, centering 1.0 (no shift). Need to confirm the musical interpretation."
+    },
+    {
+      "id": "latency",
+      "category": "performance",
+      "question": "Time-domain pitch shifting typically introduces latency. Does this node report latency? Is the latency fixed or dependent on FreqRatio?",
+      "context": "Latency is critical information for users combining this with other processing."
+    },
+    {
+      "id": "quality-and-artifacts",
+      "category": "signal_path",
+      "question": "What quality settings does the Signalsmith stretcher use? Are there artifacts at extreme ratios (0.25, 4.0)?",
+      "context": "Users need to know the practical range for good-quality pitch shifting."
+    },
+    {
+      "id": "polyphonic-memory",
+      "category": "performance",
+      "question": "IsPolyphonic is true. A pitch shifter requires significant internal buffers. Are these allocated per-voice? What is the memory footprint?",
+      "context": "Per-voice pitch shifting could have substantial memory requirements."
+    }
+  ],
+
+  "notes": "No existing documentation (0 lines). Uses the Signalsmith timestretcher library - this is a third-party dependency. FreqRatio range 0.25-4.0 covers +/- 2 octaves. The logarithmic skew (0.43) centres the useful range around 1.0 (no shift). Step=0 means continuous control. This is likely the most CPU-intensive node in the fx factory."
+}

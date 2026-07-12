@@ -1,0 +1,32 @@
+{
+  "moduleId": "Chorus",
+  "nodes": [
+    { "id": "audio_in", "type": "input", "label": "Audio In (L/R)", "importance": 1.0 },
+    { "id": "lfo", "type": "process", "label": "Internal LFO", "importance": 0.8, "description": "Parabolic waveform (1 - phi^2), 0.01-10 Hz range", "group": "modulation" },
+    { "id": "rate_param", "type": "parameter", "label": "Rate", "importance": 0.8, "group": "modulation" },
+    { "id": "width_param", "type": "parameter", "label": "Width", "importance": 0.8, "group": "modulation" },
+    { "id": "delay_param", "type": "parameter", "label": "Delay", "importance": 0.7, "group": "modulation" },
+    { "id": "delay_write", "type": "process", "label": "Write to Buffer", "importance": 0.8, "description": "input + feedback * lastDelayed -> circular buffer (2048 samples)", "group": "delay" },
+    { "id": "feedback_param", "type": "parameter", "label": "Feedback", "importance": 0.7, "group": "delay" },
+    { "id": "delay_read", "type": "process", "label": "Read (Interpolated)", "importance": 0.9, "description": "Linear interpolation at modulated position", "group": "delay" },
+    { "id": "mix", "type": "process", "label": "Subtractive Mix", "importance": 0.8, "description": "53% dry - 47% wet (hardcoded)" },
+    { "id": "audio_out", "type": "output", "label": "Audio Out (L/R)", "importance": 1.0 }
+  ],
+  "edges": [
+    { "from": "rate_param", "to": "lfo", "type": "control" },
+    { "from": "width_param", "to": "lfo", "type": "control" },
+    { "from": "delay_param", "to": "lfo", "type": "control" },
+    { "from": "audio_in", "to": "delay_write", "type": "signal" },
+    { "from": "feedback_param", "to": "delay_write", "type": "control" },
+    { "from": "delay_read", "to": "delay_write", "type": "feedback", "label": "feedback" },
+    { "from": "delay_write", "to": "delay_read", "type": "signal" },
+    { "from": "lfo", "to": "delay_read", "type": "control", "label": "modulated position" },
+    { "from": "audio_in", "to": "mix", "type": "signal" },
+    { "from": "delay_read", "to": "mix", "type": "signal" },
+    { "from": "mix", "to": "audio_out", "type": "signal" }
+  ],
+  "groups": [
+    { "id": "modulation", "label": "LFO Modulation" },
+    { "id": "delay", "label": "Delay Line" }
+  ]
+}

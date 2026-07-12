@@ -1,0 +1,1 @@
+Registers a callback that fires whenever a direct child is added to or removed from this component. The callback receives two arguments: the child's `id` (String) and a boolean indicating whether the child was added (`true`) or removed (`false`). Inside the callback, `this` refers to the ContainerChild.

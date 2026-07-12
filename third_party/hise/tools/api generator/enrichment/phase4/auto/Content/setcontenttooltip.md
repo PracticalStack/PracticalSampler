@@ -1,0 +1,1 @@
+Sets the tooltip text for the content background area. This tooltip appears when hovering over parts of the interface where no component is present. Query it at runtime with `Content.getCurrentTooltip()`.

@@ -1,0 +1,79 @@
+{
+  "className": "ErrorHandler",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "clearAllErrors": {
+      "signature": "void clearAllErrors()",
+      "returnType": "void",
+      "description": "Clear all states.",
+      "parameters": []
+    },
+    "clearErrorLevel": {
+      "signature": "void clearErrorLevel(int stateToClear)",
+      "returnType": "void",
+      "description": "Clears a state. If there is another error, it will send it again.",
+      "parameters": [
+        {
+          "name": "stateToClear",
+          "type": "int"
+        }
+      ]
+    },
+    "getCurrentErrorLevel": {
+      "signature": "int getCurrentErrorLevel()",
+      "returnType": "int",
+      "description": "Returns the current error level (and -1 if there is no error).",
+      "parameters": []
+    },
+    "getErrorMessage": {
+      "signature": "String getErrorMessage()",
+      "returnType": "String",
+      "description": "Returns the current error message.",
+      "parameters": []
+    },
+    "getNumActiveErrors": {
+      "signature": "int getNumActiveErrors()",
+      "returnType": "int",
+      "description": "Returns the number of currently active errors.",
+      "parameters": []
+    },
+    "setCustomMessageToShow": {
+      "signature": "void setCustomMessageToShow(int state, String messageToShow)",
+      "returnType": "void",
+      "description": "Overrides the default HISE error messages with custom text.",
+      "parameters": [
+        {
+          "name": "state",
+          "type": "int"
+        },
+        {
+          "name": "messageToShow",
+          "type": "String"
+        }
+      ]
+    },
+    "setErrorCallback": {
+      "signature": "void setErrorCallback(var errorCallback)",
+      "returnType": "void",
+      "description": "Sets a function with two arguments (int state, String message) that will be notified at error events.",
+      "parameters": [
+        {
+          "name": "errorCallback",
+          "type": "var"
+        }
+      ]
+    },
+    "simulateErrorEvent": {
+      "signature": "void simulateErrorEvent(int state)",
+      "returnType": "void",
+      "description": "Causes an error event to be sent through the system (for development purposes only).",
+      "parameters": [
+        {
+          "name": "state",
+          "type": "int"
+        }
+      ]
+    }
+  }
+}

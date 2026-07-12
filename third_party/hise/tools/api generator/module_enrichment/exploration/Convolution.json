@@ -1,0 +1,215 @@
+{
+  "moduleId": "Convolution",
+  "nodes": [
+    {
+      "id": "audio_in",
+      "type": "input",
+      "label": "Audio In (L/R)",
+      "importance": 1.0,
+      "group": null,
+      "description": "Stereo audio input"
+    },
+    {
+      "id": "ir_resource",
+      "type": "external",
+      "label": "Impulse Response",
+      "importance": 0.8,
+      "group": "ir_prep",
+      "description": "Audio file loaded via AudioSampleProcessor interface"
+    },
+    {
+      "id": "ir_resample",
+      "type": "process",
+      "label": "Resample IR",
+      "importance": 0.4,
+      "group": "ir_prep",
+      "description": "Resamples the IR to match the host sample rate using Lagrange interpolation"
+    },
+    {
+      "id": "damping_apply",
+      "type": "process",
+      "label": "Apply Damping",
+      "importance": 0.7,
+      "group": "ir_prep",
+      "description": "Applies an exponential fadeout to the IR based on the Damping parameter"
+    },
+    {
+      "id": "hicut_apply",
+      "type": "process",
+      "label": "Apply HiCut",
+      "importance": 0.7,
+      "group": "ir_prep",
+      "description": "Applies two cascaded one-pole low-pass filters with exponentially decreasing cutoff frequency along the IR"
+    },
+    {
+      "id": "damping_param",
+      "type": "parameter",
+      "label": "Damping",
+      "importance": 0.8,
+      "group": "ir_prep",
+      "description": "Damping amount applied to the IR fade-out"
+    },
+    {
+      "id": "hicut_param",
+      "type": "parameter",
+      "label": "HiCut",
+      "importance": 0.8,
+      "group": "ir_prep",
+      "description": "Low-pass cutoff frequency applied to the IR"
+    },
+    {
+      "id": "processinput_decision",
+      "type": "decision",
+      "label": "ProcessInput",
+      "importance": 0.5,
+      "group": null,
+      "description": "When Off, bypasses convolution and outputs dry signal only. 60ms ramp on state change."
+    },
+    {
+      "id": "processinput_param",
+      "type": "parameter",
+      "label": "ProcessInput",
+      "importance": 0.5,
+      "group": null,
+      "description": "Enables or disables convolution processing"
+    },
+    {
+      "id": "convolution",
+      "type": "process",
+      "label": "Convolve",
+      "importance": 1.0,
+      "group": "convolution_engine",
+      "description": "Two-stage partitioned FFT convolution: head (block-sized) for low latency, tail (up to 8192 samples) for the remainder"
+    },
+    {
+      "id": "ffttype_param",
+      "type": "parameter",
+      "label": "FFTType",
+      "importance": 0.4,
+      "group": "convolution_engine",
+      "description": "Selects the FFT implementation (BestAvailable, IPP, AppleAccelerate, Ooura, FFTW3)"
+    },
+    {
+      "id": "bgthread_param",
+      "type": "parameter",
+      "label": "UseBackgroundThread",
+      "importance": 0.5,
+      "group": "convolution_engine",
+      "description": "Moves tail convolution to a background thread to reduce audio thread load"
+    },
+    {
+      "id": "dry_gain",
+      "type": "process",
+      "label": "Dry Gain",
+      "importance": 0.9,
+      "group": "mix",
+      "description": "Smoothed gain applied to the original input signal"
+    },
+    {
+      "id": "drygain_param",
+      "type": "parameter",
+      "label": "DryGain",
+      "importance": 0.9,
+      "group": "mix",
+      "description": "Dry output level in dB (default -100 dB = silent)"
+    },
+    {
+      "id": "predelay",
+      "type": "process",
+      "label": "Predelay",
+      "importance": 0.7,
+      "group": "wet_path",
+      "description": "Per-sample delay line applied to the convolved signal before wet gain"
+    },
+    {
+      "id": "predelay_param",
+      "type": "parameter",
+      "label": "Predelay",
+      "importance": 0.7,
+      "group": "wet_path",
+      "description": "Delay time in milliseconds before the reverb tail"
+    },
+    {
+      "id": "wet_gain",
+      "type": "process",
+      "label": "Wet Gain",
+      "importance": 0.9,
+      "group": "wet_path",
+      "description": "Smoothed gain applied to the convolved signal"
+    },
+    {
+      "id": "wetgain_param",
+      "type": "parameter",
+      "label": "WetGain",
+      "importance": 0.9,
+      "group": "wet_path",
+      "description": "Wet output level in dB (default 0 dB = unity)"
+    },
+    {
+      "id": "half_gain",
+      "type": "process",
+      "label": "0.5x Compensation",
+      "importance": 0.8,
+      "group": "wet_path",
+      "description": "Fixed 0.5x gain multiplier applied to the wet signal after the wet gain smoother"
+    },
+    {
+      "id": "output_sum",
+      "type": "process",
+      "label": "Sum",
+      "importance": 0.9,
+      "group": "mix",
+      "description": "Adds the wet signal (with 0.5x compensation) to the dry signal"
+    },
+    {
+      "id": "audio_out",
+      "type": "output",
+      "label": "Audio Out (L/R)",
+      "importance": 1.0,
+      "group": null,
+      "description": "Stereo audio output"
+    }
+  ],
+  "edges": [
+    { "from": "ir_resource", "to": "ir_resample", "type": "signal", "label": null },
+    { "from": "ir_resample", "to": "damping_apply", "type": "signal", "label": null },
+    { "from": "damping_param", "to": "damping_apply", "type": "control", "label": null },
+    { "from": "damping_apply", "to": "hicut_apply", "type": "signal", "label": null },
+    { "from": "hicut_param", "to": "hicut_apply", "type": "control", "label": null },
+    { "from": "hicut_apply", "to": "convolution", "type": "signal", "label": "prepared IR" },
+    { "from": "ffttype_param", "to": "convolution", "type": "control", "label": null },
+    { "from": "bgthread_param", "to": "convolution", "type": "control", "label": null },
+    { "from": "processinput_param", "to": "processinput_decision", "type": "control", "label": null },
+    { "from": "audio_in", "to": "processinput_decision", "type": "signal", "label": null },
+    { "from": "processinput_decision", "to": "convolution", "type": "conditional", "label": "On" },
+    { "from": "audio_in", "to": "dry_gain", "type": "signal", "label": null },
+    { "from": "drygain_param", "to": "dry_gain", "type": "control", "label": null },
+    { "from": "convolution", "to": "predelay", "type": "signal", "label": null },
+    { "from": "predelay_param", "to": "predelay", "type": "control", "label": null },
+    { "from": "predelay", "to": "wet_gain", "type": "signal", "label": null },
+    { "from": "wetgain_param", "to": "wet_gain", "type": "control", "label": null },
+    { "from": "wet_gain", "to": "half_gain", "type": "signal", "label": null },
+    { "from": "half_gain", "to": "output_sum", "type": "signal", "label": null },
+    { "from": "dry_gain", "to": "output_sum", "type": "signal", "label": null },
+    { "from": "output_sum", "to": "audio_out", "type": "signal", "label": null },
+    { "from": "processinput_decision", "to": "dry_gain", "type": "conditional", "label": "Off (dry only)" }
+  ],
+  "groups": [
+    {
+      "id": "ir_prep",
+      "label": "IR Preparation (offline)"
+    },
+    {
+      "id": "convolution_engine",
+      "label": "Convolution Engine"
+    },
+    {
+      "id": "wet_path",
+      "label": "Wet Path"
+    },
+    {
+      "id": "mix",
+      "label": "Output Mix"
+    }
+  ]
+}

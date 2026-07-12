@@ -1,0 +1,549 @@
+{
+  "80": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "AudioLooper", "name": "masterIRReverb"}
+    ],
+    "components": [
+      {"type": "ScriptComboBox", "id": "cmbIR"}
+    ],
+    "verifyScript": null,
+    "notes": "Uses Engine.loadAudioFilesIntoPool() which returns empty array in test env (no project audio files). cmbIR items will be empty. The oncmbIRControl callback references {PROJECT_FOLDER} but only fires on user interaction, not at init. Compiles fine."
+  },
+  "81": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"},
+      {"type": "ScriptSlider", "id": "Knob1"}
+    ],
+    "verifyScript": null,
+    "notes": "Panel paint routine uses Knob1.getValue() closure. Knob1 callback calls Panel1.repaint(). Panel1 is declared after the callback but only used at runtime, not init — should compile fine."
+  },
+  "82": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"},
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "Timer-driven shrink animation on panel. Button1 callback starts timer. Compile-only test."
+  },
+  "83": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"},
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "Panel grow/shrink toggle animation using Panel1On flag. Similar to 82 but bidirectional. Commented-out toggle lines in timer callback (Panel1On = 0/1) are intentional. Compile-only test."
+  },
+  "84": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "CurveEq", "name": "Parametriq EQ1"}
+    ],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"},
+      {"type": "ScriptSlider", "id": "Knob2"},
+      {"type": "ScriptSlider", "id": "Knob3"}
+    ],
+    "verifyScript": null,
+    "notes": "Uses ParametriqEQ1.BandOffset and ParametriqEQ1.Freq attribute constants. CurveEq is the correct module type for 'Parametriq EQ'. Callback-only test, no REPL verification needed."
+  },
+  "85": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "ScriptFX", "name": "Script FX1"}
+    ],
+    "components": [
+      {"type": "ScriptSlider", "id": "HpLpKnb"}
+    ],
+    "verifyScript": null,
+    "notes": "References ScriptFX1.HP and ScriptFX1.LP attribute constants. ScriptFX is a valid module type. Since no script is loaded in the ScriptFX, setAttribute calls may produce errors but should compile at init."
+  },
+  "86": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"}
+    ],
+    "verifyScript": null,
+    "notes": "Namespace ColourOps with bit-manipulation colour saturation. Panel setPaintRoutine with gradient fill + timer repaint. Self-contained logic — compile-only LAF test."
+  },
+  "87": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptedViewport", "id": "Viewport1"},
+      {"type": "ScriptPanel", "id": "Panel1"}
+    ],
+    "verifyScript": null,
+    "notes": "Grid layout inside viewport. Panel has setPaintRoutine and setMouseCallback. Panel height is set dynamically from data. Compile-only test."
+  },
+  "88": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "PolyphonicFilter", "name": "Filter1"}
+    ],
+    "components": [
+      {"type": "ScriptLabel", "id": "Label1"},
+      {"type": "ScriptSliderPack", "id": "SliderPack1"},
+      {"type": "ScriptButton", "id": "RANDOM1"},
+      {"type": "ScriptButton", "id": "RANDOM2"},
+      {"type": "ScriptButton", "id": "RANDOM3"},
+      {"type": "ScriptButton", "id": "RANDOM4"},
+      {"type": "ScriptButton", "id": "RANDOM5"},
+      {"type": "ScriptButton", "id": "RandIT"}
+    ],
+    "verifyScript": null,
+    "notes": "Filter type selector with radio buttons synced to SliderPack. Uses Filter1.getAttribute(3) for filter mode. Large commented-out tabbed interface block is harmless."
+  },
+  "89": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "API does not exist: Libraries.load — not part of the HISE scripting API. No 'Libraries' namespace found in the scripting surface. This appears to be a scriptnode DSP network API not exposed to HiseScript.",
+    "invalid": true,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Uses Libraries.load('core').createModule('smoothed_gainer') which is not a valid HiseScript API. Also uses processBlock/prepareToPlay callbacks which are not standard HiseScript callbacks."
+  },
+  "90": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "knb0"},
+      {"type": "ScriptSlider", "id": "knb1"},
+      {"type": "ScriptSlider", "id": "knbMaster"}
+    ],
+    "verifyScript": null,
+    "notes": "Master knob scales individual knobs by their stored max values. Simple callback pattern with array indexing via indexOf."
+  },
+  "91": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "PolyphonicFilter", "name": "Filter"}
+    ],
+    "components": [
+      {"type": "ScriptSlider", "id": "KNB1"},
+      {"type": "ScriptSlider", "id": "KNB2"},
+      {"type": "ScriptSlider", "id": "MASTER"},
+      {"type": "ScriptPanel", "id": "STORAGE"}
+    ],
+    "verifyScript": null,
+    "notes": "STORAGE panel used as value store (holds an array). MASTER knob recalls stored per-knob positions. Filter.Frequency attribute used. Compile-only test."
+  },
+  "92": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "BlurryBackground"}
+    ],
+    "verifyScript": null,
+    "notes": "Simple gaussianBlur in a panel layer. Compile-only paint routine test."
+  },
+  "93": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"},
+      {"type": "ScriptPanel", "id": "Panel1"}
+    ],
+    "verifyScript": null,
+    "notes": "Knob controls ellipse size in panel paint routine via Knob1.getValue() closure. Panel1 declared after callback but only used at runtime."
+  },
+  "94": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "Delay", "name": "Delay1"}
+    ],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"},
+      {"type": "ScriptLabel", "id": "ScriptLabel1"}
+    ],
+    "verifyScript": null,
+    "notes": "Knob value used as integer index into delayTimes array (expects 0-6). Default knob range is 0.0-1.0 so delayTimes[0.5] will be undefined at runtime, but compiles fine. Compile-only test."
+  },
+  "95": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "SlickSlider"},
+      {"type": "ScriptButton", "id": "BeautifulButton"},
+      {"type": "ScriptComboBox", "id": "PresetList"},
+      {"type": "ScriptButton", "id": "ShowPresetFolder"},
+      {"type": "ScriptButton", "id": "SavePreset"},
+      {"type": "ScriptPanel", "id": "SavePresetOptions"},
+      {"type": "ScriptLabel", "id": "SavePresetTitle"},
+      {"type": "ScriptLabel", "id": "PresetNameToSave"},
+      {"type": "ScriptButton", "id": "SaveOk"},
+      {"type": "ScriptButton", "id": "SaveCancel"}
+    ],
+    "verifyScript": null,
+    "notes": "Function-before-definition issue: populatePresetList() is called at namespace init before the inline function is defined. Fix: move the populatePresetList() call to after its function definition. Uses FileSystem.getFolder(FileSystem.UserPresets) which is valid. Does NOT use FileSystem.browse. File I/O (writeObject) is acceptable in test environment.",
+    "codefix": "Move the `populatePresetList();` call (line 29 of namespace) to after `inline function populatePresetList()` definition (after line 36)."
+  },
+  "96": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "Convolution", "name": "Convolution Reverb1"},
+      {"type": "EmptyFX", "name": "Empty1"}
+    ],
+    "components": [
+      {"type": "ScriptSlider", "id": "knbWetL"},
+      {"type": "ScriptSlider", "id": "knbWetR"},
+      {"type": "ScriptSlider", "id": "knbDryL"},
+      {"type": "ScriptSlider", "id": "knbDryR"}
+    ],
+    "verifyScript": null,
+    "notes": "Timer-based level meter reading getCurrentLevel() and getDecibelsForGainFactor(). Uses ConvolutionReverb1.DryGain attribute constant. Compile-only test — level values will be 0 in test env."
+  },
+  "97": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"},
+      {"type": "ScriptSlider", "id": "Knob2"},
+      {"type": "ScriptSlider", "id": "lastKnobTouched"},
+      {"type": "ScriptPanel", "id": "Panel1"},
+      {"type": "ScriptPanel", "id": "Panel2"}
+    ],
+    "verifyScript": null,
+    "notes": "Tracks last touched knob and shows corresponding panel. lastKnobTouched is used as a state-restoring knob (saveInPreset). Panel showControl callbacks. Compile-only test."
+  },
+  "98": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"},
+      {"type": "ScriptSlider", "id": "Knob2"},
+      {"type": "ScriptPanel", "id": "Panel1"},
+      {"type": "ScriptPanel", "id": "Panel2"}
+    ],
+    "verifyScript": null,
+    "notes": "Panels show/hide on knob interaction with 3-second auto-hide timer. Compile-only test."
+  },
+  "99": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"}
+    ],
+    "verifyScript": null,
+    "notes": "Panel mouse callback sets tooltip based on left/right zone hover. Compile-only test."
+  },
+  "100": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"}
+    ],
+    "verifyScript": null,
+    "notes": "Panel with 7 zones, paint routine draws dividers, mouse callback sets zone tooltips. Compile-only test."
+  },
+  "101": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "area1"},
+      {"type": "ScriptSlider", "id": "area2"},
+      {"type": "ScriptSlider", "id": "area3"},
+      {"type": "ScriptSlider", "id": "area4"},
+      {"type": "ScriptSlider", "id": "area5"},
+      {"type": "ScriptPanel", "id": "MultiPad"}
+    ],
+    "verifyScript": null,
+    "notes": "Complex radial multi-value pad. Uses g.applyMask, g.fillTriangle, g.rotate. Mouse drag controls 5 area sliders. Compile-only LAF/paint test."
+  },
+  "102": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"},
+      {"type": "ScriptedViewport", "id": "Viewport1"}
+    ],
+    "verifyScript": null,
+    "notes": "Zone-based click on panel repositions and toggles viewport visibility. Uses getGlobalPositionX/Y. Compile-only test."
+  },
+  "103": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"},
+      {"type": "ScriptPanel", "id": "pnlMenu"}
+    ],
+    "verifyScript": null,
+    "notes": "Zone-click opens custom popup menu panel. pnlMenu paint routine renders items from popupMenuItems property. Hover highlight logic in mouse callback. Compile-only test."
+  },
+  "104": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "XYPadPnl"},
+      {"type": "ScriptLabel", "id": "InfoLbl"}
+    ],
+    "verifyScript": null,
+    "notes": "XY pad with draggable crosshair. Stores position in panel value as JSON object. InfoLbl follows mouse. Paint routine uses g.setGradientFill with string colour '0x5500FFFF' (unusual but may work). Compile-only test."
+  },
+  "105": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "Dynamics", "name": "Dynamics1"}
+    ],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"}
+    ],
+    "verifyScript": null,
+    "notes": "Timer reads Dynamics1.CompressorReduction attribute and sets Knob1 value. Knob1 is declared after the timer callback setup but only used at timer runtime, not init. Compile-only test."
+  },
+  "106": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "pnlMenu"},
+      {"type": "ScriptSlider", "id": "YmemKnb"},
+      {"type": "ScriptSlider", "id": "XmemKnb"}
+    ],
+    "verifyScript": null,
+    "notes": "Bug in mousePos() inline function: uses 'this.getHeight()' and 'this.getWidth()' but 'this' is undefined in a plain inline function (not a panel callback). Fix: replace this.getHeight()/this.getWidth() with pnlMenu.getHeight()/pnlMenu.getWidth() in mousePos(). Grid selector with row/col memorization knobs.",
+    "codefix": "In mousePos() function, replace this.getHeight() with pnlMenu.getHeight() and this.getWidth() with pnlMenu.getWidth()."
+  },
+  "107": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "AudioLooper", "name": "Looper"}
+    ],
+    "components": [
+      {"type": "ScriptSlider", "id": "End"},
+      {"type": "ScriptSlider", "id": "Start"}
+    ],
+    "verifyScript": null,
+    "notes": "AudioLooper.setSampleRange() called on init with (0, 88200). Knob callbacks update sample range. Compile-only test."
+  },
+  "108": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"},
+      {"type": "ScriptButton", "id": "Button1"},
+      {"type": "ScriptButton", "id": "Button2"}
+    ],
+    "verifyScript": null,
+    "notes": "Button array toggles Knob1 visibility. Uses ButtonArray[] indexed from 'Button1' and 'Button2'. Compile-only test."
+  },
+  "109": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"},
+      {"type": "ScriptLabel", "id": "Label1"},
+      {"type": "ScriptButton", "id": "btnStart"}
+    ],
+    "verifyScript": null,
+    "notes": "Panel timer counts 0-10, updates Label1, then hides panel. btnStart resets and starts. Classic counter example. Compile-only test."
+  },
+  "110": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"},
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "Button toggles Panel1 as popup via showAsPopup(false)/closeAsPopup(). Compile-only test."
+  },
+  "111": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "AudioLooper", "name": "Audio Loop Player"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Creates AudioWaveform and Label via addAudioWaveform/addLabel (not getComponent). Sets processorId to 'Audio Loop Player' — requires AudioLooper with that name. No file loading at init. Compile-only test."
+  },
+  "112": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "CurveEq", "name": "Parametriq EQ1"}
+    ],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"},
+      {"type": "ScriptLabel", "id": "Label1"}
+    ],
+    "verifyScript": null,
+    "notes": "Draggable EQ handle with Q control. Uses getGlobalPositionX/Y for position tracking. Sets ParametriqEQ1 attribute 2 (Q). Compile-only test."
+  },
+  "113": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel0"},
+      {"type": "ScriptPanel", "id": "Panel1"},
+      {"type": "ScriptButton", "id": "btnPage0"},
+      {"type": "ScriptButton", "id": "btnPage1"}
+    ],
+    "verifyScript": null,
+    "notes": "Simple 2-page system: buttons show/hide panels by index. NUM_PAGES=2 so panels are Panel0/Panel1 and buttons btnPage0/btnPage1."
+  },
+  "114": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "SlotFX", "name": "Effect Slot"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Buttons created via Content.addButton (not getComponent). SlotFX switches between EmptyFX and Convolution. The Convolution callback sets {PROJECT_FOLDER}British.aif — only in callback body, not at init. Compile-only test."
+  },
+  "115": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "SlotFX", "name": "Slot"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "All UI created via addButton/addKnob. SlotFX switches between SimpleGain and ScriptFX with base64 restoreState(). restoreState() with a valid base64 blob should work in test env. Compile-only test."
+  },
+  "116": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Global LAF registering drawThumbnailRange and drawThumbnailPath callbacks. No components or modules needed — the LAF functions are registered but never applied to a component here. Compile-only test."
+  },
+  "117": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "RouteFX", "name": "Routing"}
+    ],
+    "components": [
+      {"type": "ScriptComboBox", "id": "RoutingCombo"},
+      {"type": "ScriptComboBox", "id": "RoutingCombo2"}
+    ],
+    "verifyScript": null,
+    "notes": "RouteFX is a RoutableProcessor so Synth.getRoutingMatrix() can fetch it. Callbacks have guard issue: ComboBox default value is 0, so (value-1)*2 = -2 on first callback. Add guard: if (value < 1) return; in both callbacks.",
+    "codefix": "Add 'if (value < 1) return;' at the start of both onRoutingComboControl and onRoutingCombo2Control."
+  },
+  "118": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "SineSynth", "name": "SineSynth1"},
+      {"type": "FlexAHDSR", "name": "FLEX", "parent": "SineSynth1", "chain": 1}
+    ],
+    "components": [
+      {"type": "ScriptFloatingTile", "id": "FlexAHDSRGraph"},
+      {"type": "ScriptSlider", "id": "Attack"},
+      {"type": "ScriptSlider", "id": "Hold"},
+      {"type": "ScriptSlider", "id": "Decay"},
+      {"type": "ScriptSlider", "id": "Sustain"},
+      {"type": "ScriptSlider", "id": "Release"},
+      {"type": "ScriptSlider", "id": "DecayCurve"},
+      {"type": "ScriptSlider", "id": "AttackCurve"},
+      {"type": "ScriptSlider", "id": "ReleaseCurve"},
+      {"type": "ScriptSlider", "id": "AttackLevel"}
+    ],
+    "verifyScript": null,
+    "notes": "FlexAHDSR LAF with all 5 LAF callbacks. Broadcaster attaches to module parameter 'FLEX' to sync draggable UI to knobs. FlexAHDSRGraph FloatingTile needs to be a FlexEnvelope display. Uses Rectangle() constructor (valid HiseScript). FlexAHDSR added to SineSynth1 gain chain (chain 1)."
+  },
+  "119": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "SineSynth", "name": "SineSynth1"},
+      {"type": "FlexAHDSR", "name": "FLEX", "parent": "SineSynth1", "chain": 1}
+    ],
+    "components": [
+      {"type": "ScriptFloatingTile", "id": "ft_Flex"},
+      {"type": "ScriptSlider", "id": "Attack"},
+      {"type": "ScriptSlider", "id": "Hold"},
+      {"type": "ScriptSlider", "id": "Decay"},
+      {"type": "ScriptSlider", "id": "Sustain"},
+      {"type": "ScriptSlider", "id": "Release"},
+      {"type": "ScriptSlider", "id": "DecayCurve"},
+      {"type": "ScriptSlider", "id": "AttackCurve"},
+      {"type": "ScriptSlider", "id": "ReleaseCurve"},
+      {"type": "ScriptSlider", "id": "AttackLevel"}
+    ],
+    "verifyScript": null,
+    "notes": "Styled FlexAHDSR with glow effects. Same structure as 118 but with more elaborate LAF including glow layers, gradient fills, and a drawFlexAhdsrText callback. ft_Flex FloatingTile displays the FlexAHDSR. Broadcaster syncs module parameter 'FLEX' to UI knobs. FlexAHDSR added to SineSynth1 gain chain (chain 1)."
+  }
+}

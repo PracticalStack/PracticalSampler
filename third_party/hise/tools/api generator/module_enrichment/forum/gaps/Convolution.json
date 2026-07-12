@@ -1,0 +1,113 @@
+{
+  "targetId": "Convolution",
+  "domain": "modules",
+  "generatedAt": "2026-03-30",
+  "topicIds": [2793, 819, 1139, 2054, 7006, 7878, 3687, 8124, 951, 10248, 2712, 4355, 1835, 13460, 13532, 1633, 1672, 3374, 7500, 3501, 7659, 6824, 5029, 1251, 1353, 1527, 2906, 3127, 4216, 6815, 13054, 4259, 5606, 2920, 5412, 7456, 13818, 1507, 2310, 2594, 9889, 14150, 12646, 12715, 12614, 12852, 9469, 3272, 9287, 8960, 2576, 4328, 5882, 6868, 7813, 10090, 4987, 6451, 5244, 1024, 1406, 6488, 2640, 7957],
+  "questions": [
+    {
+      "id": "sample-rate-gain-increase",
+      "question": "Why does the Convolution Reverb produce significantly louder output at higher sample rates (e.g., +3.5dB at 96kHz, +6.6dB at 192kHz compared to 48kHz)?",
+      "gap_type": "behaviour",
+      "sources": ["tid:2054"],
+      "maps_to_existing_gap": null
+    },
+    {
+      "id": "multithread-option",
+      "question": "What does the MultiThread option on the Convolution Reverb module actually do, and how does it affect CPU meter readings vs. real processing cost?",
+      "gap_type": "behaviour",
+      "sources": ["tid:2793"],
+      "maps_to_existing_gap": null
+    },
+    {
+      "id": "sample-rate-in-oninit",
+      "question": "Why does Engine.getSampleRate() return -1 in an exported plugin when called from onInit, and what is the correct way to read the current sample rate for gain compensation?",
+      "gap_type": "behaviour",
+      "sources": ["tid:2054"],
+      "maps_to_existing_gap": null
+    },
+    {
+      "id": "get-audio-sample-processor",
+      "question": "How must the Convolution Reverb be declared in script to use setFile() - why does Synth.getEffect() not expose the file-loading API?",
+      "gap_type": "behaviour",
+      "sources": ["tid:1353", "tid:3687"],
+      "maps_to_existing_gap": null
+    },
+    {
+      "id": "ir-embedding-workflow",
+      "question": "Why do IRs fail to embed in an exported plugin even when 'Embed Audio Files' is enabled - what is Engine.loadAudioFilesIntoPool() required for?",
+      "gap_type": "workflow",
+      "sources": ["tid:819", "tid:1139", "tid:7659"],
+      "maps_to_existing_gap": null
+    },
+    {
+      "id": "case-sensitive-paths",
+      "question": "Why does the IR file path in setFile() need to exactly match the actual filename case, and why does it work in the HISE IDE but silently fail in the compiled plugin?",
+      "gap_type": "behaviour",
+      "sources": ["tid:1139"],
+      "maps_to_existing_gap": null
+    },
+    {
+      "id": "scriptnode-ir-switching",
+      "question": "How does switching impulse responses in the scriptnode filters.convolution node work via script?",
+      "gap_type": "workflow",
+      "sources": ["tid:4355"],
+      "maps_to_existing_gap": null
+    },
+    {
+      "id": "ir-switching-crossfade",
+      "question": "What causes clicks and artifacts when switching IRs during live audio, and is there a built-in crossfade?",
+      "gap_type": "behaviour",
+      "sources": ["tid:2906", "tid:6824"],
+      "maps_to_existing_gap": null
+    },
+    {
+      "id": "playback-start-glitch",
+      "question": "What causes a glitch or missing audio at the very beginning of DAW playback when the Convolution Reverb is active?",
+      "gap_type": "behaviour",
+      "sources": ["tid:7006"],
+      "maps_to_existing_gap": null
+    },
+    {
+      "id": "pool-file-list-usage",
+      "question": "Does the return value of loadAudioFilesIntoPool() need to be used to populate an IR list, and why can FileSystem.findFiles not be used in exported plugins?",
+      "gap_type": "workflow",
+      "sources": ["tid:819"],
+      "maps_to_existing_gap": null
+    },
+    {
+      "id": "ir-preset-recall",
+      "question": "How should the selected IR be saved and recalled in a user preset, since setFile() calls are not automatically persisted?",
+      "gap_type": "workflow",
+      "sources": ["tid:1672"],
+      "maps_to_existing_gap": null
+    },
+    {
+      "id": "pool-order-preset-bug",
+      "question": "Why does the IR list order differ between the HISE IDE and the exported plugin when using loadAudioFilesIntoPool()?",
+      "gap_type": "behaviour",
+      "sources": ["tid:8124"],
+      "maps_to_existing_gap": null
+    },
+    {
+      "id": "max-ir-length",
+      "question": "What is the maximum supported impulse response length for the Convolution Reverb module?",
+      "gap_type": "edge_case",
+      "sources": ["tid:2712"],
+      "maps_to_existing_gap": null
+    },
+    {
+      "id": "fft-type-quality",
+      "question": "How does the FFTType attribute affect audio quality, and should Ooura (value 3) be preferred over IPP (value 1) to avoid high-frequency aliasing artifacts?",
+      "gap_type": "behaviour",
+      "sources": ["tid:2793"],
+      "maps_to_existing_gap": null
+    },
+    {
+      "id": "scriptnode-ir-range",
+      "question": "How can the start/end range of an IR loaded into the scriptnode convolution be controlled via script?",
+      "gap_type": "workflow",
+      "sources": ["tid:13532", "tid:1633"],
+      "maps_to_existing_gap": null
+    }
+  ]
+}

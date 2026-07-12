@@ -1,0 +1,1 @@
+Removes the element at the given index by swapping it with the last element and shrinking the stack. This is an O(1) operation but does not preserve element order. Works in both float and event modes.

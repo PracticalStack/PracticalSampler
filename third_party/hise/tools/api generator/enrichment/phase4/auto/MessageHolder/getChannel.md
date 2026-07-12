@@ -1,0 +1,1 @@
+Returns the MIDI channel of the event. A newly created MessageHolder has channel 0, which is outside the standard MIDI 1-16 range - set it to at least 1 for standard MIDI usage.

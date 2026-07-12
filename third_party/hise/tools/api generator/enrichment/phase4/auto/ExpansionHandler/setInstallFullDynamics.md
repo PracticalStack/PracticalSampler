@@ -1,0 +1,1 @@
+Controls whether full dynamic range samples are extracted during expansion installation. When set to `true`, the installer extracts uncompressed sample data instead of the HLAC-compressed version. Set this before calling `installExpansionFromPackage()`.

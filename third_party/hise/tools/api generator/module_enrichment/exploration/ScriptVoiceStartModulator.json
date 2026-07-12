@@ -1,0 +1,102 @@
+{
+  "moduleId": "ScriptVoiceStartModulator",
+  "nodes": [
+    {
+      "id": "midi_in",
+      "label": "MIDI Input",
+      "type": "input",
+      "importance": 0.9,
+      "group": "input",
+      "description": "Incoming MIDI events (note on triggers voice start, note off triggers voice stop, CC triggers onController)"
+    },
+    {
+      "id": "on_init",
+      "label": "onInit",
+      "type": "process",
+      "importance": 0.9,
+      "group": "callbacks",
+      "description": "Runs once at compile time. Declare variables, create UI components."
+    },
+    {
+      "id": "on_voice_start",
+      "label": "onVoiceStart",
+      "type": "process",
+      "importance": 1.0,
+      "group": "callbacks",
+      "description": "Fires when a new voice starts. Receives voiceIndex. Must return modulation value (0.0-1.0)."
+    },
+    {
+      "id": "on_voice_stop",
+      "label": "onVoiceStop",
+      "type": "process",
+      "importance": 0.7,
+      "group": "callbacks",
+      "description": "Fires on note-off. Receives voiceIndex (always 0 in current implementation)."
+    },
+    {
+      "id": "on_controller",
+      "label": "onController",
+      "type": "process",
+      "importance": 0.7,
+      "group": "callbacks",
+      "description": "Fires on CC events. Access event via Message object."
+    },
+    {
+      "id": "on_control",
+      "label": "onControl",
+      "type": "process",
+      "importance": 0.6,
+      "group": "callbacks",
+      "description": "Fires when a UI component value changes. Receives component reference and new value."
+    },
+    {
+      "id": "voice_dispatch",
+      "label": "Voice Lifecycle",
+      "type": "decision",
+      "importance": 0.7,
+      "group": "routing",
+      "description": "Routes note-on to onVoiceStart, note-off to onVoiceStop, CC to onController."
+    },
+    {
+      "id": "mod_out",
+      "label": "Modulation Output",
+      "type": "output",
+      "importance": 0.9,
+      "group": "output",
+      "description": "Per-voice modulation value (0.0-1.0) returned by onVoiceStart."
+    },
+    {
+      "id": "message_obj",
+      "label": "Message",
+      "type": "external",
+      "importance": 0.7,
+      "group": "api",
+      "description": "API object for reading the current MIDI event."
+    },
+    {
+      "id": "synth_obj",
+      "label": "Synth",
+      "type": "external",
+      "importance": 0.5,
+      "group": "api",
+      "description": "API object for controlling the parent synthesiser."
+    }
+  ],
+  "edges": [
+    { "from": "midi_in", "to": "voice_dispatch", "type": "signal", "label": "MIDI event" },
+    { "from": "voice_dispatch", "to": "on_voice_start", "type": "conditional", "label": "NoteOn (voice start)" },
+    { "from": "voice_dispatch", "to": "on_voice_stop", "type": "conditional", "label": "NoteOff" },
+    { "from": "voice_dispatch", "to": "on_controller", "type": "conditional", "label": "CC" },
+    { "from": "on_voice_start", "to": "mod_out", "type": "signal", "label": "return value" },
+    { "from": "message_obj", "to": "on_voice_start", "type": "control", "label": "read event" },
+    { "from": "message_obj", "to": "on_controller", "type": "control", "label": "read event" },
+    { "from": "content_obj", "to": "on_control", "type": "control", "label": "component change" }
+  ],
+  "groups": [
+    { "id": "input", "label": "Input" },
+    { "id": "callbacks", "label": "Script Callbacks" },
+    { "id": "routing", "label": "Event Routing" },
+    { "id": "output", "label": "Output" },
+    { "id": "api", "label": "API Objects" }
+  ]
+}

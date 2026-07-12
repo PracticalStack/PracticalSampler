@@ -1,0 +1,1 @@
+Returns true if every slot contains `-1` (the sentinel value). This check is instant regardless of how many slots are populated, so it is safe to call in performance-sensitive contexts like `onNoteOn`.

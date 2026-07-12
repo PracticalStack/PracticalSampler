@@ -1,0 +1,62 @@
+{
+  "factoryPath": "core.faust",
+  "nodes": [
+    {
+      "id": "in",
+      "label": "Audio In",
+      "type": "input",
+      "importance": 1.0,
+      "description": "Audio input (channel count must match Faust output count)"
+    },
+    {
+      "id": "midi_in",
+      "label": "MIDI In",
+      "type": "input",
+      "importance": 0.5,
+      "description": "MIDI events forwarded to Faust UI zones (if MIDI zones are active)"
+    },
+    {
+      "id": "faust_code",
+      "label": "Faust Code",
+      "type": "external_data",
+      "importance": 1.0,
+      "description": "Faust DSP source code selected via classId property. Compiled via LLVM JIT or interpreter."
+    },
+    {
+      "id": "compute",
+      "label": "Faust Compute",
+      "type": "process",
+      "importance": 1.0,
+      "description": "Calls faust::dsp::compute() with copied input buffers. One DSP instance per voice."
+    },
+    {
+      "id": "faust_params",
+      "label": "Faust Parameters",
+      "type": "parameter",
+      "importance": 0.8,
+      "description": "Dynamic parameters from Faust UI elements (sliders, buttons, nentry). Mapped to zone pointers."
+    },
+    {
+      "id": "out",
+      "label": "Audio Out",
+      "type": "output",
+      "importance": 1.0,
+      "description": "Processed audio output"
+    },
+    {
+      "id": "mod_out",
+      "label": "Modulation Outputs",
+      "type": "modulation_out",
+      "importance": 0.5,
+      "description": "Dynamic modulation outputs from Faust bargraph elements (hbargraph/vbargraph)."
+    }
+  ],
+  "edges": [
+    { "from": "in", "to": "compute", "type": "signal", "label": null },
+    { "from": "midi_in", "to": "compute", "type": "signal", "label": "if MIDI zones active" },
+    { "from": "faust_code", "to": "compute", "type": "control", "label": "JIT/interpreter compiled" },
+    { "from": "faust_params", "to": "compute", "type": "control", "label": "zone pointers" },
+    { "from": "compute", "to": "out", "type": "signal", "label": null },
+    { "from": "compute", "to": "mod_out", "type": "signal", "label": "bargraph outputs" }
+  ]
+}

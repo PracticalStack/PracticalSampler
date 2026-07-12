@@ -1,0 +1,1 @@
+Converts a duration in milliseconds to quarter beats using an explicit BPM value instead of the current host tempo.

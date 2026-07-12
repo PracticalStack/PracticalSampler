@@ -1,0 +1,75 @@
+{
+  "factoryPath": "container.frame2_block",
+  "factory": "container",
+  "nodeId": "frame2_block",
+  "description": "Per sample processing for 2 audio channels",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "UI-only: controls whether the container is displayed vertically or horizontally in the scriptnode graph. No effect on audio processing."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": true,
+    "groupName": "frameN_block",
+    "templateParameter": "channel count",
+    "variantValue": "2"
+  },
+
+  "existingDoc": {
+    "path": "phase3/container/frame2_block.md",
+    "tier": "STUB",
+    "lines": 8
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "variant-difference",
+      "category": "signal_path",
+      "question": "Is frame2_block identical to frame1_block in processing logic except for fixing channel count to 2 instead of 1? Does the child's processFrame() receive a span<float, 2> with both channels interleaved?",
+      "context": "If identical except for channel count, the doc can reference frame1_block and note the stereo difference. This is the most common frame container since most networks are stereo."
+    },
+    {
+      "id": "stereo-frame-interleaving",
+      "category": "signal_path",
+      "question": "With frame<2, T>, each call to processFrame() receives span<float, 2> containing [left, right]. Is the interleaving done by FrameConverters::forwardToFrameStereo() or by the generic toFrameData() path? Are there any SIMD optimisations for the stereo case?",
+      "context": "Stereo frame processing is the most common use case. Understanding the exact mechanism helps explain performance characteristics."
+    }
+  ],
+
+  "notes": "Variant of frameN_block group with N=2 (stereo). Uses wrap::frame<2, T> = wrap::fix<2, wrap::frame_x<T>>. This is likely the most commonly used frame container since most scriptnode networks are stereo. The existing phase3 doc is a stub redirecting to frame1_block. References frame1_block exploration for shared logic (CPU overhead, bypass, per-sample concept)."
+}

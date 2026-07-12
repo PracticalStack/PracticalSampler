@@ -1,0 +1,55 @@
+{
+  "moduleId": "ChannelSetter",
+  "nodes": [
+    {
+      "id": "midi_in",
+      "type": "input",
+      "label": "MIDI Event In",
+      "importance": 1.0,
+      "description": "Incoming MIDI event from the parent processor chain"
+    },
+    {
+      "id": "event_dispatch",
+      "type": "decision",
+      "label": "Event Type?",
+      "importance": 0.7,
+      "description": "Base class processHiseEvent() dispatches by event type"
+    },
+    {
+      "id": "set_channel",
+      "type": "process",
+      "label": "Set Channel",
+      "importance": 1.0,
+      "group": "rewrite",
+      "description": "Message.setChannel(channel) overwrites the event's MIDI channel in-place"
+    },
+    {
+      "id": "channel_param",
+      "type": "parameter",
+      "label": "Channel Number",
+      "importance": 0.9,
+      "group": "rewrite",
+      "description": "Target MIDI channel (1-16), set via onControl() from the UI knob"
+    },
+    {
+      "id": "midi_out",
+      "type": "output",
+      "label": "MIDI Event Out",
+      "importance": 1.0,
+      "description": "Event continues down the processor chain with rewritten channel"
+    }
+  ],
+  "edges": [
+    { "from": "midi_in", "to": "event_dispatch", "type": "signal" },
+    { "from": "event_dispatch", "to": "set_channel", "type": "conditional", "label": "NoteOn/NoteOff/CC/PitchBend/Aftertouch" },
+    { "from": "event_dispatch", "to": "midi_out", "type": "conditional", "label": "ProgramChange/transport (passthrough)" },
+    { "from": "channel_param", "to": "set_channel", "type": "control" },
+    { "from": "set_channel", "to": "midi_out", "type": "signal" }
+  ],
+  "groups": [
+    {
+      "id": "rewrite",
+      "label": "Channel Rewrite"
+    }
+  ]
+}

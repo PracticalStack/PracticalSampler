@@ -1,0 +1,93 @@
+{
+  "factoryPath": "container.fix_blockx",
+  "factory": "container",
+  "nodeId": "fix_blockx",
+  "description": "Split the audio signal into adjustable fixed length chunks",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "UI-only: controls whether the container is displayed vertically or horizontally in the scriptnode graph. No effect on audio processing."
+    },
+    {
+      "id": "BlockSize",
+      "defaultValue": "64",
+      "type": "string",
+      "note": "Selects the fixed block size for sub-block chunking. Valid values: 8, 16, 32, 64, 128, 256, 512. Stored as a string NodeProperty. At C++ export time, the current value is baked in as a compile-time constant (equivalent to using the corresponding fixN_block node). Hidden by default in the UI -- must be shown via the parameter button."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/container/fix_blockx.md",
+    "tier": "BRIEF",
+    "lines": 16
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "property-dispatch-mechanism",
+      "category": "signal_path",
+      "question": "How does FixedBlockXNode dispatch to the correct fix_block<N> template at runtime? The infrastructure doc mentions a switch statement. Does each block size option instantiate a separate compiled code path, or is there a single dynamic path?",
+      "context": "Affects understanding of runtime overhead vs the fixN_block nodes. The existing phase3 doc says compilation removes the branching overhead."
+    },
+    {
+      "id": "invalid-blocksize-handling",
+      "category": "conditional_logic",
+      "question": "What happens if the BlockSize property is set to an invalid value (e.g., not a power of two, or a value like 4 that is below the HISE_EVENT_RASTER)? The infrastructure doc says 'defaults to 64 if invalid'. What constitutes invalid?",
+      "context": "Users editing the property need to know what values are accepted and what happens with out-of-range values."
+    },
+    {
+      "id": "bypass-behaviour",
+      "category": "signal_path",
+      "question": "Does fix_blockx have the same bypass behaviour as fixN_block (children still process with original block size when bypassed)?",
+      "context": "The existing phase3 doc does not mention bypass. Need to confirm if the A/B workflow from fix8_block applies here too."
+    },
+    {
+      "id": "compilation-baking",
+      "category": "performance",
+      "question": "The existing doc says compilation bakes the current BlockSize property into a static value. Is this done by emitting a fix_block<N> template instantiation in the C++ export, effectively removing the switch dispatch?",
+      "context": "Important for users deciding between fix_blockx (development flexibility) and fixN_block (no runtime overhead even before compilation)."
+    }
+  ],
+
+  "notes": "Related to the fixN_block variant group but not itself a variant -- it is the dynamic-property version. Uses wrap::fix_blockx<T, DynamicBlockProperty> internally with a switch statement dispatching to fix_block<N> for each valid block size. The existing phase3 doc has good content about the development workflow (evaluate block sizes, then compile). The BlockSize property is hidden by default, which is a UX detail worth preserving in the reference page."
+}

@@ -1,0 +1,1 @@
+Registers a callback that fires when the ruler/playback position changes. The callback receives a single float argument: the display index position. This is typically driven by a ScriptSliderPack component's playback indicator.

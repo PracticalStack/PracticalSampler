@@ -1,0 +1,94 @@
+{
+  "moduleId": "Analyser",
+  "prettyName": "Analyser",
+  "type": "Effect",
+  "subtype": "MasterEffect",
+  "category": "utility",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "stereo",
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "RoutingMatrix",
+      "signalFlowRole": "skip - inferred from type/subtype"
+    },
+    {
+      "name": "DisplayBufferSource",
+      "signalFlowRole": "UI communication point (not in signal path) - provides ring buffer data for goniometer, oscilloscope, and spectrum analyser visualisations"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Visualisation",
+      "rationale": "Both parameters configure the analysis display: PreviewType selects what is shown, BufferSize controls the resolution",
+      "parameters": [
+        {
+          "id": "PreviewType",
+          "name": "Preview Type",
+          "range": { "min": 1.0, "max": 4.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Selects the visualization type: goniometer for stereo phase, oscilloscope for waveforms, or spectrum analyzer for frequency content",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "BufferSize",
+          "name": "Buffer Size",
+          "range": { "min": 0.0, "max": 32768.0, "step": 1.0 },
+          "default": 8192.0,
+          "description": "Size of the analysis buffer in samples, affecting frequency resolution and latency",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "passthrough-confirmation",
+      "category": "signal_path",
+      "question": "Does applyEffect() pass audio through unchanged, or does it modify the buffer in any way?",
+      "context": "Need to confirm that the Analyser is a pure passthrough to describe it accurately in the reference page."
+    },
+    {
+      "id": "buffer-write-condition",
+      "category": "parameter_behavior",
+      "question": "Under what conditions does the ring buffer write occur? Is it gated by PreviewType (e.g. skipped when set to Nothing)?",
+      "context": "Users need to know if setting PreviewType to Nothing disables the buffer write for CPU savings."
+    },
+    {
+      "id": "preview-type-ring-buffer",
+      "category": "interface_usage",
+      "question": "How does PreviewType configure the DisplayBufferSource? Does each type register a different property object on the ring buffer?",
+      "context": "Understanding how the visualisation mode affects the ring buffer setup is needed for the reference page."
+    },
+    {
+      "id": "buffer-size-behaviour",
+      "category": "parameter_behavior",
+      "question": "Does changing BufferSize at runtime resize the ring buffer? Are there valid/invalid sizes?",
+      "context": "Users need to know if BufferSize can be changed dynamically and what values are sensible."
+    },
+    {
+      "id": "ui-components",
+      "category": "interface_usage",
+      "question": "What FloatingTile panel types are available for the Analyser? What does createEditor() return?",
+      "context": "Needed for seeAlso ui_component entries."
+    }
+  ],
+
+  "notes": "Analyser is a pure visualisation utility. It has no modulation chains and no parameters that affect audio processing. The DisplayBufferSource interface is its distinguishing feature - it feeds display data to the AudioAnalyser FloatingTile. The module has getNumInternalChains() = 0 and getNumChildProcessors() = 0."
+}

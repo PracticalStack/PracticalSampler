@@ -1,0 +1,142 @@
+{
+  "className": "FFT",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "getSpectrum2DParameters": {
+      "signature": "var getSpectrum2DParameters()",
+      "returnType": "var",
+      "description": "Returns the JSON data for the spectrum parameters.",
+      "parameters": []
+    },
+    "prepare": {
+      "signature": "void prepare(int powerOfTwoSize, int maxNumChannels)",
+      "returnType": "void",
+      "description": "Allocates the buffers required for processing.",
+      "parameters": [
+        {
+          "name": "powerOfTwoSize",
+          "type": "int"
+        },
+        {
+          "name": "maxNumChannels",
+          "type": "int"
+        }
+      ]
+    },
+    "process": {
+      "signature": "var process(var dataToProcess)",
+      "returnType": "var",
+      "description": "Process the given data (either a buffer or a array of buffers.",
+      "parameters": [
+        {
+          "name": "dataToProcess",
+          "type": "var"
+        }
+      ]
+    },
+    "setEnableInverseFFT": {
+      "signature": "void setEnableInverseFFT(bool shouldApplyReverseTransformToInput)",
+      "returnType": "void",
+      "description": "This enables the inverse transform that will reconstruct the signal from the processed FFT.",
+      "parameters": [
+        {
+          "name": "shouldApplyReverseTransformToInput",
+          "type": "bool"
+        }
+      ]
+    },
+    "setEnableSpectrum2D": {
+      "signature": "void setEnableSpectrum2D(bool shouldBeEnabled)",
+      "returnType": "void",
+      "description": "Enables the creation of a 2D spectrograph image.",
+      "parameters": [
+        {
+          "name": "shouldBeEnabled",
+          "type": "bool"
+        }
+      ]
+    },
+    "setMagnitudeFunction": {
+      "signature": "void setMagnitudeFunction(var newMagnitudeFunction, bool convertToDecibels)",
+      "returnType": "void",
+      "description": "Sets a function that will be executed with the amplitude information of the FFT bins.",
+      "parameters": [
+        {
+          "name": "newMagnitudeFunction",
+          "type": "var"
+        },
+        {
+          "name": "convertToDecibels",
+          "type": "bool"
+        }
+      ]
+    },
+    "setOverlap": {
+      "signature": "void setOverlap(double percentageOfOverlap)",
+      "returnType": "void",
+      "description": "Sets an overlap (from 0...1) for the chunks.",
+      "parameters": [
+        {
+          "name": "percentageOfOverlap",
+          "type": "double"
+        }
+      ]
+    },
+    "setPhaseFunction": {
+      "signature": "void setPhaseFunction(var newPhaseFunction)",
+      "returnType": "void",
+      "description": "Sets a function that will be executed with the phase information of the FFT bins.",
+      "parameters": [
+        {
+          "name": "newPhaseFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "setSpectrum2DParameters": {
+      "signature": "void setSpectrum2DParameters(var jsonData)",
+      "returnType": "void",
+      "description": "Sets the spectrum data from the JSON object.",
+      "parameters": [
+        {
+          "name": "jsonData",
+          "type": "var"
+        }
+      ]
+    },
+    "setUseFallbackEngine": {
+      "signature": "void setUseFallbackEngine(bool shouldUseFallback)",
+      "returnType": "void",
+      "description": "This forces the FFT object to use the fallback engine.",
+      "parameters": [
+        {
+          "name": "shouldUseFallback",
+          "type": "bool"
+        }
+      ]
+    },
+    "setUseSpectrumList": {
+      "signature": "void setUseSpectrumList(int numRows)",
+      "returnType": "void",
+      "description": "Flushes the given spectrum list to a file.",
+      "parameters": [
+        {
+          "name": "numRows",
+          "type": "int"
+        }
+      ]
+    },
+    "setWindowType": {
+      "signature": "void setWindowType(int windowType)",
+      "returnType": "void",
+      "description": "Sets a window function that will be applied to the data chunks before processing.",
+      "parameters": [
+        {
+          "name": "windowType",
+          "type": "int"
+        }
+      ]
+    }
+  }
+}

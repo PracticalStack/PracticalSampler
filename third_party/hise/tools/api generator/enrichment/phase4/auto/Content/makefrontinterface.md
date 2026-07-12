@@ -1,0 +1,1 @@
+Sets the interface dimensions and registers this script processor as the front interface. This should be the very first call in onInit for the main interface script. Call `Content.setUseHighResolutionForPanels(true)` immediately after if any ScriptPanel uses custom paint routines.

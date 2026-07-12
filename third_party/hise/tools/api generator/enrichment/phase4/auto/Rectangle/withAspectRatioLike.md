@@ -1,0 +1,3 @@
+Returns the largest Rectangle that fits within this one while matching the aspect ratio of the given reference rectangle. The result is centred on the unconstrained axis. Only the reference's aspect ratio matters - its position and absolute size are ignored. Useful for rendering a path or icon into a cell while preserving its natural proportions without distortion.
+
+> [!Warning:Zero-width reference causes division error] Passing a reference rectangle with zero width causes a division by zero. Check that the reference bounds are valid before calling this method - for example, an uninitialised Path returns empty bounds from `getBounds()`.

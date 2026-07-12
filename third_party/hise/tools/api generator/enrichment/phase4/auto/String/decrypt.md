@@ -1,0 +1,1 @@
+Decrypts a base64-encoded BlowFish-encrypted string using the provided key. The key must match the one used with `String.encrypt()`. This is not cryptographically secure storage - it provides obfuscation for things like licence strings or saved configuration data.

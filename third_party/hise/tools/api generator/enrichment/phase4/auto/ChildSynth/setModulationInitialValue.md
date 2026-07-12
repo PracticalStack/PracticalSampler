@@ -1,0 +1,1 @@
+Sets the default modulation value for the specified chain (1 = Gain, 2 = Pitch). This is the value the chain outputs when no modulators are active. Useful for setting a baseline modulation level before adding dynamic modulators.

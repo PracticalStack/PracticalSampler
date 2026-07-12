@@ -1,0 +1,2240 @@
+[
+  {
+    "title": "Programmatic MIDI Sequence with MIDIPlayer",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Engine.createMessageHolder and MIDIPlayer.flushMessageList to build a MIDI sequence programmatically. Creates note-on/note-off pairs with configurable channel, note number, velocity, position, and length using Engine.getSamplesForQuarterBeats for timing.",
+    "code": "Content.makeFrontInterface(600, 400);\n\nfunction addNote(list, channel, notenumber, velocity, position, length)\n{\n\tvar m = Engine.createMessageHolder();\n\tm.setType(m.NoteOn);\n\tm.setNoteNumber(notenumber);\n\tm.setVelocity(velocity);\n\tm.setChannel(channel);\n\tm.setTimestamp(Engine.getSamplesForQuarterBeats(position));\n\n\tvar o = Engine.createMessageHolder();\n\to.setType(o.NoteOff);\n\to.setNoteNumber(notenumber);\n\to.setChannel(channel);\n\to.setTimestamp(Engine.getSamplesForQuarterBeats(position + length));\n\n\tlist.push(m);\n\tlist.push(o);\n}\n\nvar l = [];\n\naddNote(l, 1, 60, 127, 0, 1);\naddNote(l, 1, 63, 127, 1, 0.5);\naddNote(l, 1, 65, 127, 1.5, 0.3);\naddNote(l, 1, 67, 127, 2.11, 0.5);\naddNote(l, 1, 72, 127, 3, 1);\n\nconst var MIDIPlayer1 = Synth.getMidiPlayer(\"MIDI Player1\");\n\nif(MIDIPlayer1.isEmpty())\n{\n\tMIDIPlayer1.create(4, 4, 1);\n}\n\nMIDIPlayer1.flushMessageList(l);",
+    "url": "https://forum.hise.audio/topic/10792",
+    "featured": true,
+    "validation": {
+      "tier": 3,
+      "testable": true,
+      "skipReason": null,
+      "modules": [
+        {
+          "type": "MidiPlayer",
+          "name": "MIDI Player1"
+        }
+      ],
+      "components": [],
+      "verifyScript": null,
+      "notes": "Code already guards with isEmpty() + create(4,4,1). MidiPlayer in chain 0 (MIDI processors) under the master container.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:35:40.311146Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "CSS Panel Hover Transition",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "Content.createLocalLookAndFeel with setInlineStyleSheet to style a panel using CSS gradients, borders, box-shadow, and a hover transition effect with margin animation.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var laf = Content.createLocalLookAndFeel();\n\nlaf.setInlineStyleSheet(\"\n\ndiv\n{\n\tbackground: linear-gradient(to bottom, #555, #444);\n\tborder-radius: 5px;\n\tborder: 3px solid #999;\n\t\n\tmargin: 10p;\n\tbox-shadow: inset 0px 3px 8px rgba(0, 0, 0, 0.9);\n}\n\ndiv:hover\n{\n\tmargin: 5px;\n\ttransition: margin 0.2s ease-in;\n}\n\n\");\n\nContent.getComponent(\"Panel1\").setLocalLookAndFeel(laf);",
+    "url": "https://forum.hise.audio/topic/10501",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptPanel",
+          "id": "Panel1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Pure CSS LAF demo with setInlineStyleSheet and div:hover transition. Panel1 must exist for setLocalLookAndFeel to apply.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:35:41.699511Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "CSS Styled Sliders with Panel Mouse Control",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "setInlineStyleSheet with CSS variables (--bgColour, --value) to create circular styled sliders. A transparent panel overlay captures mouse events to calculate which slider to move based on position, enabling custom multi-slider interaction with setMouseCallback.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var laf = Content.createLocalLookAndFeel();\n\n// CSS for the win!\nlaf.setInlineStyleSheet(\"\n.scriptslider\n{\n\tbackground-color: var(--bgColour);\n\tmargin: 15px 0px;\n\ttransform: rotate(-15deg);\n\tborder-radius: 50%;\n\tbox-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2);\n}\n\n.scriptslider::before\n{\n\tcontent: '';\n\twidth: max(100vh, calc(100% * var(--value)));\n\tbackground: rgba(255,255,255, 0.8);\n\tmargin: 3px;\n\tborder-radius: 50%;\n}\n\n\n\n\");\n\nconst var knobs = [Content.getComponent(\"Knob1\"),\n                   Content.getComponent(\"Knob2\"),\n                   Content.getComponent(\"Knob3\"),\n                   Content.getComponent(\"Knob4\")];\n\nfor(k in knobs)\n\tk.setLocalLookAndFeel(laf);\n\nconst var Panel1 = Content.getComponent(\"Panel1\");\n\nPanel1.set(\"allowCallbacks\", \"Clicks, Hover & Dragging\");\n\nPanel1.setPaintRoutine(function(g)\n{\n\t// Remove that line to hide the panel\n\n\tg.fillAll(0x22ff0000);\n});\n\nPanel1.setMouseCallback(function(event)\n{\n\tif(event.clicked || event.drag)\n\t{\n\t\t// calculate the normalized x/y positions\n\t\tvar xNorm = event.x / this.get(\"width\");\n\t\tvar yNorm = event.y / this.get(\"height\");\n\t\t\n\t\tvar sliderHeight = 42 / this.get(\"height\");\n\t\t\n\t\t// calculate the \"real\" y position by subtracting the slider height\n\t\t// with decreasing X to account for the angle\n\t\tvar y = yNorm - ((1.0 - xNorm) * sliderHeight);\n\t\t\n\t\t// fiddle around with the maths until the slider behaves like you want (the 6 is random)\n\t\tvar sliderIndex = Math.range(Math.round(y * 6), 0, 3);\n\t\t\n\t\t// set the slider index (we'll boost it a little bit so that the mouse position takes into account\n\t\t// the rounded border)\n\t\tknobs[sliderIndex].setValue(Math.range(xNorm * 1.03, 0.0, 1.0));\n\t}\n});",
+    "url": "https://forum.hise.audio/topic/10498",
+    "featured": true,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptSlider",
+          "id": "Knob1"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob2"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob3"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob4"
+        },
+        {
+          "type": "ScriptPanel",
+          "id": "Panel1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "CSS styling with --bgColour and --value CSS variables on sliders. Panel1 acts as a transparent overlay capturing mouse events. Knobs should be stacked vertically. Panel1 must cover same area as knobs.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:35:43.195080Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "CSS Sliders with Pseudo-State and Modal Input",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "Extended CSS slider panel with setStyleSheetPseudoState for programmatic hover highlighting and Content.showModalTextInput for shift-click value entry. Combines setInlineStyleSheet with color-mix, hover transitions, and mouse callback logic for a polished multi-slider control.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var laf = Content.createLocalLookAndFeel();\n\n// CSS for the win!\nlaf.setInlineStyleSheet(\"\n.scriptslider\n{\n\tbackground-color: var(--bgColour);\n\tmargin: 16px 0px;\n\ttransform: rotate(-15deg);\n\tborder-radius: 50%;\n\tbox-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2);\n}\n\n.scriptslider:hover\n{\n\tmargin: 15px 0px;\n\n\tbackground-color: color-mix(in srgb, white 10%, var(--bgColour));\n\ttransition: all 0.1s ease-in;\n}\n\n.scriptslider::before\n{\n\tcontent: '';\n\twidth: max(100vh, calc(100% * var(--value)));\n\tbackground: rgba(255,255,255, 0.8);\n\tmargin: 3px;\n\tborder-radius: 50%;\n\t\n}\n\");\n\nconst var knobs = [Content.getComponent(\"Knob1\"),\n                   Content.getComponent(\"Knob2\"),\n                   Content.getComponent(\"Knob3\"),\n                   Content.getComponent(\"Knob4\")];\n\nfor(k in knobs)\n\tk.setLocalLookAndFeel(laf);\n\nconst var Panel1 = Content.getComponent(\"Panel1\");\n\nPanel1.set(\"allowCallbacks\", \"All Callbacks\");\n\nPanel1.setPaintRoutine(function(g)\n{\n\t\n});\n\n\n\nPanel1.setMouseCallback(function(event)\n{\n\t// calculate the normalized x/y positions\n\tvar xNorm = event.x / this.get(\"width\");\n\tvar yNorm = event.y / this.get(\"height\");\n\t\n\tvar sliderHeight = 42 / this.get(\"height\");\n\t\n\t// calculate the \"real\" y position by subtracting the slider height\n\t// with decreasing X to account for the angle\n\tvar y = yNorm - ((1.0 - xNorm) * sliderHeight);\n\t\n\t// fiddle around with the maths until the slider behaves like you want (the 6 is random)\n\tvar sliderIndex = Math.range(Math.round(y * 6), 0, 3);\n\n\tConsole.print(\"TUT\");\n\t\n\n\tfor(i = 0 ; i < knobs.length; i++)\n\t{\n\t\tConsole.print(i == sliderIndex && event.hover);\n\n\t\tknobs[i].setStyleSheetPseudoState((i == sliderIndex && event.hover) ? \":hover\" : \"\");\n\t}\n\n\tif(event.clicked || event.drag)\n\t{\n\t\tif(event.shiftDown)\n\t\t{\n\t\t\tContent.showModalTextInput(\n\t\t\t{\n\t\t\t\t\"parentComponent\": \"Panel1\", // use an empty string for global coordinates\n\t\t\t\t\"x\": 0,\t\t\t\t\t // these positions are relative to the parentComponent\n\t\t\t\t\"y\": 6 + (sliderIndex * sliderHeight * 0.43) * this.get(\"height\"),\t\t\t\t\t // if you omit these and the area is empty, it will use\n\t\t\t\t\"width\": this.get(\"width\"),\t\t\t\t // the default positioning from the slider text box\n\t\t\t\t\"height\": 24,\n\t\t\t\t\"text\": knobs[sliderIndex].getValue()\n\t\t\t}, function[sliderIndex](ok, value)\n\t\t\t{\n\t\t\t\tif(ok)\n\t\t\t\t{\n\t\t\t\t\tknobs[sliderIndex].setValue(parseFloat(value));\n\t\t\t\t}\n\t\t\t});\n\t\t\t\n\t\t\treturn;\n\t\t}\n\t\t\n\t\t// set the slider index (we'll boost it a little bit so that the mouse position takes into account\n\t\t// the rounded border)\n\t\tknobs[sliderIndex].setValue(Math.range(xNorm * 1.03, 0.0, 1.0));\n\t}\n});",
+    "url": "https://forum.hise.audio/topic/10498",
+    "featured": true,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptSlider",
+          "id": "Knob1"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob2"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob3"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob4"
+        },
+        {
+          "type": "ScriptPanel",
+          "id": "Panel1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Extends example 2 with CSS :hover pseudo-state management via setStyleSheetPseudoState and Shift+click modal text input via Content.showModalTextInput. Panel1 must be named 'Panel1' (used by parentComponent key in modal config).",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:35:44.689066Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Colorful SliderPack Background LAF",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert"
+    ],
+    "description": "Engine.createGlobalScriptLookAndFeel with drawSliderPackBackground to paint each slider column with a random hue using Colours.withHue and Math.random.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var laf = Engine.createGlobalScriptLookAndFeel();\n\nlaf.registerFunction(\"drawSliderPackBackground\", function(g, obj)\n{\n\tvar a = obj.area;\n\n\tfor (i = 0; i < obj.numSliders; i++)\n\t{\n\t\tvar w = a[2] / obj.numSliders;\n\n\t\tg.setColour(Colours.withHue(Colours.red, Math.random()));\n\t\tg.fillRect([a[0] + i * w, 0, w, a[3]]);\n\t}\n});",
+    "url": "https://forum.hise.audio/topic/5865",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [],
+      "verifyScript": null,
+      "notes": "Engine.createGlobalScriptLookAndFeel registers a global LAF. Without a SliderPack component anywhere in the interface the drawSliderPackBackground callback never fires. Add one programmatically.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:35:46.126485Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Scriptnode Signal Visualization with Display Buffers",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions"
+    ],
+    "description": "Synth.getDisplayBufferSource and getDisplayBuffer to visualize a scriptnode signal path on a panel. Uses ScriptRingBuffer.setRingBufferProperties to configure buffer length and createPath to generate a waveform path, rendered via a timer-driven paint routine.",
+    "code": "/** Scriptnode Visualisation 101\n\n\nIf you need a full 2D plot of the signal, use Option 1.\n\nIf you only need a one-dimensional value that shows the current value \n(for stuff like mod-rings around a knob or VU meters), I would suggest Option 2. \n\nThe scriptnode network here is just a mod chain with a slow LFO that is fed \ninto a peak node and a global_cable node.\n*/\n\nContent.makeFrontInterface(220, 200);\n\n// Option 1: Use external display buffers\n// ==============================================================================\n\n// Get the script FX module as the display buffer source\nconst var dp = Synth.getDisplayBufferSource(\"Script FX1\");\n\n// Get the first external display buffer (in our case the peak node that we set \n// to be the External Display Buffer #1)\nconst var rb = dp.getDisplayBuffer(0);\n\nconst var BUFFER_LENGTH = 16384;\n\n// These are the properties that you can give the peak meter\n// NumChannels must be 1, but you can set another buffer length for the display\nconst var properties = {\n  \"BufferLength\": BUFFER_LENGTH,\n  \"NumChannels\": 1\n};\n\n// This will override the default properties of the node. You can use the same\n// procedure to customize the FFT properties too (like Window type, etc).\nrb.setRingBufferProperties(properties);\n\n// Now let's add a simple panel for displaying the signal\n;\n\nconst var P1 = Content.getComponent(\"P1\");\n\n\n\n// We need to periodically query the ring buffer to create a signal path\n// so we use the panel's timers for this.\nP1.setTimerCallback(function()\n{\n\t// The autocomplete fails somehow with supplying you the methods,\n\t// but you can look in the API Browser under ScriptRingBuffer\n\t// This method creates a path object to mirror the peak display.\n\tthis.data.buffer = rb.createPath(this.getLocalBounds(0), // area\n\t\t\t\t\t\t\t\t\t [0, BUFFER_LENGTH, 0, 1.0], // [x_start, x_end, y_min, y_max]\n\t\t\t\t\t\t\t\t\t 0.0 // start value (the initial value at position 0)\n\t\t\t\t\t\t\t\t\t );\n\tthis.repaint();\n});\n\nP1.startTimer(30);\n\nP1.setPaintRoutine(function(g)\n{\n\tg.fillAll(0x22FFFFFF);\n\tg.setColour(Colours.white);\n\tg.fillPath(this.data.buffer, this.getLocalBounds(0));\n});",
+    "url": "https://forum.hise.audio/topic/9899",
+    "featured": true,
+    "validation": {
+      "tier": 4,
+      "testable": false,
+      "skipReason": "Requires a ScriptFX module ('Script FX1') that contains a compiled scriptnode network with a peak node configured as External Display Buffer #0. Setting up the full scriptnode network (LFO -> peak -> global_cable) programmatically is not feasible for automated testing.",
+      "modules": [],
+      "components": [],
+      "verifyScript": null,
+      "notes": "Demonstrates Synth.getDisplayBufferSource + ScriptRingBuffer.createPath for 2D signal plotting. The P1 panel is obtained via getComponent \u2014 needs a ScriptPanel named 'P1' \u2014 but the core blocker is the scriptnode network dependency."
+    }
+  },
+  {
+    "title": "Effect Band Solo Buttons",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted",
+      "solved"
+    ],
+    "description": "Synth.getEffect with setAttribute to implement exclusive band solo buttons for a multi-band ScriptFX. Clicking a button solos the selected band by toggling effect attributes; clicking again re-enables all bands.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var ScriptFX1 = Synth.getEffect(\"Script FX1\");\n\nconst var grpBtns = [Content.getComponent(\"low\"),\n                     Content.getComponent(\"mid\"),\n                     Content.getComponent(\"high\")];\nfor (b in grpBtns) b.setControlCallback(onButtonBandControl);\n\ninline function onButtonBandControl(component, value)\n{\n\tlocal index = grpBtns.indexOf(component);\n\tlocal attributes = [ScriptFX1.lows, ScriptFX1.mids, ScriptFX1.highs];\n\t\n\t// If a button is clicked > solo the selected band\n\tif(value)\n\t{\n\t\tfor(i = 0; i < grpBtns.length; i++)\n\t\t{\n\t\t\tScriptFX1.setAttribute(attributes[i], i == index && value);\n\t\t\tgrpBtns[i].setValue(i == index && value);\n\t\t}\n\t}\n\t// If no button is clicked > enable all bands\n\telse\n\t{\n\t\tfor(i = 0; i < grpBtns.length; i++)\n\t\t\tScriptFX1.setAttribute(attributes[i], !value);\n\t}\n}",
+    "url": "https://forum.hise.audio/topic/10223",
+    "featured": true,
+    "validation": {
+      "tier": 3,
+      "testable": false,
+      "skipReason": "ScriptFX1.lows/mids/highs are custom properties from a specific scriptnode network - not available on generic ScriptFX",
+      "modules": [
+        {
+          "type": "SimpleGain",
+          "name": "Script FX1"
+        }
+      ],
+      "components": [
+        {
+          "type": "ScriptButton",
+          "id": "low"
+        },
+        {
+          "type": "ScriptButton",
+          "id": "mid"
+        },
+        {
+          "type": "ScriptButton",
+          "id": "high"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Demonstrates exclusive solo-button logic with an effect. The original uses a custom ScriptFX whose script defines .lows/.mids/.highs attributes \u2014 those are unavailable without the FX script. Using numeric indices 0/1/2 against SimpleGain is functionally sufficient to demonstrate the toggle pattern.",
+      "result": {
+        "tested": true,
+        "passed": false,
+        "stage": "execute",
+        "error": [
+          {
+            "errorMessage": "API call with undefined parameter at index 0. Use \"\" or false for an inactive value.",
+            "callstack": [
+              "onButtonBandControl() at Interface.js:28:26"
+            ]
+          }
+        ],
+        "logs": [],
+        "timestamp": "2026-04-07T20:35:47.773201Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Parametric EQ Interface with Filter LAF",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Full parametric EQ UI with drawFilterPath, drawFilterDragHandle, drawAnalyserPath, drawFilterGridLines, and drawAnalyserGrid LAF functions. Shows/hides per-band parameter panels on drag handle hover. Uses arrayed component references for Type, Freq, Q, and Gain controls per band.",
+    "code": "Content.makeFrontInterface(800, 500);\n\nconst numOfNodes = 8;\nconst var EQ = Synth.getEffect(\"EQ\");\n\nconst arrayed_Panel = [];\nfor (i = 0; i < numOfNodes; i++)\n{\n\tarrayed_Panel.push(Content.getComponent(\"Panel\" + i));\n\tarrayed_Panel[i].setControlCallback(onarrayed_PanelControl);\n}\n\nconst arrayed_Type = [];\nfor (i = 0; i < numOfNodes; i++)\n{\n\tarrayed_Type.push(Content.getComponent(\"Type\" + i));\n\tarrayed_Type[i].setControlCallback(onarrayed_TypeControl);\n}\n\nconst arrayed_Freq = [];\nfor (i = 0; i < numOfNodes; i++)\n{\n\tarrayed_Freq.push(Content.getComponent(\"Freq\" + i));\n\tarrayed_Freq[i].setControlCallback(onarrayed_FreqControl);\n}\n\nconst arrayed_Q = [];\nfor (i = 0; i < numOfNodes; i++)\n{\n\tarrayed_Q.push(Content.getComponent(\"Q\" + i));\n\tarrayed_Q[i].setControlCallback(onarrayed_QControl);\n}\n\nconst arrayed_Gain = [];\nfor (i = 0; i < numOfNodes; i++)\n{\n\tarrayed_Gain.push(Content.getComponent(\"Gain\" + i));\n\tarrayed_Gain[i].setControlCallback(onarrayed_GainControl);\n}\n\ninline function collective_eqWatcher_Function()\n{\n\t// Refresh EQ display when any parameter changes\n}\n\ninline function onarrayed_PanelControl(component, value)\n{\n\tcollective_eqWatcher_Function();\n}\n\ninline function onarrayed_FreqControl(component, value)\n{\n\tcollective_eqWatcher_Function();\n}\n\ninline function onarrayed_GainControl(component, value)\n{\n\tcollective_eqWatcher_Function();\n}\n\ninline function onarrayed_QControl(component, value)\n{\n\tcollective_eqWatcher_Function();\n}\n\ninline function onarrayed_TypeControl(component, value)\n{\n\tcollective_eqWatcher_Function();\n}\n\nconst var laf = Content.createLocalLookAndFeel();\n\nlaf.registerFunction(\"drawFilterPath\", function(g, obj)\n{\n\tvar a = obj.area;\n\n\tg.setGradientFill([0X307B8DFF, 0, 0.2 * a[3], 0x01F600FF, 0, 0.8 * a[3]]);\n\tg.fillPath(obj.path, obj.pathArea);\n\n\tg.setColour(0XFFFFFFFF);\n\tg.drawPath(obj.path, obj.pathArea, 2);\n});\n\nlaf.registerFunction(\"drawFilterDragHandle\", function(g, obj)\n{\n\tvar a = obj.area;\n\tvar h = obj.handle;\n\n\tg.setColour(0XFFFFFFFF);\n\tg.fillEllipse([h[0] + 2, h[1] + 2, h[2] - 4, h[3] - 4]);\n\n\tg.setColour(0XFF7B8DFF);\n\tg.drawEllipse([h[0] + 2, h[1] + 2, h[2] - 4, h[3] - 4], 2);\n\n\tg.setFont(\"Arial Black\", 17);\n\tg.drawAlignedText(obj.index, h, \"centred\");\n\n\tif(obj.hover || obj.clicked)\n\t{\n\t\tfor (i = 0; i < numOfNodes; i++)\n\t\t{\n\t\t\tarrayed_Panel[i].showControl(false);\n\t\t\tarrayed_Panel[obj.index].showControl(true);\n\t\t}\n\t}\n});\n\nlaf.registerFunction(\"drawAnalyserPath\", function(g, obj)\n{\n\tvar a = obj.area;\n\n\tg.setGradientFill([0XFF7B8DFF, 0, 0, 0X107B8DFF, 0, a[3]]);\n\tg.fillPath(obj.path, obj.pathArea);\n\n\tg.setColour(0X90FFFFFF);\n\tg.drawPath(obj.path, obj.pathArea, 1);\n});\n\nlaf.registerFunction(\"drawFilterGridLines\", function(g, obj)\n{\n\tg.setColour(0X107B8DFF);\n\tg.drawPath(obj.grid, obj.area, 1);\n});\n\nlaf.registerFunction(\"drawAnalyserGrid\", function(g, obj)\n{\n\tg.setColour(0X307B8DFF);\n\tg.drawPath(obj.grid, obj.area, 1);\n});\n\nconst var MainDragFiltFT = Content.getComponent(\"MainDragFiltFT\");\nMainDragFiltFT.setLocalLookAndFeel(laf);",
+    "url": "https://forum.hise.audio/topic/8629",
+    "featured": true,
+    "validation": {
+      "tier": 3,
+      "testable": true,
+      "skipReason": null,
+      "modules": [
+        {
+          "type": "CurveEq",
+          "name": "EQ"
+        }
+      ],
+      "components": [
+        {
+          "type": "ScriptFloatingTile",
+          "id": "MainDragFiltFT"
+        },
+        {
+          "type": "ScriptPanel",
+          "id": "Panel0"
+        },
+        {
+          "type": "ScriptPanel",
+          "id": "Panel1"
+        },
+        {
+          "type": "ScriptPanel",
+          "id": "Panel2"
+        },
+        {
+          "type": "ScriptPanel",
+          "id": "Panel3"
+        },
+        {
+          "type": "ScriptPanel",
+          "id": "Panel4"
+        },
+        {
+          "type": "ScriptPanel",
+          "id": "Panel5"
+        },
+        {
+          "type": "ScriptPanel",
+          "id": "Panel6"
+        },
+        {
+          "type": "ScriptPanel",
+          "id": "Panel7"
+        },
+        {
+          "type": "ScriptComboBox",
+          "id": "Type0"
+        },
+        {
+          "type": "ScriptComboBox",
+          "id": "Type1"
+        },
+        {
+          "type": "ScriptComboBox",
+          "id": "Type2"
+        },
+        {
+          "type": "ScriptComboBox",
+          "id": "Type3"
+        },
+        {
+          "type": "ScriptComboBox",
+          "id": "Type4"
+        },
+        {
+          "type": "ScriptComboBox",
+          "id": "Type5"
+        },
+        {
+          "type": "ScriptComboBox",
+          "id": "Type6"
+        },
+        {
+          "type": "ScriptComboBox",
+          "id": "Type7"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Freq0"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Freq1"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Freq2"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Freq3"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Freq4"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Freq5"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Freq6"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Freq7"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Q0"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Q1"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Q2"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Q3"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Q4"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Q5"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Q6"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Q7"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Gain0"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Gain1"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Gain2"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Gain3"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Gain4"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Gain5"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Gain6"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Gain7"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Full 8-band parametric EQ UI with 5 custom LAF functions (drawFilterPath, drawFilterDragHandle, drawAnalyserPath, drawFilterGridLines, drawAnalyserGrid). MainDragFiltFT must be a FloatingTile configured as a FilterDisplay/DraggableFilterPanel type backed by the CurveEq. The control callbacks all call an empty collective_eqWatcher_Function, so none crash. 41 components total.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:35:50.717194Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Custom Plotter Analyser LAF",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted",
+      "solved"
+    ],
+    "description": "Content.createLocalLookAndFeel with drawAnalyserBackground and drawAnalyserPath to customize a FloatingTile plotter display. Applies gradient fills and path rendering for a Plotter linked to an LFO modulator.",
+    "code": "Content.makeFrontInterface(200, 200);\n\nconst plotter = Content.addFloatingTile(\"plotter\", 0, 0);\n\nconst var LFO1 = Synth.getModulator(\"LFO1\");\n\nconst var laf = Content.createLocalLookAndFeel();\n\nlaf.registerFunction(\"drawAnalyserBackground\", function(g, obj)\n{\n\t //Console.print(trace(obj));\n\t g.setGradientFill([Colours.cadetblue, 0, 0, Colours.orange, obj.area[2]*0.5, 100]);\n\t g.fillRoundedRectangle(obj.area, 4);\n});\n\n\nlaf.registerFunction(\"drawAnalyserPath\", function(g, obj)\n{\n\t //Console.print(trace(obj));\n\t g.setColour(Colours.white);\n\t g.setGradientFill([Colours.withAlpha(Colours.orangered, 0.5), 0, 0, Colours.withAlpha(Colours.red, 0.5), obj.area[2]*0.5, 100]);\n\t g.fillPath(obj.path, obj.area);\n\t \n\t g.setColour(Colours.white);\n\t g.drawPath(obj.path, obj.area, 1);\n});\n\nplotter.setLocalLookAndFeel(laf);",
+    "url": "https://forum.hise.audio/topic/9578",
+    "featured": false,
+    "validation": {
+      "tier": 3,
+      "testable": true,
+      "skipReason": null,
+      "modules": [
+        {
+          "type": "SineSynth",
+          "name": "Sine Wave Generator1"
+        },
+        {
+          "type": "LFO",
+          "name": "LFO1",
+          "parent": "Sine Wave Generator1",
+          "chain": 1
+        }
+      ],
+      "components": [],
+      "verifyScript": null,
+      "notes": "Registers drawAnalyserBackground and drawAnalyserPath LAF functions on a programmatically created FloatingTile plotter. The LFO1 modulator provides the live data stream for the plotter. FloatingTile is created in code (Content.addFloatingTile) so it does not need a component entry.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:35:54.059783Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Interactive Grid Selection Panel",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert"
+    ],
+    "description": "Single panel implementing a clickable grid with hover highlighting using setPaintRoutine and setMouseCallback. Calculates cell index from mouse position, draws active/hover states with configurable colors, and fires setValue/changed on click.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var Panel1 = Content.getComponent(\"Panel1\");\nPanel1.data.hover = -1;\nPanel1.data.numCols = 4;\nPanel1.data.numRows = 4;\nPanel1.setControlCallback(onPanel1Control);\n\ninline function onPanel1Control(component, value)\n{\n\tConsole.print(value);\n\tcomponent.repaint();\n}\n\nPanel1.setPaintRoutine(function(g)\n{\n\tvar a = this.getLocalBounds(0);\n\tvar w = a[2] / this.data.numCols;\n\tvar h = a[3] / this.data.numRows;\n\t\n\tfor (i = 0; i < this.data.numCols * this.data.numRows; i++)\n\t{\n\t\tvar x = (i % 4) * w;\n\t\tvar y = Math.floor(i / 4) * h;\n\t\tvar active = this.getValue() == i;\n\n\t\tif (active)\n\t\t\tg.setColour(this.get(\"itemColour\"));\n\t\telse\n\t\t\tg.setColour(Colours.withAlpha(this.get(\"bgColour\"), this.data.hover == i ? 1.0 : 0.6 - (0.2 * !this.get(\"enabled\"))));\n\t\t\n\t\tg.fillRoundedRectangle([x, y, w - 5, h - 5], this.get(\"borderRadius\"));\n\t\n\t\tg.setFont(\"Oxygen\", 18);\n\t\tg.setColour(Colours.withAlpha(this.get(\"textColour\"), active ? 1.0 : 0.7));\n\t\tg.drawFittedText(i, [x + 5, y + 5, w - 15, h - 15], \"centred\", 2, 1.0);\n\t}\n});\n\nPanel1.setMouseCallback(function(event)\n{\n\tvar col = Math.floor(event.x / this.getWidth() * this.data.numCols);\n\tvar row = Math.floor(event.y / this.getHeight() * this.data.numRows);\n\tvar value = 1 * row * this.data.numCols + col;\n\t\n\tthis.data.hover = event.hover ? value : -1;\n\t\t\t\n\tif (event.clicked && !event.rightClick)\n\t{\n\t\tthis.setValue(value);\n\t\tthis.changed();\n\t}\n\telse\n\t{\n\t\tthis.repaint();\n\t}\n});",
+    "url": "https://forum.hise.audio/topic/9548",
+    "featured": true,
+    "validation": {
+      "tier": 2,
+      "testable": false,
+      "skipReason": "API does not exist: Graphics.drawFittedText - not part of the HISE scripting API",
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptPanel",
+          "id": "Panel1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Self-contained 4x4 clickable grid with hover highlighting, all drawn via setPaintRoutine and controlled via setMouseCallback. Panel1.data stores hover index, numCols, numRows.",
+      "result": {
+        "tested": true,
+        "passed": false,
+        "stage": "execute",
+        "error": [
+          {
+            "errorMessage": "function not found",
+            "callstack": [
+              "function() at Interface.js:36:19"
+            ]
+          }
+        ],
+        "logs": [],
+        "timestamp": "2026-04-07T20:35:55.288178Z",
+        "attempts": 1
+      },
+      "invalid": true
+    }
+  },
+  {
+    "title": "OpenGL Shader on Panel",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Content.createShader and g.applyShader to render an OpenGL shader on a panel. A knob controls a uniform variable via shader.setUniformData, enabling real-time parameter control of GPU-rendered graphics.",
+    "code": "Content.makeFrontInterface(600, 500);\r\n\r\nconst var Panel1 = Content.getComponent(\"Panel1\");\r\nconst var shader = Content.createShader(\"shader\");\r\n\r\n//shader.setBlendFunc(true, shader.GL_SRC_ALPHA , shader.GL_ONE);\r\n\r\n\r\nPanel1.setPaintRoutine(function(g)\r\n{\r\n\tg.applyShader(shader, [0, 0, this.getWidth(), this.getHeight()]);\r\n});\r\n\r\n\r\nconst var Knob1 = Content.getComponent(\"Knob1\");\r\ninline function onKnob1Control(component, value)\r\n{\r\n\tshader.setUniformData(\"myValue\", value);\r\n};\r\n\r\nContent.getComponent(\"Knob1\").setControlCallback(onKnob1Control);",
+    "url": "https://forum.hise.audio/topic/4187",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptPanel",
+          "id": "Panel1"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Content.createShader('shader') creates an empty shader object if 'shader.glsl' is not found in the project \u2014 the code compiles and runs but renders nothing visible. The uniform setUniformData call is still exercised. Shader file presence is optional for compilation testing.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:35:56.677047Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Linked Knobs with setAttribute",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions"
+    ],
+    "description": "Two knobs linked via a toggle button using setAttribute on effects instead of changed() to avoid infinite callback loops. When the link button is active, moving either knob updates both knobs and their associated SimpleGain effects.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var linkBtn = Content.getComponent(\"linkBtn\");\nconst var Knob1 = Content.getComponent(\"Knob1\");\nconst var Knob2 = Content.getComponent(\"Knob2\");\nconst var SimpleGain1 = Synth.getEffect(\"Simple Gain1\");\nconst var SimpleGain2 = Synth.getEffect(\"Simple Gain2\");\n\ninline function onKnob1Control(component, value)\n{\n\tSimpleGain1.setAttribute(SimpleGain1.Gain, value);\n\n\tif (linkBtn.getValue())\n\t{\n\t\tKnob2.setValue(value);\n\t\tSimpleGain2.setAttribute(SimpleGain2.Gain, value);\n\t\t\t\t\n\t}\n};\nKnob1.setControlCallback(onKnob1Control);\n\n\ninline function onKnob2Control(component, value)\n{\t\n\tSimpleGain2.setAttribute(SimpleGain2.Gain, value);\n\n\tif (linkBtn.getValue())\n\t{\n\t\tKnob1.setValue(value);\n\t\tSimpleGain1.setAttribute(SimpleGain1.Gain, value);\n\t\t\n\t}\n};\nKnob2.setControlCallback(onKnob2Control);\n\n\n\n\n\ninline function onlinkBtnControl(component, value)\n{\n\tif(value)\n\t{\n\t\tKnob1.setValue(Knob1.getValue());\n\t\tKnob1.changed();\t\n\t}\n\t\n};\n\nContent.getComponent(\"linkBtn\").setControlCallback(onlinkBtnControl);",
+    "url": "https://forum.hise.audio/topic/5757",
+    "featured": false,
+    "validation": {
+      "tier": 3,
+      "testable": true,
+      "skipReason": null,
+      "modules": [
+        {
+          "type": "SimpleGain",
+          "name": "Simple Gain1"
+        },
+        {
+          "type": "SimpleGain",
+          "name": "Simple Gain2"
+        }
+      ],
+      "components": [
+        {
+          "type": "ScriptButton",
+          "id": "linkBtn"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob1"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob2"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Demonstrates safe knob-linking via setAttribute on effects to avoid infinite callback loops. Two SimpleGain effects in the FX chain (chain 3).",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:35:58.472985Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "CPU Usage Display Panel",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert"
+    ],
+    "description": "Panel timer callback with Engine.getCpuUsage and Engine.doubleToString to display real-time CPU usage. Uses setPaintRoutine with drawAlignedText and startTimer for periodic refresh.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var Panel1 = Content.getComponent(\"Panel1\");\n\nPanel1.setPaintRoutine(function(g)\n{\n\tvar a = this.getLocalBounds(0);\n\t\n\tg.setColour(this.get(\"textColour\"));\n\tg.drawAlignedText(this.get(\"text\"), a, \"centred\");\n});\n\nPanel1.setTimerCallback(function()\n{\n\tthis.set(\"text\", \"CPU: \" + Engine.doubleToString(Engine.getCpuUsage(), 2) + \"%\");\n\tthis.repaint();\n});\n\nPanel1.startTimer(200);",
+    "url": "https://forum.hise.audio/topic/8991",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptPanel",
+          "id": "Panel1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Uses Engine.getCpuUsage and Engine.doubleToString inside a panel timer callback to show real-time CPU% via drawAlignedText. Reads panel's own textColour and text properties. startTimer(200) is already in the code.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:35:59.963391Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Global Routing Cable to SliderPack",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "Engine.getGlobalRoutingManager with getCable and connectToGlobalModulator to route a macro modulator value into a SliderPack at a specific index. Uses registerCallback with SyncNotification for real-time updates.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var rm = Engine.getGlobalRoutingManager();\n\nconst var m1 = rm.getCable(\"Macro1\");\nm1.connectToGlobalModulator(\"M1\", true);\n\nconst var SliderPack1 = Content.getComponent(\"SliderPack1\");\n\nreg packIndex = 4;\n\ninline function onMacro1(value)\n{\n\tSliderPack1.setSliderAtIndex(packIndex, value);\n}\n\nm1.registerCallback(onMacro1, SyncNotification);",
+    "url": "https://forum.hise.audio/topic/8910",
+    "featured": false,
+    "validation": {
+      "tier": 3,
+      "testable": true,
+      "skipReason": null,
+      "modules": [
+        {
+          "type": "SineSynth",
+          "name": "Sine Wave Generator1"
+        },
+        {
+          "type": "Constant",
+          "name": "M1",
+          "parent": "Sine Wave Generator1",
+          "chain": 1
+        }
+      ],
+      "components": [
+        {
+          "type": "ScriptSliderPack",
+          "id": "SliderPack1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Engine.getGlobalRoutingManager + getCable('Macro1') + connectToGlobalModulator('M1', true) wires the Macro1 cable to receive values from the global modulator named M1. The registered callback sets a SliderPack slider at index 4. A Constant modulator named M1 in the gain chain acts as the source.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:02.173988Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Arrayed Knob to Modulator Mapping",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "Dynamic arrays of knobs and modulator targets with a single shared inline callback. Uses indexOf to resolve the knob index and iterates pitchTargets[idx] to call setIntensity on multiple Constant modulators per knob.",
+    "code": "Content.makeFrontInterface(600, 600);\n\n// change this for every project\nconst var PITCH_INDEXES = [\"a\", \"b\", \"c\"]; \nconst var PITCH_TARGET_INDEXES = [[1], [2, 3, 4], [5, 6]];\n\n// This will hold a list of all knobs\nconst var pitchKnobs = [];\n\n// This will hold a 2D-array of all targets (so that the index of the knob can be connected to multiple targets)\nconst var pitchTargets = [];\n\n// One callback to rule them all\ninline function onPitchKnob(component, value)\n{\n\t// get the index from the list\n\tlocal idx = pitchKnobs.indexOf(component);\n\t\n\t// set all targets in the target list for the given index\n\tfor(t in pitchTargets[idx])\n\t\tt.setIntensity(value);\n}\n\n// This function will create the two arrays used in the callback\ninline function init()\n{\n\tfor(i = 0; i < PITCH_INDEXES.length; i++)\n\t{\n\t\tpitchKnobs.push(Content.getComponent(\"Pitch_\" + PITCH_INDEXES[i]));\n\t\tpitchKnobs[i].setControlCallback(onPitchKnob);\n\t\t\n\t\tlocal targets = [];\n\t\t\n\t\tfor(p in PITCH_TARGET_INDEXES[i])\n\t\t\ttargets.push(Synth.getModulator(\"Constant\" + p));\n\t\t\n\t\tpitchTargets.push(targets);\n\t}\n}\n\ninit();",
+    "url": "https://forum.hise.audio/topic/8266",
+    "featured": false,
+    "validation": {
+      "tier": 3,
+      "testable": true,
+      "skipReason": null,
+      "modules": [
+        {
+          "type": "SineSynth",
+          "name": "Sine Wave Generator1"
+        },
+        {
+          "type": "Constant",
+          "name": "Constant1",
+          "parent": "Sine Wave Generator1",
+          "chain": 1
+        },
+        {
+          "type": "Constant",
+          "name": "Constant2",
+          "parent": "Sine Wave Generator1",
+          "chain": 1
+        },
+        {
+          "type": "Constant",
+          "name": "Constant3",
+          "parent": "Sine Wave Generator1",
+          "chain": 1
+        },
+        {
+          "type": "Constant",
+          "name": "Constant4",
+          "parent": "Sine Wave Generator1",
+          "chain": 1
+        },
+        {
+          "type": "Constant",
+          "name": "Constant5",
+          "parent": "Sine Wave Generator1",
+          "chain": 1
+        },
+        {
+          "type": "Constant",
+          "name": "Constant6",
+          "parent": "Sine Wave Generator1",
+          "chain": 1
+        }
+      ],
+      "components": [
+        {
+          "type": "ScriptSlider",
+          "id": "Pitch_a"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Pitch_b"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Pitch_c"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Demonstrates dynamic knob-to-modulator wiring using index arrays. PITCH_INDEXES defines knob suffixes; PITCH_TARGET_INDEXES maps each knob to a list of Constant modulator indices. Moving Pitch_a sets intensity of Constant1; Pitch_b sets Constant2/3/4; Pitch_c sets Constant5/6.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:04.334508Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Rotated Text on Panel",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert"
+    ],
+    "description": "g.rotate with Math.toRadians to draw vertically rotated text on a panel. Rotates -90 degrees around the panel center before calling drawAlignedText.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var Panel1 = Content.getComponent(\"Panel1\");\n\nPanel1.setPaintRoutine(function(g)\n{\n\tvar a = this.getLocalBounds(0);\n\n\tg.rotate(Math.toRadians(-90), [a[2] / 2, a[3] / 2]);\n\tg.setColour(this.get(\"textColour\"));\n\t\n\tg.setFont(\"Oxygen\", 24);\n\tg.drawAlignedText(\"This is some text\", a, \"left\");\n});",
+    "url": "https://forum.hise.audio/topic/8790",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptPanel",
+          "id": "Panel1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Simple g.rotate demo using Math.toRadians(-90) around panel center to draw vertically oriented text.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:05.826874Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Basic Linear Slider LAF",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert"
+    ],
+    "description": "Content.createLocalLookAndFeel with drawLinearSlider to render a simple horizontal slider with a rounded rectangle track and value fill using obj.value.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var Knob1 = Content.getComponent(\"Knob1\");\n\nconst var laf = Content.createLocalLookAndFeel();\n\nKnob1.setLocalLookAndFeel(laf);\n\nlaf.registerFunction(\"drawLinearSlider\", function(g, obj)\n{\n\tg.setColour(Colours.red);\n\tg.fillRoundedRectangle(obj.area, 10);\n\n\tg.setColour(Colours.blue);\n\tg.fillRoundedRectangle([obj.area[0], obj.area[1], obj.area[2] * obj.value, obj.area[3]], 10);\n});",
+    "url": "https://forum.hise.audio/topic/8743",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptSlider",
+          "id": "Knob1",
+          "properties": {
+            "style": "Linear Horizontal"
+          }
+        }
+      ],
+      "verifyScript": null,
+      "notes": "drawLinearSlider LAF only fires when the slider style is a linear variant (not rotary). Knob1 must have its style changed to 'Linear Horizontal' (or 'Linear Vertical') to trigger the registered LAF function.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:08.398853Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Rotary Slider Value Text LAF",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "drawRotarySlider LAF using obj.valueAsText to display the current slider value as centered text. Shows how to access the formatted value string in a Look and Feel callback.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var knobs = [Content.getComponent(\"Knob1\"),\n                   Content.getComponent(\"Knob2\"),\n                   Content.getComponent(\"Knob3\"),\n                   Content.getComponent(\"Knob4\")];\n\nconst var laf = Content.createLocalLookAndFeel();\n\nlaf.registerFunction(\"drawRotarySlider\", function(g, obj)\n{\n\tvar a = obj.area;\n\n\tg.setColour(Colours.whitesmoke);\n\tg.drawAlignedText(obj.valueAsText, a, \"centred\");\n});\n\nfor (knb in knobs)\n\tknb.setLocalLookAndFeel(laf);",
+    "url": "https://forum.hise.audio/topic/8691",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptSlider",
+          "id": "Knob1"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob2"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob3"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob4"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Uses obj.valueAsText in drawRotarySlider to overlay the current formatted value as centred text. Knobs use default rotary style. Note: code references Colours.whitesmoke \u2014 verify HISE supports this colour constant (standard CSS colour name).",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:09.832821Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Icon-Based Peak Meter LAF",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert"
+    ],
+    "description": "drawMatrixPeakMeter LAF that fills an SVG icon path with opacity driven by obj.peaks[0]. Loads path data via Content.createPath and applies the LAF to a FloatingTile for a custom peak meter visualization.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var pathData = \"487.t0llYjCQWz0sCEmtHuBQWz0sCM5duPjQ2+5PwwnKyPDcQh5PL5xLDA..dNTbL5xLDwnaSNzn68BQ5h.iCEmtHuBQnKJgCA.flPD5hR3PwYzMgPD5hR3PdQXGDoKBLNTb0EcFDwnaSNTcQmAQ..fmCEWcQmAQzEIpC4EgcPjQ2+5PwYzMgPzEcc6P..nIDcQW2NzXsA.flPz12z5Pw4EUiPz12z5P3vQHDA4wnNTbSPtGDYzUjNzDj6AQ..fmCE2Dj6AQ5h5kCgCGgPDb3L4Pw4EUiPTIH63P..nIDUBxNNTbitZJDUBxNNDxiuBQvgyjCEm6a3BQ5h5kC49FtPD..34Pw49FtPjQWQ5PHO9JDA4wnNTbitZJDs8MsND..ZBQaeSqCMVa..nIDEcQHOTbwZCGDEcQHODUBOAQjmLuCE28Ms.Q12TrCA.fGPD..34PwceSKPTBxp3PTI7DDgCa9MTbwZCGD0EcmMD..ZBQcQ2YCEGTICCQcQ2YCwZO4PDNr42PwofrAQTBxp3P..XQDA..dNTbJHaPDYeSwNDq8jCQjmLuCEGTICCQQWDxCA.flPTzEg7PiUF\";\nconst var icon = Content.createPath();\nicon.loadFromData(pathData);\n\nconst var peakMeterLaf = Content.createLocalLookAndFeel();\n\npeakMeterLaf.registerFunction(\"drawMatrixPeakMeter\", function(g, obj)\n{\n\tg.setColour(Colours.withAlpha(Colours.white, obj.peaks[0]));\n\tg.fillPath(icon, obj.area);\n});\n\nconst var FloatingTile1 = Content.getComponent(\"FloatingTile1\");\nFloatingTile1.setLocalLookAndFeel(peakMeterLaf);",
+    "url": "https://forum.hise.audio/topic/8648",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptFloatingTile",
+          "id": "FloatingTile1",
+          "properties": {
+            "contentType": "MatrixPeakMeter"
+          }
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Registers drawMatrixPeakMeter LAF that fills an SVG icon path with opacity driven by obj.peaks[0]. The icon path data is hard-coded via Content.createPath + loadFromData. FloatingTile1 must be configured as a MatrixPeakMeter to supply the obj.peaks data.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:12.296686Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Transport Handler with MIDI Player Sync",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "Engine.createTransportHandler with setEnableGrid, setSyncMode, and startInternalClock to synchronize two MIDI players to a master clock. Uses setOnGridChange with AsyncNotification for grid-aligned visual updates on a panel.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var MIDIPlayer1 = Synth.getMidiPlayer(\"MIDI Player1\");\nconst var MIDIPlayer2 = Synth.getMidiPlayer(\"MIDI Player2\");\n\nconst var th = Engine.createTransportHandler();\n\nth.setEnableGrid(true, 8);\n\n\nMIDIPlayer1.setSyncToMasterClock(true);\nMIDIPlayer2.setSyncToMasterClock(true);\n\nth.setSyncMode(th.InternalOnly);\n\nconst var t = MIDIPlayer1.getTimeSignature();;\n\n\nt.NumBars = 8.0; // HISE...\nMIDIPlayer1.setTimeSignature(t);\n\n\nth.stopInternalClock(0);\nth.startInternalClock(2048);\n\nconst var Panel1 = Content.getComponent(\"Panel1\");\n\nPanel1.setPaintRoutine(function(g)\n{\n\tif(this.data.on)\n\t{\n\t\tg.setFont(\"Comic Sans MS\", 32.0);\n\t\tg.setColour(Colours.white);\n\t\t\n\t\tg.drawAlignedText(\"HISE GPT\", this.getLocalBounds(0), \"centred\");\n\t}\n});\n\nth.setOnGridChange(AsyncNotification, function(g, i)\n{\n\tPanel1.data.on = !Panel1.data.on;\n\tPanel1.repaint();\n});",
+    "url": "https://forum.hise.audio/topic/7406",
+    "featured": true,
+    "validation": {
+      "tier": 3,
+      "testable": false,
+      "skipReason": "Cannot assign to TimeSignature properties directly - getTimeSignature returns read-only object",
+      "modules": [
+        {
+          "type": "MidiPlayer",
+          "name": "MIDI Player1"
+        },
+        {
+          "type": "MidiPlayer",
+          "name": "MIDI Player2"
+        }
+      ],
+      "components": [
+        {
+          "type": "ScriptPanel",
+          "id": "Panel1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Uses Engine.createTransportHandler with setEnableGrid, setSyncToMasterClock, setSyncMode(InternalOnly), and setOnGridChange to toggle a panel text on each grid beat. Two MidiPlayers in the MIDI processor chain (chain 0).",
+      "result": {
+        "tested": true,
+        "passed": false,
+        "stage": "execute",
+        "error": [
+          {
+            "errorMessage": "Cannot assign to this expression!",
+            "callstack": [
+              "onInit() at Interface.js:19:11"
+            ]
+          }
+        ],
+        "logs": [],
+        "timestamp": "2026-04-07T20:36:13.899449Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Audio-Reactive Shader Animation",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "Content.createShader with g.applyShader on a panel, driven by getCurrentLevel from a synth. A timer callback smooths the audio level with exponential decay and passes it as a uniform to the GPU shader for real-time audio visualization.",
+    "code": "Content.makeFrontInterface(500, 572);\n\nconst var sh = Content.createShader(\"bunny.glsl\");\n\nconst var SineWaveGenerator1 = Synth.getChildSynth(\"Sine Wave Generator1\");\n\nconst var p = Content.addPanel(\"Panel1\", 0, 0);\n\np.data.l = 0.0;\np.set(\"width\", 500);\np.set(\"height\", 500);\n\n\np.setPaintRoutine(function(g)\n{\n\tg.applyShader(sh, this.getLocalBounds(0));\n});\n\np.setTimerCallback(function()\n{\n\tvar l = 4.0 * SineWaveGenerator1.getCurrentLevel(true);\n\t\n\tif(l > this.data.l)\n\t\tthis.data.l = l;\n\telse\n\t\tthis.data.l *= 0.8;\n\t\n\n\tsh.setUniformData(\"amp\", this.data.l);\n\tthis.repaint();\n});\n\np.startTimer(15);",
+    "url": "https://forum.hise.audio/topic/8459",
+    "featured": true,
+    "validation": {
+      "tier": 3,
+      "testable": true,
+      "skipReason": null,
+      "modules": [
+        {
+          "type": "SineSynth",
+          "name": "Sine Wave Generator1"
+        }
+      ],
+      "components": [],
+      "verifyScript": null,
+      "notes": "Content.createShader('bunny.glsl') creates an empty shader object if the file is missing \u2014 code compiles and runs but renders a blank panel. The getCurrentLevel + uniform smoothing logic is still exercised. Panel is created in code (Content.addPanel). SineWaveGenerator1 provides getCurrentLevel data.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:15.743319Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Rounded Tab Button LAF with Panel Toggle",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "drawToggleButton LAF using Content.createPath with quadraticTo to draw rounded tab shapes. Active and inactive states use different corner rounding. Paired with a callback that shows/hides corresponding panels based on button index.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var btns = [Content.getComponent(\"Button1\"),\n                  Content.getComponent(\"Button2\")];\n\nconst var pnls = [Content.getComponent(\"Panel1\"),\n                  Content.getComponent(\"Panel2\")];\n\nconst var R = 6;\nconst var TWO_R = R * 2;\n\nconst var tabLAF = Content.createLocalLookAndFeel();\n\ntabLAF.registerFunction(\"drawToggleButton\", function(g, obj)\n{\n\tvar a = obj.area;\n\tvar p = Content.createPath();\n\t\n\tp.startNewSubPath(TWO_R, 0);\n\tp.lineTo(a[2] - TWO_R, 0);\n\tp.quadraticTo(a[2] - R, 0, a[2] - R, R);\n\t\n\tif (obj.value)\n\t{\n\t\tp.lineTo(a[2] - R, a[3] - R);\n\t\tp.quadraticTo(a[2] - R, a[3], a[2], a[3]);\n\t\tp.lineTo(0, a[3]);\n\t\tp.quadraticTo(R, a[3], R, a[3] - R);\n\t}\n\telse\n\t{\n\t\tp.lineTo(a[2] - R, a[3]);\n\t\tp.lineTo(a[2], a[3]);\n\t\tp.lineTo(0, a[3]);\n\t\tp.lineTo(R, a[3]);\n\t}\n\t\n\tp.lineTo(R, R);\n\tp.quadraticTo(R, 0, TWO_R, 0);\n\t\n\tg.setColour(obj.value ? obj.bgColour : 0xFF808080);\n\tg.fillPath(p, a);\n\t\n\tg.setColour(obj.value ? obj.itemColour2 : obj.textColour);\n\tg.drawAlignedText(obj.text, obj.area, \"centred\");\n});\n\n\n\nfor (b in btns)\n{\n\tb.setLocalLookAndFeel(tabLAF);\n\tb.setControlCallback(onbtnsControl);\n}\n\n\n\ninline function onbtnsControl(component, value)\n{\n\tfor (p in pnls)\n\t{\n\t\tif (pnls.indexOf(p) == btns.indexOf(component))\n\t\t\tp.showControl(value);\n\t}\n};",
+    "url": "https://forum.hise.audio/topic/8450",
+    "featured": true,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptButton",
+          "id": "Button1"
+        },
+        {
+          "type": "ScriptButton",
+          "id": "Button2"
+        },
+        {
+          "type": "ScriptPanel",
+          "id": "Panel1"
+        },
+        {
+          "type": "ScriptPanel",
+          "id": "Panel2"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Custom tab LAF using Content.createPath with quadraticTo for rounded-corner tabs. Active tab draws a notch at the bottom; inactive tab is flat. Clicking toggles the paired panel visibility. Buttons should be set to toggle mode (radioGroup or individual toggle).",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:17.287998Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Slider LAF Color from ComboBox State",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert"
+    ],
+    "description": "drawLinearSlider LAF using obj.id with Content.getAllComponents to resolve slider index, then reads a paired ComboBox value to determine the fill color. Calls sendRepaintMessage from the ComboBox callback to trigger a LAF refresh.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst knoblaf = Content.createLocalLookAndFeel();\n\nknoblaf.registerFunction(\"drawLinearSlider\", function(g, obj)\n{\n\tvar index = knobIds.indexOf(obj.id);\n\tvar state = comboBoxes[index].getValue() - 1;\n\n\tvar colour;\n\t\n\tswitch (state)\n\t{\n\t\tcase 0:\n\t\t\tcolour = Colours.red;\n\t\t\tbreak;\n\n\t\tcase 1:\n\t\t\tcolour = Colours.blue;\n\t\t\tbreak;\n\n\t\tcase 2:\n\t\t\tcolour = Colours.green;\n\t\t\tbreak;\n\t}\n\t\n\tg.fillAll(colour);\t\n});\n\n// knobs\nconst knobIds = [];\nconst knobs = Content.getAllComponents(\"Knob\\\\d\");\n\nfor (x in knobs)\n{\n\tknobIds.push(x.getId());\n\tx.setLocalLookAndFeel(knoblaf);\n}\t\n\t\n// combo boxes\nconst comboBoxes = Content.getAllComponents(\"ComboBox\\\\d\");\n\nfor (x in comboBoxes)\n\tx.setControlCallback(oncomboBoxControl);\n\t\ninline function oncomboBoxControl(component, value)\n{\n\tlocal index = comboBoxes.indexOf(component);\n\tknobs[index].sendRepaintMessage();\n}",
+    "url": "https://forum.hise.audio/topic/8200",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptSlider",
+          "id": "Knob1",
+          "properties": {
+            "style": "Linear Horizontal"
+          }
+        },
+        {
+          "type": "ScriptComboBox",
+          "id": "ComboBox1",
+          "properties": {
+            "items": "Red\nBlue\nGreen"
+          }
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Uses Content.getAllComponents('Knob\\d') and Content.getAllComponents('ComboBox\\d') to build paired arrays. The LAF reads obj.id to find the index, then reads the paired ComboBox value to pick a fill color. Needs at least one Knob and one ComboBox with IDs matching the regex patterns. ComboBox must have 3 items (for states 0/1/2). Sliders should be in linear mode so drawLinearSlider fires.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:19.814820Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Broadcaster Mouse Event Listener",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert"
+    ],
+    "description": "Engine.createBroadcaster with attachToComponentMouseEvents to listen for hover events on an array of buttons. Uses Content.getAllComponents with a regex pattern and addListener to react to mouse actions.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst buttons = Content.getAllComponents(\"Button\\\\d\");\n\nconst bc = Engine.createBroadcaster({\"id\": \"Show Comboboxes\", \"args\": [component, obj]});\n\nbc.attachToComponentMouseEvents(buttons, \"Clicks & Hover\", \"\");\n\nbc.addListener(\"mouseAction\", \"Mouse action to show combo boxes on hover\", function(component, event)\n{\n\tif (event.hover)\n\t\tConsole.print(component.getId());\n});",
+    "url": "https://forum.hise.audio/topic/8194",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptButton",
+          "id": "Button1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Engine.createBroadcaster with attachToComponentMouseEvents and addListener to log hover events. Uses Content.getAllComponents('Button\\d') so any button with an ID matching the pattern works. At least one Button needed.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:21.255061Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "ComboBox Lookup Object Mapping",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert"
+    ],
+    "description": "JSON lookup object mapping ComboBox display items to internal values using component.getItemText() as the key. Demonstrates how to decouple the user-facing list from the actual values loaded (e.g., sample maps).",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst animals = \n{\n\t\"Animal 1\": \"Dog\",\n\t\"Animal 2\": \"Cat\",\n\t\"Animal 3\": \"Fish\",\n\t\"Animal 4\": \"Bird\",\n\t\"Animal 5\": \"Cow\",\n\t\"Animal 6\": \"Chicken\",\n\t\"Animal 7\": \"Horse\",\n\t\"Animal 8\": \"Monkey\",\n\t\"Animal 9\": \"Hamster\",\n\t\"Animal 10\": \"Frog\"\n};\n\n\n\ninline function onComboBox1Control(component, value)\n{\n\tlocal selectedItem = component.getItemText();\n\tlocal animal = animals[selectedItem];\n\t\n\tif (isDefined(animal))\n\t{\n\t\tConsole.print(animal);\n\t}\t\n};\n\nContent.getComponent(\"ComboBox1\").setControlCallback(onComboBox1Control);",
+    "url": "https://forum.hise.audio/topic/8155",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptComboBox",
+          "id": "ComboBox1",
+          "properties": {
+            "items": "Animal 1\nAnimal 2\nAnimal 3\nAnimal 4\nAnimal 5\nAnimal 6\nAnimal 7\nAnimal 8\nAnimal 9\nAnimal 10"
+          }
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Demonstrates JSON object as lookup table keyed by getItemText() result. ComboBox1 must have items 'Animal 1' through 'Animal 10' so getItemText() returns keys that match the animals object.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:22.698788Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Custom Segmented Button Panel",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Single panel implementing a segmented button control with setPaintRoutine and setMouseCallback. Draws rounded tab segments with active state highlighting, calculates selection from mouse position, and fires setValue/changed for preset-saveable state.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var Pnl = Content.getComponent(\"Pnl\");\n\nPnl.setPaintRoutine(function(g)\n{\n\tvar a = this.getLocalBounds(0);\n\tvar t = [\"Hall\", \"Room\", \"Plate\"];\n\tg.setFont(\"default\", 11);\n\tg.setColour(this.get(\"bgColour\"));\n\tg.fillRoundedRectangle(a, 6);\n\t\n\tvar w = a[2]/3;\n\t\n\tfor (i = 0; i < 3; i++)\n\t{\n\t\tif (i == this.getValue())\n\t\t{\n\t\t\tvar area = [4 + (w-2) * i, 2, w-4, a[3]-4];\n\t\t\tg.setColour(this.get(\"itemColour2\"));\n\t\t\tg.fillRoundedRectangle(area, 4);\n\t\t\tg.setColour(this.get(\"itemColour\"));\n\t\t\tg.drawRoundedRectangle(area, 4, 2);\n\t\t\tg.setColour(this.get(\"textColour\"));\n\t\t\tg.drawAlignedText(t[i], [w*i, 0, w, a[3]], \"centred\");\n\t\t}\n\t}\n});\n\nPnl.setMouseCallback(function(event)\n{\n    if (event.hover)\n    \tthis.data.value = parseInt(event.x / this.getWidth() * 3);\n    \t\n    if (event.drag && this.data.value != this.getValue())\n    {\n\t    this.setValue(this.data.value);\n\t    this.changed();\n    }\n});\n\n\ninline function onPnlControl(component, value)\n{\n\tConsole.print(value);\n};\n\nContent.getComponent(\"Pnl\").setControlCallback(onPnlControl);",
+    "url": "https://forum.hise.audio/topic/7991",
+    "featured": true,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptPanel",
+          "id": "Pnl"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Self-contained panel with setPaintRoutine and setMouseCallback. Draws segmented button tabs with active state. Uses setValue/changed for preset-saveable state. The paint routine reads bgColour, itemColour2, itemColour, textColour from the component properties which have sensible defaults.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:24.142158Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Animated Knob Border on Hover",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "drawRotarySlider LAF with Engine.createTimerObject to animate a dot tracing the knob border on hover. Uses a state machine (xinc/yinc/xdec/ydec) with reg variables for persistent animation state across paint calls.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var Knbs = [Content.getComponent(\"Knb\"),\n                  Content.getComponent(\"Knb1\"),\n                  Content.getComponent(\"Knb2\"),\n                  Content.getComponent(\"Knb3\")];\n\n\nconst KnbLaf = Content.createLocalLookAndFeel();\n\nKnbLaf.registerFunction(\"drawRotarySlider\", function(g, obj)\n{\n\t//Console.print(trace(obj));\n\tg.fillAll(obj.bgColour);\n\t\n\treg a = obj.area;\n\treg speed = 10;\n\treg ani = !isDefined(ani) ? 0 : ani;\n\treg comp = Content.getComponent(obj.id);\n\treg t = !isDefined(t) ? Engine.createTimerObject() : t;\n\treg inc = !isDefined(inc) ? true : inc;\n\treg state = !isDefined(state) ? \"xinc\" : state;\n\treg xy = !isDefined(xy) ? [0, 0, 0, 0] : xy;\n\t\n\tif (obj.hover)\n\t{\n\t\tt.setTimerCallback(function()\n\t\t{\n\t\t\tswitch (state)\n\t\t\t{\n\t\t\t\tcase \"xinc\":\n\t\t\t\t\tani = ani+speed;\n\t\t\t\t\txy = [ani, 0];\n\t\t\t\t\t\t\t\n\t\t\t\t\tif (ani+speed > a[2])\n\t\t\t\t\t{\n\t\t\t\t\t\tstate = \"yinc\";\n\t\t\t\t\t\tani = 0;\n\t\t\t\t\t\txy = [a[2], ani];\n\t\t\t\t\t}\n\t\t\t\t\tbreak;\n\t\t\t\t\t\n\t\t\t\tcase \"yinc\":\n\t\t\t\t\tani = ani+speed;\n\t\t\t\t\txy = [a[2], ani];\n\t\t\t\t\t\n\t\t\t\t\tif ((ani+speed) % a[3] == 0)\n\t\t\t\t\t{\n\t\t\t\t\t\tstate = \"xdec\";\n\t\t\t\t\t\tani = a[2];\n\t\t\t\t\t\txy = [ani, a[3]];\n\t\t\t\t\t}\n\t\t\t\t\tbreak;\n\t\t\t\t\t\n\t\t\t\tcase \"xdec\":\n\t\t\t\t\tani = ani-speed;\n\t\t\t\t\txy = [ani, a[3]];\n\t\t\t\t\t\n\t\t\t\t\tif (ani-speed < 0)\n\t\t\t\t\t{\n\t\t\t\t\t\tstate = \"ydec\";\n\t\t\t\t\t\tani = a[3];\n\t\t\t\t\t\txy = [0, ani];\n\t\t\t\t\t}\n\t\t\t\t\tbreak;\n\t\t\t\t\t\n\t\t\t\tcase \"ydec\":\n\t\t\t\t\tani = ani-speed;\n\t\t\t\t\txy = [0, ani];\n\t\t\t\t\t\n\t\t\t\t\tif (ani-speed < 0)\n\t\t\t\t\t{\n\t\t\t\t\t\tstate = \"xinc\";\n\t\t\t\t\t\tani = 0;\n\t\t\t\t\t\txy = [ani, 0];\n\t\t\t\t\t}\n\t\t\t\t\tbreak;\n\t\t\t}\n\t\t\tcomp.sendRepaintMessage();\n\t\t});\n\t\t\n\t\tt.startTimer(30);\n\t\tg.setColour(obj.itemColour1);\n\t\tg.fillEllipse([xy[0]-6, xy[1]-6, 12, 12]);\n\t}\n\t\n\tif (!obj.hover)\n\t{\n\t\tani = undefined;\n\t\tinc = true;\n\t\tt.stopTimer();\n\t}\n});\n\n\nfor (k in Knbs)\n\tk.setLocalLookAndFeel(KnbLaf);",
+    "url": "https://forum.hise.audio/topic/7977",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptSlider",
+          "id": "Knb"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knb1"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knb2"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knb3"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "LAF drawRotarySlider with per-call reg state using !isDefined guard pattern. Uses Engine.createTimerObject inside the LAF callback to animate a dot tracing the knob border on hover. The reg variable persistence across LAF calls is valid HiseScript.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:25.637757Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Rotating Blur Animation on Knob Hover",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "drawRotarySlider LAF with Engine.createTimerObject and g.rotate for a sweeping light animation on hover. Uses beginLayer/gaussianBlur/endLayer for a glow effect, with getMilliSecondsSinceCounterReset for frame-independent timing.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var Knbs = [Content.getComponent(\"Knb\"),\n                  Content.getComponent(\"Knb1\"),\n                  Content.getComponent(\"Knb2\"),\n                  Content.getComponent(\"Knb3\")];\n\nconst var Speed = Content.getComponent(\"Speed\");\nconst var Degrees = Content.getComponent(\"Degrees\");\nconst var Blur = Content.getComponent(\"Blur\");\nconst var Width = Content.getComponent(\"Width\");\n\n\n\nconst KnbLaf = Content.createLocalLookAndFeel();\n\nKnbLaf.registerFunction(\"drawRotarySlider\", function(g, obj)\n{\n\treg a = obj.area;\n\treg comp = Content.getComponent(obj.id);\n\treg t = !isDefined(t) ? Engine.createTimerObject() : t;\n\treg count = !isDefined(count) ? 0 : count;\n\treg done = !isDefined(done) ? false : done;\n\tvar w = Width.getValue();\n\t\n\tif (obj.hover)\n\t{\n\t\tt.setTimerCallback(function()\n\t\t{\n\t\t\tcount = parseInt(t.getMilliSecondsSinceCounterReset() / (12-Speed.getValue()));\n\t\t\t\n\t\t\tif (count > Degrees.getValue())\n\t\t\t{\n\t\t\t\tdone = true;\n\t\t\t\tcount = 0;\n\t\t\t\tt.stopTimer();\n\t\t\t}\n\t\t\t\n\t\t\tcomp.sendRepaintMessage();\n\t\t});\n\t\t\n\t\tif (!t.isTimerRunning() && !done)\n\t\t\tt.startTimer(30);\n\t}\n\t\n\tif (!obj.hover)\n\t{\n\t\tcount = 0;\n\t\tdone = undefined;\n\t\tt.stopTimer();\n\t}\n\t\n\tg.beginLayer(false);\n\t\n\t//\tAnimation\n\tif (count > 0)\n\t{\n\t\tg.rotate(Math.toRadians(count), [a[2]/2, a[3]/2]);\n\t\tg.setColour(Colours.white);\n\t\tg.fillRoundedRectangle([a[2]/2-w, -a[3], w*2, a[3]*3], 2);\n\t}\n\tg.rotate(Math.toRadians(-count), [a[2]/2, a[3]/2]);\n\tg.gaussianBlur(Blur.getValue());\n\tg.endLayer();\n\t\n\t//\tRectangle\n\tg.setColour(obj.bgColour);\n\tg.fillRoundedRectangle([2, 2, a[2]-4, a[3]-4], 6);\n\t\n\t//\tObject text\n\tg.setFont(\"default\", a[3]/3);\n\tg.setColour(Colours.withAlpha(obj.textColour, 0.3));\n\tg.drawAlignedText(obj.text, a, \"centred\");\n\t\n\t//\tHandle\n\tg.setColour(obj.itemColour2);\n\tg.fillRoundedRectangle([(a[2]-4)*obj.valueNormalized, 6, 5, a[3]-12], 2);\n\t\n\t//\tValue\n\tg.setFont(\"default\", 13);\n\tg.setColour(Colours.withAlpha(obj.textColour, 0.7));\n\tg.drawAlignedText(obj.valueAsText, [0, 6, a[2], a[3]-12], \"centredTop\");\n});\n\n\nfor (k in Knbs)\n\tk.setLocalLookAndFeel(KnbLaf);",
+    "url": "https://forum.hise.audio/topic/7977",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptSlider",
+          "id": "Knb"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knb1"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knb2"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knb3"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Speed"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Degrees"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Blur"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Width"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "LAF drawRotarySlider with hover-triggered rotation sweep animation. Uses beginLayer/gaussianBlur/endLayer for glow effect. Speed, Degrees, Blur, Width are control knobs. Set sensible ranges: Speed 1-11, Degrees 1-360, Blur 1-20, Width 2-20.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:27.183171Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Regex Search Filter from Label",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert"
+    ],
+    "description": "Engine.matchesRegex with toLowerCase for case-insensitive filtering of an array from a Label control callback. Iterates the source array and pushes matching items to a result array.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst animals = [\"dog\", \"cat\", \"Bird\", \"fish\", \"dogfish\", \"catfish\", \"turtle\"];\n\n\ninline function onLabel1Control(component, value)\n{\n\tlocal result = [];\n\n\tfor (x in animals)\n\t{\n\t\tif (!Engine.matchesRegex(x.toLowerCase(), value.toLowerCase()))\n\t\t\tcontinue;\n\t\t\n\t\tresult.push(x);\n\t}\n\t\n\tConsole.print(trace(result));\n};\n\nContent.getComponent(\"Label1\").setControlCallback(onLabel1Control);",
+    "url": "https://forum.hise.audio/topic/7895",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptLabel",
+          "id": "Label1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Uses Engine.matchesRegex with toLowerCase for case-insensitive filtering. Label setControlCallback fires when text is committed. Result printed to console.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:28.563518Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Global Cable with Sync and Async Callbacks",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "Engine.getGlobalRoutingManager with getCable and registerCallback demonstrating both SyncNotification (audio thread, safe for setAttribute) and AsyncNotification (UI thread) on the same cable for simultaneous gain and pan modulation.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var rm = Engine.getGlobalRoutingManager();\nconst var c = rm.getCable(\"my_cable\");\n\nconst var SimpleGain1 = Synth.getEffect(\"Simple Gain1\");\n\n// This will be executed synchronously on the audio thread\ninline function onSync(value)\n{\n\tSimpleGain1.setAttribute(0, Engine.getDecibelsForGainFactor(value)); // GAIN\n};\n\n// This will be executed on the UI Thread, so if you close the UI, the panning will stop modulating\ninline function onAsync(value)\n{\n\tSimpleGain1.setAttribute(3, value * 200 - 100); // PAN\n}\n\nc.registerCallback(onSync, SyncNotification);\n\nc.registerCallback(onAsync, AsyncNotification);",
+    "url": "https://forum.hise.audio/topic/7731",
+    "featured": false,
+    "validation": {
+      "tier": 3,
+      "testable": true,
+      "skipReason": null,
+      "modules": [
+        {
+          "type": "SimpleGain",
+          "name": "Simple Gain1",
+          "chain": 3
+        }
+      ],
+      "components": [],
+      "verifyScript": null,
+      "notes": "Uses Engine.getGlobalRoutingManager().getCable() which creates cables on demand. Registers both SyncNotification (audio thread, setAttribute) and AsyncNotification (UI thread) callbacks on the same cable. SimpleGain needed for setAttribute calls. Cable value can be tested via REPL: rm.getCable('my_cable').setValue(0.5).",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:30.415015Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Display Buffer VU Meter with Timer",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "Synth.getDisplayBufferSource with getReadBuffer and getMagnitude to drive a knob as a VU meter. Configures ring buffer properties (BufferLength, NumChannels) and polls the buffer at 30Hz using Engine.createTimerObject.",
+    "code": "Content.makeFrontInterface(600, 600);\n\n// Fetch a displaybuffer source reference to the DSP network\nconst var dp = Synth.getDisplayBufferSource(\"Script FX1\");\n\n// Get the first \"external\" Displaybuffer\nconst var gr = dp.getDisplayBuffer(0);\n\n// Set the buffer length to 1024 (about 23ms)\n// (this correlates with the timer frequency below)\ngr.setRingBufferProperties({\n  \"BufferLength\": 1024,\n  \"NumChannels\": 1\n});\n\n// Get a reference to the FIFO that contains the values\nconst var buffer = gr.getReadBuffer();\n\n\nconst var Knob1 = Content.getComponent(\"Knob1\");\n\nconst var t = Engine.createTimerObject();\n\n\nt.setTimerCallback(function()\n{\n\t// Fetch the maximum value of the last 50ms and display\n\t// it on the knob\n\tKnob1.setValue(buffer.getMagnitude(0, buffer.length));\n});\n\n// Start the timer with ~30Hz.\nt.startTimer(30);",
+    "url": "https://forum.hise.audio/topic/6324",
+    "featured": true,
+    "validation": {
+      "tier": 4,
+      "testable": false,
+      "skipReason": "Requires a ScriptFX ('Script FX1') with an active scriptnode network containing an external display buffer node. ScriptFX modules without compiled scriptnode networks cannot provide DisplayBuffer interfaces via getDisplayBuffer(0). Cannot be set up via Builder API alone.",
+      "modules": [],
+      "components": [],
+      "verifyScript": null,
+      "notes": "Would need a scriptnode network with a peak node configured as External Display Buffer #1 inside a Script FX. Cannot be created programmatically."
+    }
+  },
+  {
+    "title": "Draggable Sticky Note with Modal Edit",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Panel with setDraggingBounds for constrained dragging, getValue() storing an object with note text and position, and a modal panel for text editing. Uses getStringWidth to auto-size the label width, with confirm/cancel buttons and preset-saveable state.",
+    "code": "Content.makeFrontInterface(600, 600);\nConsole.clear();\n\nconst var bgPnl = Content.getComponent(\"bgPnl\");\nconst var stickyLabelPnl = Content.getComponent(\"stickyLabelPnl\");\nstickyLabelPnl.setValue({note:\"Sticky Note\", x:(bgPnl.getWidth() - stickyLabelPnl.getWidth())/2, y:(bgPnl.getHeight() - stickyLabelPnl.getHeight())/2});\n\nconst var modalPnl = Content.getComponent(\"modalPnl\");\nmodalPnl.showControl(false);\nconst var stickyTextLbl = Content.getComponent(\"stickyTextLbl\");\nconst var stickyTextConfirmBtn = Content.getComponent(\"stickyTextConfirmBtn\");\nconst var stickyTextCancelBtn = Content.getComponent(\"stickyTextCancelBtn\");\n\n\nstickyLabelPnl.setDraggingBounds(bgPnl.getLocalBounds(0.0));\n\n// The label itself\nstickyLabelPnl.setPaintRoutine(function(g)\n{\n\tg.fillAll(Colours.lightgoldenrodyellow);\n\tg.setColour(Colours.black);\n\t\n\tg.setFont(\"Comic Sans MS\", 18.0);\n\t\n\tvar width = g.getStringWidth(this.getValue().note) + 20;\n\tvar a = this.getLocalBounds(0.0);\n\ta[2] = width;\n\t\n\tthis.set(\"width\", width);\n\t\n\tg.drawAlignedText(this.getValue().note, a, \"centred\");\n});\n\n\n\n// Repaint on preset change\ninline function onstickyLabelPnlControl(component, value)\n{\n\tcomponent.repaint();\n\tcomponent.set(\"x\", component.getValue().x);\n\tcomponent.set(\"y\", component.getValue().y);\n\t\n};\nstickyLabelPnl.setControlCallback(onstickyLabelPnlControl);\n\n// update position\nstickyLabelPnl.setMouseCallback(function(event)\n{\n\tif (event.mouseUp)\n\t{\n\t\tstickyLabelPnl.getValue().x = this.get(\"x\");\n\t\tstickyLabelPnl.getValue().y = this.get(\"y\");\n\t}\n});\n\n\n// show the modal\ninline function onupdateStickyLabelBtnControl(component, value)\n{\n\tif (value)\n\t{\n\t\tstickyTextLbl.set(\"text\", stickyLabelPnl.getValue().note);\n\t\tmodalPnl.showControl(true);\n\t}\n};\n\nContent.getComponent(\"updateStickyLabelBtn\").setControlCallback(onupdateStickyLabelBtnControl);\n\n\n\n// OK\ninline function onstickyTextConfirmBtnControl(component, value)\n{\n\tif (value)\n\t{\n\t\tstickyLabelPnl.getValue().note = stickyTextLbl.get(\"text\");\n\t\tstickyLabelPnl.repaint();\n\t\tmodalPnl.showControl(false);\n\t}\n};\nstickyTextConfirmBtn.setControlCallback(onstickyTextConfirmBtnControl);\n\n\n\n// CANCEL\ninline function onstickyTextCancelBtnControl(component, value)\n{\n\tif (value)\n\t{\n\t\tstickyTextLbl.set(\"text\", stickyLabelPnl.getValue().note);\n\t\tmodalPnl.showControl(false);\n\t}\n};\nstickyTextCancelBtn.setControlCallback(onstickyTextCancelBtnControl);",
+    "url": "https://forum.hise.audio/topic/7718",
+    "featured": true,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptPanel",
+          "id": "bgPnl"
+        },
+        {
+          "type": "ScriptPanel",
+          "id": "stickyLabelPnl"
+        },
+        {
+          "type": "ScriptPanel",
+          "id": "modalPnl"
+        },
+        {
+          "type": "ScriptLabel",
+          "id": "stickyTextLbl"
+        },
+        {
+          "type": "ScriptButton",
+          "id": "stickyTextConfirmBtn"
+        },
+        {
+          "type": "ScriptButton",
+          "id": "stickyTextCancelBtn"
+        },
+        {
+          "type": "ScriptButton",
+          "id": "updateStickyLabelBtn"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Sticky note with constrained dragging via setDraggingBounds. Panel value stores an object with 'note' and 'x'/'y' position. Modal overlay panel for text editing. All UI interactions are script-driven with no file system or network calls.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:31.905087Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Complete SliderPack LAF",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "All four SliderPack LAF functions \u2014 drawSliderPackBackground, drawSliderPackFlashOverlay, drawSliderPackRightClickLine, drawSliderPackTextPopup \u2014 plus drawLinearSlider for individual slider rendering. Demonstrates the complete set of callbacks needed for custom SliderPack styling.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var pack_laf = Content.createLocalLookAndFeel();\n\npack_laf.registerFunction(\"drawSliderPackBackground\", function(g, obj)\n{\n\tg.setColour(obj.bgColour);\n\tg.fillRect(obj.area);\n\tg.setColour(obj.itemColour);\n\tg.drawRect(obj.area, 1.0);\n});\n\npack_laf.registerFunction(\"drawSliderPackFlashOverlay\", function(g, obj)\n{\n\tg.setColour(Colours.withAlpha(obj.itemColour, obj.intensity));\n\tg.fillRect(obj.area);\n});\n\npack_laf.registerFunction(\"drawSliderPackRightClickLine\", function(g, obj)\n{\n\tg.setColour(obj.itemColour);\n\tg.drawLine(obj.x1, obj.x2, obj.y1, obj.y2, 2.0);\n});\n\npack_laf.registerFunction(\"drawSliderPackTextPopup\", function(g, obj)\n{\n\tg.setColour(obj.textColour);\n\tg.fillRect([0, 0, obj.area[2], 14]);\n\tg.drawAlignedText(obj.text, obj.area, \"topRight\");\n});\n\npack_laf.registerFunction(\"drawLinearSlider\", function(g, obj)\n{\n\tg.setColour(obj.itemColour2);\n\tobj.area[1] = (1.0 - obj.valueNormalized) * obj.area[3];\n\n\tvar x = obj.area[0];\n\tvar y = obj.area[1];\n\tvar w = obj.area[2];\n\tvar h = obj.area[3] / 24.0;\n\n\tg.fillRect([x, y, w, h]);\n});\n\nContent.getComponent(\"SliderPack1\").setLocalLookAndFeel(pack_laf);",
+    "url": "https://forum.hise.audio/topic/7703",
+    "featured": true,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptSliderPack",
+          "id": "SliderPack1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Demonstrates all four SliderPack LAF callbacks: drawSliderPackBackground, drawSliderPackFlashOverlay, drawSliderPackRightClickLine, drawSliderPackTextPopup, plus drawLinearSlider for individual slider rendering.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:33.346990Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Custom Value Popup Function",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert"
+    ],
+    "description": "ScriptSlider.setValuePopupFunction to customize the text shown in the value popup. Returns \"OFF\" for a specific value and Math.round for all others.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var Knob1 = Content.getComponent(\"Knob1\");\n\nKnob1.setValuePopupFunction(function(value)\n{\n\tif (value == 30)\n\t\treturn \"OFF\";\n\t\t\n\treturn Math.round(value);\n});",
+    "url": "https://forum.hise.audio/topic/7705",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptSlider",
+          "id": "Knob1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Simple setValuePopupFunction example. Returns 'OFF' for value==30 and Math.round for all others. Set Knob1 range to 0-60 to make the value 30 reachable mid-range.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:34.834921Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Knob Value Snapping with Broadcaster",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Engine.createBroadcaster with attachToComponentMouseEvents to implement value snapping on a hidden source knob. Calculates the nearest snap point from a predefined frequency array using midpoint thresholds, then sets the display knob. Hides the source knob with an empty drawRotarySlider LAF.",
+    "code": "Content.makeFrontInterface(600, 600);\nConsole.clear();\n\nconst var snapBtn = Content.getComponent(\"snapBtn\");\nconst var Knob1 = Content.getComponent(\"Knob1\");\nconst var Knob2 = Content.getComponent(\"Knob2\");\n\nconst var v = [75, 150, 500, 1040, 3600, 15000];\n\n\n\nconst var snapperBC = Engine.createBroadcaster({\n  \"id\": \"Knob Snapper\",\n  \"args\": [\"component\", \"event\"]\n});\n\nsnapperBC.attachToComponentMouseEvents(Knob1, \"All Callbacks\", \"Snapper Mouse Listener\");\n\n\nsnapperBC.addListener(\"Snapper\", \"Snap knob values\", function(component, event)\n{\n\tif (event.drag)\n\t{\n\t\tif (snapBtn.getValue())\n\t\t{\n\t\t\tfor (i=0;i<v.length-1;i++)\n\t\t\t{\n\t\t\t\tif (component.getValue() > v[i] && component.getValue() < v[i+1])\n\t\t\t\t{\n\t\t\t\t\t// define the mid value between two snapping values\n\t\t\t\t\tvar threshold = v[i] + (v[i+1] - v[i])/2;\n\t\t\t\t\t\n\t\t\t\t\tif (component.getValue() <= threshold)\n\t\t\t\t\t\tKnob2.setValue(v[i]);\n\t\t\t\t\telse\n\t\t\t\t\t\tKnob2.setValue(v[i+1]);\n\t\t\t\t\t\n\t\t\t\t\tKnob2.changed();\n\t\t\t\t\t\n\t\t\t\t\tbreak;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t\telse\n\t\t{\n\t\t\tKnob2.setValue(component.getValue());\n\t\t\tKnob2.changed();\n\t\t}\n\t}\n}); \n\n\n\n// The knob to use the value from\ninline function onKnob2Control(component, value)\n{\n\tConsole.print(value);\n};\nKnob2.setControlCallback(onKnob2Control);\n\n\n\n// Hide Knob1\nconst var knobLAF = Content.createLocalLookAndFeel();\n\nknobLAF.registerFunction(\"drawRotarySlider\", function(g, obj){});\n\nKnob1.setLocalLookAndFeel(knobLAF);",
+    "url": "https://forum.hise.audio/topic/7690",
+    "featured": true,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptButton",
+          "id": "snapBtn"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob1"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob2"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Broadcaster attachToComponentMouseEvents approach to value snapping. Knob1 is the hidden drag source (rendered invisible by empty drawRotarySlider LAF), Knob2 is the display knob. Set Knob1 and Knob2 range to 75-15000 to match the snap value array.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:36.323756Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Knob Value Snapping with Callback",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Control callback approach to value snapping \u2014 a hidden source knob snaps to predefined frequency values using midpoint thresholds and mirrors to a display knob. Alternative to the broadcaster-based approach.",
+    "code": "Content.makeFrontInterface(600, 600);\nConsole.clear();\n\nconst var snapBtn = Content.getComponent(\"snapBtn\");\nconst var Knob1 = Content.getComponent(\"Knob1\");\nconst var Knob2 = Content.getComponent(\"Knob2\");\n\nconst var v = [75, 150, 500, 1040, 3600, 15000];\n\n\n// Hidden knob\ninline function onKnob1Control(component, value)\n{\n\tif (snapBtn.getValue())\n\t{\n\t\tfor (i=0;i<v.length-1;i++)\n\t\t{\n\t\t\tif (value > v[i] && value < v[i+1])\n\t\t\t{\n\t\t\t\t// define the mid value between two snapping values\n\t\t\t\tlocal threshold = v[i] + (v[i+1] - v[i])/2;\n\t\t\t\t\n\t\t\t\tif (value <= threshold)\n\t\t\t\t\tKnob2.setValue(v[i]);\n\t\t\t\telse\n\t\t\t\t\tKnob2.setValue(v[i+1]);\n\t\t\t\t\n\t\t\t\tKnob2.changed();\n\t\t\t\t\n\t\t\t\tbreak;\n\t\t\t}\n\t\t}\n\t}\n\telse\n\t{\n\t\tKnob2.setValue(value);\n\t\tKnob2.changed();\n\t}\n};\nKnob1.setControlCallback(onKnob1Control);\n\n\n\n// The knob to use the value from\ninline function onKnob2Control(component, value)\n{\n\tConsole.print(value);\n};\nKnob2.setControlCallback(onKnob2Control);\n\n\n\n// Hide Knob1\nconst var knobLAF = Content.createLocalLookAndFeel();\n\nknobLAF.registerFunction(\"drawRotarySlider\", function(g, obj){});\n\nKnob1.setLocalLookAndFeel(knobLAF);",
+    "url": "https://forum.hise.audio/topic/7690",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptButton",
+          "id": "snapBtn"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob1"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob2"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Control callback alternative to the broadcaster snapping approach. Same component layout and snap value array [75, 150, 500, 1040, 3600, 15000]. Set both knob ranges to 75-15000.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:37.809425Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Knob Step Size Toggle for Snapping",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Simplest approach to value snapping \u2014 toggles a knob between free and discrete modes by changing stepSize via a snap button. Uses a lookup array for snapped values and linear interpolation for free mode.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var snapBtn = Content.getComponent(\"snapBtn\");\nconst var Knob1 = Content.getComponent(\"Knob1\");\n\nconst var v = [75, 150, 500, 1040, 3600, 15000];\n\nKnob1.set(\"max\", v.length - 1);\n\ninline function onKnob1Control(component, value)\n{\n\tlocal freq;\n\n\tif (snapBtn.getValue())\n\t\tfreq = v[value];\n\telse\n\t\tfreq = v[0] + (v[v.length - 1] - v[0]) * (value / Knob1.get(\"max\"));\n};\nKnob1.setControlCallback(onKnob1Control);\n\ninline function onsnapBtnControl(component, value)\n{\n\tKnob1.set(\"stepSize\", value ? 1.0 : 0.01);\n\tKnob1.changed();\n};\nsnapBtn.setControlCallback(onsnapBtnControl);",
+    "url": "https://forum.hise.audio/topic/7690",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptButton",
+          "id": "snapBtn"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Simplest snapping approach: toggles stepSize between 1.0 (discrete) and 0.01 (free). Sets Knob1.max = v.length - 1 = 5 at init. When snap is off, uses linear interpolation across the full range.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:39.194328Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "XML Parameter Duplicate Detector",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "FileSystem.browse to load a Desktop.xml file, then loadAsString and split to parse widget definitions. Scans for duplicate pluginParameterName values across ScriptButton and ScriptSlider elements and reports the offending widget IDs.",
+    "code": "Content.makeFrontInterface(480, 600);\n\nconst var SelectedFilePath = Content.getComponent(\"SelectedFilePath\");\nSelectedFilePath.set(\"text\",\"...\");\nconst var Results = Content.getComponent(\"Results\");\nResults.set(\"text\",\"...\");\n\nreg targetFile;\nreg jsonFile;\nreg fileAsString;\nreg fileAsArray;\nreg tempParam;\nreg tempID;\nconst paramArray = [];\n\ninline function onSelectXMLFileControl(component, value)\n{\n\tif(value) //momentary  button-so only exute on press down\n\t{\n\t\t// open a file browser to let the user select an xmlfile\n\t\tFileSystem.browse(\".\", false, \"*.xml\", function(result){\n\t\t\t//got a file so...\n\t\t\ttargetFile = result;\n\t\t\tSelectedFilePath.set(\"text\", result.toString(File.FullPath)); //show the path\n\t\t});\n\t};\n};\nContent.getComponent(\"SelectXMLFile\").setControlCallback(onSelectXMLFileControl);\n\n\ninline function onRunTestControl(component, value)\n{\n\tif(value)\n\t{\n\t\t//the user wishes to execute the test....\n\n\t\t//reset the results display....\n\t\tResults.set(\"text\",\"....\");\n\t\t//reset the array weuse to test for duplicates\n\t\tparamArray.clear();\n\t\t//jsonFile = targetFile.loadFromXmlFile(); <--- oh how I wish this worked....\n\t\t// get teh file into a string...and split it based upon \"=\"\n\t\tfileAsString = targetFile.loadAsString();\n\t\tfileAsArray =fileAsString.split(\"=\");\n\t\t// now we shoud have an ugly array with params name and param values in adjacent array slots \n\t\t\n\t\t//Console.print(trace(fileAsArray));\n\t\t\n\t\tfor (i = 0;i< fileAsArray.length; i++)\n\t\t{\n\t\t\t// move thru the array looking for the type of widget we care about...\n\n\t\t\tif(fileAsArray[i].contains(\"ScriptButton\") || fileAsArray[i].contains(\"ScriptSlider\"))\n\t\t\t{\n\t\t\t\t//Ok we found one.. so look in its \"block\" tosee if it uses a plugin param...\n\n\t\t\t\treg j = i;\n\n\t\t\t\twhile(!fileAsArray[j].contains(\"/>\"))\n\t\t\t\t{\n\t\t\t\t\t// search this block for the plugin param name...\t\n\t\t\t\t\tif (fileAsArray[j].contains(\"pluginParameterName\"))\n\t\t\t\t\t{\n\t\t\t\t\t\t// found it.,so the next array elemtn will include its name\n\t\t\t\t\t\ttempParam = fileAsArray[j+1];\n\t\t\t\t\t\t// clean up\n\t\t\t\t\t\ttempParam = tempParam.substring(1,tempParam.lastIndexOf(\"\\\"\"));\n\t\t\t\t\t\t// check for duplicates...\n\t\t\t\t\t\tif (paramArray.indexOf(tempParam) != -1)\n\t\t\t\t\t\t{\n\t\t\t\t\t\t\t// dupe found...\n\t\t\t\t\t\t\tResults.set(\"text\",Results.get(\"text\")+ \"\\n\"+ \"ERROR--------DUPLICATE---:\" + tempParam);\n\t\t\t\t\t\t}else{\n\t\t\t\t\t\t\tparamArray.push(tempParam);\n\t\t\t\t\t\t}\n\t\t\t\t\t\t// this is a param user - search the same block for its ID\n\t\t\t\t\t\treg k =i;\n\t\t\t\t\t\twhile(!fileAsArray[k].contains(\"/>\"))\n\t\t\t\t\t\t{\n\t\t\t\t\t\t\tif (fileAsArray[k].contains(\" id\"))\n\t\t\t\t\t\t\t{\n\t\t\t\t\t\t\t\ttempID =  fileAsArray[k+1].substring(1,fileAsArray[k+1].lastIndexOf(\"\\\"\"));\n\t\t\t\t\t\t\t\tbreak;  //got it so leave this search\n\t\t\t\t\t\t\t};\n\t\t\t\t\t\t\tk++;\n\t\t\t\t\t\t};\n\t\t\t\t\t\t// print the result..\n\t\t\t\t\t\t//Console.print(\"PARAM:\" + tempParam + \" -used by: \" + tempID);\n\t\t\t\t\t\tResults.set(\"text\",Results.get(\"text\")+ \"\\n\"+ \"PARAM:\" + tempParam + \" - used by:\" + tempID);\n\t\t\t\t\t\tbreak;  // got it so leave this search\n\t\t\t\t\t\t\n\t\t\t\t\t};\n\t\t\t\t\tj++;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t}\n\t\t\t\n\t\t}\n\t};\n\n};\nContent.getComponent(\"RunTest\").setControlCallback(onRunTestControl);",
+    "url": "https://forum.hise.audio/topic/7588",
+    "featured": false,
+    "validation": {
+      "tier": 4,
+      "testable": false,
+      "skipReason": "Uses FileSystem.browse() which opens a modal OS file picker dialog. Cannot be tested in headless/automated context.",
+      "modules": [],
+      "components": [],
+      "verifyScript": null,
+      "notes": "Also requires SelectedFilePath (ScriptLabel), Results (ScriptLabel), SelectXMLFile (ScriptButton), RunTest (ScriptButton). The browse callback approach requires user interaction."
+    }
+  },
+  {
+    "title": "Reorderable Effect Rack Panels",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted",
+      "solved"
+    ],
+    "description": "Draggable effect panel reordering using a state array stored in a container panel value. Prev/Next buttons swap adjacent panel positions by manipulating the state array and repositioning panels via set(\"x\"). State is preset-saveable through the container panel.",
+    "code": "Content.makeFrontInterface(1000, 200);\n\nconst numRacks = 5;\nconst panelWidth = 190;\nconst panelHeight = 140;\nconst arry_EffectPanel = [];\nconst arry_PrevBtn = [];\nconst arry_NextBtn = [];\n\nconst var stateObj = {state:[0, 1, 2, 3, 4]};\n\nconst var Container = Content.getComponent(\"Container\");\ninline function onContainerControl(component, value)\n{\n\n\t\tif (typeof(component.getValue()) == \"object\")\n\t\t{\n\t\t\tpanelOrderHandler();\n\t\t}\n\n\t\telse\n\t\t{\n\t\t\tcomponent.setValue(stateObj);\n\t\t\tpanelOrderHandler();\n\t\t}\t\n\t\t\n};\nContent.getComponent(\"Container\").setControlCallback(onContainerControl);\n\n\n\n\n\nfor (i = 0; i < numRacks; i++)\n{\n    arry_EffectPanel.push(Content.getComponent(\"EffectPanel\" + i));\n    \n    arry_PrevBtn.push(Content.getComponent(\"PrevBtn\" + i));\n    arry_PrevBtn[i].setControlCallback(onarry_PrevBtnControl);\n    \n    arry_NextBtn.push(Content.getComponent(\"NextBtn\" + i));\n    arry_NextBtn[i].setControlCallback(onarry_NextBtnControl);    \n}\n\n\n\n\n\ninline function panelOrderHandler()\n{\t\n\tlocal panelVal = Container.getValue().state;\n\t\n\tfor (i = 0; i < numRacks; i++)\n\t{\n\t\tarry_EffectPanel[panelVal[i]].set(\"x\", panelWidth * i);\t\t\t\t\n\t\tarry_PrevBtn[i].set(\"visible\", true);\n\t\tarry_NextBtn[i].set(\"visible\", true);\t\n\t}\n\t\n\tarry_PrevBtn[panelVal[0]].set(\"visible\", false);\n\tarry_NextBtn[panelVal[4]].set(\"visible\", false);\t\n}\n\n\n\n\n\ninline function onarry_PrevBtnControl(component, value)\n{\n\tif (value)\n\t{\t\t\n\t\tlocal idx = arry_PrevBtn.indexOf(component);\t\t\n\t\tlocal containerVal = Container.getValue().state;\t\t\n\t\tlocal getPos = arry_EffectPanel[idx].get(\"x\") / panelWidth;\t\t\t\n\t\tlocal swappedPanel = containerVal[getPos - 1];\t\t\n\t\t\n\t\tcontainerVal[getPos] = swappedPanel;\n\t\tcontainerVal[getPos - 1] = idx;\n\t\t\n\t\tlocal Data = {state: containerVal};\n\t\t\n\t\tContainer.setValue(Data);\n\t\tContainer.changed();\n\t}\n}\n\n\n\ninline function onarry_NextBtnControl(component, value)\n{\n\tif (value)\n\t{\t\t\n\t\tlocal idx = arry_NextBtn.indexOf(component);\t\t\n\t\tlocal containerVal = Container.getValue().state;\t\t\n\t\tlocal getPos = arry_EffectPanel[idx].get(\"x\") / panelWidth;\t\t\t\n\t\tlocal swappedPanel = containerVal[getPos + 1];\t\t\n\t\t\n\t\tcontainerVal[getPos] = swappedPanel;\n\t\tcontainerVal[getPos + 1] = idx;\n\t\t\n\t\tlocal Data = {state: containerVal};\n\t\t\n\t\tContainer.setValue(Data);\n\t\tContainer.changed();\n\t}\n}",
+    "url": "https://forum.hise.audio/topic/7044",
+    "featured": true,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptPanel",
+          "id": "Container"
+        },
+        {
+          "type": "ScriptPanel",
+          "id": "EffectPanel0"
+        },
+        {
+          "type": "ScriptPanel",
+          "id": "EffectPanel1"
+        },
+        {
+          "type": "ScriptPanel",
+          "id": "EffectPanel2"
+        },
+        {
+          "type": "ScriptPanel",
+          "id": "EffectPanel3"
+        },
+        {
+          "type": "ScriptPanel",
+          "id": "EffectPanel4"
+        },
+        {
+          "type": "ScriptButton",
+          "id": "PrevBtn0"
+        },
+        {
+          "type": "ScriptButton",
+          "id": "PrevBtn1"
+        },
+        {
+          "type": "ScriptButton",
+          "id": "PrevBtn2"
+        },
+        {
+          "type": "ScriptButton",
+          "id": "PrevBtn3"
+        },
+        {
+          "type": "ScriptButton",
+          "id": "PrevBtn4"
+        },
+        {
+          "type": "ScriptButton",
+          "id": "NextBtn0"
+        },
+        {
+          "type": "ScriptButton",
+          "id": "NextBtn1"
+        },
+        {
+          "type": "ScriptButton",
+          "id": "NextBtn2"
+        },
+        {
+          "type": "ScriptButton",
+          "id": "NextBtn3"
+        },
+        {
+          "type": "ScriptButton",
+          "id": "NextBtn4"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "State managed via Container panel getValue/setValue with an object. The Container callback fires on preset load/change to restore panel order. Prev/Next buttons swap adjacent items in the state array and reposition panels by setting 'x' property.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:40.745781Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Sequenced Timer for Chained Parameter Updates",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Panel timer with a state counter to chain three groups of effect parameter updates with controlled delays. Uses ParaEQ.BandOffset for band-indexed attribute access and prevents re-entry with a data.isRunning flag.",
+    "code": "Content.makeFrontInterface(300, 200);\n\nconst var ParaEQ = Synth.getEffect(\"ParaEQ\");\nconst var SimpleGainer = Synth.getEffect(\"SimpleGainer\");\nconst var Reverberate = Synth.getEffect(\"Reverberate\");\n\nconst var Knob1TimerPnl = Content.getComponent(\"Knob1TimerPnl\");\n\nreg STATE = 0;\nKnob1TimerPnl.setTimerCallback(function()\n{\n\tif (STATE == 0)\n\t{\n\t\tfunctTwo();\n\t\tSTATE = 1;\n\t\tthis.startTimer(50);\n\t}\n\t\n\telse\n\t{\n\t\tfunctThree();\n\t\tSTATE = 0;\n\t\tKnob1TimerPnl.data.isRunning = undefined;\n\t\tthis.stopTimer();\n\t}\n});\n\nconst var Knob1 = Content.getComponent(\"Knob1\");\n\ninline function onKnob1Control(component, value)\n{\n\tif (isDefined(Knob1TimerPnl.data.isRunning))\n\t\treturn;\n\t\n\telse\n\t{\n\t\tfunctOne();\n\t\tKnob1TimerPnl.startTimer(30);\n\t\tKnob1TimerPnl.data.isRunning = true;\n\t}\n\t/*\t\n\t1. Firstly run functOne()\n\t2. Then wait for 30 ms and run functTwo()\n\t3. Then wait for 50 ms and run functThree()\t\n\t*/\n};\n\nContent.getComponent(\"Knob1\").setControlCallback(onKnob1Control);\n\n\n\ninline function functOne()\n{\t\n\tlocal index_One_Gain = ParaEQ.BandOffset * 1 + ParaEQ.Gain;\n\tlocal index_Three_Gain = ParaEQ.BandOffset * 3 + ParaEQ.Gain;\n\t\n\tParaEQ.setAttribute(index_One_Gain, 13.6 * Knob1.getValue());\n\tParaEQ.setAttribute(index_Three_Gain, -10.9 * Knob1.getValue());\t\n\tReverberate.setAttribute(Reverberate.RoomSize, 0.95 - 0.2 * Knob1.getValue());\n\t\n\tConsole.print(\"function 1\");\n}\n\n\n\ninline function functTwo()\n{\n\tlocal index_One_Freq = ParaEQ.BandOffset * 1 + ParaEQ.Freq;\n\tlocal index_Three_Freq = ParaEQ.BandOffset * 3 + ParaEQ.Freq;\n\t\n\tParaEQ.setAttribute(index_One_Freq, 100 + 1200 * Knob1.getValue());\n\tParaEQ.setAttribute(index_Three_Freq, 500 - 400 * Knob1.getValue());\t\n\tSimpleGainer.setAttribute(SimpleGainer.Width, 100 + 50 * Knob1.getValue());\t\n\tReverberate.setAttribute(Reverberate.Damping, 1.0 - 0.5 * Knob1.getValue());\n\t\n\tConsole.print(\"function 2\");\t\n}\n\n\n\ninline function functThree()\n{\n\tSimpleGainer.setAttribute(SimpleGainer.Gain, 0 + 2.3 * Knob1.getValue());\t\n\t\n\tlocal index_One_Q = ParaEQ.BandOffset * 1 + ParaEQ.Q;\n\tlocal index_Three_Q = ParaEQ.BandOffset * 3 + ParaEQ.Q;\n\t\n\tParaEQ.setAttribute(index_One_Q, 1.0 - 0.34 * Knob1.getValue());\n\tParaEQ.setAttribute(index_Three_Q, 1 + 2.5 * Knob1.getValue());\n\t\n\tConsole.print(\"function 3\");\n}",
+    "url": "https://forum.hise.audio/topic/7377",
+    "featured": false,
+    "validation": {
+      "tier": 3,
+      "testable": false,
+      "skipReason": "CurveEq attribute indices (BandOffset*band+param) exceed available bands in default config",
+      "modules": [
+        {
+          "type": "CurveEq",
+          "name": "ParaEQ",
+          "chain": 3
+        },
+        {
+          "type": "SimpleGain",
+          "name": "SimpleGainer",
+          "chain": 3
+        },
+        {
+          "type": "SimpleReverb",
+          "name": "Reverberate",
+          "chain": 3
+        }
+      ],
+      "components": [
+        {
+          "type": "ScriptPanel",
+          "id": "Knob1TimerPnl"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Uses ParaEQ.BandOffset for indexed CurveEq band access. Uses SimpleGainer.Width and SimpleGainer.Gain \u2014 valid SimpleGain parameters. Uses Reverberate.RoomSize and Reverberate.Damping \u2014 valid SimpleReverb parameters. Panel timer chains three sequential function calls with 30ms and 50ms delays.",
+      "result": {
+        "tested": true,
+        "passed": false,
+        "stage": "execute",
+        "error": [
+          {
+            "errorMessage": "Invalid attribute index: 5",
+            "callstack": []
+          },
+          {
+            "errorMessage": "Invalid attribute index: 15",
+            "callstack": []
+          }
+        ],
+        "logs": [
+          "function 1"
+        ],
+        "timestamp": "2026-04-07T20:36:42.617303Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "FloatingTile Data Modification via JSON",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert",
+      "solved"
+    ],
+    "description": "FloatingTile get(\"Data\").parseAsJSON() to read and modify properties of a Keyboard floating tile at runtime. Sets the Type property and updates LowKey, then converts back with trace() to apply changes.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var FloatingTile1 = Content.getComponent(\"FloatingTile1\");\n\ninline function onKnob1Control(component, value)\n{\n\tsetLowKey(value);\n};\n\nContent.getComponent(\"Knob1\").setControlCallback(onKnob1Control);\n\ninline function setLowKey(value)\n{\n\tlocal data = FloatingTile1.get(\"Data\").parseAsJSON();\n\t\t\n\tdata.Type = \"Keyboard\"; // You must set the content type here\n\tdata.LowKey = value;\n\t\n\tFloatingTile1.set(\"Data\", trace(data));\n}",
+    "url": "https://forum.hise.audio/topic/7466",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptFloatingTile",
+          "id": "FloatingTile1"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Reads FloatingTile Data property as JSON, sets Type to 'Keyboard', modifies LowKey, and writes back using trace(). FloatingTile1 should be configured as a Keyboard type in its Data property. Set Knob1 range to 0-127 for MIDI note range.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:44.157904Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Viewport Table Mode with LAF",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted",
+      "solved"
+    ],
+    "description": "ScriptedViewport.setTableMode, setTableColumns, setTableRowData, and setTableCallback for a data table with text cells and action buttons. Custom drawTableCell and drawToggleButton LAF functions style the table rows and button columns.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var Viewport1 = Content.getComponent(\"Viewport1\");\nconst var ViewportLAF = Content.createLocalLookAndFeel();\n\nViewportLAF.registerFunction(\"drawTableCell\", function(g, obj)\n{\n\tvar a = obj.area;\n\tg.setColour(Colours.white);\n\tg.drawAlignedText(obj.text, a, \"left\");\n});\n\nViewportLAF.registerFunction(\"drawToggleButton\", function(g, obj)\n{\n\tvar a = obj.area;\n\tg.setColour(Colours.grey);\n\n\tif (obj.over)\n\t\tg.setColour(Colours.darkgrey);\n\n\tg.fillRect(a);\n});\n\nViewport1.setLocalLookAndFeel(ViewportLAF);\n\nViewport1.setTableMode({\n\t\"RowHeight\": 24,\n\t\"HeaderHeight\": 0\n});\n\nViewport1.setTableColumns([\n{\n\t\"ID\": \"FirstID\",\n\t\"Type\": \"Text\",\n\t\"Width\": 380\n},\n{\n\t\"ID\": \"SecondID\",\n\t\"Type\": \"Button\",\n\t\"Text\": \"OK\",\n\t\"Toggle\": false,\n\t\"Width\": 30\n}\n]);\n\nViewport1.setTableRowData([\n\t{ \"FirstID\": \"Some Text\", \"SecondID\": false },\n\t{ \"FirstID\": \"Some other Text\", \"SecondID\": false }\n]);\n\ninline function onTableCallback(obj)\n{\n\tif (obj.Type == \"Click\")\n\t\tConsole.print(\"Clicked on text\");\n\n\tif (obj.value && obj.Type == \"Button\")\n\t\tConsole.print(\"Clicked on Button\");\n};\n\nViewport1.setTableCallback(onTableCallback);",
+    "url": "https://forum.hise.audio/topic/7445",
+    "featured": true,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptedViewport",
+          "id": "Viewport1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Full table mode example with drawTableCell and drawToggleButton LAF, setTableColumns with Text and Button column types, setTableRowData with row objects, and setTableCallback for click/button events.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:46.666653Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Table Snap Values Generator",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Utility function that generates evenly-spaced snap values for a ScriptTable using setSnapValues. Divides the 0-1 range into equal segments based on the desired number of snaps.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var Table = Content.getComponent(\"Table\");\n\ninline function setTableSnapValues(table, snaps)\n{\n\tlocal values = [];\n\tlocal snap = 1 / snaps;\n\n\tfor (i = 0; i < snaps; i++)\n\t\tvalues.push(snap * i);\n\n\tvalues.push(1.0);\n\ttable.setSnapValues(values);\n}\n\nsetTableSnapValues(Table, 20);",
+    "url": "https://forum.hise.audio/topic/7375",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptTable",
+          "id": "Table"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Utility function that generates evenly-spaced snap values for a ScriptTable. Generates 20 snaps across 0-1 range.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:48.111732Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Table Snap Values with Visual Grid",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Table snap values with a panel overlay drawing vertical grid lines at each snap position. Uses a panel setValue to pass the snap array, then draws grid lines proportionally spaced across the panel width in setPaintRoutine.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var Table = Content.getComponent(\"Table\");\nconst var TableGrid = Content.getComponent(\"TableGrid\");\n\n//\tSET SNAP VALUE\ninline function setTableSnapValues(table, snaps)\n{\n\tlocal values = [];\n\tlocal snap = 1/snaps;\n\t\n\tfor (i = 0; i < snaps; i++)\n\t\tvalues.push(snap * i);\n\t\n\tvalues.push(1.0);\n\t\n\ttable.setSnapValues(values);\n\tTableGrid.setValue(values);\n\tTableGrid.changed();\n}\n\n//\tEXECUTE\nsetTableSnapValues(Table, 20);\n\n\n\n//\tWITH GRID\nTableGrid.setPaintRoutine(function(g)\n{\n\tg.setColour(Colours.chartreuse);\n\t\n\tif (typeof this.getValue() == \"object\")\n\t{\n\t\tvar space = this.getWidth() / (this.getValue().length-1);\n\t\t\n\t\tfor (i = 0; i <= this.getValue().length; i++)\n\t\t\tg.drawLine(i * space, i * space, 4, this.getHeight()-4, 0.2);\n\t}\n\t\n});",
+    "url": "https://forum.hise.audio/topic/7375",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptTable",
+          "id": "Table"
+        },
+        {
+          "type": "ScriptPanel",
+          "id": "TableGrid"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Extends snap values example with a panel overlay drawing vertical grid lines. TableGrid panel setValue receives the snap values array and draws proportional grid lines in its paint routine.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:49.491493Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Table with Grid Factory Function",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Factory function using Content.addPanel and Content.addTable with parentComponent to create a self-contained table-with-grid widget. Dynamically creates container, grid overlay, and table components with setSnapValues and a paint routine for visual grid lines.",
+    "code": "Content.makeFrontInterface(600, 600);\n\n//\tTABLE W GRID FACTORY (name, x, y, width, height, number of snaps)\ninline function createTableWithGrid(name, x, y, w, h, numsnaps)\n{\n\tlocal container = Content.addPanel(name+\"Container\", x, y);\n\tContent.setPropertiesFromJSON(name+\"Container\",\n\t{\n\t\t\"type\": \"ScriptPanel\",\n\t\t\"id\": name+\"Container\",\n\t\t\"x\": x,\n\t\t\"y\": y,\n\t\t\"width\": w,\n\t\t\"height\": h,\n\t\t\"bgColour\": 16777215,\n\t\t\"itemColour\": 0,\n\t\t\"itemColour2\": 0,\n\t\t\"textColour\": 16777215,\n\t});\n\t\n\tlocal grid = Content.addPanel(name+\"Grid\");\n\tContent.setPropertiesFromJSON(name+\"Grid\",\n\t{\n\t\t\"type\": \"ScriptPanel\",\n\t\t\"id\": name+\"Grid\",\n\t\t\"x\": 0,\n\t\t\"y\": 0,\n\t\t\"width\": w,\n\t\t\"height\": h,\n\t\t\"parentComponent\": name+\"Container\"\n\t});\n\t\n\tlocal table = Content.addTable(name);\n\tContent.setPropertiesFromJSON(name,\n\t{\n\t\t\"type\": \"ScriptTable\",\n\t\t\"id\": name,\n\t\t\"x\": 0,\n\t\t\"y\": 0,\n\t\t\"width\": w,\n\t\t\"height\": h,\n\t\t\"saveInPreset\": true,\n\t\t\"parentComponent\": name+\"Container\"\n\t});\n\t\n\tlocal values = [];\n\tlocal snap = 1/numsnaps;\n\t\n\tfor (i = 0; i < numsnaps; i++)\n\t\tvalues.push(snap * i);\n\t\t\n\tvalues.push(1.0);\n\t\n\ttable.setSnapValues(values);\n\tgrid.setValue(values);\n\tgrid.changed();\n\t\n\tgrid.setPaintRoutine(function(g)\n\t{\n\t\tg.setColour(Colours.chartreuse);\n\t\t\n\t\tif (typeof this.getValue() == \"object\")\n\t\t{\n\t\t\tvar space = this.getWidth() / (this.getValue().length-1);\n\t\t\t\n\t\t\tfor (j = 0; j <= this.getValue().length; j++)\n\t\t\t\tg.drawLine(j * space, j * space, 4, this.getHeight()-4, 0.2);\n\t\t}\n\t});\n}\n\n//\tCREATE\t------------\nconst Tbl = createTableWithGrid(\"Tbl\", 100, 100, 400, 200, 20);",
+    "url": "https://forum.hise.audio/topic/7375",
+    "featured": true,
+    "validation": {
+      "tier": 1,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [],
+      "verifyScript": null,
+      "notes": "All components created dynamically via Content.addPanel and Content.addTable with parentComponent set. Factory function createTableWithGrid creates container, grid overlay, and table. No pre-existing components required. The factory uses Content.setPropertiesFromJSON for initial setup.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:50.877150Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Path Follow Animation with getPointOnPath",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Content.createPath with quadraticTo to define a curved path, then getPointOnPath with getLength to position a panel along the path driven by a knob. Draws the path on a background panel and moves a foreground panel using setPosition.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var pathPnl = Content.getComponent(\"pathPnl\");\nconst var Panel1 = Content.getComponent(\"Panel1\");\n\n\nconst var p = Content.createPath();\np.startNewSubPath(50, 250);\np.quadraticTo(350, 100, 200, 50);\np.quadraticTo(50, 100, 350, 250);\n\n\npathPnl.setPaintRoutine(function(g)\n{\n\tg.setColour(0xffff0000);\n\t\n\tif (true)\n\t\tg.drawPath(p, p.getBounds(1.0), 1.0);\n});\n\n\n\ninline function onKnob1Control(component, value)\n{\n\tlocal point = p.getPointOnPath(p.getLength() * value);\n\tlocal posX = point[0] + pathPnl.get(\"x\") - Panel1.getWidth()/2.0;\n\tlocal posY = point[1] + pathPnl.get(\"y\") - Panel1.getHeight()/2.0;\n\t\n\tPanel1.setPosition(posX, posY, Panel1.getWidth(), Panel1.getHeight());\n};\n\nContent.getComponent(\"Knob1\").setControlCallback(onKnob1Control);",
+    "url": "https://forum.hise.audio/topic/7373",
+    "featured": true,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptPanel",
+          "id": "pathPnl"
+        },
+        {
+          "type": "ScriptPanel",
+          "id": "Panel1"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "Knob1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Draws a bezier path on pathPnl and moves Panel1 along the path based on Knob1 value. Uses Content.createPath with quadraticTo, getPointOnPath, and getLength. Panel1 should be positioned within the pathPnl area and be small (e.g. 20x20px).",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:52.373546Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Ring Shape Mouse Hit Detection",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Panel setMouseCallback with Math.sqrt distance calculation to detect whether the mouse is within a donut/ring shape. Computes distance from center and checks against inner and outer radii for visual feedback.",
+    "code": "Content.makeFrontInterface(600, 600);\nConsole.clear();\n\nconst var Panel1 = Content.getComponent(\"Panel1\");\n\nconst var outer = 250;\nconst var inner = 200;\n\nPanel1.setPaintRoutine(function(g)\n{\n\tg.fillAll(Colours.black);\n\t\n\tg.setColour(this.data.isValid ? Colours.green : Colours.darkred);\n\tg.fillEllipse([(this.getWidth()-outer)/2.0, (this.getHeight()-outer)/2.0, outer, outer]);\n\tg.setColour(Colours.black);\n\tg.fillEllipse([(this.getWidth()-inner)/2.0, (this.getHeight()-inner)/2.0, inner, inner]);\n});\n\n\nPanel1.setMouseCallback(function(event)\n{\n\tvar posX = event.x - this.getWidth()/2.0;\n\tvar posY = event.y - this.getHeight()/2.0;\n\t\n\tvar l = Math.sqrt((posX*posX) + (posY*posY));\n\t\n\tthis.data.isValid = l < outer/2.0 && l > inner/2.0;\n\tthis.repaint();\n});",
+    "url": "https://forum.hise.audio/topic/7373",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptPanel",
+          "id": "Panel1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Uses Math.sqrt distance calculation to detect mouse within a donut/ring shape. Outer radius 250, inner radius 200. Panel must be large enough (at least 500x500) to fit the ring. Sets panel width/height to 600 via makeFrontInterface.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:53.799722Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Open Samples Folder Button",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert"
+    ],
+    "description": "FileSystem.getFolder(FileSystem.Samples) with isDirectory and show() to open the samples folder in the OS file browser from a button click.",
+    "code": "Content.makeFrontInterface(600, 600);\n\n\ninline function onButton1Control(component, value)\n{\n\tif (value)\n\t{\n\t\tlocal dir = FileSystem.getFolder(FileSystem.Samples);\t\n\t\t\n\t\tif (isDefined(dir) && dir.isDirectory())\n\t\t\tdir.show();\n\t}\t\n};\n\nContent.getComponent(\"Button1\").setControlCallback(onButton1Control);",
+    "url": "https://forum.hise.audio/topic/7364",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptButton",
+          "id": "Button1"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Uses FileSystem.getFolder(FileSystem.Samples).show() to open the samples folder in the OS file browser. Unlike FileSystem.browse(), show() is non-blocking and does not require user interaction to complete. The Samples folder will always exist in a HISE project context.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:55.247277Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "FFT Display Buffer Configuration",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "Complete ring buffer properties object for FFT visualization \u2014 BufferLength, WindowType, DecibelRange, UsePeakDecay, UseDecibelScale, YGamma, Decay, and UseLogarithmicFreqAxis. Applied to a Parametriq EQ display buffer via setRingBufferProperties.",
+    "code": "Content.makeFrontInterface(600, 600);\n\n// You can get those from a scriptnode FFT node (click Edit Properties and copy that bad boy)\nconst var props = {\n  \"BufferLength\": 1024,\n  \"WindowType\": \"Blackman Harris\",\n  \"DecibelRange\": [\n    -100.0,\n    0.0\n  ],\n  \"UsePeakDecay\": false,\n  \"UseDecibelScale\": true,\n  \"YGamma\": 1.0,\n  \"Decay\": 0.699999988079071,\n  \"UseLogarithmicFreqAxis\": true\n};\n\n// The EQ is also a display buffer source \nconst var dp0 = Synth.getDisplayBufferSource(\"Parametriq EQ1\");\nconst var dp = dp0.getDisplayBuffer(0);\ndp.setRingBufferProperties(props);",
+    "url": "https://forum.hise.audio/topic/7307",
+    "featured": false,
+    "validation": {
+      "tier": 3,
+      "testable": true,
+      "skipReason": null,
+      "modules": [
+        {
+          "type": "CurveEq",
+          "name": "Parametriq EQ1",
+          "chain": 3
+        }
+      ],
+      "components": [],
+      "verifyScript": null,
+      "notes": "CurveEq modules have built-in display buffers (getDisplayBuffer(0) returns the FFT display). setRingBufferProperties configures FFT analysis parameters: BufferLength, WindowType (Blackman Harris), DecibelRange, UsePeakDecay, UseDecibelScale, YGamma, Decay, UseLogarithmicFreqAxis. No UI components required \u2014 the buffer config is the example.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:57.122742Z",
+        "attempts": 1
+      }
+    }
+  },
+  {
+    "title": "Keyboard Range from Knobs",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert",
+      "solved"
+    ],
+    "description": "Two knobs controlling the LowKey and HiKey of a Keyboard FloatingTile via get(\"Data\").parseAsJSON() and set(\"Data\", trace(data)). Shared setKeyboardRange function updates both properties simultaneously.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var fltKeyboard = Content.getComponent(\"fltKeyboard\");\n\nconst var knbLow = Content.getComponent(\"knbLow\");\nknbLow.setControlCallback(onknbLowControl);\n\ninline function onknbLowControl(component, value)\n{\n\tsetKeyboardRange(knbLow.getValue(), knbHigh.getValue());\n}\n\nconst var knbHigh = Content.getComponent(\"knbHigh\");\nknbHigh.setControlCallback(onknbHighControl);\n\ninline function onknbHighControl(component, value)\n{\n\tsetKeyboardRange(knbLow.getValue(), knbHigh.getValue());\n}\n\ninline function setKeyboardRange(low, high)\n{\n\tlocal data = fltKeyboard.get(\"Data\").parseAsJSON();\n\n\tdata.LowKey = low;\n\tdata.HiKey = high;\n\n\tfltKeyboard.set(\"Data\", trace(data));\n}",
+    "url": "https://forum.hise.audio/topic/7248",
+    "featured": false,
+    "validation": {
+      "tier": 2,
+      "testable": true,
+      "skipReason": null,
+      "modules": [],
+      "components": [
+        {
+          "type": "ScriptFloatingTile",
+          "id": "fltKeyboard"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "knbLow"
+        },
+        {
+          "type": "ScriptSlider",
+          "id": "knbHigh"
+        }
+      ],
+      "verifyScript": null,
+      "notes": "Reads and modifies Keyboard FloatingTile Data JSON at runtime. knbLow callback references knbHigh before its const declaration, but since the callback only fires on user interaction (after parse), knbHigh will be defined by then. Set both knobs range to 0-127. FloatingTile1 Data should include Type='Keyboard'.",
+      "result": {
+        "tested": true,
+        "passed": true,
+        "verifications": [],
+        "timestamp": "2026-04-07T20:36:58.507393Z",
+        "attempts": 1
+      }
+    }
+  }
+]

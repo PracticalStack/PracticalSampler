@@ -1,0 +1,1 @@
+When enabled, `[]` operator assignments (e.g. `spd[3] = 0.75`) route through the undo system instead of calling `setValue()` directly. Disabled by default. Enable this when users interact with slider values through operator syntax and expect Ctrl+Z to work.

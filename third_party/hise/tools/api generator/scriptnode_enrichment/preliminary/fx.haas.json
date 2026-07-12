@@ -1,0 +1,94 @@
+{
+  "factoryPath": "fx.haas",
+  "factory": "fx",
+  "nodeId": "haas",
+  "description": "A Haas effect (simulate stereo position using delay)",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Stereo position",
+      "rationale": "Single parameter controlling the perceived stereo position via inter-channel delay.",
+      "parameters": [
+        {
+          "id": "Position",
+          "range": { "min": -1.0, "max": 1.0, "step": 0.1, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/fx/haas.md",
+    "tier": "BRIEF",
+    "lines": 14
+  },
+
+  "availableImages": ["script-fx1.png"],
+
+  "gaps": [
+    {
+      "id": "delay-implementation",
+      "category": "signal_path",
+      "question": "How is the delay implemented? Does it use a delay buffer? Is interpolation used for sub-sample delay? What is the maximum delay time and how does Position map to delay time?",
+      "context": "The existing doc mentions a hardcoded 20ms maximum. Need to confirm and understand the Position-to-delay mapping."
+    },
+    {
+      "id": "channel-handling",
+      "category": "signal_path",
+      "question": "How does the node handle stereo? Does it delay one channel and leave the other dry? What happens with mono input or >2 channels?",
+      "context": "Haas effect requires at least stereo. Need to document channel requirements and behaviour."
+    },
+    {
+      "id": "position-mapping",
+      "category": "parameter_behaviour",
+      "question": "Position ranges -1 to 1. At Position=0, is delay zero on both channels (bypass)? At Position=-1, which channel is delayed? Is the mapping linear?",
+      "context": "Users need to understand the left/right semantics of the Position parameter."
+    },
+    {
+      "id": "polyphonic-state",
+      "category": "signal_path",
+      "question": "IsPolyphonic is true. Does the node maintain per-voice delay buffers?",
+      "context": "Per-voice delay buffers have significant memory implications."
+    }
+  ],
+
+  "notes": "Existing doc mentions hardcoded 20ms maximum delay. The Haas effect works by applying a short delay (under ~35ms) to one channel, creating the perception of stereo directionality. Step size of 0.1 suggests coarse control. Only 1 parameter makes this a simple node."
+}

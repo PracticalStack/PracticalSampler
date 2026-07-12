@@ -1,0 +1,1 @@
+Sets the local input range with a skew factor derived from a mid point. The `midPoint` value specifies which input value should map to 0.5 in the normalised space, creating a logarithmic or exponential curve. Useful for frequency or gain ranges where perceptual linearity matters.

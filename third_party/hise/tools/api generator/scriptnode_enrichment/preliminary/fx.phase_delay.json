@@ -1,0 +1,94 @@
+{
+  "factoryPath": "fx.phase_delay",
+  "factory": "fx",
+  "nodeId": "phase_delay",
+  "description": "A phase delay for comb filtering",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Frequency control",
+      "rationale": "Single parameter setting the frequency of the comb filter's phase delay.",
+      "parameters": [
+        {
+          "id": "Frequency",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.1, "skew": 0.2299 },
+          "default": 400.0,
+          "textConverter": "Frequency",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/fx/phase_delay.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": ["script-fx1.png"],
+
+  "gaps": [
+    {
+      "id": "phase-delay-algorithm",
+      "category": "signal_path",
+      "question": "What type of phase delay is implemented? Is it an allpass filter, a simple delay line, or something else? How does Frequency map to delay time?",
+      "context": "The description says 'for comb filtering' but a phase delay alone does not create a comb filter - it needs to be mixed with the dry signal. Need to understand the actual algorithm."
+    },
+    {
+      "id": "comb-filter-topology",
+      "category": "signal_path",
+      "question": "Does the node implement a full comb filter (delay + mix with original) or just the phase delay component? Is there feedback?",
+      "context": "Critical for the reference page description. 'Phase delay for comb filtering' is ambiguous."
+    },
+    {
+      "id": "frequency-to-delay-mapping",
+      "category": "parameter_behaviour",
+      "question": "The Frequency parameter uses the 'Frequency' TextToValueConverter and has a skew of 0.23 (logarithmic). Does the frequency set the comb filter's fundamental, the allpass corner frequency, or something else?",
+      "context": "Users need to understand what frequency they are setting."
+    },
+    {
+      "id": "processing-model",
+      "category": "performance",
+      "question": "Is processing per-sample or per-block? Does the node use frame processing?",
+      "context": "Needed for CPU profile."
+    }
+  ],
+
+  "notes": "STUB existing doc - no useful content. The description 'phase delay for comb filtering' is ambiguous and needs C++ verification. The logarithmic skew on Frequency (0.23) provides fine control at low frequencies and coarse control at high frequencies, standard for frequency parameters. Single-parameter node."
+}

@@ -1,0 +1,1 @@
+Removes and returns the first element. All remaining elements shift left by one index. Returns `undefined` if the array is empty. Prefer `pop()` when removal order does not matter, as `shift` is O(n) due to element shifting.

@@ -1,0 +1,1 @@
+Formats a numeric value as a string with the specified number of decimal places. Use this for display purposes when you need precise control over decimal formatting in labels or UI text.

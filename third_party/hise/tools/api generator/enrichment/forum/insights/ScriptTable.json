@@ -1,0 +1,47 @@
+[
+  {
+    "id": "control-callback-not-fired",
+    "source_tids": [3268],
+    "category": "B",
+    "summary": "The control callback (onControl or setControlCallback) does not fire when users drag table points. It only fires when changed() is called manually from script.",
+    "verify": true,
+    "target": "api:ScriptTable",
+    "placement": "Readme prose"
+  },
+  {
+    "id": "ctrl-scroll-curve-points",
+    "source_tids": [596],
+    "category": "B",
+    "summary": "Hold Ctrl and scroll the mouse wheel over a table segment to adjust the curve between two points. This works for all table editors in HISE, including envelope displays.",
+    "verify": false,
+    "target": "api:ScriptTable",
+    "placement": "Readme prose"
+  },
+  {
+    "id": "custom-colours-flat-style",
+    "source_tids": [596],
+    "category": "B",
+    "summary": "Setting the customColours property to true switches the table to flat-style rendering and enables the standard colourId properties (bgColour, itemColour, etc.) for styling.",
+    "verify": false,
+    "target": "api:ScriptTable",
+    "placement": "Readme prose"
+  },
+  {
+    "id": "multi-tableprocessor-crash",
+    "source_tids": [10491],
+    "category": "F",
+    "summary": "Binding multiple TableProcessors to a single ScriptTable (by switching processorId at runtime) can cause a crash on save.",
+    "verify": false,
+    "target": "api:ScriptTable",
+    "placement": "issues.md"
+  },
+  {
+    "id": "gettablevalue-0-1-range",
+    "source_tids": [6539, 5178, 6072],
+    "category": "E",
+    "summary": "getTableValue expects normalised 0-1 input. Already documented as common mistake.",
+    "verify": false,
+    "target": "api:ScriptTable",
+    "placement": "skip"
+  }
+]

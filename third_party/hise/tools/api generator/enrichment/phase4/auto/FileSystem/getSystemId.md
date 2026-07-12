@@ -1,0 +1,1 @@
+Returns a unique machine identifier string for the current computer, derived from hardware characteristics. The value is deterministic - calling it multiple times returns the same hex string. This is typically used for workflows that identify a specific installation, such as crash reporting, usage analytics, or machine-bound configuration.

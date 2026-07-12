@@ -1,0 +1,38 @@
+{
+  "targetId": "Delay",
+  "domain": "modules",
+  "generatedAt": "2026-03-31",
+  "topicIds": [12323, 14196, 13091, 11516, 10559, 14356, 12416, 10193, 9931, 2422],
+  "questions": [
+    {
+      "id": "min-time-granularity",
+      "question": "What is the minimum time granularity of the Delay effect's time parameter - is it constrained to whole milliseconds, or can fractional millisecond values be set?",
+      "gap_type": "edge_case",
+      "sources": ["tid:11516"]
+    },
+    {
+      "id": "sample-accurate-alternative",
+      "question": "For use cases requiring sample-accurate delay alignment, is the Delay effect suitable, or should the scriptnode delay node be used instead?",
+      "gap_type": "workflow",
+      "sources": ["tid:11516"]
+    },
+    {
+      "id": "latency-reporting",
+      "question": "Does the Delay effect introduce any processing latency that the plugin must report to the DAW host, or is it a zero-latency effect from the host's perspective?",
+      "gap_type": "behaviour",
+      "sources": ["tid:12416"]
+    },
+    {
+      "id": "first-buffer-silence",
+      "question": "Is the first-buffer skip on initialization audible as a brief silent period at the start of playback, and under what conditions does it occur?",
+      "gap_type": "behaviour",
+      "sources": ["tid:12416"]
+    },
+    {
+      "id": "vestigial-filter-params",
+      "question": "The Delay module exposes LowPassFreq and HiPassFreq parameters described as filtering the feedback signal - do these parameters actually affect the audio output?",
+      "gap_type": "behaviour",
+      "sources": ["exploration:Delay.md"]
+    }
+  ]
+}

@@ -1,0 +1,113 @@
+{
+  "className": "Builder",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "clear": {
+      "signature": "void clear()",
+      "returnType": "void",
+      "description": "WARNING: Clears all child sound generators, effects and MIDI processor (except for this one obviously).",
+      "parameters": []
+    },
+    "clearChildren": {
+      "signature": "int clearChildren(int buildIndex, int chainIndex)",
+      "returnType": "int",
+      "description": "Clears all child processors of the chain in the module with the given build index",
+      "parameters": [
+        {
+          "name": "buildIndex",
+          "type": "int"
+        },
+        {
+          "name": "chainIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "connectToScript": {
+      "signature": "bool connectToScript(int buildIndex, String relativePath)",
+      "returnType": "bool",
+      "description": "Connects the script processor to an external script.",
+      "parameters": [
+        {
+          "name": "buildIndex",
+          "type": "int"
+        },
+        {
+          "name": "relativePath",
+          "type": "String"
+        }
+      ]
+    },
+    "create": {
+      "signature": "int create(var type, var id, int rootBuildIndex, int chainIndex)",
+      "returnType": "int",
+      "description": "Creates a module and returns the build index (0=master container).",
+      "parameters": [
+        {
+          "name": "type",
+          "type": "var"
+        },
+        {
+          "name": "id",
+          "type": "var"
+        },
+        {
+          "name": "rootBuildIndex",
+          "type": "int"
+        },
+        {
+          "name": "chainIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "flush": {
+      "signature": "void flush()",
+      "returnType": "void",
+      "description": "Sends a rebuild message. Call this after you've created all the processors to make sure that the patch browser is updated accordingly.",
+      "parameters": []
+    },
+    "get": {
+      "signature": "var get(int buildIndex, String interfaceType)",
+      "returnType": "var",
+      "description": "Returns a typed reference for the module with the given build index.",
+      "parameters": [
+        {
+          "name": "buildIndex",
+          "type": "int"
+        },
+        {
+          "name": "interfaceType",
+          "type": "String"
+        }
+      ]
+    },
+    "getExisting": {
+      "signature": "int getExisting(String processorId)",
+      "returnType": "int",
+      "description": "Adds the existing module to the internal list and returns the index for refering to it.",
+      "parameters": [
+        {
+          "name": "processorId",
+          "type": "String"
+        }
+      ]
+    },
+    "setAttributes": {
+      "signature": "void setAttributes(int buildIndex, var attributeValues)",
+      "returnType": "void",
+      "description": "Set multiple attributes for the given module at once using a JSON object.",
+      "parameters": [
+        {
+          "name": "buildIndex",
+          "type": "int"
+        },
+        {
+          "name": "attributeValues",
+          "type": "var"
+        }
+      ]
+    }
+  }
+}

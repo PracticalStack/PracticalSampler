@@ -1,0 +1,1 @@
+Sets the time signature and bar count of the specified sequence. Pass -1 to target the current sequence. Returns true if the values are valid, or false if the sequence does not exist or any of `Nominator`, `Denominator`, or `NumBars` is zero or negative.

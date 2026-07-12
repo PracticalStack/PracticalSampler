@@ -1,0 +1,1 @@
+Restores the table to its default state: a linear ramp from two points at (0, 0) and (1, 1), both with a curve factor of 0.5. All existing points are removed. Any registered content callback fires with a point index of -1 to indicate a bulk change.

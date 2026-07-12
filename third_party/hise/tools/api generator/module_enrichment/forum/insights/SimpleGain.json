@@ -1,0 +1,88 @@
+{
+  "targetId": "SimpleGain",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [734, 1845, 1252, 1524, 6062, 10845, 1361, 941, 7321, 8822, 9574, 12040, 7804],
+  "insights": [
+    {
+      "type": "BUG",
+      "title": "Pan modulation has been persistently broken across multiple HISE versions",
+      "summary": "Multiple reports spanning 2018-2024 confirm pan/balance modulation does not work reliably. The issue has been acknowledged repeatedly but was unresolved as of 2019 (tid:941 bump). A related UI bug (tid:6062) shows bipolar pan table reporting 300L-100R instead of 100L-100R.",
+      "sources": ["tid:941", "tid:1361", "tid:6062"],
+      "verify": true,
+      "verify_hint": "grep BalanceCalculator or balanceMod in hi_core/hi_modules/effects/fx/GainEffect.cpp; check Balance modulation chain handling"
+    },
+    {
+      "type": "BUG",
+      "title": "Balance range reported as 10000 in some HISE versions",
+      "summary": "A bug causes the pan/balance parameter range to display as 10000 instead of the expected -100 to 100. David Healey flagged this as a known issue related to prior pan modulation bugs.",
+      "sources": ["tid:10845"],
+      "verify": true,
+      "verify_hint": "grep balance range or BalanceCalculator range in GainEffect.h or parameter definitions"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "SimpleGain does not attenuate a multi-channel Sampler below 0dB",
+      "summary": "When a Sampler uses multiple mic channels (multisamples with multiple microphones), a SimpleGain added to that sampler will provide a boost but gain reduction below 0dB has no audible effect. This is caused by signal doubling via routing. The fix is to use one SimpleGain per mic channel, or restructure routing.",
+      "sources": ["tid:1252"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Width=0 collapses the entire signal to mono",
+      "summary": "Setting the Width parameter to 0 encodes the signal as mid-only (full mono). Any upstream stereo content is permanently collapsed. If Width is set to 0 early in the signal chain, later stereo processing has nothing to work with.",
+      "sources": ["tid:7321"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Width above 100% amplifies the side (L-R) signal, not a pseudo-stereo effect",
+      "summary": "The Width parameter above 100% works by amplifying the side signal in mid/side encoding. It does not synthesise new stereo content from mono - it only exaggerates existing stereo differences. Mono sources are unaffected.",
+      "sources": ["tid:1524"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Sampler's own gain parameter is not smoothed; use SimpleGain instead",
+      "summary": "The Gain parameter on a sound generator (including Sampler) uses a raw gain factor with no smoothing, to avoid CPU overhead when many modules are active. To get click-free gain changes on a Sampler, add a SimpleGain as a child effect and connect controls to that instead.",
+      "sources": ["tid:8822"],
+      "verify": true,
+      "verify_hint": "grep smoothedGain or setGain in sound generator base class; confirm no Smoother on generator gain"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "SimpleGain cannot be placed inside a Sampler's own FX chain for multi-channel gain control",
+      "summary": "Placing a SimpleGain inside a Sampler works for a single mono/stereo channel, but for a multi-channel Sampler each mic channel needs its own SimpleGain. The alternative is to place the Sampler inside a Container and attach SimpleGain there, or use scriptnode.",
+      "sources": ["tid:1252", "tid:9574"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Pan modulation requires the Balance knob to be set away from centre to have any range",
+      "summary": "Pan modulation only has range to work with if the Balance knob is set to a non-centre value (e.g. 100R). With Balance at centre (0), the pan modulation chain has no effect because the modulation value scales the existing balance offset.",
+      "sources": ["tid:6062"],
+      "verify": true,
+      "verify_hint": "check Balance modulation formula in GainEffect.cpp: smoothedBalance *= balanceModValue"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use SimpleGain over Sampler's gain parameter when smooth automated gain changes are needed",
+      "summary": "SimpleGain applies a 50ms smoothed gain ramp (and 1000ms for balance), avoiding clicks on automated gain changes. This makes it the recommended approach for any gain automation or scripted gain control on sound generators.",
+      "sources": ["tid:8822"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Table modulation on pan has a latency issue",
+      "summary": "Table modulation assigned to the pan/balance parameter of SimpleGain introduces latency. This was acknowledged by Christoph Hart (tid:734) as a known issue, though it was not on the priority list at the time (2018).",
+      "sources": ["tid:734"],
+      "verify": true,
+      "verify_hint": "check balance modulation chain in GainEffect.cpp for delay or buffering in table lookup path"
+    }
+  ]
+}

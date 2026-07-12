@@ -1,0 +1,1 @@
+Registers a callback that fires when the playback position changes during audio playback. The callback receives the current position as a sample index. Use `this` inside the callback body to access the AudioFile (e.g. `this.getNumSamples()` for normalising the position to a 0.0-1.0 range).

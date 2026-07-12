@@ -1,0 +1,1 @@
+Sets the number of sliders. Existing values are preserved up to the new count, and new sliders are filled with the default value (1.0). When a preallocated length has been set via `setUsePreallocatedLength()`, resizing up to that limit adjusts the view without allocating, preserving all values including those beyond the new count.

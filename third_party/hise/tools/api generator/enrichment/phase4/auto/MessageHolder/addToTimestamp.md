@@ -1,0 +1,3 @@
+Adds a sample offset to the current timestamp, shifting the event earlier or later relative to its current position. Positive values delay the event, negative values move it earlier (clamped to a minimum of 0).
+
+> [!Warning:Delta clamped to 16-bit range] The delta is internally limited to the range -32768 to 32767, even though the absolute timestamp field can hold much larger values. Deltas outside this range are silently truncated.

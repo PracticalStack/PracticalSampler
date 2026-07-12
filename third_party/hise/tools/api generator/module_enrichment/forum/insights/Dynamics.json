@@ -1,0 +1,96 @@
+{
+  "targetId": "Dynamics",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [1904, 6324, 8515, 1965, 1717, 11869, 12229, 9182, 7102, 3499, 443, 2072, 4969, 7143, 11926, 655, 13755, 10460, 13368, 6382, 6972, 1745, 3960, 3626, 3559, 3466, 7236, 8165, 12215, 13300, 1929, 407, 2857, 12884, 12992, 2015, 4705, 3490],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Auto-makeup gain for the compressor is over-compensating by design",
+      "summary": "Multiple trusted users (including audio engineers) found the compressor auto-makeup adds too much gain at typical settings. The formula `(1 - ratio) * threshold * -1` applies full theoretical gain at threshold, which is too hot in practice. Community workarounds scale it by 0.7 or use logarithmic corrections.",
+      "sources": ["tid:1965"],
+      "verify": true,
+      "verify_hint": "grep updateMakeupValues in hi_core/hi_modules/effects/fx/Dynamics.cpp; formula is (1 - ratio) * attenuation * -1"
+    },
+    {
+      "type": "BUG",
+      "title": "Changing limiter attack time mid-playback causes pops and introduces a delay",
+      "summary": "Christoph Hart confirmed that changing the limiter's attack parameter while audio is playing switches internal processing at a random point in the buffer and introduces a delay, causing clicks and pops. The attack time should not be automated or changed during playback.",
+      "sources": ["tid:2857", "tid:3490"],
+      "verify": true,
+      "verify_hint": "grep limiterPending in Dynamics.cpp; check setInternalAttribute case for LimiterAttack; look for buffer switch logic"
+    },
+    {
+      "type": "API",
+      "title": "Reduction parameters must be polled with a timer - they do not push updates",
+      "summary": "CompressorReduction, GateReduction, and LimiterReduction are read-only attributes that must be polled via `getAttribute()` inside a timer callback. They hold the current peak-hold value but the module does not call any script callback when they change.",
+      "sources": ["tid:1929", "tid:6382", "tid:12992"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "CompressorReduction may return a constant 10 if the Dynamics module is not enabled or compressor stage is inactive",
+      "summary": "A user reported CompressorReduction returning a constant value of 10 when polled. The value is likely the raw meter value in a disabled state. Ensure the compressor stage is enabled (CompressorEnabled = true) and audio is playing before relying on the reduction value.",
+      "sources": ["tid:6972"],
+      "verify": true,
+      "verify_hint": "grep CompressorReduction in Dynamics.cpp; check getAttribute return value when compressor is disabled"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "The standalone Limiter FX module has broken knob ranges when connected via parameter ID",
+      "summary": "David Healey (expert) confirmed that the standalone Limiter FX module's parameter ranges do not map correctly when connected through processor/parameter ID, making the value popup useless. The recommended approach is to use the limiter stage inside the Dynamics module instead.",
+      "sources": ["tid:3499", "tid:7143"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Standalone Limiter FX module is deprecated - use the Dynamics module limiter stage",
+      "summary": "Christoph Hart stated the standalone Limiter FX (a separate effect from the Dynamics module) is going to be deprecated and should not be used. The limiter inside the Dynamics module is the supported alternative.",
+      "sources": ["tid:2015", "tid:4705"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Sidechain filtering for the Dynamics module requires scriptnode",
+      "summary": "The Dynamics module has no built-in sidechain filter for frequency-dependent compression (e.g., de-essing). When asked about this, Christoph Hart pointed to scriptnode as the solution, providing a snippet that routes a filtered sidechain signal through a DSP network to drive a compressor.",
+      "sources": ["tid:2072"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "The Dynamics compressor uses a hard knee - no soft knee control is exposed",
+      "summary": "Forum discussion confirmed the chunkware SimpleComp algorithm behind the Dynamics compressor implements a hard knee only. There is no knee parameter in the module. Users wanting soft-knee compression need a custom scriptnode compressor.",
+      "sources": ["tid:3466"],
+      "verify": true,
+      "verify_hint": "grep SimpleComp in hi_core/hi_modules/effects/fx/chunkware_simple_dynamics; look for knee parameter"
+    },
+    {
+      "type": "API",
+      "title": "Gain reduction meters can be displayed using a FloatingTile with indexed slots",
+      "summary": "David Healey confirmed that the Dynamics module exposes gain reduction meters as FloatingTile slots. Set the FloatingTile processor ID to the Dynamics module name, and use index 0 for gate reduction, 1 for compressor reduction, and 2 for limiter reduction. The external slot must be enabled in the module first.",
+      "sources": ["tid:13755"],
+      "verify": true,
+      "verify_hint": "grep DynamicsEditor or FloatingTile in Dynamics.cpp; check how DisplayBuffer slots are registered"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Parallel compression requires Routing Matrix to split audio into dry and wet paths",
+      "summary": "The Dynamics module has no built-in dry/wet mix parameter. To implement parallel (New York) compression, increase the container channel count to 4, use a Routing Matrix to send signal to channels 3-4, apply Dynamics only to 3-4, and mix the two paths using a gain module controlled by a single knob.",
+      "sources": ["tid:1745"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Using a timer to sidechain one Dynamics compressor from another requires scriptnode",
+      "summary": "Attempting to use a timer to read CompressorReduction from one Dynamics module and feed it to another is unreliable - timers run at ~30ms intervals on the UI thread and require the UI to be open. Christoph Hart confirmed scriptnode is required for sample-accurate inter-module gain reduction routing.",
+      "sources": ["tid:3559"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

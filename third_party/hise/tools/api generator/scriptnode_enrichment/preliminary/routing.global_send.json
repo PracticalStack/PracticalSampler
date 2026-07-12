@@ -1,0 +1,101 @@
+{
+  "factoryPath": "routing.global_send",
+  "factory": "routing",
+  "nodeId": "global_send",
+  "description": "Send the signal anywhere in HISE!",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Gain",
+      "rationale": "Controls the amplitude of the signal pushed to the global signal slot.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0, "max": 1, "step": 0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "Connection",
+      "defaultValue": "",
+      "type": "string",
+      "note": "String ID of the global signal slot. Only one global_send can be connected to each slot. The slot is created on demand in the GlobalRoutingManager."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/routing/global_send.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "signal-copy-vs-consume",
+      "category": "signal_path",
+      "question": "Does global_send copy the audio to the shared buffer (signal continues in the local chain) or consume it (silence after the send)?",
+      "context": "From infrastructure: push() uses copyWithMultiply into shared buffer. But does the local signal path continue with the original signal unmodified?"
+    },
+    {
+      "id": "value-as-gain",
+      "category": "parameter_behaviour",
+      "question": "The Value parameter (0-1) is used as the gain multiplier in push(). Is this linear gain or does it use any curve/conversion?",
+      "context": "From infrastructure: push uses FloatVectorOperations::copyWithMultiply with the value directly. Confirm it is linear."
+    },
+    {
+      "id": "uncompileable-reason",
+      "category": "description_accuracy",
+      "question": "The node is marked UncompileableNode. What is the architectural reason it cannot be compiled to C++?",
+      "context": "Users doing C++ export need to know this limitation and what alternative to use (routing.send/receive or routing.global_cable for control values)."
+    },
+    {
+      "id": "one-sender-per-slot",
+      "category": "signal_path",
+      "question": "From infrastructure: only one send node per signal slot. What error/behaviour occurs if a second global_send tries to connect to an occupied slot?",
+      "context": "Users need to understand this constraint to avoid debugging confusion."
+    }
+  ],
+
+  "notes": "routing.global_send pushes audio to a global signal slot that routing.global_receive nodes read from. Marked UncompileableNode -- cannot be used in C++ exported networks. Value parameter acts as a gain multiplier. Only one sender per slot but multiple receivers allowed. The description 'Send the signal anywhere in HISE!' is shared with global_receive (copy-paste error in base data) -- global_receive should say 'Receive' instead."
+}

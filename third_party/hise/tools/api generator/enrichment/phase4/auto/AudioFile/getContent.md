@@ -1,0 +1,1 @@
+Returns the audio data as an array of Buffer objects, one per channel. After calling `setRange()`, the returned buffers contain only the samples within the active range, not the full file. Reset the range with `setRange(0, getTotalLengthInSamples())` to access the complete file content again.

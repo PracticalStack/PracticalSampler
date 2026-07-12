@@ -1,0 +1,12 @@
+{
+  "factoryPath": "core.snex_shaper",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal to be shaped" },
+    { "id": "shaper", "label": "SNEX Shaper", "type": "process", "importance": 1.0, "description": "User-defined waveshaping via SNEX code" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Shaped audio output" }
+  ],
+  "edges": [
+    { "from": "in", "to": "shaper", "type": "signal", "label": null },
+    { "from": "shaper", "to": "out", "type": "signal", "label": null }
+  ]
+}

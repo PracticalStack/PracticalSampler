@@ -1,0 +1,1 @@
+Returns a reference to the Loris spectral analysis manager. Requires the `HISE_INCLUDE_LORIS` preprocessor flag. Returns `undefined` silently if Loris support is not compiled in.

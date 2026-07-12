@@ -1,0 +1,1 @@
+Returns the number of child sound generators in the parent synth. The parent synth must be a container type (SynthChain or SynthGroup). Use the return value to determine valid index bounds for `Synth.getChildSynthByIndex()`.

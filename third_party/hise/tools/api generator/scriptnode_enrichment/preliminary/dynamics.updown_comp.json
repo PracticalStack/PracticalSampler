@@ -1,0 +1,180 @@
+{
+  "factoryPath": "dynamics.updown_comp",
+  "factory": "dynamics",
+  "nodeId": "updown_comp",
+  "description": "A compressor with adjustable knee, RMS detection and upwards compression",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Upward compression (low level)",
+      "rationale": "LowThreshold and LowRatio control upward compression: signals below LowThreshold are boosted according to LowRatio. Default LowThreshold of -100 dB means upward compression is effectively disabled by default.",
+      "parameters": [
+        {
+          "id": "LowThreshold",
+          "range": { "min": -100.0, "max": 0.0, "step": 0.0, "skew": 3.49 },
+          "default": -100.0,
+          "textConverter": "Decibel",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "LowRatio",
+          "range": { "min": 0.2, "max": 100.0, "step": 0.0, "skew": 0.14 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Downward compression (high level)",
+      "rationale": "HighThreshold and HighRatio control standard downward compression: signals above HighThreshold are reduced according to HighRatio. Default HighThreshold of 0 dB means downward compression is effectively disabled by default.",
+      "parameters": [
+        {
+          "id": "HighThreshold",
+          "range": { "min": -100.0, "max": 0.0, "step": 0.0, "skew": 11.20 },
+          "default": 0.0,
+          "textConverter": "Decibel",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "HighRatio",
+          "range": { "min": 0.2, "max": 100.0, "step": 0.0, "skew": 0.14 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Compression shape",
+      "rationale": "Knee controls the transition smoothness around the threshold points.",
+      "parameters": [
+        {
+          "id": "Knee",
+          "range": { "min": 0.0, "max": 0.3, "step": 0.0, "skew": 1.0 },
+          "default": 0.15,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Envelope timing",
+      "rationale": "Attack and Release control how quickly the compressor responds to level changes. Shared between upward and downward sections.",
+      "parameters": [
+        {
+          "id": "Attack",
+          "range": { "min": 0.0, "max": 1000.0, "step": 0.0, "skew": 1.0 },
+          "default": 50.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Release",
+          "range": { "min": 0.0, "max": 1000.0, "step": 0.0, "skew": 1.0 },
+          "default": 50.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Detection mode",
+      "rationale": "RMS selects between peak and RMS level detection for the envelope follower.",
+      "parameters": [
+        {
+          "id": "RMS",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "encoded_converter_2_options",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "displayBuffers": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/dynamics/updown_comp.md",
+    "tier": "STUB",
+    "lines": 6
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "updown-gain-computation",
+      "category": "signal_path",
+      "question": "How is the combined upward+downward gain reduction computed? Are there two independent envelope followers (one for low, one for high) or a single detector with a two-segment transfer function? How do the low and high sections interact when both are active?",
+      "context": "Core to understanding the dual-band compression algorithm. This is the key differentiator from dynamics.comp."
+    },
+    {
+      "id": "knee-range-meaning",
+      "category": "parameter_behaviour",
+      "question": "The Knee parameter has range 0-0.3 with default 0.15. What units is this in -- dB width of the knee, a normalised 0-1 factor, or something else? Does Knee=0 mean hard knee and Knee=0.3 mean maximum soft knee? Does the knee apply to both low and high thresholds?",
+      "context": "The small range (0-0.3) is unusual and needs clarification for accurate parameter documentation."
+    },
+    {
+      "id": "rms-detection-modes",
+      "category": "parameter_behaviour",
+      "question": "The RMS parameter has 2 options (encoded converter, range 0-1). What are the two modes -- likely 0=Peak and 1=RMS? If RMS mode, what is the RMS window size (fixed, or derived from Attack time)?",
+      "context": "RMS vs peak detection significantly affects the compressor's response to transients."
+    },
+    {
+      "id": "ratio-range-meaning",
+      "category": "parameter_behaviour",
+      "question": "LowRatio and HighRatio have range 0.2-100. For downward compression (HighRatio), values >1 make sense (e.g., 4:1). For upward compression (LowRatio), what does ratio mean? Is LowRatio=2 a 2:1 upward compression (making quiet signals louder)? What does a ratio of 0.2 do -- is that expansion?",
+      "context": "Upward compression ratio semantics differ from standard downward compression. Users need to understand how to set LowRatio for the desired upward compression amount."
+    },
+    {
+      "id": "display-buffer-content",
+      "category": "signal_path",
+      "question": "The node has 1 DisplayBuffer. What does it display -- the transfer curve (input vs output level), the gain reduction over time, or the detected envelope?",
+      "context": "A transfer curve display would be especially useful for visualising the dual-threshold behaviour."
+    },
+    {
+      "id": "shared-base-with-comp",
+      "category": "signal_path",
+      "question": "Does updown_comp share any base class or template with comp/gate/limiter, or is it a completely independent implementation? The different parameter set (no Sidechain, has Knee/RMS, separate low/high bands) suggests it may be independent.",
+      "context": "Understanding the implementation relationship helps determine whether comp/gate/limiter documentation applies here."
+    }
+  ],
+
+  "notes": "This is the most feature-rich dynamics node, with separate upward and downward compression, adjustable knee, and RMS detection mode. Unlike comp/gate/limiter which share identical parameters, updown_comp has a unique parameter set suggesting an independent implementation. The defaults are conservative: LowThreshold=-100dB (upward compression off), HighThreshold=0dB (downward compression off), both ratios=1 (no compression). The Knee range of 0-0.3 is unusually small, suggesting it may be a normalised factor rather than a dB width. Attack/Release range is 0-1000ms (same as envelope_follower, wider than comp/gate/limiter's 0-250ms). The skew of 11.20 on HighThreshold heavily concentrates the control near 0 dB, while LowThreshold's skew of 3.49 is more moderate."
+}

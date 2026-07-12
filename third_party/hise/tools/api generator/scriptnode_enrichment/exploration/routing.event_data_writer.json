@@ -1,0 +1,16 @@
+{
+  "factoryPath": "routing.event_data_writer",
+  "nodes": [
+    { "id": "event_in", "label": "HiseEvent (Note-On)", "type": "input", "importance": 1.0, "description": "Note-on event provides the event ID for storage association" },
+    { "id": "store_id", "label": "Store Event ID", "type": "process", "importance": 0.8, "description": "Captures event ID per voice on note-on and writes current value" },
+    { "id": "write", "label": "Write to Event Storage", "type": "process", "importance": 1.0, "description": "Writes value to AdditionalEventStorage[eventId][slotIndex] for all active voices" },
+    { "id": "slot_index", "label": "SlotIndex", "type": "parameter", "importance": 1.0, "description": "Selects which data slot (0-15) to write" },
+    { "id": "value", "label": "Value", "type": "parameter", "importance": 1.0, "description": "The value to store (nominally 0..1, but any double accepted)" }
+  ],
+  "edges": [
+    { "from": "event_in", "to": "store_id", "type": "signal", "label": null },
+    { "from": "store_id", "to": "write", "type": "signal", "label": "eventId" },
+    { "from": "slot_index", "to": "write", "type": "control", "label": null },
+    { "from": "value", "to": "write", "type": "control", "label": null }
+  ]
+}

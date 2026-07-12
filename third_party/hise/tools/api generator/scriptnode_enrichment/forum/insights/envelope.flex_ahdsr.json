@@ -1,0 +1,69 @@
+{
+  "targetId": "envelope.flex_ahdsr",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [14211, 13481, 3735],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "No modulation slots for envelope parameters",
+      "summary": "The flex_ahdsr currently lacks modulation slots, making it impossible to modulate parameters like Decay time via the standard HISE modulation system. Christoph Hart confirmed this limitation in January 2026 and indicated he would investigate adding them. Sustain modulation on the related AHDSR is static-only, which he noted was limiting.",
+      "sources": [
+        { "tid": 14211, "quote": "Yeah I missed that. I'll check if I can add them in easily. Should I make the sustain modulation dynamic so that you can modulate a voice while it's playing? The AHDSR has only static modulation but I found it a bit limiting for the sustain parameter." }
+      ],
+      "verify": true,
+      "verify_hint": "Check whether modulation slots have been added to envelope.flex_ahdsr parameters since January 2026. Confirm whether sustain modulation is now dynamic or still static."
+    },
+    {
+      "type": "API",
+      "title": "Retrigger attribute (index 1) affects release behaviour",
+      "summary": "The node exposes a 'Retrigger' attribute at attribute index 1 with a default value of 1.0. Adjusting this attribute, in combination with the Mode slider, can change how the envelope behaves on note release and retriggering. This is not obvious from the node's primary UI controls.",
+      "sources": [
+        { "tid": 13481, "quote": "You could also play with the \"Retrigger\" attribute. It is attribute 1 and in default it is set to \"1.0\"." }
+      ],
+      "verify": true,
+      "verify_hint": "Confirm the Retrigger attribute index and default value programmatically. Document the full set of Mode slider values and how they interact with Retrigger."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use GlobalModulatorContainer for velocity-to-envelope routing",
+      "summary": "To modulate an envelope parameter (e.g. Decay time) from velocity without scripting, place a Velocity modulator inside a GlobalModulatorContainer and assign the target envelope parameter a matrixTargetId. This avoids the need for realtime scripting and integrates cleanly with the HISE modulation system.",
+      "sources": [
+        { "tid": 14211, "quote": "You could create a velocity modulator in the GlobalModulatorContainer and give the UI button that controls your envelope a matrixTargetId. Then you can do it via the modulation system." }
+      ],
+      "verify": false,
+      "verify_hint": "Verify that matrixTargetId on UI components correctly routes GlobalModulatorContainer modulators to flex_ahdsr parameters."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Reported UI performance issues with the Flex AHDSR envelope",
+      "summary": "At least one experienced user (Oli Ullmann) reported UI performance problems specifically with the Flex AHDSR envelope. Christoph Hart acknowledged this and requested a minimal reproducer, suggesting the issue was not yet resolved as of January 2026. This may manifest as UI sluggishness or frame drops when the envelope is active.",
+      "sources": [
+        { "tid": 14211, "quote": "Ullmann you mentioned in another thread that there are UI performance issues with the Flex AHDSR envelope. Can you make a minimal snippet? Ideally this should prevent you from using it." }
+      ],
+      "verify": true,
+      "verify_hint": "Test UI frame rate with multiple polyphonic voices using flex_ahdsr active. Check if a fix or workaround was committed after January 2026."
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Looping sustain segment: use ramp generator into a table",
+      "summary": "The flex_ahdsr does not natively support a looping sustain zone (like Kontakt's flex envelope loop region). To approximate this, route a ramp generator set to loop from a non-zero start value into a table node in scriptnode. Setting the loop start point above zero emulates a looping sustain segment.",
+      "sources": [
+        { "tid": 3735, "quote": "you might play around with a ramp generator that goes into a table in scriptnode. You can set the ramp to loop from non zero to get a looppoint > start." }
+      ],
+      "verify": false,
+      "verify_hint": "Confirm the ramp generator has a non-zero loop start parameter and that chaining ramp -> table produces audible looping sustain behaviour comparable to Kontakt's flex envelope loop zone."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Realtime envelope parameter control must not run in the Interface script",
+      "summary": "Modifying envelope parameters in response to MIDI events (e.g. velocity affecting decay time) must not be done from the Interface script, which should always be deferred. Doing so will cause a HISE runtime error. Instead, add a dedicated MIDI processor script for any realtime envelope parameter manipulation.",
+      "sources": [
+        { "tid": 14211, "quote": "Yeah it's fine, but I wouldn't do it from the Interface script in a real project. That script should be deferred. Add another script (midi processor) for this kind of thing." },
+        { "tid": 14211, "quote": "If you always defer your Interface script by default, which I think is a good habit, HISE will give you an error if you accidentality try to do any realtime stuff in it." }
+      ],
+      "verify": false,
+      "verify_hint": "Confirm that setting flex_ahdsr parameters from a deferred Interface script raises a HISE runtime error, and that a non-deferred MIDI processor script works correctly for the same operation."
+    }
+  ]
+}

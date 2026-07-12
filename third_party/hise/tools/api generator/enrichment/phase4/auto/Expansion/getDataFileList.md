@@ -1,0 +1,1 @@
+Returns an array of pool reference strings for all data files in this expansion's AdditionalSourceCode folder. Only returns files already known to the pool - it does not scan the filesystem for new files. Use `loadDataFile()` and `writeDataFile()` to read and write individual entries.

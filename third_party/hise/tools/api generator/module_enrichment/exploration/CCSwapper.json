@@ -1,0 +1,86 @@
+{
+  "moduleId": "CCSwapper",
+  "nodes": [
+    {
+      "id": "midi_in",
+      "type": "input",
+      "label": "MIDI In",
+      "importance": 1.0,
+      "description": "Incoming MIDI events from the event buffer"
+    },
+    {
+      "id": "event_dispatch",
+      "type": "decision",
+      "label": "Is CC event?",
+      "importance": 0.7,
+      "description": "Base class processHiseEvent() dispatches by event type; only CC events reach the swap logic"
+    },
+    {
+      "id": "cc_match",
+      "type": "decision",
+      "label": "CC# matches FirstCC or SecondCC?",
+      "importance": 1.0,
+      "group": "swap",
+      "description": "Compares incoming CC number against both parameter values"
+    },
+    {
+      "id": "swap_to_second",
+      "type": "process",
+      "label": "Set CC# = SecondCC",
+      "importance": 0.9,
+      "group": "swap",
+      "description": "Replaces controller number with SecondCC value when incoming matches FirstCC"
+    },
+    {
+      "id": "swap_to_first",
+      "type": "process",
+      "label": "Set CC# = FirstCC",
+      "importance": 0.9,
+      "group": "swap",
+      "description": "Replaces controller number with FirstCC value when incoming matches SecondCC"
+    },
+    {
+      "id": "first_cc_param",
+      "type": "parameter",
+      "label": "FirstCC",
+      "importance": 0.9,
+      "group": "swap",
+      "description": "First controller number in the swap pair (0-127)"
+    },
+    {
+      "id": "second_cc_param",
+      "type": "parameter",
+      "label": "SecondCC",
+      "importance": 0.9,
+      "group": "swap",
+      "description": "Second controller number in the swap pair (0-127)"
+    },
+    {
+      "id": "midi_out",
+      "type": "output",
+      "label": "MIDI Out",
+      "importance": 1.0,
+      "description": "Modified (or unmodified) MIDI events continuing downstream"
+    }
+  ],
+  "edges": [
+    { "from": "midi_in", "to": "event_dispatch", "type": "signal" },
+    { "from": "event_dispatch", "to": "midi_out", "type": "conditional", "label": "non-CC (passthrough)" },
+    { "from": "event_dispatch", "to": "cc_match", "type": "conditional", "label": "CC event" },
+    { "from": "first_cc_param", "to": "cc_match", "type": "control" },
+    { "from": "second_cc_param", "to": "cc_match", "type": "control" },
+    { "from": "cc_match", "to": "swap_to_second", "type": "conditional", "label": "matches FirstCC" },
+    { "from": "cc_match", "to": "swap_to_first", "type": "conditional", "label": "matches SecondCC" },
+    { "from": "cc_match", "to": "midi_out", "type": "conditional", "label": "no match (passthrough)" },
+    { "from": "second_cc_param", "to": "swap_to_second", "type": "control" },
+    { "from": "first_cc_param", "to": "swap_to_first", "type": "control" },
+    { "from": "swap_to_second", "to": "midi_out", "type": "signal" },
+    { "from": "swap_to_first", "to": "midi_out", "type": "signal" }
+  ],
+  "groups": [
+    {
+      "id": "swap",
+      "label": "CC Number Swap Logic"
+    }
+  ]
+}

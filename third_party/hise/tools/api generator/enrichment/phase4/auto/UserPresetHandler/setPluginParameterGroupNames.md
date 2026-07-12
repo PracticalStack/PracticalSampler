@@ -1,0 +1,1 @@
+Registers the valid set of plugin parameter group names that can be used in `setCustomAutomation` slot definitions via the `pluginParameterGroup` property. Call this before `setCustomAutomation` if any of your automation slots use non-empty group names. Plugin parameter groups organise DAW-visible parameters into named categories, which some hosts display as submenus or folders.

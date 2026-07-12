@@ -1,0 +1,14 @@
+{
+  "factoryPath": "fx.sampleandhold",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "hold", "label": "Sample & Hold", "type": "process", "importance": 1.0, "description": "Captures a sample every N inputs; holds value for remaining N-1 samples" },
+    { "id": "counter", "label": "Counter", "type": "parameter", "importance": 1.0, "description": "Decimation factor: hold each sample for N periods (1=passthrough, 64=max reduction)" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Decimated audio signal with staircase waveform" }
+  ],
+  "edges": [
+    { "from": "in", "to": "hold", "type": "signal", "label": null },
+    { "from": "counter", "to": "hold", "type": "control", "label": null },
+    { "from": "hold", "to": "out", "type": "signal", "label": null }
+  ]
+}

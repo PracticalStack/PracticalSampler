@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 140" width="280" height="140">
+  <defs>
+    <marker id="arr" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
+      <polygon points="0 0, 6 2.5, 0 5" fill="#808080"/>
+    </marker>
+  </defs>
+
+  <!-- Left: original rectangle -->
+  <rect x="15" y="15" width="80" height="100" rx="3"
+        fill="none" stroke="#808080" stroke-width="1"/>
+  <text x="55" y="70" font-family="Lato, sans-serif" font-size="11"
+        fill="#808080" text-anchor="middle">rect</text>
+
+  <!-- Arrow -->
+  <line x1="108" y1="65" x2="132" y2="65"
+        stroke="#808080" stroke-width="1" marker-end="url(#arr)"/>
+
+  <!-- Right: ghost of original (dashed, dimmed) -->
+  <rect x="150" y="15" width="80" height="100" rx="3"
+        fill="none" stroke="#808080" stroke-width="1" stroke-dasharray="4,3" stroke-opacity="0.4"/>
+
+  <!-- Right: result with right trimmed (green) - right moved left, left edge stays -->
+  <rect x="150" y="15" width="55" height="100" rx="3"
+        fill="#90FFB1" fill-opacity="0.12" stroke="#90FFB1" stroke-width="1.5"/>
+  <text x="177" y="70" font-family="Lato, sans-serif" font-size="11"
+        fill="#90FFB1" text-anchor="middle">result</text>
+
+  <!-- Dimension: trimmed amount -->
+  <line x1="207" y1="122" x2="228" y2="122" stroke="#808080" stroke-width="1"/>
+  <line x1="207" y1="118" x2="207" y2="126" stroke="#808080" stroke-width="1"/>
+  <line x1="228" y1="118" x2="228" y2="126" stroke="#808080" stroke-width="1"/>
+  <text x="217" y="136" font-family="Consolas, 'Courier New', monospace" font-size="10"
+        fill="#808080" text-anchor="middle">amt</text>
+</svg>

@@ -1,0 +1,12 @@
+{
+  "factoryPath": "control.resetter",
+  "nodes": [
+    { "id": "value_in", "label": "Value (Trigger)", "type": "parameter", "importance": 0.7, "description": "Any change triggers the reset impulse (value ignored)" },
+    { "id": "impulse", "label": "Reset Impulse", "type": "process", "importance": 1.0, "description": "Sends 0.0 then 1.0 in immediate succession" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Normalised output: 0 then 1 impulse pair" }
+  ],
+  "edges": [
+    { "from": "value_in", "to": "impulse", "type": "control", "label": "triggers" },
+    { "from": "impulse", "to": "mod_out", "type": "signal", "label": "0.0 then 1.0" }
+  ]
+}

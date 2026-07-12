@@ -1,0 +1,3 @@
+Exports only the UI control values (knobs, sliders, buttons) of a script processor as a base64 string. Unlike `exportState()`, this captures only the scripting content, and restoring via `restoreScriptControls()` does not trigger recompilation - useful for preset-like state management without the overhead of a full state restore.
+
+> [!Warning:Only works on script processors] Only works on script processors. Calling this on built-in MIDI modules (Transposer, Arpeggiator, etc.) throws a script error. When iterating all MIDI processors via `Synth.getIdList()`, filter to known script processor IDs or use `exportState()` instead.

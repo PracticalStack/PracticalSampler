@@ -1,0 +1,245 @@
+{
+  "File": {
+    "brief": "Handle to a specific file or directory on disk, with methods for reading, writing, and manipulating file content and metadata.",
+    "domain": "file",
+    "role": "handle",
+    "baseClass": "ConstScriptingObject",
+    "creates": ["File"],
+    "references": ["FileSystem", "Buffer", "MessageHolder", "Sampler"],
+    "seeAlso": [
+      {
+        "class": "FileSystem",
+        "reason": "FileSystem provides folder locations and file browsing utilities; File is a handle to one specific file or directory returned by FileSystem methods."
+      }
+    ],
+    "callbackDensity": 0.02,
+    "statefulness": 0.55,
+    "threadingExposure": 0.6
+  },
+  "FileSystem": {
+    "brief": "Namespace providing access to special folder locations, file browsing dialogs, and RSA encryption utilities.",
+    "domain": "file",
+    "role": "factory",
+    "baseClass": "ApiClass",
+    "creates": ["File"],
+    "references": ["File", "Content"],
+    "seeAlso": [
+      {
+        "class": "File",
+        "reason": "FileSystem returns File objects from getFolder/fromAbsolutePath/browse; File is the handle you operate on after obtaining it from FileSystem."
+      }
+    ],
+    "callbackDensity": 0.27,
+    "statefulness": 0.07,
+    "threadingExposure": 0.4
+  },
+  "Server": {
+    "brief": "HTTP client for GET/POST requests and file downloads, with queue management and server activity callbacks.",
+    "domain": "network",
+    "role": "service",
+    "baseClass": "ApiClass",
+    "creates": ["Download"],
+    "references": ["Download", "FileSystem", "File", "Console", "Engine"],
+    "seeAlso": [
+      {
+        "class": "Download",
+        "reason": "Server.downloadFile() returns a Download handle; Server initiates requests while Download tracks the state of a single transfer."
+      }
+    ],
+    "callbackDensity": 0.19,
+    "statefulness": 0.44,
+    "threadingExposure": 0.7
+  },
+  "Download": {
+    "brief": "Handle to an active or completed file download with progress tracking, pause/resume, and abort capabilities.",
+    "domain": "network",
+    "role": "handle",
+    "baseClass": "ConstScriptingObject",
+    "creates": ["File"],
+    "references": ["Server", "File"],
+    "seeAlso": [
+      {
+        "class": "Server",
+        "reason": "Download objects are created by Server.downloadFile(); Server manages the HTTP connection while Download exposes per-transfer state."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.82,
+    "threadingExposure": 0.7
+  },
+  "Console": {
+    "brief": "Debugging utility for printing messages, benchmarking, assertions, and automated callback testing.",
+    "domain": "scripting",
+    "role": "utility",
+    "baseClass": "ApiClass",
+    "creates": [],
+    "references": ["ScriptPanel", "Content"],
+    "seeAlso": [],
+    "callbackDensity": 0.06,
+    "statefulness": 0.0,
+    "threadingExposure": 0.0
+  },
+  "Math": {
+    "brief": "Standard math library with trigonometric, logarithmic, rounding, clamping, and range conversion functions.",
+    "domain": "data",
+    "role": "utility",
+    "baseClass": "ApiClass",
+    "creates": [],
+    "references": ["Engine"],
+    "seeAlso": [],
+    "callbackDensity": 0.0,
+    "statefulness": 0.0,
+    "threadingExposure": 0.0
+  },
+  "Date": {
+    "brief": "Date/time utility providing system time access and ISO-8601 string conversion.",
+    "domain": "scripting",
+    "role": "utility",
+    "baseClass": "ApiClass",
+    "creates": [],
+    "references": [],
+    "seeAlso": [],
+    "callbackDensity": 0.0,
+    "statefulness": 0.5,
+    "threadingExposure": 0.0
+  },
+  "UserPresetHandler": {
+    "brief": "Service for managing user preset load/save lifecycle, custom automation, host parameter mapping, and preset preprocessing.",
+    "domain": "preset-model",
+    "role": "service",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": ["Engine", "MacroHandler", "MidiAutomationHandler"],
+    "seeAlso": [
+      {
+        "class": "MacroHandler",
+        "reason": "MacroHandler manages macro control connections; UserPresetHandler manages the full preset and host automation model that macros feed into."
+      },
+      {
+        "class": "MidiAutomationHandler",
+        "reason": "MidiAutomationHandler maps MIDI CC to parameters; UserPresetHandler manages the broader preset model including custom automation slots."
+      }
+    ],
+    "callbackDensity": 0.32,
+    "statefulness": 0.56,
+    "threadingExposure": 0.3
+  },
+  "MacroHandler": {
+    "brief": "Service for reading and writing macro control connection data with change notification callbacks.",
+    "domain": "preset-model",
+    "role": "service",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": ["UserPresetHandler", "MidiAutomationHandler"],
+    "seeAlso": [
+      {
+        "class": "UserPresetHandler",
+        "reason": "UserPresetHandler manages the full preset model; MacroHandler specifically manages macro-to-parameter connections within that model."
+      },
+      {
+        "class": "MidiAutomationHandler",
+        "reason": "MidiAutomationHandler maps MIDI CC to parameters; MacroHandler maps macro knobs to parameters. Both are preset-model services with similar get/set data patterns."
+      }
+    ],
+    "callbackDensity": 0.25,
+    "statefulness": 0.75,
+    "threadingExposure": 0.1
+  },
+  "MidiAutomationHandler": {
+    "brief": "Service for managing MIDI CC-to-parameter automation mappings with popup configuration and change callbacks.",
+    "domain": "preset-model",
+    "role": "service",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": ["UserPresetHandler", "MacroHandler"],
+    "seeAlso": [
+      {
+        "class": "MacroHandler",
+        "reason": "Both manage parameter automation mappings; MidiAutomationHandler maps MIDI CC messages while MacroHandler maps macro knob indices."
+      },
+      {
+        "class": "UserPresetHandler",
+        "reason": "UserPresetHandler manages the full preset and host automation system; MidiAutomationHandler handles the MIDI CC mapping subset."
+      }
+    ],
+    "callbackDensity": 0.14,
+    "statefulness": 0.71,
+    "threadingExposure": 0.1
+  },
+  "ExpansionHandler": {
+    "brief": "Factory/manager for loading, installing, and managing expansion packs with encryption and credential support.",
+    "domain": "preset-model",
+    "role": "factory",
+    "baseClass": "ConstScriptingObject",
+    "creates": ["Expansion"],
+    "references": ["Expansion", "File", "FileSystem", "Engine"],
+    "seeAlso": [
+      {
+        "class": "Expansion",
+        "reason": "ExpansionHandler is the factory that manages the collection of expansions; Expansion is a handle to a single installed expansion pack."
+      },
+      {
+        "class": "Unlocker",
+        "reason": "Unlocker manages RSA key-based product licensing; ExpansionHandler manages expansion pack installation/encryption which may use Unlocker credentials."
+      }
+    ],
+    "callbackDensity": 0.17,
+    "statefulness": 0.44,
+    "threadingExposure": 0.4
+  },
+  "Expansion": {
+    "brief": "Handle to a single installed expansion pack, providing access to its sample maps, audio files, images, data, and user presets.",
+    "domain": "preset-model",
+    "role": "handle",
+    "baseClass": "ConstScriptingObject",
+    "creates": ["File"],
+    "references": ["ExpansionHandler", "File", "Sampler"],
+    "seeAlso": [
+      {
+        "class": "ExpansionHandler",
+        "reason": "ExpansionHandler is the factory that returns Expansion references; Expansion is a handle to one specific expansion pack."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.65,
+    "threadingExposure": 0.3
+  },
+  "Unlocker": {
+    "brief": "RSA key-based product license manager for registration validation, key file handling, and expansion unlocking.",
+    "domain": "preset-model",
+    "role": "service",
+    "baseClass": "ConstScriptingObject",
+    "creates": ["File"],
+    "references": ["ExpansionHandler", "FileSystem", "File"],
+    "seeAlso": [
+      {
+        "class": "BeatportManager",
+        "reason": "Both handle product licensing/DRM but through different backends; Unlocker uses RSA key files while BeatportManager uses the Beatport SDK."
+      },
+      {
+        "class": "ExpansionHandler",
+        "reason": "Unlocker can manage expansion-level licensing; ExpansionHandler manages the expansion packs themselves."
+      }
+    ],
+    "callbackDensity": 0.06,
+    "statefulness": 0.63,
+    "threadingExposure": 0.2
+  },
+  "BeatportManager": {
+    "brief": "Beatport DRM integration service for validating product access through the Beatport SDK.",
+    "domain": "preset-model",
+    "role": "service",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": [],
+    "seeAlso": [
+      {
+        "class": "Unlocker",
+        "reason": "Both handle product DRM/licensing; BeatportManager uses the Beatport SDK while Unlocker uses RSA key file validation."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.67,
+    "threadingExposure": 0.2
+  }
+}

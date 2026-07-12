@@ -1,0 +1,140 @@
+{
+  "factoryPath": "jdsp.jcompressor",
+  "factory": "jdsp",
+  "nodeId": "jcompressor",
+  "description": "",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Detection",
+      "rationale": "Threshold and Ratio define when and how much compression occurs.",
+      "parameters": [
+        {
+          "id": "Treshold",
+          "range": { "min": -100.0, "max": 0.0, "step": 0.0, "skew": 5.422270774841309 },
+          "default": 0.0,
+          "textConverter": "Decibel",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Ratio",
+          "range": { "min": 1.0, "max": 32.0, "step": 0.0, "skew": 0.4658005833625793 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Timing",
+      "rationale": "Attack and Release control the envelope follower timing.",
+      "parameters": [
+        {
+          "id": "Attack",
+          "range": { "min": 0.0, "max": 300.0, "step": 0.0, "skew": 0.3868528008460999 },
+          "default": 1.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Release",
+          "range": { "min": 0.0, "max": 300.0, "step": 0.0, "skew": 0.2037950456142426 },
+          "default": 100.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "displayBuffers": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/jdsp/jcompressor.md",
+    "tier": "BRIEF",
+    "lines": 14
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-processing",
+      "category": "signal_path",
+      "question": "How does the node wrap JUCE's dsp::Compressor? Does it use process() with AudioBlock? How is stereo detection handled (linked or independent channels)?",
+      "context": "Need to describe the signal flow and stereo behaviour."
+    },
+    {
+      "id": "modulation-output-value",
+      "category": "parameter_behaviour",
+      "question": "The node has ModulationTargets and a DisplayBuffer. What value does the modulation output send -- gain reduction in dB, linear gain, or normalised 0-1?",
+      "context": "Phase3 doc says it sends gain reduction. Need to confirm the format and range."
+    },
+    {
+      "id": "display-buffer-content",
+      "category": "signal_path",
+      "question": "What does the DisplayBuffer contain? Is it the gain reduction curve, the envelope follower output, or the compressed signal?",
+      "context": "Need to describe what the display buffer visualises."
+    },
+    {
+      "id": "threshold-spelling",
+      "category": "description_accuracy",
+      "question": "The parameter is spelled 'Treshold' (missing 'h'). Is this intentional or a typo in the JUCE wrapper?",
+      "context": "Need to document the actual parameter ID accurately even if misspelled."
+    },
+    {
+      "id": "monophonic-confirmation",
+      "category": "signal_path",
+      "question": "No cppProperties are set. Confirm that jcompressor is indeed monophonic.",
+      "context": "Empty cppProperties needs verification."
+    },
+    {
+      "id": "no-makeup-gain",
+      "category": "parameter_behaviour",
+      "question": "There is no makeup gain parameter. Does the compressor apply any automatic makeup gain, or is the output always quieter when compressing?",
+      "context": "Phase3 doc describes this as a 'simple and lightweight compressor'. Need to confirm there is no makeup gain."
+    },
+    {
+      "id": "cpu-profile",
+      "category": "performance",
+      "question": "What is the CPU cost relative to dynamics.comp?",
+      "context": "Phase3 doc says it is 'simple and lightweight'. Need to confirm."
+    }
+  ],
+
+  "notes": "Empty description in base data. Has both ModulationTargets and a DisplayBuffer, which is unusual for a jdsp node. Phase3 doc mentions the modulation output sends gain reduction for UI visualisation. The 'Treshold' spelling (missing 'h') is notable -- this is the actual parameter ID. Not in any surveyed project usage. No cppProperties set despite having modulation output."
+}

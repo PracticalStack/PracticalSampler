@@ -1,0 +1,1 @@
+Checks whether a user preset is read-only. In the HISE IDE, always returns the value of the `ReadOnlyFactoryPresets` project setting. In exported plugins with `READ_ONLY_FACTORY_PRESETS` defined, checks a specific preset file (pass a relative path, a ScriptFile object, or omit to check the currently loaded preset).

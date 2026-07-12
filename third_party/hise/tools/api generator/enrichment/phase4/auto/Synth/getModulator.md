@@ -1,0 +1,1 @@
+Returns a `ScriptModulator` handle to the modulator with the given name within the parent synth's subtree. This includes all modulator types: LFOs, envelopes, voice start modulators, and time variant modulators. Store the reference in a `const var` at the top level of your script for reuse across callbacks.

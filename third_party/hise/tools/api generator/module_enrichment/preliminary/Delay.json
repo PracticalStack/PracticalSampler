@@ -1,0 +1,205 @@
+{
+  "moduleId": "Delay",
+  "prettyName": "Delay",
+  "type": "Effect",
+  "subtype": "MasterEffect",
+  "category": "delay",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "stereo",
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "RoutingMatrix",
+      "signalFlowRole": "skip - inferred from type/subtype"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Delay Time",
+      "rationale": "Left/right delay times with shared tempo sync toggle",
+      "parameters": [
+        {
+          "id": "DelayTimeLeft",
+          "name": "Delay Time Left",
+          "range": { "min": 0.0, "max": 3000.0, "step": 1.0 },
+          "default": "dynamic",
+          "description": "Left channel delay time in milliseconds or tempo-synced note value when sync is enabled",
+          "composite": {
+            "type": "tempoSyncMux",
+            "details": {
+              "syncParam": "TempoSync",
+              "externalInput": "HostBPM"
+            }
+          },
+          "modChain": null
+        },
+        {
+          "id": "DelayTimeRight",
+          "name": "Delay Time Right",
+          "range": { "min": 0.0, "max": 3000.0, "step": 1.0 },
+          "default": "dynamic",
+          "description": "Right channel delay time in milliseconds or tempo-synced note value when sync is enabled",
+          "composite": {
+            "type": "tempoSyncMux",
+            "details": {
+              "syncParam": "TempoSync",
+              "externalInput": "HostBPM"
+            }
+          },
+          "modChain": null
+        },
+        {
+          "id": "TempoSync",
+          "name": "Tempo Sync",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Enables tempo-synced delay times instead of milliseconds",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Feedback",
+      "rationale": "Independent left/right feedback controls",
+      "parameters": [
+        {
+          "id": "FeedbackLeft",
+          "name": "Feedback Left",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.3,
+          "description": "Left channel feedback amount where 0.0 is no repeats and 1.0 is infinite",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "FeedbackRight",
+          "name": "Feedback Right",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.3,
+          "description": "Right channel feedback amount where 0.0 is no repeats and 1.0 is infinite",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Filter",
+      "rationale": "Low-pass and high-pass filters shape the feedback tone",
+      "parameters": [
+        {
+          "id": "LowPassFreq",
+          "name": "Low-Pass Frequency",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0 },
+          "default": 20000.0,
+          "description": "Low-pass cutoff frequency applied to the delay feedback",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "HiPassFreq",
+          "name": "High-Pass Frequency",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0 },
+          "default": 40.0,
+          "description": "High-pass cutoff frequency applied to the delay feedback",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Mix",
+      "rationale": "Dry/wet balance control",
+      "parameters": [
+        {
+          "id": "Mix",
+          "name": "Mix",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.5,
+          "description": "Dry and wet balance where 0.0 is fully dry and 1.0 is fully wet",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [
+    {
+      "type": "tempoSyncMux",
+      "param": "DelayTimeLeft",
+      "details": {
+        "syncParam": "TempoSync",
+        "externalInput": "HostBPM"
+      }
+    },
+    {
+      "type": "tempoSyncMux",
+      "param": "DelayTimeRight",
+      "details": {
+        "syncParam": "TempoSync",
+        "externalInput": "HostBPM"
+      }
+    }
+  ],
+
+  "standaloneModChains": [],
+
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-order",
+      "category": "signal_path",
+      "question": "What is the complete processing order in applyEffect()? Specifically: input -> delay line write -> feedback -> filter -> delay line read -> mix -> output?",
+      "context": "Need to understand the exact signal flow for the pseudo-code."
+    },
+    {
+      "id": "filter-placement",
+      "category": "signal_path",
+      "question": "Are the low-pass and high-pass filters applied within the feedback loop (filtering the feedback signal) or on the wet output? Are they applied in series?",
+      "context": "Filter placement determines whether repeats get progressively darker/thinner."
+    },
+    {
+      "id": "crossfade-on-time-change",
+      "category": "parameter_behavior",
+      "question": "What happens when delay time changes? Is there a crossfade to prevent clicks? If so, what is the crossfade length?",
+      "context": "Users need to know if delay time automation is safe."
+    },
+    {
+      "id": "tempo-sync-values",
+      "category": "parameter_behavior",
+      "question": "When TempoSync is enabled, what note values are available? How is the parameter range mapped to note divisions?",
+      "context": "Need to document available tempo sync options."
+    },
+    {
+      "id": "mix-implementation",
+      "category": "parameter_behavior",
+      "question": "How is the Mix parameter applied? Linear crossfade, equal-power, or something else?",
+      "context": "Affects how the dry/wet balance behaves perceptually."
+    },
+    {
+      "id": "max-delay-buffer",
+      "category": "parameter_behavior",
+      "question": "What is the maximum delay buffer size? Does the 3000ms range represent the actual maximum?",
+      "context": "Users need to know the maximum delay time available."
+    },
+    {
+      "id": "performance",
+      "category": "performance",
+      "question": "Is the delay line processing per-sample or per-block? What interpolation method is used for fractional delay?",
+      "context": "Determines the CPU cost tier."
+    }
+  ],
+
+  "notes": "Delay has tempo sync (TempoSync defaults to On). The delay times have 'dynamic' defaults, likely set from the host tempo. No modulation chains are exposed. Known batch relationship: shares delay-line topology with Chorus and PhaseFX."
+}

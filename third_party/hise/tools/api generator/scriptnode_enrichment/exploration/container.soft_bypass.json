@@ -1,0 +1,17 @@
+{
+  "factoryPath": "container.soft_bypass",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "bypass_state", "label": "Bypass state", "type": "parameter", "importance": 1.0, "description": "Bypass toggle (controlled via parameter connection or UI)" },
+    { "id": "crossfade", "label": "Crossfade", "type": "process", "importance": 1.0, "description": "Linear crossfade between dry (bypassed) and wet (active) with double-ramp" },
+    { "id": "serial", "label": "Serial dispatch", "type": "process", "importance": 0.8, "description": "Children process audio serially when active" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Crossfaded output" }
+  ],
+  "edges": [
+    { "from": "in", "to": "crossfade", "type": "signal", "label": null },
+    { "from": "bypass_state", "to": "crossfade", "type": "control", "label": null },
+    { "from": "crossfade", "to": "serial", "type": "conditional", "label": "when active or transitioning" },
+    { "from": "serial", "to": "crossfade", "type": "feedback", "label": "wet signal" },
+    { "from": "crossfade", "to": "out", "type": "signal", "label": null }
+  ]
+}

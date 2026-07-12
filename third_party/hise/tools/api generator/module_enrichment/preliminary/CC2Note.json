@@ -1,0 +1,91 @@
+{
+  "moduleId": "CC2Note",
+  "prettyName": "MIDI CC to Note Generator",
+  "type": "MidiProcessor",
+  "subtype": "MidiProcessor",
+  "category": "note_processing, routing",
+
+  "io": {
+    "midiIn": "MIDI in",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [],
+
+  "parameterGroups": [
+    {
+      "label": "CC-to-Note Mapping",
+      "rationale": "Both parameters control the CC-to-note conversion: Bypass gates the entire process, ccSelector chooses which CC number triggers notes",
+      "parameters": [
+        {
+          "id": "Bypass",
+          "name": "Bypass",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Bypasses CC-to-note triggering",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "ccSelector",
+          "name": "CC Selector",
+          "range": { "min": 0.0, "max": 127.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Controller number that triggers notes",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "cc-to-note-mapping",
+      "category": "signal_path",
+      "question": "How does CC2Note transform incoming CC messages into note events in processHiseEvent()? Does it generate noteOn when CC value > 0 and noteOff when CC value == 0, or is there a different threshold/mapping?",
+      "context": "Users need to understand the exact CC-value-to-note conversion to use this module correctly."
+    },
+    {
+      "id": "note-number-source",
+      "category": "parameter_behavior",
+      "question": "How is the generated note number determined? Is it derived from the CC value, a fixed note, or some other mapping? Similarly, how is the velocity of the generated note determined?",
+      "context": "Users need to know what note number and velocity the generated events will have to set up their sound generators correctly."
+    },
+    {
+      "id": "non-matching-cc-passthrough",
+      "category": "signal_path",
+      "question": "What happens to CC messages that do not match the selected CC number? Are they passed through unchanged, or are all CC messages consumed/filtered?",
+      "context": "Users need to know whether placing this module in the MIDI chain affects other CC messages."
+    },
+    {
+      "id": "note-event-passthrough",
+      "category": "signal_path",
+      "question": "Are existing noteOn/noteOff events in the MIDI stream passed through, or does CC2Note only output generated notes?",
+      "context": "Determines whether this module can coexist with keyboard input or replaces it entirely."
+    },
+    {
+      "id": "bypass-active-notes",
+      "category": "conditional_logic",
+      "question": "When Bypass is toggled on while a note is active (CC value was nonzero), does the module send a noteOff for the active note or leave it hanging?",
+      "context": "Active note cleanup during bypass is important for avoiding stuck notes."
+    },
+    {
+      "id": "description-round-robin",
+      "category": "description_accuracy",
+      "question": "The base data description mentions 'round-robin triggering'. Is there actual round-robin logic in the module, or is this referring to a use case where the user sets up round-robin downstream?",
+      "context": "The description should accurately reflect the module's own capabilities versus suggested workflows."
+    }
+  ],
+
+  "notes": "CC2Note is a simple MidiProcessor with only two parameters and no modulation chains or interfaces. The description mentions 'round-robin triggering' which may be a use-case suggestion rather than built-in functionality - this needs C++ verification. The ccSelector default of 0 means it listens to CC#0 (Bank Select MSB) by default, which is an unusual default worth noting."
+}

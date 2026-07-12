@@ -1,0 +1,125 @@
+{
+  "factoryPath": "routing.selector",
+  "factory": "routing",
+  "nodeId": "selector",
+  "description": "A dynamic router of the first channel (pair)",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Channel Selection",
+      "rationale": "These parameters together define which channels are selected and how many are used.",
+      "parameters": [
+        {
+          "id": "ChannelIndex",
+          "range": { "min": 0, "max": 16, "step": 1, "skew": 1.0 },
+          "default": 0,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "NumChannels",
+          "range": { "min": 1, "max": 16, "step": 1, "skew": 1.0 },
+          "default": 1,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Output Behaviour",
+      "rationale": "These parameters control how the selected channels are routed to the output.",
+      "parameters": [
+        {
+          "id": "SelectOutput",
+          "range": { "min": 0, "max": 1, "step": 1, "skew": 1.0 },
+          "default": 0,
+          "textConverter": "has converter",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "ClearOtherChannels",
+          "range": { "min": 0, "max": 1, "step": 1, "skew": 1.0 },
+          "default": 1,
+          "textConverter": "has converter",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/routing/selector.md",
+    "tier": "GOOD",
+    "lines": 25
+  },
+
+  "availableImages": [
+    "selector1_2.png",
+    "selector12_34.png",
+    "selector3_1.png"
+  ],
+
+  "gaps": [
+    {
+      "id": "select-output-meaning",
+      "category": "parameter_behaviour",
+      "question": "SelectOutput has range 0-1 step 1 with a converter. What do the two values mean? Does it toggle between selecting input channels vs output channels?",
+      "context": "The converter text labels will clarify this binary toggle."
+    },
+    {
+      "id": "clear-other-channels-behaviour",
+      "category": "parameter_behaviour",
+      "question": "ClearOtherChannels defaults to 1 (on). When enabled, are non-selected channels zeroed? When disabled, do non-selected channels pass through unchanged?",
+      "context": "Determines whether the selector acts as an isolator (clear) or a swapper (no clear)."
+    },
+    {
+      "id": "channel-routing-logic",
+      "category": "signal_path",
+      "question": "How does the selector route channels? If ChannelIndex=2 and NumChannels=2, does it copy channels 2-3 to channels 0-1? Or does it shift the entire buffer?",
+      "context": "The description says 'router of the first channel (pair)' suggesting it moves selected channels to the front of the buffer."
+    },
+    {
+      "id": "polyphonic-channel-selection",
+      "category": "parameter_behaviour",
+      "question": "With IsPolyphonic true, can different voices select different channels via modulated ChannelIndex? How does per-voice channel routing work?",
+      "context": "Polyphonic channel selection could enable creative voice-per-channel effects."
+    }
+  ],
+
+  "notes": "routing.selector has multiple images available showing different configurations (1->2, 12->34, 3->1). SelectOutput and ClearOtherChannels are boolean toggles with text converters. The description 'A dynamic router of the first channel (pair)' is somewhat vague. IsPolyphonic suggests per-voice channel selection is possible."
+}

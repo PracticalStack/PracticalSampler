@@ -1,0 +1,809 @@
+{
+  "className": "Graphics",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "addDropShadowFromAlpha": {
+      "signature": "void addDropShadowFromAlpha(var colour, int radius)",
+      "returnType": "void",
+      "description": "Adds a drop shadow based on the alpha values of the current image.",
+      "parameters": [
+        {
+          "name": "colour",
+          "type": "var"
+        },
+        {
+          "name": "radius",
+          "type": "int"
+        }
+      ]
+    },
+    "addNoise": {
+      "signature": "void addNoise(var noiseAmount)",
+      "returnType": "void",
+      "description": "Adds noise to the current layer.",
+      "parameters": [
+        {
+          "name": "noiseAmount",
+          "type": "var"
+        }
+      ]
+    },
+    "applyGamma": {
+      "signature": "void applyGamma(float gamma)",
+      "returnType": "void",
+      "description": "Applies a gamma correction to the current layer.",
+      "parameters": [
+        {
+          "name": "gamma",
+          "type": "float"
+        }
+      ]
+    },
+    "applyGradientMap": {
+      "signature": "void applyGradientMap(var darkColour, var brightColour)",
+      "returnType": "void",
+      "description": "Applies a gradient map to the brightness level of the current layer.",
+      "parameters": [
+        {
+          "name": "darkColour",
+          "type": "var"
+        },
+        {
+          "name": "brightColour",
+          "type": "var"
+        }
+      ]
+    },
+    "applyHSL": {
+      "signature": "void applyHSL(float hue, float saturation, float lightness)",
+      "returnType": "void",
+      "description": "Applies a HSL grading on the current layer.",
+      "parameters": [
+        {
+          "name": "hue",
+          "type": "float"
+        },
+        {
+          "name": "saturation",
+          "type": "float"
+        },
+        {
+          "name": "lightness",
+          "type": "float"
+        }
+      ]
+    },
+    "applyMask": {
+      "signature": "void applyMask(var path, var area, bool invert)",
+      "returnType": "void",
+      "description": "Applies a mask to the current layer.",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "var"
+        },
+        {
+          "name": "area",
+          "type": "var"
+        },
+        {
+          "name": "invert",
+          "type": "bool"
+        }
+      ]
+    },
+    "applySepia": {
+      "signature": "void applySepia()",
+      "returnType": "void",
+      "description": "Applies an oldschool sepia filter on the current layer.",
+      "parameters": []
+    },
+    "applyShader": {
+      "signature": "bool applyShader(var shader, var area)",
+      "returnType": "bool",
+      "description": "Applies an OpenGL shader to the panel. Returns false if the shader could not be compiled.",
+      "parameters": [
+        {
+          "name": "shader",
+          "type": "var"
+        },
+        {
+          "name": "area",
+          "type": "var"
+        }
+      ]
+    },
+    "applySharpness": {
+      "signature": "void applySharpness(int delta)",
+      "returnType": "void",
+      "description": "Applies a sharpen / soften filter on the current layer.",
+      "parameters": [
+        {
+          "name": "delta",
+          "type": "int"
+        }
+      ]
+    },
+    "applyVignette": {
+      "signature": "void applyVignette(float amount, float radius, float falloff)",
+      "returnType": "void",
+      "description": "Applies a vignette (dark corners on the current layer.",
+      "parameters": [
+        {
+          "name": "amount",
+          "type": "float"
+        },
+        {
+          "name": "radius",
+          "type": "float"
+        },
+        {
+          "name": "falloff",
+          "type": "float"
+        }
+      ]
+    },
+    "beginBlendLayer": {
+      "signature": "void beginBlendLayer(String blendMode, float alpha)",
+      "returnType": "void",
+      "description": "Begins a new layer that will use the given blend effect.",
+      "parameters": [
+        {
+          "name": "blendMode",
+          "type": "String"
+        },
+        {
+          "name": "alpha",
+          "type": "float"
+        }
+      ]
+    },
+    "beginLayer": {
+      "signature": "void beginLayer(bool drawOnParent)",
+      "returnType": "void",
+      "description": "Starts a new Layer.",
+      "parameters": [
+        {
+          "name": "drawOnParent",
+          "type": "bool"
+        }
+      ]
+    },
+    "boxBlur": {
+      "signature": "void boxBlur(var blurAmount)",
+      "returnType": "void",
+      "description": "Applies a box blur to the current layer.",
+      "parameters": [
+        {
+          "name": "blurAmount",
+          "type": "var"
+        }
+      ]
+    },
+    "desaturate": {
+      "signature": "void desaturate()",
+      "returnType": "void",
+      "description": "Removes all colour from the current layer.",
+      "parameters": []
+    },
+    "drawAlignedText": {
+      "signature": "void drawAlignedText(String text, var area, String alignment)",
+      "returnType": "void",
+      "description": "Draws a text with the given alignment (see the Label alignment property).",
+      "parameters": [
+        {
+          "name": "text",
+          "type": "String"
+        },
+        {
+          "name": "area",
+          "type": "var"
+        },
+        {
+          "name": "alignment",
+          "type": "String"
+        }
+      ]
+    },
+    "drawAlignedTextShadow": {
+      "signature": "void drawAlignedTextShadow(String text, var area, String alignment, var shadowData)",
+      "returnType": "void",
+      "description": "Renders a (blurred) shadow for the text.",
+      "parameters": [
+        {
+          "name": "text",
+          "type": "String"
+        },
+        {
+          "name": "area",
+          "type": "var"
+        },
+        {
+          "name": "alignment",
+          "type": "String"
+        },
+        {
+          "name": "shadowData",
+          "type": "var"
+        }
+      ]
+    },
+    "drawDropShadow": {
+      "signature": "void drawDropShadow(var area, var colour, int radius)",
+      "returnType": "void",
+      "description": "Draws a drop shadow around a rectangle.",
+      "parameters": [
+        {
+          "name": "area",
+          "type": "var"
+        },
+        {
+          "name": "colour",
+          "type": "var"
+        },
+        {
+          "name": "radius",
+          "type": "int"
+        }
+      ]
+    },
+    "drawDropShadowFromPath": {
+      "signature": "void drawDropShadowFromPath(var path, var area, var colour, int radius, var offset)",
+      "returnType": "void",
+      "description": "Draws a drop shadow from a path using melatonin blur.",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "var"
+        },
+        {
+          "name": "area",
+          "type": "var"
+        },
+        {
+          "name": "colour",
+          "type": "var"
+        },
+        {
+          "name": "radius",
+          "type": "int"
+        },
+        {
+          "name": "offset",
+          "type": "var"
+        }
+      ]
+    },
+    "drawEllipse": {
+      "signature": "void drawEllipse(var area, float lineThickness)",
+      "returnType": "void",
+      "description": "Draws a ellipse in the given area.",
+      "parameters": [
+        {
+          "name": "area",
+          "type": "var"
+        },
+        {
+          "name": "lineThickness",
+          "type": "float"
+        }
+      ]
+    },
+    "drawFFTSpectrum": {
+      "signature": "void drawFFTSpectrum(var fftObject, var area)",
+      "returnType": "void",
+      "description": "Draws the spectrum of the FFT object to the panel.",
+      "parameters": [
+        {
+          "name": "fftObject",
+          "type": "var"
+        },
+        {
+          "name": "area",
+          "type": "var"
+        }
+      ]
+    },
+    "drawFittedText": {
+      "signature": "void drawFittedText(String text, var area, String alignment, int maxLines, float scale)",
+      "returnType": "void",
+      "description": "Tries to draw a text string inside a given space.",
+      "parameters": [
+        {
+          "name": "text",
+          "type": "String"
+        },
+        {
+          "name": "area",
+          "type": "var"
+        },
+        {
+          "name": "alignment",
+          "type": "String"
+        },
+        {
+          "name": "maxLines",
+          "type": "int"
+        },
+        {
+          "name": "scale",
+          "type": "float"
+        }
+      ]
+    },
+    "drawHorizontalLine": {
+      "signature": "void drawHorizontalLine(int y, float x1, float x2)",
+      "returnType": "void",
+      "description": "Draws a (non interpolated) horizontal line.",
+      "parameters": [
+        {
+          "name": "y",
+          "type": "int"
+        },
+        {
+          "name": "x1",
+          "type": "float"
+        },
+        {
+          "name": "x2",
+          "type": "float"
+        }
+      ]
+    },
+    "drawImage": {
+      "signature": "void drawImage(String imageName, var area, int xOffset, int yOffset)",
+      "returnType": "void",
+      "description": "Draws a image into the area.",
+      "parameters": [
+        {
+          "name": "imageName",
+          "type": "String"
+        },
+        {
+          "name": "area",
+          "type": "var"
+        },
+        {
+          "name": "xOffset",
+          "type": "int"
+        },
+        {
+          "name": "yOffset",
+          "type": "int"
+        }
+      ]
+    },
+    "drawInnerShadowFromPath": {
+      "signature": "void drawInnerShadowFromPath(var path, var area, var colour, int radius, var offset)",
+      "returnType": "void",
+      "description": "Draws an inner shadow for the given path using melatonin blur.",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "var"
+        },
+        {
+          "name": "area",
+          "type": "var"
+        },
+        {
+          "name": "colour",
+          "type": "var"
+        },
+        {
+          "name": "radius",
+          "type": "int"
+        },
+        {
+          "name": "offset",
+          "type": "var"
+        }
+      ]
+    },
+    "drawLine": {
+      "signature": "void drawLine(float x1, float x2, float y1, float y2, float lineThickness)",
+      "returnType": "void",
+      "description": "Draws a line.",
+      "parameters": [
+        {
+          "name": "x1",
+          "type": "float"
+        },
+        {
+          "name": "x2",
+          "type": "float"
+        },
+        {
+          "name": "y1",
+          "type": "float"
+        },
+        {
+          "name": "y2",
+          "type": "float"
+        },
+        {
+          "name": "lineThickness",
+          "type": "float"
+        }
+      ]
+    },
+    "drawMarkdownText": {
+      "signature": "void drawMarkdownText(var markdownRenderer)",
+      "returnType": "void",
+      "description": "Draws the text of the given markdown renderer to its specified area.",
+      "parameters": [
+        {
+          "name": "markdownRenderer",
+          "type": "var"
+        }
+      ]
+    },
+    "drawMultiLineText": {
+      "signature": "void drawMultiLineText(String text, var xy, int maxWidth, String alignment, float leading)",
+      "returnType": "void",
+      "description": "Break to new lines when the text becomes wider than maxWidth.",
+      "parameters": [
+        {
+          "name": "text",
+          "type": "String"
+        },
+        {
+          "name": "xy",
+          "type": "var"
+        },
+        {
+          "name": "maxWidth",
+          "type": "int"
+        },
+        {
+          "name": "alignment",
+          "type": "String"
+        },
+        {
+          "name": "leading",
+          "type": "float"
+        }
+      ]
+    },
+    "drawPath": {
+      "signature": "void drawPath(var path, var area, var strokeStyle)",
+      "returnType": "void",
+      "description": "Draws the given path.",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "var"
+        },
+        {
+          "name": "area",
+          "type": "var"
+        },
+        {
+          "name": "strokeStyle",
+          "type": "var"
+        }
+      ]
+    },
+    "drawRect": {
+      "signature": "void drawRect(var area, float borderSize)",
+      "returnType": "void",
+      "description": "Draws a rectangle.",
+      "parameters": [
+        {
+          "name": "area",
+          "type": "var"
+        },
+        {
+          "name": "borderSize",
+          "type": "float"
+        }
+      ]
+    },
+    "drawRepaintMarker": {
+      "signature": "void drawRepaintMarker(String label)",
+      "returnType": "void",
+      "description": "fills the entire component with a random colour to indicate a UI repaint.",
+      "parameters": [
+        {
+          "name": "label",
+          "type": "String"
+        }
+      ]
+    },
+    "drawRoundedRectangle": {
+      "signature": "void drawRoundedRectangle(var area, var cornerData, float borderSize)",
+      "returnType": "void",
+      "description": "Draws a rounded rectangle. cornerData can be either a float number (for the corner size) or a JSON object for more customization options.",
+      "parameters": [
+        {
+          "name": "area",
+          "type": "var"
+        },
+        {
+          "name": "cornerData",
+          "type": "var"
+        },
+        {
+          "name": "borderSize",
+          "type": "float"
+        }
+      ]
+    },
+    "drawSVG": {
+      "signature": "void drawSVG(var svgObject, var bounds, float opacity)",
+      "returnType": "void",
+      "description": "Draws a SVG object within the given bounds and opacity.",
+      "parameters": [
+        {
+          "name": "svgObject",
+          "type": "var"
+        },
+        {
+          "name": "bounds",
+          "type": "var"
+        },
+        {
+          "name": "opacity",
+          "type": "float"
+        }
+      ]
+    },
+    "drawText": {
+      "signature": "void drawText(String text, var area)",
+      "returnType": "void",
+      "description": "Draws a centered and vertically stretched text.",
+      "parameters": [
+        {
+          "name": "text",
+          "type": "String"
+        },
+        {
+          "name": "area",
+          "type": "var"
+        }
+      ]
+    },
+    "drawTriangle": {
+      "signature": "void drawTriangle(var area, float angle, float lineThickness)",
+      "returnType": "void",
+      "description": "Draws a triangle rotated by the angle in radians.",
+      "parameters": [
+        {
+          "name": "area",
+          "type": "var"
+        },
+        {
+          "name": "angle",
+          "type": "float"
+        },
+        {
+          "name": "lineThickness",
+          "type": "float"
+        }
+      ]
+    },
+    "drawVerticalLine": {
+      "signature": "void drawVerticalLine(int x, float y1, float y2)",
+      "returnType": "void",
+      "description": "Draws a (non interpolated) vertical line.",
+      "parameters": [
+        {
+          "name": "x",
+          "type": "int"
+        },
+        {
+          "name": "y1",
+          "type": "float"
+        },
+        {
+          "name": "y2",
+          "type": "float"
+        }
+      ]
+    },
+    "endLayer": {
+      "signature": "void endLayer()",
+      "returnType": "void",
+      "description": "flushes the current layer.",
+      "parameters": []
+    },
+    "fillAll": {
+      "signature": "void fillAll(var colour)",
+      "returnType": "void",
+      "description": "Fills the whole area with the given colour.",
+      "parameters": [
+        {
+          "name": "colour",
+          "type": "var"
+        }
+      ]
+    },
+    "fillEllipse": {
+      "signature": "void fillEllipse(var area)",
+      "returnType": "void",
+      "description": "Fills a ellipse in the given area.",
+      "parameters": [
+        {
+          "name": "area",
+          "type": "var"
+        }
+      ]
+    },
+    "fillPath": {
+      "signature": "void fillPath(var path, var area)",
+      "returnType": "void",
+      "description": "Fills a Path.",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "var"
+        },
+        {
+          "name": "area",
+          "type": "var"
+        }
+      ]
+    },
+    "fillRect": {
+      "signature": "void fillRect(var area)",
+      "returnType": "void",
+      "description": "Fills a rectangle with the given colour.",
+      "parameters": [
+        {
+          "name": "area",
+          "type": "var"
+        }
+      ]
+    },
+    "fillRoundedRectangle": {
+      "signature": "void fillRoundedRectangle(var area, var cornerData)",
+      "returnType": "void",
+      "description": "Fills a rounded rectangle. cornerData can be either a float number (for the corner size) or a JSON object for more customization options.",
+      "parameters": [
+        {
+          "name": "area",
+          "type": "var"
+        },
+        {
+          "name": "cornerData",
+          "type": "var"
+        }
+      ]
+    },
+    "fillTriangle": {
+      "signature": "void fillTriangle(var area, float angle)",
+      "returnType": "void",
+      "description": "Fills a triangle rotated by the angle in radians.",
+      "parameters": [
+        {
+          "name": "area",
+          "type": "var"
+        },
+        {
+          "name": "angle",
+          "type": "float"
+        }
+      ]
+    },
+    "flip": {
+      "signature": "void flip(bool horizontally, var totalArea)",
+      "returnType": "void",
+      "description": "Flips the canvas at the center.",
+      "parameters": [
+        {
+          "name": "horizontally",
+          "type": "bool"
+        },
+        {
+          "name": "totalArea",
+          "type": "var"
+        }
+      ]
+    },
+    "gaussianBlur": {
+      "signature": "void gaussianBlur(var blurAmount)",
+      "returnType": "void",
+      "description": "Applies gaussian blur to the current layer.",
+      "parameters": [
+        {
+          "name": "blurAmount",
+          "type": "var"
+        }
+      ]
+    },
+    "getStringWidth": {
+      "signature": "float getStringWidth(String text)",
+      "returnType": "float",
+      "description": "Returns the width of the string using the current font.",
+      "parameters": [
+        {
+          "name": "text",
+          "type": "String"
+        }
+      ]
+    },
+    "rotate": {
+      "signature": "void rotate(var angleInRadian, var center)",
+      "returnType": "void",
+      "description": "Rotates the canvas around center `[x, y]` by the given amount in radian.",
+      "parameters": [
+        {
+          "name": "angleInRadian",
+          "type": "var"
+        },
+        {
+          "name": "center",
+          "type": "var"
+        }
+      ]
+    },
+    "setColour": {
+      "signature": "void setColour(var colour)",
+      "returnType": "void",
+      "description": "Sets the current colour.",
+      "parameters": [
+        {
+          "name": "colour",
+          "type": "var"
+        }
+      ]
+    },
+    "setFont": {
+      "signature": "void setFont(String fontName, float fontSize)",
+      "returnType": "void",
+      "description": "Sets the current font.",
+      "parameters": [
+        {
+          "name": "fontName",
+          "type": "String"
+        },
+        {
+          "name": "fontSize",
+          "type": "float"
+        }
+      ]
+    },
+    "setFontWithSpacing": {
+      "signature": "void setFontWithSpacing(String fontName, float fontSize, float spacing)",
+      "returnType": "void",
+      "description": "Sets the current font with the specified spacing between the characters.",
+      "parameters": [
+        {
+          "name": "fontName",
+          "type": "String"
+        },
+        {
+          "name": "fontSize",
+          "type": "float"
+        },
+        {
+          "name": "spacing",
+          "type": "float"
+        }
+      ]
+    },
+    "setGradientFill": {
+      "signature": "void setGradientFill(var gradientData)",
+      "returnType": "void",
+      "description": "Sets the current gradient via an array [Colour1, x1, y1, Colour2, x2, y2]",
+      "parameters": [
+        {
+          "name": "gradientData",
+          "type": "var"
+        }
+      ]
+    },
+    "setOpacity": {
+      "signature": "void setOpacity(float alphaValue)",
+      "returnType": "void",
+      "description": "Sets a global transparency level.",
+      "parameters": [
+        {
+          "name": "alphaValue",
+          "type": "float"
+        }
+      ]
+    }
+  }
+}

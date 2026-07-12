@@ -1,0 +1,16 @@
+{
+  "factoryPath": "control.ppq",
+  "nodes": [
+    { "id": "transport", "label": "Transport Event", "type": "input", "importance": 1.0, "description": "Transport start or resync event with PPQ position" },
+    { "id": "tempo", "label": "Tempo", "type": "parameter", "importance": 0.9, "description": "Musical time value defining loop length" },
+    { "id": "multiplier", "label": "Multiplier", "type": "parameter", "importance": 0.7, "description": "Multiplier for loop length" },
+    { "id": "wrap", "label": "PPQ Wrap", "type": "process", "importance": 1.0, "description": "fmod(ppqPos, loopLength) / loopLength -> 0..1" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Normalised position within loop (0..1)" }
+  ],
+  "edges": [
+    { "from": "transport", "to": "wrap", "type": "signal", "label": "ppq position" },
+    { "from": "tempo", "to": "wrap", "type": "control", "label": "loop length" },
+    { "from": "multiplier", "to": "wrap", "type": "control", "label": "loop length multiplier" },
+    { "from": "wrap", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

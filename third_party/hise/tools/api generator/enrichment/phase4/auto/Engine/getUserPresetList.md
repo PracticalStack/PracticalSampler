@@ -1,0 +1,1 @@
+Returns an array of all available user preset paths as strings. Each entry is a relative path from the UserPresets directory without the `.preset` extension, using forward slashes (e.g., `"Bass/Deep Bass"`).

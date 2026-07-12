@@ -1,0 +1,70 @@
+{
+  "factoryPath": "math.clip",
+  "factory": "math",
+  "nodeId": "clip",
+  "description": "Truncates the signal range (on both ends) using the Value as limit",
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+  "parameterGroups": [
+    {
+      "label": "Operation",
+      "rationale": "Single Value parameter controlling the math operation: clamp to [-value, value]",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": {
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.0,
+            "skew": 1.0
+          },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+  "properties": [],
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/math/clip.md",
+    "tier": "BRIEF",
+    "lines": 12
+  },
+  "availableImages": [],
+  "gaps": [
+    {
+      "id": "clip-opsingle-bug-impact",
+      "category": "signal_path",
+      "question": "The opSingle path multiplies s by the clamped value instead of just clamping. In what container configurations does the frame path get used vs the block path?",
+      "context": "Users need to know whether this bug affects their use case depending on the container context (fix_block vs chain)."
+    }
+  ],
+  "notes": "Known bug: the frame-processing path (opSingle) computes s *= jlimit(-value, value, s) instead of s = jlimit(-value, value, s). The block path correctly uses vclip. This means clip behaves differently depending on whether it is in a frame-based or block-based container."
+}

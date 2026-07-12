@@ -1,0 +1,1 @@
+Defines which key presses this component consumes. Must be called before `setKeyPressCallback()`. Pass `"all"` to catch all keys exclusively, `"all_nonexclusive"` to catch all keys while still letting parents receive them, or an array of key description strings (e.g. `["ctrl + S", "F5", "escape"]`) or JSON objects with `keyCode`, `shift`, `cmd`, `alt` properties.

@@ -1,0 +1,86 @@
+{
+  "factoryPath": "math.pack",
+  "factory": "math",
+  "nodeId": "pack",
+  "description": "Processes the signal with the slider pack as LUT function",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 1,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/math/pack.md",
+    "tier": "BRIEF",
+    "lines": 12
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "input-scaling-with-pack-size",
+      "category": "signal_path",
+      "question": "How does the input scaling work with variable pack size? The hmath.md says 'input scaled by pack size' -- does this mean the input is multiplied by the pack size to produce an index, or is the input expected in [0,1] and internally scaled? What index type is used?",
+      "context": "Users need to understand what input range to provide and how changing the pack size affects the mapping."
+    },
+    {
+      "id": "pack-interpolation",
+      "category": "signal_path",
+      "question": "What interpolation is used between slider pack values? Linear interpolation between adjacent entries, or nearest-neighbour (step function)?",
+      "context": "Interpolation method determines whether the output is smooth or stepped, which matters for waveshaping vs step-sequencer use cases."
+    },
+    {
+      "id": "functional-difference-from-table",
+      "category": "signal_path",
+      "question": "How does math.pack differ from math.table functionally? The hmath.md says they use the same template with DataSize=0 for pack. What are the practical differences beyond data source (SliderPack vs Table)?",
+      "context": "Users need guidance on when to use math.pack vs math.table. Key differences likely include resolution (variable vs 512), UI (sliders vs curve), and possibly interpolation."
+    },
+    {
+      "id": "pack-size-range",
+      "category": "parameter_behaviour",
+      "question": "What are the minimum and maximum slider pack sizes supported? Can the pack be resized at runtime, and if so, does this cause audio glitches?",
+      "context": "Users need to know the practical limits and whether dynamic resizing is safe."
+    },
+    {
+      "id": "out-of-range-input",
+      "category": "signal_path",
+      "question": "What happens when the input value falls outside the expected range? Is it clamped, wrapped, or does it produce undefined output?",
+      "context": "Important for understanding boundary behaviour when using with audio signals that may exceed expected ranges."
+    }
+  ],
+
+  "notes": "math.pack is the SliderPack counterpart to math.table. Both are LUT nodes but math.pack uses SliderPack external data with variable size instead of the fixed 512-sample Table. The hmath.md notes they share the same C++ template with DataSize=0 for pack (vs a fixed DataSize for table). No parameters, no cppProperties. The existing doc is BRIEF (12 lines). Unlike math.table which has a fixed 512-sample resolution, the pack size is user-configurable."
+}

@@ -1,0 +1,1 @@
+Returns a new Rectangle with the same size, repositioned so its centre is at the given coordinates. This is the non-mutating version of `setCentre()`.

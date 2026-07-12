@@ -1,0 +1,103 @@
+{
+  "factoryPath": "routing.local_cable",
+  "factory": "routing",
+  "nodeId": "local_cable",
+  "description": "",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Value",
+      "rationale": "The control value routed through this local cable.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0, "max": 1, "step": 0, "skew": 1.0 },
+          "default": 0,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "LocalId",
+      "defaultValue": "",
+      "type": "string",
+      "note": "String identifier for this local cable within the current network. Multiple local_cable nodes with the same LocalId share the same value -- setting Value on one updates all others with the same ID."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/routing/local_cable.md",
+    "tier": "GOOD",
+    "lines": 35
+  },
+
+  "availableImages": [
+    "local_cable_clean.png"
+  ],
+
+  "gaps": [
+    {
+      "id": "empty-description",
+      "category": "description_accuracy",
+      "question": "The base data description is empty. What is an accurate description of this node?",
+      "context": "From context: it is a local (within-network) control value cable with normalised 0..1 range. Need a concise description for the reference page."
+    },
+    {
+      "id": "local-cable-value-flow",
+      "category": "signal_path",
+      "question": "How does the value flow between local_cable nodes sharing the same LocalId? When one node's Value parameter changes, do all others update? Is there a recursion guard like global_cable?",
+      "context": "Users need to understand whether local_cable is bidirectional or unidirectional."
+    },
+    {
+      "id": "scope-limitation",
+      "category": "signal_path",
+      "question": "Is the local cable strictly scoped to one DspNetwork, or can it cross into nested networks? What is the exact scope boundary?",
+      "context": "From infrastructure: local cables are within one network (unlike global cables). Confirm the exact scoping rules."
+    },
+    {
+      "id": "compilation-support",
+      "category": "signal_path",
+      "question": "Local cables are compileable to C++ (unlike global_send/receive). How are they represented in compiled code -- as direct parameter connections or as a shared variable?",
+      "context": "Users doing C++ export need to know if local cables are preserved or require restructuring."
+    }
+  ],
+
+  "notes": "routing.local_cable is a control node within a single network. Unlike routing.global_cable which crosses network boundaries and is always 0..1, the local cable is network-scoped. It is compileable to C++. The empty description needs to be filled. One image available (local_cable_clean.png). The infrastructure comparison table shows: local cables have arbitrary value range and no OSC support, vs global cables with 0..1 clamping and OSC support. However the parameter range IS 0..1, so the 'arbitrary' range may refer to the unscaled variant."
+}

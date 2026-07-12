@@ -1,0 +1,1 @@
+Renders the specified frame of the loaded Lottie animation. Pair with a timer callback to create animated playback by incrementing the frame number on each tick. Use `getAnimationData().numFrames` to determine the valid frame range.

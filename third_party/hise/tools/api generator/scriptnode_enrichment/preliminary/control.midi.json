@@ -1,0 +1,81 @@
+{
+  "factoryPath": "control.midi",
+  "factory": "control",
+  "nodeId": "midi",
+  "description": "Create a modulation signal from MIDI input",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": true,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "Mode",
+      "defaultValue": "Gate",
+      "type": "enum",
+      "note": "Selects which MIDI data to convert: Gate, Velocity, NoteNumber, Frequency, Random. Maps to a C++ template argument (HasModeTemplateArgument). TemplateArgumentIsPolyphonic means the mode selection also affects polyphonic behaviour."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/midi.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "mode-variants",
+      "category": "conditional_logic",
+      "question": "Confirm all available Mode values. From hise-event.md we know: Gate, Velocity, NoteNumber, Frequency, Random. Are there others? What is the exact output range for each?",
+      "context": "Each mode produces a different normalised value. Users need to know the mapping for each."
+    },
+    {
+      "id": "processing-pattern",
+      "category": "signal_path",
+      "question": "control.midi does NOT have OutsideSignalPath or IsControlNode. It uses wrap::mod pattern instead of direct parameter output. Confirm: does it have non-empty process()/processFrame() methods, or is it purely event-driven via handleHiseEvent()?",
+      "context": "This node is unusual among control nodes -- it sits in the signal path and uses the modulation wrapper. This affects how it should be documented."
+    },
+    {
+      "id": "polyphonic-template",
+      "category": "parameter_behaviour",
+      "question": "TemplateArgumentIsPolyphonic is true. Does this mean the Mode template also controls whether the node is polyphonic? For example, is Gate mode polyphonic while Velocity is monophonic?",
+      "context": "Polyphonic behaviour per mode is critical for users placing this in poly containers."
+    }
+  ],
+
+  "notes": "IMPORTANT: control.midi does NOT have OutsideSignalPath or IsControlNode in cppProperties. It only has IsProcessingHiseEvent, TemplateArgumentIsPolyphonic, and HasModeTemplateArgument. This means it sits IN the signal path and uses the wrap::mod pattern (Pattern 6 from control-infrastructure). No parameters at all. The midi_logic namespace provides Gate, Velocity, NoteNumber, Frequency, Random modes."
+}

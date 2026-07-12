@@ -1,0 +1,1 @@
+Sets the coarse detune amount in semitones (-128 to 127) for this event. This per-event pitch modifier works together with `setFineDetune()` and is applied during voice rendering. Unlike `setTransposeAmount()`, coarse detune does not affect NoteOn/NoteOff matching.

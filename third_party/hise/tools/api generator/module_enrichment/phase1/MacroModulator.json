@@ -1,0 +1,51 @@
+{
+  "moduleId": "MacroModulator",
+  "notes": "Implemented as a TimeVariantModulator. The macro slot value arrives via macroControllerMoved() called by the macro control system, not via the audio signal path. The smoothing operates at the control rate (sampleRate / HISE_CONTROL_RATE_DOWNSAMPLING_FACTOR). When smoothing is active, calculateBlock() processes sample-by-sample; otherwise it fills the buffer with a constant value. The table lookup is applied in macroControllerMoved() before smoothing, so the smoother operates on the post-table value. MacroValue is a write-only parameter driven by the macro system - getAttribute returns a hardcoded 1.0 with jassertfalse.",
+  "nodes": [
+    {
+      "id": "macro_slot",
+      "label": "Macro Slot",
+      "type": "external_input",
+      "detail": "Value from macro controller system (0..1)",
+      "scope": "monophonic",
+      "importance": 1.0,
+      "parameters": ["MacroIndex"]
+    },
+    {
+      "id": "table_lookup",
+      "label": "Table Lookup",
+      "type": "table",
+      "detail": "Optional response curve",
+      "scope": "shared_resource",
+      "importance": 0.7,
+      "parameters": ["UseTable"],
+      "condition": {
+        "parameter": "UseTable",
+        "whenTrue": "Macro value passed through lookup table",
+        "whenFalse": "Macro value passed through directly"
+      }
+    },
+    {
+      "id": "smoothing",
+      "label": "Smoothing",
+      "type": "audio",
+      "detail": "Per-sample smoother at control rate",
+      "scope": "monophonic",
+      "importance": 0.8,
+      "parameters": ["SmoothTime"]
+    },
+    {
+      "id": "output",
+      "label": "Mod Output",
+      "type": "modulation",
+      "detail": "Monophonic time-variant modulation output",
+      "scope": "monophonic",
+      "importance": 1.0
+    }
+  ],
+  "edges": [
+    { "from": "macro_slot", "to": "table_lookup", "type": "signal" },
+    { "from": "table_lookup", "to": "smoothing", "type": "signal" },
+    { "from": "smoothing", "to": "output", "type": "signal" }
+  ]
+}

@@ -1,0 +1,63 @@
+---
+title: fix128_block
+description: "Splits the audio buffer into chunks of 128 samples for higher modulation update rates."
+factoryPath: container.fix128_block
+factory: container
+polyphonic: false
+tags: [container, block-size, modulation-precision]
+cpuProfile:
+  baseline: negligible
+  polyphonic: false
+  scalingFactors: []
+seeAlso:
+  - { id: "container.fix_blockx", type: alternative, reason: "Adjustable block size via property for evaluating different chunk sizes" }
+  - { id: "container.frame2_block", type: disambiguation, reason: "Per-sample processing instead of block chunking" }
+llmRef: |
+  container.fix128_block
+
+  Serial container that splits the incoming audio buffer into chunks of at most 128 samples. Children process each chunk sequentially. Increases modulation update rate to roughly 345 Hz at 44.1 kHz sample rate.
+
+  Signal flow:
+    audio in -> split into 128-sample chunks -> children process each chunk serially -> audio out
+
+  CPU: negligible, monophonic
+
+  Parameters: none
+
+  When to use:
+    When a moderate modulation update improvement is needed with very low overhead (4 iterations for a 512-sample buffer). Suitable for slow modulation such as vibrato or tremolo where the host buffer rate is too coarse.
+
+  See also:
+    [alternative] container.fix_blockx - adjustable block size via property
+    [disambiguation] container.frame2_block - per-sample processing instead of block chunking
+---
+
+The `fix128_block` container splits the incoming audio buffer into chunks of at most 128 samples and processes its children serially on each chunk. This provides a modulation update rate of roughly 345 Hz at 44.1 kHz sample rate with very low overhead (4 iterations for a 512-sample buffer).
+
+This is a lightweight option when the host buffer is large (512 or 1024 samples) and modulation parameters only need a modest update rate improvement. Slow modulation sources such as vibrato LFOs or gradual filter sweeps benefit from this subdivision without adding meaningful CPU cost. For faster modulation, consider [fix64_block]($SN.container.fix64_block$) or [fix32_block]($SN.container.fix32_block$).
+
+## Signal Path
+
+::signal-path
+---
+glossary:
+  functions:
+    children.process:
+      desc: "Processes all child nodes serially on the current chunk"
+---
+
+```
+// container.fix128_block - splits buffer into 128-sample chunks
+// audio in -> audio out
+
+process(input) {
+    for each chunk of 128 samples in input:
+        children.process(chunk)
+}
+```
+
+::
+
+The block size of 128 is a maximum -- the last chunk may be smaller if the host buffer size is not a multiple of 128. MIDI events are distributed across chunks by timestamp for sub-block timing accuracy. When bypassed, children process the full host buffer without chunking, equivalent to a [container.chain]($SN.container.chain$). Toggling bypass triggers a full re-preparation of all children. If the network is already in frame mode, this container becomes a no-op.
+
+**See also:** $SN.container.fix_blockx$ -- adjustable block size via property, $SN.container.frame2_block$ -- per-sample processing instead of block chunking

@@ -1,0 +1,1 @@
+Creates a thread-safe storage container for exchanging data between the audio thread and the scripting/UI thread without locks. The container provides lock-free read/write methods that avoid unsafe shared variable access across threads.

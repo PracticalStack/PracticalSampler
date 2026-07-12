@@ -1,0 +1,1 @@
+Sets a modulator attribute by parameter index. Use the dynamic parameter constants (e.g., `mod.Frequency`, `mod.Attack`) for readability, or `getAttributeIndex` when the parameter name is in a variable. The bracket-write operator `mod["Frequency"] = 2.5` is an equivalent shorthand.

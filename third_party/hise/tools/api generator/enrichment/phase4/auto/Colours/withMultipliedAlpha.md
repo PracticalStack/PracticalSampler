@@ -1,0 +1,1 @@
+Scales the existing alpha channel by the given factor rather than replacing it. A factor of 0.0 makes the colour fully transparent, 1.0 leaves it unchanged, and values above 1.0 increase opacity (clamped to the byte range internally). Use this instead of `Colours.withAlpha()` when fading a colour that may already have partial transparency and you want to preserve that proportion.

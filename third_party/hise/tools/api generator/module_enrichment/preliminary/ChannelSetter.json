@@ -1,0 +1,64 @@
+{
+  "moduleId": "ChannelSetter",
+  "prettyName": "MIDI Channel Setter",
+  "type": "MidiProcessor",
+  "subtype": "MidiProcessor",
+  "category": "routing, note_processing",
+
+  "io": {
+    "midiIn": "MIDI_in",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [],
+
+  "parameterGroups": [
+    {
+      "label": "Channel Assignment",
+      "rationale": "Single parameter controlling the target MIDI channel for all incoming messages",
+      "parameters": [
+        {
+          "id": "channelNumber",
+          "name": "Channel Number",
+          "range": { "min": 1.0, "max": 16.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "MIDI channel assigned to all incoming messages",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "message-types-affected",
+      "category": "signal_path",
+      "question": "Which MIDI message types does ChannelSetter rewrite? Does it affect all channel messages (noteOn, noteOff, CC, pitchBend, aftertouch, programChange) or only a subset?",
+      "context": "Users need to know if routing controllers and notes to different channels requires separate handling or if ChannelSetter covers everything."
+    },
+    {
+      "id": "processing-method",
+      "category": "signal_path",
+      "question": "How is the channel rewrite implemented in processHiseEvent()? Is it a simple setChannel() call on each event, or is there filtering or conditional logic?",
+      "context": "Determines whether the reference page shows a trivial one-line transform or something more involved."
+    },
+    {
+      "id": "channel-parameter-application",
+      "category": "parameter_behavior",
+      "question": "Is the channelNumber parameter applied to events in real time (affects already-sounding notes' subsequent messages) or only to new events? Does changing channelNumber mid-stream cause orphaned noteOff messages on the old channel?",
+      "context": "Important for users who automate or switch channels during playback - orphaned notes would cause stuck notes."
+    }
+  ],
+
+  "notes": "ChannelSetter is one of the simplest MIDI processors - a single discrete parameter that rewrites the MIDI channel. The base data fields builderPath ('b.MidiProcessors.ChannelSetter') and metadataType ('static') are not part of the preliminary schema but were present in the input. No interfaces, no modulation chains, no children, no FX chain. The module pairs naturally with ChannelFilter (which reads channels) as a complementary routing tool."
+}

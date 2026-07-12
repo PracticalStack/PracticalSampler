@@ -1,0 +1,1 @@
+Controls whether each macro slot allows only one parameter connection. When enabled, adding a new connection to a slot automatically removes the previous one. This is the expected mode for NKS and DAW automation workflows where each macro knob should control exactly one parameter.

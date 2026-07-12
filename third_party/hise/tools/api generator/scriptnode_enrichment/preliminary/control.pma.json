@@ -1,0 +1,108 @@
+{
+  "factoryPath": "control.pma",
+  "factory": "control",
+  "nodeId": "pma",
+  "description": "Scales and offsets a modulation signal",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input Signal",
+      "rationale": "Value is the primary input that receives the modulation signal to be transformed.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Transformation",
+      "rationale": "Multiply and Add together define the affine transformation applied to the input: output = Value * Multiply + Add, clamped to 0..1.",
+      "parameters": [
+        {
+          "id": "Multiply",
+          "range": { "min": -1.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Add",
+          "range": { "min": -1.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/pma.md",
+    "tier": "BRIEF",
+    "lines": 15
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "pma-formula-verification",
+      "category": "signal_path",
+      "question": "In multilogic::pma::getValue(), is the formula exactly jlimit(0.0, 1.0, value * mulValue + addValue)? Does the clamping always apply?",
+      "context": "Need to confirm the exact formula and clamping behaviour for accurate documentation of the normalised output."
+    },
+    {
+      "id": "pma-dirty-flag-semantics",
+      "category": "parameter_behaviour",
+      "question": "When multiple parameters change in rapid succession, does sendPending() coalesce them into a single output, or does each parameter change trigger an output?",
+      "context": "Affects user expectations about update frequency and whether intermediate states are sent."
+    },
+    {
+      "id": "pma-polyphonic-voice-handling",
+      "category": "parameter_behaviour",
+      "question": "In polyphonic mode, does setParameter iterate all voices while sendPending reads only the current voice? Does this mean UI changes affect all voices but modulation changes affect only the active voice?",
+      "context": "Important for documenting polyphonic behaviour and voice-specific modulation routing."
+    }
+  ],
+
+  "notes": "pma is the normalised variant; pma_unscaled is the unnormalised variant. Both use the multi_parameter template with multilogic::pma / multilogic::pma_unscaled. pma is one of the most commonly used control nodes -- the fundamental value-scaling building block in scriptnode. Output is normalised (0..1), meaning target parameter ranges are applied by the connection system."
+}

@@ -1,0 +1,1 @@
+Sets the maximum number of file downloads that can run in parallel. Use this to throttle bandwidth consumption when downloading multiple files (e.g. expansion packs or sample libraries). Downloads beyond the limit are queued and start automatically as earlier downloads complete.

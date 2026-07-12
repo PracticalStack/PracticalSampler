@@ -1,0 +1,12 @@
+{
+  "factoryPath": "core.mono2stereo",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input signal (must have 2+ channels)" },
+    { "id": "copy", "label": "Copy L->R", "type": "process", "importance": 1.0, "description": "Copies channel 0 to channel 1" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Channel 0 unchanged, channel 1 = copy of channel 0" }
+  ],
+  "edges": [
+    { "from": "in", "to": "copy", "type": "signal", "label": null },
+    { "from": "copy", "to": "out", "type": "signal", "label": null }
+  ]
+}

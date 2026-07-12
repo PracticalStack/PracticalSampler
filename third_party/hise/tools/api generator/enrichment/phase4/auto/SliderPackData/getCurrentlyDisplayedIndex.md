@@ -1,0 +1,1 @@
+Returns the current ruler/playback position as a float index. This reflects the display position driven by a ScriptSliderPack component or the underlying data's position updates. Returns 0.0 if no display index has been set.

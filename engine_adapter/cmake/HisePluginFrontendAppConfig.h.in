@@ -1,0 +1,163 @@
+#pragma once
+
+#define JUCE_ENABLE_AUDIO_GUARD 1
+
+#define JucePlugin_Name "Decent Rhapsody Studio"
+#define JucePlugin_Desc "Decent Rhapsody Studio"
+#define JucePlugin_Manufacturer "Decent Rhapsody"
+#define JucePlugin_ManufacturerWebsite "https://example.invalid"
+#define JucePlugin_ManufacturerEmail "team@example.invalid"
+#define JucePlugin_ManufacturerCode 0x44726870
+#define JucePlugin_PluginCode 0x44727330
+#define JucePlugin_Version 0x00010000
+#define JucePlugin_VersionString "0.1.0"
+#define JucePlugin_VersionCode 0x00010000
+#define JucePlugin_IsSynth 1
+#define JucePlugin_WantsMidiInput 1
+#define JucePlugin_ProducesMidiOutput 0
+#define JucePlugin_IsMidiEffect 0
+#define JucePlugin_EditorRequiresKeyboardFocus 0
+#define JucePlugin_MaxNumInputChannels 0
+#define JucePlugin_MaxNumOutputChannels 2
+#define JucePlugin_PreferredChannelConfigurations {0, 2}
+
+#define JUCE_DISPLAY_SPLASH_SCREEN 0
+#define JUCE_USE_DARK_SPLASH_SCREEN 1
+#define JUCE_PROJUCER_VERSION 0x8000e
+
+#define JUCE_MODULE_AVAILABLE_hi_core 1
+#define JUCE_MODULE_AVAILABLE_hi_dsp_library 1
+#define JUCE_MODULE_AVAILABLE_hi_frontend 1
+#define JUCE_MODULE_AVAILABLE_hi_lac 1
+#define JUCE_MODULE_AVAILABLE_hi_rlottie 1
+#define JUCE_MODULE_AVAILABLE_hi_scripting 1
+#define JUCE_MODULE_AVAILABLE_hi_snex 1
+#define JUCE_MODULE_AVAILABLE_hi_tools 1
+#define JUCE_MODULE_AVAILABLE_hi_zstd 1
+#define JUCE_MODULE_AVAILABLE_juce_audio_basics 1
+#define JUCE_MODULE_AVAILABLE_juce_audio_devices 1
+#define JUCE_MODULE_AVAILABLE_juce_audio_formats 1
+#define JUCE_MODULE_AVAILABLE_juce_audio_processors 1
+#define JUCE_MODULE_AVAILABLE_juce_audio_processors_headless 1
+#define JUCE_MODULE_AVAILABLE_juce_audio_utils 1
+#define JUCE_MODULE_AVAILABLE_juce_core 1
+#define JUCE_MODULE_AVAILABLE_juce_cryptography 1
+#define JUCE_MODULE_AVAILABLE_juce_data_structures 1
+#define JUCE_MODULE_AVAILABLE_juce_dsp 1
+#define JUCE_MODULE_AVAILABLE_juce_events 1
+#define JUCE_MODULE_AVAILABLE_juce_graphics 1
+#define JUCE_MODULE_AVAILABLE_juce_gui_basics 1
+#define JUCE_MODULE_AVAILABLE_juce_gui_extra 1
+#define JUCE_MODULE_AVAILABLE_juce_osc 1
+#define JUCE_MODULE_AVAILABLE_juce_product_unlocking 1
+#define JUCE_MODULE_AVAILABLE_melatonin_blur 1
+
+#define JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED 1
+
+#ifndef USE_BACKEND
+#define USE_BACKEND 0
+#endif
+
+#ifndef USE_FRONTEND
+#define USE_FRONTEND 1
+#endif
+
+#ifndef USE_RAW_FRONTEND
+#define USE_RAW_FRONTEND 0
+#endif
+
+#ifndef HI_EXPORT_DSP_LIBRARY
+#define HI_EXPORT_DSP_LIBRARY 0
+#endif
+
+#ifndef USE_COPY_PROTECTION
+#define USE_COPY_PROTECTION 0
+#endif
+
+#ifndef IS_STANDALONE_APP
+#define IS_STANDALONE_APP 0
+#endif
+
+#ifndef FRONTEND_IS_PLUGIN
+#define FRONTEND_IS_PLUGIN 1
+#endif
+
+#ifndef IS_STANDALONE_FRONTEND
+#define IS_STANDALONE_FRONTEND 0
+#endif
+
+#ifndef HISE_ENABLE_MIDI_INPUT_FOR_FX
+#define HISE_ENABLE_MIDI_INPUT_FOR_FX 0
+#endif
+
+#ifndef PROCESS_SOUND_GENERATORS_IN_FX_PLUGIN
+#define PROCESS_SOUND_GENERATORS_IN_FX_PLUGIN 1
+#endif
+
+#ifndef HISE_MIDIFX_PLUGIN
+#define HISE_MIDIFX_PLUGIN 0
+#endif
+
+#ifndef USE_CUSTOM_FRONTEND_TOOLBAR
+#define USE_CUSTOM_FRONTEND_TOOLBAR 0
+#endif
+
+#ifndef HI_SUPPORT_FULL_DYNAMICS_HLAC
+#define HI_SUPPORT_FULL_DYNAMICS_HLAC 1
+#endif
+
+#ifndef READ_ONLY_FACTORY_PRESETS
+#define READ_ONLY_FACTORY_PRESETS 0
+#endif
+
+#ifndef USE_GLITCH_DETECTION
+#define USE_GLITCH_DETECTION 1
+#endif
+
+#ifndef ENABLE_PLOTTER
+#define ENABLE_PLOTTER 0
+#endif
+
+#ifndef ENABLE_SCRIPTING_SAFE_CHECKS
+#define ENABLE_SCRIPTING_SAFE_CHECKS 0
+#endif
+
+#ifndef ENABLE_ALL_PEAK_METERS
+#define ENABLE_ALL_PEAK_METERS 0
+#endif
+
+#ifndef ENABLE_CONSOLE_OUTPUT
+#define ENABLE_CONSOLE_OUTPUT 0
+#endif
+
+#ifndef HISE_OVERWRITE_OLD_USER_PRESETS
+#define HISE_OVERWRITE_OLD_USER_PRESETS 0
+#endif
+
+#ifndef HISE_INCLUDE_RLOTTIE
+#define HISE_INCLUDE_RLOTTIE 1
+#endif
+
+#ifndef HISE_INCLUDE_LORIS
+#define HISE_INCLUDE_LORIS 0
+#endif
+
+#ifndef HISE_INCLUDE_FAUST
+#define HISE_INCLUDE_FAUST 0
+#endif
+
+#ifndef HISE_USE_SYSTEM_APP_DATA_FOLDER
+#define HISE_USE_SYSTEM_APP_DATA_FOLDER 0
+#endif
+
+#ifndef JUCE_WEB_BROWSER
+#define JUCE_WEB_BROWSER 0
+#endif
+
+#ifndef JUCE_USE_CURL
+#define JUCE_USE_CURL 1
+#endif
+
+#ifndef JUCE_VST3_CAN_REPLACE_VST2
+#define JUCE_VST3_CAN_REPLACE_VST2 0
+#endif

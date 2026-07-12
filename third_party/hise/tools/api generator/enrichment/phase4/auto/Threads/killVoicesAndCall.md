@@ -1,0 +1,3 @@
+Suspends audio processing, kills all active voices, and executes the given function on the Loading thread with the Scripting lock held. This is the standard pattern for operations that must modify audio-thread-accessible state safely - for example, swapping sample maps, toggling bypass on multiple processors, or reconfiguring routing. The function must take zero arguments. For operations that are part of a larger background workflow with progress tracking, prefer `BackgroundTask.killVoicesAndCall()` instead.
+
+> [!Warning:False means deferred, not failed] A return value of `false` does not indicate failure - it means the function was queued for deferred execution rather than running immediately. Both `true` and `false` are success outcomes.

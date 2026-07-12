@@ -1,0 +1,120 @@
+{
+  "moduleId": "GlobalEnvelopeModulator",
+  "prettyName": "Global Envelope Modulator",
+  "type": "Modulator",
+  "subtype": "EnvelopeModulator",
+  "category": "routing",
+
+  "io": {
+    "midiIn": "noteOn+noteOff",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": true,
+    "fxChain": null
+  },
+
+  "voiceContext": "per-voice",
+
+  "interfaces": [
+    {
+      "name": "TableProcessor",
+      "signalFlowRole": "Optional lookup table applied to the incoming global modulation value before output"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Voice Mode",
+      "rationale": "Standard EnvelopeModulator base class parameters controlling voice behavior",
+      "parameters": [
+        {
+          "id": "Monophonic",
+          "name": "Monophonic",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": "dynamic",
+          "description": "Enables monophonic mode where only one voice is rendered",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Retrigger",
+          "name": "Retrigger",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Restarts the envelope when a new note is triggered in monophonic mode",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Value Processing",
+      "rationale": "Controls how the received global modulation value is transformed locally",
+      "parameters": [
+        {
+          "id": "UseTable",
+          "name": "Use Table",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Enables a lookup table to transform the incoming modulation value",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Inverted",
+          "name": "Inverted",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Inverts the modulation signal (1 - value)",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "signal-flow",
+      "category": "signal_path",
+      "question": "What is the complete signal flow? How does this module receive the envelope value from the GlobalModulatorContainer? Does it call calculateBlock on the source envelope, or read a shared buffer?",
+      "context": "Core architecture question - need to document how the producer/consumer connection works for envelope modulators."
+    },
+    {
+      "id": "connection-mechanism",
+      "category": "signal_path",
+      "question": "How does the user select which global envelope to connect to? Is there a dropdown, a reference by ID, or an automatic lookup?",
+      "context": "Users need to know how to establish the connection between the consumer and the source modulator in the container."
+    },
+    {
+      "id": "table-application",
+      "category": "interface_usage",
+      "question": "Where is the table lookup applied in the signal path? Before or after inversion? What is the input/output range?",
+      "context": "Needed for accurate pseudo-code showing the processing order."
+    },
+    {
+      "id": "voice-sync",
+      "category": "signal_path",
+      "question": "How does voice synchronisation work? When this module starts a note, does it sync with the corresponding voice in the GlobalModulatorContainer's hosted envelope?",
+      "context": "Per-voice envelope modulators need voice context - need to document how voice mapping works across the global connection."
+    },
+    {
+      "id": "monophonic-retrigger",
+      "category": "parameter_behavior",
+      "question": "Do the Monophonic and Retrigger parameters affect this module's own behavior, or are they pass-through from the source envelope? Are they functional?",
+      "context": "These are inherited from EnvelopeModulator base - need to determine if they control local behavior or are vestigial."
+    },
+    {
+      "id": "disconnected-behavior",
+      "category": "conditional_logic",
+      "question": "What happens when no global envelope is connected? Does the module output 1.0, 0.0, or something else?",
+      "context": "Users need to know the default state before a connection is established."
+    }
+  ],
+
+  "notes": "GlobalEnvelopeModulator is a consumer in the global modulation system. It is an EnvelopeModulator that reads its values from a source envelope hosted in a GlobalModulatorContainer. The TableProcessor interface and Inverted parameter allow local transformation of the received values. Monophonic and Retrigger are inherited from the EnvelopeModulator base class - need to verify if they are functional in this context."
+}

@@ -1,0 +1,1 @@
+Replaces NaN and Infinity values with 0.0. Useful for guarding against non-finite values that can propagate through arithmetic chains and corrupt audio output or UI state. For checking without replacement, use `Math.isnan()` or `Math.isinf()`.

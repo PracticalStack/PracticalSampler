@@ -1,0 +1,128 @@
+{
+  "moduleId": "CurveEq",
+  "nodes": [
+    {
+      "id": "audio_in",
+      "type": "input",
+      "label": "Audio In (L/R)",
+      "importance": 1.0,
+      "group": null,
+      "description": "Stereo audio input buffer"
+    },
+    {
+      "id": "sub_block",
+      "type": "process",
+      "label": "64-Sample Sub-blocking",
+      "importance": 0.5,
+      "group": "processing",
+      "description": "Divides the buffer into 64-sample chunks for filter coefficient update granularity"
+    },
+    {
+      "id": "filter_cascade",
+      "type": "process",
+      "label": "Filter Band Cascade",
+      "importance": 1.0,
+      "group": "processing",
+      "description": "All enabled filter bands process in series. Each band modifies the buffer in-place, so the output of band N feeds band N+1."
+    },
+    {
+      "id": "band_gain",
+      "type": "parameter",
+      "label": "Gain",
+      "importance": 0.8,
+      "group": "band_params",
+      "description": "Per-band gain in dB. Only affects LowShelf, HighShelf, and Peak types."
+    },
+    {
+      "id": "band_freq",
+      "type": "parameter",
+      "label": "Freq",
+      "importance": 0.8,
+      "group": "band_params",
+      "description": "Per-band centre frequency in Hz"
+    },
+    {
+      "id": "band_q",
+      "type": "parameter",
+      "label": "Q",
+      "importance": 0.8,
+      "group": "band_params",
+      "description": "Per-band Q factor (bandwidth)"
+    },
+    {
+      "id": "band_type",
+      "type": "parameter",
+      "label": "Type",
+      "importance": 0.7,
+      "group": "band_params",
+      "description": "Per-band filter type: Low Pass, High Pass, Low Shelf, High Shelf, Peak"
+    },
+    {
+      "id": "band_enabled",
+      "type": "decision",
+      "label": "Enabled",
+      "importance": 0.7,
+      "group": "band_params",
+      "description": "Per-band enable/disable toggle. Disabled bands are skipped."
+    },
+    {
+      "id": "fft_write",
+      "type": "process",
+      "label": "FFT Buffer Write",
+      "importance": 0.6,
+      "group": "fft",
+      "description": "Writes post-filter output to the FFT ring buffer for spectrum display"
+    },
+    {
+      "id": "fft_active",
+      "type": "decision",
+      "label": "FFT Active",
+      "importance": 0.4,
+      "group": "fft",
+      "description": "Spectrum analyser is only active when explicitly enabled"
+    },
+    {
+      "id": "fft_display",
+      "type": "external",
+      "label": "Spectrum Display",
+      "importance": 0.5,
+      "group": "fft",
+      "description": "DraggableFilterPanel FloatingTile renders the FFT data as a spectrum overlay"
+    },
+    {
+      "id": "audio_out",
+      "type": "output",
+      "label": "Audio Out (L/R)",
+      "importance": 1.0,
+      "group": null,
+      "description": "Stereo audio output (in-place, same buffer as input)"
+    }
+  ],
+  "edges": [
+    { "from": "audio_in", "to": "sub_block", "type": "signal", "label": null },
+    { "from": "sub_block", "to": "filter_cascade", "type": "signal", "label": "64-sample chunks" },
+    { "from": "band_gain", "to": "filter_cascade", "type": "control", "label": null },
+    { "from": "band_freq", "to": "filter_cascade", "type": "control", "label": null },
+    { "from": "band_q", "to": "filter_cascade", "type": "control", "label": null },
+    { "from": "band_type", "to": "filter_cascade", "type": "control", "label": null },
+    { "from": "band_enabled", "to": "filter_cascade", "type": "conditional", "label": "skip if disabled" },
+    { "from": "filter_cascade", "to": "fft_active", "type": "signal", "label": null },
+    { "from": "fft_active", "to": "fft_write", "type": "conditional", "label": "if enabled" },
+    { "from": "fft_write", "to": "fft_display", "type": "signal", "label": "ring buffer" },
+    { "from": "filter_cascade", "to": "audio_out", "type": "signal", "label": null }
+  ],
+  "groups": [
+    {
+      "id": "processing",
+      "label": "Filter Processing"
+    },
+    {
+      "id": "band_params",
+      "label": "Per-Band Parameters"
+    },
+    {
+      "id": "fft",
+      "label": "Spectrum Analyser"
+    }
+  ]
+}

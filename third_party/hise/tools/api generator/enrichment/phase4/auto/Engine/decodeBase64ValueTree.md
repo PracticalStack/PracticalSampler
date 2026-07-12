@@ -1,0 +1,1 @@
+Decodes a Base64-encoded ValueTree (such as a HISE snippet) and returns its content as an XML string. Tries three decoding strategies in sequence. Returns an empty string if all strategies fail. This is primarily a debugging utility for inspecting encoded preset data or HISE snippets.

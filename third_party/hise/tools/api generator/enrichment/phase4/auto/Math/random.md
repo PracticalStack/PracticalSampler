@@ -1,0 +1,1 @@
+Returns a random double in the range [0.0, 1.0). Safe to call from any thread, including the audio thread. For a random integer within a specific range, use `Math.randInt()` instead. To create a bipolar random offset (positive and negative), scale the output: `2.0 * Math.random() - 1.0`.

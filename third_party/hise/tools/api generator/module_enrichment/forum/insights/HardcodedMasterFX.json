@@ -1,0 +1,88 @@
+{
+  "targetId": "HardcodedMasterFX",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [6645, 5911, 13907, 11975, 5935, 12190, 11860, 6569, 7701, 8643, 8652, 14452, 12498, 10192],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Use Synth.getSlotFX() not Synth.getEffect() to call setEffect() and getModuleList()",
+      "summary": "To load a compiled network or retrieve the list of available networks via script, you must reference the module with Synth.getSlotFX(). A reference obtained via Synth.getEffect() does not expose the SlotFX API methods. For exportState()/restoreState(), use Synth.getEffect().",
+      "sources": ["tid:7701", "tid:12498"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use restoreState() to load a network and its parameter values in a single call",
+      "summary": "Rather than calling setEffect() and then setting individual parameters, you can capture the entire module state with exportState() (or via Edit > Create Base64 encoded state) and restore it in one call with restoreState(). The Base64 string encodes both the loaded network name and all parameter values.",
+      "sources": ["tid:7701", "tid:12498"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "getCurrentEffectId() returns the module ID, not the loaded network name",
+      "summary": "Calling getCurrentEffectId() on a HardcodedMasterFX reference returns a string like 'Effect Slot1_Hardcoded Master FX' — the module's own ID — not the name of the currently loaded compiled network. There is no direct script API to read the loaded network name; the network must be tracked externally.",
+      "sources": ["tid:6645"],
+      "verify": true,
+      "verify_hint": "grep getCurrentEffectId in hi_scripting; check what SlotFX::getCurrentEffectId returns for HardcodedMasterFX"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "AllowCompilation must be enabled per-network before the DLL build step",
+      "summary": "Each scriptnode network that should appear in the HardcodedMasterFX dropdown must have AllowCompilation enabled individually. The compilation dialog shows which networks are queued. After building and restarting HISE, use Tools > Show DLL info to verify the compiled networks are registered.",
+      "sources": ["tid:5911"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Build configuration (Debug/Release) must match the HISE build for DLL compilation",
+      "summary": "Compiling the DSP networks DLL in the wrong build configuration (e.g., Debug when HISE is built in Release) will result in the compiled networks not being found. HISE attempts to use the correct default, but mismatches are a common source of 'No DLL loaded' issues.",
+      "sources": ["tid:5911"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "A parameter must exist on the root chain for compilation to succeed",
+      "summary": "If a scriptnode network has no parameter at the root level, the compilation step may silently succeed but the network produces no exposed parameters. Any parameter intended to be visible must be routed to the root modulation chain of the network.",
+      "sources": ["tid:5911"],
+      "verify": true,
+      "verify_hint": "grep root parameter check in HardcodedModules or OpaqueNode compilation logic"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "UI knob ranges must match scriptnode parameter ranges for correct filmstrip display",
+      "summary": "When using custom filmstrip knobs to control HardcodedMasterFX parameters, the UI knob's min/max range must exactly match the parameter range declared in the scriptnode network. A mismatch causes the filmstrip to display incorrect positions even though the underlying value is set correctly.",
+      "sources": ["tid:14452"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "Peak meter shows identical values for both channels in a compiled FX plugin",
+      "summary": "In a compiled effect plugin (not inside HISE), peak meter tiles show the same value for left and right channels regardless of the actual stereo content. Adding ENABLE_ALL_PEAK_METERS=1 to Extra Definitions resolves the issue.",
+      "sources": ["tid:8652"],
+      "verify": true,
+      "verify_hint": "grep ENABLE_ALL_PEAK_METERS in HISE source; check peak meter read path for MasterEffectProcessor in compiled mode"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Nesting HardcodedMasterFX inside a SlotFX adds a redundant layer and causes problems",
+      "summary": "HardcodedMasterFX is itself a slot-type module and should be used directly. Placing it inside a SlotFX creates a double-slot arrangement that is unsupported and can cause unexpected behaviour. Use HardcodedMasterFX standalone.",
+      "sources": ["tid:6569"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "SDK must be placed in tools/SDK for DLL compilation to work",
+      "summary": "The JUCE/HISE SDK required to compile DSP network DLLs must be extracted into the project's tools/SDK folder. Placing it elsewhere or keeping multiple copies causes the compilation to crash or fail silently.",
+      "sources": ["tid:10192"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

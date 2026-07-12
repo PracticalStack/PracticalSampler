@@ -1,0 +1,1 @@
+Returns a new colour with the alpha channel replaced by the given value (0.0-1.0, clamped). All other channels are preserved. This is the most commonly used method in the namespace - the standard way to add transparency to a named constant or theme colour for use in LAF paint functions, shadow effects, and overlay fills.

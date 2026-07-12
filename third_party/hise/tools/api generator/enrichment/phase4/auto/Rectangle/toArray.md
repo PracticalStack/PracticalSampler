@@ -1,0 +1,1 @@
+Converts this Rectangle to a standard `[x, y, width, height]` array. Useful when passing rectangle data to older utility functions or third-party include files that expect arrays, or when storing layout data as JSON-serialisable values.

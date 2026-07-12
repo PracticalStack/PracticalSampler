@@ -1,0 +1,132 @@
+{
+  "factoryPath": "template.bipolar_mod",
+  "factory": "template",
+  "nodeId": "bipolar_mod",
+  "description": "a serial chain optimized for modulation sources",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Modulation Output",
+      "rationale": "Value is the base input to the PMA node, which produces the final modulation output. This is the unmodulated 'centre' value that the bipolar modulation offsets from.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": null,
+          "textConverter": null,
+          "unnormalisedModulation": false,
+          "connectionTarget": "pma.Value"
+        }
+      ]
+    },
+    {
+      "label": "Modulation Depth",
+      "rationale": "Intensity controls how much the bipolar modulation signal affects the output by scaling the bipolar node's range (-1..1).",
+      "parameters": [
+        {
+          "id": "Intensity",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": null,
+          "textConverter": null,
+          "unnormalisedModulation": false,
+          "connectionTarget": "bipolar.Scale"
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "UI layout orientation for the root container"
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/template/bipolar_mod.md",
+    "tier": "STUB",
+    "lines": 8
+  },
+
+  "availableImages": [],
+
+  "internalStructure": {
+    "rootContainer": "container.modchain",
+    "signalFlow": "Serial modulation chain (control rate, mono): mod_signal (container.chain with core.ramp dummy) -> math.sig2mod -> core.peak -> control.bipolar -> control.pma",
+    "internalConnections": [
+      "core.peak modulates -> control.bipolar.Value",
+      "control.bipolar modulates -> control.pma.Add"
+    ],
+    "childNodes": [
+      { "id": "mod_signal", "factory": "container.chain", "purpose": "User-replaceable modulation source chain. Default contains core.ramp as a dummy placeholder." },
+      { "id": "sig2mod", "factory": "math.sig2mod", "purpose": "Converts audio-range signal (-1..1) to modulation range (0..1)" },
+      { "id": "peak", "factory": "core.peak", "purpose": "Captures the signal value and outputs it as modulation to control.bipolar" },
+      { "id": "bipolar", "factory": "control.bipolar", "purpose": "Converts 0..1 input to bipolar range (-Scale..+Scale) with optional gamma curve" },
+      { "id": "pma", "factory": "control.pma", "purpose": "Combines base Value with bipolar Add offset: output = Value * Multiply + Add. User connects pma modulation output to target parameter." }
+    ]
+  },
+
+  "gaps": [
+    {
+      "id": "internal-signal-flow-verification",
+      "category": "signal_path",
+      "question": "The root is container.modchain which wraps children in wrap::fix<1, wrap::control_rate<...>>. Does this mean the entire bipolar_mod template runs at control rate (HISE_EVENT_RASTER=8 decimation) and mono, or does the modchain only apply to its direct children?",
+      "context": "Important for users to understand the timing resolution of the modulation output."
+    },
+    {
+      "id": "pma-output-connection",
+      "category": "parameter_behaviour",
+      "question": "The pma node has empty ModulationTargets in the JSON. How does the user connect the pma output to an external target parameter? Is pma itself a modulation source (control node with mod output)?",
+      "context": "Users need to know the final step: connecting the template's output to the parameter they want to modulate."
+    },
+    {
+      "id": "description-accuracy",
+      "category": "description_accuracy",
+      "question": "The base description says 'a serial chain optimized for modulation sources' which describes the root container.modchain, not the template's specific bipolar modulation purpose. Should the description reflect that this creates a bipolar modulation source with Value+Intensity controls?",
+      "context": "The description is inherited from container.modchain and does not describe the template's actual function."
+    },
+    {
+      "id": "user-replaceable-source",
+      "category": "signal_path",
+      "question": "The mod_signal chain contains a core.ramp dummy. Is the intended workflow for the user to delete the ramp and insert their own modulation source, or to add nodes alongside it?",
+      "context": "Documentation should explain how users customize the modulation source within this template."
+    }
+  ],
+
+  "notes": "This is a COMPOSITE template node, not a C++ class. The cppProperties field is empty because template nodes have no direct C++ implementation -- their behaviour emerges from the composition of child nodes. The root container.modchain processes children at control rate in mono. The internal chain converts an audio signal to a bipolar modulation value: source -> sig2mod (audio to 0..1) -> peak (capture value) -> bipolar (scale to -intensity..+intensity) -> pma (add offset to base Value). The user is expected to: (1) replace the dummy ramp in mod_signal with their desired modulation source, (2) set Value as the centre point, (3) set Intensity as the modulation depth, and (4) connect pma's modulation output to the target parameter."
+}

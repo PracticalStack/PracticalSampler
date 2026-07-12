@@ -1,0 +1,1 @@
+Fills the interior of a Path object using the current colour. If `area` is an `[x, y, w, h]` array, the path is scaled to fit the rectangle. If `area` is omitted or not an array, the path is drawn at its original coordinates. If the path is empty, the method silently does nothing.

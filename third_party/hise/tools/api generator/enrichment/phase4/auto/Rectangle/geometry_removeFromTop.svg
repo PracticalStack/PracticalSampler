@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 270 140" width="270" height="140">
+  <defs>
+    <marker id="arr" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
+      <polygon points="0 0, 6 2.5, 0 5" fill="#808080"/>
+    </marker>
+  </defs>
+
+  <!-- Left: original rectangle (before) -->
+  <rect x="15" y="15" width="80" height="100" rx="3"
+        fill="none" stroke="#808080" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="55" y="70" font-family="Lato, sans-serif" font-size="11"
+        fill="#808080" text-anchor="middle">rect</text>
+
+  <!-- Arrow -->
+  <line x1="108" y1="65" x2="132" y2="65"
+        stroke="#808080" stroke-width="1" marker-end="url(#arr)"/>
+
+  <!-- Right top: returned strip (green) -->
+  <rect x="145" y="15" width="80" height="35" rx="3"
+        fill="#90FFB1" fill-opacity="0.12" stroke="#90FFB1" stroke-width="1.5"/>
+  <text x="185" y="37" font-family="Lato, sans-serif" font-size="11"
+        fill="#90FFB1" text-anchor="middle">strip</text>
+
+  <!-- Right bottom: mutated source (orange) -->
+  <rect x="145" y="50" width="80" height="65" rx="3"
+        fill="#FFBA00" fill-opacity="0.12" stroke="#FFBA00" stroke-width="1.5"/>
+  <text x="185" y="87" font-family="Lato, sans-serif" font-size="11"
+        fill="#FFBA00" text-anchor="middle">rect</text>
+
+  <!-- Dimension bracket for strip height -->
+  <line x1="232" y1="17" x2="232" y2="48" stroke="#808080" stroke-width="1"/>
+  <line x1="228" y1="17" x2="236" y2="17" stroke="#808080" stroke-width="1"/>
+  <line x1="228" y1="48" x2="236" y2="48" stroke="#808080" stroke-width="1"/>
+  <text x="242" y="37" font-family="Consolas, 'Courier New', monospace" font-size="10"
+        fill="#808080">h</text>
+</svg>

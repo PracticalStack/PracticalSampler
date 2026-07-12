@@ -1,0 +1,108 @@
+{
+  "factoryPath": "control.input_toggle",
+  "factory": "control",
+  "nodeId": "input_toggle",
+  "description": "Switch between two input values as modulation signal",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Selector",
+      "rationale": "The Input parameter selects which of the two values is forwarded to the output.",
+      "parameters": [
+        {
+          "id": "Input",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "62.nT6K8CRMoF..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.QTPRtAWczARLJjjavUGcfHC.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Input values",
+      "rationale": "The two values that can be selected between. Both are marked as unscaled inputs, receiving raw values.",
+      "parameters": [
+        {
+          "id": "Value1",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": true
+        },
+        {
+          "id": "Value2",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": true
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": true,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/input_toggle.md",
+    "tier": "BRIEF",
+    "lines": 11
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "toggle-selection-logic",
+      "category": "signal_path",
+      "question": "When Input=0, is Value1 forwarded? When Input=1, is Value2 forwarded? Is the selection based on a threshold (< 0.5 vs >= 0.5) or on the exact integer step?",
+      "context": "Users need to know the exact mapping from Input to which value is selected."
+    },
+    {
+      "id": "toggle-text-converter",
+      "category": "parameter_behaviour",
+      "question": "The Input parameter has an encoded TextToValueConverter string. What display labels does this produce? Likely 'Value1' and 'Value2' (or 'Off'/'On').",
+      "context": "The text converter affects how the parameter is displayed in the UI combobox."
+    },
+    {
+      "id": "toggle-output-on-input-change",
+      "category": "parameter_behaviour",
+      "question": "When Input changes from 0 to 1, does the node immediately send Value2? When Value1 or Value2 change while they are the active input, is the new value sent immediately?",
+      "context": "Determines the node's responsiveness to both selector and value changes."
+    }
+  ],
+
+  "notes": "input_toggle uses UseUnnormalisedModulation with Value1 and Value2 as unscaled parameters. The Input parameter has step=1.0 making it a two-state switch. The encoded TextToValueConverter likely produces human-readable labels for the two states. This is conceptually a multiplexer: select one of two input signals."
+}

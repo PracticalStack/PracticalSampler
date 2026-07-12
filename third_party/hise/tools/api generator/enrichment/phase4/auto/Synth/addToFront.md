@@ -1,0 +1,1 @@
+Designates this script processor's interface as the main plugin UI. Call `Synth.addToFront(true)` in `onInit` to make this script processor's `Content` area the visible interface in the compiled plugin. Only one script processor in the entire project should call this.

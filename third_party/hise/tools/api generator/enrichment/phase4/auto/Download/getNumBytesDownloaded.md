@@ -1,0 +1,1 @@
+Returns the number of bytes downloaded so far, including any pre-existing bytes from a previous partial download when resuming. Returns 0.0 before the download starts.

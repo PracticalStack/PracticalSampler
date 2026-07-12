@@ -1,0 +1,1 @@
+Creates a ScriptShader object for GLSL-based rendering in ScriptPanels. Pass a filename to load a fragment shader from the project's shader folder, or an empty string to create a shader without loading a file. Attach the shader to a panel with `ScriptPanel.setShader()` and pass dynamic data via `ScriptShader.setUniformData()`.

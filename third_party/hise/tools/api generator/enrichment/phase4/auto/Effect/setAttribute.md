@@ -1,0 +1,1 @@
+Sets the value of the parameter at the given index. Use the effect's named constants for readable access (e.g. `fx.setAttribute(fx.Frequency, 1000.0)`). Safe to call from any thread - the notification behaviour adapts automatically to the calling context.

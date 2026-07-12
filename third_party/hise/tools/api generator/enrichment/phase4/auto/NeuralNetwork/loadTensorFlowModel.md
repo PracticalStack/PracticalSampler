@@ -1,0 +1,1 @@
+Loads a TensorFlow model from JSON data in RTNeural's TensorFlow format. The JSON contains the full model definition including weights - no separate `build` or `loadWeights` step is needed. Do not call `loadWeights` after this method; TensorFlow models initialise their weights from the model JSON.

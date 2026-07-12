@@ -1,0 +1,12 @@
+{
+  "factoryPath": "math.abs",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "abs", "label": "Absolute Value", "type": "process", "importance": 1.0, "description": "output = |input|, folds negative samples to positive" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Rectified signal (all values >= 0)" }
+  ],
+  "edges": [
+    { "from": "in", "to": "abs", "type": "signal", "label": null },
+    { "from": "abs", "to": "out", "type": "signal", "label": null }
+  ]
+}

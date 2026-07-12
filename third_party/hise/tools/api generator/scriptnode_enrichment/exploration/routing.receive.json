@@ -1,0 +1,16 @@
+{
+  "factoryPath": "routing.receive",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Existing audio signal in the buffer" },
+    { "id": "cable_read", "label": "Read from Cable", "type": "process", "importance": 1.0, "description": "Reads audio data from the connected send node's cable buffer" },
+    { "id": "feedback", "label": "Feedback", "type": "parameter", "importance": 1.0, "description": "Scales the received signal (0..1)" },
+    { "id": "add", "label": "Add to Input", "type": "process", "importance": 1.0, "description": "Adds scaled received signal to existing audio: output = input + received * Feedback" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Combined signal" }
+  ],
+  "edges": [
+    { "from": "in", "to": "add", "type": "signal", "label": null },
+    { "from": "cable_read", "to": "add", "type": "signal", "label": null },
+    { "from": "feedback", "to": "cable_read", "type": "control", "label": "scale factor" },
+    { "from": "add", "to": "out", "type": "signal", "label": null }
+  ]
+}

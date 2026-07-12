@@ -1,0 +1,1 @@
+Connects this waveform to an external audio data source so it displays that source's content instead of its own internal buffer. Accepts a ScriptAudioFile handle, another ScriptAudioWaveform (to share its data), or `-1` to reset back to the component's own internal buffer.

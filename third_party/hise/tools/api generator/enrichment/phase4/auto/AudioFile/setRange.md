@@ -1,0 +1,1 @@
+Sets the active sample range within the loaded audio file. After calling this, `getContent()` and `getNumSamples()` operate on the selected sub-range only. The range is clamped to valid bounds automatically. This has the same effect as dragging the sample range interactively in a ScriptAudioWaveform component.

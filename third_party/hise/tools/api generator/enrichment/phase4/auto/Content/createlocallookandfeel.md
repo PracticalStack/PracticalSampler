@@ -1,0 +1,3 @@
+Creates a local look-and-feel object for customising the appearance of individual UI components. Register drawing functions on the returned object with `registerFunction()`, then assign it to specific components with `component.setLocalLookAndFeel(laf)`. The LAF only applies to components that have it explicitly assigned - it does not affect other components.
+
+For a global look-and-feel that applies to all components of a type, use `Engine.createGlobalScriptLookAndFeel()` instead.

@@ -1,0 +1,150 @@
+{
+  "className": "LorisManager",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "analyse": {
+      "signature": "bool analyse(var file, double estimatedRootFrequency)",
+      "returnType": "bool",
+      "description": "Analyse a file.",
+      "parameters": [
+        {
+          "name": "file",
+          "type": "var"
+        },
+        {
+          "name": "estimatedRootFrequency",
+          "type": "double"
+        }
+      ]
+    },
+    "createEnvelopePaths": {
+      "signature": "var createEnvelopePaths(var file, String parameter, int harmonicIndex)",
+      "returnType": "var",
+      "description": "Creates a list of path of every channel from the envelope of the given parameter and harmonic index.",
+      "parameters": [
+        {
+          "name": "file",
+          "type": "var"
+        },
+        {
+          "name": "parameter",
+          "type": "String"
+        },
+        {
+          "name": "harmonicIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "createEnvelopes": {
+      "signature": "var createEnvelopes(var file, String parameter, int harmonicIndex)",
+      "returnType": "var",
+      "description": "Creates an audio rate envelope from the given parameter and harmonic index.",
+      "parameters": [
+        {
+          "name": "file",
+          "type": "var"
+        },
+        {
+          "name": "parameter",
+          "type": "String"
+        },
+        {
+          "name": "harmonicIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "createSnapshot": {
+      "signature": "var createSnapshot(var file, String parameter, double time)",
+      "returnType": "var",
+      "description": "Creates a parameter value list for each harmonic at the given time.",
+      "parameters": [
+        {
+          "name": "file",
+          "type": "var"
+        },
+        {
+          "name": "parameter",
+          "type": "String"
+        },
+        {
+          "name": "time",
+          "type": "double"
+        }
+      ]
+    },
+    "get": {
+      "signature": "var get(String optionId)",
+      "returnType": "var",
+      "description": "Returns the setting value for the Loris algorithm.",
+      "parameters": [
+        {
+          "name": "optionId",
+          "type": "String"
+        }
+      ]
+    },
+    "process": {
+      "signature": "void process(var file, String command, var data)",
+      "returnType": "void",
+      "description": "Processes the partial list using predefined commands.",
+      "parameters": [
+        {
+          "name": "file",
+          "type": "var"
+        },
+        {
+          "name": "command",
+          "type": "String"
+        },
+        {
+          "name": "data",
+          "type": "var"
+        }
+      ]
+    },
+    "processCustom": {
+      "signature": "void processCustom(var file, var processCallback)",
+      "returnType": "void",
+      "description": "Processes the partial list using the given function.",
+      "parameters": [
+        {
+          "name": "file",
+          "type": "var"
+        },
+        {
+          "name": "processCallback",
+          "type": "var"
+        }
+      ]
+    },
+    "set": {
+      "signature": "void set(String optionId, var newValue)",
+      "returnType": "void",
+      "description": "set a option for the Loris algorithm.",
+      "parameters": [
+        {
+          "name": "optionId",
+          "type": "String"
+        },
+        {
+          "name": "newValue",
+          "type": "var"
+        }
+      ]
+    },
+    "synthesise": {
+      "signature": "var synthesise(var file)",
+      "returnType": "var",
+      "description": "Resynthesise the file from the partial lists. Returns an array of variant buffers.",
+      "parameters": [
+        {
+          "name": "file",
+          "type": "var"
+        }
+      ]
+    }
+  }
+}

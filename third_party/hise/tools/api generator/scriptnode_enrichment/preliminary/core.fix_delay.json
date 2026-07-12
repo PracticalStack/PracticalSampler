@@ -1,0 +1,101 @@
+{
+  "factoryPath": "core.fix_delay",
+  "factory": "core",
+  "nodeId": "fix_delay",
+  "description": "a non-interpolating delay line",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Delay",
+      "rationale": "DelayTime sets the delay duration; FadeTime sets the crossfade length when delay time changes to avoid clicks",
+      "parameters": [
+        {
+          "id": "DelayTime",
+          "range": { "min": 0.0, "max": 1000.0, "step": 0.1, "skew": 0.3010300099849701 },
+          "default": 100.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "FadeTime",
+          "range": { "min": 0.0, "max": 1024.0, "step": 1.0, "skew": 1.0 },
+          "default": 512.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/fix_delay.md",
+    "tier": "BRIEF",
+    "lines": 14
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "non-interpolating-meaning",
+      "category": "signal_path",
+      "question": "The description says 'non-interpolating'. Does this mean the delay time is quantised to integer samples? What happens with fractional delay times -- are they rounded or truncated?",
+      "context": "Non-interpolating delays have different artefacts than interpolating ones -- users need to know the tradeoffs."
+    },
+    {
+      "id": "fade-time-units",
+      "category": "parameter_behaviour",
+      "question": "FadeTime has range 0-1024 with step 1 and no text converter. Is this in samples, milliseconds, or some other unit? The integer step suggests samples.",
+      "context": "Users need to know the unit to set an appropriate crossfade when modulating delay time."
+    },
+    {
+      "id": "channel-handling",
+      "category": "signal_path",
+      "question": "Does fix_delay maintain separate delay lines per channel, or does it use a single shared delay buffer?",
+      "context": "Determines whether stereo signals are delayed independently."
+    },
+    {
+      "id": "max-delay-buffer",
+      "category": "performance",
+      "question": "What is the maximum internal buffer size? The DelayTime max is 1000ms -- is the buffer pre-allocated at prepare() for this maximum?",
+      "context": "Memory usage and latency implications for real-time use."
+    }
+  ],
+
+  "notes": "core.fix_delay is monophonic (no IsPolyphonic flag) and has no MIDI processing. The 'fix' in the name likely refers to fixed (non-modulated) delay time rather than a fixed buffer size. The FadeTime parameter (default 512, range 0-1024, integer steps) strongly suggests a sample-count unit for crossfading when delay time changes. The logarithmic skew on DelayTime provides better control at short delay times."
+}

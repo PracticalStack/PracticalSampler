@@ -1,0 +1,12 @@
+{
+  "factoryPath": "control.file_analyser",
+  "nodes": [
+    { "id": "audio_file", "label": "Audio File", "type": "external_data", "importance": 1.0, "description": "Audio file that triggers analysis on load" },
+    { "id": "analyse", "label": "Analyse", "type": "process", "importance": 1.0, "description": "Extracts pitch, duration, or peak from file data (mode-dependent)" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Raw analysis result (Hz, ms, or linear amplitude)" }
+  ],
+  "edges": [
+    { "from": "audio_file", "to": "analyse", "type": "signal", "label": "on file load" },
+    { "from": "analyse", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

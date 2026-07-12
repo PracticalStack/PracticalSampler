@@ -1,0 +1,72 @@
+{
+  "targetId": "SynthGroup",
+  "domain": "modules",
+  "generatedAt": "2026-03-31",
+  "topicIds": [3508, 2871, 13030, 13134, 3512, 3523, 1937, 669, 1415, 539, 5146, 6135, 5479, 5770, 7162, 14141, 452, 3340],
+  "gaps": [
+    {
+      "id": "unison-no-realtime-update",
+      "category": "behaviour",
+      "question": "Can UnisonoVoiceAmount, UnisonoDetune, and UnisonoSpread be updated in real-time for held notes?",
+      "answer": "No. These parameters are read at note-on time only. Changing them while notes are held has no effect on those voices. To update in real-time, use the Detune Modulation or Spread Modulation chains instead of the parameters directly. For voice count changes, all voices must be killed and retriggered.",
+      "sources": ["tid:13030", "tid:14141"],
+      "mapsTo": "unison-voice-rendering"
+    },
+    {
+      "id": "child-pitch-chain-bypassed",
+      "category": "behaviour",
+      "question": "What happens to a child synth's pitch modulation chain inside a SynthGroup?",
+      "answer": "It is bypassed and hidden in the UI. The SynthGroup's shared Pitch Modulation chain is the only pitch modulation path for all children. Independent per-child pitch modulation is not possible.",
+      "sources": ["tid:669"],
+      "mapsTo": "shared-modulation-mechanism"
+    },
+    {
+      "id": "unison-click-on-note-on",
+      "category": "behaviour",
+      "question": "Why do unison voices click on note-on?",
+      "answer": "Each unison voice is given a random start offset (up to ~10ms at 44.1kHz) to prevent phase cancellation. This offset causes an audible click when no amplitude envelope is present. Adding a ~5ms attack time on the group's gain envelope eliminates the click.",
+      "sources": ["tid:2871"],
+      "mapsTo": "unison-voice-rendering"
+    },
+    {
+      "id": "per-child-gain-control",
+      "category": "workflow",
+      "question": "How to set independent gain per child without zipper noise?",
+      "answer": "Changing a child module's Gain parameter directly causes zipper noise when modulated rapidly. Use a gain modulator (which operates in the 0-1 range, not dB) on the child for smooth, artifact-free gain changes.",
+      "sources": ["tid:1415"],
+      "mapsTo": null
+    },
+    {
+      "id": "monophonic-with-unison",
+      "category": "workflow",
+      "question": "How to achieve monophonic behaviour with unison voices?",
+      "answer": "SynthGroup has no built-in mono mode. Add the built-in 'Legato with Retrigger' MIDI script to the SynthGroup for monophonic unison.",
+      "sources": ["tid:539"],
+      "mapsTo": null
+    },
+    {
+      "id": "scriptnode-pitch-mod-detune",
+      "category": "interaction",
+      "question": "Does core.pitch_mod inside a scriptnode child observe SynthGroup unison detune?",
+      "answer": "No. core.pitch_mod reads pitch modulation values before the SynthGroup applies per-voice unison detune amounts. The detune offset is not visible to scriptnode nodes. Use the clone container instead for fully scriptnode-based unison with per-voice detune.",
+      "sources": ["tid:13030"],
+      "mapsTo": "child-constrainer-meaning"
+    },
+    {
+      "id": "sampler-unison-phasing",
+      "category": "behaviour",
+      "question": "Is the automatic random start offset sufficient for sampler-based unison?",
+      "answer": "The auto random start offset may not be enough to avoid phasing artifacts with sampler children. Manually randomize sample start position in the sampler settings for better results.",
+      "sources": ["tid:5146"],
+      "mapsTo": "unison-voice-rendering"
+    },
+    {
+      "id": "per-child-midi-processors",
+      "category": "interaction",
+      "question": "Can children inside a SynthGroup have independent MIDI processors?",
+      "answer": "Needs documentation. Forum topic suggests this is a common question but details are unclear from the available posts.",
+      "sources": ["tid:13134"],
+      "mapsTo": "child-constrainer-meaning"
+    }
+  ]
+}

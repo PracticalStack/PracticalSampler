@@ -1,0 +1,1 @@
+Returns the operating system as a short string: `"WIN"`, `"OSX"`, or `"LINUX"`. This is determined at compile time. Useful for platform-specific adjustments such as font loading, where different platforms may require different font files or rendering settings.

@@ -1,0 +1,14 @@
+{
+  "factoryPath": "control.sliderbank",
+  "nodes": [
+    { "id": "value_in", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Input value multiplied by each slider pack element" },
+    { "id": "slider_pack", "label": "SliderPack", "type": "external_data", "importance": 1.0, "description": "Slider pack providing per-output scaling factors" },
+    { "id": "scale", "label": "Scale per Output", "type": "process", "importance": 1.0, "description": "output[i] = Value * sliderPack[i]" },
+    { "id": "mod_out", "label": "Multi-Output", "type": "modulation_out", "importance": 1.0, "description": "Up to 8 normalised outputs, each scaled by corresponding slider" }
+  ],
+  "edges": [
+    { "from": "value_in", "to": "scale", "type": "control", "label": null },
+    { "from": "slider_pack", "to": "scale", "type": "control", "label": "per-element scaling" },
+    { "from": "scale", "to": "mod_out", "type": "signal", "label": "per-output" }
+  ]
+}

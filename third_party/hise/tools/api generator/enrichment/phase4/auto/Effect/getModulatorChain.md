@@ -1,0 +1,1 @@
+Returns a `Modulator` handle to the modulator chain at the specified child processor index. Use this to inspect or manipulate an effect's internal modulation chains, e.g. to read the chain's intensity or add modulators via the returned handle.

@@ -1,0 +1,3 @@
+Simulates an error event as if it came from the HISE system. Sets the specified state as active and fires the error callback with the highest-priority active error. Use this during development to test your error handling UI without triggering real system errors.
+
+> [!Warning:Development only] In compiled plugins this method does nothing. It is strictly a development tool for testing error UI in the HISE IDE.

@@ -1,0 +1,1 @@
+Adds a quadratic Bezier curve from the current position to the endpoint `(x, y)`, shaped by the control point `(cx, cy)`. The control point "pulls" the curve toward itself, creating a smooth arc. This is the primary curve primitive for envelope editors (attack, decay, release segments) and custom UI shapes with rounded corners like tooltip bubbles.

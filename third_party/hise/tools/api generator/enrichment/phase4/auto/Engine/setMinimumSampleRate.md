@@ -1,0 +1,1 @@
+Sets the minimum sample rate for internal processing. If the audio device's sample rate is below this value, HISE enables oversampling to reach the target rate. Returns `true` if the oversampling configuration changed. Call during `onInit`.

@@ -1,0 +1,1 @@
+Refreshes the cached tick marks, enabled states, and dynamic text for all context menu items by re-calling the state function. Context menu state is automatically refreshed after each menu selection, so this method is only needed when external state changes should be visible before the next user interaction with the menu.

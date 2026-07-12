@@ -1,0 +1,1 @@
+Splits a camelCase or PascalCase string into an array of word tokens at uppercase letter and digit boundaries. Consecutive uppercase letters form a single token, and consecutive digits are grouped together. This is the standard way to decompose structured component IDs like `"FilterAttack"` into `["Filter", "Attack"]` for dispatch logic or display labels.

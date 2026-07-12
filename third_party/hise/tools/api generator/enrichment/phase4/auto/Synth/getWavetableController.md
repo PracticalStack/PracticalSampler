@@ -1,0 +1,1 @@
+Returns a `ScriptWavetableController` handle that provides script-level access to wavetable synthesiser features (position, gain table) for the named processor. This method searches the entire module tree, not just the parent synth's subtree.

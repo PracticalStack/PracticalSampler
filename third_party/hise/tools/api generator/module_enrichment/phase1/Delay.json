@@ -1,0 +1,108 @@
+{
+  "moduleId": "Delay",
+  "notes": "LowPassFreq and HiPassFreq parameters are defined in the enum and serialized but never applied in applyEffect() - no filter objects exist in the class. They are vestigial/unimplemented. The dry/wet mix uses an overlap fader (scriptnode::faders::overlap): at mix=0.5 both dry and wet are at full volume (1.0); at extremes one fades to zero while the other stays at 1.0. The first buffer after construction is skipped entirely (skipFirstBuffer flag). DelayLine uses integer-sample delay only (no fractional interpolation) and has a built-in 1024-sample crossfade when delay time changes to prevent clicks.",
+  "nodes": [
+    {
+      "id": "input",
+      "label": "Input",
+      "type": "io",
+      "detail": "Stereo",
+      "scope": "monophonic",
+      "importance": 1.0
+    },
+    {
+      "id": "tempo_sync",
+      "label": "Tempo Sync",
+      "type": "decision",
+      "scope": "parameter",
+      "importance": 0.6,
+      "parameters": ["TempoSync"],
+      "condition": {
+        "parameter": "TempoSync",
+        "whenTrue": "Delay times from tempo-synced note values",
+        "whenFalse": "Delay times in milliseconds"
+      }
+    },
+    {
+      "id": "delay_left",
+      "label": "Delay L",
+      "type": "delay_line",
+      "detail": "Integer-sample, 1024-sample crossfade on time change",
+      "scope": "monophonic",
+      "importance": 1.0,
+      "parameters": ["DelayTimeLeft"]
+    },
+    {
+      "id": "delay_right",
+      "label": "Delay R",
+      "type": "delay_line",
+      "detail": "Integer-sample, 1024-sample crossfade on time change",
+      "scope": "monophonic",
+      "importance": 1.0,
+      "parameters": ["DelayTimeRight"]
+    },
+    {
+      "id": "feedback_left",
+      "label": "Feedback L",
+      "type": "gain",
+      "detail": "lastValue * feedbackLeft added to input before writing to delay line",
+      "scope": "monophonic",
+      "importance": 0.9,
+      "parameters": ["FeedbackLeft"]
+    },
+    {
+      "id": "feedback_right",
+      "label": "Feedback R",
+      "type": "gain",
+      "detail": "lastValue * feedbackRight added to input before writing to delay line",
+      "scope": "monophonic",
+      "importance": 0.9,
+      "parameters": ["FeedbackRight"]
+    },
+    {
+      "id": "mix",
+      "label": "Dry / Wet",
+      "type": "gain",
+      "detail": "Overlap fader: at 0.5 both dry and wet are full volume",
+      "scope": "monophonic",
+      "importance": 0.9,
+      "parameters": ["Mix"]
+    },
+    {
+      "id": "output",
+      "label": "Output",
+      "type": "io",
+      "detail": "Stereo",
+      "scope": "monophonic",
+      "importance": 1.0
+    }
+  ],
+  "edges": [
+    { "from": "input", "to": "delay_left", "type": "signal", "label": "Left channel" },
+    { "from": "input", "to": "delay_right", "type": "signal", "label": "Right channel" },
+    { "from": "tempo_sync", "to": "delay_left", "type": "modulation", "label": "Delay time" },
+    { "from": "tempo_sync", "to": "delay_right", "type": "modulation", "label": "Delay time" },
+    { "from": "feedback_left", "to": "delay_left", "type": "feedback", "label": "Feedback loop" },
+    { "from": "feedback_right", "to": "delay_right", "type": "feedback", "label": "Feedback loop" },
+    { "from": "delay_left", "to": "feedback_left", "type": "signal" },
+    { "from": "delay_right", "to": "feedback_right", "type": "signal" },
+    { "from": "input", "to": "mix", "type": "bypass", "label": "Dry path" },
+    { "from": "delay_left", "to": "mix", "type": "signal", "label": "Wet L" },
+    { "from": "delay_right", "to": "mix", "type": "signal", "label": "Wet R" },
+    { "from": "mix", "to": "output", "type": "signal" }
+  ],
+  "groups": [
+    {
+      "id": "left_channel",
+      "label": "Left Channel",
+      "nodes": ["delay_left", "feedback_left"],
+      "style": "dashed_outline"
+    },
+    {
+      "id": "right_channel",
+      "label": "Right Channel",
+      "nodes": ["delay_right", "feedback_right"],
+      "style": "dashed_outline"
+    }
+  ]
+}

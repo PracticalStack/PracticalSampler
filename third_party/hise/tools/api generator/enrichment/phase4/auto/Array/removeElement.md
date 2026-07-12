@@ -1,0 +1,3 @@
+Removes the element at the specified index. Elements after the removed index shift left. Out-of-range indices are silently ignored. This is the HiseScript equivalent of JavaScript's `splice(index, 1)`.
+
+> [!Warning:Adjust index when removing in a forward loop] After `removeElement(i)`, element `i+1` shifts to index `i` and gets skipped on the next iteration. Use `removeElement(i--)` or iterate backward.

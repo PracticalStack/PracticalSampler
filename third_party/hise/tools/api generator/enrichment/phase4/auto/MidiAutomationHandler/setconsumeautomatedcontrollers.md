@@ -1,0 +1,1 @@
+Controls whether CC messages that match an automation entry are removed from the MIDI buffer before reaching script callbacks. When enabled (the default), automated CC messages are consumed and never arrive in `onController`. Pass `false` to let them through if you need to react to automated CCs in your script as well.

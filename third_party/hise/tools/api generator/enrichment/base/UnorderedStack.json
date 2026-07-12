@@ -1,0 +1,132 @@
+{
+  "className": "UnorderedStack",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "asBuffer": {
+      "signature": "var asBuffer(bool getAllElements)",
+      "returnType": "var",
+      "description": "Returns a buffer that refers the data.",
+      "parameters": [
+        {
+          "name": "getAllElements",
+          "type": "bool"
+        }
+      ]
+    },
+    "clear": {
+      "signature": "bool clear()",
+      "returnType": "bool",
+      "description": "Clears the stack.",
+      "parameters": []
+    },
+    "contains": {
+      "signature": "bool contains(var value)",
+      "returnType": "bool",
+      "description": "checks if the number is in the stack.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "copyTo": {
+      "signature": "bool copyTo(var target)",
+      "returnType": "bool",
+      "description": "Copies the stack into the given container.",
+      "parameters": [
+        {
+          "name": "target",
+          "type": "var"
+        }
+      ]
+    },
+    "insert": {
+      "signature": "bool insert(var value)",
+      "returnType": "bool",
+      "description": "Inserts a number at the end of the stack.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "isEmpty": {
+      "signature": "bool isEmpty()",
+      "returnType": "bool",
+      "description": "Checks if any number is present in the stack.",
+      "parameters": []
+    },
+    "remove": {
+      "signature": "bool remove(var value)",
+      "returnType": "bool",
+      "description": "removes the given number and fills the gap.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "removeElement": {
+      "signature": "bool removeElement(int index)",
+      "returnType": "bool",
+      "description": "Removes the element at the given number and fills the gap.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "removeIfEqual": {
+      "signature": "bool removeIfEqual(var holder)",
+      "returnType": "bool",
+      "description": "Removes the matching event from the stack and puts it in the holder.",
+      "parameters": [
+        {
+          "name": "holder",
+          "type": "var"
+        }
+      ]
+    },
+    "setIsEventStack": {
+      "signature": "void setIsEventStack(bool shouldBeEventStack, var eventCompareFunction)",
+      "returnType": "void",
+      "description": "Sets this stack to hold HISE events rather than floating point numbers.",
+      "parameters": [
+        {
+          "name": "shouldBeEventStack",
+          "type": "bool"
+        },
+        {
+          "name": "eventCompareFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "size": {
+      "signature": "int size()",
+      "returnType": "int",
+      "description": "Returns the number of values in the stack.",
+      "parameters": []
+    },
+    "storeEvent": {
+      "signature": "bool storeEvent(int index, var holder)",
+      "returnType": "bool",
+      "description": "Stores the event into the message holder.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        },
+        {
+          "name": "holder",
+          "type": "var"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "factoryPath": "core.snex_shaper",
+  "factory": "core",
+  "nodeId": "snex_shaper",
+  "description": "A custom waveshaper using SNEX",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "ClassId",
+      "defaultValue": "",
+      "type": "string",
+      "note": "Selects the SNEX shaper class to compile and run. Maps to a .h file in DspNetworks/code_library/snex_shaper/."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/snex_shaper.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "shaper-callback-set",
+      "category": "signal_path",
+      "question": "Confirm the required callbacks: process, processFrame, prepare, reset. The default template provides getSample(float) as a convenience -- is this just a convention or is it a required callback?",
+      "context": "Users need to know the minimum code required for a working waveshaper."
+    },
+    {
+      "id": "transfer-function-display",
+      "category": "signal_path",
+      "question": "The SNEX overview mentions a waveshaper display that passes 128 samples from -1 to 1. Is this automatic or does the user need to implement a specific callback for the display?",
+      "context": "The visual transfer function display is a key UX feature of snex_shaper."
+    },
+    {
+      "id": "template-argument-polyphonic",
+      "category": "parameter_behaviour",
+      "question": "TemplateArgumentIsPolyphonic is set. The SNEX overview says the shaper type receives NumVoices as a template parameter. Does this mean the SNEX code can use PolyData even though the outer node is monophonic?",
+      "context": "The interaction between the outer monophonic wrapper and the inner NumVoices template is confusing."
+    },
+    {
+      "id": "external-data-support",
+      "category": "signal_path",
+      "question": "The SNEX overview says setExternalData is forwarded only if the inner type implements it. Confirm that snex_shaper supports external data (tables, etc.) when the SNEX code defines setExternalData.",
+      "context": "Users may want lookup tables for waveshaping curves."
+    },
+    {
+      "id": "no-midi-events",
+      "category": "description_accuracy",
+      "question": "Confirm that snex_shaper does NOT handle MIDI events (SN_EMPTY_HANDLE_EVENT). The cppProperties show no IsProcessingHiseEvent flag.",
+      "context": "Important distinction from snex_node which does receive MIDI events."
+    }
+  ],
+
+  "notes": "snex_shaper is a specialised SNEX node focused on waveshaping (sample-level transformation). It is simpler than snex_node -- the default template only needs a getSample(float) function. The node does not handle MIDI events. TemplateArgumentIsPolyphonic means the user's SNEX class receives NumVoices as a template parameter, allowing PolyData usage even though the outer wrapper is monophonic. The ComplexData slots are dynamically determined by the SNEX code (base JSON shows empty). No modulation output support (unlike snex_node)."
+}

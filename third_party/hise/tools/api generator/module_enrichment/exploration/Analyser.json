@@ -1,0 +1,59 @@
+{
+  "moduleId": "Analyser",
+  "nodes": [
+    {
+      "id": "audio_in",
+      "type": "input",
+      "label": "Audio In (L/R)",
+      "importance": 1.0
+    },
+    {
+      "id": "buffer_write",
+      "type": "process",
+      "label": "Ring Buffer Write",
+      "importance": 0.7,
+      "description": "Copies audio data into the display ring buffer for UI visualisation"
+    },
+    {
+      "id": "preview_type",
+      "type": "parameter",
+      "label": "PreviewType",
+      "importance": 0.7,
+      "description": "Selects the visualisation mode (configures the ring buffer property object)"
+    },
+    {
+      "id": "buffer_size",
+      "type": "parameter",
+      "label": "BufferSize",
+      "importance": 0.5,
+      "description": "Controls the ring buffer size in samples"
+    },
+    {
+      "id": "display_buffer",
+      "type": "external",
+      "label": "Display Buffer",
+      "importance": 0.6,
+      "description": "Ring buffer consumed by the AudioAnalyser FloatingTile"
+    },
+    {
+      "id": "audio_out",
+      "type": "output",
+      "label": "Audio Out (passthrough)",
+      "importance": 1.0
+    }
+  ],
+  "edges": [
+    { "from": "audio_in", "to": "buffer_write", "type": "signal" },
+    { "from": "preview_type", "to": "buffer_write", "type": "control" },
+    { "from": "buffer_size", "to": "buffer_write", "type": "control" },
+    { "from": "buffer_write", "to": "display_buffer", "type": "signal", "label": "UI data" },
+    { "from": "audio_in", "to": "audio_out", "type": "signal", "label": "passthrough" }
+  ],
+  "groups": [
+    {
+      "id": "visualisation",
+      "label": "Visualisation",
+      "nodes": ["buffer_write", "preview_type", "buffer_size", "display_buffer"]
+    }
+  ]
+}

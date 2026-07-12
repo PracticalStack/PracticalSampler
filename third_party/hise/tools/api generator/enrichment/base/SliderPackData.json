@@ -1,0 +1,196 @@
+{
+  "className": "SliderPackData",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "fromBase64": {
+      "signature": "void fromBase64(String b64)",
+      "returnType": "void",
+      "description": "Restores the data from the B64 string.",
+      "parameters": [
+        {
+          "name": "b64",
+          "type": "String"
+        }
+      ]
+    },
+    "getCurrentlyDisplayedIndex": {
+      "signature": "float getCurrentlyDisplayedIndex()",
+      "returnType": "float",
+      "description": "Returns the currently displayed slider index.",
+      "parameters": []
+    },
+    "getDataAsBuffer": {
+      "signature": "var getDataAsBuffer()",
+      "returnType": "var",
+      "description": "Returns a Buffer object containing all slider values (as reference).",
+      "parameters": []
+    },
+    "getNumSliders": {
+      "signature": "int getNumSliders()",
+      "returnType": "int",
+      "description": "Returns the amount of sliders.",
+      "parameters": []
+    },
+    "getStepSize": {
+      "signature": "var getStepSize()",
+      "returnType": "var",
+      "description": "Returns the step size.",
+      "parameters": []
+    },
+    "getValue": {
+      "signature": "float getValue(int index)",
+      "returnType": "float",
+      "description": "Returns the value at the given position.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "linkTo": {
+      "signature": "void linkTo(var other)",
+      "returnType": "void",
+      "description": "Links the sliderpack to the other slider pack.",
+      "parameters": [
+        {
+          "name": "other",
+          "type": "var"
+        }
+      ]
+    },
+    "setAllValues": {
+      "signature": "void setAllValues(var value)",
+      "returnType": "void",
+      "description": "Sets all values.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "setAllValuesWithUndo": {
+      "signature": "void setAllValuesWithUndo(var value)",
+      "returnType": "void",
+      "description": "Sets all values with an undo operation.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "setAssignIsUndoable": {
+      "signature": "void setAssignIsUndoable(bool shouldBeUndoable)",
+      "returnType": "void",
+      "description": "Enables undo support for []-operator assignments.",
+      "parameters": [
+        {
+          "name": "shouldBeUndoable",
+          "type": "bool"
+        }
+      ]
+    },
+    "setContentCallback": {
+      "signature": "void setContentCallback(var contentFunction)",
+      "returnType": "void",
+      "description": "Sets a callback that is being executed when a point is added / removed / changed.",
+      "parameters": [
+        {
+          "name": "contentFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "setDisplayCallback": {
+      "signature": "void setDisplayCallback(var displayFunction)",
+      "returnType": "void",
+      "description": "Sets a callback that is being executed when the ruler position changes.",
+      "parameters": [
+        {
+          "name": "displayFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "setNumSliders": {
+      "signature": "void setNumSliders(var numSliders)",
+      "returnType": "void",
+      "description": "Sets the amount of sliders.",
+      "parameters": [
+        {
+          "name": "numSliders",
+          "type": "var"
+        }
+      ]
+    },
+    "setRange": {
+      "signature": "void setRange(double minValue, double maxValue, double stepSize)",
+      "returnType": "void",
+      "description": "Sets the range.",
+      "parameters": [
+        {
+          "name": "minValue",
+          "type": "double"
+        },
+        {
+          "name": "maxValue",
+          "type": "double"
+        },
+        {
+          "name": "stepSize",
+          "type": "double"
+        }
+      ]
+    },
+    "setUsePreallocatedLength": {
+      "signature": "void setUsePreallocatedLength(int length)",
+      "returnType": "void",
+      "description": "Sets a preallocated length that will retain values when the slider pack is resized below that limit.",
+      "parameters": [
+        {
+          "name": "length",
+          "type": "int"
+        }
+      ]
+    },
+    "setValue": {
+      "signature": "void setValue(int sliderIndex, float value)",
+      "returnType": "void",
+      "description": "Sets the value at the given position.",
+      "parameters": [
+        {
+          "name": "sliderIndex",
+          "type": "int"
+        },
+        {
+          "name": "value",
+          "type": "float"
+        }
+      ]
+    },
+    "setValueWithUndo": {
+      "signature": "void setValueWithUndo(int sliderIndex, float value)",
+      "returnType": "void",
+      "description": "Sets a single value at the given position with undo support.",
+      "parameters": [
+        {
+          "name": "sliderIndex",
+          "type": "int"
+        },
+        {
+          "name": "value",
+          "type": "float"
+        }
+      ]
+    },
+    "toBase64": {
+      "signature": "String toBase64()",
+      "returnType": "String",
+      "description": "Exports the data to a B64 string.",
+      "parameters": []
+    }
+  }
+}

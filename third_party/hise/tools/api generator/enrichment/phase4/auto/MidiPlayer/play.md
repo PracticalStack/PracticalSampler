@@ -1,0 +1,1 @@
+Starts playback from the beginning of the sequence. Pass 0 for immediate start, or a sample-accurate timestamp for delayed start within the current audio buffer. Returns true if playback started, false if the player is synced to the master clock (in which case transport is controlled externally).

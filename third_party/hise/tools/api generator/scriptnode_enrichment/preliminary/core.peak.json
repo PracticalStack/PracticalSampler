@@ -1,0 +1,80 @@
+{
+  "factoryPath": "core.peak",
+  "factory": "core",
+  "nodeId": "peak",
+  "description": "create a modulation signal from the (absolute) input magnitude",
+
+  "classification": {
+    "signalPathRole": "analysis",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/peak.md",
+    "tier": "GOOD",
+    "lines": 39
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "peak-detection-algorithm",
+      "category": "signal_path",
+      "question": "How is the peak value computed? Is it the maximum absolute value in the block, or a running peak with decay, or an RMS measurement?",
+      "context": "The detection algorithm determines how responsive and smooth the modulation output is."
+    },
+    {
+      "id": "normalisation-range",
+      "category": "signal_path",
+      "question": "The description says 'absolute input magnitude'. The modulation output has no UseUnnormalisedModulation flag, so it should be 0..1. How is the signal magnitude mapped to 0..1 -- is it clamped, or does it assume the input is already in -1..1 range?",
+      "context": "Users need to know whether clipping or normalisation occurs."
+    },
+    {
+      "id": "audio-passthrough",
+      "category": "signal_path",
+      "question": "Does core.peak pass the audio signal through unchanged, or does it consume/modify it?",
+      "context": "Determines whether this node can be inserted inline or needs to be in a split container."
+    },
+    {
+      "id": "channel-handling",
+      "category": "signal_path",
+      "question": "For stereo signals, does core.peak measure the peak of channel 0 only, the max across channels, or produce separate values per channel?",
+      "context": "Multi-channel behaviour affects how the modulation output represents the input."
+    }
+  ],
+
+  "notes": "core.peak converts audio signal magnitude to a modulation signal. No parameters -- it is a pure analysis/conversion node. Has ModulationTargets and DisplayBuffer. The 'absolute' qualifier means it takes abs() of the input before measuring. Compare with core.peak_unscaled which outputs raw values. This is one of the most common ways to create amplitude-following modulation in scriptnode."
+}

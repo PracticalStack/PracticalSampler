@@ -1,0 +1,1 @@
+Returns the modulation target ID for a given UI component. Accepts either a component reference or a component name string. For components connected to a MatrixModulator's Value parameter, returns the modulator's processor ID. For ScriptSliders with a `matrixTargetId` property, returns that property value. Returns an empty string if no target ID is found.

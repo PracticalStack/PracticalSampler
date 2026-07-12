@@ -1,0 +1,138 @@
+{
+  "60": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);\nContent.addPanel(\"Panel1\", 0, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "Panel1 != undefined", "value": 1, "delay": 0}
+    ],
+    "notes": "Colour saturation gradient paint routine. Compile + verify. Visual-only."
+  },
+  "61": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Server.downloadFile requires external server connectivity and network access",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Sequential file download from remote server."
+  },
+  "62": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Engine.saveUserPreset writes to disk at a deeply nested path which should not be done in test environment",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Saves user preset to deeply nested subfolder. Side-effect heavy."
+  },
+  "63": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "FileSystem.browse opens a modal file dialog that cannot be automated",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Browse dialog for loading/saving user presets."
+  },
+  "64": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "FileSystem.browse opens a modal file dialog and references undefined MIDIPlayer1 variable",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "MIDI file save via browse dialog. MIDIPlayer1 not defined in snippet."
+  },
+  "65": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.addButton(\"Compare\", 0, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "Compare_Elements_Array.length > 0", "value": 1, "delay": 0},
+      {"type": "REPL", "expression": "Compare_A.length", "value": "Compare_Elements_Array.length", "delay": 0}
+    ],
+    "notes": "Already has makeFrontInterface. A/B compare toggle. Verify arrays initialized. Can't easily verify swap logic via REPL since callback needs trigger."
+  },
+  "66": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "PersistentData.pnlDataRestorer != undefined", "value": 1, "delay": 0}
+    ],
+    "notes": "Self-contained namespace. Creates panel via Content.addPanel internally. Verify namespace and panel exist."
+  },
+  "67": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);",
+    "testOnlyCode": "one();",
+    "verifyScript": null,
+    "notes": "Demonstrates local loop variable scoping. Call one() which calls two(). Compile + execute. Console output is too verbose to verify."
+  },
+  "68": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.addLabel(\"Label1\", 0, 0);\nContent.addPanel(\"Panel1\", 100, 0);\nContent.addButton(\"btnStart\", 200, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "Label1 != undefined", "value": 1, "delay": 0},
+      {"type": "REPL", "expression": "Panel1 != undefined", "value": 1, "delay": 0},
+      {"type": "REPL", "expression": "Panel1.getValue()", "value": 0, "delay": 0}
+    ],
+    "notes": "Already has makeFrontInterface(600, 500). Timer countdown panel. Compile + verify initial state."
+  },
+  "69": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "key_low", "value": 1610678271, "delay": 0}
+    ],
+    "notes": "Already has makeFrontInterface(600, 500). Sets keyboard key colour. Verify hex constant value: 0x6000ffff = 1610678271."
+  },
+  "70": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "typeof colour", "value": "object", "delay": 0}
+    ],
+    "notes": "Self-contained. Uses Content.setHeight and Content.addKnob/addLabel/addPanel. Uses old-style onControl callback. Compile + verify."
+  },
+  "71": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "area != undefined", "value": 1, "delay": 0}
+    ],
+    "notes": "Uses Content.setHeight and Content.addPanel. Self-contained paint routine. Compile + verify."
+  },
+  "72": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "Knob.getValue()", "value": -18, "delay": 0}
+    ],
+    "notes": "Already has makeFrontInterface. Creates knob via addKnob, configures via setPropertiesFromJSON, then setValue(-18). Verify value."
+  }
+}

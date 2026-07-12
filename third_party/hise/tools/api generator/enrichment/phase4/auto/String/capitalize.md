@@ -1,0 +1,1 @@
+Converts the first letter of each word to uppercase (title case). Words are split on spaces, so hyphenated or underscored names should be run through `String.replace()` first to normalise separators before capitalising.

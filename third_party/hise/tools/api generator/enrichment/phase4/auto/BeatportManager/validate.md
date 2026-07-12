@@ -1,0 +1,3 @@
+Validates the current Beatport access and returns the result as a JSON object. In production mode, this delegates to the Beatport SDK. In simulation mode, it waits 1.5s to mimic network latency, then reads and parses `{project}/AdditionalSourceCode/beatport/validate_response.json`. The structure of the returned object depends on the Beatport SDK response format.
+
+> [!Warning:Missing response file throws in simulation mode] In simulation mode, this method throws a script error if `validate_response.json` is missing or contains invalid JSON. Create the file with a valid response structure before calling this method during development.

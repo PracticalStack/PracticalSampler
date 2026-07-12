@@ -1,0 +1,124 @@
+{
+  "moduleId": "SendFX",
+  "prettyName": "Send Effect",
+  "type": "Effect",
+  "subtype": "MasterEffect",
+  "category": "routing, mixing",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "stereo",
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "RoutingMatrix",
+      "signalFlowRole": "skip - inferred from type/subtype"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Send Routing",
+      "rationale": "Controls which Send Container receives the signal and at which channel offset",
+      "parameters": [
+        {
+          "id": "SendIndex",
+          "name": "Send Index",
+          "range": { "min": 0.0, "max": 128.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Index of the send container to receive the routed signal",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "ChannelOffset",
+          "name": "Channel Offset",
+          "range": { "min": 0.0, "max": 16.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Channel offset applied when routing into the send container",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Send Level",
+      "rationale": "Controls the gain level and smoothing of the send signal",
+      "parameters": [
+        {
+          "id": "Gain",
+          "name": "Gain",
+          "range": { "min": -100.0, "max": 0.0, "step": 0.1 },
+          "default": -100.0,
+          "description": "Send gain in decibels applied before routing to the send container",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Smoothing",
+          "name": "Smoothing",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Enables smoothing of gain changes to reduce clicks",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+
+  "standaloneModChains": [
+    {
+      "name": "Send Modulation",
+      "chainIndex": 0,
+      "modulationMode": "gain",
+      "constrainer": "*",
+      "note": "Modulates the send gain. Applied per-block as start/end values for ramped gain."
+    }
+  ],
+
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "signal-flow",
+      "category": "signal_path",
+      "question": "How does the SendEffect route audio to the SendContainer? Does it pass through audio or does it only copy/send?",
+      "context": "Need to clarify whether the original signal is preserved (send) or diverted (insert)."
+    },
+    {
+      "id": "gain-smoothing-detail",
+      "category": "parameter_behavior",
+      "question": "How does the Smoothing toggle affect gain changes? What is the smoothing time? Is it per-sample or per-block?",
+      "context": "Users need to know when to enable/disable smoothing for automation scenarios."
+    },
+    {
+      "id": "send-index-connection",
+      "category": "parameter_behavior",
+      "question": "How does SendIndex connect to a specific SendContainer? Is it by creation order?",
+      "context": "Users need to understand how to target a specific container."
+    },
+    {
+      "id": "bypass-behaviour",
+      "category": "conditional_logic",
+      "question": "What happens when the SendEffect is bypassed? Does the send signal ramp to zero or cut immediately?",
+      "context": "Important for live automation and avoiding clicks."
+    },
+    {
+      "id": "mod-chain-application",
+      "category": "parameter_behavior",
+      "question": "How is the Send Modulation chain applied? Per-sample or per-block? How does it interact with the gain parameter?",
+      "context": "Users need to know the modulation resolution for the send level."
+    }
+  ],
+
+  "notes": "SendFX is the send side of the send/return pair with SendContainer. The default gain is -100 dB (silent), so the user must raise it to hear any send signal. The Smoothing parameter defaults to On. The Send Modulation chain has no parameterIndex - it's a standalone modulation applied to the send gain."
+}

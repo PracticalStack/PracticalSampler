@@ -1,0 +1,1 @@
+Returns the current resynthesis options as a JSON object. Modify properties on the returned object and pass it back to `setResynthesisOptions()` to update settings. This is the recommended workflow for changing individual options without affecting the rest.

@@ -1,0 +1,64 @@
+{
+  "targetId": "ChokeGroupProcessor",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [437, 6609, 8197, 11473, 11814, 13857],
+  "insights": [
+    {
+      "type": "API",
+      "title": "Notes choke across groups, not within them - polyphonic play inside a group is allowed",
+      "summary": "Triggering a note in group N kills voices from OTHER processors in group N. Multiple notes in the same group can play simultaneously; only a new incoming note triggers a choke. This is correct drum behavior: playing two open hi-hats does not self-choke.",
+      "sources": ["tid:6609"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Built-in processor does not support dynamic per-note group assignment",
+      "summary": "The ChokeGroup parameter applies to the whole processor, not to individual MIDI notes. Drum machines that need to assign any of N notes to any of M groups at runtime cannot use the built-in processor and must implement choke logic in a ScriptProcessor using event IDs.",
+      "sources": ["tid:11473"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Each drum type (e.g. open hat, closed hat, kick) needs its own sampler with a ChokeGroupProcessor",
+      "summary": "Because the processor manages voices on its owner synth only, the standard setup is one sampler per drum type, each with a ChokeGroupProcessor set to the appropriate group number. Processors on different samplers with the same group number will choke each other globally.",
+      "sources": ["tid:13857", "tid:6609"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Original motivation: MIDI player multichannel setups where scripts cannot see cross-channel events",
+      "summary": "When MIDI players send notes into separate channels, a ScriptProcessor on one channel never sees note-on events on other channels, making script-based choke unreliable. The built-in ChokeGroupProcessor uses a global registry inside EventIdHandler that works across the entire module tree regardless of channel routing.",
+      "sources": ["tid:6609"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Hi/LoKey range also blocks all-notes-off behavior and is not a standalone note filter",
+      "summary": "Users wanting a simple note range filter are often misled by the LoKey/HiKey parameters. These parameters are coupled to choke group logic and are not equivalent to a standalone MIDI range filter. For range filtering without choke behavior, a dedicated script or a different processor is needed.",
+      "sources": ["tid:8197"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Manual choke via script requires Message.makeArtificial() before storing event IDs",
+      "summary": "When implementing choke logic in a ScriptProcessor (pre-built processor approach, or for dynamic group assignment), you must call Message.makeArtificial() on note-ons before pushing their event IDs to an array. HISE can only kill artificial events via Synth.noteOffByEventId() for stability reasons.",
+      "sources": ["tid:437"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Script-based choke for dynamic group membership: track a rolling evtList per group",
+      "summary": "For drum machines where notes can be reassigned to groups at runtime, maintain one array per choke group. On note-on for a choke group member, call Synth.noteOffByEventId() for all IDs in that group's array, clear it, then push the new artificial event ID. This gives correct mono-choke behavior for any combination of notes.",
+      "sources": ["tid:11473", "tid:437"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

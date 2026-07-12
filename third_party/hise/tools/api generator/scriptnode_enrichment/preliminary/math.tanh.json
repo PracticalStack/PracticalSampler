@@ -1,0 +1,63 @@
+{
+  "factoryPath": "math.tanh",
+  "factory": "math",
+  "nodeId": "tanh",
+  "description": "Applies the tanh function on the signal.",
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+  "parameterGroups": [
+    {
+      "label": "Operation",
+      "rationale": "Single Value parameter controlling the math operation: s = tanh(s * value)",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": {
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.0,
+            "skew": 1.0
+          },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+  "properties": [],
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/math/tanh.md",
+    "tier": "STUB",
+    "lines": 8
+  },
+  "availableImages": [],
+  "gaps": [],
+  "notes": "Uses tanhf per sample. Value parameter scales the input before tanh is applied, controlling the amount of saturation. At Value=1.0, gentle soft clipping. Higher values increase drive/saturation."
+}

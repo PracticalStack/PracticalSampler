@@ -1,0 +1,232 @@
+{
+  "className": "ScriptModulationMatrix",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "canConnect": {
+      "signature": "bool canConnect(String source, String target)",
+      "returnType": "bool",
+      "description": "Checks whether the modulation connection can be made.",
+      "parameters": [
+        {
+          "name": "source",
+          "type": "String"
+        },
+        {
+          "name": "target",
+          "type": "String"
+        }
+      ]
+    },
+    "clearAllConnections": {
+      "signature": "void clearAllConnections(String targetId)",
+      "returnType": "void",
+      "description": "Removes all connections for the given target (or all connections if no target is specified).",
+      "parameters": [
+        {
+          "name": "targetId",
+          "type": "String"
+        }
+      ]
+    },
+    "connect": {
+      "signature": "bool connect(String sourceId, String targetId, bool addConnection)",
+      "returnType": "bool",
+      "description": "Adds (or removes) a connection from the source to the target.",
+      "parameters": [
+        {
+          "name": "sourceId",
+          "type": "String"
+        },
+        {
+          "name": "targetId",
+          "type": "String"
+        },
+        {
+          "name": "addConnection",
+          "type": "bool"
+        }
+      ]
+    },
+    "fromBase64": {
+      "signature": "void fromBase64(String b64)",
+      "returnType": "void",
+      "description": "Loads the state from a previously exported Base64 string.",
+      "parameters": [
+        {
+          "name": "b64",
+          "type": "String"
+        }
+      ]
+    },
+    "getComponent": {
+      "signature": "var getComponent(String targetId)",
+      "returnType": "var",
+      "description": "Get the component reference for the given modulation target ID.",
+      "parameters": [
+        {
+          "name": "targetId",
+          "type": "String"
+        }
+      ]
+    },
+    "getConnectionProperty": {
+      "signature": "var getConnectionProperty(String sourceId, String targetId, String propertyId)",
+      "returnType": "var",
+      "description": "Returns the property of a modulation connection.",
+      "parameters": [
+        {
+          "name": "sourceId",
+          "type": "String"
+        },
+        {
+          "name": "targetId",
+          "type": "String"
+        },
+        {
+          "name": "propertyId",
+          "type": "String"
+        }
+      ]
+    },
+    "getMatrixModulationProperties": {
+      "signature": "var getMatrixModulationProperties()",
+      "returnType": "var",
+      "description": "Returns a JSON object with the current matrix modulation properties.",
+      "parameters": []
+    },
+    "getModulationDisplayData": {
+      "signature": "var getModulationDisplayData(String targetId)",
+      "returnType": "var",
+      "description": "Returns a JSON object with the visualisation data for the given modulation target.",
+      "parameters": [
+        {
+          "name": "targetId",
+          "type": "String"
+        }
+      ]
+    },
+    "getSourceList": {
+      "signature": "var getSourceList()",
+      "returnType": "var",
+      "description": "Return a list of all sources.",
+      "parameters": []
+    },
+    "getTargetId": {
+      "signature": "String getTargetId(var componentOrId)",
+      "returnType": "String",
+      "description": "Get the target ID (either ID of the matrix modulator or matrixTargetId property) for the given component.",
+      "parameters": [
+        {
+          "name": "componentOrId",
+          "type": "var"
+        }
+      ]
+    },
+    "getTargetList": {
+      "signature": "var getTargetList()",
+      "returnType": "var",
+      "description": "Return a list of all targets.",
+      "parameters": []
+    },
+    "setConnectionCallback": {
+      "signature": "void setConnectionCallback(var updateFunction)",
+      "returnType": "void",
+      "description": "Set a callback that will be executed whenever the matrix state changes.",
+      "parameters": [
+        {
+          "name": "updateFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "setConnectionProperty": {
+      "signature": "bool setConnectionProperty(String sourceId, String targetId, String propertyId, var value)",
+      "returnType": "bool",
+      "description": "Sets the property of a modulation connection (with undo).",
+      "parameters": [
+        {
+          "name": "sourceId",
+          "type": "String"
+        },
+        {
+          "name": "targetId",
+          "type": "String"
+        },
+        {
+          "name": "propertyId",
+          "type": "String"
+        },
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "setCurrentlySelectedSource": {
+      "signature": "void setCurrentlySelectedSource(String sourceId)",
+      "returnType": "void",
+      "description": "Sets the currently selected source.",
+      "parameters": [
+        {
+          "name": "sourceId",
+          "type": "String"
+        }
+      ]
+    },
+    "setDragCallback": {
+      "signature": "void setDragCallback(var newDragCallback)",
+      "returnType": "void",
+      "description": "Attaches a callback to be notified wheneve a modulation connection is being dragged.",
+      "parameters": [
+        {
+          "name": "newDragCallback",
+          "type": "var"
+        }
+      ]
+    },
+    "setEditCallback": {
+      "signature": "void setEditCallback(var menuItems, var editFunction)",
+      "returnType": "void",
+      "description": "Set a callback that will be executed when the user clicks on \"Edit connections\".",
+      "parameters": [
+        {
+          "name": "menuItems",
+          "type": "var"
+        },
+        {
+          "name": "editFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "setMatrixModulationProperties": {
+      "signature": "void setMatrixModulationProperties(var newProperties)",
+      "returnType": "void",
+      "description": "Sets the global properties for the matrix modulation system.",
+      "parameters": [
+        {
+          "name": "newProperties",
+          "type": "var"
+        }
+      ]
+    },
+    "setSourceSelectionCallback": {
+      "signature": "void setSourceSelectionCallback(var sourceSelectionCallback)",
+      "returnType": "void",
+      "description": "Attaches a callback to be notified whenever a new modulation source is selected.",
+      "parameters": [
+        {
+          "name": "sourceSelectionCallback",
+          "type": "var"
+        }
+      ]
+    },
+    "toBase64": {
+      "signature": "String toBase64()",
+      "returnType": "String",
+      "description": "Creates a Base64 string of all connections.",
+      "parameters": []
+    }
+  }
+}

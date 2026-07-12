@@ -1,0 +1,80 @@
+{
+  "targetId": "HardcodedEnvelopeModulator",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [13185, 2926, 7890, 8144, 13641],
+  "insights": [
+    {
+      "type": "BUG",
+      "title": "Crash in compiled plugin on macOS with release + LTO build flags",
+      "summary": "The HardcodedEnvelopeModulator can crash in a compiled macOS plugin when built with release configuration and LTO enabled. The crash is build-flag-specific; any change to build flags suppresses it. A code-level fix was applied by the author (2025-08-13).",
+      "sources": ["tid:13185"],
+      "verify": true,
+      "verify_hint": "Check HISE git history around 2025-08-13 for HardcodedModules.cpp changes; test compiled macOS release+LTO build"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Network must output exactly one channel (NumChannels==1)",
+      "summary": "The scriptnode network hosted by the HardcodedEnvelopeModulator must be compiled with NumChannels set to 1. Modulators are monophonic signal generators. A channel count of -1 at runtime indicates something else went wrong during initialisation.",
+      "sources": ["tid:13185"],
+      "verify": true,
+      "verify_hint": "grep checkHardcodedChannelCount in HardcodedModuleBase.cpp; enforces numChannels==1"
+    },
+    {
+      "type": "BUG",
+      "title": "MIDI CC events (e.g. sustain pedal CC64) are ignored inside the scriptnode envelope",
+      "summary": "MIDI CC messages such as the sustain pedal (CC 64) are not forwarded into the scriptnode envelope modulator's network. The flex envelope outside a scriptnode responds correctly; inside scriptnode it does not. Reported as a bug by a trusted user.",
+      "sources": ["tid:13641"],
+      "verify": true,
+      "verify_hint": "grep handleHiseEvent in HardcodedModules.cpp and HardcodedModuleBase.cpp; check CC filtering in voiceStack.handleHiseEvent"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Envelope cannot modulate parameters at container level",
+      "summary": "A scriptnode envelope modulator cannot be used on a filter or parameter that lives at the container level. Containers have no concept of voices, so envelope (per-voice) modulation is not applicable there. Confirmed by the author.",
+      "sources": ["tid:7890"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Modulation source and target must both be inside the midichain container for sample-accurate timing",
+      "summary": "When connecting a scriptnode envelope to a modulation target, both the modulation source node and the target node must be placed inside the midichain container. Placing the add node outside the midichain loses sample-accurate timing and only applies the value from the last incoming MIDI message to the entire buffer.",
+      "sources": ["tid:7890"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Using a scriptnode envelope as a global modulator requires Uniform Voice Handler",
+      "summary": "To use a scriptnode envelope as a global modulator across multiple sound generators, add a uniform voice handler at the root level with Synth.setUseUniformVoiceHandler(). This ensures all sound generators allocate voices synchronously, which is required for envelope-based global modulation.",
+      "sources": ["tid:7890"],
+      "verify": true,
+      "verify_hint": "grep setUseUniformVoiceHandler in HISE scripting API; check mod_matrix branch merge into develop"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Modulation output is unipolar (0 to 1), not bipolar",
+      "summary": "All HISE envelope modulators output values in the 0-1 range. Bipolar modulation (subtract from a set point) requires placing the backend parameter value at the top of the desired range and using the intensity setting to control the negative swing, rather than centering the parameter value.",
+      "sources": ["tid:2926"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "Audible click in envelope output",
+      "summary": "A click artefact in the envelope signal was reported by a trusted user. The author noted a known glitch in the hold knob that occasionally appears. Whether this applies to the hardcoded envelope modulator specifically or the general HISE envelope was not conclusively resolved in the thread.",
+      "sources": ["tid:2926"],
+      "verify": true,
+      "verify_hint": "Check hold knob handling in EnvelopeModulator base class; test click with hold time changes"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use the JUCE plugin host for debugging compiled plugin crashes",
+      "summary": "When debugging crashes that only appear in compiled plugin form, use the minimal JUCE plugin host (built from source with VST3 SDK) instead of a full DAW. Save a plugin setup inside the host so it restores automatically on each Xcode launch, significantly accelerating the debug cycle.",
+      "sources": ["tid:13185"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

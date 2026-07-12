@@ -1,0 +1,95 @@
+{
+  "factoryPath": "control.converter",
+  "factory": "control",
+  "nodeId": "converter",
+  "description": "converts a control value",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input Signal",
+      "rationale": "Value is the primary input. Marked as unscaled -- receives raw values without range conversion.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": true
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "Mode",
+      "defaultValue": "Ms2Freq",
+      "type": "enum",
+      "note": "Selects the conversion formula. Maps to a C++ template argument via the 'conversion_logic' namespace. Available modes likely include Ms2Freq, Freq2Ms, Midi2Freq, Freq2Midi, and possibly others."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": true,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/converter.md",
+    "tier": "GOOD",
+    "lines": 28
+  },
+
+  "availableImages": ["converter.png"],
+
+  "gaps": [
+    {
+      "id": "converter-mode-variants",
+      "category": "conditional_logic",
+      "question": "What are all available Mode options in the conversion_logic namespace? Expected candidates: Ms2Freq, Freq2Ms, Midi2Freq, Freq2Midi, Gain2dB, dB2Gain. What is the complete list and what formula does each apply?",
+      "context": "Each mode represents a different unit conversion. All modes must be documented for the reference page."
+    },
+    {
+      "id": "converter-input-output-domains",
+      "category": "signal_path",
+      "question": "For each conversion mode, what is the expected input domain and output domain? For example, Ms2Freq expects milliseconds in and outputs frequency in Hz?",
+      "context": "Since both input and output are unnormalised, users need to know the exact value domains for each mode."
+    },
+    {
+      "id": "converter-template-compilation",
+      "category": "conditional_logic",
+      "question": "The HasModeTemplateArgument flag means the Mode property maps to a C++ template argument at compile time. Does this mean the conversion logic is fully inlined with no runtime branching?",
+      "context": "Relevant for understanding performance characteristics and compile-time constraints."
+    }
+  ],
+
+  "notes": "converter is a unit conversion node. It uses the templated_mode pattern with the 'conversion_logic' namespace, meaning each Mode option maps to a different C++ class at compile time. Both input and output are unnormalised (raw values). The existing phase3 doc is GOOD quality (28 lines) and may already list the available modes. This is one of only two nodes in this batch with a Mode property (the other has none). Not polyphonic."
+}

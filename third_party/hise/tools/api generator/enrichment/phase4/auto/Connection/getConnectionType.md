@@ -1,0 +1,1 @@
+Returns an integer indicating the connection source type: `0` for macro parameter connections, `1` for single-output modulation connections, and `2` for multi-output modulation connections.

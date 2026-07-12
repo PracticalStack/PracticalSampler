@@ -1,0 +1,1 @@
+Returns a 64-bit hash code for the string. Identical strings always produce the same value. Useful for state fingerprinting - concatenate several control values into a string, hash the result, and compare with the previous hash to skip expensive operations when nothing has changed.

@@ -1,0 +1,1 @@
+Returns an array of child Node references if this node is a container. Leaf nodes return an empty array. When recursive is true, returns all descendant nodes in a flat array via depth-first traversal rather than just direct children.

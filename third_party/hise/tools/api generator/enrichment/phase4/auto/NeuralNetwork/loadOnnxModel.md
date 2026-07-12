@@ -1,0 +1,1 @@
+Loads an ONNX model from base64-encoded binary data for spectral classification via `processFFTSpectrum`. The ONNX runtime DLL is loaded from the HISE tools directory (in the IDE) or the app data directory (in exported plugins). Returns 1 on success.

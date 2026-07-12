@@ -1,0 +1,1 @@
+Initialises the HISE example asset manager, which provides dummy audio files, MIDI files, and filmstrip images for use in code snippets and examples. Only works in the HISE IDE - in exported plugins this call is a no-op.

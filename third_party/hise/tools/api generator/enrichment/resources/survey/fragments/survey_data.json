@@ -1,0 +1,421 @@
+{
+  "Array": {
+    "brief": "Dynamic-size general-purpose container that holds any type of element (numbers, strings, objects, nested arrays), similar to JavaScript arrays.",
+    "domain": "scripting",
+    "role": "container",
+    "baseClass": "juce::var (built-in JavaScript engine type)",
+    "creates": [],
+    "references": ["String"],
+    "seeAlso": [
+      {
+        "class": "Buffer",
+        "distinction": "Use Buffer when you need a fixed-size float array for audio sample data with math operations; use Array for dynamic, mixed-type collections."
+      },
+      {
+        "class": "MidiList",
+        "distinction": "Use MidiList for exactly 128 integer slots indexed by MIDI note number; use Array for variable-length, general-purpose collections."
+      },
+      {
+        "class": "FixObjectArray",
+        "distinction": "Use FixObjectArray for fixed-size arrays of typed objects with named properties and memory-efficient layout; use Array for dynamic heterogeneous collections."
+      },
+      {
+        "class": "FixObjectStack",
+        "distinction": "Use FixObjectStack for a LIFO stack of typed objects with insert/remove; use Array for push/pop of any value type."
+      },
+      {
+        "class": "UnorderedStack",
+        "distinction": "Use UnorderedStack for fast insert/remove of up to 128 floats or events without preserving order; use Array for ordered, dynamic collections of any type."
+      },
+      {
+        "class": "ThreadSafeStorage",
+        "distinction": "Use ThreadSafeStorage to safely pass data between threads; use Array as a standard container on a single thread."
+      }
+    ],
+    "callbackDensity": 0.25,
+    "statefulness": 0.0,
+    "threadingExposure": 0.0
+  },
+  "String": {
+    "brief": "Built-in string type with methods for searching, splitting, transforming, encrypting, and parsing text values.",
+    "domain": "scripting",
+    "role": "utility",
+    "baseClass": "juce::String (built-in JavaScript engine type)",
+    "creates": ["Array"],
+    "references": [],
+    "seeAlso": [],
+    "callbackDensity": 0.0,
+    "statefulness": 0.15,
+    "threadingExposure": 0.0
+  },
+  "Buffer": {
+    "brief": "Fixed-size float array optimized for audio sample data, supporting DSP operations like normalization, resampling, pitch detection, and median filtering.",
+    "domain": "audio",
+    "role": "container",
+    "baseClass": "VariantBuffer (built-in JavaScript engine type)",
+    "creates": ["Buffer"],
+    "references": ["String"],
+    "seeAlso": [
+      {
+        "class": "Array",
+        "distinction": "Use Array for dynamic mixed-type collections; use Buffer for fixed-size float arrays with audio DSP operations."
+      },
+      {
+        "class": "MidiList",
+        "distinction": "Use MidiList for 128 integer slots keyed by MIDI note number; use Buffer for contiguous float sample data of any length."
+      },
+      {
+        "class": "DisplayBuffer",
+        "distinction": "Use DisplayBuffer to reference a ring buffer owned by a processor for visualization; use Buffer for standalone audio sample data you manipulate directly."
+      },
+      {
+        "class": "AudioFile",
+        "distinction": "Use AudioFile to load/manage audio files from disk with playback integration; use Buffer for in-memory float sample manipulation."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.0,
+    "threadingExposure": 0.3
+  },
+  "MidiList": {
+    "brief": "Exactly 128 integer slots (indexed 0-127) for storing per-note values like velocity curves, key switches, or note-number mappings in MIDI processing.",
+    "domain": "event",
+    "role": "container",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": ["String"],
+    "seeAlso": [
+      {
+        "class": "Array",
+        "distinction": "Use Array for dynamic-size collections of any type; use MidiList for a fixed 128-slot integer lookup table keyed by MIDI note number."
+      },
+      {
+        "class": "Buffer",
+        "distinction": "Use Buffer for floating-point audio sample data; use MidiList for integer values indexed by MIDI note number (0-127)."
+      },
+      {
+        "class": "UnorderedStack",
+        "distinction": "Use UnorderedStack for a dynamic set of active floats/events with fast insert/remove; use MidiList for a static 128-slot note-indexed lookup."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.73,
+    "threadingExposure": 0.3
+  },
+  "FixObjectArray": {
+    "brief": "Fixed-size array of typed objects with named properties and contiguous memory layout, created via FixObjectFactory for memory-efficient structured data.",
+    "domain": "data",
+    "role": "container",
+    "baseClass": "fixobj::Array (LayoutBase, AssignableObject, ObjectWithJSONConverter, ConstScriptingObject)",
+    "creates": [],
+    "references": ["String", "Buffer"],
+    "seeAlso": [
+      {
+        "class": "Array",
+        "distinction": "Use Array for dynamic mixed-type collections; use FixObjectArray for fixed-size arrays of identically-typed objects with named properties."
+      },
+      {
+        "class": "FixObjectStack",
+        "distinction": "Use FixObjectStack when you need insert/remove (dynamic size up to capacity); use FixObjectArray when all slots are always valid (fixed iteration count)."
+      },
+      {
+        "class": "FixObjectFactory",
+        "distinction": "Use FixObjectFactory to define the object layout and create FixObjectArray/FixObjectStack instances; FixObjectArray is the container itself."
+      },
+      {
+        "class": "UnorderedStack",
+        "distinction": "Use UnorderedStack for up to 128 floats or events with fast unordered insert/remove; use FixObjectArray for fixed-size arrays of multi-property objects."
+      },
+      {
+        "class": "Buffer",
+        "distinction": "Use Buffer for homogeneous float sample data; use FixObjectArray for structured objects with multiple named properties per element."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.22,
+    "threadingExposure": 0.0
+  },
+  "FixObjectStack": {
+    "brief": "Variable-occupancy stack of typed objects (up to a fixed capacity) with insert/remove operations, created via FixObjectFactory for event tracking and active-voice lists.",
+    "domain": "data",
+    "role": "container",
+    "baseClass": "fixobj::Stack (inherits fixobj::Array)",
+    "creates": [],
+    "references": ["String", "Buffer"],
+    "seeAlso": [
+      {
+        "class": "FixObjectArray",
+        "distinction": "Use FixObjectArray when all slots are always valid; use FixObjectStack when you need dynamic insert/remove within a fixed capacity."
+      },
+      {
+        "class": "FixObjectFactory",
+        "distinction": "Use FixObjectFactory to define the layout and create FixObjectStack instances; FixObjectStack is the container you insert into and remove from."
+      },
+      {
+        "class": "Array",
+        "distinction": "Use Array for dynamic mixed-type collections; use FixObjectStack for preallocated typed-object stacks with no allocation on insert."
+      },
+      {
+        "class": "UnorderedStack",
+        "distinction": "Use UnorderedStack for up to 128 floats or HISE events; use FixObjectStack for multi-property typed objects with custom compare functions."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.14,
+    "threadingExposure": 0.0
+  },
+  "FixObjectFactory": {
+    "brief": "Factory that defines a typed memory layout from a JSON prototype and creates FixObjectArray, FixObjectStack, and single FixObject instances from it.",
+    "domain": "data",
+    "role": "factory",
+    "baseClass": "fixobj::Factory (LayoutBase, ConstScriptingObject)",
+    "creates": ["FixObjectArray", "FixObjectStack"],
+    "references": [],
+    "seeAlso": [
+      {
+        "class": "FixObjectArray",
+        "distinction": "FixObjectFactory creates FixObjectArray instances; FixObjectArray is the fixed-size container of typed objects."
+      },
+      {
+        "class": "FixObjectStack",
+        "distinction": "FixObjectFactory creates FixObjectStack instances; FixObjectStack is the variable-occupancy container of typed objects."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.2,
+    "threadingExposure": 0.0
+  },
+  "UnorderedStack": {
+    "brief": "Fast insert/remove container for up to 128 float numbers or HISE events, without preserving order -- ideal for tracking active notes on the audio thread.",
+    "domain": "event",
+    "role": "container",
+    "baseClass": "ConstScriptingObject",
+    "creates": ["Buffer"],
+    "references": ["MessageHolder"],
+    "seeAlso": [
+      {
+        "class": "Array",
+        "distinction": "Use Array for ordered, dynamic, mixed-type collections on the UI thread; use UnorderedStack for fast unordered insert/remove safe for the audio thread."
+      },
+      {
+        "class": "MidiList",
+        "distinction": "Use MidiList for a static 128-slot lookup by note number; use UnorderedStack for a dynamic set of active values/events with fast membership tests."
+      },
+      {
+        "class": "FixObjectStack",
+        "distinction": "Use FixObjectStack for multi-property typed objects; use UnorderedStack for simple floats or HISE events with built-in event matching."
+      },
+      {
+        "class": "Buffer",
+        "distinction": "Use Buffer for fixed-size float arrays with DSP operations; use UnorderedStack for a dynamic set of values with insert/remove semantics."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.17,
+    "threadingExposure": 0.7
+  },
+  "ThreadSafeStorage": {
+    "brief": "Lock-based container for safely passing arbitrary data (JSON, arrays, objects) between the audio thread and the UI/scripting thread.",
+    "domain": "data",
+    "role": "container",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": [],
+    "seeAlso": [
+      {
+        "class": "Array",
+        "distinction": "Use Array for standard single-thread collections; use ThreadSafeStorage when data must be shared between audio and UI threads."
+      },
+      {
+        "class": "UnorderedStack",
+        "distinction": "Use UnorderedStack for audio-thread-safe float/event tracking with insert/remove; use ThreadSafeStorage for passing arbitrary data objects between threads."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 1.0,
+    "threadingExposure": 1.0
+  },
+  "Table": {
+    "brief": "Scriptable reference to a lookup table (curve editor data) used by modulators and effects, supporting point manipulation, value queries, and change callbacks.",
+    "domain": "complex-data",
+    "role": "handle",
+    "baseClass": "ScriptComplexDataReferenceBase (ConstScriptingObject, ComplexDataUIUpdaterBase::EventListener)",
+    "creates": [],
+    "references": ["Array"],
+    "seeAlso": [
+      {
+        "class": "SliderPackData",
+        "distinction": "Use Table for continuous curve lookup data (modulation shapes); use SliderPackData for discrete step-sequence or multi-slider data."
+      },
+      {
+        "class": "AudioFile",
+        "distinction": "Use AudioFile for audio waveform data from files; use Table for editable modulation curves defined by control points."
+      },
+      {
+        "class": "DisplayBuffer",
+        "distinction": "Use DisplayBuffer for read-only ring buffer visualization from a processor; use Table for an editable modulation curve with control points."
+      }
+    ],
+    "callbackDensity": 0.2,
+    "statefulness": 0.5,
+    "threadingExposure": 0.2
+  },
+  "SliderPackData": {
+    "brief": "Scriptable reference to a slider pack's data array (multiple discrete float values), used to control step sequencers, arpeggiators, and multi-parameter displays.",
+    "domain": "complex-data",
+    "role": "handle",
+    "baseClass": "ScriptComplexDataReferenceBase (ConstScriptingObject, ComplexDataUIUpdaterBase::EventListener)",
+    "creates": ["Buffer"],
+    "references": [],
+    "seeAlso": [
+      {
+        "class": "Table",
+        "distinction": "Use Table for continuous curve data defined by control points; use SliderPackData for an array of discrete slider values."
+      },
+      {
+        "class": "AudioFile",
+        "distinction": "Use AudioFile for audio waveform references; use SliderPackData for arrays of parameter values (step sequencer, LFO steps)."
+      },
+      {
+        "class": "Buffer",
+        "distinction": "Use Buffer for standalone float arrays you process directly; use SliderPackData for float arrays that are bound to a UI slider pack component."
+      },
+      {
+        "class": "DisplayBuffer",
+        "distinction": "Use DisplayBuffer for read-only ring buffer visualization; use SliderPackData for editable discrete slider values."
+      }
+    ],
+    "callbackDensity": 0.11,
+    "statefulness": 0.67,
+    "threadingExposure": 0.2
+  },
+  "AudioFile": {
+    "brief": "Scriptable reference to an audio file slot in a processor, providing file loading, sample data access, range/loop control, and playback position callbacks.",
+    "domain": "complex-data",
+    "role": "handle",
+    "baseClass": "ScriptComplexDataReferenceBase (ConstScriptingObject, ComplexDataUIUpdaterBase::EventListener)",
+    "creates": [],
+    "references": ["Buffer", "String"],
+    "seeAlso": [
+      {
+        "class": "Table",
+        "distinction": "Use Table for editable modulation curves; use AudioFile for loading and accessing audio waveform data from files."
+      },
+      {
+        "class": "SliderPackData",
+        "distinction": "Use SliderPackData for discrete slider value arrays; use AudioFile for audio sample data with file loading and playback."
+      },
+      {
+        "class": "DisplayBuffer",
+        "distinction": "Use DisplayBuffer for a processor's ring buffer visualization; use AudioFile for loading and manipulating audio files in sample slots."
+      },
+      {
+        "class": "Buffer",
+        "distinction": "Use Buffer for standalone in-memory float arrays; use AudioFile for audio file slots with file I/O, sample rate info, and range management."
+      }
+    ],
+    "callbackDensity": 0.13,
+    "statefulness": 0.47,
+    "threadingExposure": 0.2
+  },
+  "DisplayBuffer": {
+    "brief": "Scriptable reference to a processor's ring buffer, used for real-time waveform/spectrum visualization by reading and converting audio data to paths.",
+    "domain": "complex-data",
+    "role": "handle",
+    "baseClass": "ScriptComplexDataReferenceBase (ConstScriptingObject, ComplexDataUIUpdaterBase::EventListener)",
+    "creates": ["Buffer"],
+    "references": ["String"],
+    "seeAlso": [
+      {
+        "class": "Table",
+        "distinction": "Use Table for editable modulation curve data; use DisplayBuffer for read-only ring buffer visualization from a DSP processor."
+      },
+      {
+        "class": "SliderPackData",
+        "distinction": "Use SliderPackData for editable discrete slider values; use DisplayBuffer for streaming audio visualization data."
+      },
+      {
+        "class": "AudioFile",
+        "distinction": "Use AudioFile for loading/managing audio files; use DisplayBuffer for visualizing a processor's real-time audio output."
+      },
+      {
+        "class": "Buffer",
+        "distinction": "Use Buffer for standalone sample manipulation; use DisplayBuffer for accessing a processor's internal ring buffer for UI visualization."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.44,
+    "threadingExposure": 0.3
+  },
+  "FFT": {
+    "brief": "Fast Fourier Transform processor that analyses audio buffers into frequency-domain magnitude/phase data, with optional inverse FFT and 2D spectrogram generation.",
+    "domain": "audio",
+    "role": "processor",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": ["Buffer"],
+    "seeAlso": [
+      {
+        "class": "NeuralNetwork",
+        "distinction": "Use FFT for frequency-domain analysis/resynthesis of audio; use NeuralNetwork for machine-learning inference on audio or parameter data."
+      },
+      {
+        "class": "LorisManager",
+        "distinction": "Use LorisManager for partial-tracking analysis and resynthesis of audio; use FFT for standard windowed FFT spectral processing."
+      },
+      {
+        "class": "Buffer",
+        "distinction": "Use Buffer to hold the audio sample data that FFT processes; FFT operates on Buffer contents."
+      }
+    ],
+    "callbackDensity": 0.25,
+    "statefulness": 0.42,
+    "threadingExposure": 0.3
+  },
+  "NeuralNetwork": {
+    "brief": "Machine-learning inference engine supporting PyTorch, TensorFlow, NAM, and ONNX models for real-time audio processing or parameter prediction.",
+    "domain": "audio",
+    "role": "processor",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": ["Buffer", "FFT"],
+    "seeAlso": [
+      {
+        "class": "FFT",
+        "distinction": "Use FFT for standard spectral analysis; use NeuralNetwork for learned audio transformations via neural network inference."
+      },
+      {
+        "class": "LorisManager",
+        "distinction": "Use LorisManager for deterministic partial-tracking resynthesis; use NeuralNetwork for data-driven inference using trained models."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.46,
+    "threadingExposure": 0.3
+  },
+  "LorisManager": {
+    "brief": "Interface to the Loris partial-tracking library for analysis, manipulation, and resynthesis of audio via sinusoidal partials -- requires optional Loris module.",
+    "domain": "audio",
+    "role": "processor",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": ["Buffer"],
+    "seeAlso": [
+      {
+        "class": "FFT",
+        "distinction": "Use FFT for standard windowed FFT spectral processing; use LorisManager for sinusoidal partial tracking with per-partial manipulation."
+      },
+      {
+        "class": "NeuralNetwork",
+        "distinction": "Use NeuralNetwork for ML-based audio processing; use LorisManager for physics-based spectral analysis and resynthesis via Loris partials."
+      },
+      {
+        "class": "Buffer",
+        "distinction": "Use Buffer to hold the audio data that LorisManager analyses and resynthesises; LorisManager operates on audio files and returns Buffer arrays."
+      }
+    ],
+    "callbackDensity": 0.11,
+    "statefulness": 0.22,
+    "threadingExposure": 0.1
+  }
+}

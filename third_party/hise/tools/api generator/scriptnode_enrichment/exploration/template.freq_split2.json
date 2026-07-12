@@ -1,0 +1,26 @@
+{
+  "factoryPath": "template.freq_split2",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input signal, duplicated to both bands by container.split" },
+    { "id": "split", "label": "Split (copy to bands)", "type": "process", "importance": 0.7, "description": "container.split copies input to band1 and band2" },
+    { "id": "lr1_1", "label": "lr1_1 (LP)", "type": "process", "importance": 1.0, "description": "Linkwitz-Riley 4th-order lowpass at Band 1 frequency" },
+    { "id": "dummy1", "label": "dummy1 (user processing)", "type": "process", "importance": 0.9, "description": "Placeholder for user per-band processing (low band)" },
+    { "id": "lr2_1", "label": "lr2_1 (HP)", "type": "process", "importance": 1.0, "description": "Linkwitz-Riley 4th-order highpass at Band 1 frequency" },
+    { "id": "dummy2", "label": "dummy2 (user processing)", "type": "process", "importance": 0.9, "description": "Placeholder for user per-band processing (high band)" },
+    { "id": "sum", "label": "Sum bands", "type": "process", "importance": 0.8, "description": "container.split sums band outputs (phase-coherent flat sum)" },
+    { "id": "band1_param", "label": "Band 1", "type": "parameter", "importance": 1.0, "description": "Crossover frequency (20-20000 Hz, log). Routes to lr1_1.Frequency and lr2_1.Frequency." },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Reconstructed full-spectrum output" }
+  ],
+  "edges": [
+    { "from": "in", "to": "split", "type": "signal", "label": null },
+    { "from": "split", "to": "lr1_1", "type": "signal", "label": "band1" },
+    { "from": "lr1_1", "to": "dummy1", "type": "signal", "label": null },
+    { "from": "split", "to": "lr2_1", "type": "signal", "label": "band2" },
+    { "from": "lr2_1", "to": "dummy2", "type": "signal", "label": null },
+    { "from": "dummy1", "to": "sum", "type": "signal", "label": null },
+    { "from": "dummy2", "to": "sum", "type": "signal", "label": null },
+    { "from": "sum", "to": "out", "type": "signal", "label": null },
+    { "from": "band1_param", "to": "lr1_1", "type": "control", "label": "-> Frequency" },
+    { "from": "band1_param", "to": "lr2_1", "type": "control", "label": "-> Frequency" }
+  ]
+}

@@ -1,0 +1,1 @@
+Returns a human-readable string describing the event contents, including the type, channel, number, value, event ID, and timestamp. For pitch wheel events, the number and value fields are replaced with a single 14-bit pitch wheel value. Pass the result to `Console.print()` to inspect events during development.

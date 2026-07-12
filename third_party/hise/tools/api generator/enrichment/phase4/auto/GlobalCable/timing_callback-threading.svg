@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 420">
+  <defs>
+    <marker id="arrow-green" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#4E8E35"/>
+    </marker>
+    <marker id="arrow-teal" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#3F6E6E"/>
+    </marker>
+  </defs>
+  
+  <!-- Title -->
+  <text x="450" y="30" font-family="Lato, sans-serif" font-size="16" font-weight="bold" fill="#CCCCCC" text-anchor="middle">Sync vs Async Callback Threading</text>
+  
+  <!-- Thread lanes -->
+  <!-- Audio thread lane -->
+  <rect x="120" y="55" width="760" height="80" fill="#4E8E35" fill-opacity="0.05" stroke="#4E8E35" stroke-opacity="0.2" rx="6"/>
+  <text x="50" y="100" font-family="Lato, sans-serif" font-size="13" font-weight="bold" fill="#4E8E35">Audio Thread</text>
+  
+  <!-- UI thread lane -->
+  <rect x="120" y="155" width="760" height="140" fill="#3F6E6E" fill-opacity="0.05" stroke="#3F6E6E" stroke-opacity="0.2" rx="6"/>
+  <text x="50" y="230" font-family="Lato, sans-serif" font-size="13" font-weight="bold" fill="#3F6E6E">UI Thread</text>
+  
+  <!-- Timeline markers -->
+  <text x="140" y="50" font-family="Lato, sans-serif" font-size="10" fill="#808080">Time -></text>
+  
+  <!-- === SYNC PATH (top lane) === -->
+  <circle cx="200" cy="95" r="6" fill="#90FFB1"/>
+  <text x="200" y="80" font-family="Consolas, monospace" font-size="10" fill="#CCCCCC" text-anchor="middle">setValue(0.5)</text>
+  
+  <line x1="206" y1="95" x2="340" y2="95" stroke="#4E8E35" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <text x="270" y="85" font-family="Lato, sans-serif" font-size="9" fill="#4E8E35">immediate</text>
+  
+  <rect x="350" y="75" width="160" height="40" fill="#161b22" stroke="#4E8E35" stroke-width="2" rx="6"/>
+  <text x="430" y="93" font-family="Consolas, monospace" font-size="11" fill="#90FFB1" text-anchor="middle">inline function</text>
+  <text x="430" y="107" font-family="Lato, sans-serif" font-size="10" fill="#CCCCCC" text-anchor="middle">callback(0.5)</text>
+  
+  <text x="540" y="100" font-family="Lato, sans-serif" font-size="10" font-weight="bold" fill="#4E8E35">SyncNotification</text>
+  
+  <!-- === ASYNC PATH (bottom lane) === -->
+  
+  <!-- setValue(0.3) - will be dropped -->
+  <circle cx="200" cy="195" r="6" fill="#90FFB1" opacity="0.4"/>
+  <text x="200" y="180" font-family="Consolas, monospace" font-size="10" fill="#808080" text-anchor="middle">setValue(0.3)</text>
+  <line x1="200" y1="182" x2="200" y2="170" stroke="#f85149" stroke-width="1" opacity="0.6"/>
+  <text x="200" y="167" font-family="Lato, sans-serif" font-size="8" fill="#f85149" text-anchor="middle">dropped</text>
+  
+  <!-- Arrow into ModValue -->
+  <line x1="206" y1="195" x2="280" y2="220" stroke="#3F6E6E" stroke-width="1" stroke-dasharray="3,2"/>
+  
+  <!-- ModValue atomic store -->
+  <rect x="280" y="205" width="100" height="35" fill="#161b22" stroke="#3F6E6E" rx="6"/>
+  <text x="330" y="220" font-family="Consolas, monospace" font-size="10" fill="#90FFB1" text-anchor="middle">ModValue</text>
+  <text x="330" y="233" font-family="Lato, sans-serif" font-size="9" fill="#808080" text-anchor="middle">atomic store</text>
+  
+  <!-- setValue(0.7) - will be dropped -->
+  <circle cx="400" cy="195" r="6" fill="#90FFB1" opacity="0.4"/>
+  <text x="400" y="180" font-family="Consolas, monospace" font-size="10" fill="#808080" text-anchor="middle">setValue(0.7)</text>
+  <line x1="400" y1="182" x2="400" y2="170" stroke="#f85149" stroke-width="1" opacity="0.6"/>
+  <text x="400" y="167" font-family="Lato, sans-serif" font-size="8" fill="#f85149" text-anchor="middle">dropped</text>
+
+  <!-- Arrow into ModValue (overwrite) -->
+  <line x1="406" y1="195" x2="370" y2="220" stroke="#3F6E6E" stroke-width="1" stroke-dasharray="3,2"/>
+  
+  <!-- setValue(0.9) - THIS ONE WINS -->
+  <circle cx="500" cy="195" r="8" fill="#90FFB1"/>
+  <text x="500" y="180" font-family="Consolas, monospace" font-size="11" fill="#CCCCCC" text-anchor="middle" font-weight="bold">setValue(0.9)</text>
+  
+  <!-- Arrow into ModValue (final overwrite) -->
+  <line x1="500" y1="203" x2="380" y2="222" stroke="#3F6E6E" stroke-width="2" marker-end="url(#arrow-teal)"/>
+  <text x="440" y="218" font-family="Lato, sans-serif" font-size="9" fill="#3F6E6E">overwrites</text>
+  
+  <!-- Timer tick boundary -->
+  <line x1="600" y1="160" x2="600" y2="290" stroke="#3F6E6E" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="608" y="172" font-family="Lato, sans-serif" font-size="10" fill="#3F6E6E">timer tick</text>
+  
+  <!-- Callback receives only 0.9 -->
+  <line x1="600" y1="240" x2="650" y2="240" stroke="#3F6E6E" stroke-width="2" marker-end="url(#arrow-teal)"/>
+  
+  <rect x="660" y="218" width="200" height="48" fill="#161b22" stroke="#3F6E6E" stroke-width="2" rx="6"/>
+  <text x="760" y="238" font-family="Consolas, monospace" font-size="12" fill="#90FFB1" text-anchor="middle" font-weight="bold">callback(0.9)</text>
+  <text x="760" y="256" font-family="Lato, sans-serif" font-size="10" fill="#e3b341" text-anchor="middle">only latest value delivered</text>
+  
+  <text x="660" y="210" font-family="Lato, sans-serif" font-size="10" font-weight="bold" fill="#3F6E6E">AsyncNotification</text>
+  
+  <!-- Annotation -->
+  <text x="140" y="330" font-family="Lato, sans-serif" font-size="11" fill="#CCCCCC">Async callbacks poll at UI refresh rate. Multiple setValue() calls between ticks are coalesced -</text>
+  <text x="140" y="348" font-family="Lato, sans-serif" font-size="11" fill="#e3b341">only the last value reaches the callback. Intermediate values are silently discarded.</text>
+  <text x="140" y="374" font-family="Lato, sans-serif" font-size="11" fill="#CCCCCC">Sync callbacks execute inline on the calling thread (audio thread) and deliver every value.</text>
+  <text x="140" y="392" font-family="Lato, sans-serif" font-size="11" fill="#CCCCCC">Must use <tspan font-family="Consolas, monospace" fill="#90FFB1">inline function</tspan> - regular functions are silently rejected.</text>
+</svg>

@@ -1,0 +1,1 @@
+Returns the fine detune amount in cents stored on this event. This per-event property works together with coarse detune (in semitones) to compute the final pitch factor during voice playback.

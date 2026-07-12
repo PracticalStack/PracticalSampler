@@ -1,0 +1,111 @@
+{
+  "moduleId": "ReleaseTrigger",
+  "prettyName": "Release Trigger",
+  "type": "MidiProcessor",
+  "subtype": "MidiProcessor",
+  "category": "note_processing",
+
+  "io": {
+    "midiIn": "MIDI_in",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "TableProcessor",
+      "signalFlowRole": "Lookup table step in signal path - likely the attenuation curve that shapes release velocity over time"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Time Attenuation",
+      "rationale": "All three parameters control the time-based velocity attenuation feature: TimeAttenuate enables it, Time sets the normalisation window, and TimeTable defines the attenuation curve shape",
+      "parameters": [
+        {
+          "id": "TimeAttenuate",
+          "name": "Time Attenuate",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Enables time-based velocity attenuation on release",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Time",
+          "name": "Time",
+          "range": { "min": 0.0, "max": 20.0, "step": 0.1 },
+          "default": 0.0,
+          "description": "Time in seconds used to normalise the release attenuation curve",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "TimeTable",
+          "name": "Time Table",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "Curve that scales release velocity over time",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "noteoff-to-noteon-logic",
+      "category": "signal_path",
+      "question": "How does ReleaseTrigger transform noteOff events into noteOn events in processHiseEvent()? Does it generate a new noteOn with the same note number, or does it modify the existing event? What happens to the original noteOff - is it passed through or consumed?",
+      "context": "The core behavior of this module is the noteOff-to-noteOn transformation. The reference page needs to show exactly what MIDI events are produced and whether original events are preserved."
+    },
+    {
+      "id": "velocity-source",
+      "category": "signal_path",
+      "question": "What velocity is assigned to the generated release noteOn? Is it the original noteOn velocity, the noteOff velocity, or a fixed value? How does the time attenuation modify it?",
+      "context": "Users need to understand how release note velocity is determined to design their release layer properly."
+    },
+    {
+      "id": "table-lookup-position",
+      "category": "interface_usage",
+      "question": "Where in the signal path does the TableProcessor lookup occur? Is the table input the elapsed time since noteOn (normalised by the Time parameter), and is the table output used as a velocity multiplier?",
+      "context": "The TableProcessor interface maps to a lookup table step. Need to know the table's input domain and how its output is applied to velocity."
+    },
+    {
+      "id": "time-attenuate-gating",
+      "category": "conditional_logic",
+      "question": "When TimeAttenuate is off (0), is the velocity passed through unchanged, or is some other default behavior applied? Does disabling it skip the table lookup entirely?",
+      "context": "Users need to know whether TimeAttenuate gates the entire attenuation feature or just changes how velocity is calculated."
+    },
+    {
+      "id": "time-default-zero",
+      "category": "parameter_behavior",
+      "question": "The Time parameter defaults to 0.0 seconds. What happens when Time is 0 - does the normalisation degenerate (divide by zero), clamp to a minimum, or produce full attenuation immediately?",
+      "context": "A default of 0 for a time normalisation parameter is suspicious. Need to verify the edge case behavior."
+    },
+    {
+      "id": "timetable-parameter-type",
+      "category": "description_accuracy",
+      "question": "The TimeTable parameter has type 'Unspecified' and range 0-1 with step 0. Is this actually the TableProcessor's table data rather than a conventional parameter? Is it exposed in the UI as a table editor rather than a slider?",
+      "context": "The 'Unspecified' type suggests this is not a normal parameter. Need to clarify its nature for accurate documentation."
+    },
+    {
+      "id": "original-noteon-tracking",
+      "category": "parameter_behavior",
+      "question": "How does ReleaseTrigger track which noteOn corresponds to each noteOff? Does it store the original velocity per note number? Is there polyphonic tracking (multiple held notes)?",
+      "context": "Understanding the note tracking mechanism is important for documenting polyphonic behavior and edge cases like overlapping notes."
+    }
+  ],
+
+  "notes": "ReleaseTrigger is a MIDI event transformer that generates noteOn events on key-up, enabling release-triggered sample layers. The time attenuation feature allows velocity to decrease the longer a key is held, simulating the natural decay of plucked/struck instruments. The TableProcessor interface likely provides the attenuation curve shape. All three parameters relate to a single feature (time attenuation), suggesting the module's core noteOff-to-noteOn behavior requires no parameters. The Time parameter's unit is listed as 'ms' in the base data but the range goes to 20.0 with the description saying 'seconds' - this discrepancy should be verified during C++ exploration."
+}

@@ -1,0 +1,1 @@
+Returns the number of bytes of free disk space on the volume where this file resides. Useful for checking available space before starting a large extraction or write operation. Returns 0 if the volume cannot be determined.

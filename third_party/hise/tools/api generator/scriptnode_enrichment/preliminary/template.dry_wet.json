@@ -1,0 +1,124 @@
+{
+  "factoryPath": "template.dry_wet",
+  "factory": "template",
+  "nodeId": "dry_wet",
+  "description": "Processes each node independently and sums up the output.",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Mix Control",
+      "rationale": "DryWet is the single exposed parameter that controls the crossfade balance between dry and wet signal paths via the internal control.xfader node.",
+      "parameters": [
+        {
+          "id": "DryWet",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": null,
+          "textConverter": null,
+          "unnormalisedModulation": false,
+          "connectionTarget": "dry_wet_mixer.Value"
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/template/dry_wet.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": ["drywet.png"],
+
+  "internalStructure": {
+    "rootContainer": "container.split",
+    "signalFlow": "Parallel split: input is duplicated to dry_path and wet_path, each processed independently, then summed at the split output.",
+    "internalConnections": [
+      "control.xfader (dry_wet_mixer) SwitchTarget[0] -> dry_gain.Gain",
+      "control.xfader (dry_wet_mixer) SwitchTarget[1] -> wet_gain.Gain"
+    ],
+    "childNodes": [
+      {
+        "id": "dry_path",
+        "factory": "container.chain",
+        "purpose": "Dry signal path. Contains the xfader control node and dry_gain. The dry signal passes through unprocessed, scaled by the dry gain.",
+        "children": [
+          { "id": "dry_wet_mixer", "factory": "control.xfader", "purpose": "Crossfade controller with 2 switch targets (Linear mode). Distributes complementary gain values to dry_gain and wet_gain based on DryWet parameter." },
+          { "id": "dry_gain", "factory": "core.gain", "purpose": "Applies the dry portion of the crossfade to the dry signal path." }
+        ]
+      },
+      {
+        "id": "wet_path",
+        "factory": "container.chain",
+        "purpose": "Wet signal path. Contains a math.mul dummy placeholder (user replaces with wet processing) followed by wet_gain.",
+        "children": [
+          { "id": "dummy", "factory": "math.mul", "purpose": "Placeholder node (multiply by 1.0 = passthrough). User should add wet DSP processing here or replace this node." },
+          { "id": "wet_gain", "factory": "core.gain", "purpose": "Applies the wet portion of the crossfade to the wet signal path." }
+        ]
+      }
+    ]
+  },
+
+  "gaps": [
+    {
+      "id": "xfader-crossfade-curve",
+      "category": "signal_path",
+      "question": "The control.xfader is set to Linear mode with 2 parameters (NumParameters=2). In Linear mode, how does the xfader distribute values to its two switch targets? Is it a simple linear crossfade (dry = 1-x, wet = x) or does it use equal-power curves?",
+      "context": "Users need to know the crossfade law to understand how DryWet=0.5 behaves (e.g., whether it sums to 0dB or -6dB at midpoint)."
+    },
+    {
+      "id": "split-summing-behaviour",
+      "category": "signal_path",
+      "question": "The root container.split sums the outputs of dry_path and wet_path. Since the xfader controls complementary gain values, is the summed output at unity when DryWet is at either extreme (0 or 1)? What happens at intermediate values -- is there gain compensation?",
+      "context": "Critical for understanding whether the dry/wet mix preserves overall signal level."
+    },
+    {
+      "id": "description-accuracy",
+      "category": "description_accuracy",
+      "question": "The base description 'Processes each node independently and sums up the output' describes the generic container.split behaviour, not the dry/wet mixing template. Should the description reflect the crossfade mix functionality?",
+      "context": "The description is inherited from container.split and does not describe the template's actual purpose."
+    },
+    {
+      "id": "wet-path-user-workflow",
+      "category": "signal_path",
+      "question": "The wet_path contains a math.mul dummy with Value=1.0 (passthrough). Is the user expected to add processing nodes between the dummy and wet_gain, or replace the dummy entirely? Does the position of wet_gain at the end matter (i.e., must it remain last)?",
+      "context": "Documentation should explain how users add their wet processing to this template."
+    }
+  ],
+
+  "notes": "This is a COMPOSITE template node implementing a standard dry/wet mixer pattern. The cppProperties field is empty because template nodes have no direct C++ implementation. The root container.split duplicates the input signal to two parallel paths. The dry_path contains the control.xfader (which calculates complementary gain values) and a core.gain for the dry signal. The wet_path contains a placeholder math.mul node (passthrough) and a core.gain for the wet signal. The xfader has Mode=Linear and NumParameters=2, distributing switch target outputs to dry_gain.Gain and wet_gain.Gain respectively. The exposed DryWet parameter (0..1) drives the xfader's Value, creating the crossfade. Users add their wet effect processing in the wet_path, typically replacing or supplementing the dummy math.mul node."
+}

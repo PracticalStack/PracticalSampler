@@ -1,0 +1,111 @@
+{
+  "factoryPath": "control.pack6_writer",
+  "factory": "control",
+  "nodeId": "pack6_writer",
+  "description": "Writes the values from the parameter sliders into a slider pack",
+
+  "classification": {
+    "signalPathRole": "utility",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Value inputs",
+      "rationale": "Each Value parameter writes to the corresponding index in the connected SliderPack",
+      "parameters": [
+        {
+          "id": "Value1",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Value2",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Value3",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Value4",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Value5",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Value6",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 1,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": true,
+    "groupName": "packN_writer",
+    "templateParameter": "number of Value parameters",
+    "variantValue": "6"
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/pack6_writer.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "variant-difference",
+      "category": "parameter_behaviour",
+      "question": "pack6_writer has 6 Value parameters vs pack2_writer's 2. Is the write logic identical except for the parameter count?",
+      "context": "If identical, the doc can reference the base variant and note only the parameter count difference."
+    }
+  ],
+
+  "notes": "Variant of packN_writer group (N=6). See control.pack2_writer.json for full gap analysis. All behaviour expected to be identical to pack2_writer except for having 6 Value parameters writing to slider indices 0-5."
+}

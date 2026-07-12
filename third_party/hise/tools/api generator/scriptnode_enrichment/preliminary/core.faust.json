@@ -1,0 +1,86 @@
+{
+  "factoryPath": "core.faust",
+  "factory": "core",
+  "nodeId": "faust",
+  "description": "",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/faust.md",
+    "tier": "STUB",
+    "lines": 6
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "faust-integration",
+      "category": "signal_path",
+      "question": "How does the Faust node integrate with scriptnode? Does it compile Faust DSP code at runtime (like SNEX) or load pre-compiled Faust modules? What is the signal flow?",
+      "context": "The base JSON is almost entirely empty -- no parameters, no properties, no description. The C++ source is essential."
+    },
+    {
+      "id": "faust-parameters",
+      "category": "parameter_behaviour",
+      "question": "Are parameters defined dynamically by the Faust code (like SNEX nodes)? How are Faust UI elements (sliders, buttons) mapped to scriptnode parameters?",
+      "context": "The base JSON shows no parameters, but Faust programs typically define UI controls."
+    },
+    {
+      "id": "faust-description-missing",
+      "category": "description_accuracy",
+      "question": "The base JSON has an empty description string. What is the correct short description for this node?",
+      "context": "Every node needs a description for the reference page."
+    },
+    {
+      "id": "faust-polyphony",
+      "category": "signal_path",
+      "question": "No cppProperties are set. Does the Faust node support polyphony? Does it handle MIDI events? Can it use external data?",
+      "context": "The completely empty cppProperties suggest the node may be a minimal placeholder or a runtime-configured wrapper."
+    },
+    {
+      "id": "faust-compilation",
+      "category": "signal_path",
+      "question": "Is Faust support conditional on a preprocessor flag (e.g., HISE_INCLUDE_FAUST)? Is the Faust compiler embedded or does it require an external installation?",
+      "context": "Users need to know if Faust support requires additional setup."
+    }
+  ],
+
+  "notes": "The Faust node has the most sparse base data of any node in this batch -- empty description, no parameters, no properties, no cppProperties, no ComplexData. This suggests either: (a) it is a runtime-configured wrapper where everything is determined by the Faust code, similar to how SNEX nodes work; or (b) it is a partially implemented feature. C++ exploration is essential to determine the node's actual capabilities. The Faust programming language (GRAME) is a functional DSP language, so the integration pattern may differ significantly from SNEX."
+}

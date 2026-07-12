@@ -1,0 +1,80 @@
+{
+  "targetId": "control.timer",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [14414, 13308, 2146, 10720, 1201, 10390, 2447, 112, 10573, 8169, 7791],
+  "insights": [
+    {
+      "type": "BUG",
+      "title": "control.timer node crashes DAW plugins; workaround uses tempo-synced ramp + compare nodes",
+      "summary": "The `control.timer` scriptnode has been reported to crash both Ableton and standalone apps (topics 14414 and 13308). A reliable workaround is to replace it with a tempo-synced ramp node and a pair of compare nodes to simulate engagement behaviour. This avoids the crash entirely.",
+      "evidence": "trillbilly: 'If anyone hits the same problem, I got around it by using a tempo-synced ramp and a couple compare nodes to simulate the timers engagement. Simple and works.'",
+      "topicId": 14414,
+      "confidence": "high"
+    },
+    {
+      "type": "CONTRADICTION",
+      "title": "Synth timer interval uses seconds; TimerObject interval uses milliseconds — an acknowledged inconsistency",
+      "summary": "`Synth.startTimer()` takes a value in seconds (e.g. `0.1`), while `Engine.createTimerObject().startTimer()` takes an integer in milliseconds (e.g. `100`). These are the same duration but require different values. Christoph confirmed this is a known, unfixable inconsistency because changing the unit would break all existing code.",
+      "evidence": "David Healey [expert]: 'the global timer can take a value such as 0.1 but when using a timer object I'd have to pass it a value of 100.' Christoph Hart [author]: 'Yes this is one of the most annoying inconsistencies, but I can't change it without breaking every single use of the timers. The reason for it was that I created the global timer first and didn't bother about milliseconds as unit, but the UI timer object is just a wrapper around a JUCE class which uses milliseconds as unit.'",
+      "topicId": 2146,
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Panel timers stop when the plugin UI is closed",
+      "summary": "Timers attached to `ScriptPanel` objects (via `panel.startTimer()`) stop firing when the plugin's user interface is hidden or closed by the DAW. If the timer drives any runtime logic (not just animation), it must be replaced with a standalone `Engine.createTimerObject()` timer, which keeps running regardless of UI visibility.",
+      "evidence": "aaronventure [trusted]: 'Remember that the panel timers stop when the UI of the plugin is closed. You can test this with the little moon icon in the interface designer. If this breaks your functionality in any way, use your own timer objects.'",
+      "topicId": 10720,
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "TimerObject runs on the UI/message thread — use the Synth timer for anything affecting audio output",
+      "summary": "`Engine.createTimerObject()` executes its callback on the message (UI) thread and is suitable for display updates and non-realtime logic. It must NOT be used for operations that affect audio output, such as triggering notes, setting gain, or sending MIDI events. Those operations must be done inside `onTimer` (the Synth timer), which runs on the audio thread. Using the wrong timer type causes incorrect behaviour during offline rendering.",
+      "evidence": "Christoph Hart [author]: 'This timer is running on the UI thread and you need to supply a function that is executed. The onTimer callback is for audio stuff.' Also: 'Yes. Use the synth timer for anything that is affecting the sound output.'",
+      "topicId": 1201,
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Starting a timer inside its own callback creates an infinite loop and will crash",
+      "summary": "Calling `Synth.startTimer()` (or `timer.startTimer()`) from within the timer's own callback re-enters the timer immediately, creating an endless loop that causes an execution timeout crash. Start the timer once in `onInit` and do not restart it from within the callback unless deliberately changing the interval.",
+      "evidence": "David Healey [expert]: 'You're starting the timer inside the timer callback so it will create an endless loop... you'll see it outputs forever until it crashes.' Christoph Hart [author]: 'One thing that might cause issues is the compile time-out which fires if you have a lot of stuff to do in the first onInit call.'",
+      "topicId": 2447,
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Only one timer exists per sound module — starting it in one script starts it for all scripts in that module",
+      "summary": "The Synth timer (accessed via `Synth.startTimer()` / `onTimer`) is shared across all Script Processors inside the same sound module. Starting it in one script will also trigger the `onTimer` callback in any other script processor in the same module. For independent timers, use `Engine.createTimerObject()` instead.",
+      "evidence": "Christoph Hart [author]: 'Yeah, there is only one timer per sound module. I decided against multiple timers because I didn't need it yet and it reduces the overhead, but I agree it violates the encapsulation principle of the module architecture.'",
+      "topicId": 112,
+      "confidence": "high"
+    },
+    {
+      "type": "API",
+      "title": "Calling startTimer() again while the timer is running changes its interval without stopping it",
+      "summary": "You can dynamically change the firing interval of an already-running timer by calling `startTimer()` again with a new value. The timer continues running at the new rate immediately — there is no need to stop and restart it.",
+      "evidence": "David Healey [expert]: 'Yes, you can call startTimer() again to set a new time, even while the timer is already running.'",
+      "topicId": 10573,
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Timers not working in VST3 may be caused by peak collection settings, not the timer itself",
+      "summary": "Reports of timers appearing to do nothing in VST3 exports (Cubase, Logic) were resolved by adjusting the HISE peak collection preference ('Set this to 0 to deactivate peak collection for any other processor than the main synth chain'). Before assuming a timer bug, verify that the callback is actually changing a value — use `Math.random()` as a diagnostic — rather than assuming the host is not calling the timer.",
+      "evidence": "Christoph Hart [author]: 'I think you need to figure out whether the timers are not running or the source is not giving you updated values (I suggest the latter). Try changing the code so that the values in the timer callback definitely change (eg. Math.random()), then export the plugin again.' ulrik [trusted] resolved the issue using a specific HISE peak collection preference setting.",
+      "topicId": 8169,
+      "confidence": "medium"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Do not declare reg variables inside timer callbacks; use var instead",
+      "summary": "`reg` variables are intended for use in the outer script scope and behave incorrectly when declared inside a timer callback function. Use `var` for any local variables within a timer callback.",
+      "evidence": "David Healey [expert]: 'Don't declare reg inside timer callbacks, use var.'",
+      "topicId": 7791,
+      "confidence": "medium"
+    }
+  ]
+}

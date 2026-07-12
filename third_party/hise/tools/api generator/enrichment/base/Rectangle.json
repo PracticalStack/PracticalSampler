@@ -1,0 +1,411 @@
+{
+  "className": "Rectangle",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "constrainedWithin": {
+      "signature": "void constrainedWithin(var targetArea)",
+      "returnType": "void",
+      "description": "Tries to fit this rectangle within a target area, returning the result.",
+      "parameters": [
+        {
+          "name": "targetArea",
+          "type": "var"
+        }
+      ]
+    },
+    "contains": {
+      "signature": "void contains(var otherRectOrPoint)",
+      "returnType": "void",
+      "description": "Returns true if this other rectangle is completely inside this one.",
+      "parameters": [
+        {
+          "name": "otherRectOrPoint",
+          "type": "var"
+        }
+      ]
+    },
+    "expanded": {
+      "signature": "void expanded(double x, double optionalY)",
+      "returnType": "void",
+      "description": "Returns a rectangle that is larger than this one by a given amount.",
+      "parameters": [
+        {
+          "name": "x",
+          "type": "double"
+        },
+        {
+          "name": "optionalY",
+          "type": "double"
+        }
+      ]
+    },
+    "getIntersection": {
+      "signature": "void getIntersection(var otherRect)",
+      "returnType": "void",
+      "description": "Returns the intersection of both rectangles (the largest rectangle that fits into both rectangles.",
+      "parameters": [
+        {
+          "name": "otherRect",
+          "type": "var"
+        }
+      ]
+    },
+    "getUnion": {
+      "signature": "void getUnion(var otherRect)",
+      "returnType": "void",
+      "description": "Returns the smallest rectangle that contains both this one and the one passed-in.",
+      "parameters": [
+        {
+          "name": "otherRect",
+          "type": "var"
+        }
+      ]
+    },
+    "intersects": {
+      "signature": "void intersects(var otherRect)",
+      "returnType": "void",
+      "description": "Returns true if any part of another rectangle overlaps this one.",
+      "parameters": [
+        {
+          "name": "otherRect",
+          "type": "var"
+        }
+      ]
+    },
+    "isEmpty": {
+      "signature": "void isEmpty()",
+      "returnType": "void",
+      "description": "Returns true if the rectangle's width or height are zero or less.",
+      "parameters": []
+    },
+    "reduced": {
+      "signature": "void reduced(double x, double optionalY)",
+      "returnType": "void",
+      "description": "Returns a rectangle that is smaller than this one by a given amount.",
+      "parameters": [
+        {
+          "name": "x",
+          "type": "double"
+        },
+        {
+          "name": "optionalY",
+          "type": "double"
+        }
+      ]
+    },
+    "removeFromBottom": {
+      "signature": "void removeFromBottom(double numToRemove)",
+      "returnType": "void",
+      "description": "Removes a strip from the bottom of this rectangle, reducing this rectangle by the specified amount and returning the section that was removed.",
+      "parameters": [
+        {
+          "name": "numToRemove",
+          "type": "double"
+        }
+      ]
+    },
+    "removeFromLeft": {
+      "signature": "void removeFromLeft(double numToRemove)",
+      "returnType": "void",
+      "description": "Removes a strip from the left of this rectangle, reducing this rectangle by the specified amount and returning the section that was removed.",
+      "parameters": [
+        {
+          "name": "numToRemove",
+          "type": "double"
+        }
+      ]
+    },
+    "removeFromRight": {
+      "signature": "void removeFromRight(double numToRemove)",
+      "returnType": "void",
+      "description": "Removes a strip from the right of this rectangle, reducing this rectangle by the specified amount and returning the section that was removed.",
+      "parameters": [
+        {
+          "name": "numToRemove",
+          "type": "double"
+        }
+      ]
+    },
+    "removeFromTop": {
+      "signature": "void removeFromTop(double numToRemove)",
+      "returnType": "void",
+      "description": "Removes a strip from the top of this rectangle, reducing this rectangle by the specified amount and returning the section that was removed.",
+      "parameters": [
+        {
+          "name": "numToRemove",
+          "type": "double"
+        }
+      ]
+    },
+    "scaled": {
+      "signature": "void scaled(double factorX, double optionalFactorY)",
+      "returnType": "void",
+      "description": "Returns a rectangle with the position and size being scaled by the given factors.",
+      "parameters": [
+        {
+          "name": "factorX",
+          "type": "double"
+        },
+        {
+          "name": "optionalFactorY",
+          "type": "double"
+        }
+      ]
+    },
+    "setCentre": {
+      "signature": "void setCentre(double centerX, double centerY)",
+      "returnType": "void",
+      "description": "Changes the position of the rectangle's centre (leaving its size unchanged).",
+      "parameters": [
+        {
+          "name": "centerX",
+          "type": "double"
+        },
+        {
+          "name": "centerY",
+          "type": "double"
+        }
+      ]
+    },
+    "setPosition": {
+      "signature": "void setPosition(double x, double y)",
+      "returnType": "void",
+      "description": "Changes the position of the rectangle's top-left corner (leaving its size unchanged).",
+      "parameters": [
+        {
+          "name": "x",
+          "type": "double"
+        },
+        {
+          "name": "y",
+          "type": "double"
+        }
+      ]
+    },
+    "setSize": {
+      "signature": "void setSize(double width, double height)",
+      "returnType": "void",
+      "description": "Changes the rectangle's size, leaving the position of its top-left corner unchanged.",
+      "parameters": [
+        {
+          "name": "width",
+          "type": "double"
+        },
+        {
+          "name": "height",
+          "type": "double"
+        }
+      ]
+    },
+    "toArray": {
+      "signature": "void toArray()",
+      "returnType": "void",
+      "description": "Returns a standard JS array with the position [x, y, w, h].",
+      "parameters": []
+    },
+    "translated": {
+      "signature": "void translated(double deltaX, double deltaY)",
+      "returnType": "void",
+      "description": "Returns a rectangle which is the same as this one moved by a given amount.",
+      "parameters": [
+        {
+          "name": "deltaX",
+          "type": "double"
+        },
+        {
+          "name": "deltaY",
+          "type": "double"
+        }
+      ]
+    },
+    "withAspectRatioLike": {
+      "signature": "void withAspectRatioLike(var otherRect)",
+      "returnType": "void",
+      "description": "Returns the biggest rectangle that fits in this rectangle using the aspect ratio of the other rectangle.",
+      "parameters": [
+        {
+          "name": "otherRect",
+          "type": "var"
+        }
+      ]
+    },
+    "withBottom": {
+      "signature": "void withBottom(double newBottom)",
+      "returnType": "void",
+      "description": "Returns a new rectangle with a different bottom edge position, but the same top edge as this one.",
+      "parameters": [
+        {
+          "name": "newBottom",
+          "type": "double"
+        }
+      ]
+    },
+    "withBottomY": {
+      "signature": "void withBottomY(double newBottomY)",
+      "returnType": "void",
+      "description": "Returns a rectangle which has the same size and x-position as this one, but whose bottom edge has the given position.",
+      "parameters": [
+        {
+          "name": "newBottomY",
+          "type": "double"
+        }
+      ]
+    },
+    "withCentre": {
+      "signature": "void withCentre(double newWidth, double newHeight)",
+      "returnType": "void",
+      "description": "Returns a rectangle with the same size as this one, but a new centre position.",
+      "parameters": [
+        {
+          "name": "newWidth",
+          "type": "double"
+        },
+        {
+          "name": "newHeight",
+          "type": "double"
+        }
+      ]
+    },
+    "withHeight": {
+      "signature": "void withHeight(double newHeight)",
+      "returnType": "void",
+      "description": "Returns a rectangle which has the same position and width as this one, but with a different height.",
+      "parameters": [
+        {
+          "name": "newHeight",
+          "type": "double"
+        }
+      ]
+    },
+    "withLeft": {
+      "signature": "void withLeft(double newLeft)",
+      "returnType": "void",
+      "description": "Returns a new rectangle with a different x position, but the same right-hand edge as this one.",
+      "parameters": [
+        {
+          "name": "newLeft",
+          "type": "double"
+        }
+      ]
+    },
+    "withRight": {
+      "signature": "void withRight(double newRight)",
+      "returnType": "void",
+      "description": "Returns a new rectangle with a different right-hand edge position, but the same left-hand edge as this one.",
+      "parameters": [
+        {
+          "name": "newRight",
+          "type": "double"
+        }
+      ]
+    },
+    "withSize": {
+      "signature": "void withSize(double newWidth, double newHeight)",
+      "returnType": "void",
+      "description": "Returns a rectangle with the same top-left position as this one, but a new size.",
+      "parameters": [
+        {
+          "name": "newWidth",
+          "type": "double"
+        },
+        {
+          "name": "newHeight",
+          "type": "double"
+        }
+      ]
+    },
+    "withSizeKeepingCentre": {
+      "signature": "void withSizeKeepingCentre(double newWidth, double newHeight)",
+      "returnType": "void",
+      "description": "Returns a rectangle with the same centre position as this one, but a new size.",
+      "parameters": [
+        {
+          "name": "newWidth",
+          "type": "double"
+        },
+        {
+          "name": "newHeight",
+          "type": "double"
+        }
+      ]
+    },
+    "withTrimmedBottom": {
+      "signature": "void withTrimmedBottom(double amountToRemove)",
+      "returnType": "void",
+      "description": "Returns a version of this rectangle with the given amount removed from its bottom edge.",
+      "parameters": [
+        {
+          "name": "amountToRemove",
+          "type": "double"
+        }
+      ]
+    },
+    "withTrimmedLeft": {
+      "signature": "void withTrimmedLeft(double amountToRemove)",
+      "returnType": "void",
+      "description": "Returns a version of this rectangle with the given amount removed from its left-hand edge.",
+      "parameters": [
+        {
+          "name": "amountToRemove",
+          "type": "double"
+        }
+      ]
+    },
+    "withTrimmedRight": {
+      "signature": "void withTrimmedRight(double amountToRemove)",
+      "returnType": "void",
+      "description": "Returns a version of this rectangle with the given amount removed from its right-hand edge.",
+      "parameters": [
+        {
+          "name": "amountToRemove",
+          "type": "double"
+        }
+      ]
+    },
+    "withTrimmedTop": {
+      "signature": "void withTrimmedTop(double amountToRemove)",
+      "returnType": "void",
+      "description": "Returns a version of this rectangle with the given amount removed from its top edge.",
+      "parameters": [
+        {
+          "name": "amountToRemove",
+          "type": "double"
+        }
+      ]
+    },
+    "withWidth": {
+      "signature": "void withWidth(double newWidth)",
+      "returnType": "void",
+      "description": "Returns a rectangle which has the same position and height as this one, but with a different width.",
+      "parameters": [
+        {
+          "name": "newWidth",
+          "type": "double"
+        }
+      ]
+    },
+    "withX": {
+      "signature": "void withX(double newX)",
+      "returnType": "void",
+      "description": "Returns a rectangle which has the same size and y-position as this one, but with a different x-position.",
+      "parameters": [
+        {
+          "name": "newX",
+          "type": "double"
+        }
+      ]
+    },
+    "withY": {
+      "signature": "void withY(double newY)",
+      "returnType": "void",
+      "description": "Returns a rectangle which has the same size and x-position as this one, but with a different y-position.",
+      "parameters": [
+        {
+          "name": "newY",
+          "type": "double"
+        }
+      ]
+    }
+  }
+}

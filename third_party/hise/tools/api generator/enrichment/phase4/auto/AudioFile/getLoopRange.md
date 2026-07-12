@@ -1,0 +1,1 @@
+Returns the loop range as a two-element array `[start, end]` in sample positions. When `subtractStart` is true, the positions are relative to the current range start set by `setRange()` rather than absolute positions within the original file.

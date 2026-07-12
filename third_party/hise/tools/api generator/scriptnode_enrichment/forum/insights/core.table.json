@@ -1,0 +1,64 @@
+{
+  "targetId": "core.table",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [11532, 9922, 7183, 11751, 9848, 8733, 7042, 3895, 4814],
+  "insights": [
+    {
+      "type": "BUG",
+      "title": "Table envelope attack jumps to 1.0 when the last attack node is not 0 or 1",
+      "summary": "When the last breakpoint of a table envelope's attack segment is set to any value other than 0 or 1, the envelope jumps to 1.0 at the end of the attack phase even if the note is still held. This makes it impossible to have a held sustain at a fractional level using the built-in table envelope. David Healey confirmed a fix exists (removing an offending line) and submitted a PR.",
+      "sources": ["tid:7183"],
+      "verify": true,
+      "verify_hint": "Check if the PR fixing the attack-table jump has been merged into the HISE develop branch."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Table envelope attack stops when the note is released — attack does not complete",
+      "summary": "If a note is released before the table envelope's attack stage finishes, the attack stops progressing at that point. The resulting base value is then multiplied by the release table (which is also 0–1), so releasing early causes a quieter-than-expected release. To let the attack always run to completion, use a ramp + resetter pattern triggered from note-on rather than the built-in gate.",
+      "sources": ["tid:9922"],
+      "verify": true,
+      "verify_hint": "Verify aaronventure's ramp+resetter pattern in tid:9922 snippet produces a full attack despite early note release."
+    },
+    {
+      "type": "API",
+      "title": "Connect a scriptnode table to the UI via Synth.getTableProcessor().getTable()",
+      "summary": "To link a `core.table` node inside a scriptnode network to an external HiseScript table object (e.g. for a UI TableEditor), use `Synth.getTableProcessor(\"Script FX1\").getTable(0)`. The index 0 refers to the first table slot in the network. Alternatively, add an external slot in the network and connect via processor ID from the UI component.",
+      "sources": ["tid:11751", "tid:9848"],
+      "verify": true,
+      "verify_hint": "Confirm Synth.getTableProcessor().getTable(index) returns a writable table data object."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Table cables stop working in hardcoded (compiled) DSP networks — known regression",
+      "summary": "After a refactor of the complex data code (filter coefficient management across DLL boundaries), table cables broke in hardcoded/compiled networks. Christoph confirmed this was a regression and fixed it. If table connections stop working after compiling to DLL, update HISE.",
+      "sources": ["tid:8733"],
+      "verify": true,
+      "verify_hint": "Test table parameter cables in a compiled hardcoded effect to confirm the fix is stable."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Put modulation nodes inside container.modchain for accurate modulation signals",
+      "summary": "When using `core.table` as part of an envelope or LFO modulation chain (e.g. ramp feeding a table), placing the entire chain inside a `container.modchain` separates the modulation signal from the audio path. This produces more accurate modulation values because the modchain processes at the appropriate rate without mixing with the audio signal.",
+      "sources": ["tid:11532"],
+      "verify": true,
+      "verify_hint": "Verify that container.modchain improves modulation accuracy compared to placing mod nodes inline."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Table input value > 0.5 causes clipping if the table is set to a flat 50% output",
+      "summary": "When a table's output is a flat 0.5 line (50%) and the input modulation signal exceeds that value, the result can clip. The table output range is always 0–1, so if a non-unity-gain signal drives it, the combined output can exceed 1.0. Ensure the input ramp range and table output are calibrated to avoid clipping.",
+      "sources": ["tid:11532"],
+      "verify": false,
+      "verify_hint": "Demonstrated in clevername27's post in tid:11532 with screenshot of clipped output."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Table envelope attack minimum is 1ms — using setAttribute with 0 causes a crash",
+      "summary": "Setting a table envelope's attack time to 0ms via `setAttribute` causes a crash because the minimum value is 1ms. Use `Math.max(1, value)` when setting the attack time programmatically. Additionally, modulating the attack time down to near-zero via a velocity modulator (multiplied to a very low value) triggers the same issue.",
+      "sources": ["tid:89"],
+      "verify": true,
+      "verify_hint": "Check if the crash was fixed or if the attribute clamp is still needed as user-side workaround."
+    }
+  ]
+}

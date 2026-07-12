@@ -1,0 +1,15 @@
+{
+  "65": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.addButton(\"Compare\", 0, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "Compare_Elements_Array.length > 0", "value": 1, "delay": 0},
+      {"type": "REPL", "expression": "Compare_A.length > 0", "value": 1, "delay": 0},
+      {"type": "REPL", "expression": "Compare_A.length == Compare_Elements_Array.length", "value": 1, "delay": 0}
+    ],
+    "notes": "Already has makeFrontInterface. A/B compare toggle. Array lengths depend on components in tree (non-deterministic). Verify arrays match in length."
+  }
+}

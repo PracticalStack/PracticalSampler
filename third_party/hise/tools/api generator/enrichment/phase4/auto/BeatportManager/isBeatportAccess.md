@@ -1,0 +1,1 @@
+Returns whether the current session has valid Beatport access. In production mode, this delegates to the Beatport SDK. In simulation mode, it waits 500ms to mimic SDK latency and returns `true` if `validate_response.json` exists in the project's `AdditionalSourceCode/beatport/` folder.

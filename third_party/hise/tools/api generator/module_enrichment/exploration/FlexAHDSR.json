@@ -1,0 +1,301 @@
+{
+  "moduleId": "FlexAHDSR",
+  "nodes": [
+    {
+      "id": "midi_input",
+      "label": "MIDI Input",
+      "type": "input",
+      "importance": 0.8,
+      "group": "voice_lifecycle",
+      "description": "NoteOn triggers voice start; NoteOff triggers release stage"
+    },
+    {
+      "id": "mod_chain_eval",
+      "label": "Evaluate Modulation Chains",
+      "type": "process",
+      "importance": 0.7,
+      "group": "voice_lifecycle",
+      "description": "At voice start, evaluate all 5 internal chains to get per-voice modulation multipliers for time and level parameters"
+    },
+    {
+      "id": "mode_decision",
+      "label": "Mode Switch",
+      "type": "decision",
+      "importance": 0.8,
+      "group": "state_machine",
+      "description": "Mode parameter selects envelope behavior: Note (sustain holds), Trigger (one-shot), Loop (repeats)"
+    },
+    {
+      "id": "attack_stage",
+      "label": "Attack Stage",
+      "type": "process",
+      "importance": 0.9,
+      "group": "state_machine",
+      "description": "Ramp from 0 (or prevValue on retrigger) to AttackLevel over Attack time, shaped by AttackCurve"
+    },
+    {
+      "id": "hold_stage",
+      "label": "Hold Stage",
+      "type": "process",
+      "importance": 0.6,
+      "group": "state_machine",
+      "description": "Maintain AttackLevel for Hold time (static output, no curve). Skipped if Hold=0"
+    },
+    {
+      "id": "decay_stage",
+      "label": "Decay Stage",
+      "type": "process",
+      "importance": 0.8,
+      "group": "state_machine",
+      "description": "Ramp from AttackLevel to Sustain level over Decay time, shaped by DecayCurve"
+    },
+    {
+      "id": "sustain_stage",
+      "label": "Sustain Stage",
+      "type": "process",
+      "importance": 0.8,
+      "group": "state_machine",
+      "description": "Maintain Sustain level. In Note mode: holds until note-off. In Trigger/Loop mode: immediately advances"
+    },
+    {
+      "id": "release_stage",
+      "label": "Release Stage",
+      "type": "process",
+      "importance": 0.8,
+      "group": "state_machine",
+      "description": "Ramp from current level to 0 over Release time, shaped by ReleaseCurve"
+    },
+    {
+      "id": "done_state",
+      "label": "Done / Loop Check",
+      "type": "decision",
+      "importance": 0.6,
+      "group": "state_machine",
+      "description": "In Loop mode with gate active, restart from Attack. Otherwise mark voice as finished"
+    },
+    {
+      "id": "curve_computation",
+      "label": "Power Curve Shaping",
+      "type": "process",
+      "importance": 0.7,
+      "group": "dsp_core",
+      "description": "Apply pow(progress, curve) or inverted power curve. curve=1.0 is linear. Curve values smoothed over 20ms"
+    },
+    {
+      "id": "level_interpolation",
+      "label": "Level Interpolation",
+      "type": "process",
+      "importance": 0.7,
+      "group": "dsp_core",
+      "description": "Linear interpolation between prevLevel and target level using curved progress value"
+    },
+    {
+      "id": "envelope_output",
+      "label": "Envelope Value",
+      "type": "output",
+      "importance": 0.9,
+      "group": "dsp_core",
+      "description": "Per-sample envelope value (0.0-1.0) written to internal buffer, applied to voice audio"
+    },
+    {
+      "id": "display_buffer",
+      "label": "Display Buffer Update",
+      "type": "external",
+      "importance": 0.3,
+      "group": "ui_feedback",
+      "description": "Send state+progress to DisplayBuffer for FlexAHDSRGraph visualization (last started voice only)"
+    },
+    {
+      "id": "param_attack",
+      "label": "Attack",
+      "type": "parameter",
+      "importance": 0.7,
+      "group": "params_time",
+      "description": "Attack time in ms (0-30000, default 5ms)"
+    },
+    {
+      "id": "param_hold",
+      "label": "Hold",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": "params_time",
+      "description": "Hold time in ms (0-30000, default 0ms)"
+    },
+    {
+      "id": "param_decay",
+      "label": "Decay",
+      "type": "parameter",
+      "importance": 0.7,
+      "group": "params_time",
+      "description": "Decay time in ms (0-30000, default 100ms)"
+    },
+    {
+      "id": "param_sustain",
+      "label": "Sustain",
+      "type": "parameter",
+      "importance": 0.7,
+      "group": "params_level",
+      "description": "Sustain level (0-1 linear, default 0.5)"
+    },
+    {
+      "id": "param_release",
+      "label": "Release",
+      "type": "parameter",
+      "importance": 0.7,
+      "group": "params_time",
+      "description": "Release time in ms (0-30000, default 300ms)"
+    },
+    {
+      "id": "param_mode",
+      "label": "Mode",
+      "type": "parameter",
+      "importance": 0.8,
+      "group": "params_control",
+      "description": "Envelope mode: Trigger(0)=one-shot, Note(1)=standard, Loop(2)=repeating"
+    },
+    {
+      "id": "param_attack_level",
+      "label": "AttackLevel",
+      "type": "parameter",
+      "importance": 0.6,
+      "group": "params_level",
+      "description": "Peak level at end of attack (0-1 linear, default 1.0). Clamped to >= Sustain"
+    },
+    {
+      "id": "param_attack_curve",
+      "label": "AttackCurve",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": "params_curve",
+      "description": "Attack curvature (0-1, default 0.5=linear). Converted via pow(2, (v-0.5)*8)"
+    },
+    {
+      "id": "param_decay_curve",
+      "label": "DecayCurve",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": "params_curve",
+      "description": "Decay curvature (0-1, default 0.5=linear). Same conversion formula"
+    },
+    {
+      "id": "param_release_curve",
+      "label": "ReleaseCurve",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": "params_curve",
+      "description": "Release curvature (0-1, default 0.5=linear). Same conversion formula"
+    },
+    {
+      "id": "param_monophonic",
+      "label": "Monophonic",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": "params_control",
+      "description": "Forces single voice (voiceIndex=0 for all notes)"
+    },
+    {
+      "id": "param_retrigger",
+      "label": "Retrigger",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": "params_control",
+      "description": "Restart envelope on new note in monophonic mode (default: on)"
+    },
+    {
+      "id": "mod_attack_time",
+      "label": "AttackTimeModulation",
+      "type": "modulation",
+      "importance": 0.5,
+      "group": "mod_chains",
+      "description": "VoiceStart chain: multiplies Attack time per voice"
+    },
+    {
+      "id": "mod_attack_level",
+      "label": "AttackLevelModulation",
+      "type": "modulation",
+      "importance": 0.5,
+      "group": "mod_chains",
+      "description": "VoiceStart chain: multiplies Attack+Hold level per voice"
+    },
+    {
+      "id": "mod_decay_time",
+      "label": "DecayTimeModulation",
+      "type": "modulation",
+      "importance": 0.5,
+      "group": "mod_chains",
+      "description": "VoiceStart chain: multiplies Decay time per voice"
+    },
+    {
+      "id": "mod_sustain_level",
+      "label": "SustainLevelModulation",
+      "type": "modulation",
+      "importance": 0.5,
+      "group": "mod_chains",
+      "description": "Normal chain (voice-start + time-variant): multiplies Sustain+Decay target level"
+    },
+    {
+      "id": "mod_release_time",
+      "label": "ReleaseTimeModulation",
+      "type": "modulation",
+      "importance": 0.5,
+      "group": "mod_chains",
+      "description": "VoiceStart chain: multiplies Release time per voice"
+    }
+  ],
+  "edges": [
+    { "from": "midi_input", "to": "mod_chain_eval", "type": "signal", "label": "noteOn" },
+    { "from": "mod_chain_eval", "to": "attack_stage", "type": "signal", "label": "gate on" },
+    { "from": "attack_stage", "to": "hold_stage", "type": "signal", "label": "counter > time" },
+    { "from": "hold_stage", "to": "decay_stage", "type": "signal", "label": "counter > time" },
+    { "from": "decay_stage", "to": "sustain_stage", "type": "signal", "label": "counter > time" },
+    { "from": "sustain_stage", "to": "release_stage", "type": "conditional", "label": "Note mode: noteOff; Trigger/Loop: immediate" },
+    { "from": "release_stage", "to": "done_state", "type": "signal", "label": "counter > time" },
+    { "from": "done_state", "to": "attack_stage", "type": "conditional", "label": "Loop mode + gate active" },
+    { "from": "midi_input", "to": "release_stage", "type": "signal", "label": "noteOff (if before release)" },
+
+    { "from": "attack_stage", "to": "curve_computation", "type": "signal", "label": null },
+    { "from": "decay_stage", "to": "curve_computation", "type": "signal", "label": null },
+    { "from": "release_stage", "to": "curve_computation", "type": "signal", "label": null },
+    { "from": "curve_computation", "to": "level_interpolation", "type": "signal", "label": "curved progress" },
+    { "from": "level_interpolation", "to": "envelope_output", "type": "signal", "label": null },
+    { "from": "sustain_stage", "to": "envelope_output", "type": "signal", "label": "direct level" },
+    { "from": "hold_stage", "to": "envelope_output", "type": "signal", "label": "direct level" },
+    { "from": "envelope_output", "to": "display_buffer", "type": "signal", "label": "last voice only" },
+
+    { "from": "param_attack", "to": "attack_stage", "type": "control", "label": "time" },
+    { "from": "param_hold", "to": "hold_stage", "type": "control", "label": "time" },
+    { "from": "param_decay", "to": "decay_stage", "type": "control", "label": "time" },
+    { "from": "param_sustain", "to": "sustain_stage", "type": "control", "label": "level" },
+    { "from": "param_sustain", "to": "decay_stage", "type": "control", "label": "target level" },
+    { "from": "param_release", "to": "release_stage", "type": "control", "label": "time" },
+    { "from": "param_attack_level", "to": "attack_stage", "type": "control", "label": "target level" },
+    { "from": "param_attack_level", "to": "hold_stage", "type": "control", "label": "level" },
+    { "from": "param_attack_curve", "to": "curve_computation", "type": "control", "label": "attack exponent" },
+    { "from": "param_decay_curve", "to": "curve_computation", "type": "control", "label": "decay exponent" },
+    { "from": "param_release_curve", "to": "curve_computation", "type": "control", "label": "release exponent" },
+    { "from": "param_mode", "to": "mode_decision", "type": "control", "label": null },
+    { "from": "mode_decision", "to": "sustain_stage", "type": "conditional", "label": "Note: hold; Trigger/Loop: skip" },
+    { "from": "mode_decision", "to": "done_state", "type": "conditional", "label": "Loop: restart" },
+    { "from": "param_monophonic", "to": "midi_input", "type": "control", "label": "force voice 0" },
+    { "from": "param_retrigger", "to": "mod_chain_eval", "type": "control", "label": "restart gate" },
+
+    { "from": "mod_attack_time", "to": "attack_stage", "type": "control", "label": "time multiplier" },
+    { "from": "mod_attack_level", "to": "attack_stage", "type": "control", "label": "level multiplier" },
+    { "from": "mod_attack_level", "to": "hold_stage", "type": "control", "label": "level multiplier" },
+    { "from": "mod_decay_time", "to": "decay_stage", "type": "control", "label": "time multiplier" },
+    { "from": "mod_sustain_level", "to": "sustain_stage", "type": "control", "label": "level multiplier" },
+    { "from": "mod_sustain_level", "to": "decay_stage", "type": "control", "label": "target level multiplier" },
+    { "from": "mod_release_time", "to": "release_stage", "type": "control", "label": "time multiplier" }
+  ],
+  "groups": [
+    { "id": "voice_lifecycle", "label": "Voice Lifecycle" },
+    { "id": "state_machine", "label": "Envelope State Machine" },
+    { "id": "dsp_core", "label": "Per-Sample DSP" },
+    { "id": "ui_feedback", "label": "UI Feedback" },
+    { "id": "params_time", "label": "Time Parameters" },
+    { "id": "params_level", "label": "Level Parameters" },
+    { "id": "params_curve", "label": "Curve Parameters" },
+    { "id": "params_control", "label": "Playback Control" },
+    { "id": "mod_chains", "label": "Modulation Chains" }
+  ]
+}

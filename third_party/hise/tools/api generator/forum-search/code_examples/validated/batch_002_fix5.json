@@ -1,0 +1,11 @@
+{
+  "38": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "HardcodedMasterFX module has no display buffer data without a loaded scriptnode network",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "targetId": "SynthChain",
+  "domain": "modules",
+  "generatedAt": "2026-03-31",
+  "topicIds": [10888, 1583, 841, 7528, 9393, 13424, 9031, 12946, 5558, 4950, 8545, 198, 3110, 5655, 3032, 8752, 2088, 2683, 3077, 3604, 4889, 3727, 3132, 8485, 2949, 13153, 8405],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Polyphonic FX added to a Container's FX chain silently have no effect",
+      "summary": "Containers do not render voices - they sum child output monophonically. Any polyphonic effect placed in a Container's FX chain is silently ignored. Use a monophonic filter on the Container for shared post-mix filtering, or add polyphonic effects to each child sound generator individually.",
+      "sources": ["tid:198"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "FX plugin exports ignore all child sound generators - only master chain FX are active",
+      "summary": "When exporting as an FX plugin, HISE only uses the effects in the master SynthChain's FX chain. Any child sound generators (samplers, synths, containers) inside the master chain are ignored entirely. The plugin receives host audio directly into the master FX chain.",
+      "sources": ["tid:1583", "tid:2088"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Global modulators cannot be placed in or accessed from the root SynthChain directly",
+      "summary": "A Global modulator can only be referenced by processors that are children of the GlobalModulatorContainer in the tree. Placing a Global modulator reference above the GlobalModulatorContainer (e.g., directly in the root chain's gain modulation) will have no effect. Workaround: add a nested Container below the GlobalModulatorContainer and place sound generators inside it.",
+      "sources": ["tid:1583"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "VoiceLimit parameter and NUM_POLYPHONIC_VOICES are distinct concepts",
+      "summary": "NUM_POLYPHONIC_VOICES is a compile-time constant (default 256) that determines the actual voice pool size allocated at startup for all sound generators. The VoiceLimit parameter in SynthChain is a runtime soft limit that simply ignores voices above that count from the pre-allocated pool. Setting VoiceLimit lower than NUM_POLYPHONIC_VOICES wastes the pre-allocated voices but does not shrink memory. To reduce the pool at compile time, set NUM_POLYPHONIC_VOICES in Extra Definitions.",
+      "sources": ["tid:10888"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Project DLL and HISE must be compiled with matching NUM_POLYPHONIC_VOICES or glitches occur",
+      "summary": "When building a scriptnode DLL loaded into HISE, both the DLL and the HISE build must be compiled with the same NUM_POLYPHONIC_VOICES value. A mismatch causes audio glitches because voice array sizes disagree. Either set the value in Extra Definitions (requires matching the HISE build) or change the HISE source directly so both compile to the same constant automatically.",
+      "sources": ["tid:10888"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Connect UI volume controls to a Simple Gain FX rather than the Master Chain's Gain parameter",
+      "summary": "Connecting a UI slider directly to the Master Chain's Gain parameter can result in the connection breaking after saving as XML (the master chain is renamed to match the XML filename on save). Using a Simple Gain effect as the volume stage instead is more robust and has the added benefit that its value is smoothed, eliminating clicks when the user adjusts volume during playback.",
+      "sources": ["tid:5655"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Using a Send Effect alongside direct output doubles the signal",
+      "summary": "When a send effect is added and the child sound generator also routes to the regular outputs, the signal is summed twice: once through the direct path and once through the send return. To use a send effect correctly, the direct output from the source must be zeroed out or routed exclusively to the send, using the channel settings and routing matrix.",
+      "sources": ["tid:9393"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Crash when changing container channel count: change master chain channels first",
+      "summary": "Changing a nested container's channel count before the master SynthChain's channel count is set could crash HISE (a now-fixed multichannel buffer bug). The safe order is to set the master chain's channel count first, then add the nested container. To support more than the default maximum channel count, increase NUM_MAX_CHANNELS in hi_tools/Macros.h and rebuild HISE.",
+      "sources": ["tid:7528"],
+      "verify": true,
+      "verify_hint": "grep NUM_MAX_CHANNELS in hi_tools/Macros.h; verify crash is fixed in current develop"
+    },
+    {
+      "type": "API",
+      "title": "Raw C++ API for creating a Container uses builder.create with Chains::Direct",
+      "summary": "To programmatically add a Container (SynthChain) via the HISE raw C++ builder API, use: builder.create<ModulatorSynthChain>(parent, raw::IDs::Chains::Direct). The Direct chain type places the container as a direct child sound generator rather than in a modulation or FX chain.",
+      "sources": ["tid:3727"],
+      "verify": true,
+      "verify_hint": "grep raw::IDs::Chains::Direct in hi_core or hi_scripting raw API headers"
+    },
+    {
+      "type": "API",
+      "title": "ScriptDynamicContainer (Dynamic Container) is work-in-progress and not part of HISE 5",
+      "summary": "As of September 2025, the Dynamic Container component and its associated scripting API (setData, updateContentPropertyInternal, DragContainerHandler) are incomplete and unstable. Christoph Hart confirmed it will not ship as part of HISE 5. Do not rely on this API in production.",
+      "sources": ["tid:13424"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

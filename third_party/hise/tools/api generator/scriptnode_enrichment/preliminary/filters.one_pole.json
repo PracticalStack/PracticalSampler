@@ -1,0 +1,136 @@
+{
+  "factoryPath": "filters.one_pole",
+  "factory": "filters",
+  "nodeId": "one_pole",
+  "description": "A filter node",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Filter Response",
+      "rationale": "Frequency sets the cutoff, Q and Gain are present for interface consistency but may have limited or no effect on a one-pole filter (first-order, no resonance).",
+      "parameters": [
+        {
+          "id": "Frequency",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0, "skew": 0.2299045622348785 },
+          "default": 1000.0,
+          "textConverter": "Frequency",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Q",
+          "range": { "min": 0.300000011920929, "max": 9.899999618530273, "step": 0.0, "skew": 0.2647178173065186 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Gain",
+          "range": { "min": -18.0, "max": 18.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Decibel",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Filter Configuration",
+      "rationale": "Mode selects LP or HP (2 modes), Smoothing controls coefficient interpolation speed, Enabled toggles the filter on/off.",
+      "parameters": [
+        {
+          "id": "Mode",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "52.nT6K8CxJYE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.GT.SPo.RPAPXiQWZ1UF.ADf...",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Smoothing",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 0.3010300099849701 },
+          "default": 0.009999999776482582,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Enabled",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "filterCoefficients": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/filters/one_pole.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "one-pole-mode-values",
+      "category": "conditional_logic",
+      "question": "Mode parameter has range 0-1 (2 discrete values). What do these correspond to? Expected: 0=LowPass, 1=HighPass.",
+      "context": "A one-pole filter typically only supports LP and HP. Confirm these are the two modes."
+    },
+    {
+      "id": "one-pole-q-and-gain-effect",
+      "category": "parameter_behaviour",
+      "question": "A one-pole filter is first-order and has no resonance. Does the Q parameter actually affect the filter response, or is it silently ignored? Similarly, does Gain have any effect? These parameters may exist only for interface consistency with the filter_base parameter set.",
+      "context": "Critical for documentation: if Q and Gain are non-functional on one_pole, users should be told explicitly to avoid confusion."
+    },
+    {
+      "id": "one-pole-slope",
+      "category": "signal_path",
+      "question": "Confirm the one-pole filter has a 6 dB/octave (first-order) rolloff. Is it implemented as a simple y[n] = (1-a)*y[n-1] + a*x[n] topology?",
+      "context": "The gentle slope of a one-pole filter is its defining characteristic vs other filter nodes. Users choosing one_pole need to know it provides 6 dB/oct rather than the 12 dB/oct of a biquad."
+    },
+    {
+      "id": "description-accuracy",
+      "category": "description_accuracy",
+      "question": "The base description 'A filter node' is generic. Confirm the correct characterisation as a first-order (one-pole) filter with 6 dB/octave slope.",
+      "context": "The vague description does not help users distinguish between the 9 different filter nodes."
+    }
+  ],
+
+  "notes": "filters.one_pole is the simplest filter topology in the factory. A one-pole (first-order) filter provides a gentle 6 dB/octave slope and no resonance. The Q and Gain parameters are likely non-functional but present for interface consistency with the shared filter_base infrastructure. Only 2 modes (likely LP/HP). Good candidate for DC blocking, gentle tone shaping, or smoothing. References filter-base-architecture, smoothing-units, and enabled-bypass-behaviour gaps from filters.svf."
+}

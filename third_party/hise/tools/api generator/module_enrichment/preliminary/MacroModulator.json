@@ -1,0 +1,120 @@
+{
+  "moduleId": "MacroModulator",
+  "prettyName": "Macro Modulator",
+  "type": "Modulator",
+  "subtype": "TimeVariantModulator",
+  "category": "routing",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": true,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "TableProcessor",
+      "signalFlowRole": "Optional response curve lookup applied to the incoming macro value before smoothing"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Macro Connection",
+      "rationale": "Controls which macro slot this modulator listens to",
+      "parameters": [
+        {
+          "id": "MacroIndex",
+          "name": "Macro Index",
+          "range": { "min": -1.0, "max": 7.0, "step": 1.0 },
+          "default": -1.0,
+          "description": "The macro controller slot index (0-7) to link to",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Value Processing",
+      "rationale": "Controls how the macro value is transformed and smoothed before output",
+      "parameters": [
+        {
+          "id": "UseTable",
+          "name": "Use Table",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Enables a lookup table for custom macro value response curves",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "SmoothTime",
+          "name": "Smooth Time",
+          "range": { "min": 0.0, "max": 1000.0, "step": 0.0 },
+          "default": 200.0,
+          "description": "Smoothing time in milliseconds for value transitions",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Internal",
+      "rationale": "System-driven parameter, not user-facing",
+      "parameters": [
+        {
+          "id": "MacroValue",
+          "name": "Macro Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 1.0,
+          "description": "The current macro value (automated by macro controller). Write-only - driven by the macro system, not user-editable.",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "signal-flow",
+      "category": "signal_path",
+      "question": "What is the complete signal flow from macro value input to modulation output? How do the table and smoothing stages interact?",
+      "context": "Need to document the processing order for the pseudo-code: macro value -> table lookup -> smoothing -> output."
+    },
+    {
+      "id": "smoothing-detail",
+      "category": "parameter_behavior",
+      "question": "How does the smoother work? Is it per-sample or per-block? What rate does it operate at? What happens when smoothing time is 0?",
+      "context": "Users need to know the resolution and behavior of smoothing for automation scenarios."
+    },
+    {
+      "id": "table-application",
+      "category": "interface_usage",
+      "question": "Where exactly is the table lookup applied? Before or after smoothing? What is the input/output range?",
+      "context": "Important for users designing custom response curves."
+    },
+    {
+      "id": "macro-value-param",
+      "category": "parameter_behavior",
+      "question": "How does the MacroValue parameter work? Is it truly write-only? What drives it?",
+      "context": "Need to clarify that this is a system-driven parameter, not user-configurable."
+    },
+    {
+      "id": "disconnected-behavior",
+      "category": "conditional_logic",
+      "question": "What happens when MacroIndex is -1 (disconnected)? Does the modulator output a default value?",
+      "context": "Users need to know the default state when no macro is assigned."
+    }
+  ],
+
+  "notes": "MacroModulator is a TimeVariantModulator that bridges the macro control system to the modulation system. It has no child processors and no modulation chains of its own. The existing phase1 JSON contains a graph topology that can inform Step 3. MacroValue appears to be a write-only parameter driven by the macro system - getAttribute returns a hardcoded 1.0 with jassertfalse."
+}

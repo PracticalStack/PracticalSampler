@@ -1,0 +1,34 @@
+{
+  "moduleId": "EmptyFX",
+  "prettyName": "Empty",
+  "type": "Effect",
+  "subtype": "MasterEffect",
+  "category": "utility",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "stereo",
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "RoutingMatrix",
+      "signalFlowRole": "skip - inferred from type/subtype"
+    }
+  ],
+
+  "parameterGroups": [],
+
+  "compositeBlocks": [],
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "gaps": [],
+
+  "notes": "EmptyFX is trivially simple - a passthrough with no parameters, no modulation chains, and no child processors. applyEffect() is an empty method body. It serves as a placeholder in effect chains and as the default child of SlotFX when no effect is loaded. No C++ exploration gaps are needed because the module is self-evidently a no-op from its base data and class definition."
+}

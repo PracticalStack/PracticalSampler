@@ -1,0 +1,828 @@
+export interface HISEData {
+  uiComponentProperties: UIComponentProperty[];
+  scriptingAPI: ScriptingAPIMethod[];
+  moduleParameters: ModuleParameter[];
+  codeSnippets: CodeSnippet[];
+}
+
+export interface UIComponentProperty {
+  id: string;
+  componentType: string;
+  propertyName: string;
+  propertyType: string;
+  defaultValue: string | number | boolean;
+  description: string;
+  possibleValues?: string[];
+  deprecated?: boolean;
+  deprecatedSince?: string;
+  replacement?: string;
+}
+
+export interface ScriptingAPIMethod {
+  id: string;
+  namespace: string;
+  methodName: string;
+  returnType: string;
+  parameters: APIParameter[];
+  description: string;
+  example?: string;
+  deprecated?: boolean;
+  deprecatedSince?: string;
+  replacement?: string;
+  // Enriched fields (present for enriched classes, absent for Tier 2)
+  callScope?: string;
+  callScopeNote?: string;
+  examples?: APIExample[];
+  crossReferences?: string[];
+  pitfalls?: string[];
+  llmRef?: string;
+}
+
+export interface APIExample {
+  title: string;
+  code: string;
+}
+
+export interface APIParameter {
+  name: string;
+  type: string;
+  description: string;
+  optional: boolean;
+  defaultValue?: string;
+}
+
+export interface ModuleParameter {
+  id: string;
+  moduleType: string;
+  parameterId: string;
+  parameterName: string;
+  min: number;
+  max: number;
+  step: number;
+  defaultValue: number;
+  description: string;
+}
+
+export interface CodeSnippet {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  tags: string[];
+  code: string;
+  relatedAPIs: string[];
+  relatedComponents: string[];
+  difficulty: "beginner" | "intermediate" | "advanced";
+}
+
+export type SearchDomain = "all" | "api" | "ui" | "modules" | "snippets";
+
+export interface SearchResult {
+  id: string;
+  domain: SearchDomain;
+  name: string;
+  description: string;
+  score: number;
+  matchType: "exact" | "prefix" | "keyword" | "fuzzy";
+}
+
+export interface EnrichedResult<T> {
+  result: T;
+  related: string[];
+}
+
+export interface ServerStatusBase {
+  server: {
+    name: string;
+    version: string;
+  };
+  runtime: {
+    nodeVersion: string;
+    platform: string;
+  };
+  data: {
+    loaded: boolean;
+    cachedAt: string | null;
+    cacheAgeMinutes: number | null;
+    snippetsLoaded: boolean;
+  };
+  statistics: {
+    uiComponents: number;
+    uiProperties: number;
+    scriptingNamespaces: number;
+    scriptingMethods: number;
+    moduleTypes: number;
+    moduleParameters: number;
+    codeSnippets: number;
+    lafComponents: number;
+    lafFunctions: number;
+  };
+}
+
+export interface ServerStatus extends ServerStatusBase {
+  mode: 'local' | 'production';
+  hiseRuntime: {
+    available: boolean;
+    url: string;
+    project: string | null;
+    error: string | null;
+  };
+  hints: {
+    resources: string;
+  };
+}
+
+// ============================================================================
+// Class Survey Types (explore_hise)
+// ============================================================================
+
+/**
+ * A "see also" distinction entry - explains when to use class A vs class B
+ */
+export interface ClassSurveySeeAlso {
+  class: string;
+  distinction: string;
+}
+
+/**
+ * A single class entry in the survey dataset
+ */
+export interface ClassSurveyEntry {
+  brief: string;
+  domain: string;           // "audio", "ui", "event", "scripting", etc.
+  role: string;             // "handle", "factory", "container", "service", etc.
+  baseClass: string;
+  creates: string[];
+  references: string[];
+  seeAlso: ClassSurveySeeAlso[];
+  callbackDensity: number;
+  statefulness: number;
+  threadingExposure: number;
+  createdBy: string[];
+  fanOut: number;
+  fanIn: number;
+}
+
+/**
+ * Root structure of the class survey dataset
+ */
+export interface ClassSurveyData {
+  meta: {
+    generatedAt: string;
+    classCount: number;
+    groups: string[];
+  };
+  classes: Record<string, ClassSurveyEntry>;
+}
+
+// ============================================================================
+// Workflow Types
+// ============================================================================
+
+/**
+ * Workflow definition for guiding AI agents through common tasks
+ */
+export interface Workflow {
+  id: string;
+  name: string;
+  description: string;
+  steps: string[];
+  tools: string[];
+  tips?: string[];
+}
+
+// ============================================================================
+// HISE Runtime Bridge Types
+// These types correspond to HISE REST API responses
+// ============================================================================
+
+/**
+ * Code context for an error location
+ */
+export interface ErrorCodeContext {
+  /** Callback name where error occurred (e.g., "onInit") */
+  callback: string;
+  /** Error line number (1-based) */
+  line: number;
+  /** Error column number (1-based) */
+  column: number;
+  /** Code snippet with line numbers (e.g., "14: code\n15: error line\n16: code") */
+  code: string;
+}
+
+/**
+ * HISE REST API error structure
+ */
+export interface HiseError {
+  errorMessage: string;
+  callstack: string[];
+  /** Auto-populated code context around the error location */
+  codeContext?: ErrorCodeContext;
+  /** Suggestions for fixing the error (from pattern matching + API search) */
+  suggestions?: string[];
+}
+
+/**
+ * Script processor callback info
+ */
+export interface HiseCallback {
+  id: string;
+  empty: boolean;
+}
+
+/**
+ * Script processor info from HISE
+ */
+export interface HiseScriptProcessor {
+  moduleId: string;
+  isMainInterface: boolean;
+  externalFiles: string[];
+  callbacks: HiseCallback[];
+}
+
+/**
+ * Response from GET /api/status
+ */
+export interface HiseStatusResponse {
+  success: boolean;
+  server: {
+    version: string;
+    compileTimeout?: string;  // Timeout in seconds (from HISE settings)
+  };
+  project: {
+    name: string;
+    projectFolder: string;
+    scriptsFolder: string;
+  };
+  scriptProcessors: HiseScriptProcessor[];
+  logs: string[];
+  errors: HiseError[];
+}
+
+/**
+ * External file reference from include() statements
+ */
+export interface HiseExternalFile {
+  name: string;        // e.g., "ExternalStuff.js"
+  path: string;        // Full path to the file
+}
+
+/**
+ * Response from GET /api/get_script
+ * Now returns structured callbacks object instead of merged script
+ */
+export interface HiseScriptResponse {
+  success: boolean;
+  moduleId: string;
+  callbacks: Record<string, string>;  // e.g., { "onInit": "...", "onNoteOn": "function onNoteOn() {...}" }
+  externalFiles: HiseExternalFile[];  // Files referenced via include()
+  logs: string[];
+  errors: HiseError[];
+}
+
+/**
+ * Response from POST /api/set_script and POST /api/recompile
+ */
+export interface HiseCompileResponse {
+  success: boolean;
+  moduleId?: string;
+  updatedCallbacks?: string[];  // Which callbacks were updated
+  result?: string;
+  logs: string[];
+  errors: HiseError[];
+}
+
+/**
+ * Response from GET /api/screenshot
+ */
+export interface HiseScreenshotResponse {
+  success: boolean;
+  moduleId: string;
+  id?: string;
+  width: number;
+  height: number;
+  scale: number;
+  imageData?: string;   // Base64 PNG if outputPath not specified
+  filePath?: string;    // File path if outputPath was specified
+  logs: string[];
+  errors: HiseError[];
+}
+
+/**
+ * Parameters for set_script
+ * Now uses structured callbacks object instead of single script string
+ */
+export interface SetScriptParams {
+  moduleId: string;
+  callbacks: Record<string, string>;  // e.g., { "onInit": "...", "onNoteOn": "..." }
+  compile?: boolean;
+}
+
+/**
+ * Cached script data for efficient line editing
+ */
+export interface CachedScript {
+  script: string;
+  lines: string[];
+  timestamp: number;
+  hash: string;  // SHA256 hash (first 16 chars) for cache validation
+}
+
+/**
+ * Parameters for edit_script (string replacement, works like native mcp_edit)
+ */
+export interface EditScriptParams {
+  moduleId: string;
+  callback: string;
+  oldString: string;   // Exact string to find and replace
+  newString: string;   // Replacement string
+  replaceAll?: boolean; // Replace all occurrences (default: false)
+  compile?: boolean;   // Default: true
+}
+
+/**
+ * Parameters for screenshot
+ */
+export interface ScreenshotParams {
+  moduleId?: string;
+  id?: string;
+  scale?: number;
+  outputPath?: string;
+}
+
+// ============================================================================
+// Component-related types for UI bridge tools
+// ============================================================================
+
+/**
+ * Basic component info (flat list)
+ */
+export interface HiseComponentInfo {
+  id: string;
+  type: string;
+}
+
+/**
+ * Component info with hierarchy and layout properties
+ */
+export interface HiseComponentHierarchy extends HiseComponentInfo {
+  visible: boolean;
+  enabled: boolean;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  childComponents: HiseComponentHierarchy[];
+}
+
+/**
+ * Response from GET /api/list_components
+ */
+export interface HiseListComponentsResponse {
+  success: boolean;
+  moduleId: string;
+  components: HiseComponentInfo[] | HiseComponentHierarchy[];
+  logs: string[];
+  errors: HiseError[];
+}
+
+/**
+ * Component property with value and metadata
+ */
+export interface HiseComponentProperty {
+  id: string;
+  value: string | number | boolean;
+  isDefault: boolean;
+  options?: string[];
+}
+
+/**
+ * Response from GET /api/get_component_properties
+ */
+export interface HiseGetComponentPropertiesResponse {
+  success: boolean;
+  moduleId: string;
+  id: string;
+  type: string;
+  properties?: HiseComponentProperty[];  // Optional - omitted when compact=true and all properties are default
+  logs: string[];
+  errors: HiseError[];
+}
+
+/**
+ * Options for getComponentProperties - allows filtering the response
+ */
+export interface GetComponentPropertiesOptions {
+  compact?: boolean;      // Default: true - only return non-default properties
+  properties?: string[];  // Filter to only these specific property names
+}
+
+/**
+ * Response from POST /api/set_component_properties
+ */
+export interface HiseSetComponentPropertiesResponse {
+  success: boolean;
+  moduleId: string;
+  applied?: { id: string; properties: string[] }[];
+  recompileRequired?: boolean;
+  locked?: { id: string; property: string }[];
+  errorMessage?: string;
+  logs: string[];
+  errors: HiseError[];
+}
+
+/**
+ * Response from GET /api/get_component_value
+ */
+export interface HiseGetComponentValueResponse {
+  success: boolean;
+  moduleId: string;
+  id: string;
+  type: string;
+  value: number;
+  min: number;
+  max: number;
+  logs: string[];
+  errors: HiseError[];
+}
+
+/**
+ * Response from POST /api/set_component_value
+ */
+export interface HiseSetComponentValueResponse {
+  success: boolean;
+  moduleId: string;
+  id: string;
+  type: string;
+  logs: string[];
+  errors: HiseError[];
+}
+
+/**
+ * Selected component with full properties
+ */
+export interface HiseSelectedComponent {
+  id: string;
+  type: string;
+  properties: HiseComponentProperty[];
+}
+
+/**
+ * Response from GET /api/get_selected_components
+ */
+export interface HiseGetSelectedComponentsResponse {
+  success: boolean;
+  moduleId: string;
+  selectionCount: number;
+  components: HiseSelectedComponent[];
+  logs: string[];
+  errors: HiseError[];
+}
+
+/**
+ * Parameters for set_component_properties
+ */
+export interface SetComponentPropertiesParams {
+  moduleId: string;
+  changes: { id: string; properties: Record<string, unknown> }[];
+  force?: boolean;
+}
+
+/**
+ * Parameters for set_component_value
+ */
+export interface SetComponentValueParams {
+  moduleId: string;
+  id: string;
+  value: number;
+  validateRange?: boolean;
+}
+
+// ============================================================================
+// REPL Types
+// ============================================================================
+
+/**
+ * Parameters for evaluating a script expression (REPL)
+ */
+export interface ReplParams {
+  moduleId: string;
+  expression: string;
+}
+
+/**
+ * Response from POST /api/repl
+ * - value can be any JSON type (number, string, array, object, etc.)
+ * - result is a status message (e.g., "REPL Evaluation OK")
+ */
+export interface HiseReplResponse {
+  success: boolean;
+  result?: string;
+  value?: unknown;
+  logs?: string[];
+  errors?: HiseError[];
+}
+
+// ============================================================================
+// Profiling Types
+// ============================================================================
+
+/**
+ * Profiling event with timing information
+ */
+export interface ProfileEvent {
+  name: string;
+  sourceType: string;
+  duration: number;
+  start: number;
+  children?: ProfileEvent[];
+}
+
+/**
+ * Thread container in full profile data
+ */
+export interface ProfileThread {
+  thread: string;
+  events: ProfileEvent[];
+}
+
+/**
+ * Summary/filtered result item from profile API
+ */
+export interface ProfileResultItem {
+  name: string;
+  sourceType: string;
+  thread: string;
+  start?: number;
+  duration?: number;
+  children?: ProfileEvent[];
+  // Summary fields (when summary=true)
+  count?: number;
+  median?: number;
+  peak?: number;
+  min?: number;
+  total?: number;
+}
+
+/**
+ * Parameters for starting a profiling session (mode="record")
+ */
+export interface ProfileRecordParams {
+  mode: 'record';
+  durationMs?: number;
+  threadFilter?: string[];
+  eventFilter?: string[];
+}
+
+/**
+ * Parameters for retrieving profiling results (mode="get")
+ */
+export interface ProfileGetParams {
+  mode: 'get';
+  threadFilter?: string[];
+  summary?: boolean;
+  filter?: string;
+  minDuration?: number;
+  sourceTypeFilter?: string;
+  nested?: boolean;
+  limit?: number;
+  wait?: boolean;
+  maxDepth?: number;  // Client-side: limit event nesting depth (default: 3)
+}
+
+/**
+ * Union type for profile parameters
+ */
+export type ProfileParams = ProfileRecordParams | ProfileGetParams;
+
+/**
+ * Response from POST /api/profile
+ * - threads: full event tree (when no filter/summary)
+ * - results: filtered/summarized items
+ * - flows: additional flow data
+ */
+export interface HiseProfileResponse {
+  success: boolean;
+  recording?: boolean;
+  durationMs?: number;
+  threads?: ProfileThread[];
+  results?: ProfileResultItem[];
+  flows?: unknown[];
+  logs?: string[];
+  errors?: HiseError[];
+}
+
+// ============================================================================
+// Launch and Shutdown Types
+// ============================================================================
+
+/**
+ * Parameters for launching HISE with the REST server
+ */
+export interface LaunchParams {
+  projectFolder: string;
+  debug?: boolean;   // Use HISE Debug build (default: false)
+  port?: number;     // REST server port (default: 1900)
+  force?: boolean;   // Shut down existing HISE if running with different project (default: false)
+}
+
+/**
+ * Response from launching or connecting to HISE
+ */
+export interface HiseLaunchResponse {
+  success: boolean;
+  alreadyRunning: boolean;
+  project?: {
+    name: string;
+    projectFolder: string;
+  };
+  port?: number;
+  error?: string;
+}
+
+/**
+ * Response from shutting down HISE
+ */
+export interface HiseShutdownResponse {
+  success: boolean;
+  error?: string;
+}
+
+// ============================================================================
+// LAF (LookAndFeel) Types
+// ============================================================================
+
+/**
+ * A single property available in the LAF callback's obj parameter
+ */
+export interface LAFCallbackProperty {
+  type: string;
+  description: string;
+}
+
+/**
+ * A LAF function definition with its callback properties
+ */
+export interface LAFFunction {
+  description: string;
+  callbackProperties: Record<string, LAFCallbackProperty>;
+}
+
+/**
+ * A component that has LAF functions
+ */
+export interface LAFComponent {
+  lafFunctions: Record<string, LAFFunction>;
+}
+
+/**
+ * Root structure of the LAF style guide data
+ */
+export interface LAFStyleGuideData {
+  version: string;
+  generated: string;
+  categories: {
+    ScriptComponents: {
+      description: string;
+      components: Record<string, LAFComponent>;
+    };
+    FloatingTileContentTypes: {
+      description: string;
+      contentTypes: Record<string, LAFComponent>;
+    };
+    Global: {
+      description: string;
+      categories: Record<string, LAFComponent>;
+    };
+  };
+}
+
+/**
+ * Result from list_laf_functions
+ */
+export interface LAFListResult {
+  componentType: string;
+  category: 'ScriptComponents' | 'FloatingTileContentTypes' | 'Global';
+  functions: string[];
+  note?: string;
+}
+
+/**
+ * Result from query_laf_function
+ */
+export interface LAFQueryResult {
+  functionName: string;
+  componentType: string;
+  category: 'ScriptComponents' | 'FloatingTileContentTypes' | 'Global';
+  description: string;
+  properties: Record<string, LAFCallbackProperty>;
+}
+
+/**
+ * Result from hise_runtime_get_laf_functions
+ */
+export interface LAFRuntimeResult {
+  componentIds: string[];
+  functions: string[];
+}
+
+// Auth Types (Phase 1-2)
+
+export interface TokenValidationResult {
+  valid: boolean;
+  user_id?: number;
+  username?: string;
+  email?: string;
+  scopes?: string[];
+  token_type?: 'access_token' | 'api_key';
+  error?: string;
+  error_description?: string;
+}
+
+export interface UserContext {
+  id: number;
+  username: string;
+  email: string;
+  scopes: string[];
+  tokenType: 'access_token' | 'api_key';
+}
+
+export interface CachedToken {
+  user: UserContext;
+  expires: number;
+}
+
+export interface AuthConfig {
+  validateTokenUrl: string;
+  sharedSecret: string;
+  cacheTtlMs: number;
+}
+
+// OAuth Types (Phase 3)
+
+export interface OAuthConfig {
+  issuer: string;
+  authorizeUrl: string;
+  tokenUrl: string;
+  clientId: string;
+  clientSecret: string;
+  mcpServerUrl: string;
+  supportedScopes: string[];
+}
+
+export interface OAuthMetadata {
+  issuer: string;
+  authorization_endpoint: string;
+  token_endpoint: string;
+  registration_endpoint: string;
+  response_types_supported: string[];
+  grant_types_supported: string[];
+  code_challenge_methods_supported: string[];
+  scopes_supported: string[];
+  token_endpoint_auth_methods_supported: string[];
+}
+
+export interface TokenRequest {
+  grant_type: 'authorization_code' | 'refresh_token';
+  code?: string;
+  redirect_uri?: string;
+  code_verifier?: string;
+  refresh_token?: string;
+  client_id?: string;
+  client_secret?: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  refresh_token?: string;
+  scope?: string;
+}
+
+export interface TokenErrorResponse {
+  error: string;
+  error_description?: string;
+}
+
+export interface ClientRegistrationRequest {
+  client_name: string;
+  redirect_uris: string[];
+  grant_types?: string[];
+  response_types?: string[];
+  scope?: string;
+  token_endpoint_auth_method?: string;
+}
+
+export interface ClientRegistrationResponse {
+  client_id: string;
+  client_secret?: string;
+  client_name: string;
+  redirect_uris: string[];
+  grant_types: string[];
+  response_types: string[];
+  scope: string;
+  token_endpoint_auth_method: string;
+  client_id_issued_at: number;
+  client_secret_expires_at: number;
+}

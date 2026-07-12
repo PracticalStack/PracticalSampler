@@ -1,0 +1,121 @@
+{
+  "moduleId": "StereoFX",
+  "prettyName": "Stereo FX",
+  "type": "Effect",
+  "subtype": "VoiceEffect",
+  "category": "mixing",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "voice",
+    "audioOut": "voice",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "per-voice",
+
+  "interfaces": [],
+
+  "parameterGroups": [
+    {
+      "label": "Stereo Image",
+      "rationale": "Pan and Width jointly control the stereo image of each voice - Pan sets position, Width sets spread",
+      "parameters": [
+        {
+          "id": "Pan",
+          "name": "Pan",
+          "range": { "min": -100.0, "max": 100.0, "step": 1.0 },
+          "default": 100.0,
+          "description": "Maximum stereo pan position where -100 is full left and 100 is full right",
+          "composite": {
+            "type": "modMultiply",
+            "details": {
+              "chainName": "Pan Modulation",
+              "chainIndex": 0,
+              "constrainer": "*"
+            }
+          },
+          "modChain": {
+            "name": "Pan Modulation",
+            "chainIndex": 0,
+            "modulationMode": "pan",
+            "constrainer": "*"
+          }
+        },
+        {
+          "id": "Width",
+          "name": "Width",
+          "range": { "min": 0.0, "max": 200.0, "step": 1.0 },
+          "default": 100.0,
+          "description": "Stereo width as percentage where 0 is mono, 100 is normal, and 200 is exaggerated",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [
+    {
+      "type": "modMultiply",
+      "param": "Pan",
+      "details": {
+        "chainName": "Pan Modulation",
+        "chainIndex": 0,
+        "constrainer": "*"
+      }
+    }
+  ],
+
+  "standaloneModChains": [],
+
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-order",
+      "category": "signal_path",
+      "question": "What is the processing order in applyEffect()? Is Width applied before or after Pan? Is there mid/side encoding involved?",
+      "context": "Need the exact processing chain for the pseudo-code. Pan and Width could interact (e.g., width applied in mid/side domain, then pan applied to the result)."
+    },
+    {
+      "id": "pan-parameter-semantics",
+      "category": "description_accuracy",
+      "question": "The Pan parameter description says 'Maximum stereo pan position' and defaults to 100 (full right). Does 'Maximum' mean this defines the range/extent of the pan modulation chain rather than a static pan position? A default of full-right seems wrong for a static pan.",
+      "context": "Critical for the reference page - users need to know if Pan is a static position or a modulation range. The word 'Maximum' and the default of 100 strongly suggest it scales the mod chain output."
+    },
+    {
+      "id": "pan-law",
+      "category": "parameter_behavior",
+      "question": "What panning law is used? Equal-power (constant power), linear, or something else? How is the -100 to 100 range mapped to left/right gain coefficients?",
+      "context": "The panning law affects perceived loudness during pan sweeps. Users doing precise stereo placement need to know."
+    },
+    {
+      "id": "width-implementation",
+      "category": "parameter_behavior",
+      "question": "How is Width implemented? Mid/side encoding where Width < 100 reduces sides and Width > 100 boosts sides? What is the exact formula?",
+      "context": "Width values above 100% are unusual - users need to understand the stereo effect and whether it can cause phase issues."
+    },
+    {
+      "id": "voice-pan-interaction",
+      "category": "signal_path",
+      "question": "How does StereoFX interact with the voice's existing stereo signal? Does it assume the input is mono and pan it, or does it process an already-stereo voice buffer?",
+      "context": "VoiceEffects process per-voice buffers. Whether the input is mono or stereo affects how Pan and Width behave."
+    },
+    {
+      "id": "modulation-resolution",
+      "category": "parameter_behavior",
+      "question": "Is the Pan modulation applied per-sample or per-block? Given this is a VoiceEffect with pan mode, per-sample would enable smooth automation.",
+      "context": "Modulation resolution matters for avoiding zipper noise on pan sweeps."
+    },
+    {
+      "id": "performance-per-voice",
+      "category": "performance",
+      "question": "What is the per-voice CPU cost? Is mid/side encoding (if used for Width) applied per-sample? Is processing skipped when Pan=0 and Width=100 (neutral settings)?",
+      "context": "As a VoiceEffect, this runs once per active voice. Cost scales with polyphony."
+    }
+  ],
+
+  "notes": "StereoFX is a polyphonic (VoiceEffect) stereo processor - unusual because most stereo tools are master effects. The Pan parameter's description says 'Maximum' position with a default of 100, strongly suggesting it defines the modulation range rather than a static pan position. The Pan Modulation chain uses 'pan' modulationMode (not 'gain'), which is significant - this likely means the modulator output maps to left-right position rather than amplitude scaling. Width has no modulation chain, so it is static per-voice (set at voice start or by parameter). No interfaces are declared."
+}

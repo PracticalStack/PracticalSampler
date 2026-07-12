@@ -1,0 +1,95 @@
+{
+  "factoryPath": "core.smoother",
+  "factory": "core",
+  "nodeId": "smoother",
+  "description": "Smoothes the input signal using a low pass filter",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Smoothing",
+      "rationale": "SmoothingTime sets the filter time constant; DefaultValue sets the initial output value on voice start",
+      "parameters": [
+        {
+          "id": "SmoothingTime",
+          "range": { "min": 0.0, "max": 2000.0, "step": 0.1, "skew": 0.2313782125711441 },
+          "default": 100.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "DefaultValue",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "NormalizedPercentage",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/smoother.md",
+    "tier": "BRIEF",
+    "lines": 12
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "filter-type",
+      "category": "signal_path",
+      "question": "What type of low pass filter is used for smoothing? Is it a one-pole IIR (exponential decay), a moving average, or something else?",
+      "context": "The filter type determines the smoothing character -- exponential vs linear vs other."
+    },
+    {
+      "id": "processing-model",
+      "category": "signal_path",
+      "question": "Does core.smoother process per-sample or per-block? Does it process all channels with the same filter state or independently per channel?",
+      "context": "Channel handling affects whether stereo signals are smoothed identically."
+    },
+    {
+      "id": "default-value-usage",
+      "category": "parameter_behaviour",
+      "question": "Is DefaultValue used as the filter's initial state on voice start (reset())? Does it affect processing or just the initial condition?",
+      "context": "Users need to know what DefaultValue does in practice -- it may prevent initial transients."
+    }
+  ],
+
+  "notes": "core.smoother applies signal-rate smoothing (low pass filtering) to the audio input. This is different from parameter smoothing (sfloat) -- it operates on the actual audio signal. Useful for smoothing control signals that have been converted to audio rate, or for simple low-pass filtering. The 2000ms maximum SmoothingTime and logarithmic skew suggest this is for relatively slow smoothing."
+}

@@ -1,0 +1,32 @@
+{
+  "targetId": "core.file_player",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [13579, 2221, 13406],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Files loaded from the Audio Files folder (filesystem path) will not embed in compiled plugins",
+      "summary": "When loading audio files into a `core.file_player` slot, files must be loaded from the pool using `Engine.loadAudioFilesIntoPool()` and referenced with the `{PROJECT_FOLDER}` wildcard. Loading via a raw filesystem path works in HISE development but the file will not be found in the compiled plugin because external paths are not embedded.",
+      "sources": ["tid:13579"],
+      "verify": true,
+      "verify_hint": "Confirm that Engine.loadAudioFilesIntoPool() + {PROJECT_FOLDER} reference is the correct pattern for embedded audio."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "core.file_player is a low-level, 'raw' node — inconsistent behaviour across DAWs",
+      "summary": "The `core.file_player` node was originally implemented as an internal test/signal tool and is not production-hardened. Inconsistent looping behaviour was reported across different DAWs (Cubase, Pro Tools, Reaper) due to voice-start timing and sample-rate detection issues. Christoph acknowledged it is 'pretty raw in its current state' and may not be suitable as the sole audio-file playback mechanism in a polished plugin.",
+      "sources": ["tid:2221"],
+      "verify": true,
+      "verify_hint": "Check current HISE source to assess whether the reported DAW inconsistencies have been addressed."
+    },
+    {
+      "type": "API",
+      "title": "Access multiple file_player slots via ScriptFX getAudioFile(index)",
+      "summary": "To load files into multiple `core.file_player` nodes (each with its own external audio slot) from HiseScript, get a reference to the ScriptFX module and call `getAudioFile(index)` for each slot index. Create all references in `onInit`, not inside control callbacks. Each returned slot object supports `setFile(path)` for runtime file loading.",
+      "sources": ["tid:13406"],
+      "verify": true,
+      "verify_hint": "Confirm ScriptFX.getAudioFile(index) API and that slot indices are zero-based in the order they were created."
+    }
+  ]
+}

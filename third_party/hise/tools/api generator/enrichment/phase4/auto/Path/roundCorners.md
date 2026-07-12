@@ -1,0 +1,1 @@
+Replaces all sharp corners in the path with smooth curves of the given radius. This is a destructive operation - the original corner geometry cannot be recovered. Applies uniformly to all corners in all sub-paths.

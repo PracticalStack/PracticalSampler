@@ -1,0 +1,1 @@
+Tests whether a point `[x, y]` lies inside the path. Returns `true` if the point is within any closed sub-path, `false` otherwise. Only meaningful for closed paths - open paths have no defined interior.

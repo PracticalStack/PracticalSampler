@@ -1,0 +1,1 @@
+Sets the coarse detune amount in semitones on the current event. Sound generators combine this with fine detune and transpose to calculate the final playback pitch. Typically paired with `Message.setTransposeAmount()` for timbre shifting - the transpose selects a different sample zone while the coarse detune cancels the pitch change.

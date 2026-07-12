@@ -1,0 +1,90 @@
+{
+  "moduleId": "GlobalTimeVariantModulator",
+  "prettyName": "Global Time Variant Modulator",
+  "type": "Modulator",
+  "subtype": "TimeVariantModulator",
+  "category": "routing",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": true,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "TableProcessor",
+      "signalFlowRole": "Optional lookup table applied to the incoming global modulation value before output"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Value Processing",
+      "rationale": "Controls how the received global modulation value is transformed locally",
+      "parameters": [
+        {
+          "id": "UseTable",
+          "name": "Use Table",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Enables a lookup table to transform the incoming modulation value",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Inverted",
+          "name": "Inverted",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Inverts the modulation signal (1 - value)",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "signal-flow",
+      "category": "signal_path",
+      "question": "What is the complete signal flow in calculateBlock? How does this module retrieve the continuous modulation buffer from the source TimeVariantModulator in the GlobalModulatorContainer?",
+      "context": "Core signal path: source buffer retrieval -> optional table -> optional inversion -> output buffer."
+    },
+    {
+      "id": "connection-mechanism",
+      "category": "signal_path",
+      "question": "How does the user select which global time variant modulator to connect to? Is there a dropdown, a reference by ID, or an automatic lookup?",
+      "context": "Users need to know how to establish the connection."
+    },
+    {
+      "id": "table-application",
+      "category": "interface_usage",
+      "question": "Where is the table lookup applied? Is it per-sample on the buffer or per-block? Before or after inversion?",
+      "context": "TimeVariantModulators operate on buffers - need to know if table is per-sample."
+    },
+    {
+      "id": "buffer-sharing",
+      "category": "signal_path",
+      "question": "Does this module copy the source buffer or reference it directly? What happens if the source is calculating while this module reads?",
+      "context": "Important for understanding whether multiple GlobalTimeVariantModulators reading the same source cause issues."
+    },
+    {
+      "id": "disconnected-behavior",
+      "category": "conditional_logic",
+      "question": "What happens when no global time variant modulator is connected? Does it output 1.0 (unity) or 0.0?",
+      "context": "Users need to know the default state."
+    }
+  ],
+
+  "notes": "GlobalTimeVariantModulator is a consumer in the global modulation system. As a TimeVariantModulator, it provides continuous monophonic modulation by reading from a source TimeVariantModulator in the GlobalModulatorContainer. Unlike GlobalStaticTimeVariantModulator (which snapshots the value at voice start), this module continuously tracks the source. Structurally very similar to the other Global*Modulator consumers."
+}

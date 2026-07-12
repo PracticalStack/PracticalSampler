@@ -1,0 +1,16 @@
+{
+  "factoryPath": "control.input_toggle",
+  "nodes": [
+    { "id": "input_param", "label": "Input", "type": "parameter", "importance": 1.0, "description": "Selector: 0 = Value1, 1 = Value2 (threshold at 0.5)" },
+    { "id": "value1_param", "label": "Value1", "type": "parameter", "importance": 1.0, "description": "First input value (unscaled)" },
+    { "id": "value2_param", "label": "Value2", "type": "parameter", "importance": 1.0, "description": "Second input value (unscaled)" },
+    { "id": "select", "label": "Select", "type": "decision", "importance": 1.0, "description": "If Input < 0.5, forward Value1; otherwise forward Value2" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Selected value (unnormalised)" }
+  ],
+  "edges": [
+    { "from": "input_param", "to": "select", "type": "control", "label": "threshold 0.5" },
+    { "from": "value1_param", "to": "select", "type": "control", "label": "if Input < 0.5" },
+    { "from": "value2_param", "to": "select", "type": "control", "label": "if Input >= 0.5" },
+    { "from": "select", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

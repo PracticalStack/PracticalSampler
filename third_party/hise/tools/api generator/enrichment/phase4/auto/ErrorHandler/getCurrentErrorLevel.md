@@ -1,0 +1,3 @@
+Returns the state constant of the highest-priority active error, or -1 if no errors are active. Priority follows the state constant ordering - lower numbers are higher priority.
+
+> [!Warning:Returns highest priority, not most recent] If both `SamplesNotFound` (10) and `IllegalBufferSize` (11) are active, this returns 10 regardless of which error arrived last. Use `getNumActiveErrors()` to check whether multiple errors are queued.

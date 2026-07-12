@@ -1,0 +1,84 @@
+{
+  "moduleId": "Velocity",
+  "nodes": [
+    {
+      "id": "midi_velocity",
+      "label": "MIDI Velocity",
+      "type": "input",
+      "importance": 0.9,
+      "group": null,
+      "description": "Reads the note-on velocity as a 0-1 float value from the incoming MIDI event"
+    },
+    {
+      "id": "invert",
+      "label": "Invert",
+      "type": "process",
+      "importance": 0.8,
+      "group": "transform",
+      "description": "Flips the velocity value (1.0 - value) when Inverted is enabled"
+    },
+    {
+      "id": "param_inverted",
+      "label": "Inverted",
+      "type": "parameter",
+      "importance": 0.7,
+      "group": "transform",
+      "description": "Toggles velocity inversion"
+    },
+    {
+      "id": "table_lookup",
+      "label": "Table Lookup",
+      "type": "process",
+      "importance": 0.8,
+      "group": "transform",
+      "description": "Maps the value through a user-defined curve table (0-1 in, 0-1 out)"
+    },
+    {
+      "id": "param_usetable",
+      "label": "UseTable",
+      "type": "parameter",
+      "importance": 0.7,
+      "group": "transform",
+      "description": "Enables the lookup table for custom velocity curves"
+    },
+    {
+      "id": "db_convert",
+      "label": "Decibel Convert",
+      "type": "process",
+      "importance": 0.8,
+      "group": "transform",
+      "description": "Maps value to -100..0 dB range then converts to linear gain"
+    },
+    {
+      "id": "param_decibelmode",
+      "label": "DecibelMode",
+      "type": "parameter",
+      "importance": 0.7,
+      "group": "transform",
+      "description": "Enables logarithmic gain curve via dB conversion"
+    },
+    {
+      "id": "mod_output",
+      "label": "Modulation Output",
+      "type": "output",
+      "importance": 0.9,
+      "group": null,
+      "description": "Final modulation value (0-1) sent to the parent modulation chain"
+    }
+  ],
+  "edges": [
+    { "from": "midi_velocity", "to": "invert", "type": "signal", "label": null },
+    { "from": "param_inverted", "to": "invert", "type": "conditional", "label": "if Inverted" },
+    { "from": "invert", "to": "table_lookup", "type": "signal", "label": null },
+    { "from": "param_usetable", "to": "table_lookup", "type": "conditional", "label": "if UseTable" },
+    { "from": "table_lookup", "to": "db_convert", "type": "signal", "label": null },
+    { "from": "param_decibelmode", "to": "db_convert", "type": "conditional", "label": "if DecibelMode" },
+    { "from": "db_convert", "to": "mod_output", "type": "signal", "label": null }
+  ],
+  "groups": [
+    {
+      "id": "transform",
+      "label": "Velocity Transform Chain"
+    }
+  ]
+}

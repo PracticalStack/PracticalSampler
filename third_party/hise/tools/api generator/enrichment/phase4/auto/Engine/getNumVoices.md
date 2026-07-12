@@ -1,0 +1,1 @@
+Returns the total number of currently active (sounding) voices across all synthesisers. This is the live voice count, not the maximum polyphony setting.

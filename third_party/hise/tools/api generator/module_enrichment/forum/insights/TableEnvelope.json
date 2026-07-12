@@ -1,0 +1,88 @@
+{
+  "targetId": "TableEnvelope",
+  "domain": "modules",
+  "generatedAt": "2026-04-08",
+  "topicIds": [9922, 8372, 13402, 7042, 7183, 13164, 3596, 89, 200, 4076, 9920],
+  "insights": [
+    {
+      "type": "BUG",
+      "title": "Attack table jumps to 1 when last node is not 0 or 1",
+      "summary": "If the last node of the attack table is set to any value other than 0 or 1, the envelope will jump to full (1.0) when the attack phase completes, even while the note is still held. This makes intermediate sustain levels via the attack table effectively unusable.",
+      "sources": ["tid:7183"],
+      "verify": true,
+      "verify_hint": "Search for clamp or forced value at end of attack phase in TableEnvelope or EnvelopeModulator C++ source; the offending line was identified by David Healey in a PR around 2024-01"
+    },
+    {
+      "type": "API",
+      "title": "Attack and release tables are multiplicative, not sequential gain stages",
+      "summary": "Both the attack and release tables output values in the 0-1 range that multiply the signal gain. They are not independent level stages - the release table multiplies from wherever the attack table stopped, not from 1.0.",
+      "sources": ["tid:9922"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Attack table freezes at its current position when key is released",
+      "summary": "When a note is released before the attack table has completed, the table position stops advancing and the held gain value becomes the base for the release multiplication. This means a release that draws from 1.0 down to 0 will actually release from a lower value if the attack was interrupted early.",
+      "sources": ["tid:9922"],
+      "verify": true,
+      "verify_hint": "Check TableEnvelope state machine in hi_scripting; look for attack phase completion flag and what triggers transition to release"
+    },
+    {
+      "type": "BUG",
+      "title": "Setting Attack to 0ms via setAttribute crashes HISE",
+      "summary": "Calling setAttribute() with an Attack value of 0ms causes a crash. The UI knob enforces a minimum of 1ms, but script can bypass this. Workaround: clamp the value with Math.max(1, value) before passing to setAttribute.",
+      "sources": ["tid:89"],
+      "verify": true,
+      "verify_hint": "Check minimum attack time guard in TableEnvelope or EnvelopeModulator C++ setAttribute handler"
+    },
+    {
+      "type": "BUG",
+      "title": "Velocity modulator on AttackTime causes silence at velocities above 64 with short attack",
+      "summary": "When a velocity modulator is connected to the AttackTime modulation chain, playing velocities above 64 produces silence if the attack time is very short (under ~25ms). This occurs because the modulated time goes below the engine's safe minimum, causing an undefined initial value to be used as the interpolated start.",
+      "sources": ["tid:200"],
+      "verify": true,
+      "verify_hint": "Search for minimum attack time clamp in TableEnvelope; Christoph confirmed attack time must not be modulated below 1ms - grep for '1.0f' guard near attack modulation calculation"
+    },
+    {
+      "type": "API",
+      "title": "Table graph points cannot be modulated in realtime",
+      "summary": "Any change to a table graph point triggers a full recalculation of the lookup table, which is not realtime-safe. Attempting per-sample or per-block table point updates from audio code will cause audio thread hazards.",
+      "sources": ["tid:4076"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "TableEnvelope output is strictly unipolar (0 to 1)",
+      "summary": "The envelope can only modulate from 0 up to its intensity value. It cannot represent a downward-starting shape (e.g., start at full gain and fade down to a user-set level) without using the intensity parameter or scriptnode as an alternative.",
+      "sources": ["tid:7042"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Link multiple TableEnvelope modules using exportAsBase64 / restoreFromBase64 via Broadcaster",
+      "summary": "To keep several TableEnvelope modules in sync, use a Broadcaster: when one table changes, export its state with exportAsBase64() and restore it on all linked envelopes with restoreFromBase64(). Alternatively, use Global Mods and connect UI tables to them via ProcessorID without scripting.",
+      "sources": ["tid:8372", "tid:13402"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Use a scriptnode ramp + resetter to guarantee full attack playthrough on release",
+      "summary": "The stock TableEnvelope stops the attack table when the note is released. To ensure the attack always plays to completion, build a scriptnode network: drive a ramp with a resetter triggered by script note-on (not by gate), then feed the ramp through a table node for the attack shape and a separate table for the release. This decouples the attack progress from note-off.",
+      "sources": ["tid:9922"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "getTableValue() reads the current table lookup value for scripting",
+      "summary": "To use a TableEnvelope's curve shape for custom scripted glide or pitch-fade logic, call getTableValue() on the module reference obtained via Synth.getTableProcessor(). Pass a normalized position (0-1) and it returns the table's output at that position.",
+      "sources": ["tid:9920"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

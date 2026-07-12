@@ -1,0 +1,209 @@
+{
+  "moduleId": "EventDataEnvelope",
+  "nodes": [
+    {
+      "id": "note_on",
+      "label": "Note On",
+      "type": "input",
+      "importance": 0.8,
+      "group": "lifecycle",
+      "description": "MIDI note-on triggers startVoice(), which stores the HiseEvent and reads the initial slot value"
+    },
+    {
+      "id": "store_event",
+      "label": "Store HiseEvent",
+      "type": "process",
+      "importance": 0.7,
+      "group": "lifecycle",
+      "description": "Captures the voice's HiseEvent in per-voice state for use in subsequent block calculations"
+    },
+    {
+      "id": "slot_index",
+      "label": "SlotIndex",
+      "type": "parameter",
+      "importance": 0.8,
+      "group": "parameters",
+      "description": "Selects which event data slot (0-15) to read from AdditionalEventStorage"
+    },
+    {
+      "id": "default_value",
+      "label": "DefaultValue",
+      "type": "parameter",
+      "importance": 0.6,
+      "group": "parameters",
+      "description": "Fallback value (0-1) used when the event data slot has not been written"
+    },
+    {
+      "id": "smoothing_time",
+      "label": "SmoothingTime",
+      "type": "parameter",
+      "importance": 0.7,
+      "group": "parameters",
+      "description": "Linear ramp time in milliseconds (0-2000) for smoothing value transitions. 0 = instant."
+    },
+    {
+      "id": "poll_slot",
+      "label": "Poll Event Data Slot",
+      "type": "process",
+      "importance": 0.9,
+      "group": "block_calc",
+      "description": "Every audio block: reads AdditionalEventStorage.getValue(eventId, slotIndex). Returns the current value or triggers defaultValue fallback."
+    },
+    {
+      "id": "event_data_storage",
+      "label": "AdditionalEventStorage",
+      "type": "external",
+      "importance": 0.7,
+      "group": null,
+      "description": "Shared storage (via GlobalRoutingManager) holding per-event-ID data slots. Written by scripts, read by this modulator."
+    },
+    {
+      "id": "target_changed",
+      "label": "Target Changed?",
+      "type": "decision",
+      "importance": 0.7,
+      "group": "block_calc",
+      "description": "Compares polled value to rampValue.targetValue. If different, initiates a new linear ramp."
+    },
+    {
+      "id": "ramp_active",
+      "label": "Ramp Active?",
+      "type": "decision",
+      "importance": 0.6,
+      "group": "block_calc",
+      "description": "Checks if the linear ramp has remaining steps (stepsToDo > 0)"
+    },
+    {
+      "id": "linear_ramp",
+      "label": "Linear Ramp (per-sample)",
+      "type": "process",
+      "importance": 0.8,
+      "group": "block_calc",
+      "description": "Per-sample linear interpolation: value += delta each sample until target reached"
+    },
+    {
+      "id": "constant_fill",
+      "label": "Constant Fill",
+      "type": "process",
+      "importance": 0.5,
+      "group": "block_calc",
+      "description": "SIMD-optimized fill of internalBuffer with the current constant value (no ramp needed)"
+    },
+    {
+      "id": "internal_buffer",
+      "label": "internalBuffer",
+      "type": "output",
+      "importance": 0.8,
+      "group": "block_calc",
+      "description": "The modulation output buffer, consumed by applyTimeModulation() to modulate the voice signal"
+    },
+    {
+      "id": "mod_output",
+      "label": "Modulation Output",
+      "type": "output",
+      "importance": 0.9,
+      "group": null,
+      "description": "Final modulation signal applied to the parent voice buffer via multiply or add (depending on Modulation::Mode)"
+    }
+  ],
+  "edges": [
+    {
+      "from": "note_on",
+      "to": "store_event",
+      "type": "signal",
+      "label": "HiseEvent"
+    },
+    {
+      "from": "store_event",
+      "to": "poll_slot",
+      "type": "signal",
+      "label": "eventId"
+    },
+    {
+      "from": "slot_index",
+      "to": "poll_slot",
+      "type": "control",
+      "label": "slotIndex"
+    },
+    {
+      "from": "event_data_storage",
+      "to": "poll_slot",
+      "type": "signal",
+      "label": "slot value lookup"
+    },
+    {
+      "from": "default_value",
+      "to": "poll_slot",
+      "type": "control",
+      "label": "fallback if slot unwritten"
+    },
+    {
+      "from": "poll_slot",
+      "to": "target_changed",
+      "type": "signal",
+      "label": "polled value"
+    },
+    {
+      "from": "target_changed",
+      "to": "ramp_active",
+      "type": "conditional",
+      "label": "target unchanged"
+    },
+    {
+      "from": "target_changed",
+      "to": "linear_ramp",
+      "type": "conditional",
+      "label": "target changed -> set new ramp"
+    },
+    {
+      "from": "smoothing_time",
+      "to": "linear_ramp",
+      "type": "control",
+      "label": "ramp duration"
+    },
+    {
+      "from": "ramp_active",
+      "to": "linear_ramp",
+      "type": "conditional",
+      "label": "yes: ramp in progress"
+    },
+    {
+      "from": "ramp_active",
+      "to": "constant_fill",
+      "type": "conditional",
+      "label": "no: use constant"
+    },
+    {
+      "from": "linear_ramp",
+      "to": "internal_buffer",
+      "type": "signal",
+      "label": "per-sample values"
+    },
+    {
+      "from": "constant_fill",
+      "to": "internal_buffer",
+      "type": "signal",
+      "label": "constant value"
+    },
+    {
+      "from": "internal_buffer",
+      "to": "mod_output",
+      "type": "signal",
+      "label": "applyTimeModulation()"
+    }
+  ],
+  "groups": [
+    {
+      "id": "lifecycle",
+      "label": "Voice Lifecycle"
+    },
+    {
+      "id": "parameters",
+      "label": "Parameters"
+    },
+    {
+      "id": "block_calc",
+      "label": "Per-Block Calculation"
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+{
+  "moduleId": "SilentSynth",
+  "prettyName": "Silent Synth",
+  "type": "SoundGenerator",
+  "subtype": "SoundGenerator",
+  "category": "custom",
+
+  "io": {
+    "midiIn": "noteOn+noteOff",
+    "audioIn": null,
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": "*"
+  },
+
+  "voiceContext": "per-voice",
+
+  "interfaces": [
+    {
+      "name": "RoutingMatrix",
+      "signalFlowRole": "skip (inferred from type/subtype)"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Output",
+      "rationale": "Standard SoundGenerator output parameters",
+      "parameters": [
+        {
+          "id": "Gain",
+          "name": "Gain",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.25,
+          "description": "The output volume as normalised linear gain (0.0 to 1.0)",
+          "composite": null,
+          "modChain": {
+            "name": "Gain Modulation",
+            "chainIndex": 1,
+            "constrainer": "*",
+            "disabled": true
+          }
+        },
+        {
+          "id": "Balance",
+          "name": "Balance",
+          "range": { "min": -1.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "The stereo balance",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Voice Management",
+      "rationale": "Controls for polyphony and voice lifecycle",
+      "parameters": [
+        {
+          "id": "VoiceLimit",
+          "name": "VoiceLimit",
+          "range": { "min": 1.0, "max": 256.0, "step": 1.0 },
+          "default": 256.0,
+          "description": "The maximum number of voices",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "KillFadeTime",
+          "name": "KillFadeTime",
+          "range": { "min": 0.0, "max": 20000.0, "step": 1.0 },
+          "default": 20.0,
+          "description": "The fade out time in milliseconds when voices are killed",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "standaloneModChains": [],
+
+  "disabledModChains": [
+    {
+      "name": "Gain Modulation",
+      "chainIndex": 1,
+      "note": "Disabled - SilentSynth produces no audio so gain modulation is meaningless"
+    },
+    {
+      "name": "Pitch Modulation",
+      "chainIndex": 2,
+      "note": "Disabled - SilentSynth produces no pitched audio"
+    }
+  ],
+
+  "compositeBlocks": [],
+
+  "gaps": [
+    {
+      "id": "voice-rendering",
+      "category": "signal_path",
+      "question": "What does the voice rendering do? Does it clear the buffer and then run the FX chain, or skip rendering entirely?",
+      "context": "Essential for explaining how the FX chain receives signal"
+    },
+    {
+      "id": "fx-chain-usage",
+      "category": "signal_path",
+      "question": "How does the FX chain operate on a silent voice buffer? What signal does it process?",
+      "context": "The FX chain is the only meaningful processing this module does"
+    },
+    {
+      "id": "envelope-requirement",
+      "category": "parameter_behavior",
+      "question": "Does SilentSynth require an envelope modulator for voice management, or does it handle voice lifecycle differently?",
+      "context": "Important for setup guidance since the module produces no audio"
+    },
+    {
+      "id": "routing-matrix",
+      "category": "signal_path",
+      "question": "Does the routing matrix allow resizing for multi-channel configurations?",
+      "context": "Relevant for advanced FX routing setups"
+    },
+    {
+      "id": "check-release-behavior",
+      "category": "signal_path",
+      "question": "How does voice release work? Does checkRelease handle tailing poly effects?",
+      "context": "Determines when voices are freed - important for FX tail behaviour"
+    }
+  ],
+
+  "notes": "SilentSynth is a sound generator that produces silence but runs its FX chain. Both Gain Modulation and Pitch Modulation chains are explicitly disabled. The routing matrix allows resizing, suggesting multi-channel output support. The module does not require an envelope (synthNeedsEnvelope returns false)."
+}

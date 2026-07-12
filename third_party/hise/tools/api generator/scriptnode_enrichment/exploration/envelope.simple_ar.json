@@ -1,0 +1,28 @@
+{
+  "factoryPath": "envelope.simple_ar",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "midi", "label": "MIDI Events", "type": "input", "importance": 0.8, "description": "Note-on/off events trigger envelope gate" },
+    { "id": "smoother", "label": "AR Smoother", "type": "process", "importance": 1.0, "description": "Blends exponential follower and linear ramp based on AttackCurve. Sustains at 1.0." },
+    { "id": "multiply", "label": "Multiply", "type": "process", "importance": 1.0, "description": "Each audio sample multiplied by envelope value" },
+    { "id": "attack", "label": "Attack", "type": "parameter", "importance": 0.8, "description": "Attack time in ms (0-1000)" },
+    { "id": "release", "label": "Release", "type": "parameter", "importance": 0.8, "description": "Release time in ms (0-1000)" },
+    { "id": "gate_param", "label": "Gate", "type": "parameter", "importance": 0.7, "description": "Manual gate trigger (Off/On)" },
+    { "id": "attack_curve", "label": "AttackCurve", "type": "parameter", "importance": 0.6, "description": "Curve shape: 0=exponential, 0.5=linear, 1=power" },
+    { "id": "cv_out", "label": "CV Output", "type": "modulation_out", "importance": 1.0, "description": "Continuous envelope value (0..1)" },
+    { "id": "gate_out", "label": "Gate Output", "type": "modulation_out", "importance": 0.9, "description": "Binary gate: 1 while active, 0 when idle" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Audio multiplied by envelope" }
+  ],
+  "edges": [
+    { "from": "in", "to": "multiply", "type": "signal", "label": null },
+    { "from": "midi", "to": "smoother", "type": "signal", "label": "note-on/off" },
+    { "from": "gate_param", "to": "smoother", "type": "control", "label": "manual gate" },
+    { "from": "attack", "to": "smoother", "type": "control", "label": null },
+    { "from": "release", "to": "smoother", "type": "control", "label": null },
+    { "from": "attack_curve", "to": "smoother", "type": "control", "label": null },
+    { "from": "smoother", "to": "multiply", "type": "signal", "label": "envelope value" },
+    { "from": "multiply", "to": "out", "type": "signal", "label": null },
+    { "from": "smoother", "to": "cv_out", "type": "signal", "label": null },
+    { "from": "smoother", "to": "gate_out", "type": "signal", "label": null }
+  ]
+}

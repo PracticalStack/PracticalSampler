@@ -1,0 +1,104 @@
+{
+  "targetId": "MatrixModulator",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [13203, 13409, 14354, 13759, 13365, 13369, 13638, 13240, 13379, 14088, 14348, 13907, 14476, 13977],
+  "insights": [
+    {
+      "type": "API",
+      "title": "matrixTargetId links a single UI control to multiple MatrixModulators at once",
+      "summary": "Assigning the same matrixTargetId to several MatrixModulators and to a UI control (e.g. a knob) causes that knob to drive the Value parameter of all matching modulators simultaneously. This is the recommended way to build unified macro controls across multiple modulation targets.",
+      "sources": ["tid:13203"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Using matrixTargetId on a plain knob (not a MatrixModulator) loses polyphonic and sample-accurate modulation",
+      "summary": "When a matrixTargetId is used to expose a parameter that has no MatrixModulator in its modulation chain, the value is sent only once per buffer and is always monophonic. For polyphonic, sample-accurate modulation the MatrixModulator must be placed in the modulation chain and the knob connected to its Value parameter via the matrixTargetId.",
+      "sources": ["tid:13203"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "setMatrixModulationProperties must be called once at init, not per-connection",
+      "summary": "Mode comboboxes in the matrix table stay empty after drag-and-drop if setMatrixModulationProperties has not been called. This call is a one-time setup at onInit that pre-defines the allowed modes and ranges for each target; it does not need to be repeated inside the connection callback.",
+      "sources": ["tid:13379"],
+      "verify": true,
+      "verify_hint": "grep setMatrixModulationProperties in MatrixModulator scripting API; check if it is processed at init or per-connection"
+    },
+    {
+      "type": "BUG",
+      "title": "Envelope sources only send UI updates when voices are rendering; filter display stays stale when silent",
+      "summary": "Envelope-based sources in the matrix modulator do not update the filter display (or any linked UI) when no voice is active, because envelope render callbacks only fire during voice rendering. Christoph acknowledged this and planned to fix it for HISE 5.",
+      "sources": ["tid:13409"],
+      "verify": true,
+      "verify_hint": "grep MatrixModulator in filter display / UI update path; check whether envelope sends update when voice count is zero"
+    },
+    {
+      "type": "BUG",
+      "title": "extra_mod nodes in compiled FX plugins do not modulate parameters at runtime",
+      "summary": "In exported FX plugins (AllowPolyphonic disabled), parameters connected via extra_mod nodes and MatrixModulators appear to work correctly in HISE but produce no modulation in the compiled plugin. Direct parameter connections (bypassing extra_mod) do work. Christoph noted this is an untested FX-context code path. Multiple users confirmed the same symptom independently.",
+      "sources": ["tid:14354"],
+      "verify": true,
+      "verify_hint": "grep ExternalModulationInfo or extra_mod in monophonic FX path; check if lastModValue is updated during compiled plugin render"
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Removing and recreating the MatrixModulator node can fix scripting state corruption",
+      "summary": "After scripting bugs with clearAllConnections or other scripting API calls leave the MatrixModulator in a broken state, deleting and recreating the module in the module tree sometimes resolves the issue. This suggests certain scripting operations can corrupt internal connection state.",
+      "sources": ["tid:14348"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "Null voice pointer crash was caused by inverted null check in voice save logic",
+      "summary": "A crash could occur when the first voice pointer was null at the point where the modulator saves its state. The bug was an inverted null guard (checking voice != nullptr instead of voice == nullptr) that prevented saving when it should have saved. This was fixed in source but was not immediately pushed.",
+      "sources": ["tid:13759"],
+      "verify": true,
+      "verify_hint": "grep saveFirst in MatrixModulator.cpp; confirm the null check is 'voice == nullptr || voice...' not 'voice != nullptr && voice...'"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "The matrix table slider labels block mouse interaction even when hidden with CSS display:none",
+      "summary": "Labels inside the modulation matrix table rows intercept mouse events even when set to display:none via CSS. This creates invisible dead zones in the slider area. The issue was reported and appears to affect the snippet browser example as well.",
+      "sources": ["tid:13365"],
+      "verify": true,
+      "verify_hint": "check MatrixContent component mouse handling for label overlay intercept"
+    },
+    {
+      "type": "API",
+      "title": "Matrix table columns are styled by CSS ID selectors that apply to both header and rows",
+      "summary": "CSS ID selectors such as #sourceindex, #targetid, #mode, #inverted, and #plotter target both the header cell and every data cell in that column simultaneously, allowing uniform column widths or visibility toggling in a single rule. The plotter column intentionally does not support background/color CSS because converting its real-time path to base64 for CSS rendering would impose significant CPU overhead at 30fps.",
+      "sources": ["tid:13369"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Wrap RNBO or Faust nodes in a scriptnode network to expose modulation slots for MatrixModulator",
+      "summary": "Compiled RNBO and Faust nodes have no built-in modulation slots. The recommended workflow is: create a scriptnode network, load the compiled node inside it, create network parameters mirroring every RNBO/Faust parameter, assign extra_mod modulation slots to the desired parameters, compile the network, then load it in a HardcodedFX module. The new 'wrap node' tool in the scriptnode start window automates the parameter forwarding step.",
+      "sources": ["tid:13638"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use the FilterFreq or FilterFreq Logarithmic edit-range preset for filter cutoff modulation",
+      "summary": "When driving filter cutoff from a MatrixModulator, click 'Edit Range' and select the FilterFreq or FilterFreq Logarithmic preset. Set the filter's frequency parameter to 20 kHz, then connect the UI knob to the MatrixModulator's Value parameter. Using the connection wizard sets the knob range and suffixes automatically.",
+      "sources": ["tid:13240"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Commenting out matrix IDs in Matrix Modulation Properties can fix broken exported plugin modulation",
+      "summary": "One user resolved a modulation failure in an exported plugin by commenting out the relevant matrix IDs inside the Matrix Modulation Properties block. The root cause was not fully diagnosed, but the workaround restored correct behaviour.",
+      "sources": ["tid:14354"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

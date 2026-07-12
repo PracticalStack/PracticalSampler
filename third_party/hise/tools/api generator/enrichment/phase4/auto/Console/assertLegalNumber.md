@@ -1,0 +1,1 @@
+Throws a script error if `value` is not a finite number. This checks both that the value is numeric (not a string, object, or array) and that it is not `NaN` or infinity. Useful for catching numeric corruption before it propagates through calculations.

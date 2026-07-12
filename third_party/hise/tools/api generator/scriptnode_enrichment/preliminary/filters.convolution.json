@@ -1,0 +1,153 @@
+{
+  "factoryPath": "filters.convolution",
+  "factory": "filters",
+  "nodeId": "convolution",
+  "description": "A convolution reverb node",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Convolution Control",
+      "rationale": "Gate enables/disables the convolution processing, Multithread controls whether the FFT runs on a background thread.",
+      "parameters": [
+        {
+          "id": "Gate",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Multithread",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "IR Shaping",
+      "rationale": "These parameters shape the impulse response before convolution: Predelay adds silence before the IR, Damping attenuates the tail, HiCut applies a low-pass filter to the IR.",
+      "parameters": [
+        {
+          "id": "Predelay",
+          "range": { "min": 0.0, "max": 1000.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Damping",
+          "range": { "min": -100.0, "max": 0.0, "step": 0.1000000014901161, "skew": 5.422270774841309 },
+          "default": 0.0,
+          "textConverter": "Decibel",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "HiCut",
+          "range": { "min": 20.0, "max": 20000.0, "step": 1.0, "skew": 0.2299045622348785 },
+          "default": 20000.0,
+          "textConverter": "Frequency",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 1,
+    "filterCoefficients": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/filters/convolution.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "convolution-processing-model",
+      "category": "signal_path",
+      "question": "How is the convolution implemented? Uniform-partitioned FFT convolution, non-uniform partitioned, or direct time-domain? What is the internal FFT block size, and does it introduce latency?",
+      "context": "Convolution latency is critical for real-time use. Users need to know whether this introduces latency and how much."
+    },
+    {
+      "id": "convolution-multithread-behaviour",
+      "category": "performance",
+      "question": "The Multithread parameter (boolean) presumably offloads FFT processing to a background thread. What exactly runs on the background thread vs the audio thread? Does enabling it affect latency or audio quality?",
+      "context": "Users on CPU-constrained systems need to understand the trade-offs of multithreaded convolution."
+    },
+    {
+      "id": "convolution-gate-behaviour",
+      "category": "parameter_behaviour",
+      "question": "Does Gate=0 stop convolution processing entirely (saving CPU), or does it just mute the output while the convolution tail continues? Is there click-free crossfading when toggling Gate?",
+      "context": "Gate behaviour affects both CPU usage and audio smoothness. Users need to know if Gate is a CPU-saving bypass or just a mute."
+    },
+    {
+      "id": "convolution-damping-implementation",
+      "category": "parameter_behaviour",
+      "question": "How does Damping work? Does it apply an exponential decay envelope to the IR, or does it truncate the IR at a certain level? The range is -100 to 0 dB with a high skew (5.42), suggesting the useful range is heavily weighted toward 0 dB.",
+      "context": "Damping behaviour affects the perceived reverb tail length and character."
+    },
+    {
+      "id": "convolution-hicut-implementation",
+      "category": "parameter_behaviour",
+      "question": "Does HiCut apply a low-pass filter to the IR (pre-processing) or to the convolution output (post-processing)? Pre-processing would be more efficient but changes the IR permanently; post-processing allows real-time adjustment.",
+      "context": "Whether HiCut is pre- or post-processing affects both the sound character and whether it can be modulated in real time."
+    },
+    {
+      "id": "convolution-ir-format",
+      "category": "signal_path",
+      "question": "What audio formats and channel configurations does the AudioFile slot accept? Mono IR applied to stereo signal (true stereo vs mono-to-stereo), or does it support multichannel IRs?",
+      "context": "Users loading impulse responses need to know format requirements and how mono/stereo IRs are handled."
+    },
+    {
+      "id": "convolution-not-polyphonic",
+      "category": "signal_path",
+      "question": "Convolution has no IsPolyphonic flag (unlike all other filter nodes). Is it intentionally monophonic-only, or can it be used inside a polyphonic context? If monophonic, what happens if placed in a polyphonic voice chain?",
+      "context": "This is the only filter node without IsPolyphonic. Users need to understand the limitation."
+    },
+    {
+      "id": "description-accuracy",
+      "category": "description_accuracy",
+      "question": "The description 'A convolution reverb node' is more descriptive than other filter nodes but placed in the filters factory rather than fx. Is this correctly categorised, or is the factory placement a historical artifact?",
+      "context": "Convolution is architecturally different from all other filter nodes and its factory placement may confuse users."
+    }
+  ],
+
+  "notes": "filters.convolution is the complete outlier in the filters factory. It shares nothing with the other 9 filter nodes: different parameters (Gate/Predelay/Damping/HiCut/Multithread vs Frequency/Q/Gain/Smoothing/Mode/Enabled), different ComplexData type (AudioFiles vs Filters), no IsPolyphonic flag, and fundamentally different processing (FFT convolution vs IIR filtering). Its placement in the filters factory rather than fx is notable. The description is the only one that is somewhat specific ('A convolution reverb node' vs generic 'A filter node'). This node has the most gaps due to its unique architecture."
+}

@@ -1,0 +1,1 @@
+Returns the last ruler position that was sent to the table's display updater, as a normalised value between 0.0 and 1.0. This position updates whenever `getTableValueNormalised()` is called or when a module queries the table during audio processing. Useful for reading back the last evaluated position for custom UI synchronisation.

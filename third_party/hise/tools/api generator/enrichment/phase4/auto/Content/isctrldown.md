@@ -1,0 +1,1 @@
+Returns 1 if the Ctrl key (Windows/Linux) or Command key (macOS) is currently pressed, 0 otherwise. This provides cross-platform modifier detection.

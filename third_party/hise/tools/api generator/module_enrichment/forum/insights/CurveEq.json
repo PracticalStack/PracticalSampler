@@ -1,0 +1,112 @@
+{
+  "targetId": "CurveEq",
+  "domain": "modules",
+  "generatedAt": "2026-03-31",
+  "topicIds": [6368, 3546, 4330, 3040, 1308, 6379, 2410, 2704, 8629, 12275, 12563, 5557, 11694, 7420, 2260, 2774, 13743, 8643, 8915, 10092, 3118, 6393, 8366, 2076, 12968, 530, 8884, 7477, 14486, 13319, 12902, 13715, 13487, 9324, 300],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Q parameter minimum is 0.1; setting lower via scripting causes assertion failure",
+      "summary": "The Q parameter range starts at 0.1. Setting a band's Q to 0 (e.g., from a UI knob with default value 0) causes a JUCE assertion failure in MultiChannelFilters.cpp and breaks the EQ. Ensure all Q controls have a minimum of 0.1.",
+      "sources": ["tid:1308", "tid:14486"],
+      "verify": true,
+      "verify_hint": "grep Q range or minimum in hi_core/hi_modules/effects/fx/CurveEq.h getMetadata; check MultiChannelFilters.cpp:699 assertion"
+    },
+    {
+      "type": "BUG",
+      "title": "setAttribute with an out-of-bounds band index causes assertion failure and crash",
+      "summary": "Calling setAttribute() with an index addressing a band that does not yet exist (e.g., band * BandOffset + param where band >= current band count) triggers a JUCE assertion failure in MultiChannelFilters.cpp and can segfault. Always guard setAttribute calls against the current band count.",
+      "sources": ["tid:14486"],
+      "verify": true,
+      "verify_hint": "JUCE Assertion failure in MultiChannelFilters.cpp:699; check bounds checking in setInternalAttribute in CurveEq.cpp"
+    },
+    {
+      "type": "BUG",
+      "title": "DraggableFilterPanel display sticks when the last band is deleted",
+      "summary": "Deleting a band (particularly the last one) leaves the filter curve path visually stuck on screen. The fix replaces the internal repaint() call with refreshAsync() to force a proper path rebuild. Verify whether this is fixed in the current codebase.",
+      "sources": ["tid:13743"],
+      "verify": true,
+      "verify_hint": "grep repaint vs refreshAsync in EQComponent.cpp or DraggableFilterPanel component source"
+    },
+    {
+      "type": "BUG",
+      "title": "DraggableFilterPanel fails to update when loading a preset with no bands",
+      "summary": "If a preset contains no EQ bands (empty state), loading it causes an error and the DraggableFilterPanel does not display correctly. At least one band must be present in the saved state for the panel to restore properly.",
+      "sources": ["tid:11694"],
+      "verify": true,
+      "verify_hint": "reproduce by saving a preset with zero bands then loading; check preset restore path in CurveEq.cpp restoreFromValueTree"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "LowPass and HighPass Q visually affects the curve display but has no DSP effect",
+      "summary": "LowPass and HighPass bands are one-pole filters; Q and Gain have no effect on the audio output. However, in the default biquad mode the UI curve responds to Q changes, creating a misleading display. Enable HISE_USE_SVF_FOR_CURVE_EQ to get SVF-based LP/HP filters where the Q actually shapes the DSP behaviour.",
+      "sources": ["tid:7420"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "HISE_USE_SVF_FOR_CURVE_EQ eliminates zipper noise during band parameter automation",
+      "summary": "Adding HISE_USE_SVF_FOR_CURVE_EQ=1 to Extra Definitions switches all bands from biquad to state-variable filters (the same types available in scriptnode). SVF filters do not produce zipper noise when frequency, gain, or Q are changed in real time, making them preferable whenever bands will be automated or scripted to move. Requires recompiling HISE for use in development. The static sound is slightly different from biquad.",
+      "sources": ["tid:5557", "tid:7420"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "No native callback fires when the user drags a band in the DraggableFilterPanel",
+      "summary": "There is no built-in onBandChanged or parameter callback triggered by GUI band interaction. To sync external UI controls (e.g., knobs showing band frequency/gain), attach a broadcaster to the FloatingTile's mouse events via attachToComponentMouseEvents() and read band values on drag and click events.",
+      "sources": ["tid:6379", "tid:8629"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "EQ broadcaster stops firing after the first reset unless setEnableQueue(true) is called",
+      "summary": "When using a broadcaster attached to EQ parameters to enforce a band count limit (detect excess band, restore saved state), the broadcaster silently stops responding after the first reset. Calling setEnableQueue(true) on the broadcaster prevents deduplication and ensures every change fires the callback.",
+      "sources": ["tid:4330"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "No built-in band count limit; enforce via broadcaster and exportState/restoreState",
+      "summary": "CurveEq has no maximum band count property. To present a fixed-band-count EQ, use a broadcaster on EQ parameters: save state via exportState() before each change, check the resulting band count, and call restoreState() with the saved state if the count exceeds the limit. Requires setEnableQueue(true) on the broadcaster.",
+      "sources": ["tid:4330"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use exportState/restoreState to implement EQ preset shapes",
+      "summary": "The complete band configuration (count, frequency, gain, Q, type for all bands) can be serialised with exportState() and restored with restoreState(). This is the recommended approach for implementing named EQ preset slots (e.g., stored in a ComboBox or array).",
+      "sources": ["tid:8915"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "EQ state must be added to user presets via Engine.addModuleStateToUserPreset()",
+      "summary": "The DraggableFilterPanel FloatingTile does not participate in user preset saving. To include EQ band state in user presets, call Engine.addModuleStateToUserPreset() with the EQ module reference. Saving through the tile or relying on default preset behaviour will not capture band state.",
+      "sources": ["tid:7477"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "UI knobs with saveInPreset=true assigned to EQ bands cause wrong values on preset load",
+      "summary": "If scripted UI knobs are connected to EQ band parameters and have saveInPreset set to true, they write stale values back to the EQ on load, overriding the correct module state. EQ band state should be owned exclusively by the module; UI knobs driving band parameters should have saveInPreset=false.",
+      "sources": ["tid:13487"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "DraggableFilterPanel appearance is customised via 10 LAF functions on a local LookAndFeel",
+      "summary": "The panel's visual rendering is fully overridable via a local LookAndFeel object. The available functions are: drawFilterBackground, drawFilterPath, drawFilterGridLines, drawFilterDragHandle, drawTableHeaderColumn, drawAnalyserBackground, drawAnalyserPath, drawAnalyserGrid, drawOscilloscopeBackground, drawOscilloscopePath. Use a local (not global) LAF — global LAF breaks on compile errors until HISE is restarted.",
+      "sources": ["tid:6368"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

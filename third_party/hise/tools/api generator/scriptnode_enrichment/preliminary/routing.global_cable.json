@@ -1,0 +1,101 @@
+{
+  "factoryPath": "routing.global_cable",
+  "factory": "routing",
+  "nodeId": "global_cable",
+  "description": "",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Value",
+      "rationale": "Single input value that is sent to and received from the global cable.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0, "max": 1, "step": 0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "Connection",
+      "defaultValue": "",
+      "type": "string",
+      "note": "String ID of the global cable slot in the GlobalRoutingManager. Created on demand if it does not exist. Shared across all DspNetworks in the HISE instance."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/routing/global_cable.md",
+    "tier": "GOOD",
+    "lines": 93
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "bidirectional-value-flow",
+      "category": "signal_path",
+      "question": "The global_cable acts as both sender and receiver on the same cable. When one global_cable node sets a value, how does it avoid feedback loops? Is there a recursion guard?",
+      "context": "From infrastructure: yes, there is a recursion guard. But the documentation should clarify the bidirectional nature and that setting Value locally broadcasts to all other global_cable nodes on the same Connection."
+    },
+    {
+      "id": "empty-description",
+      "category": "description_accuracy",
+      "question": "The base data description is empty. What is a concise, accurate description of this node's purpose?",
+      "context": "Need to supply a description for the reference page. From infrastructure docs: it routes a normalised 0..1 control value across networks via the GlobalRoutingManager."
+    },
+    {
+      "id": "binary-data-transmission",
+      "category": "parameter_behaviour",
+      "question": "The compiled global_cable supports sendData() for binary data transmission. Is this feature accessible from the interpreted (IDE) global_cable node, or only from C++ compiled code?",
+      "context": "If available in the IDE, this is a significant feature to document. From infrastructure: the Cable class supports it, but the IDE GlobalCableNode may not expose it."
+    },
+    {
+      "id": "osc-integration",
+      "category": "parameter_behaviour",
+      "question": "Global cables with IDs starting with '/' can be controlled via OSC. Is this documented behaviour or implementation detail? What input/output range mapping is applied?",
+      "context": "From infrastructure: OSC support exists. Users may want to use this for external controller integration."
+    }
+  ],
+
+  "notes": "routing.global_cable is a control node (not in audio signal path) that participates in the GlobalRoutingManager cable system. Values are always clamped to 0..1. It acts as both source and target on the cable -- setting Value sends to all other nodes on the same Connection, and receiving a value from another node triggers modulation output. IsFixRuntimeTarget means it uses compile-time hash-based addressing for C++ export. The empty description needs to be filled in. This is the most feature-rich routing node with OSC support and binary data transmission capabilities."
+}

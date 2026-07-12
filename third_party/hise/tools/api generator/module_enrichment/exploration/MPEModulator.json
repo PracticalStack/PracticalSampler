@@ -1,0 +1,301 @@
+{
+  "moduleId": "MPEModulator",
+  "nodes": [
+    {
+      "id": "midi_in",
+      "label": "MIDI Input",
+      "type": "input",
+      "importance": 0.8,
+      "group": "input",
+      "description": "Incoming HiseEvent stream (note-on, note-off, CC, aftertouch, pitch wheel)"
+    },
+    {
+      "id": "gesture_filter",
+      "label": "Gesture Type Filter",
+      "type": "decision",
+      "importance": 0.9,
+      "group": "event_processing",
+      "description": "Filters MIDI events based on selected gesture type: Press=aftertouch, Slide=CC74, Glide=pitchWheel, Stroke=noteOn velocity, Lift=noteOff velocity"
+    },
+    {
+      "id": "param_gesture_cc",
+      "label": "GestureCC",
+      "type": "parameter",
+      "importance": 0.8,
+      "group": "event_processing",
+      "description": "Selects which MPE gesture type to respond to (Press/Slide/Glide/Stroke/Lift)"
+    },
+    {
+      "id": "normalize",
+      "label": "Normalize to 0-1",
+      "type": "process",
+      "importance": 0.6,
+      "group": "event_processing",
+      "description": "Normalizes raw MIDI value to 0.0-1.0 float range. Glide centers at 0.5."
+    },
+    {
+      "id": "mono_aggregation",
+      "label": "Monophonic Max-Value",
+      "type": "process",
+      "importance": 0.5,
+      "group": "event_processing",
+      "description": "In monophonic mode: stores per-channel values and returns maximum across all channels (Press/Slide) or most-deviated from center (Glide)"
+    },
+    {
+      "id": "param_monophonic",
+      "label": "Monophonic",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": "voice_mode",
+      "description": "Enables monophonic mode with shared state and max-value aggregation"
+    },
+    {
+      "id": "table_lookup",
+      "label": "Table Lookup",
+      "type": "process",
+      "importance": 0.8,
+      "group": "shaping",
+      "description": "512-point interpolated lookup table maps normalized gesture value through user-defined curve. Always active."
+    },
+    {
+      "id": "set_target",
+      "label": "Set Voice Target",
+      "type": "process",
+      "importance": 0.7,
+      "group": "per_voice",
+      "description": "Sets the smoothing target on the matching voice state (channel-matched in poly mode, shared in mono mode)"
+    },
+    {
+      "id": "smoother",
+      "label": "One-Pole Smoother",
+      "type": "process",
+      "importance": 0.8,
+      "group": "per_voice",
+      "description": "Per-sample one-pole smoothing toward target value. Runs per-voice at control rate."
+    },
+    {
+      "id": "param_smoothing_time",
+      "label": "SmoothingTime",
+      "type": "parameter",
+      "importance": 0.6,
+      "group": "per_voice",
+      "description": "Controls the smoothing time constant in milliseconds (0-2000ms)"
+    },
+    {
+      "id": "param_default_value",
+      "label": "DefaultValue",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": "event_processing",
+      "description": "Initial value when voice starts and no gesture data is available. Mode-dependent scaling."
+    },
+    {
+      "id": "intensity_scale",
+      "label": "Intensity Scaling",
+      "type": "process",
+      "importance": 0.7,
+      "group": "output",
+      "description": "Base class applyTimeModulation() multiplies internal buffer by modulator intensity"
+    },
+    {
+      "id": "param_smoothed_intensity",
+      "label": "SmoothedIntensity",
+      "type": "parameter",
+      "importance": 0.6,
+      "group": "output",
+      "description": "Modulation depth/amplitude. Sets the modulator intensity. Mode-dependent display scaling."
+    },
+    {
+      "id": "mod_out",
+      "label": "Modulation Output",
+      "type": "output",
+      "importance": 0.8,
+      "group": "output",
+      "description": "Per-voice modulation signal applied to the voice buffer"
+    },
+    {
+      "id": "mpe_global_enable",
+      "label": "MPE Global Enable",
+      "type": "external",
+      "importance": 0.7,
+      "group": "bypass",
+      "description": "Global MPE mode state from MPEData. Controls bypass: modulator is bypassed when MPE is disabled or modulator is not connected."
+    },
+    {
+      "id": "param_retrigger",
+      "label": "Retrigger",
+      "type": "parameter",
+      "importance": 0.3,
+      "group": "voice_mode",
+      "description": "In monophonic mode, restarts the smoother from start value on new note"
+    },
+    {
+      "id": "voice_start",
+      "label": "Voice Start",
+      "type": "process",
+      "importance": 0.6,
+      "group": "per_voice",
+      "description": "Initializes voice state with default value, captures MIDI channel for routing. Stroke uses table-mapped velocity."
+    },
+    {
+      "id": "voice_stop",
+      "label": "Voice Stop",
+      "type": "process",
+      "importance": 0.4,
+      "group": "per_voice",
+      "description": "Sets isPressed=false, stops receiving gesture updates. isRingingOff if target is zero."
+    }
+  ],
+  "edges": [
+    {
+      "from": "midi_in",
+      "to": "gesture_filter",
+      "type": "signal",
+      "label": "HiseEvent"
+    },
+    {
+      "from": "param_gesture_cc",
+      "to": "gesture_filter",
+      "type": "control",
+      "label": "gesture type"
+    },
+    {
+      "from": "gesture_filter",
+      "to": "normalize",
+      "type": "signal",
+      "label": "matched event"
+    },
+    {
+      "from": "normalize",
+      "to": "mono_aggregation",
+      "type": "conditional",
+      "label": "monophonic only"
+    },
+    {
+      "from": "normalize",
+      "to": "table_lookup",
+      "type": "signal",
+      "label": "polyphonic path"
+    },
+    {
+      "from": "mono_aggregation",
+      "to": "table_lookup",
+      "type": "signal",
+      "label": "max value"
+    },
+    {
+      "from": "param_monophonic",
+      "to": "mono_aggregation",
+      "type": "control",
+      "label": "enable"
+    },
+    {
+      "from": "table_lookup",
+      "to": "set_target",
+      "type": "signal",
+      "label": "curved value"
+    },
+    {
+      "from": "set_target",
+      "to": "smoother",
+      "type": "signal",
+      "label": "target value"
+    },
+    {
+      "from": "param_smoothing_time",
+      "to": "smoother",
+      "type": "control",
+      "label": "time constant"
+    },
+    {
+      "from": "smoother",
+      "to": "intensity_scale",
+      "type": "signal",
+      "label": "smoothed value"
+    },
+    {
+      "from": "param_smoothed_intensity",
+      "to": "intensity_scale",
+      "type": "control",
+      "label": "depth"
+    },
+    {
+      "from": "intensity_scale",
+      "to": "mod_out",
+      "type": "signal",
+      "label": "scaled modulation"
+    },
+    {
+      "from": "mpe_global_enable",
+      "to": "gesture_filter",
+      "type": "control",
+      "label": "bypass when disabled"
+    },
+    {
+      "from": "param_default_value",
+      "to": "voice_start",
+      "type": "control",
+      "label": "initial value"
+    },
+    {
+      "from": "param_retrigger",
+      "to": "voice_start",
+      "type": "control",
+      "label": "retrigger behavior"
+    },
+    {
+      "from": "midi_in",
+      "to": "voice_start",
+      "type": "signal",
+      "label": "note-on"
+    },
+    {
+      "from": "voice_start",
+      "to": "smoother",
+      "type": "signal",
+      "label": "initial state"
+    },
+    {
+      "from": "midi_in",
+      "to": "voice_stop",
+      "type": "signal",
+      "label": "note-off"
+    },
+    {
+      "from": "voice_stop",
+      "to": "smoother",
+      "type": "signal",
+      "label": "stop updates"
+    }
+  ],
+  "groups": [
+    {
+      "id": "input",
+      "label": "Input"
+    },
+    {
+      "id": "event_processing",
+      "label": "Event Processing"
+    },
+    {
+      "id": "shaping",
+      "label": "Curve Shaping"
+    },
+    {
+      "id": "per_voice",
+      "label": "Per-Voice Processing"
+    },
+    {
+      "id": "voice_mode",
+      "label": "Voice Mode"
+    },
+    {
+      "id": "output",
+      "label": "Output"
+    },
+    {
+      "id": "bypass",
+      "label": "Global MPE Control"
+    }
+  ]
+}

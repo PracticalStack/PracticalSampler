@@ -1,0 +1,68 @@
+{
+  "19": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptLabel", "id": "PresetNameLabel"}
+    ],
+    "verifyScript": null,
+    "notes": "UserPresetHandler.setPostCallback exists - compile-only, callback won't fire"
+  },
+  "24": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "StreamingSampler", "name": "Sampler1"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Sampler timestretch config - StreamingSampler via Builder API"
+  },
+  "25": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptComboBox", "id": "ComboBox1"}
+    ],
+    "verifyScript": null,
+    "notes": "CSS + LAF hybrid - CSS always compiles per skip policy"
+  },
+  "31": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "StreamingSampler", "name": "Sampler1"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Sampler selection filter - StreamingSampler via Builder API"
+  },
+  "34": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Typed inline function syntax (inline function: object) - valid HiseScript per skip policy"
+  },
+  "51": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "MidiPlayer", "name": "myMidiPlayer1"},
+      {"type": "MidiPlayer", "name": "myMidiPlayer2"},
+      {"type": "MidiPlayer", "name": "myMidiPlayer3"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "MidiPlayer sync - MidiPlayer modules via Builder API"
+  }
+}

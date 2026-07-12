@@ -1,0 +1,1 @@
+Opens the given URL in the system's default web browser. The URL must be well-formed or a script error is thrown.

@@ -1,0 +1,100 @@
+{
+  "factoryPath": "envelope.extra_mod_gate",
+  "factory": "envelope",
+  "nodeId": "extra_mod_gate",
+  "description": "Sends a On-Off modulation signal while the extra modulator is active.",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Source Selection",
+      "rationale": "Index selects which extra modulation chain to monitor for active/inactive state.",
+      "parameters": [
+        {
+          "id": "Index",
+          "range": { "min": 0.0, "max": 16.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/envelope/extra_mod_gate.md",
+    "tier": "STUB",
+    "lines": 0
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "gate-signal-derivation",
+      "category": "signal_path",
+      "question": "How does extra_mod_gate determine whether the extra modulator chain is 'active'? Does it check ClearState from the EventData, check signal amplitude, or use another method?",
+      "context": "Same question as global_mod_gate but for extra modulation chains. The two nodes likely share implementation logic."
+    },
+    {
+      "id": "runtime-target-connection",
+      "category": "signal_path",
+      "question": "extra_mod_gate has IsFixRuntimeTarget. Does it connect to ExternalModulatorChain (RuntimeTarget type) with hash 5000 (like core.extra_mod), or does it have its own connection mechanism?",
+      "context": "Need to verify the runtime target type and hash to understand which HISE source it reads from."
+    },
+    {
+      "id": "shared-implementation-with-global-gate",
+      "category": "signal_path",
+      "question": "Do global_mod_gate and extra_mod_gate share a common base class or template? They have identical parameter structures and similar descriptions.",
+      "context": "If they share implementation, the documentation can reference a common pattern and highlight only the differences (GlobalModulator vs ExternalModulatorChain source)."
+    },
+    {
+      "id": "modulation-output-type",
+      "category": "signal_path",
+      "question": "The ModulationTargets field is present but empty. Does extra_mod_gate produce strictly binary (0/1) modulation output via handleModulation()?",
+      "context": "Users need to know the exact output behaviour for connecting to downstream parameters."
+    },
+    {
+      "id": "polyphonic-gate-per-voice",
+      "category": "signal_path",
+      "question": "As a polyphonic node, does extra_mod_gate track per-voice active state from the extra modulation chain? Extra mod chains can contain envelope modulators with per-voice state.",
+      "context": "Per-voice tracking is important for voice lifecycle management in polyphonic instruments."
+    }
+  ],
+
+  "notes": "extra_mod_gate is the companion to core.extra_mod, analogous to how global_mod_gate relates to core.global_mod. It provides binary gate output based on the active state of an extra modulation chain. The parameter structure (single Index parameter, range 0-16) is identical to global_mod_gate. Both nodes share IsPolyphonic + IsFixRuntimeTarget without IsControlNode. The description has the same grammar issue as global_mod_gate ('a On-Off' should be 'an On-Off'). These two gate nodes likely share a template or base class with only the RuntimeTarget type differing."
+}

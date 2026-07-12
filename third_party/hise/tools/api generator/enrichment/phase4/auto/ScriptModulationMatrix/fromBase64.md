@@ -1,0 +1,1 @@
+Restores the modulation matrix state from a Base64 string previously exported with `toBase64()`. The string is decoded and decompressed, and the resulting data replaces all current connections. Silently does nothing if the string is invalid.

@@ -1,0 +1,144 @@
+{
+  "moduleId": "WaveSynth",
+  "notes": "Uses Martin Finke's PolyBLEP algorithm for band-limited waveform synthesis. 9 waveform types available: Sine, Triangle, Saw, Square, Noise, Triangle 2, Square 2, Trapezoid 1, Trapezoid 2. PolyBLEP falls back to sine when frequency >= sampleRate/4 to prevent aliasing artifacts. Osc1 writes to voiceBuffer[0], osc2 writes to voiceBuffer[1] during generation - these are NOT stereo channels but separate oscillator outputs that get mixed and panned into stereo afterward. Mix crossfade is linear: osc1 *= (1 - mix), osc2 *= mix. Pan uses BalanceCalculator with equal-power panning law (sqrt(2) * cos/sin). Hard sync resets osc2 phase when osc1 completes a cycle via PolyBLEP::inc() return value. Osc2PitchChain supports audio-rate modulation, enabling FM-style synthesis. The pitch calculation combines octave transpose (pow(2, octaves)), semitone transpose (pow(2, semitones/12)), and detune in cents (pow(2, cents/1200)). MixChain is clamped 0-1, allows audio-rate modulation, and includes monophonic values in voice rendering. When EnableSecondOscillator is off, osc1 output is copied to both channels and mix/pan stages are skipped entirely.",
+  "nodes": [
+    {
+      "id": "note_on",
+      "label": "Note-On",
+      "type": "midi_event",
+      "scope": "per_voice",
+      "importance": 0.8
+    },
+    {
+      "id": "osc1",
+      "label": "Oscillator 1",
+      "type": "audio",
+      "detail": "PolyBLEP, 9 waveform types",
+      "scope": "per_voice",
+      "importance": 1.0,
+      "parameters": ["WaveForm1", "OctaveTranspose1", "SemiTones1", "Detune1", "PulseWidth1"]
+    },
+    {
+      "id": "osc2",
+      "label": "Oscillator 2",
+      "type": "audio",
+      "detail": "PolyBLEP, 9 waveform types",
+      "scope": "per_voice",
+      "importance": 1.0,
+      "parameters": ["WaveForm2", "OctaveTranspose2", "SemiTones2", "Detune2", "PulseWidth2"],
+      "condition": {
+        "parameter": "EnableSecondOscillator",
+        "whenTrue": "Independent oscillator with separate waveform, pitch, and pulse width",
+        "whenFalse": "Disabled, osc1 output copied to both internal channels"
+      }
+    },
+    {
+      "id": "pitch_mod",
+      "label": "Pitch Mod",
+      "type": "external_input",
+      "detail": "Inherited pitch chain, applies to both oscillators",
+      "scope": "per_voice",
+      "importance": 0.7
+    },
+    {
+      "id": "osc2_pitch_mod",
+      "label": "Osc2 Pitch Mod",
+      "type": "external_input",
+      "detail": "Independent pitch chain, audio rate, PitchMode",
+      "scope": "per_voice",
+      "importance": 0.7
+    },
+    {
+      "id": "hard_sync",
+      "label": "Hard Sync",
+      "type": "decision",
+      "scope": "parameter",
+      "importance": 0.6,
+      "parameters": ["HardSync"],
+      "condition": {
+        "parameter": "HardSync",
+        "whenTrue": "Osc1 cycle-complete resets osc2 phase",
+        "whenFalse": "Oscillators run independently"
+      }
+    },
+    {
+      "id": "gain_mod",
+      "label": "Gain Mod",
+      "type": "external_input",
+      "detail": "Inherited gain chain, applied to both channels before mix",
+      "scope": "per_voice",
+      "importance": 0.8
+    },
+    {
+      "id": "mix_crossfade",
+      "label": "Mix",
+      "type": "gain",
+      "detail": "Linear crossfade: osc1 * (1-mix), osc2 * mix",
+      "scope": "per_voice",
+      "importance": 0.9,
+      "parameters": ["Mix"]
+    },
+    {
+      "id": "mix_mod",
+      "label": "Mix Mod",
+      "type": "external_input",
+      "detail": "ScaleAdd mode, audio rate, clamped 0..1",
+      "scope": "per_voice",
+      "importance": 0.5
+    },
+    {
+      "id": "pan_balance",
+      "label": "Pan / Balance",
+      "type": "gain",
+      "detail": "Equal-power panning per oscillator, then summed to stereo",
+      "scope": "per_voice",
+      "importance": 0.7,
+      "parameters": ["Pan1", "Pan2"]
+    },
+    {
+      "id": "effect_chain",
+      "label": "Effects",
+      "type": "external_input",
+      "detail": "Inherited per-voice effect chain",
+      "scope": "per_voice",
+      "importance": 0.5
+    },
+    {
+      "id": "output",
+      "label": "Output",
+      "type": "io",
+      "detail": "Stereo, per-voice, summed across voices by ModulatorSynth",
+      "scope": "per_voice",
+      "importance": 1.0
+    }
+  ],
+  "edges": [
+    { "from": "note_on", "to": "osc1", "type": "signal", "label": "Start frequency from MIDI note" },
+    { "from": "note_on", "to": "osc2", "type": "signal", "label": "Start frequency from MIDI note" },
+    { "from": "pitch_mod", "to": "osc1", "type": "modulation", "label": "Pitch scale" },
+    { "from": "pitch_mod", "to": "osc2", "type": "modulation", "label": "Pitch scale" },
+    { "from": "osc2_pitch_mod", "to": "osc2", "type": "modulation", "label": "Independent pitch scale" },
+    { "from": "hard_sync", "to": "osc2", "type": "modulation", "label": "Phase reset on osc1 cycle" },
+    { "from": "osc1", "to": "gain_mod", "type": "signal" },
+    { "from": "osc2", "to": "gain_mod", "type": "signal" },
+    { "from": "gain_mod", "to": "mix_crossfade", "type": "signal" },
+    { "from": "mix_mod", "to": "mix_crossfade", "type": "modulation", "label": "Modulated mix value" },
+    { "from": "mix_crossfade", "to": "pan_balance", "type": "signal" },
+    { "from": "pan_balance", "to": "effect_chain", "type": "signal" },
+    { "from": "effect_chain", "to": "output", "type": "signal" }
+  ],
+  "groups": [
+    {
+      "id": "oscillators",
+      "label": "Oscillators",
+      "nodes": ["osc1", "osc2", "hard_sync"],
+      "style": "dashed_outline"
+    },
+    {
+      "id": "voice_processing",
+      "label": "Per Voice",
+      "nodes": ["note_on", "osc1", "osc2", "pitch_mod", "osc2_pitch_mod", "hard_sync", "gain_mod", "mix_crossfade", "mix_mod", "pan_balance", "effect_chain", "output"],
+      "style": "polyphonic"
+    }
+  ]
+}

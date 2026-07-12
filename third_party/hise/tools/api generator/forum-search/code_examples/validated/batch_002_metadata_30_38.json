@@ -1,0 +1,97 @@
+{
+  "30": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"}
+    ],
+    "verifyScript": null,
+    "notes": "Quadrilateral path drawing on panel - compile-only"
+  },
+  "31": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "SLIDER"}
+    ],
+    "verifyScript": null,
+    "notes": "Bipolar pan slider LAF - compile-only"
+  },
+  "32": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptAudioWaveform", "id": "AudioWaveform1"}
+    ],
+    "verifyScript": null,
+    "notes": "Audio waveform render options LAF - compile-only"
+  },
+  "33": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "SwitcherPanel namespace utility - just defines a function, never called. Compile-only."
+  },
+  "34": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptFloatingTile", "id": "WebView1"}
+    ],
+    "verifyScript": null,
+    "notes": "WebView MIDI forwarding in onController - compile-only"
+  },
+  "35": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Requires specific audio files (deep_piano_noise.wav, SonidoVoz.wav) in AudioFiles folder and Loris spectral processing",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "36": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "FileSystem.browse opens modal dialog that blocks execution",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "37": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptedViewport", "id": "Viewport1"}
+    ],
+    "verifyScript": [
+      {"type": "REPL", "expression": "Viewport1.getTableRowData().length", "value": 3, "delay": 0}
+    ],
+    "notes": "Viewport table mode with data - can verify row count"
+  },
+  "38": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"}
+    ],
+    "verifyScript": null,
+    "notes": "Display buffer visualization - HardcodedMasterFX may not exist but getDisplayBufferSource should still compile"
+  }
+}

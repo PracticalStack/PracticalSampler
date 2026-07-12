@@ -1,0 +1,1 @@
+Deprecated since 2017. Calling this method throws a script error. Remove any calls to this method from your code.

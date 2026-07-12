@@ -1,0 +1,149 @@
+{
+  "43": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "loadAudioFilesIntoPool returns empty in test env, but compiles fine"
+  },
+  "44": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"}
+    ],
+    "verifyScript": null,
+    "notes": "Rotary slider LAF with arc rendering, compile-only"
+  },
+  "45": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Utility function definition, compile-only"
+  },
+  "46": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Function definition only, never called during init"
+  },
+  "47": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Server.callWithGET/downloadFile requires external network connectivity",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "48": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"},
+      {"type": "ScriptSlider", "id": "Knob2"},
+      {"type": "ScriptSlider", "id": "Knob3"},
+      {"type": "ScriptSlider", "id": "Knob4"},
+      {"type": "ScriptComboBox", "id": "SELECTOR"}
+    ],
+    "verifyScript": null,
+    "notes": "Show/hide by selector index, compile-only"
+  },
+  "49": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"}
+    ],
+    "verifyScript": null,
+    "notes": "Scrolling text with timer, compile-only"
+  },
+  "50": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Global LAF drawToggleButton, compile-only"
+  },
+  "51": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "StreamingSampler", "name": "Sampler1"}
+    ],
+    "components": [
+      {"type": "ScriptComboBox", "id": "cmbsmp"},
+      {"type": "ScriptButton", "id": "prev"},
+      {"type": "ScriptButton", "id": "next"}
+    ],
+    "verifyScript": null,
+    "notes": "Sample map browser, empty list in test env but compiles fine"
+  },
+  "52": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Global LAF drawDialogButton, compile-only"
+  },
+  "53": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptComboBox", "id": "ComboBox1"},
+      {"type": "ScriptImage", "id": "Image1"},
+      {"type": "ScriptImage", "id": "Image2"},
+      {"type": "ScriptImage", "id": "Image3"}
+    ],
+    "verifyScript": null,
+    "notes": "Image switcher, compile-only"
+  },
+  "54": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Utility function definition, compile-only"
+  },
+  "55": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Server.callWithGET requires external network connectivity",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "56": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "MIDI callbacks, compile-only"
+  }
+}

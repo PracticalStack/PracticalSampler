@@ -1,0 +1,1 @@
+Returns the pixel width of a text string when rendered with the specified font name, size, and spacing. The font must have been loaded via `Engine.loadFontAs()` or be available as a system font. Useful for calculating text layout widths in custom paint routines or LAF callbacks.

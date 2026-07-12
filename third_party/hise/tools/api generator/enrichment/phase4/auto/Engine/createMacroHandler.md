@@ -1,0 +1,1 @@
+Creates a macro handler for programmatically managing HISE's macro control system. The handler allows changing macro connections, setting macro values, and querying which parameters are connected to each macro slot. Call `Engine.setFrontendMacros()` before creating the handler to enable macros.

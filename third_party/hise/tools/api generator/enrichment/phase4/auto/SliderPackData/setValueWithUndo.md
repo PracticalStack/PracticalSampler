@@ -1,0 +1,1 @@
+Sets a single slider value with undo support. Behaves like `setValue()` but registers the change with the undo manager, storing both old and new values for restoration. Use this for any user-initiated edit where Ctrl+Z should work.

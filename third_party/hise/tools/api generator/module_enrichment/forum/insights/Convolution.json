@@ -1,0 +1,120 @@
+{
+  "targetId": "Convolution",
+  "domain": "modules",
+  "generatedAt": "2026-03-30",
+  "topicIds": [2793, 819, 1139, 2054, 7006, 7878, 3687, 8124, 951, 10248, 2712, 4355, 1835, 13460, 13532, 1633, 1672, 3374, 7500, 3501, 7659, 6824, 5029, 1251, 1353, 1527, 2906, 3127, 4216, 6815, 13054, 4259, 5606, 2920, 5412, 7456, 13818, 1507, 2310, 2594, 9889, 14150, 12646, 12715, 12614, 12852, 9469, 3272, 9287, 8960, 2576, 4328, 5882, 6868, 7813, 10090, 4987, 6451, 5244, 1024, 1406, 6488, 2640, 7957],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Engine.loadAudioFilesIntoPool() required for IR embedding in exported plugins",
+      "summary": "IRs are not automatically embedded in exported plugins. Calling Engine.loadAudioFilesIntoPool() in onInit is required for the audio file pool to be included at compile time. This is the single most recurring support issue.",
+      "sources": ["tid:1507", "tid:7456", "tid:13054", "tid:13818"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "getAudioSampleProcessor() required for setFile() - getEffect() does not expose it",
+      "summary": "Synth.getEffect() returns a reference that does not have setFile(). You must use Synth.getAudioSampleProcessor() to dynamically load IRs at runtime.",
+      "sources": ["tid:1353", "tid:3687"],
+      "verify": true,
+      "verify_hint": "grep getAudioSampleProcessor in hi_scripting; check AudioSampleProcessor scripting wrapper class"
+    },
+    {
+      "type": "BUG",
+      "title": "IPP FFT backend causes aliasing artifacts in convolution",
+      "summary": "The IPP FFT backend (FFTType value 1) produces audible aliasing. Workaround: set FFTType to 3 (Ooura). Value 0 (auto) silently defaults to IPP when the library is present.",
+      "sources": ["tid:2793"],
+      "verify": true,
+      "verify_hint": "grep FFTType in ConvolutionEffect; check hi_dsp_library for FFT backend selection"
+    },
+    {
+      "type": "BUG",
+      "title": "IR resampling causes gain increase at non-native sample rates",
+      "summary": "When the host sample rate differs from the IR's native sample rate, resampling introduces a gain increase (~6dB at 96kHz vs 44.1kHz). No built-in compensation.",
+      "sources": ["tid:2054"],
+      "verify": true,
+      "verify_hint": "grep resample in ConvolutionEffect or audio pool loading path"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Engine.getSampleRate() returns -1 in onInit in compiled plugins",
+      "summary": "In exported plugins, the audio engine is not initialized when onInit runs, so Engine.getSampleRate() returns -1. Defer sample-rate-dependent logic to a Timer or control callback.",
+      "sources": ["tid:2054"],
+      "verify": true,
+      "verify_hint": "grep getSampleRate in scripting API; check plugin lifecycle vs script init"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "File path must use {PROJECT_FOLDER} prefix and is case-sensitive in compiled plugins",
+      "summary": "setFile() requires the {PROJECT_FOLDER} prefix. Without it, the file is not found in the pool. Filenames are also case-sensitive in compiled plugins on all platforms.",
+      "sources": ["tid:1139", "tid:5412"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "Default user preset reorders IR file list in exported plugin",
+      "summary": "Saving a default user preset can cause the IR file list from loadAudioFilesIntoPool() to be shuffled, breaking index-based preset recall. Store IR references by name, not index.",
+      "sources": ["tid:8124"],
+      "verify": true,
+      "verify_hint": "grep preset loading / audio pool restoration in exported plugin init path"
+    },
+    {
+      "type": "BUG",
+      "title": "Glitch when DAW playback starts at the exact beginning of the timeline",
+      "summary": "Starting DAW playback from position 0:0:0 causes an audible glitch in the Convolution Reverb output. Acknowledged by Christoph Hart, no workaround documented.",
+      "sources": ["tid:7006"],
+      "verify": true,
+      "verify_hint": "grep playback start / transport state in ConvolutionEffect; look for buffer reset logic"
+    },
+    {
+      "type": "API",
+      "title": "IR switching uses a 20ms crossfade added in late 2022",
+      "summary": "Switching IRs at runtime via setFile() no longer causes a hard click. A 20ms crossfade was added around November 2022.",
+      "sources": ["tid:6824"],
+      "verify": true,
+      "verify_hint": "grep crossfade or fadeIn/fadeOut in ConvolutionEffect"
+    },
+    {
+      "type": "API",
+      "title": "Scriptnode convolution slots accessed via getAudioFile(index) on a ScriptFX handle",
+      "summary": "When a ScriptFX hosts a filters.convolution node, the IR is loaded via Synth.getEffect('ScriptFX1').getAudioFile(0), not via getAudioSampleProcessor().",
+      "sources": ["tid:4355"],
+      "verify": true,
+      "verify_hint": "grep getAudioFile in scripting API; check ScriptEffect wrapper"
+    },
+    {
+      "type": "PATTERN",
+      "title": "IR preset recall requires a hidden slider or combobox as intermediary",
+      "summary": "HISE presets save control values, not script state. To make IR selection recallable, bind the selection to a hidden slider whose onControl callback calls setFile().",
+      "sources": ["tid:1672"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Large IR libraries can use the Expansion system or AudioResources.dat",
+      "summary": "For products with many IRs, use the Expansion system to package IRs separately, or uncheck 'Embed Audio Files' and distribute AudioResources.dat to the user's AppData folder.",
+      "sources": ["tid:4259"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "AudioWaveform component connected to Convolution Reverb can cause crashes",
+      "summary": "Binding an AudioWaveform UI component to the Convolution Reverb and switching IRs at runtime has caused crashes in some HISE versions, likely a thread-safety issue during IR reload.",
+      "sources": ["tid:3501"],
+      "verify": true,
+      "verify_hint": "grep AudioWaveform or AudioDisplayComponent interaction with AudioSampleProcessor"
+    },
+    {
+      "type": "API",
+      "title": "FFTType attribute controls which FFT backend the convolution uses",
+      "summary": "FFTType attribute: 0=best available (auto), 1=IPP, 2=Apple Accelerate, 3=Ooura. Only 0 and 3 are known to be artifact-free. IPP (1) produces aliasing.",
+      "sources": ["tid:2793"],
+      "verify": true,
+      "verify_hint": "grep FFTType enum in ConvolutionEffect attribute list"
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+Applies a gaussian blur to the current layer. Gaussian blur produces a smooth, natural-looking blur with a bell curve falloff. The blur amount is clamped to the range 0-100. For a computationally cheaper but blockier alternative, use `boxBlur`.

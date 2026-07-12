@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 400">
+  <defs>
+    <marker id="arrow-purple" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#7E60B1"/>
+    </marker>
+    <marker id="arrow-teal" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#3F6E6E"/>
+    </marker>
+  </defs>
+
+  <!-- Source zone -->
+  <rect x="12" y="50" width="230" height="340" fill="#7E60B1" fill-opacity="0.04" stroke="#7E60B1" stroke-opacity="0.2" rx="6"/>
+  <text x="127" y="40" font-family="Lato, sans-serif" font-size="12" font-weight="bold" fill="#7E60B1" text-anchor="middle">SOURCES</text>
+
+  <!-- Target zone -->
+  <rect x="618" y="50" width="230" height="340" fill="#3F6E6E" fill-opacity="0.04" stroke="#3F6E6E" stroke-opacity="0.2" rx="6"/>
+  <text x="733" y="40" font-family="Lato, sans-serif" font-size="12" font-weight="bold" fill="#3F6E6E" text-anchor="middle">TARGETS</text>
+
+  <!-- Source boxes -->
+  <rect x="32" y="68" width="190" height="34" fill="#161b22" stroke="rgba(0,0,0,0.5)" rx="6"/>
+  <text x="127" y="90" font-family="Consolas, monospace" font-size="12" fill="#CCCCCC" text-anchor="middle">ComponentValue</text>
+
+  <rect x="32" y="112" width="190" height="34" fill="#161b22" stroke="rgba(0,0,0,0.5)" rx="6"/>
+  <text x="127" y="134" font-family="Consolas, monospace" font-size="12" fill="#CCCCCC" text-anchor="middle">ModuleParameter</text>
+
+  <rect x="32" y="156" width="190" height="34" fill="#161b22" stroke="rgba(0,0,0,0.5)" rx="6"/>
+  <text x="127" y="178" font-family="Consolas, monospace" font-size="12" fill="#CCCCCC" text-anchor="middle">MouseEvents</text>
+
+  <rect x="32" y="200" width="190" height="34" fill="#161b22" stroke="rgba(0,0,0,0.5)" rx="6"/>
+  <text x="127" y="222" font-family="Consolas, monospace" font-size="12" fill="#CCCCCC" text-anchor="middle">RadioGroup</text>
+
+  <rect x="32" y="244" width="190" height="34" fill="#161b22" stroke="rgba(0,0,0,0.5)" rx="6"/>
+  <text x="127" y="266" font-family="Consolas, monospace" font-size="12" fill="#CCCCCC" text-anchor="middle">ContextMenu</text>
+
+  <rect x="32" y="288" width="190" height="34" fill="#161b22" stroke="rgba(0,0,0,0.5)" rx="6"/>
+  <text x="127" y="310" font-family="Consolas, monospace" font-size="12" fill="#CCCCCC" text-anchor="middle">ComplexData</text>
+
+  <!-- "... and more" indicator -->
+  <text x="127" y="350" font-family="Lato, sans-serif" font-size="12" fill="#808080" text-anchor="middle">+ 8 more source types</text>
+
+  <!-- Hub -->
+  <rect x="310" y="150" width="240" height="100" fill="#161b22" stroke="#90FFB1" stroke-width="2" rx="6"/>
+  <text x="430" y="190" font-family="Lato, sans-serif" font-size="16" font-weight="bold" fill="#90FFB1" text-anchor="middle">Broadcaster</text>
+
+  <!-- lastValues inside hub -->
+  <rect x="345" y="205" width="170" height="28" fill="#0d1117" stroke="#444444" rx="4"/>
+  <text x="430" y="224" font-family="Consolas, monospace" font-size="11" fill="#CCCCCC" text-anchor="middle">lastValues[]</text>
+
+  <!-- Target boxes -->
+  <rect x="638" y="68" width="190" height="34" fill="#161b22" stroke="rgba(0,0,0,0.5)" rx="6"/>
+  <text x="733" y="90" font-family="Consolas, monospace" font-size="12" fill="#CCCCCC" text-anchor="middle">addListener</text>
+
+  <rect x="638" y="112" width="190" height="34" fill="#161b22" stroke="rgba(0,0,0,0.5)" rx="6"/>
+  <text x="733" y="134" font-family="Consolas, monospace" font-size="12" fill="#CCCCCC" text-anchor="middle">ComponentProperty</text>
+
+  <rect x="638" y="156" width="190" height="34" fill="#161b22" stroke="rgba(0,0,0,0.5)" rx="6"/>
+  <text x="733" y="178" font-family="Consolas, monospace" font-size="12" fill="#CCCCCC" text-anchor="middle">ComponentValue</text>
+
+  <rect x="638" y="200" width="190" height="34" fill="#161b22" stroke="rgba(0,0,0,0.5)" rx="6"/>
+  <text x="733" y="222" font-family="Consolas, monospace" font-size="12" fill="#CCCCCC" text-anchor="middle">ComponentRefresh</text>
+
+  <rect x="638" y="244" width="190" height="34" fill="#161b22" stroke="rgba(0,0,0,0.5)" rx="6"/>
+  <text x="733" y="266" font-family="Consolas, monospace" font-size="12" fill="#CCCCCC" text-anchor="middle">ModuleParameterSyncer</text>
+
+  <rect x="638" y="288" width="190" height="34" fill="#161b22" stroke="rgba(0,0,0,0.5)" rx="6"/>
+  <text x="733" y="310" font-family="Consolas, monospace" font-size="12" fill="#CCCCCC" text-anchor="middle">DelayedListener</text>
+
+  <!-- Source -> Hub connections (orthogonal: horizontal from source, then vertical to hub entry) -->
+  <path d="M 222 85 L 266 85 L 266 175 L 310 175" fill="none" stroke="#7E60B1" stroke-width="1" marker-end="url(#arrow-purple)"/>
+  <path d="M 222 129 L 256 129 L 256 185 L 310 185" fill="none" stroke="#7E60B1" stroke-width="1" marker-end="url(#arrow-purple)"/>
+  <path d="M 222 173 L 246 173 L 246 195 L 310 195" fill="none" stroke="#7E60B1" stroke-width="1" marker-end="url(#arrow-purple)"/>
+  <path d="M 222 217 L 246 217 L 246 205 L 310 205" fill="none" stroke="#7E60B1" stroke-width="1" marker-end="url(#arrow-purple)"/>
+  <path d="M 222 261 L 256 261 L 256 215 L 310 215" fill="none" stroke="#7E60B1" stroke-width="1" marker-end="url(#arrow-purple)"/>
+  <path d="M 222 305 L 266 305 L 266 225 L 310 225" fill="none" stroke="#7E60B1" stroke-width="1" marker-end="url(#arrow-purple)"/>
+
+  <!-- Hub -> Target connections (orthogonal: horizontal from hub, then vertical to target entry) -->
+  <path d="M 550 175 L 594 175 L 594 85 L 638 85" fill="none" stroke="#3F6E6E" stroke-width="1" marker-end="url(#arrow-teal)"/>
+  <path d="M 550 185 L 604 185 L 604 129 L 638 129" fill="none" stroke="#3F6E6E" stroke-width="1" marker-end="url(#arrow-teal)"/>
+  <path d="M 550 195 L 614 195 L 614 173 L 638 173" fill="none" stroke="#3F6E6E" stroke-width="1" marker-end="url(#arrow-teal)"/>
+  <path d="M 550 205 L 614 205 L 614 217 L 638 217" fill="none" stroke="#3F6E6E" stroke-width="1" marker-end="url(#arrow-teal)"/>
+  <path d="M 550 215 L 604 215 L 604 261 L 638 261" fill="none" stroke="#3F6E6E" stroke-width="1" marker-end="url(#arrow-teal)"/>
+  <path d="M 550 225 L 594 225 L 594 305 L 638 305" fill="none" stroke="#3F6E6E" stroke-width="1" marker-end="url(#arrow-teal)"/>
+
+  <!-- Connection labels (with background rects for readability over arrows) -->
+  <rect x="232" y="145" width="76" height="18" fill="#161b22" fill-opacity="0.85" rx="3"/>
+  <text x="270" y="159" font-family="Consolas, monospace" font-size="11" fill="#7E60B1" text-anchor="middle">attachTo*()</text>
+  <rect x="555" y="145" width="70" height="18" fill="#161b22" fill-opacity="0.85" rx="3"/>
+  <text x="590" y="159" font-family="Consolas, monospace" font-size="11" fill="#3F6E6E" text-anchor="middle">callSync()</text>
+</svg>

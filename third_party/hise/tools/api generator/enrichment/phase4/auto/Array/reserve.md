@@ -1,0 +1,3 @@
+Pre-allocates internal storage for at least the specified number of elements without changing the array's length or contents. Call this in `onInit` to prevent reallocation warnings when `push` is used on the audio thread. A typical capacity for MIDI note tracking is `128`.
+
+> [!Warning:Each sub-array needs its own reserve call] `reserve()` only allocates slots for element references in the outer array. If the array contains nested arrays or objects as elements, each inner collection manages its own storage independently and must be reserved separately. This also means `reserve()` does not prevent reallocation when pushing complex objects (arrays or objects) as elements - only primitive values (numbers, strings) benefit from a single top-level `reserve()`.

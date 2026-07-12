@@ -1,0 +1,1 @@
+Returns the total length of the original audio file in samples, regardless of the current range set by `setRange()`. Use this when you need the full file length after narrowing the active range with `setRange()`.

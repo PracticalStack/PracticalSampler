@@ -1,0 +1,48 @@
+{
+  "moduleId": "KeyNumber",
+  "nodes": [
+    {
+      "id": "midi_note",
+      "label": "MIDI Note Number",
+      "type": "input",
+      "importance": 0.9,
+      "group": null,
+      "description": "Reads the note number (0-127) from the incoming note-on MIDI event"
+    },
+    {
+      "id": "normalize",
+      "label": "Normalize",
+      "type": "process",
+      "importance": 0.7,
+      "group": "transform",
+      "description": "Divides the note number by 127.0 to produce a 0-1 range value"
+    },
+    {
+      "id": "table_lookup",
+      "label": "Table Lookup",
+      "type": "process",
+      "importance": 0.9,
+      "group": "transform",
+      "description": "Maps the normalized note number through a user-defined curve table (0-1 in, 0-1 out). Always active -- no UseTable toggle."
+    },
+    {
+      "id": "mod_output",
+      "label": "Modulation Output",
+      "type": "output",
+      "importance": 0.9,
+      "group": null,
+      "description": "Final modulation value (0-1) sent to the parent modulation chain"
+    }
+  ],
+  "edges": [
+    { "from": "midi_note", "to": "normalize", "type": "signal", "label": null },
+    { "from": "normalize", "to": "table_lookup", "type": "signal", "label": null },
+    { "from": "table_lookup", "to": "mod_output", "type": "signal", "label": null }
+  ],
+  "groups": [
+    {
+      "id": "transform",
+      "label": "Note Number Transform"
+    }
+  ]
+}

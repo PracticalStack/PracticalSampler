@@ -1,0 +1,3 @@
+Attaches a script callback to a custom automation slot that fires whenever the slot's value changes - whether from DAW automation, MIDI CC, or script calls. The callback receives two arguments: the automation index and the new value. Use `SyncNotification` when the callback drives audio-thread state (e.g. updating `reg` variables), or `AsyncNotification` when it updates the UI. Pass a non-function value (e.g. `false`) to remove a previously attached callback for that slot.
+
+> [!Warning:One callback per automation ID] Only one callback can be attached per automation ID. Attaching a new callback for the same ID silently replaces the previous one. When switching which slot a callback listens to, remove the old binding first by passing a non-function value for the old ID.

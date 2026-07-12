@@ -1,0 +1,500 @@
+{
+  "Engine": {
+    "brief": "Central factory and utility class that provides object creation (Broadcasters, Timers, MidiLists, ModulationMatrices, etc.), unit conversions (dB/gain, MIDI/frequency, samples/ms), global state management (user presets, expansions, zoom), and resource loading (fonts, images, audio files).",
+    "domain": "scripting",
+    "role": "factory",
+    "baseClass": "ScriptingObject, ApiClass",
+    "creates": [
+      "MessageHolder",
+      "MidiList",
+      "Broadcaster",
+      "Timer",
+      "BackgroundTask",
+      "DspNetwork",
+      "ExpansionHandler",
+      "ErrorHandler",
+      "FFT",
+      "FixObjectFactory",
+      "GlobalRoutingManager",
+      "NeuralNetwork",
+      "ScriptModulationMatrix",
+      "UnorderedStack",
+      "AudioFile",
+      "DisplayBuffer",
+      "SliderPackData",
+      "Table",
+      "BeatportManager",
+      "UserPresetHandler",
+      "MidiAutomationHandler",
+      "MacroHandler",
+      "TransportHandler"
+    ],
+    "references": [
+      "Synth",
+      "Settings",
+      "Content",
+      "Buffer"
+    ],
+    "seeAlso": [
+      {
+        "class": "Synth",
+        "distinction": "Engine provides global utilities, object factories, and conversion functions, while Synth controls the parent synthesiser's voice management, MIDI processing, and module tree traversal."
+      },
+      {
+        "class": "Settings",
+        "distinction": "Engine handles global project-level concerns (presets, resources, conversions), while Settings manages audio device configuration and standalone app preferences."
+      }
+    ],
+    "callbackDensity": 0.03,
+    "statefulness": 0.45,
+    "threadingExposure": 0.1
+  },
+  "Synth": {
+    "brief": "Script handle to the parent synthesiser that provides MIDI note generation, voice control (pitch/volume fades, kill, legato), module tree traversal (getEffect, getModulator, getSampler, etc.), and real-time timer callbacks on the audio thread.",
+    "domain": "audio",
+    "role": "processor",
+    "baseClass": "ScriptingObject, ApiClass",
+    "creates": [
+      "Builder",
+      "Effect",
+      "Modulator",
+      "ChildSynth",
+      "MidiProcessor",
+      "Sampler",
+      "AudioSampleProcessor",
+      "TableProcessor",
+      "SlotFX",
+      "MidiPlayer",
+      "RoutingMatrix",
+      "WavetableController",
+      "DisplayBufferSource"
+    ],
+    "references": [
+      "Message",
+      "MessageHolder"
+    ],
+    "seeAlso": [
+      {
+        "class": "Engine",
+        "distinction": "Synth operates on the parent synthesiser's signal chain and voices, while Engine provides global utilities and object creation unrelated to a specific synth."
+      },
+      {
+        "class": "ChildSynth",
+        "distinction": "Synth is the implicit parent synth available in every script, while ChildSynth is a handle to a specific child sound generator retrieved via Synth.getChildSynth()."
+      }
+    ],
+    "callbackDensity": 0.05,
+    "statefulness": 0.35,
+    "threadingExposure": 0.7
+  },
+  "Message": {
+    "brief": "Transient reference to the current MIDI event inside onNoteOn/onNoteOff/onController callbacks, providing getters/setters for note number, velocity, channel, detune, gain, and event ID -- only valid during the callback execution.",
+    "domain": "event",
+    "role": "event",
+    "baseClass": "ScriptingObject, ApiClass",
+    "creates": [],
+    "references": [
+      "MessageHolder"
+    ],
+    "seeAlso": [
+      {
+        "class": "MessageHolder",
+        "distinction": "Message is a transient reference valid only inside MIDI callbacks, while MessageHolder is a persistent object that stores a copy of a MIDI event for later use."
+      }
+    ],
+    "callbackDensity": 0.03,
+    "statefulness": 0.85,
+    "threadingExposure": 1.0
+  },
+  "MessageHolder": {
+    "brief": "Persistent, copyable container for a MIDI event that can be stored across callbacks, used in arrays (e.g. for MidiPlayer event lists), and manipulated independently of the real-time message stream.",
+    "domain": "event",
+    "role": "container",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": [
+      "Message",
+      "MidiPlayer"
+    ],
+    "seeAlso": [
+      {
+        "class": "Message",
+        "distinction": "MessageHolder persists a MIDI event for deferred processing or storage, while Message is a transient callback-scoped reference to the live event."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.9,
+    "threadingExposure": 0.4
+  },
+  "Sampler": {
+    "brief": "Script handle to a ModulatorSampler module that provides sample map loading/saving, round-robin group management, sample selection/filtering, mic position purging, timestretching control, and per-sample property access.",
+    "domain": "audio",
+    "role": "handle",
+    "baseClass": "ConstScriptingObject",
+    "creates": [
+      "Sample",
+      "ComplexGroupManager"
+    ],
+    "references": [
+      "ChildSynth",
+      "Synth"
+    ],
+    "seeAlso": [
+      {
+        "class": "Sample",
+        "distinction": "Sampler controls the sampler module (loading maps, groups, mic positions), while Sample is a handle to an individual sound within the sampler's current map."
+      },
+      {
+        "class": "AudioSampleProcessor",
+        "distinction": "Sampler manages multi-sample instruments with key/velocity mapping, while AudioSampleProcessor controls single audio file playback modules like AudioLoopPlayer."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.55,
+    "threadingExposure": 0.5
+  },
+  "Sample": {
+    "brief": "Handle to a single sampler sound within a sample map, allowing get/set of per-sample properties (root key, velocity range, loop points, sample start/end), audio data analysis, and sample replacement.",
+    "domain": "audio",
+    "role": "handle",
+    "baseClass": "ConstScriptingObject, AssignableObject",
+    "creates": [
+      "Sample"
+    ],
+    "references": [
+      "Sampler"
+    ],
+    "seeAlso": [
+      {
+        "class": "Sampler",
+        "distinction": "Sample represents a single sound with its mapping properties, while Sampler is the module-level handle that manages the entire sample map and all its sounds."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.8,
+    "threadingExposure": 0.2
+  },
+  "Builder": {
+    "brief": "Programmatic module tree construction tool that creates synths, effects, and modulators by type/ID, sets their attributes, and connects script processors -- used for dynamically building the entire processor hierarchy at init time.",
+    "domain": "scripting",
+    "role": "factory",
+    "baseClass": "ConstScriptingObject",
+    "creates": [
+      "Sampler",
+      "Effect",
+      "Modulator",
+      "ChildSynth",
+      "MidiProcessor",
+      "AudioSampleProcessor",
+      "TableProcessor",
+      "SlotFX"
+    ],
+    "references": [
+      "Synth"
+    ],
+    "seeAlso": [
+      {
+        "class": "Synth",
+        "distinction": "Builder creates/destroys modules in the processor tree programmatically, while Synth retrieves existing modules by name and controls voice/MIDI processing."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.15,
+    "threadingExposure": 0.1
+  },
+  "ComplexGroupManager": {
+    "brief": "Advanced multi-layer round-robin group controller for Samplers that provides per-layer/per-group volume, fade-in/out, delay, start offset, gain tracking, and fixed-length playback -- designed for complex multi-articulation instruments.",
+    "domain": "audio",
+    "role": "handle",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": [
+      "Sampler"
+    ],
+    "seeAlso": [
+      {
+        "class": "Sampler",
+        "distinction": "ComplexGroupManager provides fine-grained per-layer/per-group voice control (fades, delays, volumes), while Sampler handles sample map loading and basic RR group switching."
+      }
+    ],
+    "callbackDensity": 0.06,
+    "statefulness": 0.5,
+    "threadingExposure": 0.8
+  },
+  "MidiPlayer": {
+    "brief": "Script handle to a MIDI Player module that provides MIDI file loading, sequence playback control (play/stop/record), event list editing with undo, tempo sync, and visualization helpers for piano-roll style displays.",
+    "domain": "playback",
+    "role": "handle",
+    "baseClass": "MidiPlayerBaseType, ConstScriptingObject, SuspendableTimer",
+    "creates": [
+      "MidiProcessor"
+    ],
+    "references": [
+      "MessageHolder",
+      "Synth"
+    ],
+    "seeAlso": [
+      {
+        "class": "MidiProcessor",
+        "distinction": "MidiPlayer provides MIDI file playback, recording, and sequence editing, while MidiProcessor is a generic handle to any MIDI processor module for attribute control."
+      }
+    ],
+    "callbackDensity": 0.15,
+    "statefulness": 0.4,
+    "threadingExposure": 0.5
+  },
+  "MidiProcessor": {
+    "brief": "Generic script handle to any MIDI processor module in the signal chain, providing attribute get/set, bypass control, state export/restore, and conversion to a MidiPlayer reference if applicable.",
+    "domain": "event",
+    "role": "handle",
+    "baseClass": "ConstScriptingObject, AssignableObject",
+    "creates": [
+      "MidiPlayer"
+    ],
+    "references": [
+      "Synth"
+    ],
+    "seeAlso": [
+      {
+        "class": "MidiPlayer",
+        "distinction": "MidiProcessor is a generic handle for setting attributes on any MIDI processor, while MidiPlayer adds full MIDI file playback, editing, and visualization capabilities."
+      },
+      {
+        "class": "Effect",
+        "distinction": "MidiProcessor controls modules in the MIDI processing chain, while Effect controls modules in the audio effect chain."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.65,
+    "threadingExposure": 0.3
+  },
+  "Modulator": {
+    "brief": "Script handle to a modulator in the signal chain (LFO, envelope, constant, etc.) that provides attribute control, intensity/bipolar settings, global modulator connections, state management, and conversion to a TableProcessor reference.",
+    "domain": "audio",
+    "role": "handle",
+    "baseClass": "ConstScriptingObject, AssignableObject",
+    "creates": [
+      "Modulator"
+    ],
+    "references": [
+      "Synth",
+      "TableProcessor"
+    ],
+    "seeAlso": [
+      {
+        "class": "ScriptModulationMatrix",
+        "distinction": "Modulator is a handle to a single modulator module for direct parameter control, while ScriptModulationMatrix manages a dynamic many-to-many modulation routing system."
+      },
+      {
+        "class": "Effect",
+        "distinction": "Modulator controls modulation sources (LFOs, envelopes) that shape parameters over time, while Effect controls audio processing modules (filters, reverbs) in the FX chain."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.65,
+    "threadingExposure": 0.4
+  },
+  "Effect": {
+    "brief": "Script handle to an audio effect module in the signal chain (filter, reverb, delay, etc.) that provides attribute control, bypass, modulator chain access, peak level monitoring, draggable filter data, and state export/restore.",
+    "domain": "audio",
+    "role": "handle",
+    "baseClass": "ConstScriptingObject",
+    "creates": [
+      "Modulator"
+    ],
+    "references": [
+      "Synth",
+      "SlotFX"
+    ],
+    "seeAlso": [
+      {
+        "class": "SlotFX",
+        "distinction": "Effect is a static handle to a specific effect module, while SlotFX is a container that can dynamically swap different effect types at runtime."
+      },
+      {
+        "class": "Modulator",
+        "distinction": "Effect processes audio in the FX chain, while Modulator generates control signals that modulate parameters over time."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.6,
+    "threadingExposure": 0.3
+  },
+  "ChildSynth": {
+    "brief": "Script handle to a child sound generator module (synth, sampler, etc.) within a SynthGroup or SynthChain, providing attribute control, bypass, modulator chain access, routing matrix retrieval, and conversion to a Sampler reference.",
+    "domain": "audio",
+    "role": "handle",
+    "baseClass": "ConstScriptingObject",
+    "creates": [
+      "Modulator",
+      "Sampler",
+      "RoutingMatrix",
+      "ChildSynth"
+    ],
+    "references": [
+      "Synth",
+      "Effect"
+    ],
+    "seeAlso": [
+      {
+        "class": "Synth",
+        "distinction": "ChildSynth is a handle to a specific child sound generator for attribute and routing control, while Synth is the parent-level API for voice management and module traversal."
+      },
+      {
+        "class": "Effect",
+        "distinction": "ChildSynth references a sound-generating module (with its own voice management), while Effect references an audio processing module in the FX chain."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.6,
+    "threadingExposure": 0.3
+  },
+  "SlotFX": {
+    "brief": "Script handle to a dynamic effect slot that can load and swap different effect types at runtime, providing hot-swapping of effects, parameter property queries, and soft bypass -- used for user-selectable FX chains.",
+    "domain": "audio",
+    "role": "handle",
+    "baseClass": "ConstScriptingObject",
+    "creates": [
+      "Effect"
+    ],
+    "references": [
+      "Synth"
+    ],
+    "seeAlso": [
+      {
+        "class": "Effect",
+        "distinction": "SlotFX is a container that dynamically loads/swaps effect modules at runtime, while Effect is a static handle to a fixed effect already in the signal chain."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.4,
+    "threadingExposure": 0.3
+  },
+  "AudioSampleProcessor": {
+    "brief": "Script handle to a module that plays a single audio file (AudioLoopPlayer, etc.), providing file loading, sample range control, loop range queries, and access to the underlying AudioFile complex data object.",
+    "domain": "audio",
+    "role": "handle",
+    "baseClass": "ConstScriptingObject",
+    "creates": [
+      "AudioFile"
+    ],
+    "references": [
+      "Synth"
+    ],
+    "seeAlso": [
+      {
+        "class": "Sampler",
+        "distinction": "AudioSampleProcessor plays a single audio file with sample range control, while Sampler manages multi-sample instruments with key/velocity mapping and round-robin groups."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.65,
+    "threadingExposure": 0.2
+  },
+  "TableProcessor": {
+    "brief": "Script handle to any module that contains lookup tables (table envelopes, table modulators, etc.), providing table point editing, base64 state export/restore, and access to ScriptTableData complex data objects.",
+    "domain": "audio",
+    "role": "handle",
+    "baseClass": "ConstScriptingObject",
+    "creates": [
+      "Table"
+    ],
+    "references": [
+      "Synth",
+      "Modulator"
+    ],
+    "seeAlso": [
+      {
+        "class": "Modulator",
+        "distinction": "TableProcessor provides direct table curve editing for any module with tables, while Modulator controls the modulator's parameters and intensity without direct table access."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.7,
+    "threadingExposure": 0.15
+  },
+  "RoutingMatrix": {
+    "brief": "Script handle to a processor's channel routing matrix that manages source-to-destination channel connections and send connections, with channel count queries and per-channel gain monitoring.",
+    "domain": "routing",
+    "role": "handle",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": [
+      "Synth",
+      "ChildSynth"
+    ],
+    "seeAlso": [
+      {
+        "class": "GlobalRoutingManager",
+        "distinction": "RoutingMatrix manages internal channel routing within a single processor, while GlobalRoutingManager handles cross-module signal routing via named cables and OSC."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.55,
+    "threadingExposure": 0.2
+  },
+  "Settings": {
+    "brief": "Audio device and standalone application settings manager that provides get/set access to audio driver selection, buffer size, sample rate, MIDI input devices, zoom level, disk streaming mode, and OpenGL configuration.",
+    "domain": "scripting",
+    "role": "service",
+    "baseClass": "ApiClass, ScriptingObject",
+    "creates": [],
+    "references": [
+      "Engine"
+    ],
+    "seeAlso": [
+      {
+        "class": "Engine",
+        "distinction": "Settings manages audio device and standalone app configuration, while Engine handles project-level concerns like presets, resources, and utility conversions."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.85,
+    "threadingExposure": 0.05
+  },
+  "WavetableController": {
+    "brief": "Script handle to a WavetableSynth module that provides wavetable loading from audio files or buffers, resynthesis control, post-FX processing chain configuration, and wavetable export to HWT/audio formats.",
+    "domain": "audio",
+    "role": "handle",
+    "baseClass": "ConstScriptingObject, ControlledObject, WeakErrorHandler",
+    "creates": [],
+    "references": [
+      "Synth",
+      "Buffer",
+      "FFT"
+    ],
+    "seeAlso": [
+      {
+        "class": "Sampler",
+        "distinction": "WavetableController manages wavetable synthesis with resynthesis and morphing between cycles, while Sampler handles traditional sample-based playback with key/velocity mapping."
+      }
+    ],
+    "callbackDensity": 0.05,
+    "statefulness": 0.4,
+    "threadingExposure": 0.2
+  },
+  "ScriptModulationMatrix": {
+    "brief": "Dynamic modulation routing system that manages many-to-many connections between global modulator sources and UI component targets, with connection callbacks, drag interaction support, user preset integration, and per-connection property control.",
+    "domain": "audio",
+    "role": "service",
+    "baseClass": "ConstScriptingObject, ControlledObject, UserPresetStateManager",
+    "creates": [],
+    "references": [
+      "Engine",
+      "Modulator"
+    ],
+    "seeAlso": [
+      {
+        "class": "Modulator",
+        "distinction": "ScriptModulationMatrix dynamically routes multiple modulation sources to multiple targets with user-configurable connections, while Modulator is a handle to a single fixed modulator for direct parameter control."
+      },
+      {
+        "class": "GlobalRoutingManager",
+        "distinction": "ScriptModulationMatrix handles modulation-specific routing with intensity, inversion, and display data, while GlobalRoutingManager handles general-purpose signal and data routing via named cables."
+      }
+    ],
+    "callbackDensity": 0.25,
+    "statefulness": 0.35,
+    "threadingExposure": 0.3
+  }
+}

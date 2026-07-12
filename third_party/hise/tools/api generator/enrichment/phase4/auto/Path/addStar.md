@@ -1,0 +1,1 @@
+Adds a star shape centred at the given point. The star has alternating vertices at `innerRadius` (the concave points between tips) and `outerRadius` (the tips). A 5-pointed star uses `numPoints = 5`. The `angle` parameter rotates the star in radians.

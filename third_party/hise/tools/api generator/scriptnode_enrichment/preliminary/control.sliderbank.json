@@ -1,0 +1,95 @@
+{
+  "factoryPath": "control.sliderbank",
+  "factory": "control",
+  "nodeId": "sliderbank",
+  "description": "Scale a value with a slider pack and send it to multiple targets",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input",
+      "rationale": "The input value that gets scaled by each slider pack element before sending to the corresponding output.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "NumParameters",
+      "defaultValue": 0,
+      "type": "integer",
+      "note": "Number of output parameter slots. Each slot corresponds to one slider in the slider pack."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 1,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": true,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/sliderbank.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "scaling-formula",
+      "category": "signal_path",
+      "question": "How does the slider pack scale the input Value for each output? Is it Value * sliderPackElement[i] for each output i? Or a different transformation?",
+      "context": "The core functionality needs to be documented precisely."
+    },
+    {
+      "id": "num-parameters-sync",
+      "category": "parameter_behaviour",
+      "question": "How does NumParameters interact with the slider pack size? Must they match? What happens if the slider pack has more/fewer elements than NumParameters?",
+      "context": "Users need to understand the relationship between the slider pack and the output count."
+    },
+    {
+      "id": "multi-output-pattern",
+      "category": "signal_path",
+      "question": "Does sliderbank use dynamic_list as its ParameterType for multi-output? How are individual outputs connected -- via SwitchTargets (present but empty count)?",
+      "context": "Understanding the output wiring pattern is essential for practical use."
+    }
+  ],
+
+  "notes": "sliderbank has SwitchTargets (empty in base data) and a NumParameters property, suggesting it is a multi-output node like xfader. It uses a slider pack to scale the input Value before distributing to multiple outputs. One SliderPack ComplexData slot."
+}

@@ -1,0 +1,81 @@
+{
+  "factoryPath": "container.midichain",
+  "factory": "container",
+  "nodeId": "midichain",
+  "description": "Sends MIDI events to child nodes",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "UI-only layout hint. Does not affect processing."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/container/midichain.md",
+    "tier": "BRIEF",
+    "lines": 19
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "event-splitting-mechanism",
+      "category": "signal_path",
+      "question": "Confirm the wrap::event processing model: audio is split at MIDI event timestamps using ChunkableProcessData. For each event, audio up to that timestamp is processed first, then handleHiseEvent() is called, then remaining audio continues. Does this apply recursively if multiple events have the same timestamp?",
+      "context": "Sample-accurate MIDI processing is midichain's core feature. The exact splitting behavior determines timing precision."
+    },
+    {
+      "id": "serial-processing-within",
+      "category": "signal_path",
+      "question": "Confirm that midichain processes children serially (same as chain) and that the wrap::event wrapper is the ONLY difference from a regular chain. Is the child processing via DynamicSerialProcessor identical to ChainNode's?",
+      "context": "Users need to know that midichain = chain + MIDI event splitting. No other processing differences."
+    },
+    {
+      "id": "context-requirement",
+      "category": "signal_path",
+      "question": "The phase3 doc says MIDI processing is automatic in synthesiser/envelope/time-variant-modulator contexts but disabled by default for effects. Confirm this is controlled by the wrap::event wrapper setting isProcessingHiseEvent=true. Does midichain also work (is it redundant but harmless) in contexts where MIDI is already enabled?",
+      "context": "Users need guidance on when midichain is necessary vs redundant."
+    }
+  ],
+
+  "notes": "Midichain wraps DynamicSerialProcessor in wrap::event, which forces isProcessingHiseEvent=true. The cppProperties in base data are empty because the MIDI processing flag is set by the wrapper at runtime, not registered as a compile-time property of the container class itself. The phase3 doc has useful content about the audio-splitting behavior with timestamp example."
+}

@@ -1,0 +1,1 @@
+Exports the complete processor state as a base64-encoded string. The snapshot captures all parameters, modulator chain configuration, and internal processor state. Pass the returned string to `restoreState` to reload the saved configuration - useful for implementing "FX lock" features that preserve settings across preset changes.

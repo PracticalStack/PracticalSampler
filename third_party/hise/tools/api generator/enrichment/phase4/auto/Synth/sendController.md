@@ -1,0 +1,1 @@
+Sends a controller event into the MIDI buffer at the current event's timestamp. The `number` parameter accepts standard CC numbers (0-127), or the special values 128 (pitch bend, value range 0-16383) and 129 (aftertouch). Unlike `addController`, this method does not set the artificial flag and does not allow specifying a channel or custom timestamp.

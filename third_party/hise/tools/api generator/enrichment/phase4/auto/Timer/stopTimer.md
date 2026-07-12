@@ -1,0 +1,1 @@
+Stops the timer. No further callbacks fire after this call. Safe to call on a timer that is not running. The timer also stops automatically on script recompilation or when the Timer object is destroyed.

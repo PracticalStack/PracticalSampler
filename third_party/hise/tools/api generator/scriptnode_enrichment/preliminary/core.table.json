@@ -1,0 +1,80 @@
+{
+  "factoryPath": "core.table",
+  "factory": "core",
+  "nodeId": "table",
+  "description": "a (symmetrical) lookup table based waveshaper",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 1,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/table.md",
+    "tier": "STUB",
+    "lines": 6
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "symmetrical-meaning",
+      "category": "signal_path",
+      "question": "The description says 'symmetrical'. Does this mean the table lookup is applied symmetrically to positive and negative signal values (i.e., abs(input) is used for lookup, then the sign is restored)?",
+      "context": "Critical for understanding waveshaping behaviour -- symmetrical shaping preserves odd harmonics only."
+    },
+    {
+      "id": "index-mapping",
+      "category": "signal_path",
+      "question": "How is the input signal mapped to the table index? From index-types.md, table lookup uses normalised index with clamped<512> and lerp interpolation. But what input range maps to 0..1 for the normalised index -- is it -1..1 (audio range) or 0..1?",
+      "context": "Users need to know the expected input signal range for proper waveshaping."
+    },
+    {
+      "id": "modulation-output",
+      "category": "signal_path",
+      "question": "core.table has ModulationTargets. Does it output the table lookup result as a modulation signal in addition to replacing the audio signal?",
+      "context": "Determines whether the node can be used as both a waveshaper and a modulation source."
+    },
+    {
+      "id": "table-size",
+      "category": "signal_path",
+      "question": "Is the table always 512 samples (SAMPLE_LOOKUP_TABLE_SIZE) as described in index-types.md? Is linear interpolation used between table entries?",
+      "context": "Confirms the resolution and interpolation quality of the waveshaper."
+    }
+  ],
+
+  "notes": "core.table has no parameters -- it is entirely driven by the table data and the input signal. The table provides the transfer function for waveshaping. The 'symmetrical' qualifier is key -- it likely means the shaping curve is mirrored around zero, which is standard for waveshapers that want to preserve the fundamental. Has ModulationTargets, suggesting it can also act as a modulation source. Uses index::lerp<index::normalised<double, index::clamped<512>>> per the index-types.md infrastructure."
+}

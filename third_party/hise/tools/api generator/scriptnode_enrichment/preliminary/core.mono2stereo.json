@@ -1,0 +1,68 @@
+{
+  "factoryPath": "core.mono2stereo",
+  "factory": "core",
+  "nodeId": "mono2stereo",
+  "description": "converts a mono signal to a stereo signal (`L->L+R`)",
+
+  "classification": {
+    "signalPathRole": "utility",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/mono2stereo.md",
+    "tier": "BRIEF",
+    "lines": 10
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "copy-mechanism",
+      "category": "signal_path",
+      "question": "Does mono2stereo copy channel 0 to channel 1 (L->L+R as the description suggests)? What happens if the input already has 2 channels -- is channel 1 overwritten with channel 0?",
+      "context": "Users need to know exactly what this node does to the channel layout."
+    },
+    {
+      "id": "channel-count-change",
+      "category": "signal_path",
+      "question": "Does this node change the channel count from 1 to 2 in the ProcessData, or does it assume the buffer already has 2 channels and just copies data?",
+      "context": "Determines placement constraints in the node graph."
+    }
+  ],
+
+  "notes": "core.mono2stereo is a trivially simple utility node with no parameters, no properties, and no complex data. The description uses markdown formatting (backticks around L->L+R). Its sole purpose is to duplicate a mono signal to both stereo channels. No cppProperties at all -- monophonic, no MIDI, no modulation."
+}

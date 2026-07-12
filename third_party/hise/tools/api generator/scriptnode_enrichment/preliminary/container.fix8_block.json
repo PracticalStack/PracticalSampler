@@ -1,0 +1,93 @@
+{
+  "factoryPath": "container.fix8_block",
+  "factory": "container",
+  "nodeId": "fix8_block",
+  "description": "Split the audio signal into fixed length chunks of 8 samples.",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "UI-only: controls whether the container is displayed vertically or horizontally in the scriptnode graph. No effect on audio processing."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": true,
+    "groupName": "fixN_block",
+    "templateParameter": "block size",
+    "variantValue": "8"
+  },
+
+  "existingDoc": {
+    "path": "phase3/container/fix8_block.md",
+    "tier": "GOOD",
+    "lines": 21
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "sub-block-chunking-behaviour",
+      "category": "signal_path",
+      "question": "How does wrap::fix_block<8, T> handle incoming buffers that are not a multiple of 8? Does ChunkableProcessData produce a remainder chunk smaller than 8, or is the last chunk zero-padded?",
+      "context": "Users need to know whether child nodes always see exactly 8 samples or may see fewer in the last chunk. This affects how nodes with state (filters, delays) behave at chunk boundaries."
+    },
+    {
+      "id": "midi-event-splitting",
+      "category": "signal_path",
+      "question": "How are MIDI events distributed across sub-block chunks? Does ChunkableProcessData split events by timestamp so each chunk only sees events within its sample range?",
+      "context": "Important for understanding whether modulation driven by MIDI events (e.g., note-on triggering an envelope) has sub-block accuracy within this container."
+    },
+    {
+      "id": "bypass-revert-behaviour",
+      "category": "signal_path",
+      "question": "When bypassed, the existing doc says children still process but with default chain behaviour. Does FixedBlockNode::setBypassed() re-prepare children with the original block size, or does it simply skip the chunking in process()?",
+      "context": "The existing phase3 doc mentions A/B comparison via bypass. Need to confirm the exact mechanism: re-prepare vs passthrough."
+    },
+    {
+      "id": "block-size-vs-incoming",
+      "category": "signal_path",
+      "question": "If the host block size is smaller than 8 (e.g., blockSize=4), does fix_block<8> pass through without chunking, or does it buffer samples across callbacks?",
+      "context": "The infrastructure doc says 'if numSamples < BlockSize, forwards directly'. Need to confirm this means no chunking occurs and child sees the smaller buffer as-is."
+    },
+    {
+      "id": "frame-mode-passthrough",
+      "category": "conditional_logic",
+      "question": "When already in frame mode (blockSize==1 from a parent frame container), does fix_block skip its chunking logic entirely? The wrap-templates doc mentions withBlockSizeT preserves frame mode.",
+      "context": "Affects nested container behaviour. Users may nest fix_block inside frame containers."
+    }
+  ],
+
+  "notes": "Base variant of the fixN_block group. All fixN variants (8, 16, 32, 64, 128, 256) share identical C++ logic via wrap::fix_block<N, T> -- only the template parameter N differs. The existing phase3 doc is the most detailed of the group and contains useful information about modulation update rate implications and the bypass A/B workflow. The cppProperties object is empty, which is expected for containers -- containers are not flagged with IsPolyphonic, IsControlNode, etc. in the base data."
+}

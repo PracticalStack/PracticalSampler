@@ -1,0 +1,87 @@
+{
+  "factoryPath": "container.sidechain",
+  "factory": "container",
+  "nodeId": "sidechain",
+  "description": "Creates a empty audio by duplicating the channel amount for sidechain routing.",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "UI-only layout hint. Does not affect processing."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/container/sidechain.md",
+    "tier": "GOOD",
+    "lines": 23
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "channel-doubling-mechanism",
+      "category": "signal_path",
+      "question": "Confirm the wrap::sidechain processing model: (1) prepare() doubles numChannels for children, (2) process() creates a new channel pointer array where the first half are the original audio channels and the second half are zeroed sidechain buffer channels, (3) children see 2x the channels. After processing, only the first half of channels (original audio) are returned to the parent.",
+      "context": "The channel doubling is the core mechanism. Users need to understand that the extra channels start as silence and can be filled by routing nodes."
+    },
+    {
+      "id": "frame-processing-limitation",
+      "category": "signal_path",
+      "question": "Confirm that sidechain asserts false in processFrame() and skips sidechain buffer allocation when blockSize=1. This means sidechain containers cannot be nested inside frame-based containers.",
+      "context": "Important constraint for users building nested container hierarchies."
+    },
+    {
+      "id": "sidechain-buffer-content",
+      "category": "signal_path",
+      "question": "The extra channels start zeroed each process() call. Confirm that any signal routed into these channels (via routing nodes) persists only for that block. Is the sidechain buffer cleared every call, or does it retain state between blocks?",
+      "context": "Users need to know whether sidechain input must be continuously supplied or if it persists."
+    },
+    {
+      "id": "description-grammar",
+      "category": "description_accuracy",
+      "question": "The base data description says 'Creates a empty audio' -- should be 'an empty'. Also 'duplicating the channel amount for sidechain routing' could be clearer. Consider: 'Doubles the channel count by adding empty sidechain channels.'",
+      "context": "Minor grammar issue in the description."
+    }
+  ],
+
+  "notes": "Sidechain uses wrap::sidechain<T>. The phase3 doc has an excellent explanation of the typical workflow: (1) wrap in sidechain container, (2) add dynamics node with Sidechain parameter enabled, (3) use routing nodes to fill the extra channels with sidechain input. The description has a minor grammar error ('a empty' should be 'an empty')."
+}

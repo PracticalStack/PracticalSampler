@@ -1,0 +1,119 @@
+{
+  "factoryPath": "math.expr",
+  "factory": "math",
+  "nodeId": "expr",
+  "description": "A JIT compiled math expression using SNEX.",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Expression Input",
+      "rationale": "The Value parameter provides a user-controllable variable that can be referenced within the SNEX expression. It acts as an external input to the expression formula.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "Code",
+      "defaultValue": "input",
+      "type": "string",
+      "note": "The SNEX math expression to apply to the signal. The default 'input' passes the signal through unchanged. Likely supports standard math operations and the 'input' and 'value' variables."
+    },
+    {
+      "id": "Debug",
+      "defaultValue": false,
+      "type": "boolean",
+      "note": "Enables debug mode for the expression. Likely provides diagnostic output or disables JIT optimisation for easier debugging."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/math/expr.md",
+    "tier": "GOOD",
+    "lines": 132
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "available-variables-and-functions",
+      "category": "signal_path",
+      "question": "What variables and functions are available inside the SNEX expression? The default Code is 'input' -- is this the signal sample? Is 'value' the Value parameter? What hmath functions can be called (sin, cos, etc.)?",
+      "context": "Users need a complete reference of what they can write in the Code property to create useful expressions."
+    },
+    {
+      "id": "value-parameter-interaction",
+      "category": "parameter_behaviour",
+      "question": "How does the Value parameter interact with the expression? Is it available as a variable named 'value' in the expression code? Is it per-voice since IsPolyphonic is true?",
+      "context": "Understanding how to parameterise expressions is essential for making them modulatable and interactive."
+    },
+    {
+      "id": "debug-property-function",
+      "category": "conditional_logic",
+      "question": "What does the Debug property do when set to true? Does it disable JIT compilation and use an interpreter, show intermediate values in the UI, or produce console output?",
+      "context": "Users need to know when and why to enable Debug mode during expression development."
+    },
+    {
+      "id": "compilation-timing",
+      "category": "signal_path",
+      "question": "When does the expression get compiled? On every Code property change? Is there a compilation delay or audio dropout during recompilation? What happens if the expression has a syntax error?",
+      "context": "Important for understanding the workflow: whether expressions can be edited live and what error handling exists."
+    },
+    {
+      "id": "processing-model",
+      "category": "signal_path",
+      "question": "Does math.expr process per-sample only (via opSingle), or does it also have a block processing path? The hmath.md says it uses OpNode<expression_base<ExpressionClass>, NV> -- does expression_base provide both op() and opSingle()?",
+      "context": "Determines whether expressions are limited to per-sample processing or can benefit from block-level optimisation."
+    },
+    {
+      "id": "expression-syntax",
+      "category": "signal_path",
+      "question": "What is the exact syntax for the expression? Is it a single-line return expression (like 'input * value'), or can it contain multiple statements? Are there operator precedence rules that differ from standard C?",
+      "context": "Users need syntax guidance to write correct expressions without trial and error."
+    }
+  ],
+
+  "notes": "math.expr uses JIT-compiled SNEX expressions for custom per-sample math. It wraps an ExpressionClass in the OpNode template via expression_base, making it structurally similar to the standard math ops but with user-defined logic. IsPolyphonic is true, so the Value parameter is per-voice. The existing doc is GOOD quality (132 lines) and likely contains useful information about available variables and syntax. The Code property defaults to 'input' which passes the signal through unchanged. The snex-overview.md infrastructure doc would provide additional context about SNEX JIT compilation."
+}

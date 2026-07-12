@@ -1,0 +1,72 @@
+{
+  "targetId": "routing.send",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [1223, 1766, 4553, 5032, 6236, 6353, 6372, 10600],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Send container must come AFTER the send FX node",
+      "body": "The send container must be placed after the send FX in the signal chain. If the send container comes before the send FX, the signal will be delayed by one full buffer size. This is a hard ordering constraint.",
+      "source": "tid:1223",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "receive node must come after the send node in the graph",
+      "body": "Scriptnode processes nodes top-down, left-to-right. If a routing.receive node is placed before its corresponding routing.send node within a split container, the signal has not been duplicated yet and the receive node points to garbage — causing clicks and artifacts at note start/end. Either keep them in the same chain or ensure the receive node comes after the send node.",
+      "source": "tid:1766",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "API",
+      "title": "One send source can fan out to multiple receive nodes, but each receive has exactly one input",
+      "body": "A single routing.send node can feed multiple routing.receive nodes. However, every routing.receive node can only accept one input source. To merge multiple sources at a single destination, use a split node with multiple receive nodes inside it — each pulling from a different send.",
+      "source": "tid:4553, tid:10600",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "BUG",
+      "title": "Send FX in the main container causes instant feedback",
+      "body": "Placing a send FX directly in the main/master container creates a feedback loop that instantly clips and can damage speakers. Always place the send FX inside a child container, not at the top-level master container. This was acknowledged by the author as a user-error that should be prevented, and a guard was added in a later commit.",
+      "source": "tid:5032, tid:6236",
+      "author": "ustk [trusted], Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Send containers in effect plugins require 'Enable Sound Generators FX' flag",
+      "body": "To use send containers (and Global Modulation Containers) in an effect plugin rather than an instrument plugin, you must enable the 'Enable Sound Generators FX' flag in project settings. Without it, the send container is not processed.",
+      "source": "tid:6353",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Send signal introduces one-buffer delay in effect plugin context",
+      "body": "When using send/receive routing in an effect plugin (master FX chain), the send signal is delayed by one buffer size. The author notes this makes the concept 'a bit flawed for audio effects'. A workaround is to route to extra channels (e.g. 3/4) and sum back to stereo using the routing matrix, but the buffer delay still applies to the aux path.",
+      "source": "tid:6353",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Networks using global send/receive nodes cannot be compiled to DLL",
+      "body": "Scriptnode networks that contain global send or global receive nodes cannot be compiled to a native DLL. This is a hard limitation — if compilation is needed, the global send/receive pattern must be redesigned to avoid global routing.",
+      "source": "tid:10600",
+      "author": "Lindon [trusted]",
+      "confidence": "high"
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Use channel offset parameter to multiplex multiple sends into a single container",
+      "body": "To use multiple send busses without adding multiple send containers, increase the channel count of a single send container and use the 'channel offset' parameter on individual send FX nodes to target different channels within that container. This avoids the overhead of multiple containers.",
+      "source": "tid:1223",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    }
+  ]
+}

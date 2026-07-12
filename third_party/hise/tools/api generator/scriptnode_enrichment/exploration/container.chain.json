@@ -1,0 +1,12 @@
+{
+  "factoryPath": "container.chain",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "serial", "label": "Serial dispatch", "type": "process", "importance": 1.0, "description": "Each child processes the buffer in-place, sequentially" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Output after all children have processed" }
+  ],
+  "edges": [
+    { "from": "in", "to": "serial", "type": "signal", "label": null },
+    { "from": "serial", "to": "out", "type": "signal", "label": "N children in sequence" }
+  ]
+}

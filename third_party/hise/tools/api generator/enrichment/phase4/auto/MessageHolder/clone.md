@@ -1,0 +1,1 @@
+Creates an independent copy of this MessageHolder. Modifying the clone does not affect the original and vice versa. Use this when you need to store multiple variations of the same event - for example, building a sequence by cloning a template holder and adjusting each copy's timestamp and note number.

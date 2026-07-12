@@ -1,0 +1,1 @@
+Removes all elements from the array. The internal storage capacity is retained, so subsequent `push` calls within the previous capacity do not trigger reallocation. To release the allocated memory as well, reassign to a new empty array (`a = [];`).

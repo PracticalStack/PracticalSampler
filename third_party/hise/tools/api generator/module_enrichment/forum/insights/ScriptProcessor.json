@@ -1,0 +1,112 @@
+{
+  "targetId": "ScriptProcessor",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [8290, 4527, 12052, 8937, 5425, 10735, 651, 12914, 13789, 12580, 13846, 5692, 13042, 1294, 11310, 5315, 11430, 3333, 4672, 4993, 12800, 5097, 1529, 7399, 7279, 171, 1634, 14503, 11505],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Preset recall only restores controls on the Interface script — not secondary ScriptProcessors",
+      "summary": "HISE presets save and restore only the UI component state of the main interface script. Controls in secondary ScriptProcessors are not saved. To persist their state across presets, link those controls to a control on the Interface script via processorId/parameterId or setAttribute().",
+      "sources": ["tid:12800"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "Components in secondary ScriptProcessor panels lose their cross-script connections after HISE restart",
+      "summary": "If a UI component in a secondary ScriptProcessor is inside a panel and is connected to a UI component on the Interface script via processorId/parameterId, the connection is silently lost on project reload. Removing and remaking the connection restores it temporarily. No fix was confirmed at the time of the report.",
+      "sources": ["tid:11430"],
+      "verify": true,
+      "verify_hint": "search for processorId/panel connection persistence in ScriptProcessorModules or ScriptComponent save/load"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "DspNetwork inside a ScriptFX silently consumes onControl callbacks",
+      "summary": "When a ScriptFX (or any ScriptProcessor) contains a DspNetwork, the network intercepts all parameter/control callbacks by default. onControl will not fire for UI components. Call DspNetwork.setForwardControlsToParameters(false) on your network object to restore onControl callbacks.",
+      "sources": ["tid:5425", "tid:14503"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Keep UI logic in the Interface script, real-time MIDI logic in a separate ScriptProcessor",
+      "summary": "The recommended architecture is to have the Interface script deferred (Synth.deferCallbacks(true)) and handle only UI. Real-time MIDI processing goes in a separate non-deferred ScriptProcessor. The two communicate through linked controls (processorId/parameterId) or setAttribute(), not global variables.",
+      "sources": ["tid:10735", "tid:12580", "tid:11505", "tid:4527"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Make secondary ScriptProcessors self-contained with their own duplicate controls",
+      "summary": "A secondary processing script should declare its own controls and operate independently, without relying on the Interface script's variables or global state. The Interface script then links to those controls. This makes the secondary script portable and reusable across projects.",
+      "sources": ["tid:8937", "tid:12580"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Global variables create hidden coupling between ScriptProcessors",
+      "summary": "Using the global keyword to pass data between ScriptProcessors creates implicit dependencies. A script that relies on globals from another processor will silently break when used in a different project or module arrangement. Prefer linked controls or setAttribute() for cross-processor communication.",
+      "sources": ["tid:8937", "tid:12580", "tid:5692"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Timer in a secondary ScriptProcessor inside a Synth Group may not fire correctly",
+      "summary": "Timers in a ScriptProcessor nested inside a Synth Group appear to have edge-case issues. An expert confirmed visual update bugs in that configuration and recommended placing the timer ScriptProcessor outside the Synth Group or using a non-visual approach (e.g., setAttribute to update UI).",
+      "sources": ["tid:8290"],
+      "verify": true,
+      "verify_hint": "check timer channel-matching logic in ScriptProcessorModules.cpp processHiseEvent; chain index assignment for nested processors"
+    },
+    {
+      "type": "API",
+      "title": "External ScriptProcessor scripts are embedded in the exported binary",
+      "summary": "When a ScriptProcessor is connected to an external .js file via 'Connect to external script', the file is embedded into the compiled plugin binary at export time, just like include() files. Scripts can reference files outside the project folder, but embedding on export requires files to be within the project.",
+      "sources": ["tid:171"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Connecting a ScriptProcessor to an external script removes the editor tabs",
+      "summary": "Once a ScriptProcessor is connected to an external file, the callback editor tabs disappear and the processor enters read-only mode in the module view. The script can still be edited via the main Code Editor. To make local modifications, use 'Disconnect from external script' first.",
+      "sources": ["tid:12052"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Interface Designer should not be used for secondary ScriptProcessors",
+      "summary": "The visual Interface Designer is designed for the main interface script. For secondary ScriptProcessors, UI components should be created entirely through code (Content.addKnob(), etc.) so the script can be reused in other projects without losing its UI setup.",
+      "sources": ["tid:4672"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Use Content.setHeight()/Content.setWidth() instead of makeFrontInterface() for non-interface scripts",
+      "summary": "For a secondary ScriptProcessor that needs a visible panel (not the main plugin interface), use Content.setHeight() and Content.setWidth() to size the content area. Content.makeFrontInterface() should only be called once, in the main interface script.",
+      "sources": ["tid:4993"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Use 'load script from clipboard' when pasting multi-callback scripts into the editor",
+      "summary": "Pasting a complete multi-callback HiseScript directly into the editor window will not distribute code into the correct callback slots. Use the right-click context menu option 'Load script from clipboard' instead — this parses the callbacks and places each one into the correct tab.",
+      "sources": ["tid:13846"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "local keyword outside a callback or inline function is silently treated as var",
+      "summary": "Using the local keyword in onInit or at script scope (outside a callback or inline function) triggers a warning and HISE silently treats the variable as var. The correct keyword for onInit is const or reg; local is only valid inside callbacks and inline functions.",
+      "sources": ["tid:5425"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

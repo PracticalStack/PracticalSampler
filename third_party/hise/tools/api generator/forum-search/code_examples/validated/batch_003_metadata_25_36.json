@@ -1,0 +1,142 @@
+{
+  "25": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Fixed: added 'const var v = [100, 200, 400, 800, 1600, 3200];' to resolve undefined array reference"
+  },
+  "26": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "MIDI callback code, compile-only test"
+  },
+  "27": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "SNEX C++ template code, not HiseScript",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "28": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Container"},
+      {"type": "ScriptPanel", "id": "EffectPanel0"},
+      {"type": "ScriptPanel", "id": "EffectPanel1"},
+      {"type": "ScriptPanel", "id": "EffectPanel2"},
+      {"type": "ScriptPanel", "id": "EffectPanel3"},
+      {"type": "ScriptPanel", "id": "EffectPanel4"},
+      {"type": "ScriptButton", "id": "PrevBtn0"},
+      {"type": "ScriptButton", "id": "PrevBtn1"},
+      {"type": "ScriptButton", "id": "PrevBtn2"},
+      {"type": "ScriptButton", "id": "PrevBtn3"},
+      {"type": "ScriptButton", "id": "PrevBtn4"},
+      {"type": "ScriptButton", "id": "NextBtn0"},
+      {"type": "ScriptButton", "id": "NextBtn1"},
+      {"type": "ScriptButton", "id": "NextBtn2"},
+      {"type": "ScriptButton", "id": "NextBtn3"},
+      {"type": "ScriptButton", "id": "NextBtn4"}
+    ],
+    "verifyScript": null,
+    "notes": "Complex panel reordering system with 16 components, compile-only test"
+  },
+  "29": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "AudioLooper", "name": "audioLoopPlayer0"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Compile-only, tempo change callback won't fire"
+  },
+  "30": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "FileSystem.browse modal dialog blocks execution; references undefined variables (myExpectedControl, doSomething)",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "31": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Server.callWithGET requires external network connectivity",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "32": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"}
+    ],
+    "verifyScript": null,
+    "notes": "Timer state machine, compile-only test"
+  },
+  "33": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"}
+    ],
+    "verifyScript": null,
+    "notes": "Broadcaster delayed chain, compile-only test"
+  },
+  "34": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"}
+    ],
+    "verifyScript": null,
+    "notes": "Paint routine with drop shadow path, compile-only test"
+  },
+  "35": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "CurveEq", "name": "Parametriq EQ1"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Display buffer configuration for CurveEq"
+  },
+  "36": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Sampler1Panel"},
+      {"type": "ScriptPanel", "id": "Sampler2Panel"},
+      {"type": "ScriptPanel", "id": "Sampler3Panel"},
+      {"type": "ScriptPanel", "id": "Sampler4Panel"}
+    ],
+    "verifyScript": null,
+    "notes": "Content.addButton creates the show button, panels need to pre-exist"
+  }
+}

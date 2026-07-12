@@ -1,0 +1,107 @@
+{
+  "factoryPath": "jdsp.jpanner",
+  "factory": "jdsp",
+  "nodeId": "jpanner",
+  "description": "",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Panning",
+      "rationale": "Pan sets the stereo position, Rule selects the panning law.",
+      "parameters": [
+        {
+          "id": "Pan",
+          "range": { "min": -1.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Rule",
+          "range": { "min": 0.0, "max": 6.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "92.nT6K8CRXcJ..hRTDX.XhMfzBLSdJFeSlZc1txz1qiHBX9YoTJbDDu2zVkWZgPbLMm..53jVluJgx5pMYYpv4WcfQ.7TX3sRvieyusGD7ErrPD..HIW6skbDauPA",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/jdsp/jpanner.md",
+    "tier": "GOOD",
+    "lines": 22
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-processing",
+      "category": "signal_path",
+      "question": "How does the node wrap JUCE's Panner? Does it use process() with AudioBlock? Does it require stereo input or can it upmix mono to stereo?",
+      "context": "Need to describe the signal flow and channel requirements."
+    },
+    {
+      "id": "rule-parameter-values",
+      "category": "conditional_logic",
+      "question": "The Rule parameter has range 0-6 with step 1 and an encoded TextToValueConverter. The phase3 doc lists 7 rules (Linear, Balanced, Sin3dB, Sin4p5dB, Sin6dB, SquareRoot3dB, SquareRoot4p5dB). Confirm the mapping from C++ and verify the default (1 = Balanced).",
+      "context": "Need to list all rules with their attenuation characteristics."
+    },
+    {
+      "id": "mono-input-behaviour",
+      "category": "signal_path",
+      "question": "What happens when the panner receives a mono signal? Does it duplicate to stereo first?",
+      "context": "Important for practical usage guidance."
+    },
+    {
+      "id": "polyphonic-state",
+      "category": "signal_path",
+      "question": "IsPolyphonic is true. Does each voice get independent pan position via PolyData? Can per-voice panning be controlled?",
+      "context": "Need to document polyphonic behaviour for multi-voice contexts."
+    },
+    {
+      "id": "cpu-profile",
+      "category": "performance",
+      "question": "What is the CPU cost? The panning rules use different math (sin, sqrt) so cost may vary by rule.",
+      "context": "Need to set cpuProfile baseline."
+    }
+  ],
+
+  "notes": "Empty description in base data. Phase3 doc is GOOD quality with a complete table of all 7 panning rules including attenuation values and descriptions. Most popular jdsp node with 19 occurrences in the usage survey. IsPolyphonic is true, suggesting per-voice panning is supported. Default Rule is 1 (Balanced) rather than 0 (Linear)."
+}

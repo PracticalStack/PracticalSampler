@@ -1,0 +1,1 @@
+Sets the bypass state of the MIDI processor. When bypassed, the module stops processing MIDI events entirely. Commonly used with MidiMuter modules to implement mute/solo and articulation switching systems.

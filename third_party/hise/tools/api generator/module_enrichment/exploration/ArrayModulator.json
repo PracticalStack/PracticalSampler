@@ -1,0 +1,91 @@
+{
+  "moduleId": "ArrayModulator",
+  "nodes": [
+    {
+      "id": "midi_input",
+      "label": "MIDI noteOn",
+      "type": "input",
+      "importance": 0.8,
+      "group": null,
+      "description": "Incoming MIDI noteOn event triggers voice start"
+    },
+    {
+      "id": "note_number_extract",
+      "label": "Extract Note Number",
+      "type": "process",
+      "importance": 0.7,
+      "group": "lookup",
+      "description": "Reads MIDI note number (0-127) from HiseEvent"
+    },
+    {
+      "id": "sliderpack_data",
+      "label": "SliderPack[128]",
+      "type": "external",
+      "importance": 0.9,
+      "group": "lookup",
+      "description": "128-element slider array (one per MIDI note), range 0.0-1.0, default all 1.0"
+    },
+    {
+      "id": "array_lookup",
+      "label": "Lookup value[noteNumber]",
+      "type": "process",
+      "importance": 1.0,
+      "group": "lookup",
+      "description": "Indexes SliderPack using note number as direct array index, returns slider value"
+    },
+    {
+      "id": "display_update",
+      "label": "Update Display Index",
+      "type": "process",
+      "importance": 0.2,
+      "group": null,
+      "description": "Sets displayed slider index for UI highlighting (no audio effect)"
+    },
+    {
+      "id": "mod_output",
+      "label": "Modulation Output",
+      "type": "output",
+      "importance": 0.8,
+      "group": null,
+      "description": "Voice start modulation value (0.0-1.0), scaled by Intensity"
+    }
+  ],
+  "edges": [
+    {
+      "from": "midi_input",
+      "to": "note_number_extract",
+      "type": "signal",
+      "label": null
+    },
+    {
+      "from": "note_number_extract",
+      "to": "array_lookup",
+      "type": "signal",
+      "label": "noteNumber (0-127)"
+    },
+    {
+      "from": "sliderpack_data",
+      "to": "array_lookup",
+      "type": "control",
+      "label": "slider values"
+    },
+    {
+      "from": "note_number_extract",
+      "to": "display_update",
+      "type": "signal",
+      "label": null
+    },
+    {
+      "from": "array_lookup",
+      "to": "mod_output",
+      "type": "signal",
+      "label": "slider value (0.0-1.0)"
+    }
+  ],
+  "groups": [
+    {
+      "id": "lookup",
+      "label": "SliderPack Lookup"
+    }
+  ]
+}

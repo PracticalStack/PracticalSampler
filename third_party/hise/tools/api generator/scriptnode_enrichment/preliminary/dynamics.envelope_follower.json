@@ -1,0 +1,121 @@
+{
+  "factoryPath": "dynamics.envelope_follower",
+  "factory": "dynamics",
+  "nodeId": "envelope_follower",
+  "description": "",
+
+  "classification": {
+    "signalPathRole": "analysis",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": true,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Envelope timing",
+      "rationale": "Attack and Release control how quickly the follower tracks rising and falling levels in the input signal.",
+      "parameters": [
+        {
+          "id": "Attack",
+          "range": { "min": 0.0, "max": 1000.0, "step": 0.0, "skew": 1.0 },
+          "default": 20.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Release",
+          "range": { "min": 0.0, "max": 1000.0, "step": 0.0, "skew": 1.0 },
+          "default": 20.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Signal handling",
+      "rationale": "ProcessSignal controls whether the node passes audio through or acts as a silent analyser.",
+      "parameters": [
+        {
+          "id": "ProcessSignal",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "encoded_converter_2_options",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "displayBuffers": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/dynamics/envelope_follower.md",
+    "tier": "BRIEF",
+    "lines": 18
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-and-output",
+      "category": "signal_path",
+      "question": "How does the envelope follower work? Does it compute the envelope per-sample (rectify + filter) or per-block (RMS/peak)? Does it produce a modulation output with the envelope value, and if so, is it normalised 0-1 or raw amplitude? The base data shows no ModulationTargets but as an envelope follower it almost certainly outputs a modulation signal.",
+      "context": "Core to understanding the node's purpose. An envelope follower without modulation output would be unusual."
+    },
+    {
+      "id": "missing-description",
+      "category": "description_accuracy",
+      "question": "The base data description is empty. What is the correct one-line description for this node? Likely: 'An envelope follower that tracks the amplitude of the input signal'.",
+      "context": "The node has no description at all in the base data. Need to write an accurate one from C++ source."
+    },
+    {
+      "id": "process-signal-options",
+      "category": "parameter_behaviour",
+      "question": "The ProcessSignal parameter has 2 options (encoded converter, range 0-1). What are the two modes? Likely: 0 = pass audio through, 1 = mute/silence output (analysis only), or vice versa.",
+      "context": "Determines whether this node can be used inline in the signal path or must be placed in a sidechain/analysis branch."
+    },
+    {
+      "id": "polyphonic-behaviour",
+      "category": "signal_path",
+      "question": "This is the only polyphonic node in the dynamics factory. Does it maintain per-voice envelope state via PolyData? How does it handle voice reset -- does the envelope reset to zero on note-on?",
+      "context": "Polyphonic envelope following is useful for per-voice dynamics control. Need to document the per-voice state management."
+    },
+    {
+      "id": "display-buffer-content",
+      "category": "signal_path",
+      "question": "The node has 1 DisplayBuffer. What does it display -- the tracked envelope waveform, the input level, or the gain reduction?",
+      "context": "Determines what visual feedback users see in the scriptnode UI."
+    }
+  ],
+
+  "notes": "This is the only polyphonic node in the dynamics factory (IsPolyphonic: true implies IsProcessingHiseEvent: true via polyphonic_base). The empty description is notable and needs to be filled from C++ source. The node likely produces a modulation output (envelope value) but this is not reflected in ModulationTargets -- same pattern as dynamics.comp's 'ducking amount as modulation signal' claim. The ProcessSignal parameter suggests dual-use: inline processing or analysis-only mode. Attack/Release range is 0-1000ms (wider than comp/gate/limiter's 0-250ms), appropriate for envelope following which may need longer time constants."
+}

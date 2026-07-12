@@ -1,0 +1,146 @@
+{
+  "moduleId": "ScriptSynth",
+  "prettyName": "Scriptnode Synthesiser",
+  "type": "SoundGenerator",
+  "subtype": "SoundGenerator",
+  "category": "custom",
+
+  "io": {
+    "midiIn": "noteOn+noteOff",
+    "audioIn": null,
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": "*"
+  },
+
+  "voiceContext": "per-voice",
+
+  "interfaces": [
+    { "name": "RoutingMatrix", "signalFlowRole": "skip - inferred from SoundGenerator type" },
+    { "name": "SlotFX", "signalFlowRole": "network_host - loads and hot-swaps scriptnode DSP networks" },
+    { "name": "TableProcessor", "signalFlowRole": "complex_data - exposes Table objects from the loaded network" },
+    { "name": "SliderPackProcessor", "signalFlowRole": "complex_data - exposes SliderPack objects from the loaded network" },
+    { "name": "AudioSampleProcessor", "signalFlowRole": "complex_data - exposes AudioFile objects from the loaded network" },
+    { "name": "DisplayBufferSource", "signalFlowRole": "skip - UI communication only" }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Output",
+      "rationale": "Standard sound generator output controls inherited from the base class",
+      "parameters": [
+        {
+          "id": "Gain",
+          "name": "Gain",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.25,
+          "description": "The output volume as normalised linear gain (0.0 to 1.0)",
+          "composite": {
+            "type": "modMultiply",
+            "chainName": "Gain Modulation",
+            "chainIndex": 1,
+            "constrainer": "*"
+          },
+          "modChain": {
+            "name": "Gain Modulation",
+            "chainIndex": 1,
+            "constrainer": "*",
+            "modulationMode": "gain"
+          }
+        },
+        {
+          "id": "Balance",
+          "name": "Balance",
+          "range": { "min": -1.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "The stereo balance",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "VoiceLimit",
+          "name": "VoiceLimit",
+          "range": { "min": 1.0, "max": 256.0, "step": 1.0 },
+          "default": 256.0,
+          "description": "The maximum number of voices",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "KillFadeTime",
+          "name": "KillFadeTime",
+          "range": { "min": 0.0, "max": 20000.0, "step": 1.0 },
+          "default": 20.0,
+          "description": "The fade out time in milliseconds when voices are killed",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "standaloneModChains": [
+    {
+      "name": "Pitch Modulation",
+      "chainIndex": 2,
+      "modulationMode": "pitch",
+      "constrainer": "*",
+      "note": "Modulates the implicit base pitch of all voices"
+    }
+  ],
+
+  "disabledModChains": [],
+
+  "compositeBlocks": [
+    {
+      "type": "modMultiply",
+      "param": "Gain",
+      "details": {
+        "chainName": "Gain Modulation",
+        "chainIndex": 1,
+        "constrainer": "*"
+      }
+    }
+  ],
+
+  "gaps": [
+    {
+      "id": "network-loading-mechanism",
+      "category": "signal_path",
+      "question": "How does ScriptSynth load a scriptnode network for voice rendering? Is it set in onInit via DspNetwork creation?",
+      "context": "Users need to know how to load and configure a network for sound generation."
+    },
+    {
+      "id": "voice-rendering-pipeline",
+      "category": "signal_path",
+      "question": "How does the per-voice rendering work? Does each voice call the network's process with a VoiceSetter, and how do gain modulation and the FX chain interact?",
+      "context": "Understanding the voice rendering pipeline is essential for the signal path pseudo-code."
+    },
+    {
+      "id": "parameter-exposure",
+      "category": "parameter_behavior",
+      "question": "How are network parameters exposed alongside the fixed Gain/Balance/VoiceLimit/KillFadeTime parameters? What offset is used?",
+      "context": "Users need to understand the parameter indexing for scripting."
+    },
+    {
+      "id": "complex-data-routing",
+      "category": "interface_usage",
+      "question": "How are Tables, SliderPacks, and AudioFiles from the loaded network exposed through the module's interfaces?",
+      "context": "Complex data routing for synth networks."
+    },
+    {
+      "id": "voice-killing",
+      "category": "signal_path",
+      "question": "How does voice killing work with ScriptSynth? Does it use ScriptnodeVoiceKiller or does the network handle it directly?",
+      "context": "Voice management is critical for polyphonic instruments."
+    },
+    {
+      "id": "modulation-chain-support",
+      "category": "signal_path",
+      "question": "How do the extra modulation chains (HISE_NUM_SCRIPTNODE_SYNTH_MODS) connect to network parameters?",
+      "context": "Users need to understand how to modulate scriptnode parameters from the module tree."
+    }
+  ],
+
+  "notes": "ScriptSynth is the polyphonic sound generator variant of the scriptnode container family. It inherits Gain/Balance/VoiceLimit/KillFadeTime from ModulatorSynth and adds dynamic network parameters. The C++ class is JavascriptSynthesiser. The Hardcoded equivalent is HardcodedSynthesiser."
+}

@@ -1,0 +1,1 @@
+Creates a new empty MIDI sequence with the given time signature (nominator, denominator) and bar count, appends it to the sequence list, and selects it. Does not clear existing sequences - call `clearAllSequences()` first if you want to start fresh.

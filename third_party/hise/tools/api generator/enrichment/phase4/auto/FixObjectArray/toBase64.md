@@ -1,0 +1,1 @@
+Serialises the array's entire memory block into a Base64-encoded string. The resulting string can be stored (e.g. in user presets or script state) and later restored with `fromBase64()`. The encoding captures raw bytes in memory layout order, so it is tied to the factory's property schema - a string saved with one layout cannot be restored into an array with a different layout.

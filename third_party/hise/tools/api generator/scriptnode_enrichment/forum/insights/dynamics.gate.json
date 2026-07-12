@@ -1,0 +1,40 @@
+{
+  "targetId": "dynamics.gate",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [12497, 7987, 12722, 13014, 12246, 1191, 7734, 13675, 12794],
+  "insights": [
+    {
+      "type": "API",
+      "title": "Reading GateReduction via script requires a timer polling Dynamics.getAttribute",
+      "summary": "There is no push-based callback for gain reduction from the gate node. To display gate reduction in a plugin GUI, use a timer that polls `effect.getAttribute(Dynamics.GateReduction)`, converts the linear value to dB with `Engine.getDecibelsForGainFactor()`, and writes it to a slider or display component. The same pattern applies to CompressorReduction and LimiterReduction on the Dynamics module.",
+      "sources": ["tid:12722"],
+      "verify": true,
+      "verify_hint": "Confirm that Dynamics.GateReduction is a valid attribute index and that getDecibelsForGainFactor correctly maps the reduction value."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Gate depth control using pma node to scale modulation output",
+      "summary": "The gate's output modulation (0–1) can be scaled to implement a 'depth' parameter: route the gate modulation into a `core.pma` node and use the multiply parameter to set how deeply the gate closes. This lets you create a downward expander with adjustable depth rather than a hard gate.",
+      "sources": ["tid:12246"],
+      "verify": true,
+      "verify_hint": "Confirm that the dynamics.gate modulation output is in 0–1 range and that pma's multiply correctly scales it as a depth parameter."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Gate with reduction VU meter: community snippet available",
+      "summary": "A working gate unit with a gain reduction VU meter on the GUI was shared by resonant (trusted) as a HiseSnippet (tid:1191, 2019). This is a useful starting point for building a full gate effect UI with visual feedback.",
+      "sources": ["tid:1191"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Faust gate MIDI: gate keyword is reserved for note-on/off, not audio gating",
+      "summary": "In HISE's Faust integration, the parameter name `gate` is a reserved MIDI keyword mapped to note-on/off events (value 0 or 1). If you are building an audio gate using Faust and expose a parameter named `gate`, it will be controlled by MIDI note events rather than behaving as a UI parameter. Use a different parameter name for audio gate control threshold and route MIDI via a separate midi node.",
+      "sources": ["tid:7734"],
+      "verify": true,
+      "verify_hint": "Verify the full list of reserved Faust MIDI keywords in the HISE Faust integration (gate, freq, gain) and confirm that renaming avoids the collision."
+    }
+  ]
+}

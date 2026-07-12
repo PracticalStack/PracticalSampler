@@ -1,0 +1,108 @@
+{
+  "factoryPath": "control.logic_op",
+  "factory": "control",
+  "nodeId": "logic_op",
+  "description": "Combines the (binary) input signals using a logic operator",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Logic Inputs",
+      "rationale": "Left and Right are binary (0/1) input signals to be combined by the selected logic operator.",
+      "parameters": [
+        {
+          "id": "Left",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Right",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Operator Selection",
+      "rationale": "Operator selects which logic operation to apply between Left and Right.",
+      "parameters": [
+        {
+          "id": "Operator",
+          "range": { "min": 0.0, "max": 2.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "57.nT6K8CBLAF..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.LTPPNQjBOIkBX8jT.D1XzklckAP.AH..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/logic_op.md",
+    "tier": "BRIEF",
+    "lines": 15
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "logic-op-operator-list",
+      "category": "conditional_logic",
+      "question": "The Operator parameter has range 0..2 (3 discrete values) with a text converter. What are the 3 logic operators? Expected candidates: AND, OR, XOR. What is the complete list and index mapping?",
+      "context": "All 3 logic operators must be documented with their truth table behaviour."
+    },
+    {
+      "id": "logic-op-threshold",
+      "category": "parameter_behaviour",
+      "question": "How are the Left and Right input values converted to boolean for the logic operation? Is it a threshold (>= 0.5 = true), or strict (> 0 = true), or exact (== 1.0 = true)?",
+      "context": "Since inputs are continuous 0..1 values but logic operations require boolean, the threshold/conversion method matters."
+    },
+    {
+      "id": "logic-op-output-values",
+      "category": "signal_path",
+      "question": "Does the output strictly produce 1.0 (true) or 0.0 (false)? Is it normalised modulation?",
+      "context": "Confirm binary output behaviour consistent with the description."
+    }
+  ],
+
+  "notes": "logic_op combines two binary signals using a selectable logic operator. The Operator parameter has 3 options (range 0..2) -- likely AND, OR, XOR. Works naturally with control.compare which outputs 0/1 values. Together, compare and logic_op allow building complex conditional logic in control signal chains. Output is normalised. Uses multi_parameter template with multilogic::logic_op."
+}

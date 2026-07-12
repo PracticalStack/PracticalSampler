@@ -1,0 +1,1 @@
+Returns the current CPU usage of the audio engine as a percentage (0.0 to 100.0). Typically polled from a timer callback to drive a CPU meter display.

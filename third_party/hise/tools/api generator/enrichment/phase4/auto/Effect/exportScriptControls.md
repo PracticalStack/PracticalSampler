@@ -1,0 +1,1 @@
+Serialises the script UI control values of this effect as a Base64 string. Only works on Script FX modules - calling this on a built-in effect produces an error. Use `Effect.exportState()` for built-in effects.

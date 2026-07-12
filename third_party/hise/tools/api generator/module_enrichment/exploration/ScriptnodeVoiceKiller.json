@@ -1,0 +1,92 @@
+{
+  "moduleId": "ScriptnodeVoiceKiller",
+  "nodes": [
+    {
+      "id": "note_on",
+      "label": "Note On",
+      "type": "input",
+      "importance": 0.8,
+      "group": "voice_lifecycle",
+      "description": "Incoming note-on event triggers voice start"
+    },
+    {
+      "id": "set_active",
+      "label": "Set Voice Active",
+      "type": "process",
+      "importance": 0.8,
+      "group": "voice_lifecycle",
+      "description": "Marks the voice as active and returns 1.0"
+    },
+    {
+      "id": "fill_unity",
+      "label": "Output Unity (1.0)",
+      "type": "process",
+      "importance": 0.7,
+      "group": "modulation",
+      "description": "Fills the modulation buffer with constant 1.0"
+    },
+    {
+      "id": "mod_out",
+      "label": "Modulation Output",
+      "type": "output",
+      "importance": 0.7,
+      "group": "modulation",
+      "description": "Unity modulation signal (no attenuation)"
+    },
+    {
+      "id": "gate_close",
+      "label": "Scriptnode Gate Close",
+      "type": "external",
+      "importance": 0.9,
+      "group": "voice_killing",
+      "description": "Scriptnode envelope signals gate closure via VoiceResetter callback"
+    },
+    {
+      "id": "set_inactive",
+      "label": "Set Voice Inactive",
+      "type": "process",
+      "importance": 0.9,
+      "group": "voice_killing",
+      "description": "Marks the voice as inactive, triggering voice kill"
+    },
+    {
+      "id": "voice_killed",
+      "label": "Voice Killed",
+      "type": "output",
+      "importance": 0.8,
+      "group": "voice_killing",
+      "description": "HISE voice management system detects inactive state and kills the voice"
+    },
+    {
+      "id": "monophonic",
+      "label": "Monophonic",
+      "type": "parameter",
+      "importance": 0.4,
+      "group": "voice_mode",
+      "description": "Shares one envelope state across all voices"
+    },
+    {
+      "id": "retrigger",
+      "label": "Retrigger",
+      "type": "parameter",
+      "importance": 0.4,
+      "group": "voice_mode",
+      "description": "Restarts envelope on new notes in monophonic mode"
+    }
+  ],
+  "edges": [
+    { "from": "note_on", "to": "set_active", "type": "signal", "label": null },
+    { "from": "set_active", "to": "fill_unity", "type": "signal", "label": null },
+    { "from": "fill_unity", "to": "mod_out", "type": "signal", "label": null },
+    { "from": "gate_close", "to": "set_inactive", "type": "signal", "label": "VoiceResetter callback" },
+    { "from": "set_inactive", "to": "voice_killed", "type": "signal", "label": null },
+    { "from": "monophonic", "to": "set_active", "type": "control", "label": null },
+    { "from": "retrigger", "to": "set_active", "type": "control", "label": null }
+  ],
+  "groups": [
+    { "id": "voice_lifecycle", "label": "Voice Lifecycle" },
+    { "id": "modulation", "label": "Modulation Output" },
+    { "id": "voice_killing", "label": "Voice Killing" },
+    { "id": "voice_mode", "label": "Voice Mode" }
+  ]
+}

@@ -1,0 +1,1 @@
+Creates an FFT (Fast Fourier Transform) object for performing frequency-domain analysis on audio buffers.

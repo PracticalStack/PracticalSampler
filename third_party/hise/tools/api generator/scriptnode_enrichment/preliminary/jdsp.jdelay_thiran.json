@@ -1,0 +1,95 @@
+{
+  "factoryPath": "jdsp.jdelay_thiran",
+  "factory": "jdsp",
+  "nodeId": "jdelay_thiran",
+  "description": "A delay line using the thiran interpolation. Good performance, flat amplitude response but not suitable for fast modulation",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Delay Configuration",
+      "rationale": "Limit sets the maximum buffer size (affects memory), DelayTime sets the actual delay within that limit.",
+      "parameters": [
+        {
+          "id": "Limit",
+          "range": { "min": 0.0, "max": 1000.0, "step": 0.0, "skew": 0.3010300099849701 },
+          "default": 1000.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "DelayTime",
+          "range": { "min": 0.0, "max": 1000.0, "step": 0.0, "skew": 0.3010300099849701 },
+          "default": 0.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": true,
+    "groupName": "jdelay_interpolation",
+    "templateParameter": "interpolation algorithm (linear, cubic Lagrange, Thiran)",
+    "variantValue": "thiran"
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/jdsp/jdelay_thiran.md",
+    "tier": "GOOD",
+    "lines": 22
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-processing",
+      "category": "signal_path",
+      "question": "Does the Thiran variant use the same wrapper structure as jdelay but with JUCE's Thiran interpolation type? Confirm the template parameter.",
+      "context": "Need to verify the variant only differs in interpolation type."
+    },
+    {
+      "id": "modulation-unsuitability",
+      "category": "description_accuracy",
+      "question": "The description says 'not suitable for fast modulation'. What causes artefacts -- is it the Thiran allpass filter's transient response when coefficients change rapidly?",
+      "context": "Need to explain why users should avoid modulating the delay time quickly with this variant."
+    },
+    {
+      "id": "thiran-cpu-vs-linear",
+      "category": "performance",
+      "question": "Where does Thiran sit between linear and cubic in CPU cost? The description says 'good performance'.",
+      "context": "Need to position the performance trade-off between the three variants."
+    }
+  ],
+
+  "notes": "Variant of the jdelay interpolation group. Description claims good performance and flat amplitude response but unsuitability for fast modulation. Unused in all surveyed projects (0 occurrences in usage survey). Shares the same gaps about Limit behaviour, smoothing, and polyphonic state as the base jdelay variant."
+}

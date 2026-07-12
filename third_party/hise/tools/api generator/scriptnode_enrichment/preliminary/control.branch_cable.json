@@ -1,0 +1,114 @@
+{
+  "factoryPath": "control.branch_cable",
+  "factory": "control",
+  "nodeId": "branch_cable",
+  "description": "Send the incoming value to a single output",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Output selection",
+      "rationale": "Index selects which of the multiple output slots receives the value.",
+      "parameters": [
+        {
+          "id": "Index",
+          "range": { "min": 0.0, "max": 7.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Input value",
+      "rationale": "The value that is routed to the selected output slot.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "NumParameters",
+      "defaultValue": 0,
+      "type": "integer",
+      "note": "Number of output parameter slots. Determines how many targets can be individually addressed by the Index parameter."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": true,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/branch_cable.md",
+    "tier": "STUB",
+    "lines": 0
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "branch-routing-logic",
+      "category": "signal_path",
+      "question": "Does branch_cable use callWithRuntimeIndex(index, value) to send the value to exactly one output slot? What happens to the other outputs when the index changes -- do they retain their last value or get reset to zero?",
+      "context": "Users need to understand if unselected outputs hold their last value or go silent."
+    },
+    {
+      "id": "branch-index-clamping",
+      "category": "parameter_behaviour",
+      "question": "If Index exceeds NumParameters (e.g. Index=5 but only 3 outputs), is the index clamped, wrapped, or ignored?",
+      "context": "Prevents unexpected behaviour when the Index range does not match the number of configured outputs."
+    },
+    {
+      "id": "branch-numparameters-init",
+      "category": "conditional_logic",
+      "question": "The NumParameters property defaults to 0. How is it set in practice? Does the user configure it manually, or is it auto-detected from connected targets?",
+      "context": "Users need to know how to configure the number of output slots."
+    },
+    {
+      "id": "branch-normalisation",
+      "category": "parameter_behaviour",
+      "question": "The cppProperties do not list UseUnnormalisedModulation. Confirm that branch_cable output is normalised (0..1 with target range conversion).",
+      "context": "Determines how connected targets interpret the received value."
+    }
+  ],
+
+  "notes": "branch_cable is a multi-output node (Pattern 4 from control-infrastructure). It uses dynamic_list as ParameterType for runtime output management. The SwitchTargets field is present but empty (count 0), likely populated at runtime based on NumParameters. The Index parameter has max=7 and step=1, suggesting up to 8 possible outputs. This is the demultiplexer counterpart to input_toggle's multiplexer role."
+}

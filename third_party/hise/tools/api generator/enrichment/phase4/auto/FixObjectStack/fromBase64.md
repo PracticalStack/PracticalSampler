@@ -1,0 +1,1 @@
+Restores the raw memory block from a Base64-encoded string produced by `toBase64()`. Overwrites all allocated slots but does not restore the used count - the position pointer keeps its current value. Store and restore the position separately if needed.

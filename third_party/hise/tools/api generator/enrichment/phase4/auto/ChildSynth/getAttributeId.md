@@ -1,0 +1,1 @@
+Returns the string identifier of the attribute at the specified parameter index (e.g. index 0 returns `"Gain"`). Useful for debugging or building dynamic parameter UIs that display human-readable names.

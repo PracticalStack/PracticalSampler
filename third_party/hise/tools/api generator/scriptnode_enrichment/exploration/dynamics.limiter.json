@@ -1,0 +1,95 @@
+{
+  "factoryPath": "dynamics.limiter",
+  "nodes": [
+    {
+      "id": "in",
+      "label": "Audio In",
+      "type": "input",
+      "importance": 1.0,
+      "description": "Input audio signal (stereo or mono)"
+    },
+    {
+      "id": "sidechain_in",
+      "label": "Sidechain In",
+      "type": "input",
+      "importance": 0.6,
+      "description": "External sidechain input (when Sidechain mode enabled)"
+    },
+    {
+      "id": "detect",
+      "label": "Peak Detect",
+      "type": "process",
+      "importance": 0.8,
+      "description": "Detects peak level from input or sidechain signal"
+    },
+    {
+      "id": "limit",
+      "label": "Limit",
+      "type": "process",
+      "importance": 1.0,
+      "description": "Limits peaks above threshold with fast envelope"
+    },
+    {
+      "id": "threshold",
+      "label": "Threshhold",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Limiter threshold in dB (-100 to 0)"
+    },
+    {
+      "id": "attack",
+      "label": "Attack",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Attack time in ms (0 to 250)"
+    },
+    {
+      "id": "release",
+      "label": "Release",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Release time in ms (0 to 250)"
+    },
+    {
+      "id": "ratio",
+      "label": "Ratio",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Limiting ratio (high values approach brickwall)"
+    },
+    {
+      "id": "sidechain",
+      "label": "Sidechain",
+      "type": "parameter",
+      "importance": 0.8,
+      "description": "Sidechain source: Disabled, Original, or Sidechain"
+    },
+    {
+      "id": "out",
+      "label": "Audio Out",
+      "type": "output",
+      "importance": 1.0,
+      "description": "Peak-limited audio output"
+    },
+    {
+      "id": "mod_out",
+      "label": "Limiting Amount",
+      "type": "modulation_out",
+      "importance": 0.8,
+      "description": "Inverse gain reduction (1.0 = no limiting, 0.0 = full limiting)"
+    }
+  ],
+  "edges": [
+    { "from": "in", "to": "detect", "type": "signal", "label": null },
+    { "from": "sidechain_in", "to": "detect", "type": "signal", "label": "when Sidechain enabled" },
+    { "from": "detect", "to": "limit", "type": "signal", "label": null },
+    { "from": "in", "to": "limit", "type": "signal", "label": null },
+    { "from": "threshold", "to": "limit", "type": "control", "label": null },
+    { "from": "attack", "to": "limit", "type": "control", "label": null },
+    { "from": "release", "to": "limit", "type": "control", "label": null },
+    { "from": "ratio", "to": "limit", "type": "control", "label": null },
+    { "from": "sidechain", "to": "detect", "type": "control", "label": null },
+    { "from": "limit", "to": "out", "type": "signal", "label": null },
+    { "from": "limit", "to": "mod_out", "type": "signal", "label": "1.0 - GR" }
+  ]
+}

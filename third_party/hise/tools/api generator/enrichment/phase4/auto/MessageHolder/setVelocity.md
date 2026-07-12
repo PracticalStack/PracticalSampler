@@ -1,0 +1,1 @@
+Sets the velocity for this event (0-127 for standard MIDI). Setting velocity to 0 on a NoteOn event does not convert it to a NoteOff - HISE keeps the event type as NoteOn regardless of velocity.

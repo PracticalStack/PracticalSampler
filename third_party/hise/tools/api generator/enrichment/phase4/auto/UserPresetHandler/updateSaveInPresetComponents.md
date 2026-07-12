@@ -1,0 +1,1 @@
+Restores UI component values from a JSON object previously created by `createObjectForSaveInPresetComponents`. The two methods form a round-trip pair for selectively saving and restoring component state within a custom data model's save/load callbacks.

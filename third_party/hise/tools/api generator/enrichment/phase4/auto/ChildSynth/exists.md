@@ -1,0 +1,1 @@
+Returns whether the wrapped synth module still exists and has not been deleted. Unlike most other methods on this class, `exists` does not throw a script error on invalid objects - it is specifically designed to test validity safely.

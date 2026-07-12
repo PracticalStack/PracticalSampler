@@ -1,0 +1,147 @@
+[
+  {
+    "target": "container.split",
+    "type": "gotcha",
+    "summary": "Linkwitz-Riley filters used for multiband splitting produce dB-level bumps at crossover frequencies",
+    "detail": "Multiple trusted users (griffinboy, resonant) independently confirmed that the stock Linkwitz-Riley filter nodes produce visible amplitude bumps at crossover frequencies when used in multiband splitting setups. Griffinboy reports this has been an unresolved issue for over a year (as of 2025) and switched to custom C++ splitters as a workaround. Perfect reconstruction summing may not be achievable without latency using the stock nodes.",
+    "verify": true,
+    "verify_hint": "Check eq/filter/LinkwitzRiley in hi_dsp_library for summing behavior; search for phase cancellation or magnitude response at crossover",
+    "sources": [13053],
+    "placement": "B"
+  },
+  {
+    "target": "container.clone",
+    "type": "gotcha",
+    "summary": "Polyphonic clone container fails to compile with 'isPolyphonic' error",
+    "detail": "Compiling a polyphonic clone container triggers a C++ error: `clone_base` has no member named `isPolyphonic()`. Reported by David Healey (expert) and others in Feb 2025 on both Windows and macOS. The compile-time error fires from `Containers.h:116`. One user found a workaround: ensure the clone container holds at least one non-trivial processing node and that NumClones is set as the first macro control. Whether this is resolved in current builds is unknown.",
+    "verify": true,
+    "verify_hint": "Search Containers.h for `isPolyphonic` inside clone_base; check duplicate.h for isPolyphonic method",
+    "sources": [12012],
+    "placement": "C"
+  },
+  {
+    "target": "container.clone",
+    "type": "gotcha",
+    "summary": "Clone container with Linkwitz-Riley filters inside compiles without error but produces no sound",
+    "detail": "A user (ustk) reported that placing Linkwitz-Riley filter nodes inside a clone container compiles successfully but produces silence at runtime. Removing the clone wrapper and using the filters directly restores audio. This is distinct from the polyphonic compile error and may be a separate initialization or routing issue.",
+    "verify": true,
+    "verify_hint": "Test clone container with filter nodes in both serial and parallel modes; check if reset() is called on filter state per clone",
+    "sources": [12012],
+    "placement": "C"
+  },
+  {
+    "target": "container.clone",
+    "type": "edge-case",
+    "summary": "NumClones maximum is a compile-time constant; the parameter only caps the active count at runtime",
+    "detail": "Christoph Hart clarified: the total number of clone slots is baked in at compile time (compile-time constant). The `NumClones` parameter does not reallocate memory — it only controls how many of the pre-allocated clones are actively processed. All connected clone cables automatically adapt to the runtime NumClones value. You cannot exceed the compile-time maximum via the parameter.",
+    "verify": true,
+    "verify_hint": "Check clone_data template in duplicate.h or Containers.h for the compile-time vs runtime NumClones distinction",
+    "sources": [11905],
+    "placement": "A"
+  },
+  {
+    "target": "container.clone",
+    "type": "gotcha",
+    "summary": "control.clone_pack drives per-clone values using a normalized 0..1 range only",
+    "detail": "The `control.clone_pack` node reads its values from a sliderpack, but those values are always in the 0..1 normalized range. Users must manually remap this range to their target parameter range (e.g., frequency, gain). There is no built-in range mapping inside clone_pack itself.",
+    "verify": true,
+    "verify_hint": "Check control/clone_pack node implementation for value scaling; inspect how clone_pack reads from the sliderpack data slot",
+    "sources": [7840],
+    "placement": "B"
+  },
+  {
+    "target": "container.clone",
+    "type": "gotcha",
+    "summary": "control.clone_forward requires one node per target container, not a single shared node",
+    "detail": "Christoph Hart confirmed that you cannot connect a single `control.clone_forward` node to multiple target containers. Each target container that needs to receive forwarded clone parameter values requires its own `clone_forward` node. The node should be connected to the first child node of its target container.",
+    "verify": true,
+    "verify_hint": "Check clone_forward node routing in duplicate.h or parameter forwarding implementation",
+    "sources": [11866],
+    "placement": "B"
+  },
+  {
+    "target": "container.clone",
+    "type": "gotcha",
+    "summary": "Wrapping an oscillator in a soft_bypass node inside a clone container causes a crash",
+    "detail": "David Healey reported in 2024 that placing a `container.soft_bypass` node around an oscillator inside a `container.clone` crashes HISE. The interaction between the clone container's per-clone processing and the soft_bypass state management is the likely cause.",
+    "verify": true,
+    "verify_hint": "Test clone container containing soft_bypass wrapping an oscillator node; check Containers.h clone iteration and SoftBypass::process interaction",
+    "sources": [9277],
+    "placement": "C"
+  },
+  {
+    "target": "container.clone",
+    "type": "workflow",
+    "summary": "Precompile clone payload as a separate compiled network rather than building inline",
+    "detail": "Experienced users recommend building the DSP that goes inside a clone container as a separate compiled scriptnode network first, then loading it into the clone container. This reduces compile errors, makes the outer network cleaner, and simplifies debugging. Also: make NumClones the first macro control, with matching parameter ranges for every node it connects to.",
+    "verify": false,
+    "sources": [12012],
+    "placement": "B"
+  },
+  {
+    "target": "container.soft_bypass",
+    "type": "gotcha",
+    "summary": "Chaining two soft_bypass nodes in series produces audio clicks, not a soft transition",
+    "detail": "When two `container.soft_bypass` nodes are placed in series, their combined crossfade does not produce a smooth transition — audible clicks occur. The crossfade works correctly only when soft_bypass nodes are used in parallel. For multi-stage switching in series, use `container.branch` instead, which handles muting without crossfade artifacts. A smoother node upstream can also help in specific parallel cases.",
+    "verify": true,
+    "verify_hint": "Check SoftBypass crossfade implementation for series interaction; look for signal accumulation at transition points",
+    "sources": [11223],
+    "placement": "C"
+  },
+  {
+    "target": "container.soft_bypass",
+    "type": "workflow",
+    "summary": "Use a compare node upstream to derive bypass state from a continuous parameter",
+    "detail": "When a soft_bypass needs to activate at a specific threshold of a continuous knob (e.g., bypass a filter when gain hits zero), connect a `math.compare` node between the parameter and the soft_bypass. This gives precise threshold control rather than relying on the 0.5 default cutoff. Christoph Hart recommended this pattern as cleaner than an x-fader or intensity node approach.",
+    "verify": false,
+    "sources": [13657],
+    "placement": "B"
+  },
+  {
+    "target": "container.oversample",
+    "type": "gotcha",
+    "summary": "Bypassing an oversample node removes the upsampling but children still run at the original sample rate",
+    "detail": "Christoph Hart clarified: bypassing an oversample container does NOT stop processing — it only disables the oversampling step. The child nodes continue to execute at the host sample rate, making the node behave identically to a `container.chain`. This means bypassing is not a valid way to reduce CPU usage — the full child processing cost remains. The gap behavior on factor change is a separate issue.",
+    "verify": true,
+    "verify_hint": "Check OversampleContainer::process in Containers.h for bypass path; confirm children are still called when bypassed",
+    "sources": [2652],
+    "placement": "B"
+  },
+  {
+    "target": "container.oversample",
+    "type": "workflow",
+    "summary": "Engine.setMinimumSampleRate() provides a global HQ-mode alternative to per-network oversampling",
+    "detail": "Instead of per-node oversampling, `Engine.setMinimumSampleRate()` forces a global minimum sample rate. Setting it to 100000 ensures at least 4x oversampling at 44.1kHz and 48kHz. Setting it to 40000 ensures no oversampling at any standard rate (using 48000 would accidentally oversample 44.1kHz sessions). The engine fades voices and reinitializes the processing chain on change. Note: high CPU risk with polyphonic instruments at high voice counts.",
+    "verify": false,
+    "sources": [2652],
+    "placement": "B"
+  },
+  {
+    "target": "container.oversample",
+    "type": "workflow",
+    "summary": "Dynamically reparent the signal chain to switch oversampling factor at runtime without gaps",
+    "detail": "To offer user-selectable oversampling factors (2x/4x/8x/16x), create one oversample node for each factor, bypass all of them, and hold the actual signal chain in a separate container node. On selection, move the signal chain into the desired oversample node with `Node.setParent()` and unmute only that node. This is the only gap-free way to change the oversampling factor at runtime since changing the Factor property directly causes a brief audio gap.",
+    "verify": false,
+    "sources": [2652],
+    "placement": "B"
+  },
+  {
+    "target": "container.sidechain",
+    "type": "workflow",
+    "summary": "container.sidechain handles internal signal routing only; external DAW sidechain inputs require HISE source modification",
+    "detail": "The `container.sidechain` node is for routing signals within the scriptnode network (e.g., sidechain compressor patterns using send/receive). Accepting an external sidechain input from the DAW is not natively supported and requires modifying HISE source files (`PluginParameterProcessor.h`, `MainController.cpp`, etc.) and setting `HISE_NUM_FX_PLUGIN_CHANNELS` to the total of main + sidechain channels. Pro Tools requires a separate build for mono sidechain. Snippet browser examples cover the internal pattern.",
+    "verify": false,
+    "sources": [6632, 14276, 10519],
+    "placement": "B"
+  },
+  {
+    "target": "container.sidechain",
+    "type": "interaction",
+    "summary": "container.sidechain does not work when placed inside a container.frame block",
+    "detail": "A forum thread titled 'Sidechain doesn't work with Frame block' (tid 10870) was reported but contained no further detail. The title suggests an incompatibility between container.sidechain and frame-based processing containers, possibly because the sidechain channel zeroing logic conflicts with frame-level iteration.",
+    "verify": true,
+    "verify_hint": "Test container.sidechain nested inside container.frame; check sidechain zeroing in frame processing path in Containers.h",
+    "sources": [10870],
+    "placement": "C"
+  }
+]

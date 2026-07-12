@@ -1,0 +1,1 @@
+Sets a fade-in duration (in milliseconds) and target gain (in decibels) for voices matching a layer/group combination on the next noteOn. A target gain of 0.0 dB means unity gain; use negative values for attenuation.

@@ -1,0 +1,1 @@
+Converts a byte count into a human-readable size string with automatic unit selection (e.g. `"1.5 MB"`, `"200 bytes"`, `"3.2 GB"`). Useful for displaying disk space information from `FileSystem.getBytesFreeOnVolume()` or file sizes from `File.getSize()`.

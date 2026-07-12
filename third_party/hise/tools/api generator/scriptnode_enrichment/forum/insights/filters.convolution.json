@@ -1,0 +1,80 @@
+{
+  "targetId": "filters.convolution",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [819, 1139, 2054, 6824, 7006, 1251, 1353, 2906, 5412, 7456, 6815, 7500, 1507],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Engine.loadAudioFilesIntoPool() must be called before exporting to embed IRs",
+      "summary": "By default the audio file pool does not load all files into memory. At export time, only files currently in use will be embedded. Calling Engine.loadAudioFilesIntoPool() in onInit ensures all IRs in the project's audio files folder are loaded and embedded correctly. Christoph Hart: 'This line will make sure that every audio file is loaded before exporting and should be used whenever you have a collection of IRs that you want to switch.' Omitting this call is the most common cause of missing embedded IR resources in compiled plugins.",
+      "sources": ["tid:819", "tid:7456"],
+      "verify": false,
+      "verify_hint": "Well-established requirement confirmed by the author multiple times across different years."
+    },
+    {
+      "type": "BUG",
+      "title": "IR file path lookup is case-sensitive in compiled plugins, but not in HISE IDE",
+      "summary": "In the HISE IDE on Windows, file paths are case-insensitive (OS behaviour). In a compiled plugin, HISE uses the path as a string key to a hash map, making it case-sensitive on all platforms. A mismatch between the filename on disk and the string passed to setFile() will silently fail in the plugin even though it works fine in HISE. Christoph Hart confirmed this is not fixable without bad hacks. Lindon's real-world example: file was 'LIVE hot plate.WAV' but code passed '.wav' — worked in HISE, broke in plugin.",
+      "sources": ["tid:1139"],
+      "verify": false,
+      "verify_hint": "Confirmed by Christoph Hart as a known, by-design limitation."
+    },
+    {
+      "type": "BUG",
+      "title": "Convolution output gain increases at sample rates above 48 kHz",
+      "summary": "The convolution engine exhibits a gain increase at higher sample rates due to IR resampling artefacts. Christoph Hart's measured empirical values: 44.1 kHz = -1 dB, 48 kHz = 0 dB (reference), 96 kHz = +3.5 dB, 192 kHz = +6.6 dB. The root cause is that upsampling a dirac-like IR duplicates impulse energy, causing the output to be louder. A mathematically precise automatic correction is not possible because the relationship is non-linear across real-world IRs. A workaround is to provide separately recorded IRs at each target sample rate and load the correct one based on Engine.getSampleRate() (called from preparedToPlay, not onInit).",
+      "sources": ["tid:2054"],
+      "verify": true,
+      "verify_hint": "Check whether a gain compensation was baked into the convolution engine in a later HISE version (Christoph mentioned he wanted to add a fix but it was difficult)."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Engine.getSampleRate() returns undefined in onInit inside an exported plugin",
+      "summary": "The onInit callback runs before the sample rate is known in a plugin context. Any code that reads Engine.getSampleRate() in onInit will receive undefined in the exported plugin even though it appears to work correctly in HISE. Sample rate must be read inside the preparedToPlay callback of a Script FX node. Christoph Hart: 'The onInit callback will be executed before the samplerate is known in a plugin so you need to make sure to defer that.'",
+      "sources": ["tid:2054"],
+      "verify": false,
+      "verify_hint": "Fundamental plugin lifecycle constraint confirmed by the author."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "IR switching produced audible clicks before HISE introduced cross-fading",
+      "summary": "Prior to a 2022 commit, switching impulse responses caused harsh clicks because the old convolution tail was cut immediately. Christoph Hart added a 20 ms cross-fade between the old and new IR when switching. The switch is still audible but no longer clicks harshly. This feature requires a recent enough build of HISE (develop branch at that time). Older builds will still exhibit hard clicks on IR changes.",
+      "sources": ["tid:6824", "tid:2906"],
+      "verify": true,
+      "verify_hint": "Confirm the cross-fade feature is present in current stable HISE builds and document the minimum required version."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Offline rendering shows a glitch at the start when the render begins exactly at the start of audio",
+      "summary": "Dan Korneff (trusted) reported that convolution reverb produces a glitch artefact at the very beginning of an offline render when the render start point is positioned exactly at the start of audio. Starting the offline bounce a few milliseconds before the audio begins works around the issue. Suspected cause is a buffer not being cleared before the first block.",
+      "sources": ["tid:7006"],
+      "verify": true,
+      "verify_hint": "Check whether this offline rendering glitch has been fixed in recent HISE versions."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Access the convolution node as an AudioSampleProcessor, not as a generic Effect",
+      "summary": "To call setFile() or other IR-loading methods on a convolution node from HiseScript, the module must be obtained using Synth.getAudioSampleProcessor(), not Synth.getEffect(). Using the Effect reference does not expose the file-loading API. Jay (trusted) discovered this independently; David Healey confirmed and demonstrated it with a snippet in a 2025 thread.",
+      "sources": ["tid:1353", "tid:14114"],
+      "verify": false,
+      "verify_hint": "Consistently confirmed across multiple threads spanning 2019–2025."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Store the selected IR index (not the filename) in a knob or slider for preset recall",
+      "summary": "Because the convolution node does not automatically save which IR is loaded as part of a preset, the recommended pattern is to back the IR selection with a hidden knob or slider whose integer value represents the index into an IR array. The preset system then saves/restores this index, and the control callback reloads the correct IR on recall. Christoph Hart and orange both endorsed this approach. Alternatively, populate a ComboBox from Engine.loadAudioFilesIntoPool() and use the combo value minus one as the array index.",
+      "sources": ["tid:1672", "tid:6815", "tid:7500", "tid:1251"],
+      "verify": true,
+      "verify_hint": "Check whether newer HISE versions persist the loaded IR file reference natively in presets, making this pattern unnecessary."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Raw C++ API: use {PROJECT_FOLDER} prefix and call Engine.loadAudioFilesIntoPool() before export",
+      "summary": "When loading IRs via the Raw C++ API (ConvolutionEffect::setLoadedFile), the path must include the {PROJECT_FOLDER} token — passing just the filename will silently fail. Additionally, the HISE script must call Engine.loadAudioFilesIntoPool() before export for the IR to be embedded correctly. hisefilo resolved a 'WARNING: Not found' error by adding both of these.",
+      "sources": ["tid:5412", "tid:7456"],
+      "verify": false,
+      "verify_hint": "Confirmed by Christoph Hart directly in the thread."
+    }
+  ]
+}

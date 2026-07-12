@@ -1,0 +1,12 @@
+{
+  "factoryPath": "control.random",
+  "nodes": [
+    { "id": "value_in", "label": "Value (Trigger)", "type": "parameter", "importance": 0.8, "description": "Any change triggers new random output (value itself is ignored)" },
+    { "id": "rng", "label": "Random Generator", "type": "process", "importance": 1.0, "description": "Generates uniform random value in [0, 1)" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Normalised random value (0..1)" }
+  ],
+  "edges": [
+    { "from": "value_in", "to": "rng", "type": "control", "label": "triggers" },
+    { "from": "rng", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

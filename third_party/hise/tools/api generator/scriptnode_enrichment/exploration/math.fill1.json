@@ -1,0 +1,12 @@
+{
+  "factoryPath": "math.fill1",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal (discarded)" },
+    { "id": "fill", "label": "Fill 1.0", "type": "process", "importance": 1.0, "description": "Sets all samples to 1.0" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "DC signal at 1.0" }
+  ],
+  "edges": [
+    { "from": "in", "to": "fill", "type": "signal", "label": null },
+    { "from": "fill", "to": "out", "type": "signal", "label": null }
+  ]
+}

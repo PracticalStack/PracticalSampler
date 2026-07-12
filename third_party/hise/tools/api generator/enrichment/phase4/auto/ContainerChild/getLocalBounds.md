@@ -1,0 +1,1 @@
+Returns the component's bounds as an `[x, y, width, height]` array at the origin (x=0, y=0), reduced by the given margin on all sides. Useful inside paint routines to get the drawing area without hardcoding dimensions.

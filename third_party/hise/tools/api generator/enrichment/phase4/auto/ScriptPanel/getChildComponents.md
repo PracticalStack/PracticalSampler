@@ -1,0 +1,1 @@
+Returns an array of references to all child components whose `parentComponent` property is set to this component. This is separate from the child panel hierarchy created by `addChildPanel()` - use `getChildPanelList()` for those.

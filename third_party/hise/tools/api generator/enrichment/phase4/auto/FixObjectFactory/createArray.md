@@ -1,0 +1,1 @@
+Creates a fixed-size array of objects with the given number of elements. All elements are initialised to the prototype's default values and share the factory's layout. Use fixed arrays when the element count is known and you need to iterate the full set - for dynamically-sized collections with insert and remove, use `createStack()` instead.

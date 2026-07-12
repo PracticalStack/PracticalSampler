@@ -1,0 +1,9 @@
+ScriptComboBox::getGlobalPositionX() -> Integer
+
+Thread safety: SAFE
+Returns the absolute x-position relative to the interface root, computed by
+recursively adding parent component x-offsets.
+Pair with:
+  getGlobalPositionY -- absolute y-position
+Source:
+  ScriptingApiContent.h  ScriptComponent::getGlobalPositionX()

@@ -1,0 +1,14 @@
+{
+  "factoryPath": "math.tanh",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "tanh", "label": "Tanh", "type": "process", "importance": 1.0, "description": "Applies tanhf(s * Value) to each sample" },
+    { "id": "value", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Input drive/saturation amount (default 1.0)" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Saturated output signal bounded to (-1, 1)" }
+  ],
+  "edges": [
+    { "from": "in", "to": "tanh", "type": "signal", "label": null },
+    { "from": "value", "to": "tanh", "type": "control", "label": null },
+    { "from": "tanh", "to": "out", "type": "signal", "label": null }
+  ]
+}

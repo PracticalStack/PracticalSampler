@@ -1,0 +1,1 @@
+Stores the given value directly without mapping from a 0-1 range to the item index range. For ScriptComboBox, this behaves the same as calling `setValue()` with the raw number, which is rarely useful since combo boxes expect integer indices. Use `setValue()` with explicit 1-based indices instead.

@@ -1,0 +1,83 @@
+{
+  "moduleId": "HardcodedEnvelopeModulator",
+  "nodes": [
+    {
+      "id": "midi_in",
+      "label": "MIDI In",
+      "type": "input",
+      "importance": 0.8,
+      "group": null,
+      "description": "Note-on and note-off events trigger per-voice envelope processing"
+    },
+    {
+      "id": "network_select",
+      "label": "Network Selection",
+      "type": "decision",
+      "importance": 0.9,
+      "group": "framework",
+      "description": "Select which compiled C++ network to load as the envelope"
+    },
+    {
+      "id": "network_params",
+      "label": "Network Parameters",
+      "type": "parameter",
+      "importance": 0.8,
+      "group": "framework",
+      "description": "Parameters from the compiled network (after Monophonic/Retrigger)"
+    },
+    {
+      "id": "monophonic",
+      "label": "Monophonic",
+      "type": "parameter",
+      "importance": 0.6,
+      "group": "voice_mode",
+      "description": "Shares one envelope across all voices"
+    },
+    {
+      "id": "retrigger",
+      "label": "Retrigger",
+      "type": "parameter",
+      "importance": 0.6,
+      "group": "voice_mode",
+      "description": "Restarts envelope on new notes in monophonic mode"
+    },
+    {
+      "id": "complex_data",
+      "label": "Complex Data",
+      "type": "external",
+      "importance": 0.6,
+      "group": "framework",
+      "description": "Tables, SliderPacks, AudioFiles from the compiled network"
+    },
+    {
+      "id": "compiled_network",
+      "label": "Compiled Envelope (per voice, control rate)",
+      "type": "process",
+      "importance": 1.0,
+      "group": "processing",
+      "description": "Compiled C++ network generates per-voice envelope signal at control rate"
+    },
+    {
+      "id": "mod_out",
+      "label": "Modulation Out",
+      "type": "output",
+      "importance": 0.8,
+      "group": null,
+      "description": "Per-voice modulation signal (0-1)"
+    }
+  ],
+  "edges": [
+    { "from": "midi_in", "to": "compiled_network", "type": "signal", "label": "note on/off" },
+    { "from": "network_select", "to": "compiled_network", "type": "control", "label": "selects network" },
+    { "from": "network_params", "to": "compiled_network", "type": "control", "label": null },
+    { "from": "monophonic", "to": "compiled_network", "type": "control", "label": null },
+    { "from": "retrigger", "to": "compiled_network", "type": "control", "label": null },
+    { "from": "complex_data", "to": "compiled_network", "type": "control", "label": null },
+    { "from": "compiled_network", "to": "mod_out", "type": "signal", "label": null }
+  ],
+  "groups": [
+    { "id": "framework", "label": "Hardcoded Framework" },
+    { "id": "voice_mode", "label": "Voice Mode" },
+    { "id": "processing", "label": "Envelope Processing" }
+  ]
+}

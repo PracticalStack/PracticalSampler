@@ -1,0 +1,107 @@
+{
+  "factoryPath": "envelope.silent_killer",
+  "factory": "envelope",
+  "nodeId": "silent_killer",
+  "description": "Send a voice reset message as soon when silence is detected",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Detection",
+      "rationale": "Threshold and Active together control whether and when silence detection triggers a voice reset.",
+      "parameters": [
+        {
+          "id": "Threshold",
+          "range": { "min": -120.0, "max": -60.0, "step": 1.0, "skew": 1.0 },
+          "default": -100.0,
+          "textConverter": "Decibel",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Active",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/envelope/silent_killer.md",
+    "tier": "BRIEF",
+    "lines": 18
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "silence-detection-algorithm",
+      "category": "signal_path",
+      "question": "How does silent_killer detect silence? Does it check peak level per block, RMS, or use ProcessData::isSilent()? Is the check per-sample or per-block?",
+      "context": "The detection method determines responsiveness and whether short transients prevent false triggering."
+    },
+    {
+      "id": "voice-reset-mechanism",
+      "category": "signal_path",
+      "question": "When silence is detected, how is the voice reset performed? Does it call VoiceResetter, send a gate=0 signal, or directly kill the voice?",
+      "context": "Understanding the reset mechanism is important for knowing whether there is a fade-out or an abrupt cut."
+    },
+    {
+      "id": "active-parameter-behaviour",
+      "category": "parameter_behaviour",
+      "question": "The Active parameter (default 1.0 = on). When Active is 0, does the node pass audio through unchanged without any silence checking?",
+      "context": "Users may want to disable silent_killer dynamically without removing it from the graph."
+    },
+    {
+      "id": "audio-passthrough",
+      "category": "signal_path",
+      "question": "Does silent_killer pass the audio signal through unmodified (pure monitoring), or does it apply any processing (fade-out, muting) before killing the voice?",
+      "context": "Need to know if placing silent_killer in the chain affects the audio signal in any way."
+    },
+    {
+      "id": "description-grammar",
+      "category": "description_accuracy",
+      "question": "The description reads 'Send a voice reset message as soon when silence is detected' -- should be 'as soon as'. Minor grammar issue.",
+      "context": "Description text flows into documentation. Should be corrected in the reference page."
+    }
+  ],
+
+  "notes": "silent_killer is unique among envelope nodes: it is NOT a control node and does NOT process MIDI events. It is a polyphonic audio processor that monitors signal level and kills voices when silence is detected. It has no modulation output, no SwitchTargets, no ComplexData. The IsPolyphonic flag without IsControlNode or OutsideSignalPath means it sits in the audio signal path and has per-voice state. The Active parameter uses the same encoded converter as the Retrigger/Gate on ahdsr (likely Off/On labels)."
+}

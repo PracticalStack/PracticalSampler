@@ -1,0 +1,1 @@
+Returns all control points as a nested array of `[x, y, curve]` sub-arrays with normalised float values. The returned array is a snapshot - modifying it does not affect the table. Use this with `setTablePointsFromArray()` for read-modify-write workflows.

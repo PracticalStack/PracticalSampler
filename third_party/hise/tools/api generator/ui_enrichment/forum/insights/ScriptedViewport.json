@@ -1,0 +1,120 @@
+{
+  "targetId": "ScriptedViewport",
+  "domain": "ui",
+  "generatedAt": "2026-03-31",
+  "topicIds": [1146, 7505, 12391, 13380, 1682, 8454, 6026, 6672, 2867, 6054, 11852, 8820, 12511, 8427, 12167, 9923, 9511, 7833, 1174, 1371, 6011, 12000, 12154, 2535, 10148, 11757, 10128, 12837, 7785, 7790],
+  "insights": [
+    {
+      "type": "BUG",
+      "title": "Table mode Slider columns fire callback but do not visually update",
+      "summary": "Sliders in table mode report value changes via the table callback, but the slider thumb does not move visually. The issue persists even when MinValue/MaxValue are set. Applying a drawScrollbar or custom LAF resolves the visual rendering.",
+      "sources": ["tid:6026"],
+      "verify": true,
+      "verify_hint": "Check table slider rendering in hi_scripting; search ScriptedViewport slider repaint or drawTableCell"
+    },
+    {
+      "type": "API",
+      "title": "Undocumented column property \"Sortable\" enables built-in header-click sorting",
+      "summary": "Adding `\"Sortable\": true` to a column definition in setTableColumns() enables click-to-sort on that column header. To use a custom sort function, pass a comparator function directly to setTableSortFunction() — the function receives two cell values (a, b) and must return -1, 0, or 1.",
+      "sources": ["tid:12391"],
+      "verify": true,
+      "verify_hint": "grep Sortable in hi_scripting scripted viewport table column handling"
+    },
+    {
+      "type": "BUG",
+      "title": "Column \"Visible: false\" was not implemented and had no effect",
+      "summary": "The documented `\"Visible\": false` column property in setTableColumns() was not implemented — columns remained visible regardless. The bug was fixed in a 2025-04 PR. Projects using older HISE builds should not rely on this property.",
+      "sources": ["tid:12511"],
+      "verify": true,
+      "verify_hint": "Check git history for ScriptedViewport column visibility fix around 2025-04"
+    },
+    {
+      "type": "BUG",
+      "title": "Setting viewPositionY in onInit behaves differently in compiled plugins",
+      "summary": "Setting viewPositionY to 0 in onInit works in the HISE IDE but can misbehave in compiled plugins, leaving the viewport at a non-zero position. Workaround: defer the set call using a one-shot timer (100ms delay).",
+      "sources": ["tid:11852"],
+      "verify": true,
+      "verify_hint": "grep viewPositionY in ScriptedViewport C++ source; check compiled vs IDE path"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "viewPositionY property set via script does not reliably reset on recompile",
+      "summary": "Setting a plain viewport's viewPositionY to 0.0 via script does not always reset the scroll position on recompile. A known workaround is to set the child panel's `y` property to 0 instead, which repositions the content directly.",
+      "sources": ["tid:12000"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "Scrollbars hidden when child panel exceeds viewport in both dimensions",
+      "summary": "When a child panel is larger than the viewport in both X and Y simultaneously, one or both scrollbars can become invisible. Confirmed as a bug. Workaround: use a panel-in-panel with a Slider for manual scrolling.",
+      "sources": ["tid:12154"],
+      "verify": true,
+      "verify_hint": "grep viewport scrollbar visibility in juce_Viewport.cpp or HISE viewport wrapper"
+    },
+    {
+      "type": "API",
+      "title": "Changed callback does not fire on scroll; property broadcaster also broken",
+      "summary": "The viewport's changed callback only fires when an item is selected in list mode, not when the user scrolls. Attaching a broadcaster to the viewPositionY property also does not work. To react to scroll position changes, use a mouse broadcaster or poll with a timer.",
+      "sources": ["tid:12167", "tid:6054"],
+      "verify": true,
+      "verify_hint": "grep viewPositionY broadcaster or property listener in ScriptedViewport"
+    },
+    {
+      "type": "API",
+      "title": "Clear list mode selection by calling setValue(-1)",
+      "summary": "There is no dedicated deselect API. Calling viewport.setValue(-1) deselects the currently highlighted list item.",
+      "sources": ["tid:7785"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "drawScrollbar LAF uses obj.handle, not obj.area, for the handle bounds",
+      "summary": "Unlike most LAF functions where obj.area gives the drawable region, in drawScrollbar the scrollbar handle rectangle is in obj.handle. Using obj.area will paint over the entire track, not just the thumb.",
+      "sources": ["tid:6672"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Button columns in table mode are styled with drawToggleButton LAF",
+      "summary": "Table mode Button-type columns respond to the drawToggleButton LAF function in addition to the table-level functions. Register drawToggleButton on the same LAF object to customize button appearance per row.",
+      "sources": ["tid:12391"],
+      "verify": true,
+      "verify_hint": "grep drawToggleButton in ScriptedViewport table rendering"
+    },
+    {
+      "type": "API",
+      "title": "ComboBox is a valid table column Type",
+      "summary": "Table columns support `\"Type\": \"ComboBox\"` in addition to Text, Button, and Slider. This was added after the initial table mode release (confirmed by Christoph Hart in 2023-11).",
+      "sources": ["tid:8454"],
+      "verify": true,
+      "verify_hint": "grep ComboBox in ScriptedViewport setTableColumns column type handling"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Scrollbar renders on top of child panel content, obscuring the rightmost pixels",
+      "summary": "The scrollbar overlaps the child panel rather than sitting beside it. If content fills the full panel width, the rightmost pixels are hidden behind the scrollbar. Fix: reduce the child panel width by the scrollbar width.",
+      "sources": ["tid:2867"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Table mode is significantly lighter than a panel containing child panels",
+      "summary": "For scrollable rows with interactive controls, table mode avoids the overhead of individual child panel objects. The table callback provides a single entry point for all cell interactions, and LAF handles all visual customisation.",
+      "sources": ["tid:12391"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Mirror table cell state in a script-side JSON object to access values from other callbacks",
+      "summary": "Table cell values cannot be queried after the fact — there is no getTableCellValue() API. The recommended pattern is to update a script-side JSON object inside the table callback, then read from that object in MIDI callbacks or other handlers.",
+      "sources": ["tid:9923"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

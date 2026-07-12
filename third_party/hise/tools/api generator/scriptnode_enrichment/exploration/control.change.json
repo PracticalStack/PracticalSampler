@@ -1,0 +1,12 @@
+{
+  "factoryPath": "control.change",
+  "nodes": [
+    { "id": "value_in", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Raw input value (unscaled)" },
+    { "id": "change_detect", "label": "Change Detection", "type": "process", "importance": 1.0, "description": "Compares incoming value to stored value; only forwards when different (exact float equality)" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Unnormalised output -- only fires when value changes" }
+  ],
+  "edges": [
+    { "from": "value_in", "to": "change_detect", "type": "signal", "label": null },
+    { "from": "change_detect", "to": "mod_out", "type": "signal", "label": "only when changed" }
+  ]
+}

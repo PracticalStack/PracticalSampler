@@ -1,0 +1,115 @@
+{
+  "factoryPath": "control.smoothed_parameter",
+  "factory": "control",
+  "nodeId": "smoothed_parameter",
+  "description": "Smoothes an incoming modulation signal",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input",
+      "rationale": "The value to be smoothed before sending to the output.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Smoothing Configuration",
+      "rationale": "Controls the smoothing behaviour -- time constant and enable toggle.",
+      "parameters": [
+        {
+          "id": "SmoothingTime",
+          "range": { "min": 0.1, "max": 1000.0, "step": 0.1, "skew": 1.0 },
+          "default": 100.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Enabled",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "Mode",
+      "defaultValue": "Linear Ramp",
+      "type": "enum",
+      "note": "Selects the smoothing algorithm. Maps to C++ template argument (HasModeTemplateArgument). Mode namespace is 'smoothers'. Available modes likely include Linear Ramp, Exponential, Low Pass."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/smoothed_parameter.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "smoothing-modes",
+      "category": "conditional_logic",
+      "question": "What smoothing modes are available in the 'smoothers' namespace? Confirm: Linear Ramp, Exponential, Low Pass -- are there others? What is the mathematical behaviour of each?",
+      "context": "Users need to choose the right smoothing algorithm for their use case."
+    },
+    {
+      "id": "processing-pattern",
+      "category": "signal_path",
+      "question": "smoothed_parameter does NOT have OutsideSignalPath or IsControlNode. It uses wrap::mod with process()/processFrame() to advance the smoother each sample. Confirm that it runs in the audio callback and sends modulation via handleModulation().",
+      "context": "This is Pattern 6 from control-infrastructure (smoothed output). It differs from most control nodes by running during audio processing."
+    },
+    {
+      "id": "enabled-bypass",
+      "category": "parameter_behaviour",
+      "question": "What happens when Enabled=false? Does it pass the Value through immediately (no smoothing), or does it stop outputting entirely?",
+      "context": "Users need to know whether disabling smoothing gives instant parameter changes or silence."
+    }
+  ],
+
+  "notes": "IMPORTANT: smoothed_parameter does NOT have OutsideSignalPath or IsControlNode. It is IsPolyphonic and uses TemplateArgumentIsPolyphonic + HasModeTemplateArgument. It sits IN the signal path and uses the wrap::mod pattern (advances the smoother per sample in process(), sends via handleModulation). Disambiguation pair with smoothed_parameter_unscaled."
+}

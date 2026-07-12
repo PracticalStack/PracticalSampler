@@ -1,0 +1,22 @@
+{
+  "55": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);",
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "getAllEffects result depends on modules already in the tree from previous tests. Compile-only. The forward-iteration removal pattern is the example's intended behavior."
+  },
+  "59": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.addPanel(\"Panel1\", 0, 0);\nContent.addKnob(\"Knob1\", 100, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "Panel1 != undefined", "value": 1, "delay": 0}
+    ],
+    "notes": "Already has makeFrontInterface(150, 150). Needs Panel1 and Knob1 created. Callback fires during init changing Panel1 value, so only verify existence."
+  }
+}

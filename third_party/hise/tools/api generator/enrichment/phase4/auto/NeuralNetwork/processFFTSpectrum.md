@@ -1,0 +1,1 @@
+Runs ONNX inference on an FFT spectrum for spectral classification. Takes an FFT object and rescales its spectrum to an image of the specified dimensions, then passes it through the loaded ONNX model. Returns an array of output values (e.g. classification probabilities). Call `loadOnnxModel` before using this method.

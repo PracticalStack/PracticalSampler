@@ -1,0 +1,1 @@
+Returns `true` if the rectangle has zero or negative width or height. Useful for checking the result of `getIntersection()` to determine whether two rectangles actually overlap.

@@ -1,0 +1,16 @@
+{
+  "factoryPath": "control.pma",
+  "nodes": [
+    { "id": "value_in", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Primary 0..1 input signal" },
+    { "id": "multiply", "label": "Multiply", "type": "parameter", "importance": 1.0, "description": "Scale factor applied to input (-1..1)" },
+    { "id": "add", "label": "Add", "type": "parameter", "importance": 1.0, "description": "DC offset added after multiplication (-1..1)" },
+    { "id": "pma_op", "label": "Value * Multiply + Add", "type": "process", "importance": 1.0, "description": "Computes value * mulValue + addValue, clamped to 0..1" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Normalised 0..1 output to connected targets" }
+  ],
+  "edges": [
+    { "from": "value_in", "to": "pma_op", "type": "signal", "label": null },
+    { "from": "multiply", "to": "pma_op", "type": "control", "label": null },
+    { "from": "add", "to": "pma_op", "type": "control", "label": null },
+    { "from": "pma_op", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

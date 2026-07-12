@@ -1,0 +1,151 @@
+{
+  "0": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "DrumPad1"}
+    ],
+    "verifyScript": null,
+    "notes": "Mouse callback - compile-only test, can't simulate mouse events"
+  },
+  "1": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Server.* API calls require external network connectivity",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "2": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": [
+      {"type": "log-output", "values": ["1", "127"]}
+    ],
+    "notes": "Regex filters numeric strings, parseInt prints 1 and 127"
+  },
+  "3": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptFloatingTile", "id": "ft_Flex"}
+    ],
+    "verifyScript": null,
+    "notes": "FlexAHDSR LAF - compile-only"
+  },
+  "4": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Requires NAM model file in AudioFiles folder that doesn't exist in test environment",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "5": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Requires WavetableSynth module (not in Builder API) and {PROJECT_FOLDER} wav files",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "6": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Requires WavetableSynth module (not in Builder API) for getWavetableController",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "7": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptComboBox", "id": "ComboBox1"}
+    ],
+    "verifyScript": null,
+    "notes": "Popup menu LAF - compile-only"
+  },
+  "8": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Self-contained SVG + addPanel - compile-only"
+  },
+  "9": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptComboBox", "id": "cmb_MatchLoader"}
+    ],
+    "verifyScript": null,
+    "notes": "AudioSampleProcessor not in module types list but try anyway - compile test. Engine.loadAudioFilesIntoPool returns empty in test env."
+  },
+  "10": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Self-contained key colour setup - compile-only"
+  },
+  "11": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Requires DSP network with specific named nodes (reverb, delay, slot1, slot2) that can't be created via Builder API",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "12": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptLabel", "id": "Label1"}
+    ],
+    "verifyScript": null,
+    "notes": "CSS styled label - compile-only"
+  },
+  "13": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptFloatingTile", "id": "Matrix"}
+    ],
+    "verifyScript": null,
+    "notes": "FloatingTile child tooltips - compile-only"
+  },
+  "14": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Self-contained SVG + LAF - compile-only"
+  }
+}

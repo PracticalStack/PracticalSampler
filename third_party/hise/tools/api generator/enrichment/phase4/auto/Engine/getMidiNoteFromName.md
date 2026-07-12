@@ -1,0 +1,1 @@
+Converts a MIDI note name string (e.g., `"C3"` for middle C) to its note number (0-127). Returns -1 if the name is not recognised. The naming convention uses C3 as middle C (MIDI note 60).

@@ -1,0 +1,1 @@
+Adds or removes a modulation connection between the specified source and target. Pass `true` as the third argument to create a connection, `false` to remove it. New connections are initialised with default values based on the target type, configurable via `setMatrixModulationProperties`.

@@ -1,0 +1,1 @@
+Returns an array of `[x, y, width, height]` rectangles for all notes in the current sequence, scaled to the given target bounds. Each rectangle maps time to the x-axis and pitch to the y-axis (note 127 at the top, each note occupying 1/128 of the height).

@@ -1,0 +1,1 @@
+Creates a child directory with the given name inside this directory and returns a File handle pointing to it. Safe to call if the directory already exists. The returned handle points to the child path regardless of whether creation succeeded - call `isDirectory()` on the result to verify.

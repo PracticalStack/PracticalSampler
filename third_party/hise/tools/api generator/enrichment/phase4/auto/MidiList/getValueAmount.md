@@ -1,0 +1,1 @@
+Counts how many of the 128 slots contain the specified value. Useful for checking how many notes are mapped to a particular velocity, zone, or group number. For a newly cleared list, `getValueAmount(-1)` returns 128 since all slots hold the sentinel.

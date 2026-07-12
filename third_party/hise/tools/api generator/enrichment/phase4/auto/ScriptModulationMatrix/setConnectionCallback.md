@@ -1,0 +1,3 @@
+Registers a callback that fires whenever a connection is added or removed. The callback receives three arguments: the source ID, the target ID, and a boolean indicating whether the connection was added (`true`) or removed (`false`). The callback fires once per connection change, so bulk operations like `clearAllConnections` trigger it multiple times.
+
+> [!Warning:Broadcaster queue required for batch operations] If you forward connection events to a broadcaster, call `Broadcaster.setEnableQueue()` on it first. Without the queue, the broadcaster collapses multiple rapid events and only fires with the last one.

@@ -1,0 +1,1 @@
+Converts this modulator to a TableProcessor handle if the underlying module has a lookup table (e.g., TableEnvelope). Returns `undefined` if the modulator is not a table processor type - check the return value with `isDefined()` before use.

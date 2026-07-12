@@ -1,0 +1,1 @@
+Returns a new colour with the saturation (HSB saturation component) replaced by the given value (0.0-1.0, clamped). A saturation of 0.0 produces a greyscale colour, and 1.0 produces the fully saturated version. Hue, brightness, and alpha are preserved. For proportional desaturation relative to the current saturation, use `Colours.withMultipliedSaturation()` instead.

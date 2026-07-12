@@ -1,0 +1,1 @@
+When enabled, CC messages played back from the MIDI sequence are routed to the global MIDI automation handler, allowing MIDI file playback to drive automated parameters. The automation handler can consume these events so they do not pass through the signal chain.

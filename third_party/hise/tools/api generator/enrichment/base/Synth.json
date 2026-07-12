@@ -1,0 +1,786 @@
+{
+  "className": "Synth",
+  "category": "namespace",
+  "description": "Provides access to the synth where the script processor resides.\nThere are special methods for SynthGroups which only work with SynthGroups",
+  "methods": {
+    "addController": {
+      "signature": "void addController(int channel, int number, int value, int timeStampSamples)",
+      "returnType": "void",
+      "description": "Adds a controller to the buffer.",
+      "parameters": [
+        {
+          "name": "channel",
+          "type": "int"
+        },
+        {
+          "name": "number",
+          "type": "int"
+        },
+        {
+          "name": "value",
+          "type": "int"
+        },
+        {
+          "name": "timeStampSamples",
+          "type": "int"
+        }
+      ]
+    },
+    "addEffect": {
+      "signature": "ScriptEffect * addEffect(String type, String id, int index)",
+      "returnType": "ScriptEffect *",
+      "description": "Adds a effect (index = -1 to append it at the end).",
+      "parameters": [
+        {
+          "name": "type",
+          "type": "String"
+        },
+        {
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "addMessageFromHolder": {
+      "signature": "int addMessageFromHolder(var messageHolder)",
+      "returnType": "int",
+      "description": "Adds the event from the given holder and returns a event id for note ons.",
+      "parameters": [
+        {
+          "name": "messageHolder",
+          "type": "var"
+        }
+      ]
+    },
+    "addModulator": {
+      "signature": "ScriptModulator * addModulator(int chainId, String type, String id)",
+      "returnType": "ScriptModulator *",
+      "description": "Adds a Modulator to the synth's chain. If it already exists, it returns the index.",
+      "parameters": [
+        {
+          "name": "chainId",
+          "type": "int"
+        },
+        {
+          "name": "type",
+          "type": "String"
+        },
+        {
+          "name": "id",
+          "type": "String"
+        }
+      ]
+    },
+    "addNoteOff": {
+      "signature": "void addNoteOff(int channel, int noteNumber, int timeStampSamples)",
+      "returnType": "void",
+      "description": "Adds a note off to the buffer.",
+      "parameters": [
+        {
+          "name": "channel",
+          "type": "int"
+        },
+        {
+          "name": "noteNumber",
+          "type": "int"
+        },
+        {
+          "name": "timeStampSamples",
+          "type": "int"
+        }
+      ]
+    },
+    "addNoteOn": {
+      "signature": "int addNoteOn(int channel, int noteNumber, int velocity, int timeStampSamples)",
+      "returnType": "int",
+      "description": "Adds a note on to the buffer.",
+      "parameters": [
+        {
+          "name": "channel",
+          "type": "int"
+        },
+        {
+          "name": "noteNumber",
+          "type": "int"
+        },
+        {
+          "name": "velocity",
+          "type": "int"
+        },
+        {
+          "name": "timeStampSamples",
+          "type": "int"
+        }
+      ]
+    },
+    "addPitchFade": {
+      "signature": "void addPitchFade(int eventId, int fadeTimeMilliseconds, int targetCoarsePitch, int targetFinePitch)",
+      "returnType": "void",
+      "description": "Adds a pitch fade to the given event ID.",
+      "parameters": [
+        {
+          "name": "eventId",
+          "type": "int"
+        },
+        {
+          "name": "fadeTimeMilliseconds",
+          "type": "int"
+        },
+        {
+          "name": "targetCoarsePitch",
+          "type": "int"
+        },
+        {
+          "name": "targetFinePitch",
+          "type": "int"
+        }
+      ]
+    },
+    "addToFront": {
+      "signature": "void addToFront(bool addToFront)",
+      "returnType": "void",
+      "description": "Adds the interface to the Container's body (or the frontend interface if compiled)",
+      "parameters": [
+        {
+          "name": "addToFront",
+          "type": "bool"
+        }
+      ]
+    },
+    "addVolumeFade": {
+      "signature": "void addVolumeFade(int eventId, int fadeTimeMilliseconds, int targetVolume)",
+      "returnType": "void",
+      "description": "Fades all voices with the given event id to the target volume (in decibels).",
+      "parameters": [
+        {
+          "name": "eventId",
+          "type": "int"
+        },
+        {
+          "name": "fadeTimeMilliseconds",
+          "type": "int"
+        },
+        {
+          "name": "targetVolume",
+          "type": "int"
+        }
+      ]
+    },
+    "attachNote": {
+      "signature": "bool attachNote(int originalNoteId, int artificialNoteId)",
+      "returnType": "bool",
+      "description": "Attaches an artificial note to be stopped when the original note is stopped.",
+      "parameters": [
+        {
+          "name": "originalNoteId",
+          "type": "int"
+        },
+        {
+          "name": "artificialNoteId",
+          "type": "int"
+        }
+      ]
+    },
+    "createBuilder": {
+      "signature": "var createBuilder()",
+      "returnType": "var",
+      "description": "Creates a Builder object that can be used to create the module tree.",
+      "parameters": []
+    },
+    "deferCallbacks": {
+      "signature": "void deferCallbacks(bool makeAsynchronous)",
+      "returnType": "void",
+      "description": "Defers all callbacks to the message thread (midi callbacks become read-only).",
+      "parameters": [
+        {
+          "name": "makeAsynchronous",
+          "type": "bool"
+        }
+      ]
+    },
+    "getAllEffects": {
+      "signature": "var getAllEffects(String regex)",
+      "returnType": "var",
+      "description": "Returns an array of all effects that match the given regex.",
+      "parameters": [
+        {
+          "name": "regex",
+          "type": "String"
+        }
+      ]
+    },
+    "getAllModulators": {
+      "signature": "var getAllModulators(String regex)",
+      "returnType": "var",
+      "description": "Returns an array of all modulators that match the given regex.",
+      "parameters": [
+        {
+          "name": "regex",
+          "type": "String"
+        }
+      ]
+    },
+    "getAttribute": {
+      "signature": "float getAttribute(int attributeIndex)",
+      "returnType": "float",
+      "description": "Returns the attribute of the parent synth.",
+      "parameters": [
+        {
+          "name": "attributeIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "getAudioSampleProcessor": {
+      "signature": "ScriptAudioSampleProcessor * getAudioSampleProcessor(String name)",
+      "returnType": "ScriptAudioSampleProcessor *",
+      "description": "Returns the child synth with the supplied name.",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "String"
+        }
+      ]
+    },
+    "getChildSynth": {
+      "signature": "ScriptSynth * getChildSynth(String name)",
+      "returnType": "ScriptSynth *",
+      "description": "Returns the child synth with the supplied name.",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "String"
+        }
+      ]
+    },
+    "getChildSynthByIndex": {
+      "signature": "ScriptSynth * getChildSynthByIndex(int index)",
+      "returnType": "ScriptSynth *",
+      "description": "Returns the child synth with the given index.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "getDisplayBufferSource": {
+      "signature": "ScriptingObjects::ScriptDisplayBufferSource * getDisplayBufferSource(String name)",
+      "returnType": "ScriptingObjects::ScriptDisplayBufferSource *",
+      "description": "Returns a reference to a processor that holds a display buffer.",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "String"
+        }
+      ]
+    },
+    "getEffect": {
+      "signature": "ScriptEffect * getEffect(String name)",
+      "returnType": "ScriptEffect *",
+      "description": "Returns the Effect with the supplied name. Can only be called in onInit(). It looks also in all child processors.",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "String"
+        }
+      ]
+    },
+    "getIdList": {
+      "signature": "var getIdList(String type)",
+      "returnType": "var",
+      "description": "Searches the child processors and returns a list with every ID of the given type.",
+      "parameters": [
+        {
+          "name": "type",
+          "type": "String"
+        }
+      ]
+    },
+    "getMidiPlayer": {
+      "signature": "ScriptMidiPlayer * getMidiPlayer(String playerId)",
+      "returnType": "ScriptMidiPlayer *",
+      "description": "Creates a reference to the given MIDI player.",
+      "parameters": [
+        {
+          "name": "playerId",
+          "type": "String"
+        }
+      ]
+    },
+    "getMidiProcessor": {
+      "signature": "ScriptMidiProcessor * getMidiProcessor(String name)",
+      "returnType": "ScriptMidiProcessor *",
+      "description": "Returns the MidiProcessor with the supplied name. Can not be the own name!",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "String"
+        }
+      ]
+    },
+    "getModulator": {
+      "signature": "ScriptModulator * getModulator(String name)",
+      "returnType": "ScriptModulator *",
+      "description": "Returns the Modulator with the supplied name. Can be only called in onInit. It looks also in all child processors.",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "String"
+        }
+      ]
+    },
+    "getModulatorIndex": {
+      "signature": "int getModulatorIndex(int chainId, String id)",
+      "returnType": "int",
+      "description": "Returns the index of the Modulator in the chain with the supplied chainId",
+      "parameters": [
+        {
+          "name": "chainId",
+          "type": "int"
+        },
+        {
+          "name": "id",
+          "type": "String"
+        }
+      ]
+    },
+    "getNumChildSynths": {
+      "signature": "int getNumChildSynths()",
+      "returnType": "int",
+      "description": "Returns the number of child synths. Works with SynthGroups and SynthChains.",
+      "parameters": []
+    },
+    "getNumPressedKeys": {
+      "signature": "int getNumPressedKeys()",
+      "returnType": "int",
+      "description": "Returns the number of pressed keys (!= the number of playing voices!).",
+      "parameters": []
+    },
+    "getRoutingMatrix": {
+      "signature": "ScriptRoutingMatrix * getRoutingMatrix(String processorId)",
+      "returnType": "ScriptRoutingMatrix *",
+      "description": "Creates a reference to the routing matrix of the given processor.",
+      "parameters": [
+        {
+          "name": "processorId",
+          "type": "String"
+        }
+      ]
+    },
+    "getSampler": {
+      "signature": "Sampler * getSampler(String name)",
+      "returnType": "Sampler *",
+      "description": "Returns the first sampler with the name name.",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "String"
+        }
+      ]
+    },
+    "getSliderPackProcessor": {
+      "signature": "ScriptSliderPackProcessor * getSliderPackProcessor(String name)",
+      "returnType": "ScriptSliderPackProcessor *",
+      "description": "Returns the sliderpack processor with the given name.",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "String"
+        }
+      ]
+    },
+    "getSlotFX": {
+      "signature": "ScriptSlotFX * getSlotFX(String name)",
+      "returnType": "ScriptSlotFX *",
+      "description": "Returns the first slot with the given name.",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "String"
+        }
+      ]
+    },
+    "getTableProcessor": {
+      "signature": "ScriptTableProcessor * getTableProcessor(String name)",
+      "returnType": "ScriptTableProcessor *",
+      "description": "Returns the table processor with the given name.",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "String"
+        }
+      ]
+    },
+    "getTimerInterval": {
+      "signature": "double getTimerInterval()",
+      "returnType": "double",
+      "description": "Returns the current timer interval in seconds.",
+      "parameters": []
+    },
+    "getWavetableController": {
+      "signature": "ScriptingObjects::ScriptWavetableController * getWavetableController(String processorId)",
+      "returnType": "ScriptingObjects::ScriptWavetableController *",
+      "description": "Creates a object to control the wavetable synthesiser features.",
+      "parameters": [
+        {
+          "name": "processorId",
+          "type": "String"
+        }
+      ]
+    },
+    "isArtificialEventActive": {
+      "signature": "bool isArtificialEventActive(int eventId)",
+      "returnType": "bool",
+      "description": "Checks if the artificial event is active",
+      "parameters": [
+        {
+          "name": "eventId",
+          "type": "int"
+        }
+      ]
+    },
+    "isKeyDown": {
+      "signature": "bool isKeyDown(int noteNumber)",
+      "returnType": "bool",
+      "description": "Checks if the given key is pressed.",
+      "parameters": [
+        {
+          "name": "noteNumber",
+          "type": "int"
+        }
+      ]
+    },
+    "isLegatoInterval": {
+      "signature": "bool isLegatoInterval()",
+      "returnType": "bool",
+      "description": "Checks if any key is pressed.",
+      "parameters": []
+    },
+    "isSustainPedalDown": {
+      "signature": "bool isSustainPedalDown()",
+      "returnType": "bool",
+      "description": "Returns true if the sustain pedal is pressed.",
+      "parameters": []
+    },
+    "isTimerRunning": {
+      "signature": "bool isTimerRunning()",
+      "returnType": "bool",
+      "description": "Checks if the timer for this script is running.",
+      "parameters": []
+    },
+    "noteOff": {
+      "signature": "void noteOff(int noteNumber)",
+      "returnType": "void",
+      "description": "Sends a note off message. The envelopes will tail off.",
+      "parameters": [
+        {
+          "name": "noteNumber",
+          "type": "int"
+        }
+      ]
+    },
+    "noteOffByEventId": {
+      "signature": "void noteOffByEventId(int eventId)",
+      "returnType": "void",
+      "description": "Sends a note off message for the supplied event ID. This is more stable than the deprecated noteOff() method.",
+      "parameters": [
+        {
+          "name": "eventId",
+          "type": "int"
+        }
+      ]
+    },
+    "noteOffDelayedByEventId": {
+      "signature": "void noteOffDelayedByEventId(int eventId, int timestamp)",
+      "returnType": "void",
+      "description": "Sends a note off message for the supplied event ID with the given delay in samples.",
+      "parameters": [
+        {
+          "name": "eventId",
+          "type": "int"
+        },
+        {
+          "name": "timestamp",
+          "type": "int"
+        }
+      ]
+    },
+    "noteOffFromUI": {
+      "signature": "void noteOffFromUI(int channel, int noteNumber)",
+      "returnType": "void",
+      "description": "Injects a note off to the incoming MIDI buffer (similar to playNoteFromUI).",
+      "parameters": [
+        {
+          "name": "channel",
+          "type": "int"
+        },
+        {
+          "name": "noteNumber",
+          "type": "int"
+        }
+      ]
+    },
+    "playNote": {
+      "signature": "int playNote(int noteNumber, int velocity)",
+      "returnType": "int",
+      "description": "Plays a note and returns the event id. Be careful or you get stuck notes!",
+      "parameters": [
+        {
+          "name": "noteNumber",
+          "type": "int"
+        },
+        {
+          "name": "velocity",
+          "type": "int"
+        }
+      ]
+    },
+    "playNoteFromUI": {
+      "signature": "void playNoteFromUI(int channel, int noteNumber, int velocity)",
+      "returnType": "void",
+      "description": "Injects a note on to the incoming MIDI buffer (just as if the virtual keyboard was pressed.",
+      "parameters": [
+        {
+          "name": "channel",
+          "type": "int"
+        },
+        {
+          "name": "noteNumber",
+          "type": "int"
+        },
+        {
+          "name": "velocity",
+          "type": "int"
+        }
+      ]
+    },
+    "playNoteWithStartOffset": {
+      "signature": "int playNoteWithStartOffset(int channel, int number, int velocity, int offset)",
+      "returnType": "int",
+      "description": "Plays a note and returns the event id with the given channel and start offset.",
+      "parameters": [
+        {
+          "name": "channel",
+          "type": "int"
+        },
+        {
+          "name": "number",
+          "type": "int"
+        },
+        {
+          "name": "velocity",
+          "type": "int"
+        },
+        {
+          "name": "offset",
+          "type": "int"
+        }
+      ]
+    },
+    "removeEffect": {
+      "signature": "bool removeEffect(var effect)",
+      "returnType": "bool",
+      "description": "Removes the given effect.",
+      "parameters": [
+        {
+          "name": "effect",
+          "type": "var"
+        }
+      ]
+    },
+    "removeModulator": {
+      "signature": "bool removeModulator(var mod)",
+      "returnType": "bool",
+      "description": "Removes the modulator.",
+      "parameters": [
+        {
+          "name": "mod",
+          "type": "var"
+        }
+      ]
+    },
+    "sendController": {
+      "signature": "void sendController(int number, int value)",
+      "returnType": "void",
+      "description": "Sends a controller event to the synth.",
+      "parameters": [
+        {
+          "name": "number",
+          "type": "int"
+        },
+        {
+          "name": "value",
+          "type": "int"
+        }
+      ]
+    },
+    "sendControllerToChildSynths": {
+      "signature": "void sendControllerToChildSynths(int controllerNumber, int controllerValue)",
+      "returnType": "void",
+      "description": "The same as sendController (for backwards compatibility)",
+      "parameters": [
+        {
+          "name": "controllerNumber",
+          "type": "int"
+        },
+        {
+          "name": "controllerValue",
+          "type": "int"
+        }
+      ]
+    },
+    "setAttribute": {
+      "signature": "void setAttribute(int attributeIndex, float newAttribute)",
+      "returnType": "void",
+      "description": "Sets an attribute of the parent synth.",
+      "parameters": [
+        {
+          "name": "attributeIndex",
+          "type": "int"
+        },
+        {
+          "name": "newAttribute",
+          "type": "float"
+        }
+      ]
+    },
+    "setClockSpeed": {
+      "signature": "void setClockSpeed(int clockSpeed)",
+      "returnType": "void",
+      "description": "Sets the internal clock speed.",
+      "parameters": [
+        {
+          "name": "clockSpeed",
+          "type": "int"
+        }
+      ]
+    },
+    "setFixNoteOnAfterNoteOff": {
+      "signature": "void setFixNoteOnAfterNoteOff(bool shouldBeFixed)",
+      "returnType": "void",
+      "description": "Adds a few additional safe checks to prevent stuck notes from note offs being processed before their note-on message.",
+      "parameters": [
+        {
+          "name": "shouldBeFixed",
+          "type": "bool"
+        }
+      ]
+    },
+    "setMacroControl": {
+      "signature": "void setMacroControl(int macroIndex, float newValue)",
+      "returnType": "void",
+      "description": "Sets one of the eight macro controllers to the newValue.\nmacroIndex\nthe index of the macro from 1 - 8\nnewValue\nThe range for the newValue is 0.0 - 127.0.",
+      "parameters": [
+        {
+          "name": "macroIndex",
+          "type": "int"
+        },
+        {
+          "name": "newValue",
+          "type": "float"
+        }
+      ]
+    },
+    "setModulatorAttribute": {
+      "signature": "void setModulatorAttribute(int chainId, int modulatorIndex, int attributeIndex, float newValue)",
+      "returnType": "void",
+      "description": "Sets a ModulatorAttribute.\nchainId\nthe chain where the Modulator is. GainModulation = 1, PitchModulation = 0\nmodulatorIndex\nthe index of the Modulator starting with 0.\nattributeIndex\nthe index of the Modulator starting with 0. Intensity is '-12', Bypassed is '-13'\nnewValue\nthe value. The range for Gain is 0.0 - 1.0, the Range for Pitch is -12.0 ... 12.0",
+      "parameters": [
+        {
+          "name": "chainId",
+          "type": "int"
+        },
+        {
+          "name": "modulatorIndex",
+          "type": "int"
+        },
+        {
+          "name": "attributeIndex",
+          "type": "int"
+        },
+        {
+          "name": "newValue",
+          "type": "float"
+        }
+      ]
+    },
+    "setShouldKillRetriggeredNote": {
+      "signature": "void setShouldKillRetriggeredNote(bool killNote)",
+      "returnType": "void",
+      "description": "If set to true, this will kill retriggered notes (default).",
+      "parameters": [
+        {
+          "name": "killNote",
+          "type": "bool"
+        }
+      ]
+    },
+    "setUseUniformVoiceHandler": {
+      "signature": "void setUseUniformVoiceHandler(String containerId, bool shouldUseUniformVoiceHandling)",
+      "returnType": "void",
+      "description": "Use a uniform voice index for the given container.",
+      "parameters": [
+        {
+          "name": "containerId",
+          "type": "String"
+        },
+        {
+          "name": "shouldUseUniformVoiceHandling",
+          "type": "bool"
+        }
+      ]
+    },
+    "setVoiceGainValue": {
+      "signature": "void setVoiceGainValue(int voiceIndex, float gainValue)",
+      "returnType": "void",
+      "description": "Applies a gain factor to a specified voice.",
+      "parameters": [
+        {
+          "name": "voiceIndex",
+          "type": "int"
+        },
+        {
+          "name": "gainValue",
+          "type": "float"
+        }
+      ]
+    },
+    "setVoicePitchValue": {
+      "signature": "void setVoicePitchValue(int voiceIndex, double pitchValue)",
+      "returnType": "void",
+      "description": "Applies a pitch factor (0.5 ... 2.0) to a specified voice.",
+      "parameters": [
+        {
+          "name": "voiceIndex",
+          "type": "int"
+        },
+        {
+          "name": "pitchValue",
+          "type": "double"
+        }
+      ]
+    },
+    "startTimer": {
+      "signature": "void startTimer(double seconds)",
+      "returnType": "void",
+      "description": "Starts the timer of the synth.",
+      "parameters": [
+        {
+          "name": "seconds",
+          "type": "double"
+        }
+      ]
+    },
+    "stopTimer": {
+      "signature": "void stopTimer()",
+      "returnType": "void",
+      "description": "Stops the timer of the synth. You can call this also in the timer callback.",
+      "parameters": []
+    }
+  }
+}

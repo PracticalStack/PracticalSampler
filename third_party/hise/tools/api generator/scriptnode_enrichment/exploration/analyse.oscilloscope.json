@@ -1,0 +1,18 @@
+{
+  "factoryPath": "analyse.oscilloscope",
+  "nodes": [
+    {"id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio (1-2 channels)"},
+    {"id": "process", "label": "Oscilloscope Display", "type": "process", "importance": 1.0, "description": "Writes audio to ring buffer for waveform visualization"},
+    {"id": "midi", "label": "MIDI Note-On", "type": "event", "importance": 0.7, "description": "Optional: sync display to note frequency (one cycle per window)"},
+    {"id": "cycle_calc", "label": "Calculate cycle length", "type": "process", "importance": 0.6, "description": "Convert MIDI note frequency to sample count"},
+    {"id": "rb", "label": "SimpleRingBuffer", "type": "external_data", "importance": 1.0, "description": "Display ring buffer (1-2 channels, 128-65536 samples)"},
+    {"id": "out", "label": "Audio Out (pass-through)", "type": "output", "importance": 1.0, "description": "Input signal unchanged"}
+  ],
+  "edges": [
+    {"from": "in", "to": "process", "type": "signal", "label": null},
+    {"from": "process", "to": "rb", "type": "signal", "label": "ring buffer write"},
+    {"from": "midi", "to": "cycle_calc", "type": "event", "label": null},
+    {"from": "cycle_calc", "to": "rb", "type": "control", "label": "setMaxLength"},
+    {"from": "in", "to": "out", "type": "signal", "label": "pass-through"}
+  ]
+}

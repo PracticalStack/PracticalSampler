@@ -1,0 +1,1 @@
+Returns whether the current licence has an expiration time set. Use this to determine whether to call `checkExpirationData()` for time-limited licence validation. A false return means the licence is either permanent or no valid key file has been loaded.

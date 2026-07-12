@@ -1,0 +1,24 @@
+{
+  "factoryPath": "core.file_player",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 0.7, "description": "Input signal (used as position in SignalInput mode)" },
+    { "id": "player", "label": "File Player", "type": "process", "importance": 1.0, "description": "Reads audio from file with interpolation" },
+    { "id": "mode_switch", "label": "PlaybackMode", "type": "decision", "importance": 1.0, "description": "Static, SignalInput, or MidiFreq" },
+    { "id": "mode", "label": "PlaybackMode", "type": "parameter", "importance": 1.0, "description": "Selects playback behaviour" },
+    { "id": "gate", "label": "Gate", "type": "parameter", "importance": 0.8, "description": "Start/stop playback" },
+    { "id": "root", "label": "RootFrequency", "type": "parameter", "importance": 0.7, "description": "Reference pitch for MIDI mode" },
+    { "id": "ratio", "label": "FreqRatio", "type": "parameter", "importance": 0.7, "description": "Playback speed multiplier" },
+    { "id": "audiofile", "label": "AudioFile", "type": "external_data", "importance": 1.0, "description": "Source audio file for playback" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "File playback output (additive or replacing depending on mode)" }
+  ],
+  "edges": [
+    { "from": "in", "to": "mode_switch", "type": "signal", "label": null },
+    { "from": "mode", "to": "mode_switch", "type": "control", "label": null },
+    { "from": "mode_switch", "to": "player", "type": "conditional", "label": "selects processing path" },
+    { "from": "audiofile", "to": "player", "type": "signal", "label": "audio data" },
+    { "from": "gate", "to": "player", "type": "control", "label": null },
+    { "from": "root", "to": "player", "type": "control", "label": null },
+    { "from": "ratio", "to": "player", "type": "control", "label": null },
+    { "from": "player", "to": "out", "type": "signal", "label": null }
+  ]
+}

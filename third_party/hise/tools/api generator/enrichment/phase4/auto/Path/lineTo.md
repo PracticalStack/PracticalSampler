@@ -1,0 +1,1 @@
+Adds a straight line from the current position to `(x, y)`. Together with `startNewSubPath`, this is the most basic path construction method - used for building icons, waveform shapes, filter response curves, and any geometry composed of straight segments.

@@ -1,0 +1,108 @@
+{
+  "factoryPath": "fx.reverb",
+  "factory": "fx",
+  "nodeId": "reverb",
+  "description": "The default JUCE reverb implementation",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Reverb character",
+      "rationale": "Damping, Width, and Size together define the reverb's tonal and spatial character. They correspond to the JUCE Reverb::Parameters fields.",
+      "parameters": [
+        {
+          "id": "Size",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.5,
+          "textConverter": "NormalizedPercentage",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Damping",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.5,
+          "textConverter": "NormalizedPercentage",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Width",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.5,
+          "textConverter": "NormalizedPercentage",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/fx/reverb.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": ["script-fx1.png"],
+
+  "gaps": [
+    {
+      "id": "juce-reverb-wrapper",
+      "category": "signal_path",
+      "question": "How does the node wrap juce::Reverb? Does it use processStereo or processMono? How are the JUCE Reverb::Parameters mapped to the node parameters (particularly: does the node expose roomSize, damping, width directly, or are there any transformations)?",
+      "context": "The description says 'default JUCE reverb'. Need to confirm the wrapping is straightforward."
+    },
+    {
+      "id": "missing-parameters",
+      "category": "description_accuracy",
+      "question": "JUCE Reverb::Parameters has roomSize, damping, wetLevel, dryLevel, width, freezeMode. The node only exposes Size, Damping, Width. Are wetLevel, dryLevel, and freezeMode hardcoded? What values?",
+      "context": "Users may expect dry/wet control. If hardcoded to 100% wet, they need to use a container.split or dry_wet template."
+    },
+    {
+      "id": "not-polyphonic",
+      "category": "signal_path",
+      "question": "This is the only fx node without IsPolyphonic. Is this because juce::Reverb is inherently monophonic/shared, or was polyphonic support intentionally omitted?",
+      "context": "Important for users to understand placement constraints in polyphonic networks."
+    },
+    {
+      "id": "channel-handling",
+      "category": "signal_path",
+      "question": "Does the node process stereo (processStereo) or mono? What happens with mono input?",
+      "context": "Reverb is typically stereo. Need to document channel requirements."
+    }
+  ],
+
+  "notes": "Notable: this is the ONLY fx node without IsPolyphonic flag. All parameters use NormalizedPercentage converter (0-100% display). The JUCE Reverb is a Freeverb-style algorithm. Missing dry/wet, freeze parameters compared to full JUCE Reverb::Parameters - these are likely hardcoded. The node exposes Size rather than roomSize - check if there's a name mapping."
+}

@@ -1,0 +1,121 @@
+{
+  "factoryPath": "math.map",
+  "factory": "math",
+  "nodeId": "map",
+  "description": "A math operator that maps a signal from one range to another",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input Range",
+      "rationale": "InputStart and InputEnd define the expected range of the incoming signal. Together they describe the source domain for the mapping.",
+      "parameters": [
+        {
+          "id": "InputStart",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "InputEnd",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Output Range",
+      "rationale": "OutputStart and OutputEnd define the target range. The input signal is linearly mapped from [InputStart, InputEnd] to [OutputStart, OutputEnd].",
+      "parameters": [
+        {
+          "id": "OutputStart",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "OutputEnd",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/math/map.md",
+    "tier": "BRIEF",
+    "lines": 20
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "input-clamping-behaviour",
+      "category": "signal_path",
+      "question": "How does math.map handle input values outside the [InputStart, InputEnd] range? The hmath.md notes it uses hmath::range for clamping -- is the input clamped to [InputStart, InputEnd] before mapping, or is the output clamped to [OutputStart, OutputEnd] after mapping, or both?",
+      "context": "Users need to know whether out-of-range input produces clamped output or extrapolated values, as this affects use in waveshaping and modulation rescaling."
+    },
+    {
+      "id": "mapping-linearity",
+      "category": "signal_path",
+      "question": "Is the mapping purely linear (i.e., simple proportional rescaling), or does it support non-linear curves (e.g., via skew or additional shaping)?",
+      "context": "Determines whether math.map is a simple linear rescaler or if it can produce curved mappings."
+    },
+    {
+      "id": "processing-granularity",
+      "category": "performance",
+      "question": "Does math.map process per-sample (frame-based) or per-block with SIMD acceleration? What does the process() implementation look like?",
+      "context": "Affects CPU cost estimation and understanding of whether this node benefits from block processing."
+    },
+    {
+      "id": "inverted-range-behaviour",
+      "category": "parameter_behaviour",
+      "question": "What happens when InputStart > InputEnd or OutputStart > OutputEnd? Does the node support inverted mappings (e.g., mapping [1,0] to [0,1] for signal inversion)?",
+      "context": "Users may attempt inverted ranges for signal flipping; need to document whether this works or produces unexpected results."
+    }
+  ],
+
+  "notes": "math.map is NOT based on the OpNode template used by most math nodes. It has 4 named parameters instead of the single 'Value' parameter. The hmath.md infrastructure doc mentions it uses hmath::range for clamping, suggesting input is clamped before the linear mapping. No cppProperties are set, meaning it is monophonic and not polyphonic -- unlike most math nodes that inherit from polyphonic_base via OpNode."
+}

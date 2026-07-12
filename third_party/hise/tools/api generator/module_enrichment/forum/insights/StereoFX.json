@@ -1,0 +1,64 @@
+{
+  "targetId": "StereoFX",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [1081, 8718, 7956, 6144, 1176, 2142],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Pan parameter has zero audible effect without modulators in the Pan chain",
+      "summary": "The Pan parameter defines the maximum range of pan modulation, not a static pan position. If the Pan Modulation chain is empty, applyEffect() exits immediately and no panning is applied regardless of the Pan knob value.",
+      "sources": ["tid:1081"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Width above 100% can introduce out-of-phase content",
+      "summary": "Setting Width beyond 100% exaggerates the side signal and can produce content where left and right channels are partially out of phase. This may cause partial cancellation when the output is summed to mono.",
+      "sources": ["tid:7956"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Width has no effect on a mono source (L==R)",
+      "summary": "Mid/side width processing scales the side signal (R-L). If both channels carry the same signal, the side is zero and Width has no audible effect regardless of the knob position.",
+      "sources": ["tid:7956"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use Haas effect or chorus to widen mono samples instead of StereoFX Width alone",
+      "summary": "When widening a mono source, StereoFX Width alone does nothing because there is no stereo difference to expand. Community practice is to create stereo differences first using a short delay (Haas effect ~30ms on one channel) or a chorus node, then optionally follow with StereoFX Width.",
+      "sources": ["tid:1176", "tid:7956"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Stereo plugin sums to mono in FL Studio when HI_SUPPORT_MONO_TO_STEREO=1 is set manually",
+      "summary": "Using the HI_SUPPORT_MONO_TO_STEREO=1 extra definition together with the SupportMonoFX project checkbox causes stereo-to-mono collapse in FL Studio VST3 builds. The fix is to remove the manual preprocessor definition and rely solely on the SupportMonoFX project setting, or use ForceStereoOutput instead.",
+      "sources": ["tid:8718"],
+      "verify": true,
+      "verify_hint": "grep HI_SUPPORT_MONO_TO_STEREO and HI_SUPPORT_MONO_CHANNEL_LAYOUT in HISE plugin wrapper source; check if project settings override extra definitions"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use ForceStereoOutput + SupportMonoFX for cross-DAW mono-to-stereo compatibility",
+      "summary": "To get a mono-to-stereo FX plugin that works correctly across FL Studio, Logic, and Reaper without manual per-format build flag changes, enable ForceStereoOutput in project settings and check SupportMonoFX. Avoid setting HI_SUPPORT_MONO_TO_STEREO manually in Extra Definitions.",
+      "sources": ["tid:8718"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Scriptnode mid/side network as alternative for modulation-driven stereo width",
+      "summary": "Users needing per-voice or modulation-driven width control implement their own mid/side processing in a scriptnode DspNetwork. The StereoFX Width parameter is static (no modulation chain), so scriptnode is the recommended path when dynamic width is required.",
+      "sources": ["tid:6144"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+Serialises the entire processor state (all parameters, internal data, child processors) as a Base64 string. This is the method to use for "FX lock" workflows where you save effect states before a preset change and restore them afterwards via `Effect.restoreState()`.

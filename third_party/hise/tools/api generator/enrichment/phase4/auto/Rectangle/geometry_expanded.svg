@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 160" width="320" height="160">
+  <defs>
+    <marker id="arr" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
+      <polygon points="0 0, 6 2.5, 0 5" fill="#808080"/>
+    </marker>
+  </defs>
+
+  <!-- Left: original rectangle -->
+  <rect x="25" y="30" width="70" height="80" rx="3"
+        fill="none" stroke="#808080" stroke-width="1"/>
+  <text x="60" y="74" font-family="Lato, sans-serif" font-size="11"
+        fill="#808080" text-anchor="middle">rect</text>
+
+  <!-- Arrow -->
+  <line x1="108" y1="70" x2="132" y2="70"
+        stroke="#808080" stroke-width="1" marker-end="url(#arr)"/>
+
+  <!-- Right: ghost of original (dashed, dimmed) -->
+  <rect x="170" y="30" width="70" height="80" rx="3"
+        fill="none" stroke="#808080" stroke-width="1" stroke-dasharray="4,3" stroke-opacity="0.4"/>
+
+  <!-- Right: expanded result (green), outset by ~15px on each side -->
+  <rect x="155" y="15" width="100" height="110" rx="3"
+        fill="#90FFB1" fill-opacity="0.12" stroke="#90FFB1" stroke-width="1.5"/>
+  <text x="205" y="56" font-family="Lato, sans-serif" font-size="11"
+        fill="#90FFB1" text-anchor="middle">result</text>
+
+  <!-- Dimension: expansion amount on left side -->
+  <line x1="157" y1="32" x2="165" y2="32" stroke="#808080" stroke-width="1"/>
+  <line x1="157" y1="28" x2="157" y2="36" stroke="#808080" stroke-width="1"/>
+  <line x1="165" y1="28" x2="165" y2="36" stroke="#808080" stroke-width="1"/>
+  <text x="161" y="24" font-family="Consolas, 'Courier New', monospace" font-size="10"
+        fill="#808080" text-anchor="middle">x</text>
+
+  <!-- Dimension: expansion amount on top side -->
+  <line x1="262" y1="17" x2="262" y2="28" stroke="#808080" stroke-width="1"/>
+  <line x1="258" y1="17" x2="266" y2="17" stroke="#808080" stroke-width="1"/>
+  <line x1="258" y1="28" x2="266" y2="28" stroke="#808080" stroke-width="1"/>
+  <text x="278" y="26" font-family="Consolas, 'Courier New', monospace" font-size="10"
+        fill="#808080">y</text>
+</svg>

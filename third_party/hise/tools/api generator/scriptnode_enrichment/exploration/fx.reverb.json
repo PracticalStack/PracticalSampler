@@ -1,0 +1,18 @@
+{
+  "factoryPath": "fx.reverb",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal (mono or stereo)" },
+    { "id": "reverb", "label": "Freeverb", "type": "process", "importance": 1.0, "description": "JUCE Reverb (Freeverb-style): 8 comb filters + 4 allpass filters, 100% wet" },
+    { "id": "size", "label": "Size", "type": "parameter", "importance": 1.0, "description": "Room size (0-1): controls reverb tail length" },
+    { "id": "damping", "label": "Damping", "type": "parameter", "importance": 1.0, "description": "High-frequency damping (0-1): controls brightness of reverb tail" },
+    { "id": "width", "label": "Width", "type": "parameter", "importance": 0.7, "description": "Stereo width (0-1). NOTE: currently sets damping due to a bug in setWidth()" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "100% wet reverb output" }
+  ],
+  "edges": [
+    { "from": "in", "to": "reverb", "type": "signal", "label": null },
+    { "from": "size", "to": "reverb", "type": "control", "label": null },
+    { "from": "damping", "to": "reverb", "type": "control", "label": null },
+    { "from": "width", "to": "reverb", "type": "control", "label": null },
+    { "from": "reverb", "to": "out", "type": "signal", "label": null }
+  ]
+}

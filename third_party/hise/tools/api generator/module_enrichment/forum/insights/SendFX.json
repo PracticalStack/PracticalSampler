@@ -1,0 +1,88 @@
+{
+  "targetId": "SendFX",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [5032, 76, 13113, 12398, 7659, 5673, 6236, 6444, 9463, 12586],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Placing SendFX in the Master Container causes immediate feedback",
+      "summary": "A SendFX placed directly in the Master Container will feed its output back into itself, producing an instant full-volume feedback loop. Always place SendFX inside a child Container, never at the top level.",
+      "sources": ["tid:5032", "tid:6236"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "SendFX crashed exported plugins in HISE versions before late 2021",
+      "summary": "Send effects were reported to crash compiled plugins. This was fixed in a commit around December 2021. Users on older builds should update; the RoutingMatrix workaround is no longer required on patched versions.",
+      "sources": ["tid:5032"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "SendFX send is post-fader relative to the sound generator's gain",
+      "summary": "The send signal is tapped after the sound generator's own gain stage, making it a post-fader send. There is no pre-fader option; if pre-fader behaviour is needed, a manual routing workaround using RoutingMatrix and empty channels is required.",
+      "sources": ["tid:76"],
+      "verify": true,
+      "verify_hint": "check applyEffect call order in SendEffect vs SimpleGain in RouteFX.h; confirm signal tap point"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Convolution IR files used in send FX must be inside the project audiofiles folder",
+      "summary": "If a Convolution Reverb inside a SendContainer references an audio file by absolute path outside the project folder, it will not be embedded when exporting. The plugin's send reverb will silently produce no output. Move the IR to the project audiofiles folder and reload before exporting.",
+      "sources": ["tid:7659"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "FX plugins using SendFX require 'Process Sound Generators' enabled in project settings",
+      "summary": "When building an FX plugin (not an instrument), the 'Process Sound Generators' checkbox in project preferences must be enabled for SendFX routing to function correctly.",
+      "sources": ["tid:6444"],
+      "verify": true,
+      "verify_hint": "grep processSoundGenerators or 'Process Sound Generators' in project settings / plugin type handling"
+    },
+    {
+      "type": "BUG",
+      "title": "Renaming a SendContainer can break all connected SendFX and show 'no choices'",
+      "summary": "If a SendContainer is renamed after SendFX have been connected to it, the connection may break and the SendFX dropdown shows 'no choices'. The fix is to remove and re-add the SendContainer.",
+      "sources": ["tid:12586"],
+      "verify": true,
+      "verify_hint": "grep connect() in RouteFX.h; check how container ID is stored and resolved on patch load"
+    },
+    {
+      "type": "API",
+      "title": "SendFX placed at Container level only sends the stereo mix of that Container",
+      "summary": "When a SendFX is placed in a Container that is configured as stereo (2 channels), it sends only the stereo downmix regardless of how many channels the inner samplers produce. Placing the SendFX at the Container level rather than inside individual sound generators resolves most multichannel send routing issues.",
+      "sources": ["tid:9463"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "SendIndex channel stepping changed from steps of 2 to steps of 1",
+      "summary": "In older HISE versions the SendIndex / channel control moved in steps of 2. It now moves in steps of 1. Scripts or patches that hard-coded channel indices assuming the old step size may route to the wrong container after updating.",
+      "sources": ["tid:13113"],
+      "verify": true,
+      "verify_hint": "grep SendIndex or channel step in RouteFX.h or SendEffect parameter metadata; check createMetadata in RouteFX.cpp"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Built-in effects are stereo only; multichannel sends require duplicated effect chains",
+      "summary": "All built-in HISE effects process only a single stereo pair. To apply the same send effect to multiple channel pairs (e.g., 8-channel output), duplicate the effect for each stereo pair and assign it to the correct channels. Scriptnode effects with custom networks can handle additional inputs/outputs.",
+      "sources": ["tid:12398"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use Engine.getDecibelsForGainFactor() when exposing SendLevel as a dB knob",
+      "summary": "The SendFX SendLevel parameter accepts a linear gain factor (0 to 1). To map a user-facing dB knob to this parameter, use Engine.getDecibelsForGainFactor() for the conversion rather than a manual lookup table.",
+      "sources": ["tid:6444"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

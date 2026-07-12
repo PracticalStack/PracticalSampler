@@ -1,0 +1,226 @@
+{
+  "className": "Effect",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "addGlobalModulator": {
+      "signature": "var addGlobalModulator(var chainIndex, var globalMod, String modName)",
+      "returnType": "var",
+      "description": "Adds a and connects a receiver modulator for the given global modulator.",
+      "parameters": [
+        {
+          "name": "chainIndex",
+          "type": "var"
+        },
+        {
+          "name": "globalMod",
+          "type": "var"
+        },
+        {
+          "name": "modName",
+          "type": "String"
+        }
+      ]
+    },
+    "addModulator": {
+      "signature": "var addModulator(var chainIndex, var typeName, var modName)",
+      "returnType": "var",
+      "description": "Adds a modulator to the given chain and returns a reference.",
+      "parameters": [
+        {
+          "name": "chainIndex",
+          "type": "var"
+        },
+        {
+          "name": "typeName",
+          "type": "var"
+        },
+        {
+          "name": "modName",
+          "type": "var"
+        }
+      ]
+    },
+    "addStaticGlobalModulator": {
+      "signature": "var addStaticGlobalModulator(var chainIndex, var timeVariantMod, String modName)",
+      "returnType": "var",
+      "description": "Adds and connects a receiving static time variant modulator for the given global modulator.",
+      "parameters": [
+        {
+          "name": "chainIndex",
+          "type": "var"
+        },
+        {
+          "name": "timeVariantMod",
+          "type": "var"
+        },
+        {
+          "name": "modName",
+          "type": "String"
+        }
+      ]
+    },
+    "exists": {
+      "signature": "bool exists()",
+      "returnType": "bool",
+      "description": "Checks if the Object exists and prints a error message on the console if not.",
+      "parameters": []
+    },
+    "exportScriptControls": {
+      "signature": "String exportScriptControls()",
+      "returnType": "String",
+      "description": "Export the control values (without the script).",
+      "parameters": []
+    },
+    "exportState": {
+      "signature": "String exportState()",
+      "returnType": "String",
+      "description": "Exports the state as base64 string.",
+      "parameters": []
+    },
+    "getAttribute": {
+      "signature": "float getAttribute(int index)",
+      "returnType": "float",
+      "description": "Returns the attribute with the given index.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "getAttributeId": {
+      "signature": "String getAttributeId(int index)",
+      "returnType": "String",
+      "description": "Returns the ID of the attribute with the given index.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "getAttributeIndex": {
+      "signature": "int getAttributeIndex(String id)",
+      "returnType": "int",
+      "description": "Returns the index of the attribute with the given ID.",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "String"
+        }
+      ]
+    },
+    "getCurrentLevel": {
+      "signature": "float getCurrentLevel(bool leftChannel)",
+      "returnType": "float",
+      "description": "Returns the current peak level for the given channel.",
+      "parameters": [
+        {
+          "name": "leftChannel",
+          "type": "bool"
+        }
+      ]
+    },
+    "getDraggableFilterData": {
+      "signature": "var getDraggableFilterData()",
+      "returnType": "var",
+      "description": "Returns the draggable filter data object (if applicable).",
+      "parameters": []
+    },
+    "getId": {
+      "signature": "String getId()",
+      "returnType": "String",
+      "description": "Returns the ID of the effect.",
+      "parameters": []
+    },
+    "getModulatorChain": {
+      "signature": "var getModulatorChain(var chainIndex)",
+      "returnType": "var",
+      "description": "Returns the Modulator chain with the given index.",
+      "parameters": [
+        {
+          "name": "chainIndex",
+          "type": "var"
+        }
+      ]
+    },
+    "getNumAttributes": {
+      "signature": "int getNumAttributes()",
+      "returnType": "int",
+      "description": "Returns the number of attributes.",
+      "parameters": []
+    },
+    "isBypassed": {
+      "signature": "bool isBypassed()",
+      "returnType": "bool",
+      "description": "Checks if the effect is bypassed.",
+      "parameters": []
+    },
+    "isSuspended": {
+      "signature": "bool isSuspended()",
+      "returnType": "bool",
+      "description": "Checks if the effect is currently suspended (= no audio running through it and suspension enabled).",
+      "parameters": []
+    },
+    "restoreScriptControls": {
+      "signature": "void restoreScriptControls(String base64Controls)",
+      "returnType": "void",
+      "description": "Restores the control values for scripts (without recompiling).",
+      "parameters": [
+        {
+          "name": "base64Controls",
+          "type": "String"
+        }
+      ]
+    },
+    "restoreState": {
+      "signature": "void restoreState(String base64State)",
+      "returnType": "void",
+      "description": "Restores the state from a base64 string.",
+      "parameters": [
+        {
+          "name": "base64State",
+          "type": "String"
+        }
+      ]
+    },
+    "setAttribute": {
+      "signature": "void setAttribute(int parameterIndex, float newValue)",
+      "returnType": "void",
+      "description": "Changes one of the Parameter. Look in the manual for the index numbers of each effect.",
+      "parameters": [
+        {
+          "name": "parameterIndex",
+          "type": "int"
+        },
+        {
+          "name": "newValue",
+          "type": "float"
+        }
+      ]
+    },
+    "setBypassed": {
+      "signature": "void setBypassed(bool shouldBeBypassed)",
+      "returnType": "void",
+      "description": "Bypasses the effect.",
+      "parameters": [
+        {
+          "name": "shouldBeBypassed",
+          "type": "bool"
+        }
+      ]
+    },
+    "setDraggableFilterData": {
+      "signature": "void setDraggableFilterData(var filterData)",
+      "returnType": "void",
+      "description": "Sets the draggable filter data object (if applicable).",
+      "parameters": [
+        {
+          "name": "filterData",
+          "type": "var"
+        }
+      ]
+    }
+  }
+}

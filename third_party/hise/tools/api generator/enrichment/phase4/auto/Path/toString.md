@@ -1,0 +1,1 @@
+Converts the path to a human-readable string using single-character commands (`m` for move, `l` for line, `q` for quadratic, `c` for cubic, `z` for close) followed by coordinate values. The result can be inspected for debugging or restored with `fromString()`. For compact storage, use `toBase64()` instead.

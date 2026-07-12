@@ -1,0 +1,101 @@
+{
+  "className": "ScriptShader",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "fromBase64": {
+      "signature": "void fromBase64(String b64)",
+      "returnType": "void",
+      "description": "Compiles the code from the given base64 string.",
+      "parameters": [
+        {
+          "name": "b64",
+          "type": "String"
+        }
+      ]
+    },
+    "getOpenGLStatistics": {
+      "signature": "var getOpenGLStatistics()",
+      "returnType": "var",
+      "description": "Returns a JSON object with the current OpenGL statistics.",
+      "parameters": []
+    },
+    "setBlendFunc": {
+      "signature": "void setBlendFunc(bool enabled, int sFactor, int dFactor)",
+      "returnType": "void",
+      "description": "Sets the blend mode for the shader.",
+      "parameters": [
+        {
+          "name": "enabled",
+          "type": "bool"
+        },
+        {
+          "name": "sFactor",
+          "type": "int"
+        },
+        {
+          "name": "dFactor",
+          "type": "int"
+        }
+      ]
+    },
+    "setEnableCachedBuffer": {
+      "signature": "void setEnableCachedBuffer(bool shouldEnableBuffer)",
+      "returnType": "void",
+      "description": "If this is enabled, the shader will create a buffered image of the last rendering result.",
+      "parameters": [
+        {
+          "name": "shouldEnableBuffer",
+          "type": "bool"
+        }
+      ]
+    },
+    "setFragmentShader": {
+      "signature": "void setFragmentShader(String shaderFile)",
+      "returnType": "void",
+      "description": "Loads a .glsl file from the script folder.",
+      "parameters": [
+        {
+          "name": "shaderFile",
+          "type": "String"
+        }
+      ]
+    },
+    "setPreprocessor": {
+      "signature": "void setPreprocessor(String preprocessorString, var value)",
+      "returnType": "void",
+      "description": "Adds a preprocessor definition before the code and recompiles the shader (Empty string removes all preprocessors).",
+      "parameters": [
+        {
+          "name": "preprocessorString",
+          "type": "String"
+        },
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "setUniformData": {
+      "signature": "void setUniformData(String id, var data)",
+      "returnType": "void",
+      "description": "Sets an uniform variable to be used in the shader code.",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "name": "data",
+          "type": "var"
+        }
+      ]
+    },
+    "toBase64": {
+      "signature": "String toBase64()",
+      "returnType": "String",
+      "description": "Compresses the GLSL code and returns a encoded string snippet.",
+      "parameters": []
+    }
+  }
+}

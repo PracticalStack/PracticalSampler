@@ -1,0 +1,32 @@
+{
+  "targetId": "filters.svf",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [8941, 14037, 13944],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Filter mode cannot be changed via scriptnode parameter connections alone",
+      "summary": "The SVF filter mode (LP, HP, BP, etc.) cannot be switched directly from the scriptnode graph without scripting. Users must control the mode index via a HiseScript callback. Trusted poster Lindon confirmed this: 'you can't do it outside of scripting, script it like this'. David Healey refined the pattern by using named constants instead of raw integer indices.",
+      "sources": ["tid:8941"],
+      "verify": true,
+      "verify_hint": "Check whether a later scriptnode version exposed the mode as a modulatable parameter, or whether it still requires a script setAttribute call."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use named constants when setting SVF filter mode from script",
+      "summary": "When setting the SVF mode index from HiseScript, use named constants (e.g. the filter's attribute enum) rather than raw integer literals. David Healey's refinement of Lindon's snippet demonstrates this as the preferred pattern for readability and forward-compatibility.",
+      "sources": ["tid:8941"],
+      "verify": false,
+      "verify_hint": "Confirm the SVF node exposes a Mode attribute with a documented enum."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Stepped frequency control via array lookup + stepped knob",
+      "summary": "For SVF EQ nodes where only specific frequency values are valid, the recommended pattern is to store the allowed frequencies in a JavaScript array and use a stepped knob whose integer value is used as an array index. The callback then calls setAttribute(Frequency, freqSteps[index]). This approach integrates with preset saving automatically because the knob value (the index) is stored, not the frequency itself.",
+      "sources": ["tid:14037"],
+      "verify": false,
+      "verify_hint": "No code to verify against the engine; pattern is purely scripting convention."
+    }
+  ]
+}

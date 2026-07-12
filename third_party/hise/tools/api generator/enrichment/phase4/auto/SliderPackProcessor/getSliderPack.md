@@ -1,0 +1,1 @@
+Returns a `SliderPackData` reference for the slider pack at the given index. The index is zero-based and refers to the slider pack slots owned by the target module - index 0 for a single-pack module like an array modulator, or indices 0-2 for a module with three packs like a harmonic filter.

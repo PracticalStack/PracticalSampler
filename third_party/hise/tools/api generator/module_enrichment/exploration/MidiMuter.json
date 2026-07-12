@@ -1,0 +1,98 @@
+{
+  "moduleId": "MidiMuter",
+  "nodes": [
+    {
+      "id": "midi_in",
+      "type": "input",
+      "label": "MIDI In",
+      "importance": 1.0,
+      "description": "Incoming MIDI events (notes, CC, pitch bend, aftertouch, etc.)"
+    },
+    {
+      "id": "event_dispatch",
+      "type": "decision",
+      "label": "Event Type?",
+      "importance": 0.8,
+      "description": "Base class dispatches by HiseEvent::Type to the appropriate callback"
+    },
+    {
+      "id": "note_on_gate",
+      "type": "process",
+      "label": "Note-On Gate",
+      "importance": 1.0,
+      "group": "note_gating",
+      "description": "Blocks note-on if ignore=true. Always updates noteOns bitmask."
+    },
+    {
+      "id": "note_off_gate",
+      "type": "process",
+      "label": "Note-Off Gate",
+      "importance": 1.0,
+      "group": "note_gating",
+      "description": "Blocks note-off if ignore=true, unless fix=true AND note was previously heard. Always clears noteOns bit."
+    },
+    {
+      "id": "note_tracker",
+      "type": "process",
+      "label": "Note Tracker (BigInteger)",
+      "importance": 0.7,
+      "group": "note_gating",
+      "description": "128-bit bitmask tracking which note numbers have been heard (set on noteOn, cleared on noteOff)"
+    },
+    {
+      "id": "non_note_passthrough",
+      "type": "process",
+      "label": "Non-Note Passthrough",
+      "importance": 0.6,
+      "description": "CC, pitch bend, aftertouch, program change, and all other non-note events pass through unmodified"
+    },
+    {
+      "id": "ignore_param",
+      "type": "parameter",
+      "label": "ignoreButton",
+      "importance": 1.0,
+      "group": "mute_control",
+      "description": "Toggle: when on, note-on events are blocked"
+    },
+    {
+      "id": "fix_param",
+      "type": "parameter",
+      "label": "fixStuckNotes",
+      "importance": 0.9,
+      "group": "mute_control",
+      "description": "Toggle: when on, allows note-offs for previously-heard notes during muted state"
+    },
+    {
+      "id": "midi_out",
+      "type": "output",
+      "label": "MIDI Out",
+      "importance": 1.0,
+      "description": "Filtered MIDI events (blocked events are marked as ignored)"
+    }
+  ],
+  "edges": [
+    { "from": "midi_in", "to": "event_dispatch", "type": "signal" },
+    { "from": "event_dispatch", "to": "note_on_gate", "type": "conditional", "label": "NoteOn" },
+    { "from": "event_dispatch", "to": "note_off_gate", "type": "conditional", "label": "NoteOff" },
+    { "from": "event_dispatch", "to": "non_note_passthrough", "type": "conditional", "label": "CC/PB/AT/other" },
+    { "from": "ignore_param", "to": "note_on_gate", "type": "control" },
+    { "from": "ignore_param", "to": "note_off_gate", "type": "control" },
+    { "from": "fix_param", "to": "note_off_gate", "type": "control" },
+    { "from": "note_tracker", "to": "note_off_gate", "type": "control", "label": "was note heard?" },
+    { "from": "note_on_gate", "to": "note_tracker", "type": "signal", "label": "set bit" },
+    { "from": "note_off_gate", "to": "note_tracker", "type": "signal", "label": "clear bit" },
+    { "from": "note_on_gate", "to": "midi_out", "type": "signal" },
+    { "from": "note_off_gate", "to": "midi_out", "type": "signal" },
+    { "from": "non_note_passthrough", "to": "midi_out", "type": "signal" }
+  ],
+  "groups": [
+    {
+      "id": "note_gating",
+      "label": "Note Event Gating"
+    },
+    {
+      "id": "mute_control",
+      "label": "Mute Control Parameters"
+    }
+  ]
+}

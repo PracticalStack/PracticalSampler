@@ -1,0 +1,1 @@
+Parses the text output of Python's `print(model)` from a file and returns a JSON array describing the network layers. Pass the result directly to `build` to construct the network topology, then call `loadWeights` to set the trained parameters. This is the first step of the two-step PyTorch workflow when topology and weights are stored separately.

@@ -1,0 +1,93 @@
+{
+  "factoryPath": "container.framex_block",
+  "factory": "container",
+  "nodeId": "framex_block",
+  "description": "Enables per sample processing for the child nodes.",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "UI-only: controls whether the container is displayed vertically or horizontally in the scriptnode graph. No effect on audio processing."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/container/framex_block.md",
+    "tier": "STUB",
+    "lines": 6
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "dynamic-channel-dispatch",
+      "category": "signal_path",
+      "question": "framex_block uses wrap::frame_x<T> (without the fix<N> wrapper). How does it dispatch to processFrame() when the channel count is not known at compile time? Does it use FrameConverters::forwardToFrame16() with a runtime switch over channel counts 1-16?",
+      "context": "The key difference from frame1_block/frame2_block is dynamic channel handling. Users need to understand whether this supports arbitrary channel counts or has a maximum."
+    },
+    {
+      "id": "max-channel-count",
+      "category": "signal_path",
+      "question": "What is the maximum channel count supported by framex_block? The infrastructure doc mentions HISE_NUM_MAX_FRAME_CONTAINER_CHANNELS and forwardToFrame16 dispatching 1-16 channels. Is 16 the hard limit?",
+      "context": "Users with multi-channel setups (e.g., inside container.multi with many channels) need to know the channel limit."
+    },
+    {
+      "id": "performance-vs-fixed-frame",
+      "category": "performance",
+      "question": "Is there measurable overhead from the dynamic channel dispatch in framex_block compared to frame1_block or frame2_block where the channel count is a compile-time constant? Does the runtime switch add per-sample branching cost?",
+      "context": "Helps users decide between framex_block (flexible) and frameN_block (potentially faster). The fixed variants can inline and optimise more aggressively."
+    },
+    {
+      "id": "bypass-behaviour",
+      "category": "signal_path",
+      "question": "Does framex_block (SingleSampleBlockX) have the same bypass behaviour as frame1_block (SingleSampleBlock<1>) -- reverting to block processing when bypassed?",
+      "context": "Need to confirm bypass is consistent across the frame container family."
+    },
+    {
+      "id": "description-accuracy",
+      "category": "description_accuracy",
+      "question": "The base data description says 'Enables per sample processing for the child nodes.' without mentioning the dynamic channel count aspect. Should the description note that this version adapts to the current channel count, unlike frame1_block/frame2_block which fix the channel count?",
+      "context": "The description is vague compared to frame1_block/frame2_block which specify the channel count. The key selling point of framex_block is its channel flexibility."
+    }
+  ],
+
+  "notes": "The dynamic-channel version of the frame container family. Uses wrap::frame_x<T> directly (no fix<N> wrapper), so channel count is determined at runtime from the network context. This is NOT a variant of frameN_block -- it is a separate node with fundamentally different channel handling. The existing phase3 doc is a bare stub with only frontmatter (no content at all, even the summary is a placeholder). This node is referenced by the dynamic_blocksize doc as the equivalent of BlockSize=1."
+}

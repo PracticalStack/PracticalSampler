@@ -1,0 +1,1 @@
+Looks up a custom automation slot by its string ID and returns its zero-based index. Returns -1 if the custom data model is not active or the ID does not match any registered slot. Cache the returned index at init time rather than calling this repeatedly in a performance-sensitive context - `setAutomationValue` takes an index, not a string.

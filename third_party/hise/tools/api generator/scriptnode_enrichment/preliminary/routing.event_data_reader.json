@@ -1,0 +1,107 @@
+{
+  "factoryPath": "routing.event_data_reader",
+  "factory": "routing",
+  "nodeId": "event_data_reader",
+  "description": "reads data that was written to the event ID storage of the global routing manager",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": true,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Slot Configuration",
+      "rationale": "These parameters configure which data slot to read and whether the slot index is fixed at compile time.",
+      "parameters": [
+        {
+          "id": "SlotIndex",
+          "range": { "min": 0, "max": 16, "step": 1, "skew": 1.0 },
+          "default": 0,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Static",
+          "range": { "min": 0, "max": 1, "step": 1, "skew": 1.0 },
+          "default": 0,
+          "textConverter": "has converter",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/routing/event_data_reader.md",
+    "tier": "GOOD",
+    "lines": 24
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "event-data-storage-mechanism",
+      "category": "signal_path",
+      "question": "What is the 'event ID storage of the global routing manager'? Is it a per-event-ID key-value store with 16 slots per event? How is data associated with a specific event ID?",
+      "context": "Users need to understand the data model: events carry additional data slots that can be written by event_data_writer and read by event_data_reader."
+    },
+    {
+      "id": "read-trigger",
+      "category": "signal_path",
+      "question": "When does the reader read the data -- on note-on events (handleHiseEvent), on every process() call, or triggered by some other mechanism? What event types trigger a read?",
+      "context": "Determines whether this is an event-driven or continuously-polling reader."
+    },
+    {
+      "id": "static-parameter-meaning",
+      "category": "parameter_behaviour",
+      "question": "The Static parameter (0/1 toggle with converter) -- does it fix the SlotIndex at compile time for C++ export? Or does it change the reading behaviour (e.g., read once vs read continuously)?",
+      "context": "The text converter will provide label text, but the behavioural difference needs C++ confirmation."
+    },
+    {
+      "id": "modulation-output-value",
+      "category": "signal_path",
+      "question": "The node has ModulationTargets (modulation output). What value does it output -- the raw stored data, or a normalised 0..1 version? What is the output range?",
+      "context": "Determines how the read value can be used downstream as a modulation source."
+    },
+    {
+      "id": "polyphonic-event-association",
+      "category": "signal_path",
+      "question": "With IsPolyphonic true, does each voice read data associated with its own note-on event ID? How is the per-voice event ID resolved?",
+      "context": "Critical for understanding polyphonic use cases where different voices read different stored values."
+    }
+  ],
+
+  "notes": "routing.event_data_reader reads from a per-event data storage system managed by the GlobalRoutingManager. It is polyphonic and processes HiseEvents. The companion node is routing.event_data_writer. Together they enable passing arbitrary data between nodes via the event ID system -- for example, storing a random value at note-on and reading it later in the signal chain. The modulation output suggests the read value is forwarded as a modulation signal. 16 data slots are available per event (SlotIndex 0-16)."
+}

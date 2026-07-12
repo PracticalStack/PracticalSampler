@@ -1,0 +1,70 @@
+{
+  "moduleId": "Transposer",
+  "prettyName": "Transposer",
+  "type": "MidiProcessor",
+  "subtype": "MidiProcessor",
+  "category": "note_processing",
+
+  "io": {
+    "midiIn": "MIDI_in",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [],
+
+  "parameterGroups": [
+    {
+      "label": "Transpose",
+      "rationale": "Single parameter controlling the semitone offset applied to MIDI notes",
+      "parameters": [
+        {
+          "id": "TransposeAmount",
+          "name": "Transpose Amount",
+          "range": { "min": -24.0, "max": 24.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Semitone offset applied to incoming note-on events",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "event-types-affected",
+      "category": "signal_path",
+      "question": "Does processHiseEvent() transpose only note-on events, or does it also transpose the corresponding note-off events to ensure matched pairs? Does it affect any other MIDI event types?",
+      "context": "The base description says 'note-on events' only. If note-off events are not also transposed, notes would never release properly. Need to verify and correct the description if necessary."
+    },
+    {
+      "id": "realtime-vs-noteon",
+      "category": "parameter_behavior",
+      "question": "If TransposeAmount is changed while notes are held, do the currently sounding notes shift, or does the new value only apply to subsequent note-on events?",
+      "context": "Users need to know whether this is safe to automate during playback or only intended as a static offset."
+    },
+    {
+      "id": "boundary-clamping",
+      "category": "parameter_behavior",
+      "question": "What happens when transposition pushes a note number outside the valid MIDI range (0-127)? Is the note clamped, wrapped, or discarded?",
+      "context": "Edge case that affects usability at extreme transpose values near the top or bottom of the keyboard."
+    },
+    {
+      "id": "description-noteoff-omission",
+      "category": "description_accuracy",
+      "question": "The base description says 'Transposes incoming MIDI note-on events'. If note-off events are also transposed (as expected), the description should say 'MIDI note events' or 'note-on and note-off events'.",
+      "context": "Inaccurate description could mislead users into thinking note-off handling is broken or absent."
+    }
+  ],
+
+  "notes": "Transposer is one of the simplest MIDI processors - a single parameter with integer steps. The description mentioning only 'note-on events' is almost certainly incomplete since untransposed note-off events would leave notes stuck. This should be verified and corrected in Step 3. No interfaces, no modulation chains, no FX chain, no child processors."
+}

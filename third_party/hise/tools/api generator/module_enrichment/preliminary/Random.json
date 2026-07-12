@@ -1,0 +1,75 @@
+{
+  "moduleId": "Random",
+  "prettyName": "Random Modulator",
+  "type": "Modulator",
+  "subtype": "VoiceStartModulator",
+  "category": "generator",
+
+  "io": {
+    "midiIn": "noteOn",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": true,
+    "fxChain": null
+  },
+
+  "voiceContext": "per-voice",
+
+  "interfaces": [
+    {
+      "name": "TableProcessor",
+      "signalFlowRole": "Lookup table step in signal path"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Random Distribution",
+      "rationale": "The UseTable parameter controls whether the raw random value is shaped through a lookup table before output",
+      "parameters": [
+        {
+          "id": "UseTable",
+          "name": "UseTable",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Enables a lookup table to shape the random distribution",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "standaloneModChains": [],
+  "disabledModChains": [],
+  "compositeBlocks": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-order",
+      "category": "signal_path",
+      "question": "What is the exact processing order in calculateVoiceStartValue()? Is it: generate random value -> optionally apply table lookup -> output? Or is there any additional processing?",
+      "context": "The pseudo-code must show the correct transformation chain from random generation to final modulation value"
+    },
+    {
+      "id": "rng-algorithm",
+      "category": "parameter_behavior",
+      "question": "What random number generator is used? Is it std::rand, a Mersenne twister, or JUCE's Random class? Is the distribution uniform over 0-1?",
+      "context": "Users working with randomization need to understand the distribution characteristics"
+    },
+    {
+      "id": "table-lookup-application",
+      "category": "interface_usage",
+      "question": "When UseTable is enabled, does the random value (0-1) serve as the X position for the table lookup? Is the table output the final modulation value?",
+      "context": "Users need to know that the table effectively remaps the uniform distribution to a custom probability curve"
+    },
+    {
+      "id": "usetable-conditional",
+      "category": "conditional_logic",
+      "question": "When UseTable is Off, is the raw random value passed through directly? Does the table default to a linear 0-1 mapping when first enabled?",
+      "context": "Users need to understand the default behavior and what changes when the table is toggled on"
+    }
+  ],
+
+  "notes": "Simple VoiceStartModulator that generates a random value per voice. The UseTable parameter gates the TableProcessor interface, allowing the uniform random distribution to be reshaped through a custom curve. The 'generator' category confirms it does not read specific MIDI values - it generates its own values independently. Natural seeAlso candidates: Velocity, KeyNumber, Constant."
+}

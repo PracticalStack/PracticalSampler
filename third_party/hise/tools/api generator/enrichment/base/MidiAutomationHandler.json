@@ -1,0 +1,83 @@
+{
+  "className": "MidiAutomationHandler",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "getAutomationDataObject": {
+      "signature": "var getAutomationDataObject()",
+      "returnType": "var",
+      "description": "Returns an object that contains the MIDI automation data.",
+      "parameters": []
+    },
+    "setAutomationDataFromObject": {
+      "signature": "void setAutomationDataFromObject(var automationData)",
+      "returnType": "void",
+      "description": "Sets the MIDI automation from the automation data object.",
+      "parameters": [
+        {
+          "name": "automationData",
+          "type": "var"
+        }
+      ]
+    },
+    "setConsumeAutomatedControllers": {
+      "signature": "void setConsumeAutomatedControllers(bool shouldBeConsumed)",
+      "returnType": "void",
+      "description": "Sets whether a automated MIDI CC message should be consumed by the automation handler (default is enabled).",
+      "parameters": [
+        {
+          "name": "shouldBeConsumed",
+          "type": "bool"
+        }
+      ]
+    },
+    "setControllerNumberNames": {
+      "signature": "void setControllerNumberNames(var ccName, var nameArray)",
+      "returnType": "void",
+      "description": "Replaces the names in the popup.",
+      "parameters": [
+        {
+          "name": "ccName",
+          "type": "var"
+        },
+        {
+          "name": "nameArray",
+          "type": "var"
+        }
+      ]
+    },
+    "setControllerNumbersInPopup": {
+      "signature": "void setControllerNumbersInPopup(var numberArray)",
+      "returnType": "void",
+      "description": "Sets the numbers that are displayed in the MIDI automation popup.",
+      "parameters": [
+        {
+          "name": "numberArray",
+          "type": "var"
+        }
+      ]
+    },
+    "setExclusiveMode": {
+      "signature": "void setExclusiveMode(bool shouldBeExclusive)",
+      "returnType": "void",
+      "description": "Enables the \"exclusive\" mode for MIDI automation (only one active parameter for each controller).",
+      "parameters": [
+        {
+          "name": "shouldBeExclusive",
+          "type": "bool"
+        }
+      ]
+    },
+    "setUpdateCallback": {
+      "signature": "void setUpdateCallback(var callback)",
+      "returnType": "void",
+      "description": "Set a function (with one parameter containing the automation data as JSON) that will be executed whenever the MIDI automation changes.",
+      "parameters": [
+        {
+          "name": "callback",
+          "type": "var"
+        }
+      ]
+    }
+  }
+}

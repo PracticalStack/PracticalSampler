@@ -1,0 +1,3 @@
+Loads and decrypts the expansion list file, then passes the decrypted credentials to `ExpansionHandler.setCredentials()` to unlock individual expansions. Requires `HISE_USE_UNLOCKER_FOR_EXPANSIONS` to be enabled and the plugin to be unlocked. This method is called automatically on construction when those conditions are met, so manual calls are only needed after writing a new expansion key file.
+
+> [!Warning:Requires preprocessor flag] Throws a script error if `HISE_USE_UNLOCKER_FOR_EXPANSIONS` is not enabled. This is a build configuration issue that cannot be resolved at runtime.

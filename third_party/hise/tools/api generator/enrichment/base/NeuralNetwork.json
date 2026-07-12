@@ -1,0 +1,151 @@
+{
+  "className": "NeuralNetwork",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "build": {
+      "signature": "void build(var modelJSON)",
+      "returnType": "void",
+      "description": "Create a network using the given JSON for the layer setup.",
+      "parameters": [
+        {
+          "name": "modelJSON",
+          "type": "var"
+        }
+      ]
+    },
+    "clearModel": {
+      "signature": "void clearModel()",
+      "returnType": "void",
+      "description": "Destroys the model and allows rebuilding using a different layout JSON.",
+      "parameters": []
+    },
+    "connectToGlobalCables": {
+      "signature": "void connectToGlobalCables(String inputId, String outputId)",
+      "returnType": "void",
+      "description": "Connects the network to a input and output global cable.",
+      "parameters": [
+        {
+          "name": "inputId",
+          "type": "String"
+        },
+        {
+          "name": "outputId",
+          "type": "String"
+        }
+      ]
+    },
+    "createModelJSONFromTextFile": {
+      "signature": "var createModelJSONFromTextFile(var fileObject)",
+      "returnType": "var",
+      "description": "Helper function to create a JSON model definition from the Pytorch print(model) output.",
+      "parameters": [
+        {
+          "name": "fileObject",
+          "type": "var"
+        }
+      ]
+    },
+    "getModelJSON": {
+      "signature": "var getModelJSON()",
+      "returnType": "var",
+      "description": "Returns the model JSON.",
+      "parameters": []
+    },
+    "loadNAMModel": {
+      "signature": "void loadNAMModel(var modelJSON)",
+      "returnType": "void",
+      "description": "Loads the model from a NAM file.",
+      "parameters": [
+        {
+          "name": "modelJSON",
+          "type": "var"
+        }
+      ]
+    },
+    "loadOnnxModel": {
+      "signature": "bool loadOnnxModel(var base64Data, int numOutputValues)",
+      "returnType": "bool",
+      "description": "Loads the ONNX runtime model for spectral analysis.",
+      "parameters": [
+        {
+          "name": "base64Data",
+          "type": "var"
+        },
+        {
+          "name": "numOutputValues",
+          "type": "int"
+        }
+      ]
+    },
+    "loadPytorchModel": {
+      "signature": "void loadPytorchModel(var modelJSON)",
+      "returnType": "void",
+      "description": "Loads the model layout and weights from a Pytorch model JSON.",
+      "parameters": [
+        {
+          "name": "modelJSON",
+          "type": "var"
+        }
+      ]
+    },
+    "loadTensorFlowModel": {
+      "signature": "void loadTensorFlowModel(var modelJSON)",
+      "returnType": "void",
+      "description": "Loads the model layout and weights from a tensorflow model JSON.",
+      "parameters": [
+        {
+          "name": "modelJSON",
+          "type": "var"
+        }
+      ]
+    },
+    "loadWeights": {
+      "signature": "void loadWeights(var weightData)",
+      "returnType": "void",
+      "description": "Loads the weights from the JSON object.",
+      "parameters": [
+        {
+          "name": "weightData",
+          "type": "var"
+        }
+      ]
+    },
+    "process": {
+      "signature": "var process(var input)",
+      "returnType": "var",
+      "description": "Runs inference on the given input and returns either a single float or a reference to the output buffer.",
+      "parameters": [
+        {
+          "name": "input",
+          "type": "var"
+        }
+      ]
+    },
+    "processFFTSpectrum": {
+      "signature": "var processFFTSpectrum(var fftObject, int numFreqPixels, int numTimePixels)",
+      "returnType": "var",
+      "description": "Processes the FFT spectrum and returns the output tensor as array of float numbers.",
+      "parameters": [
+        {
+          "name": "fftObject",
+          "type": "var"
+        },
+        {
+          "name": "numFreqPixels",
+          "type": "int"
+        },
+        {
+          "name": "numTimePixels",
+          "type": "int"
+        }
+      ]
+    },
+    "reset": {
+      "signature": "void reset()",
+      "returnType": "void",
+      "description": "Resets the network pipeline.",
+      "parameters": []
+    }
+  }
+}

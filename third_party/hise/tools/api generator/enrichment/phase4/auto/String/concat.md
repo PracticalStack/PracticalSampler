@@ -1,0 +1,1 @@
+Appends one or more values to the string and returns the combined result. Accepts a variable number of arguments - all are converted to strings and concatenated in order. In most cases the `+` operator is simpler, but `concat` is useful when chaining multiple appends in a single call.

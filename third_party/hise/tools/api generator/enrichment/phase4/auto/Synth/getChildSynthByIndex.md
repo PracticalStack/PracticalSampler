@@ -1,0 +1,1 @@
+Returns a `ChildSynth` handle to the child sound generator at the given zero-based index. Use `Synth.getNumChildSynths()` to determine the valid index range. If the index is out of bounds, an invalid handle is returned silently.

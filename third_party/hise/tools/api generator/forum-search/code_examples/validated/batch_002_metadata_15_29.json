@@ -1,0 +1,159 @@
+{
+  "15": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptButton", "id": "RandomPreset"}
+    ],
+    "verifyScript": null,
+    "notes": "User preset list may be empty in test env but compiles fine"
+  },
+  "16": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Background task with runProcess - compiles fine, process won't execute on macOS"
+  },
+  "17": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "PolyphonicFilter", "name": "Filter1"}
+    ],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"}
+    ],
+    "verifyScript": null,
+    "notes": "connectToModulatedParameter needs the filter module to exist"
+  },
+  "18": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptedViewport", "id": "Viewport1"}
+    ],
+    "verifyScript": null,
+    "notes": "Timer-based scroll position set - compile-only"
+  },
+  "19": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Self-contained with addPanel and onController MIDI callback - compile-only"
+  },
+  "20": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "MidiPlayer", "name": "MIDI Player1"}
+    ],
+    "components": [
+      {"type": "ScriptPanel", "id": "pnl_MidiDisplay"}
+    ],
+    "verifyScript": null,
+    "notes": "MIDI player note display - compile-only (paint routine)"
+  },
+  "21": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"}
+    ],
+    "verifyScript": null,
+    "notes": "Global routing manager + data cable - compile-only"
+  },
+  "22": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "ParametriqEQ", "name": "Parametriq EQ1"}
+    ],
+    "components": [
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "ParametriqEQ not in module list but trying anyway per skip policy"
+  },
+  "23": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "loadImage with {PROJECT_FOLDER} paths - image files don't exist in test environment",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "24": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": [
+      {"type": "log-output", "values": ["I'm on the sample loading thread"]}
+    ],
+    "notes": "killVoicesAndCall runs callback which prints to console"
+  },
+  "25": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "onNoteOn MIDI callback - compile-only, can't trigger via API"
+  },
+  "26": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Self-contained panel as plugin parameter with mouse callback - compile-only"
+  },
+  "27": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Broadcaster tooltip with addPanel - compile-only"
+  },
+  "28": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "References undefined variables (pitchFactor, noiseGain, pitchLockAmount) from larger Loris project context",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "29": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "StreamingSampler", "name": "Sampler1"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Timestretch tempo sync - compile-only"
+  }
+}

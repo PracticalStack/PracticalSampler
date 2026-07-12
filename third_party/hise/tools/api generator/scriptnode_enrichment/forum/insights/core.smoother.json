@@ -1,0 +1,32 @@
+{
+  "targetId": "core.smoother",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [5694],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Smoother updates once per buffer — wrap in fix32 to avoid zipper noise",
+      "summary": "When using `core.smoother` to smooth parameters that are modulated from outside the network, it updates once per audio buffer rather than per sample. This can still produce zipper noise for parameters that change frequently. Wrapping the DSP in a `fix32` block (or appropriate frame-processing container) forces sample-accurate updates.",
+      "sources": ["tid:5694"],
+      "verify": true,
+      "verify_hint": "Confirm that core.smoother operates at buffer rate by default and that fix32/frame blocks upgrade it to sample rate."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use the SNEX sfloat type for internal parameter smoothing",
+      "summary": "For smoothing parameters inside a `core.snex_node`, prefer the built-in `sfloat` type (smoothed float) over wiring an external `core.smoother` node. Call `value.prepare(sampleRate, timeMs)` in `prepare()`, `value.reset()` in `reset()`, and `value.set(v)` in `setParameter()`. Advance per sample with `value.advance()`.",
+      "sources": ["tid:5694"],
+      "verify": true,
+      "verify_hint": "Verify sfloat API: prepare(), reset(), set(), advance() are all valid SNEX sfloat methods."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Wrap all DSP in a sample-accurate container to fix zipper noise and offline bounce",
+      "summary": "Wrapping the entire signal processing chain in a sample-accurate container (e.g. `container.fix_block` or frame context) not only removes zipper artefacts from parameter changes but also makes offline bounce (export) work correctly. This pattern is considered best practice when using modulated parameters in scriptnode.",
+      "sources": ["tid:5694"],
+      "verify": true,
+      "verify_hint": "Test: modulate a smoother without frame container and verify zipper noise is audible on offline render."
+    }
+  ]
+}

@@ -1,0 +1,231 @@
+{
+  "moduleId": "ShapeFX",
+  "prettyName": "Shape FX",
+  "type": "Effect",
+  "subtype": "MasterEffect",
+  "category": "dynamics",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "stereo",
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "RoutingMatrix",
+      "signalFlowRole": "skip - inferred from type/subtype"
+    },
+    {
+      "name": "TableProcessor",
+      "signalFlowRole": "Lookup table step in signal path - used by Curve and AsymetricalCurve shaping modes"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Pre-Shaper Filtering",
+      "rationale": "Filters applied to the wet signal before the shaping function, plus toggle to bypass them",
+      "parameters": [
+        {
+          "id": "HighPass",
+          "name": "HighPass",
+          "range": { "min": 20.0, "max": 8000.0, "step": 1.0 },
+          "default": 20.0,
+          "description": "High-pass cutoff frequency before the shaper",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "LowPass",
+          "name": "LowPass",
+          "range": { "min": 200.0, "max": 20000.0, "step": 1.0 },
+          "default": 20000.0,
+          "description": "Low-pass cutoff frequency before the shaper",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "BypassFilters",
+          "name": "BypassFilters",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Bypasses the pre-shaper high-pass and low-pass filters",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Input Stage",
+      "rationale": "Controls applied to the signal before the shaping function: gain, bias, and soft limiting",
+      "parameters": [
+        {
+          "id": "Gain",
+          "name": "Gain",
+          "range": { "min": 0.0, "max": 60.0, "step": 0.1 },
+          "default": 0.0,
+          "description": "Input gain in decibels applied before shaping",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "BiasLeft",
+          "name": "BiasLeft",
+          "range": { "min": -1.0, "max": 1.0, "step": 0.01 },
+          "default": 0.0,
+          "description": "DC bias applied to the left channel before shaping",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "BiasRight",
+          "name": "BiasRight",
+          "range": { "min": -1.0, "max": 1.0, "step": 0.01 },
+          "default": 0.0,
+          "description": "DC bias applied to the right channel before shaping",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "LimitInput",
+          "name": "LimitInput",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Enables a soft limiter before the input to avoid hard clipping",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Shaping",
+      "rationale": "Core shaping parameters: mode selection, drive, and oversampling quality",
+      "parameters": [
+        {
+          "id": "Mode",
+          "name": "Mode",
+          "range": { "min": 0.0, "max": 33.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Selects the shaping function used to process the signal",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Drive",
+          "name": "Drive",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "Drive amount applied to the shaper input",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Oversampling",
+          "name": "Oversampling",
+          "range": { "min": 1.0, "max": 5.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Oversampling factor to reduce aliasing in nonlinear shaping",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Reduce",
+          "name": "Reduce",
+          "range": { "min": 0.0, "max": 14.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Bit reduction amount in bits for lo-fi distortion",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Output Stage",
+      "rationale": "Controls applied after shaping: autogain compensation and dry/wet mix",
+      "parameters": [
+        {
+          "id": "Autogain",
+          "name": "Autogain",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Automatically compensates output level based on the shaping curve",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Mix",
+          "name": "Mix",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 1.0,
+          "description": "Dry and wet balance where 0.0 is fully dry and 1.0 is fully wet",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+
+  "standaloneModChains": [],
+
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-order",
+      "category": "signal_path",
+      "question": "What is the exact processing order in applyEffect()? Specifically: where do filters, gain, bias, limiter, shaping, bitcrushing, DC removal, autogain, and mix sit relative to each other?",
+      "context": "Need to author accurate pseudo-code showing the full signal chain from input to output."
+    },
+    {
+      "id": "drive-parameter-usage",
+      "category": "parameter_behavior",
+      "question": "The Drive parameter (0-1 normalised) is stored but how and where is it applied in applyEffect()? Is it redundant with Gain?",
+      "context": "Drive and Gain both seem to control input level - need to clarify their distinct roles for the parameter table."
+    },
+    {
+      "id": "mode-values",
+      "category": "conditional_logic",
+      "question": "What shaping functions are available for each Mode value (0-33)? Which modes use the TableProcessor lookup table?",
+      "context": "Users need to know what each mode does. The table-based modes (Curve, AsymetricalCurve) are the TableProcessor interface usage."
+    },
+    {
+      "id": "table-lookup-position",
+      "category": "interface_usage",
+      "question": "Where does the TableProcessor lookup occur in the signal path? Is it the shaping function itself for Curve mode?",
+      "context": "Required by the preliminary gate checklist since TableProcessor is listed as an interface."
+    },
+    {
+      "id": "oversampling-latency",
+      "category": "performance",
+      "question": "Does oversampling introduce latency? How is the dry buffer compensated for the latency? What are the CPU implications of each oversampling factor?",
+      "context": "Users need to understand the performance/quality trade-off of oversampling settings."
+    },
+    {
+      "id": "autogain-calculation",
+      "category": "parameter_behavior",
+      "question": "How is the autogain value calculated? Is it derived from the shaping curve at configuration time, or dynamically?",
+      "context": "Autogain behaviour affects how users should set gain staging."
+    },
+    {
+      "id": "dc-removal",
+      "category": "signal_path",
+      "question": "Is there DC removal after the shaper? The bias parameters add DC offset - is it removed post-shaping?",
+      "context": "Users adding bias need to know whether DC offset persists in the output."
+    },
+    {
+      "id": "mix-implementation",
+      "category": "parameter_behavior",
+      "question": "How is the dry/wet mix implemented? Is the dry copy taken before or after filtering?",
+      "context": "Affects whether the dry signal includes the pre-shaper filtering or is the unfiltered original."
+    }
+  ],
+
+  "notes": "ShapeFX has no modulation chains - it is a purely parameter-driven effect. The Mode parameter selects from multiple waveshaping functions including mathematical functions (atan, tanh, sin etc.) and table-based curves. The Drive parameter's role vs Gain is unclear from base data alone. The TableProcessor interface is used for the Curve shaping mode. BypassFilters gates the HighPass/LowPass parameters. The module also implements WaveformComponent::Broadcaster for UI display but this is not a signal-path interface."
+}

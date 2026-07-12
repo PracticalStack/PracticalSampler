@@ -1,0 +1,122 @@
+{
+  "moduleId": "Chorus",
+  "prettyName": "Chorus",
+  "type": "Effect",
+  "subtype": "MasterEffect",
+  "category": "delay",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "stereo",
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "RoutingMatrix",
+      "signalFlowRole": "skip - inferred from type/subtype"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Modulation",
+      "rationale": "Rate and Width control the internal LFO that modulates the delay time",
+      "parameters": [
+        {
+          "id": "Rate",
+          "name": "Rate",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.3,
+          "description": "LFO rate controlling the modulation speed",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Width",
+          "name": "Width",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.43,
+          "description": "Modulation depth controlling the intensity of the pitch variation",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Delay",
+      "rationale": "Feedback and Delay control the delay line characteristics",
+      "parameters": [
+        {
+          "id": "Feedback",
+          "name": "Feedback",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.3,
+          "description": "Amount of signal fed back into the delay line for more pronounced sweeps",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Delay",
+          "name": "Delay",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 1.0,
+          "description": "Base delay time that gets modulated by the LFO",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+
+  "standaloneModChains": [],
+
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-order",
+      "category": "signal_path",
+      "question": "What is the processing chain in the chorus? Is it a single modulated delay line per channel, or multiple voices? How is the wet signal mixed with the dry?",
+      "context": "Need to understand the chorus topology for pseudo-code."
+    },
+    {
+      "id": "internal-lfo",
+      "category": "signal_path",
+      "question": "What kind of LFO drives the delay modulation? Sine, triangle? Is there a phase offset between left and right channels for stereo widening?",
+      "context": "The LFO shape affects the character of the chorus effect."
+    },
+    {
+      "id": "delay-range",
+      "category": "parameter_behavior",
+      "question": "The Delay parameter has range 0-1. What does this map to in actual delay time (milliseconds)? What is the maximum delay buffer size?",
+      "context": "Users need to understand the actual time range."
+    },
+    {
+      "id": "feedback-path",
+      "category": "signal_path",
+      "question": "Where is the feedback applied in the signal chain? Is it fed back before or after mixing with dry?",
+      "context": "Determines whether high feedback creates flanging effects."
+    },
+    {
+      "id": "rate-range",
+      "category": "parameter_behavior",
+      "question": "The Rate parameter has range 0-1. What does this map to in Hz?",
+      "context": "Users need to know the actual modulation speed range."
+    },
+    {
+      "id": "performance",
+      "category": "performance",
+      "question": "Is the delay line interpolation linear or cubic? Per-sample processing?",
+      "context": "Determines the CPU cost tier."
+    }
+  ],
+
+  "notes": "Chorus has no modulation chains exposed to the user - the modulation is handled by an internal LFO. All parameters use NormalizedPercentage mode (0-1). Known scriptnode equivalent: fx.chorus."
+}

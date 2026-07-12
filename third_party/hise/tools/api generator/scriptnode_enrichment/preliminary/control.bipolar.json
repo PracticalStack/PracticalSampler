@@ -1,0 +1,108 @@
+{
+  "factoryPath": "control.bipolar",
+  "factory": "control",
+  "nodeId": "bipolar",
+  "description": "Creates a bipolar mod signal from a 0...1 range",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input Signal",
+      "rationale": "Value is the primary 0..1 normalised input to be transformed into a bipolar signal.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Bipolar Shaping",
+      "rationale": "Scale controls the depth and direction of the bipolar output. Gamma applies a non-linear curve to the input before scaling.",
+      "parameters": [
+        {
+          "id": "Scale",
+          "range": { "min": -1.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Gamma",
+          "range": { "min": 0.5, "max": 2.0, "step": 0.0, "skew": 0.6309297680854797 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/bipolar.md",
+    "tier": "BRIEF",
+    "lines": 11
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "bipolar-formula",
+      "category": "signal_path",
+      "question": "In multilogic::bipolar::getValue(), what is the exact formula? Expected pattern: apply gamma to value, then compute 0.5 + (gammaValue - 0.5) * scale, clamped to 0..1. Is this correct?",
+      "context": "Need the precise formula to document how the 0..1 input becomes a bipolar signal centred around 0.5."
+    },
+    {
+      "id": "bipolar-gamma-application",
+      "category": "parameter_behaviour",
+      "question": "How is Gamma applied? Is it pow(value, gamma), pow(value, 1/gamma), or something else? The range 0.5..2.0 with skew suggests a curve shaping parameter.",
+      "context": "Gamma's exact effect on the input curve determines the non-linear response before bipolar scaling."
+    },
+    {
+      "id": "bipolar-output-range",
+      "category": "signal_path",
+      "question": "Is the output clamped to 0..1 (normalised modulation)? With Scale at -1 or 1 and certain gamma values, could the output exceed 0..1?",
+      "context": "Since isNormalisedModulation is true (no UseUnnormalisedModulation flag), the output should be 0..1, but need to confirm clamping."
+    }
+  ],
+
+  "notes": "bipolar creates a modulation signal that swings around 0.5 (the centre of the normalised range). Scale controls how far the signal deviates from centre: positive Scale makes high input values map above 0.5, negative Scale inverts. Gamma adds non-linear shaping. This is a normalised output node -- target parameter ranges ARE applied by the connection system. Common use case: converting a unipolar modulation source into bipolar modulation for parameters like pan or pitch."
+}

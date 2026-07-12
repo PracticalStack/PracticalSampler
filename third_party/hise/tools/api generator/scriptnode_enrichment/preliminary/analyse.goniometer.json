@@ -1,0 +1,81 @@
+{
+  "factoryPath": "analyse.goniometer",
+  "factory": "analyse",
+  "nodeId": "goniometer",
+  "description": "A goniometer (stereo correlation display).",
+
+  "classification": {
+    "signalPathRole": "analysis",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "displayBuffers": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/analyse/goniometer.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-passthrough",
+      "category": "signal_path",
+      "question": "Does the goniometer pass audio through unmodified or does it consume/modify the signal?",
+      "context": "Users need to know if inserting this node affects their audio chain."
+    },
+    {
+      "id": "stereo-correlation-method",
+      "category": "signal_path",
+      "question": "How is the stereo correlation computed? Does it use a Lissajous (X-Y) plot, or a mid/side decomposition, or some other method? What data is written to the display buffer?",
+      "context": "Goniometers can use different visualisation methods. Need to document the specific approach."
+    },
+    {
+      "id": "channel-requirement",
+      "category": "signal_path",
+      "question": "Does the goniometer require stereo input? What happens with mono input (single channel)?",
+      "context": "A goniometer is inherently a stereo analysis tool -- users need to know the channel requirement."
+    },
+    {
+      "id": "cpu-profile",
+      "category": "performance",
+      "question": "Is the display buffer fill operation per-sample or per-block? What is the approximate CPU cost?",
+      "context": "Users need to know the performance impact of adding this analysis node."
+    }
+  ],
+
+  "notes": "Existing phase3 doc is a stub with no content. Goniometer requires stereo input by nature. Uses display_buffer_base infrastructure."
+}

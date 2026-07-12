@@ -1,0 +1,3 @@
+Limits the maximum buffer size for internal processing. If the host's buffer is larger, HISE splits it into multiple chunks of this size. For example, a 512-sample host buffer with a maximum block size of 300 processes alternating chunks of 300 and 212 samples. A smaller block size increases modulation update rate at the cost of higher CPU usage. This is the global variant of the `container.fix_block` scriptnode nodes, which perform the same operation locally within a DSP network.
+
+> [!Warning:Rounded to nearest multiple of 8] Use this only when your project specifically needs a defined upper block size limit for cross-module modulation. The value is rounded down to the nearest multiple of 8 and clamped to 16-512.

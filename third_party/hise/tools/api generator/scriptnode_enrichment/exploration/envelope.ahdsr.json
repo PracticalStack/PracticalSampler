@@ -1,0 +1,38 @@
+{
+  "factoryPath": "envelope.ahdsr",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "midi", "label": "MIDI Events", "type": "input", "importance": 0.8, "description": "Note-on/off events trigger envelope gate" },
+    { "id": "state_machine", "label": "AHDSR State Machine", "type": "process", "importance": 1.0, "description": "7-state envelope: IDLE -> ATTACK -> HOLD -> DECAY -> SUSTAIN -> RELEASE -> IDLE. Per-sample tick() computes exponential curves." },
+    { "id": "multiply", "label": "Multiply", "type": "process", "importance": 1.0, "description": "Each audio sample multiplied by current envelope value" },
+    { "id": "attack", "label": "Attack", "type": "parameter", "importance": 0.8, "description": "Attack time in ms (0-10000)" },
+    { "id": "attack_level", "label": "AttackLevel", "type": "parameter", "importance": 0.7, "description": "Peak level at end of attack (0-1)" },
+    { "id": "hold", "label": "Hold", "type": "parameter", "importance": 0.7, "description": "Hold time in ms at attack level" },
+    { "id": "decay", "label": "Decay", "type": "parameter", "importance": 0.8, "description": "Decay time in ms toward sustain" },
+    { "id": "sustain", "label": "Sustain", "type": "parameter", "importance": 0.8, "description": "Sustain level (0-1)" },
+    { "id": "release", "label": "Release", "type": "parameter", "importance": 0.8, "description": "Release time in ms toward zero" },
+    { "id": "attack_curve", "label": "AttackCurve", "type": "parameter", "importance": 0.6, "description": "Attack curve shape: 0=log, 0.5=linear, 1=exp" },
+    { "id": "retrigger", "label": "Retrigger", "type": "parameter", "importance": 0.5, "description": "Enable monophonic retrigger on legato notes" },
+    { "id": "gate_param", "label": "Gate", "type": "parameter", "importance": 0.6, "description": "Manual gate trigger (On/Off)" },
+    { "id": "cv_out", "label": "CV Output", "type": "modulation_out", "importance": 1.0, "description": "Continuous envelope value (0..1)" },
+    { "id": "gate_out", "label": "Gate Output", "type": "modulation_out", "importance": 0.9, "description": "Binary gate: 1 while active, 0 when idle" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Audio multiplied by envelope" }
+  ],
+  "edges": [
+    { "from": "in", "to": "multiply", "type": "signal", "label": null },
+    { "from": "midi", "to": "state_machine", "type": "signal", "label": "note-on/off" },
+    { "from": "gate_param", "to": "state_machine", "type": "control", "label": "manual gate" },
+    { "from": "attack", "to": "state_machine", "type": "control", "label": null },
+    { "from": "attack_level", "to": "state_machine", "type": "control", "label": null },
+    { "from": "hold", "to": "state_machine", "type": "control", "label": null },
+    { "from": "decay", "to": "state_machine", "type": "control", "label": null },
+    { "from": "sustain", "to": "state_machine", "type": "control", "label": null },
+    { "from": "release", "to": "state_machine", "type": "control", "label": null },
+    { "from": "attack_curve", "to": "state_machine", "type": "control", "label": null },
+    { "from": "retrigger", "to": "state_machine", "type": "control", "label": null },
+    { "from": "state_machine", "to": "multiply", "type": "signal", "label": "envelope value" },
+    { "from": "multiply", "to": "out", "type": "signal", "label": null },
+    { "from": "state_machine", "to": "cv_out", "type": "signal", "label": null },
+    { "from": "state_machine", "to": "gate_out", "type": "signal", "label": null }
+  ]
+}

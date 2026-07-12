@@ -1,0 +1,130 @@
+{
+  "moduleId": "PhaseFX",
+  "prettyName": "Phase FX",
+  "type": "Effect",
+  "subtype": "MasterEffect",
+  "category": "delay",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "stereo",
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "RoutingMatrix",
+      "signalFlowRole": "skip - inferred from type/subtype"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Sweep Range",
+      "rationale": "Frequency1 and Frequency2 define the lower and upper bounds of the phaser sweep",
+      "parameters": [
+        {
+          "id": "Frequency1",
+          "name": "Frequency 1",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0 },
+          "default": 400.0,
+          "description": "Lower frequency bound of the phaser sweep range in Hz",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Frequency2",
+          "name": "Frequency 2",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0 },
+          "default": 1600.0,
+          "description": "Upper frequency bound of the phaser sweep range in Hz",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Effect",
+      "rationale": "Feedback controls resonance intensity, Mix controls wet/dry balance",
+      "parameters": [
+        {
+          "id": "Feedback",
+          "name": "Feedback",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.7,
+          "description": "Amount of signal fed back through the filter chain for resonance",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Mix",
+          "name": "Mix",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 1.0,
+          "description": "Wet/dry balance where 0 is fully dry and 1 is fully wet",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+
+  "standaloneModChains": [
+    {
+      "name": "Phase Modulation",
+      "chainIndex": 0,
+      "modulationMode": "combined",
+      "constrainer": "*",
+      "note": "Modulates the phaser sweep position between the two frequency bounds. No parameterIndex - standalone chain."
+    }
+  ],
+
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-order",
+      "category": "signal_path",
+      "question": "What is the processing order in the phaser? How many allpass filter stages are there? Is it a cascade of allpass filters with a feedback path around all of them?",
+      "context": "Need to understand the allpass filter topology for the pseudo-code."
+    },
+    {
+      "id": "sweep-modulation",
+      "category": "parameter_behavior",
+      "question": "How does the Phase Modulation chain interact with Frequency1 and Frequency2? Does the modulation value interpolate between the two frequencies, or does it scale/offset them?",
+      "context": "Critical for explaining how users control the sweep range and modulation depth."
+    },
+    {
+      "id": "feedback-placement",
+      "category": "signal_path",
+      "question": "Where is the feedback applied? Is it fed back around the entire allpass chain or per-stage?",
+      "context": "Feedback topology determines the resonance character."
+    },
+    {
+      "id": "mix-implementation",
+      "category": "parameter_behavior",
+      "question": "How is the Mix parameter applied? Simple linear crossfade between dry and wet, or something else?",
+      "context": "Need to document the dry/wet mixing behaviour accurately."
+    },
+    {
+      "id": "internal-lfo",
+      "category": "signal_path",
+      "question": "Does PhaseFX have an internal LFO for sweep, or does it rely entirely on the Phase Modulation chain? If there is no internal LFO, the modulation chain is the sole source of sweep movement.",
+      "context": "Users need to know if the phaser sweeps on its own or requires external modulation."
+    },
+    {
+      "id": "performance",
+      "category": "performance",
+      "question": "Is the allpass processing per-sample or per-block? How many allpass stages are used?",
+      "context": "Determines the CPU cost tier."
+    }
+  ],
+
+  "notes": "PhaseFX is categorised as 'delay' because phasers use allpass delay filters. The Phase Modulation chain is standalone (no parameterIndex). Known scriptnode equivalent: fx.phase_delay."
+}

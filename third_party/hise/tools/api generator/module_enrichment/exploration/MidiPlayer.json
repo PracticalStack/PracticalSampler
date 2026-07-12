@@ -1,0 +1,229 @@
+{
+  "moduleId": "MidiPlayer",
+  "nodes": [
+    {
+      "id": "midi_in",
+      "type": "input",
+      "label": "MIDI In",
+      "importance": 0.5,
+      "description": "Incoming MIDI events (passed through; captured only during recording)"
+    },
+    {
+      "id": "playstate_check",
+      "type": "decision",
+      "label": "Playing?",
+      "importance": 0.9,
+      "description": "Checks if playState is Play or Record and a sequence is selected"
+    },
+    {
+      "id": "tick_range_calc",
+      "type": "process",
+      "label": "Tick Range Calculation",
+      "importance": 0.8,
+      "group": "playback_engine",
+      "description": "Calculates tick range for this audio block: positionInTicks to positionInTicks + (numSamples * ticksPerSample * playbackSpeed)"
+    },
+    {
+      "id": "event_fetch",
+      "type": "process",
+      "label": "Event Fetch Loop",
+      "importance": 1.0,
+      "group": "playback_engine",
+      "description": "Calls seq->getNextEvent(currentRange) in a while loop to retrieve all MIDI events within the tick range (max 16 per block)"
+    },
+    {
+      "id": "loop_wrap",
+      "type": "decision",
+      "label": "Loop Wrap?",
+      "importance": 0.8,
+      "group": "playback_engine",
+      "description": "Inside getNextEvent(): detects if tick range crosses loopEnd, splits into before-wrap and after-wrap sub-ranges"
+    },
+    {
+      "id": "event_convert",
+      "type": "process",
+      "label": "Event Conversion",
+      "importance": 0.9,
+      "group": "event_injection",
+      "description": "Converts MidiMessage to HiseEvent with sample-accurate timestamp, marks as artificial, sets channel to currentTrack+1"
+    },
+    {
+      "id": "cc_routing",
+      "type": "decision",
+      "label": "CC Routing",
+      "importance": 0.6,
+      "group": "event_injection",
+      "description": "CC events: optionally consumed by global MIDI automation handler, otherwise added to buffer. Sustain pedal (CC64) tracked."
+    },
+    {
+      "id": "noteon_inject",
+      "type": "process",
+      "label": "NoteOn Injection",
+      "importance": 1.0,
+      "group": "event_injection",
+      "description": "NoteOn added to buffer via pushArtificialNoteOn + addEvent. Matching noteOff fetched and either added to buffer or deferred to next block."
+    },
+    {
+      "id": "position_advance",
+      "type": "process",
+      "label": "Position Advance",
+      "importance": 0.7,
+      "group": "playback_engine",
+      "description": "currentPosition += delta; ticksSincePlaybackStart += tickThisTime"
+    },
+    {
+      "id": "loop_boundary_check",
+      "type": "decision",
+      "label": "Past Loop End?",
+      "importance": 0.8,
+      "group": "loop_control",
+      "description": "If position > loopEnd: when looping, wraps back to loopStart; when one-shot, stops playback"
+    },
+    {
+      "id": "record_capture",
+      "type": "process",
+      "label": "Record Capture",
+      "importance": 0.7,
+      "group": "recording",
+      "description": "In processHiseEvent(): captures incoming non-artificial MIDI events with tick timestamps during Record state"
+    },
+    {
+      "id": "overdub_flush",
+      "type": "process",
+      "label": "Overdub Flush",
+      "importance": 0.5,
+      "group": "recording",
+      "description": "OverdubUpdater timer periodically flushes accumulated note pairs into the sequence via flushEdit()"
+    },
+    {
+      "id": "midi_out",
+      "type": "output",
+      "label": "MIDI Out (Buffer)",
+      "importance": 1.0,
+      "description": "HiseEventBuffer with injected artificial events from sequence playback"
+    },
+    {
+      "id": "current_position",
+      "type": "parameter",
+      "label": "CurrentPosition",
+      "importance": 0.7,
+      "description": "Normalized playback position 0-1, read-write (seek), non-persistent"
+    },
+    {
+      "id": "current_sequence",
+      "type": "parameter",
+      "label": "CurrentSequence",
+      "importance": 0.8,
+      "description": "1-based sequence index (0 = no sequence selected)"
+    },
+    {
+      "id": "current_track",
+      "type": "parameter",
+      "label": "CurrentTrack",
+      "importance": 0.7,
+      "description": "1-based track index within multi-track MIDI file, affects both playback and editing"
+    },
+    {
+      "id": "loop_enabled",
+      "type": "parameter",
+      "label": "LoopEnabled",
+      "importance": 0.8,
+      "description": "Toggle: loop (wraps at boundaries) vs one-shot (stops at LoopEnd)"
+    },
+    {
+      "id": "loop_start",
+      "type": "parameter",
+      "label": "LoopStart",
+      "importance": 0.6,
+      "description": "Normalized loop start position; used as wrap target when looping; no effect in one-shot mode"
+    },
+    {
+      "id": "loop_end",
+      "type": "parameter",
+      "label": "LoopEnd",
+      "importance": 0.7,
+      "description": "Normalized loop end position; acts as playback endpoint in both loop and one-shot modes"
+    },
+    {
+      "id": "playback_speed",
+      "type": "parameter",
+      "label": "PlaybackSpeed",
+      "importance": 0.8,
+      "description": "Speed multiplier on top of host-tempo-synced playback (1.0 = host tempo)"
+    },
+    {
+      "id": "host_tempo",
+      "type": "external",
+      "label": "Host Tempo (BPM)",
+      "importance": 0.9,
+      "description": "Host BPM via TempoListener callback; determines ticksPerSample base rate"
+    },
+    {
+      "id": "transport_api",
+      "type": "external",
+      "label": "Transport API",
+      "importance": 0.9,
+      "description": "play() / stop() / record() called from scripting API or master clock sync"
+    },
+    {
+      "id": "midi_file_pool",
+      "type": "external",
+      "label": "MIDI File Pool",
+      "importance": 0.6,
+      "description": "HISE pool system providing MIDI file data via loadMidiFile()"
+    }
+  ],
+  "edges": [
+    { "from": "transport_api", "to": "playstate_check", "type": "control", "label": "play/stop/record" },
+    { "from": "playstate_check", "to": "midi_out", "type": "conditional", "label": "stopped (passthrough)" },
+    { "from": "playstate_check", "to": "tick_range_calc", "type": "conditional", "label": "playing/recording" },
+    { "from": "host_tempo", "to": "tick_range_calc", "type": "control", "label": "ticksPerSample" },
+    { "from": "playback_speed", "to": "tick_range_calc", "type": "control", "label": "speed multiplier" },
+    { "from": "tick_range_calc", "to": "event_fetch", "type": "signal" },
+    { "from": "current_sequence", "to": "event_fetch", "type": "control", "label": "selects sequence" },
+    { "from": "current_track", "to": "event_fetch", "type": "control", "label": "selects track" },
+    { "from": "event_fetch", "to": "loop_wrap", "type": "signal" },
+    { "from": "loop_start", "to": "loop_wrap", "type": "control", "label": "wrap target" },
+    { "from": "loop_end", "to": "loop_wrap", "type": "control", "label": "wrap boundary" },
+    { "from": "loop_wrap", "to": "event_convert", "type": "signal" },
+    { "from": "event_convert", "to": "cc_routing", "type": "conditional", "label": "CC/pitchWheel" },
+    { "from": "event_convert", "to": "noteon_inject", "type": "conditional", "label": "noteOn" },
+    { "from": "cc_routing", "to": "midi_out", "type": "signal" },
+    { "from": "noteon_inject", "to": "midi_out", "type": "signal" },
+    { "from": "event_fetch", "to": "position_advance", "type": "signal", "label": "after all events" },
+    { "from": "position_advance", "to": "loop_boundary_check", "type": "signal" },
+    { "from": "loop_enabled", "to": "loop_boundary_check", "type": "control" },
+    { "from": "loop_boundary_check", "to": "tick_range_calc", "type": "feedback", "label": "wrap to loopStart (next block)" },
+    { "from": "loop_boundary_check", "to": "playstate_check", "type": "conditional", "label": "one-shot: stop" },
+    { "from": "current_position", "to": "tick_range_calc", "type": "control", "label": "seek (when set externally)" },
+    { "from": "position_advance", "to": "current_position", "type": "feedback", "label": "updates readback" },
+    { "from": "midi_in", "to": "record_capture", "type": "signal" },
+    { "from": "playstate_check", "to": "record_capture", "type": "conditional", "label": "recording" },
+    { "from": "record_capture", "to": "overdub_flush", "type": "signal" },
+    { "from": "overdub_flush", "to": "event_fetch", "type": "feedback", "label": "edits sequence data" },
+    { "from": "midi_file_pool", "to": "event_fetch", "type": "control", "label": "loaded sequence data" },
+    { "from": "midi_in", "to": "midi_out", "type": "signal", "label": "passthrough (non-recording)" }
+  ],
+  "groups": [
+    {
+      "id": "playback_engine",
+      "label": "Playback Engine (preprocessBuffer)",
+      "nodes": ["tick_range_calc", "event_fetch", "loop_wrap", "position_advance"]
+    },
+    {
+      "id": "event_injection",
+      "label": "Event Injection",
+      "nodes": ["event_convert", "cc_routing", "noteon_inject"]
+    },
+    {
+      "id": "loop_control",
+      "label": "Loop Control",
+      "nodes": ["loop_boundary_check"]
+    },
+    {
+      "id": "recording",
+      "label": "Recording System",
+      "nodes": ["record_capture", "overdub_flush"]
+    }
+  ]
+}

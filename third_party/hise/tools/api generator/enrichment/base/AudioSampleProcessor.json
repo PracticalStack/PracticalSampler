@@ -1,0 +1,162 @@
+{
+  "className": "AudioSampleProcessor",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "exists": {
+      "signature": "bool exists()",
+      "returnType": "bool",
+      "description": "Checks if the Object exists and prints a error message on the console if not.",
+      "parameters": []
+    },
+    "getAttribute": {
+      "signature": "float getAttribute(int index)",
+      "returnType": "float",
+      "description": "Returns the attribute with the given index.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "getAttributeId": {
+      "signature": "String getAttributeId(int index)",
+      "returnType": "String",
+      "description": "Returns the attribute with the given index.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "getAttributeIndex": {
+      "signature": "int getAttributeIndex(String id)",
+      "returnType": "int",
+      "description": "Returns the index of the attribute with the given ID.",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "String"
+        }
+      ]
+    },
+    "getAudioFile": {
+      "signature": "var getAudioFile(int slotIndex)",
+      "returnType": "var",
+      "description": "Creates a ScriptAudioFile reference to the given index.",
+      "parameters": [
+        {
+          "name": "slotIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "getFilename": {
+      "signature": "String getFilename()",
+      "returnType": "String",
+      "description": "Returns the filename (including wildcard) for the currently loaded file.",
+      "parameters": []
+    },
+    "getLoopRange": {
+      "signature": "var getLoopRange(bool subtractStart)",
+      "returnType": "var",
+      "description": "Returns the current loop range in the form [start, end].",
+      "parameters": [
+        {
+          "name": "subtractStart",
+          "type": "bool"
+        }
+      ]
+    },
+    "getNumAttributes": {
+      "signature": "int getNumAttributes()",
+      "returnType": "int",
+      "description": "Returns the number of attributes.",
+      "parameters": []
+    },
+    "getSampleLength": {
+      "signature": "int getSampleLength()",
+      "returnType": "int",
+      "description": "Returns the length of the current sample selection in samples.",
+      "parameters": []
+    },
+    "getSampleRange": {
+      "signature": "var getSampleRange()",
+      "returnType": "var",
+      "description": "Returns the current sample range in the form [start, end].",
+      "parameters": []
+    },
+    "getSampleStart": {
+      "signature": "var getSampleStart()",
+      "returnType": "var",
+      "description": "Returns the sample range start.",
+      "parameters": []
+    },
+    "getTotalLengthInSamples": {
+      "signature": "var getTotalLengthInSamples()",
+      "returnType": "var",
+      "description": "Returns the total sample length in samples.",
+      "parameters": []
+    },
+    "isBypassed": {
+      "signature": "bool isBypassed()",
+      "returnType": "bool",
+      "description": "Checks if the audio sample player is bypassed.",
+      "parameters": []
+    },
+    "setAttribute": {
+      "signature": "void setAttribute(int parameterIndex, float newValue)",
+      "returnType": "void",
+      "description": "Changes one of the Parameter. Look in the manual for the index numbers of each effect.",
+      "parameters": [
+        {
+          "name": "parameterIndex",
+          "type": "int"
+        },
+        {
+          "name": "newValue",
+          "type": "float"
+        }
+      ]
+    },
+    "setBypassed": {
+      "signature": "void setBypassed(bool shouldBeBypassed)",
+      "returnType": "void",
+      "description": "Bypasses the audio sample player.",
+      "parameters": [
+        {
+          "name": "shouldBeBypassed",
+          "type": "bool"
+        }
+      ]
+    },
+    "setFile": {
+      "signature": "void setFile(String fileName)",
+      "returnType": "void",
+      "description": "loads the file. You can use the wildcard {PROJECT_FOLDER} to get the audio file folder for the current project.",
+      "parameters": [
+        {
+          "name": "fileName",
+          "type": "String"
+        }
+      ]
+    },
+    "setSampleRange": {
+      "signature": "void setSampleRange(int startSample, int endSample)",
+      "returnType": "void",
+      "description": "Sets the length of the current sample selection in samples.",
+      "parameters": [
+        {
+          "name": "startSample",
+          "type": "int"
+        },
+        {
+          "name": "endSample",
+          "type": "int"
+        }
+      ]
+    }
+  }
+}

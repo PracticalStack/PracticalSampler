@@ -1,0 +1,3 @@
+Adds a new graph point to the table at the given normalised position. The point is inserted with a default curve of `0.5` (linear interpolation) - to set a custom curve, call `setTablePoint()` on the new point afterward.
+
+> [!Warning:Add all points before adjusting indices] Point indices shift as points are added. Always add all interior points before adjusting them with `setTablePoint()`. Adding a point between two `setTablePoint()` calls changes the indices of subsequent points.

@@ -1,0 +1,1 @@
+Returns a new File object for a child path relative to this directory. The child file does not need to exist on disk - this only constructs the path. Accepts both simple filenames and relative paths with separators.

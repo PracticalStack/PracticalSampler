@@ -1,0 +1,26 @@
+{
+  "factoryPath": "core.clock_ramp",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 0.3, "description": "Audio passthrough (optionally receives ramp on ch0)" },
+    { "id": "tempo_in", "label": "Tempo/Transport", "type": "input", "importance": 0.8, "description": "BPM and PPQ from TempoListener callbacks" },
+    { "id": "ramp", "label": "Clock Ramp", "type": "process", "importance": 1.0, "description": "Generates 0..1 ramp synced to DAW tempo" },
+    { "id": "tempo", "label": "Tempo", "type": "parameter", "importance": 1.0, "description": "Musical note value (1/1 through 1/64T)" },
+    { "id": "mult", "label": "Multiplier", "type": "parameter", "importance": 0.7, "description": "Additional period scaling" },
+    { "id": "add", "label": "AddToSignal", "type": "parameter", "importance": 0.7, "description": "Whether to add ramp to audio output" },
+    { "id": "update", "label": "UpdateMode", "type": "parameter", "importance": 0.8, "description": "Continuous vs Synced phase calculation" },
+    { "id": "inactive", "label": "Inactive", "type": "parameter", "importance": 0.7, "description": "Output when transport stopped: Current/Zero/One" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 0.5, "description": "Audio with optional ramp added to ch0" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Current ramp value (0..1 normalized)" }
+  ],
+  "edges": [
+    { "from": "in", "to": "ramp", "type": "signal", "label": null },
+    { "from": "tempo_in", "to": "ramp", "type": "signal", "label": "BPM + PPQ" },
+    { "from": "tempo", "to": "ramp", "type": "control", "label": null },
+    { "from": "mult", "to": "ramp", "type": "control", "label": null },
+    { "from": "add", "to": "ramp", "type": "control", "label": null },
+    { "from": "update", "to": "ramp", "type": "control", "label": null },
+    { "from": "inactive", "to": "ramp", "type": "control", "label": null },
+    { "from": "ramp", "to": "out", "type": "signal", "label": null },
+    { "from": "ramp", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

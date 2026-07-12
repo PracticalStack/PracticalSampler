@@ -1,0 +1,153 @@
+{
+  "factoryPath": "core.oscillator",
+  "factory": "core",
+  "nodeId": "oscillator",
+  "description": "A tone generator with multiple waveforms",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": true,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Waveform",
+      "rationale": "Mode selects the waveform shape used by the oscillator",
+      "parameters": [
+        {
+          "id": "Mode",
+          "range": { "min": 0.0, "max": 4.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "74.nT6K8CBQMH..BQzCV.YrMPDQ9ZEmbysXXftA0XXY..TWoLfUty9ZSGpczdHv2pBPh2fv51EX.MwyaFHbFJ4osbV+T+EeFtxnFA.",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Pitch",
+      "rationale": "Frequency and Freq Ratio together determine the output pitch; Phase sets the start offset",
+      "parameters": [
+        {
+          "id": "Frequency",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.1, "skew": 0.2299045622348785 },
+          "default": 220.0,
+          "textConverter": "Frequency",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Freq Ratio",
+          "range": { "min": 1.0, "max": 16.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Phase",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "NormalizedPercentage",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Voice control",
+      "rationale": "Gate controls whether the oscillator is active; Gain scales the output amplitude",
+      "parameters": [
+        {
+          "id": "Gate",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Gain",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/oscillator.md",
+    "tier": "GOOD",
+    "lines": 26
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "waveform-modes",
+      "category": "conditional_logic",
+      "question": "Mode has range 0-4 (5 discrete values). What waveform does each mode value produce (e.g., sine, saw, square, triangle, noise)?",
+      "context": "Essential for the reference page to describe what each Mode value does."
+    },
+    {
+      "id": "processing-order",
+      "category": "signal_path",
+      "question": "Does the oscillator write to the output buffer (replacing input) or add to it? Is it frame-based or block-based processing?",
+      "context": "Determines whether this node must be first in a chain or can be mixed with existing signal."
+    },
+    {
+      "id": "gate-behaviour",
+      "category": "parameter_behaviour",
+      "question": "What does the Gate parameter do in handleHiseEvent? Does it respond to note-on/note-off events to set Gate, or is Gate purely a manual parameter?",
+      "context": "Users need to know if Gate is automatically controlled by MIDI or requires explicit connection."
+    },
+    {
+      "id": "antialiasing",
+      "category": "signal_path",
+      "question": "Does the oscillator use any anti-aliasing (e.g., PolyBLEP, band-limited wavetables) or is it naive (aliasing at high frequencies)?",
+      "context": "Important for users choosing between this and other oscillator options."
+    },
+    {
+      "id": "display-buffer-usage",
+      "category": "signal_path",
+      "question": "How is the DisplayBuffer used -- does it show the waveform shape or the real-time output?",
+      "context": "Helps users understand what the visual display represents."
+    },
+    {
+      "id": "freq-ratio-interaction",
+      "category": "parameter_behaviour",
+      "question": "How do Frequency and Freq Ratio interact? Is the effective frequency simply Frequency * FreqRatio, or is there a different formula?",
+      "context": "Users need to understand how pitch is computed from these two parameters."
+    }
+  ],
+
+  "notes": "The oscillator has IsProcessingHiseEvent, suggesting it responds to MIDI for pitch/gate. The Mode parameter uses an encoded TextToValueConverter, indicating named waveform options rather than raw numbers. The DisplayBuffer likely shows the waveform shape. This is a polyphonic generator node -- one of the primary tone sources in scriptnode."
+}

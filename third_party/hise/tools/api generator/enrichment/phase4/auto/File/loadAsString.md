@@ -1,0 +1,1 @@
+Reads the entire file content as a text string. Returns an empty string if the file does not exist or cannot be read - no error is reported. This is the low-level text reading method that `loadAsObject` builds upon.

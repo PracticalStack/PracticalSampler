@@ -1,0 +1,28 @@
+{
+  "moduleId": "SimpleReverb",
+  "nodes": [
+    { "id": "audio_in", "type": "input", "label": "Audio In (L/R)", "importance": 1.0 },
+    { "id": "roomsize_param", "type": "parameter", "label": "RoomSize", "importance": 0.8, "group": "reverb" },
+    { "id": "damping_param", "type": "parameter", "label": "Damping", "importance": 0.8, "group": "reverb" },
+    { "id": "freeze_param", "type": "parameter", "label": "FreezeMode", "importance": 0.6, "group": "reverb" },
+    { "id": "reverb", "type": "process", "label": "Freeverb Algorithm", "importance": 1.0, "description": "8 parallel comb filters + 4 series allpass filters per channel with stereo decorrelation", "group": "reverb" },
+    { "id": "wetlevel_param", "type": "parameter", "label": "WetLevel", "importance": 0.8, "group": "mix" },
+    { "id": "width_param", "type": "parameter", "label": "Width", "importance": 0.7, "group": "mix" },
+    { "id": "gain_comp", "type": "process", "label": "Gain Compensation", "importance": 0.5, "description": "Fixed 0.5x gain reduction" },
+    { "id": "audio_out", "type": "output", "label": "Audio Out (L/R)", "importance": 1.0 }
+  ],
+  "edges": [
+    { "from": "audio_in", "to": "reverb", "type": "signal" },
+    { "from": "roomsize_param", "to": "reverb", "type": "control" },
+    { "from": "damping_param", "to": "reverb", "type": "control" },
+    { "from": "freeze_param", "to": "reverb", "type": "control" },
+    { "from": "wetlevel_param", "to": "reverb", "type": "control" },
+    { "from": "width_param", "to": "reverb", "type": "control" },
+    { "from": "reverb", "to": "gain_comp", "type": "signal" },
+    { "from": "gain_comp", "to": "audio_out", "type": "signal" }
+  ],
+  "groups": [
+    { "id": "reverb", "label": "Reverb Engine" },
+    { "id": "mix", "label": "Output" }
+  ]
+}

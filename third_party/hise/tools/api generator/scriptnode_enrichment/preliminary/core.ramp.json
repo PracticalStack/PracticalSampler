@@ -1,0 +1,114 @@
+{
+  "factoryPath": "core.ramp",
+  "factory": "core",
+  "nodeId": "ramp",
+  "description": "Creates a ramp signal that can be used as modulation source",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Timing",
+      "rationale": "PeriodTime sets the ramp cycle duration; LoopStart sets where the ramp resets after reaching 1.0",
+      "parameters": [
+        {
+          "id": "PeriodTime",
+          "range": { "min": 0.1, "max": 1000.0, "step": 0.1, "skew": 1.0 },
+          "default": 100.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "LoopStart",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "NormalizedPercentage",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Voice control",
+      "rationale": "Gate enables/disables the ramp",
+      "parameters": [
+        {
+          "id": "Gate",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/ramp.md",
+    "tier": "BRIEF",
+    "lines": 16
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "modulation-output",
+      "category": "signal_path",
+      "question": "How does core.ramp output its modulation signal? Does it use handleModulation/ModValue, or does it write the ramp directly to the audio signal, or both?",
+      "context": "The node has ModulationTargets and is described as a modulation source, but also has UseRingBuffer. Need to clarify the output mechanism."
+    },
+    {
+      "id": "loop-start-behaviour",
+      "category": "parameter_behaviour",
+      "question": "What exactly does LoopStart do? Does it set the phase position where the ramp wraps back to (instead of 0), or does it set the initial phase after a gate trigger?",
+      "context": "Users need to understand how LoopStart interacts with the ramp cycle."
+    },
+    {
+      "id": "gate-reset",
+      "category": "parameter_behaviour",
+      "question": "When Gate transitions from 0 to 1, does the ramp reset to 0 (or LoopStart)? What happens when Gate=0 -- does the ramp freeze or output 0?",
+      "context": "Critical for envelope-like usage where the ramp should retrigger on note-on."
+    },
+    {
+      "id": "processing-model",
+      "category": "signal_path",
+      "question": "Does core.ramp write the ramp to the audio output or only output via modulation? Is the audio signal passed through unmodified?",
+      "context": "Determines whether this node is in-signal-path or purely a modulation source that happens to be inside the signal path."
+    }
+  ],
+
+  "notes": "core.ramp has ModulationTargets (empty object, indicating it is a modulation source) and UseRingBuffer (for display). It is polyphonic but does NOT have IsProcessingHiseEvent despite having a Gate parameter. This means Gate must be controlled manually (e.g., via control.midi). Compare with core.clock_ramp which syncs to HISE tempo. The PeriodTime is in milliseconds (Time converter)."
+}

@@ -1,0 +1,1 @@
+Returns the device type as a string. On desktop platforms, this always returns `"Desktop"`. The device simulator in the HISE IDE can override this value for testing different layouts.

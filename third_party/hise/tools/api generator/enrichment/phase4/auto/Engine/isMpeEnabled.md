@@ -1,0 +1,1 @@
+Returns whether the global MPE (MIDI Polyphonic Expression) mode is currently enabled.

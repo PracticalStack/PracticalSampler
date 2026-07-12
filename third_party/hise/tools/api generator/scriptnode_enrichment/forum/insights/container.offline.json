@@ -1,0 +1,16 @@
+{
+  "targetId": "container.offline",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [4497],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Scriptnode graphs run as part of the real-time audio stream and cannot be used for offline/batch processing",
+      "body": "The scriptnode graph is tightly coupled to the audio streaming engine and processes audio in real time. It cannot be repurposed for offline batch processing of audio files. For offline rendering, SNEX code may offer a path (it can reference node logic), but this is not a supported workflow. HISE's writeAudioFile API is the entry point for any audio file output, but integrating the node graph with it requires custom C++ work.",
+      "source": "tid:4497",
+      "author": "ustk [trusted], David Healey [expert]",
+      "confidence": "high"
+    }
+  ]
+}

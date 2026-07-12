@@ -1,0 +1,108 @@
+{
+  "className": "WavetableController",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "getResynthesisOptions": {
+      "signature": "var getResynthesisOptions()",
+      "returnType": "var",
+      "description": "Returns a JSON object with the current resynthesis options.",
+      "parameters": []
+    },
+    "loadData": {
+      "signature": "void loadData(var bufferOrFile, var sampleRate, var loopRange)",
+      "returnType": "void",
+      "description": "Loads a file (or buffer) into the wavetable synth.",
+      "parameters": [
+        {
+          "name": "bufferOrFile",
+          "type": "var"
+        },
+        {
+          "name": "sampleRate",
+          "type": "var"
+        },
+        {
+          "name": "loopRange",
+          "type": "var"
+        }
+      ]
+    },
+    "resynthesise": {
+      "signature": "void resynthesise()",
+      "returnType": "void",
+      "description": "Resynthesises the wavetables from the currently loaded audio file.",
+      "parameters": []
+    },
+    "saveAsAudioFile": {
+      "signature": "void saveAsAudioFile(var outputFile)",
+      "returnType": "void",
+      "description": "Saves the currently loaded wavetable as audio file.",
+      "parameters": [
+        {
+          "name": "outputFile",
+          "type": "var"
+        }
+      ]
+    },
+    "saveAsHwt": {
+      "signature": "void saveAsHwt(var outputFile)",
+      "returnType": "void",
+      "description": "Saves the currently loaded wavetable as HWT file somewhere.",
+      "parameters": [
+        {
+          "name": "outputFile",
+          "type": "var"
+        }
+      ]
+    },
+    "setEnableResynthesisCache": {
+      "signature": "void setEnableResynthesisCache(var cacheDirectory, bool clearCache)",
+      "returnType": "void",
+      "description": "This will store all resynthesised wavetables to the given directory and reused if the same file is loaded again.",
+      "parameters": [
+        {
+          "name": "cacheDirectory",
+          "type": "var"
+        },
+        {
+          "name": "clearCache",
+          "type": "bool"
+        }
+      ]
+    },
+    "setErrorHandler": {
+      "signature": "void setErrorHandler(var errorCallback)",
+      "returnType": "void",
+      "description": "Sets up a function that will be executed when a error occurs during resynthesis.",
+      "parameters": [
+        {
+          "name": "errorCallback",
+          "type": "var"
+        }
+      ]
+    },
+    "setPostFXProcessors": {
+      "signature": "void setPostFXProcessors(var postFXData)",
+      "returnType": "void",
+      "description": "Sets up a chain of post FX processors that will be applied to the loaded wavetable.",
+      "parameters": [
+        {
+          "name": "postFXData",
+          "type": "var"
+        }
+      ]
+    },
+    "setResynthesisOptions": {
+      "signature": "void setResynthesisOptions(var optionData)",
+      "returnType": "void",
+      "description": "Sets the current resynthesis options.",
+      "parameters": [
+        {
+          "name": "optionData",
+          "type": "var"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,1 @@
+Serialises a JSON object to a string, compresses it with zstd, and returns the result as a Base64 string. Use `Engine.uncompressJSON()` to reverse the process. This is useful for storing complex data structures in a compact format for clipboard operations or custom preset data.

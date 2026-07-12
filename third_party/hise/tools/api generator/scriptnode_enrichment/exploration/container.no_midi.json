@@ -1,0 +1,14 @@
+{
+  "factoryPath": "container.no_midi",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "midi_block", "label": "MIDI blocker", "type": "process", "importance": 1.0, "description": "All MIDI events are dropped; audio passes through" },
+    { "id": "serial", "label": "Serial dispatch", "type": "process", "importance": 0.8, "description": "Children process audio serially (same as chain)" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Output after serial processing (no MIDI reached children)" }
+  ],
+  "edges": [
+    { "from": "in", "to": "midi_block", "type": "signal", "label": null },
+    { "from": "midi_block", "to": "serial", "type": "signal", "label": "audio only" },
+    { "from": "serial", "to": "out", "type": "signal", "label": null }
+  ]
+}

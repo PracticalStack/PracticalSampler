@@ -1,0 +1,14 @@
+{
+  "factoryPath": "control.intensity",
+  "nodes": [
+    { "id": "value_in", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Normalised 0..1 modulation input" },
+    { "id": "intensity", "label": "Intensity", "type": "parameter", "importance": 1.0, "description": "Modulation depth 0..1 (0 = no effect, 1 = full)" },
+    { "id": "intensity_op", "label": "HISE Intensity", "type": "process", "importance": 1.0, "description": "Computes (1 - Intensity) + Intensity * Value" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Normalised 0..1 output" }
+  ],
+  "edges": [
+    { "from": "value_in", "to": "intensity_op", "type": "signal", "label": null },
+    { "from": "intensity", "to": "intensity_op", "type": "control", "label": null },
+    { "from": "intensity_op", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

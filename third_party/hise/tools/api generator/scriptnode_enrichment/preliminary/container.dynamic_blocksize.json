@@ -1,0 +1,107 @@
+{
+  "factoryPath": "container.dynamic_blocksize",
+  "factory": "container",
+  "nodeId": "dynamic_blocksize",
+  "description": "A container that processes its childnode with a dynamic buffer size",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Block Size Control",
+      "rationale": "Single parameter controlling the processing block size. The value is an index into a fixed array of valid block sizes, not the block size itself.",
+      "parameters": [
+        {
+          "id": "BlockSize",
+          "range": { "min": 0.0, "max": 7.0, "step": 1.0, "skew": 1.0 },
+          "default": 4.0,
+          "textConverter": "71.nT6K8ChOwG..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.ZTPLJfiBwXiByHiB1PiBwHCNJHSM1nPMwHC.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "UI-only: controls whether the container is displayed vertically or horizontally in the scriptnode graph. No effect on audio processing."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/container/dynamic_blocksize.md",
+    "tier": "GOOD",
+    "lines": 52
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "parameter-to-blocksize-mapping",
+      "category": "parameter_behaviour",
+      "question": "The existing doc lists the mapping as [1, 8, 16, 32, 64, 128, 256, 512] for indices 0-7. How are fractional parameter values handled? The doc says 'will round to next power of two' -- is this rounding done in setParameter or in the processing dispatch? What about negative values?",
+      "context": "The parameter can be modulated. Users need to know exactly how modulation values map to block sizes, especially edge cases."
+    },
+    {
+      "id": "thread-safety-mechanism",
+      "category": "signal_path",
+      "question": "The infrastructure doc says dynamic_blocksize uses a SimpleReadWriteLock. When the block size parameter changes, does it acquire a write lock and call prepare() on children? What happens to in-progress audio processing -- does the try-read lock cause the current block to be skipped?",
+      "context": "Critical for understanding whether block size changes are click-free or may cause brief audio dropouts."
+    },
+    {
+      "id": "frame-mode-switch",
+      "category": "signal_path",
+      "question": "When BlockSize index 0 (blockSize=1) is selected, the node switches to FrameConverters for per-sample processing. Does this trigger a re-prepare of children with blockSize=1? How does the transition from block mode to frame mode work at runtime?",
+      "context": "The existing doc mentions this as 'bonus level'. Need to confirm that children see blockSize=1 in their PrepareSpecs and can adapt accordingly."
+    },
+    {
+      "id": "compilation-behaviour",
+      "category": "performance",
+      "question": "The existing doc says this compiles to 'a dynamic version that will branch between the different block sizes'. Does the compiled output use a switch statement over all 8 block size options, or is there an optimisation for the common case?",
+      "context": "Users choosing between fix_blockx and dynamic_blocksize need to understand the performance trade-off after compilation."
+    },
+    {
+      "id": "hise-event-raster-interaction",
+      "category": "signal_path",
+      "question": "The existing doc explains why block sizes 2 and 4 are excluded (below HISE_EVENT_RASTER=8). When BlockSize=1 (frame mode) is selected, does this also go below the event raster? How are MIDI event timestamps handled in that case?",
+      "context": "BlockSize=1 is below HISE_EVENT_RASTER=8, yet it is explicitly supported. Need to understand if this is a special case or if the event raster warning only applies to intermediate sizes."
+    }
+  ],
+
+  "notes": "The most feature-rich of the block-size containers. Key distinction from fix_blockx: BlockSize is a parameter (modulatable at runtime) rather than a property (design-time only). The HasFixedParameters cppProperty means the parameter list cannot be modified at runtime (no dynamic parameter addition/removal). The existing phase3 doc is excellent -- 52 lines with a comparison table, code example, and explanation of the index-to-blocksize mapping. The text converter in the base data encodes the named display values for the parameter (Frame, 8, 16, 32, 64, 128, 256, 512)."
+}

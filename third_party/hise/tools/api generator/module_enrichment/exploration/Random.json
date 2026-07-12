@@ -1,0 +1,57 @@
+{
+  "moduleId": "Random",
+  "nodes": [
+    {
+      "id": "note_on_trigger",
+      "label": "Note-On Trigger",
+      "type": "input",
+      "importance": 0.7,
+      "group": null,
+      "description": "Voice start event triggers random value generation (MIDI event data is not read)"
+    },
+    {
+      "id": "random_gen",
+      "label": "Random Generator",
+      "type": "process",
+      "importance": 0.9,
+      "group": "generation",
+      "description": "Generates a uniform random float in [0, 1) using JUCE Random (LCG seeded with system time)"
+    },
+    {
+      "id": "table_lookup",
+      "label": "Table Lookup",
+      "type": "process",
+      "importance": 0.8,
+      "group": "generation",
+      "description": "Maps the random value through a 512-point user-defined curve table (0-1 in, 0-1 out)"
+    },
+    {
+      "id": "param_usetable",
+      "label": "UseTable",
+      "type": "parameter",
+      "importance": 0.7,
+      "group": "generation",
+      "description": "Enables the lookup table for custom probability distribution shaping"
+    },
+    {
+      "id": "mod_output",
+      "label": "Modulation Output",
+      "type": "output",
+      "importance": 0.9,
+      "group": null,
+      "description": "Final modulation value (0-1) sent to the parent modulation chain"
+    }
+  ],
+  "edges": [
+    { "from": "note_on_trigger", "to": "random_gen", "type": "signal", "label": null },
+    { "from": "random_gen", "to": "table_lookup", "type": "signal", "label": null },
+    { "from": "param_usetable", "to": "table_lookup", "type": "conditional", "label": "if UseTable" },
+    { "from": "table_lookup", "to": "mod_output", "type": "signal", "label": null }
+  ],
+  "groups": [
+    {
+      "id": "generation",
+      "label": "Random Value Generation"
+    }
+  ]
+}

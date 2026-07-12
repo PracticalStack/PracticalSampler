@@ -1,0 +1,1 @@
+Returns the current mouse button state: 0 if no button is pressed, 1 for left button, 2 for right button.

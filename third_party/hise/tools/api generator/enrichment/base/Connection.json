@@ -1,0 +1,48 @@
+{
+  "className": "Connection",
+  "category": "scriptnode",
+  "description": "A connection between two parameters or a parameter and a modulation source. These objects are supposed to be used in the scripting engine and contain NO task whatsoever.\nTODO: Make a hover info box that shows the connection update ratesearch the common containerget the process specs of the container",
+  "methods": {
+    "disconnect": {
+      "signature": "void disconnect()",
+      "returnType": "void",
+      "description": "Removes this connection.",
+      "parameters": []
+    },
+    "getConnectionType": {
+      "signature": "int getConnectionType()",
+      "returnType": "int",
+      "description": "Returns the connection type.",
+      "parameters": []
+    },
+    "getSourceNode": {
+      "signature": "var getSourceNode(bool getSignalSource)",
+      "returnType": "var",
+      "description": "Returns the source node. If getSignalSource is true, it searches the node that creates the modulation signal.",
+      "parameters": [
+        {
+          "name": "getSignalSource",
+          "type": "bool"
+        }
+      ]
+    },
+    "getTarget": {
+      "signature": "var getTarget()",
+      "returnType": "var",
+      "description": "Returns the target parameter of this connection.",
+      "parameters": []
+    },
+    "getUpdateRate": {
+      "signature": "int getUpdateRate()",
+      "returnType": "int",
+      "description": "Returns the update rate for the modulation connection.",
+      "parameters": []
+    },
+    "isConnected": {
+      "signature": "bool isConnected()",
+      "returnType": "bool",
+      "description": "Checks if the connection is still valid.",
+      "parameters": []
+    }
+  }
+}

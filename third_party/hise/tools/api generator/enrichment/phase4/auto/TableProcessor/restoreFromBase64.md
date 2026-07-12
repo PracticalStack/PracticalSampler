@@ -1,0 +1,1 @@
+Restores the table's graph points from a base64-encoded string previously created by `exportAsBase64()`. If the state string is empty, the table is reset to its default state (equivalent to calling `reset()`).

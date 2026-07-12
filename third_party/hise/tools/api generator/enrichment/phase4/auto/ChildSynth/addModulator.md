@@ -1,0 +1,1 @@
+Creates and adds a new modulator of the specified type to the given modulator chain. The `typeName` must match the exact C++ class name of the modulator type (e.g. `"LFOModulator"`, `"Velocity"`, `"ConstantModulator"`). Returns the new modulator as a Modulator handle, or undefined if creation fails.

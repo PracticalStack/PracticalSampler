@@ -1,0 +1,1 @@
+Sets the fine detune amount in cents on the current event. Sound generators combine this with coarse detune and transpose to calculate the final playback pitch. Useful for per-note microtuning or adding subtle pitch variation to avoid the "machine gun" effect on repeated notes.

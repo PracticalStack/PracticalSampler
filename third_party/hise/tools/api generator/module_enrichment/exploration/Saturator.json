@@ -1,0 +1,34 @@
+{
+  "moduleId": "Saturator",
+  "nodes": [
+    { "id": "audio_in", "type": "input", "label": "Audio In (L/R)", "importance": 1.0 },
+    { "id": "pregain_param", "type": "parameter", "label": "PreGain", "importance": 0.8, "group": "gain_stage" },
+    { "id": "pregain", "type": "process", "label": "Pre Gain", "importance": 0.8, "description": "Linear gain boost (0-24 dB)", "group": "gain_stage" },
+    { "id": "saturation_param", "type": "parameter", "label": "Saturation", "importance": 0.9, "group": "saturation" },
+    { "id": "sat_mod", "type": "modulation", "label": "Saturation Modulation", "importance": 0.7, "description": "Scales saturation amount (updated every 8 samples)", "group": "saturation" },
+    { "id": "waveshaper", "type": "process", "label": "Soft-Clip Waveshaper", "importance": 1.0, "description": "(1+k)*x / (1+k*|x|) where k = 2*sat/(1-sat)", "group": "saturation" },
+    { "id": "postgain_param", "type": "parameter", "label": "PostGain", "importance": 0.8, "group": "gain_stage" },
+    { "id": "postgain", "type": "process", "label": "Post Gain", "importance": 0.7, "description": "Linear gain cut (-24 to 0 dB)", "group": "gain_stage" },
+    { "id": "wet_param", "type": "parameter", "label": "WetAmount", "importance": 0.7, "group": "mix" },
+    { "id": "mix", "type": "process", "label": "Dry/Wet Mix", "importance": 0.8, "description": "Linear crossfade: dry * input + wet * processed", "group": "mix" },
+    { "id": "audio_out", "type": "output", "label": "Audio Out (L/R)", "importance": 1.0 }
+  ],
+  "edges": [
+    { "from": "audio_in", "to": "pregain", "type": "signal" },
+    { "from": "pregain_param", "to": "pregain", "type": "control" },
+    { "from": "pregain", "to": "waveshaper", "type": "signal" },
+    { "from": "saturation_param", "to": "waveshaper", "type": "control" },
+    { "from": "sat_mod", "to": "waveshaper", "type": "control" },
+    { "from": "waveshaper", "to": "postgain", "type": "signal" },
+    { "from": "postgain_param", "to": "postgain", "type": "control" },
+    { "from": "audio_in", "to": "mix", "type": "signal" },
+    { "from": "postgain", "to": "mix", "type": "signal" },
+    { "from": "wet_param", "to": "mix", "type": "control" },
+    { "from": "mix", "to": "audio_out", "type": "signal" }
+  ],
+  "groups": [
+    { "id": "gain_stage", "label": "Gain Staging" },
+    { "id": "saturation", "label": "Waveshaping" },
+    { "id": "mix", "label": "Output Mix" }
+  ]
+}

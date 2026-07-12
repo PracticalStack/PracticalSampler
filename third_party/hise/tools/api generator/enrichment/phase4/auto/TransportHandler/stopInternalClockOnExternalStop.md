@@ -1,0 +1,1 @@
+Configures whether the internal clock should automatically stop when the external (DAW) clock stops. Global setting on the MasterClock. Useful when using `SyncInternal` mode to prevent the internal clock from continuing after the DAW stops.

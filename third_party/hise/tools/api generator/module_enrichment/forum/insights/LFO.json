@@ -1,0 +1,128 @@
+{
+  "targetId": "LFO",
+  "domain": "modules",
+  "generatedAt": "2026-03-30",
+  "topicIds": [6446, 1445, 4696, 9736, 6813, 13793, 3712, 5148, 913, 3062, 3639, 4468, 4620, 9582, 11860, 3245, 2286, 2029, 3485, 2786, 7693, 4833, 9179, 2811, 4368, 11220, 12904, 10297, 8825, 7804, 4674, 842, 1521, 2193, 3540, 3808, 5575, 7518, 7666, 8417, 2448, 2991, 11118],
+  "insights": [
+    {
+      "type": "API",
+      "title": "LFO output is unipolar (0 to 1), not bipolar",
+      "summary": "LFO modulators always output values in the range 0-1. If bipolar modulation is needed (e.g., for panning or symmetric pitch), scriptnode is required.",
+      "sources": ["tid:4833"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "LFO frequency is hard-capped at 100Hz internally",
+      "summary": "The LFO speed parameter's UI range shows virtual limits only. The actual engine cap is 100Hz - the module is not suitable for audio-rate modulation.",
+      "sources": ["tid:842"],
+      "verify": true,
+      "verify_hint": "grep HISE_EVENT_RASTER in hi_tools/Macros.h; check LFO class for 100Hz cap"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Modulators are processed at 1/8th sample rate by default",
+      "summary": "All HISE modulators run at a reduced control rate (default: 8x slower than audio rate, set by HISE_EVENT_RASTER macro). This introduces aliasing when the LFO frequency exceeds ~30-40Hz. The macro can be set to 4, 2, or 1 in project Extra Definitions.",
+      "sources": ["tid:3639"],
+      "verify": true,
+      "verify_hint": "HISE_EVENT_RASTER in hi_tools/Macros.h line ~64"
+    },
+    {
+      "type": "API",
+      "title": "Phase parameter controls LFO start position on reset only",
+      "summary": "The Phase parameter (attribute index 8) sets where in the cycle the LFO begins when it is reset by a note-on event. It does not shift a continuously running LFO.",
+      "sources": ["tid:1445"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "IgnoreNoteOn attribute (index 10) makes LFO free-running",
+      "summary": "Setting the IgnoreNoteOn attribute to true (value 1) prevents the LFO from resetting on note-on events, creating a free-running LFO.",
+      "sources": ["tid:13793"],
+      "verify": true,
+      "verify_hint": "grep IgnoreNoteOn in hi_scripting/scripting/modules/modulators"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "LFO FadeIn has no effect when placed in a Container's gain modulator chain",
+      "summary": "Containers do not process note-on messages, so an LFO placed in a Container's gain modulator chain is never reset and its FadeIn time never triggers. Use a Global LFO Modulator instead.",
+      "sources": ["tid:3808"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Loop/one-shot mode only works for Custom and Pattern waveforms",
+      "summary": "The Loop toggle only has effect when the waveform is set to Custom or Pattern mode. On standard waveforms (Sine, Triangle, Sawtooth, etc.), it has no effect.",
+      "sources": ["tid:3062"],
+      "verify": true,
+      "verify_hint": "grep LoopType or loopMode in LFO module source"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Most filter types produce aliasing when modulated by LFO",
+      "summary": "Only the SVF and Ladder filter types are designed for LFO modulation. Biquad-based filters produce severe zipper noise when their frequency is modulated.",
+      "sources": ["tid:2029"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "LFO.getCurrentLevel() always returns 0 in compiled plugin",
+      "summary": "When a plugin is compiled, getCurrentLevel() returns 0 even when the LFO is active. Fix: add ENABLE_ALL_PEAK_METERS=1 to Extra Definitions.",
+      "sources": ["tid:7666"],
+      "verify": true,
+      "verify_hint": "grep ENABLE_ALL_PEAK_METERS in HISE source"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Bulk-bypassing modulators via script accidentally bypasses internal ModulatorChain containers",
+      "summary": "A script iterating all modulators and calling setBypassed() will also bypass internal ModulatorChain processors. Use Modulator.getType() to filter these out.",
+      "sources": ["tid:3712"],
+      "verify": true,
+      "verify_hint": "grep ModulatorChain processor type; check getType() in Modulator scripting API"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "TempoSync range limited to 1/32T-1/1 bar; slower speeds require C++ source edit",
+      "summary": "The built-in TempoSync parameter only goes as slow as 1/1 bar. Slower values (2/1, 4/1) require editing MiscToolClasses.cpp/.h. New values must be appended at the end of the enum.",
+      "sources": ["tid:6446", "tid:4696"],
+      "verify": true,
+      "verify_hint": "grep TempoSyncer::initTempoData in hi_tools/hi_tools/MiscToolClasses.cpp"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "LFO pitch modulation center shifts when intensity is reduced",
+      "summary": "When an LFO is assigned to pitch modulation, reducing the intensity does not return pitch to the unmodulated baseline - the pitch center shifts asymmetrically.",
+      "sources": ["tid:4674"],
+      "verify": true,
+      "verify_hint": "search pitch modulator centering in hi_scripting/scripting/modules"
+    },
+    {
+      "type": "API",
+      "title": "LFO Step Modulator step count can exceed 16 via NumSteps attribute",
+      "summary": "The LFO Step Modulator UI appears locked to 16 steps, but the NumSteps attribute can be set via setAttribute() to values beyond 16.",
+      "sources": ["tid:3485"],
+      "verify": true,
+      "verify_hint": "grep NumSteps in LFO step modulator source"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Dual reference required when using LFO as both TableProcessor and Modulator",
+      "summary": "Synth.getTableProcessor() and Synth.getModulator() return different typed references to the same module. To access both APIs, create two separate const var references.",
+      "sources": ["tid:8417"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use TransportHandler to align tempo-synced LFO to DAW beat grid",
+      "summary": "Create a transport handler with Engine.createTransportHandler(), call setEnableGrid(true, 8), setSyncMode(PreferExternal), and startInternalClock(0) to keep the LFO aligned to the host timeline.",
+      "sources": ["tid:9582"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

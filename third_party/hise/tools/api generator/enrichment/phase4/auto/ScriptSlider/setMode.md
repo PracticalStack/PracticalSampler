@@ -1,0 +1,1 @@
+Changes how values are interpreted and displayed, including modes such as `Frequency`, `Decibel`, `Time`, `TempoSync`, `Linear`, `Discrete`, `Pan`, and `NormalizedPercentage`. If the previous mode was still on untouched defaults, switching mode can migrate default range-related settings to the new mode automatically.

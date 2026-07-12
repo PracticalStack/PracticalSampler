@@ -1,0 +1,50 @@
+{
+  "5": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "WavetableSynth", "name": "Wavetable Synthesiser1"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "WavetableSynth available in full module list. setFile with PROJECT_FOLDER will fail but compile should pass."
+  },
+  "6": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "WavetableSynth", "name": "Wavetable Synthesiser1"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "WavetableSynth available in full module list. saveAsHwt will write but compile should pass."
+  },
+  "9": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "AudioLooper", "name": "AudioReference"}
+    ],
+    "components": [
+      {"type": "ScriptComboBox", "id": "cmb_MatchLoader"}
+    ],
+    "verifyScript": null,
+    "notes": "AudioLooper provides AudioSampleProcessor interface"
+  },
+  "38": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "HardcodedMasterFX", "name": "HardcodedMasterFX"}
+    ],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"}
+    ],
+    "verifyScript": null,
+    "notes": "HardcodedMasterFX available in full module list"
+  }
+}

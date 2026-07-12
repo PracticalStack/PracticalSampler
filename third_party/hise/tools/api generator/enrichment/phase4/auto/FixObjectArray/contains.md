@@ -1,0 +1,1 @@
+Returns 1 if the array contains an element matching the given object, 0 otherwise. The comparison uses the factory's compare function - set it via `FixObjectFactory.setCompareFunction()` for property-based matching rather than the default byte-level equality. The argument must be a FixObject from the same factory layout; passing any other type always returns 0.

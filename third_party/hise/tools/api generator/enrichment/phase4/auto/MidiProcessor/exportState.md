@@ -1,0 +1,1 @@
+Exports the full processor state (all parameters and internal state) as a base64 string. Pass the returned string to `restoreState()` to restore the saved state later. Works on any MIDI processor type, including built-in modules.

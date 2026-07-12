@@ -1,0 +1,1 @@
+Enables or disables peak volume tracking for a specific layer/group combination. Once enabled, use `getCurrentPeak()` to read the tracked peak value for individual voices by event ID. This is typically used for release trigger gain matching in custom implementations.

@@ -1,0 +1,110 @@
+{
+  "className": "ScriptLookAndFeel",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "isImageLoaded": {
+      "signature": "bool isImageLoaded(String prettyName)",
+      "returnType": "bool",
+      "description": "Checks if the image has been loaded into the look and feel obkect",
+      "parameters": [
+        {
+          "name": "prettyName",
+          "type": "String"
+        }
+      ]
+    },
+    "loadImage": {
+      "signature": "void loadImage(String imageFile, String prettyName)",
+      "returnType": "void",
+      "description": "Loads an image that can be used by the look and feel functions.",
+      "parameters": [
+        {
+          "name": "imageFile",
+          "type": "String"
+        },
+        {
+          "name": "prettyName",
+          "type": "String"
+        }
+      ]
+    },
+    "registerFunction": {
+      "signature": "void registerFunction(var functionName, var function)",
+      "returnType": "void",
+      "description": "Registers a function that will be used for the custom look and feel.",
+      "parameters": [
+        {
+          "name": "functionName",
+          "type": "var"
+        },
+        {
+          "name": "function",
+          "type": "var"
+        }
+      ]
+    },
+    "setGlobalFont": {
+      "signature": "void setGlobalFont(String fontName, float fontSize)",
+      "returnType": "void",
+      "description": "Set a global font.",
+      "parameters": [
+        {
+          "name": "fontName",
+          "type": "String"
+        },
+        {
+          "name": "fontSize",
+          "type": "float"
+        }
+      ]
+    },
+    "setInlineStyleSheet": {
+      "signature": "void setInlineStyleSheet(String cssCode)",
+      "returnType": "void",
+      "description": "Parses CSS code and switches the look and feel to use the CSS renderer.",
+      "parameters": [
+        {
+          "name": "cssCode",
+          "type": "String"
+        }
+      ]
+    },
+    "setStyleSheet": {
+      "signature": "void setStyleSheet(String fileName)",
+      "returnType": "void",
+      "description": "Parses CSS code from a style sheet file in the scripts folder and switches the look and feel to use the CSS renderer.",
+      "parameters": [
+        {
+          "name": "fileName",
+          "type": "String"
+        }
+      ]
+    },
+    "setStyleSheetProperty": {
+      "signature": "void setStyleSheetProperty(String variableId, var value, String type)",
+      "returnType": "void",
+      "description": "Sets a variable that can be queried from a style sheet.",
+      "parameters": [
+        {
+          "name": "variableId",
+          "type": "String"
+        },
+        {
+          "name": "value",
+          "type": "var"
+        },
+        {
+          "name": "type",
+          "type": "String"
+        }
+      ]
+    },
+    "unloadAllImages": {
+      "signature": "void unloadAllImages()",
+      "returnType": "void",
+      "description": "Unload all images from the look and feel object.",
+      "parameters": []
+    }
+  }
+}

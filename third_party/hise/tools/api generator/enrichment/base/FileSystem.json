@@ -1,0 +1,205 @@
+{
+  "className": "FileSystem",
+  "category": "namespace",
+  "description": "",
+  "methods": {
+    "browse": {
+      "signature": "void browse(var startFolder, bool forSaving, String wildcard, var callback)",
+      "returnType": "void",
+      "description": "Opens a file browser to choose a file.",
+      "parameters": [
+        {
+          "name": "startFolder",
+          "type": "var"
+        },
+        {
+          "name": "forSaving",
+          "type": "bool"
+        },
+        {
+          "name": "wildcard",
+          "type": "String"
+        },
+        {
+          "name": "callback",
+          "type": "var"
+        }
+      ]
+    },
+    "browseForDirectory": {
+      "signature": "void browseForDirectory(var startFolder, var callback)",
+      "returnType": "void",
+      "description": "Opens a file browser to choose a directory.",
+      "parameters": [
+        {
+          "name": "startFolder",
+          "type": "var"
+        },
+        {
+          "name": "callback",
+          "type": "var"
+        }
+      ]
+    },
+    "browseForMultipleDirectories": {
+      "signature": "void browseForMultipleDirectories(var startFolder, var callback)",
+      "returnType": "void",
+      "description": "Opens a file browser to select multiple directories.",
+      "parameters": [
+        {
+          "name": "startFolder",
+          "type": "var"
+        },
+        {
+          "name": "callback",
+          "type": "var"
+        }
+      ]
+    },
+    "browseForMultipleFiles": {
+      "signature": "void browseForMultipleFiles(var startFolder, String wildcard, var callback)",
+      "returnType": "void",
+      "description": "Opens a file browser to select multiple files (to open).",
+      "parameters": [
+        {
+          "name": "startFolder",
+          "type": "var"
+        },
+        {
+          "name": "wildcard",
+          "type": "String"
+        },
+        {
+          "name": "callback",
+          "type": "var"
+        }
+      ]
+    },
+    "decryptWithRSA": {
+      "signature": "String decryptWithRSA(String dataToDecrypt, String publicKey)",
+      "returnType": "String",
+      "description": "Decrypts the given string using a RSA public key.",
+      "parameters": [
+        {
+          "name": "dataToDecrypt",
+          "type": "String"
+        },
+        {
+          "name": "publicKey",
+          "type": "String"
+        }
+      ]
+    },
+    "descriptionOfSizeInBytes": {
+      "signature": "String descriptionOfSizeInBytes(int64 bytes)",
+      "returnType": "String",
+      "description": "Convert a file size in bytes to a neat string description.",
+      "parameters": [
+        {
+          "name": "bytes",
+          "type": "int64"
+        }
+      ]
+    },
+    "encryptWithRSA": {
+      "signature": "String encryptWithRSA(String dataToEncrypt, String privateKey)",
+      "returnType": "String",
+      "description": "Encrypts the given string using a RSA private key.",
+      "parameters": [
+        {
+          "name": "dataToEncrypt",
+          "type": "String"
+        },
+        {
+          "name": "privateKey",
+          "type": "String"
+        }
+      ]
+    },
+    "findFiles": {
+      "signature": "var findFiles(var directory, String wildcard, bool recursive)",
+      "returnType": "var",
+      "description": "Returns a list of all child files of a directory that match the wildcard.",
+      "parameters": [
+        {
+          "name": "directory",
+          "type": "var"
+        },
+        {
+          "name": "wildcard",
+          "type": "String"
+        },
+        {
+          "name": "recursive",
+          "type": "bool"
+        }
+      ]
+    },
+    "findFileSystemRoots": {
+      "signature": "var findFileSystemRoots()",
+      "returnType": "var",
+      "description": "Returns a list of all root drives of the current computer.",
+      "parameters": []
+    },
+    "fromAbsolutePath": {
+      "signature": "var fromAbsolutePath(String path)",
+      "returnType": "var",
+      "description": "Returns a file object from an absolute path (eg. C:/Windows/MyProgram.exe).",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "String"
+        }
+      ]
+    },
+    "fromReferenceString": {
+      "signature": "var fromReferenceString(String referenceStringOrFullPath, var locationType)",
+      "returnType": "var",
+      "description": "Returns a file object for the given location type and the reference string which can either contain a wildcard like `{PROJECT_FOLDER}` or a full file path.",
+      "parameters": [
+        {
+          "name": "referenceStringOrFullPath",
+          "type": "String"
+        },
+        {
+          "name": "locationType",
+          "type": "var"
+        }
+      ]
+    },
+    "getBytesFreeOnVolume": {
+      "signature": "int64 getBytesFreeOnVolume(var folder)",
+      "returnType": "int64",
+      "description": "Returns the number of free bytes on the volume of a given folder.",
+      "parameters": [
+        {
+          "name": "folder",
+          "type": "var"
+        }
+      ]
+    },
+    "getFolder": {
+      "signature": "var getFolder(var locationType)",
+      "returnType": "var",
+      "description": "Returns the current sample folder as File object.",
+      "parameters": [
+        {
+          "name": "locationType",
+          "type": "var"
+        }
+      ]
+    },
+    "getSystemId": {
+      "signature": "String getSystemId()",
+      "returnType": "String",
+      "description": "Returns a unique machine ID that can be used to identify the computer.",
+      "parameters": []
+    },
+    "loadExampleAssets": {
+      "signature": "void loadExampleAssets()",
+      "returnType": "void",
+      "description": "Loads a bunch of dummy assets (audio files, MIDI files, filmstrips) for use in snippets & examples.",
+      "parameters": []
+    }
+  }
+}

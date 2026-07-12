@@ -1,0 +1,142 @@
+{
+  "factoryPath": "filters.linkwitzriley",
+  "factory": "filters",
+  "nodeId": "linkwitzriley",
+  "description": "A filter node",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Filter Response",
+      "rationale": "Frequency sets the crossover point, Q and Gain are present for interface consistency but may have limited effect on a Linkwitz-Riley crossover filter.",
+      "parameters": [
+        {
+          "id": "Frequency",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0, "skew": 0.2299045622348785 },
+          "default": 1000.0,
+          "textConverter": "Frequency",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Q",
+          "range": { "min": 0.300000011920929, "max": 9.899999618530273, "step": 0.0, "skew": 0.2647178173065186 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Gain",
+          "range": { "min": -18.0, "max": 18.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Decibel",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Filter Configuration",
+      "rationale": "Mode selects the crossover type (3 modes: likely LP, HP, Allpass), Smoothing controls coefficient interpolation speed, Enabled toggles the filter on/off.",
+      "parameters": [
+        {
+          "id": "Mode",
+          "range": { "min": 0.0, "max": 2.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "55.nT6K8ChKwE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.JT.SPo.RPoPPPAPXiQWZ1UF.ADf...",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Smoothing",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 0.3010300099849701 },
+          "default": 0.009999999776482582,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Enabled",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "filterCoefficients": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/filters/linkwitzriley.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "linkwitzriley-mode-values",
+      "category": "conditional_logic",
+      "question": "Mode parameter has range 0-2 (3 discrete values). What do these correspond to? For a Linkwitz-Riley filter, expected modes are LP, HP, and possibly Allpass or a specific crossover order.",
+      "context": "Linkwitz-Riley filters are specifically designed for crossover networks. The mode names determine the use case."
+    },
+    {
+      "id": "linkwitzriley-order",
+      "category": "signal_path",
+      "question": "What is the order of this Linkwitz-Riley filter? LR2 (12 dB/oct), LR4 (24 dB/oct), or LR8 (48 dB/oct)? Linkwitz-Riley filters are always even-order (composed of cascaded Butterworth pairs). Is the order fixed or selectable via Mode?",
+      "context": "The filter order determines the crossover slope steepness and is the key specification for crossover design."
+    },
+    {
+      "id": "linkwitzriley-crossover-use",
+      "category": "signal_path",
+      "question": "Linkwitz-Riley filters are designed so that LP + HP outputs sum to unity gain at the crossover frequency. Is this node intended to be used as one half of a crossover pair? Does it relate to template.freq_split nodes?",
+      "context": "Understanding the crossover design intent helps users know whether to use this standalone or as part of a multiband split."
+    },
+    {
+      "id": "linkwitzriley-q-and-gain-effect",
+      "category": "parameter_behaviour",
+      "question": "Linkwitz-Riley filters have a fixed Q (0.5 for LR2, cascaded Butterworth for higher orders). Does the Q parameter actually affect this filter, or is it ignored? Similarly, does Gain have any effect?",
+      "context": "If Q is non-functional (as expected for a proper LR filter), users should be told to avoid confusion."
+    },
+    {
+      "id": "description-accuracy",
+      "category": "description_accuracy",
+      "question": "The base description 'A filter node' is generic. The phase3 doc says 'Please enter a brief description' (placeholder). Confirm the correct characterisation as a Linkwitz-Riley crossover filter.",
+      "context": "The phase3 doc has a placeholder description, confirming this node has never been properly documented."
+    }
+  ],
+
+  "notes": "filters.linkwitzriley is the only crossover-specific filter in the factory. Linkwitz-Riley filters are designed for frequency band splitting where LP + HP sum flat. This node may be related to template.freq_split nodes. The phase3 doc has a placeholder description ('Please enter a brief description'), indicating it was never documented. Q and Gain parameters may be non-functional for a proper LR implementation. Also note: jdsp.jlinkwitzriley exists as a JUCE DSP wrapper - need to clarify the relationship. References filter-base-architecture, smoothing-units, and enabled-bypass-behaviour gaps from filters.svf."
+}

@@ -1,0 +1,22 @@
+{
+  "factoryPath": "container.repitch",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal (1-2 channels)" },
+    { "id": "factor", "label": "RepitchFactor", "type": "parameter", "importance": 1.0, "description": "Resampling ratio (0.5 to 2.0, default 1.0)" },
+    { "id": "interp", "label": "Interpolation", "type": "parameter", "importance": 0.7, "description": "Quality: Cubic, Linear, or None" },
+    { "id": "downsample", "label": "Downsample", "type": "process", "importance": 1.0, "description": "Resample input into internal buffer at adjusted rate" },
+    { "id": "serial", "label": "Serial dispatch", "type": "process", "importance": 0.8, "description": "Children process the resampled buffer serially" },
+    { "id": "upsample", "label": "Upsample", "type": "process", "importance": 1.0, "description": "Resample back to original sample count" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Output at original sample rate" }
+  ],
+  "edges": [
+    { "from": "in", "to": "downsample", "type": "signal", "label": null },
+    { "from": "factor", "to": "downsample", "type": "control", "label": null },
+    { "from": "interp", "to": "downsample", "type": "control", "label": null },
+    { "from": "downsample", "to": "serial", "type": "signal", "label": "resampled" },
+    { "from": "serial", "to": "upsample", "type": "signal", "label": null },
+    { "from": "factor", "to": "upsample", "type": "control", "label": null },
+    { "from": "interp", "to": "upsample", "type": "control", "label": null },
+    { "from": "upsample", "to": "out", "type": "signal", "label": null }
+  ]
+}

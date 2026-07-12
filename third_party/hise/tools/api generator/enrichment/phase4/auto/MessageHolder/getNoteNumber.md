@@ -1,0 +1,1 @@
+Returns the MIDI note number (0-127) stored on this event. For events captured with `Message.store()`, this reflects the original note number from the callback.

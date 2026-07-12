@@ -1,0 +1,1 @@
+Triggers a repaint of the current drag image. Returns 1 if a listener handled the repaint, 0 otherwise. Use this together with `Content.getComponentUnderDrag()` to update the visual appearance of a component being dragged.

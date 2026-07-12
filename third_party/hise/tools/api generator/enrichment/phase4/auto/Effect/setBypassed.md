@@ -1,0 +1,1 @@
+Enables or disables bypass for the effect. When bypassed, the effect passes audio through without processing. Master effects apply a soft bypass with fade-out to avoid clicks. Use this for toggling entire effect groups on and off (e.g. mode switching, global FX bypass).

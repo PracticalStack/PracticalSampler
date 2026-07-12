@@ -1,0 +1,1 @@
+Returns whether the plugin is currently unlocked (licensed). This reflects whether a valid RSA-signed key file has been loaded and validated. The unlock state is also used internally by HISE to gate audio processing in unlicensed builds.

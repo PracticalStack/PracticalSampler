@@ -1,0 +1,1 @@
+Draws an ellipse outline within the specified area using the current colour. A square area produces a circle. The `lineThickness` parameter controls the stroke width. To draw a filled ellipse, use `fillEllipse` instead.

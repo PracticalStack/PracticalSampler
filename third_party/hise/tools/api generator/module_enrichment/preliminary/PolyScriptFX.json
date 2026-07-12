@@ -1,0 +1,78 @@
+{
+  "moduleId": "PolyScriptFX",
+  "prettyName": "Polyphonic Script FX",
+  "type": "Effect",
+  "subtype": "VoiceEffect",
+  "category": "custom",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "voice",
+    "audioOut": "voice",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "per-voice",
+
+  "interfaces": [
+    { "name": "SlotFX", "signalFlowRole": "network_host - loads and hot-swaps scriptnode DSP networks" },
+    { "name": "TableProcessor", "signalFlowRole": "complex_data - exposes Table objects from the loaded network" },
+    { "name": "SliderPackProcessor", "signalFlowRole": "complex_data - exposes SliderPack objects from the loaded network" },
+    { "name": "AudioSampleProcessor", "signalFlowRole": "complex_data - exposes AudioFile objects from the loaded network" },
+    { "name": "DisplayBufferSource", "signalFlowRole": "skip - UI communication only" }
+  ],
+
+  "parameterGroups": [],
+
+  "standaloneModChains": [],
+  "disabledModChains": [],
+  "compositeBlocks": [],
+
+  "gaps": [
+    {
+      "id": "network-loading-mechanism",
+      "category": "signal_path",
+      "question": "How does PolyScriptFX load a scriptnode network?",
+      "context": "Users need to know how to load a per-voice effect network."
+    },
+    {
+      "id": "voice-rendering",
+      "category": "signal_path",
+      "question": "How does per-voice rendering work? Does each voice call the network with VoiceSetter?",
+      "context": "Understanding per-voice processing is essential."
+    },
+    {
+      "id": "voice-lifecycle",
+      "category": "signal_path",
+      "question": "How do startVoice/reset map to the network's voice handling?",
+      "context": "Voice lifecycle for per-voice effects."
+    },
+    {
+      "id": "parameter-exposure",
+      "category": "parameter_behavior",
+      "question": "How are network parameters exposed? Are there any fixed parameters?",
+      "context": "Users need to understand available parameters."
+    },
+    {
+      "id": "complex-data-routing",
+      "category": "interface_usage",
+      "question": "How are Tables, SliderPacks, and AudioFiles from the loaded network exposed?",
+      "context": "Complex data routing for per-voice effect networks."
+    },
+    {
+      "id": "modulation-chain-support",
+      "category": "signal_path",
+      "question": "Does PolyScriptFX support extra modulation chains? How are they configured (HISE_NUM_POLYPHONIC_SCRIPTNODE_FX_MODS)?",
+      "context": "Users need to know about modulation chain support."
+    },
+    {
+      "id": "tail-and-suspension",
+      "category": "signal_path",
+      "question": "How does tail detection and voice suspension work for PolyScriptFX?",
+      "context": "Important for voice management and CPU efficiency."
+    }
+  ],
+
+  "notes": "PolyScriptFX is the per-voice effect variant. No fixed parameters. Each voice maintains independent state in the network. The C++ class is JavascriptPolyphonicEffect. The Hardcoded equivalent is HardcodedPolyphonicFX."
+}

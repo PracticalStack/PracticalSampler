@@ -1,0 +1,1 @@
+Converts a time value in milliseconds to the equivalent number of audio samples at the current sample rate. Returns a floating-point value; use `Math.round()` if an integer is needed. This is the inverse of `Engine.getMilliSecondsForSamples()`.

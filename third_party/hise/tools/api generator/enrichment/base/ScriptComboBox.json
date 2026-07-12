@@ -1,0 +1,356 @@
+{
+  "className": "ScriptComboBox",
+  "category": "component",
+  "description": "",
+  "methods": {
+    "addItem": {
+      "signature": "void addItem(String newName)",
+      "returnType": "void",
+      "description": "Adds an item to a combo box.",
+      "parameters": [
+        {
+          "name": "newName",
+          "type": "String"
+        }
+      ]
+    },
+    "addToMacroControl": {
+      "signature": "void addToMacroControl(int macroIndex)",
+      "returnType": "void",
+      "description": "Adds the knob / button to a macro controller (from 0 to 7).",
+      "parameters": [
+        {
+          "name": "macroIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "changed": {
+      "signature": "void changed()",
+      "returnType": "void",
+      "description": "Call this to indicate that the value has changed (the onControl callback will be executed.",
+      "parameters": []
+    },
+    "fadeComponent": {
+      "signature": "void fadeComponent(bool shouldBeVisible, int milliseconds)",
+      "returnType": "void",
+      "description": "Toggles the visibility and fades a component using the global animator.",
+      "parameters": [
+        {
+          "name": "shouldBeVisible",
+          "type": "bool"
+        },
+        {
+          "name": "milliseconds",
+          "type": "int"
+        }
+      ]
+    },
+    "get": {
+      "signature": "var get(String propertyName)",
+      "returnType": "var",
+      "description": "returns the value of the property.",
+      "parameters": [
+        {
+          "name": "propertyName",
+          "type": "String"
+        }
+      ]
+    },
+    "getAllProperties": {
+      "signature": "var getAllProperties()",
+      "returnType": "var",
+      "description": "Returns a list of all property IDs as array.",
+      "parameters": []
+    },
+    "getChildComponents": {
+      "signature": "var getChildComponents()",
+      "returnType": "var",
+      "description": "Returns list of component's children",
+      "parameters": []
+    },
+    "getGlobalPositionX": {
+      "signature": "int getGlobalPositionX()",
+      "returnType": "int",
+      "description": "Returns the absolute x-position relative to the interface.",
+      "parameters": []
+    },
+    "getGlobalPositionY": {
+      "signature": "int getGlobalPositionY()",
+      "returnType": "int",
+      "description": "Returns the absolute y-position relative to the interface.",
+      "parameters": []
+    },
+    "getHeight": {
+      "signature": "var getHeight()",
+      "returnType": "var",
+      "description": "Returns the height of the component.",
+      "parameters": []
+    },
+    "getId": {
+      "signature": "String getId()",
+      "returnType": "String",
+      "description": "Returns the ID of the component.",
+      "parameters": []
+    },
+    "getItemText": {
+      "signature": "String getItemText()",
+      "returnType": "String",
+      "description": "Returns the currently selected item text.",
+      "parameters": []
+    },
+    "getLocalBounds": {
+      "signature": "var getLocalBounds(float reduceAmount)",
+      "returnType": "var",
+      "description": "Returns a [x, y, w, h] array that was reduced by the given amount.",
+      "parameters": [
+        {
+          "name": "reduceAmount",
+          "type": "float"
+        }
+      ]
+    },
+    "getValue": {
+      "signature": "var getValue()",
+      "returnType": "var",
+      "description": "Returns the current value.",
+      "parameters": []
+    },
+    "getValueNormalized": {
+      "signature": "double getValueNormalized()",
+      "returnType": "double",
+      "description": "Returns the normalized value.",
+      "parameters": []
+    },
+    "getWidth": {
+      "signature": "var getWidth()",
+      "returnType": "var",
+      "description": "Returns the width of the component.",
+      "parameters": []
+    },
+    "grabFocus": {
+      "signature": "void grabFocus()",
+      "returnType": "void",
+      "description": "Call this method in order to grab the keyboard focus for this component.",
+      "parameters": []
+    },
+    "loseFocus": {
+      "signature": "void loseFocus()",
+      "returnType": "void",
+      "description": "Call this method in order to give away the focus for this component.",
+      "parameters": []
+    },
+    "sendRepaintMessage": {
+      "signature": "void sendRepaintMessage()",
+      "returnType": "void",
+      "description": "Manually sends a repaint message for the component.",
+      "parameters": []
+    },
+    "set": {
+      "signature": "void set(String propertyName, var value)",
+      "returnType": "void",
+      "description": "Sets the property.",
+      "parameters": [
+        {
+          "name": "propertyName",
+          "type": "String"
+        },
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "setConsumedKeyPresses": {
+      "signature": "void setConsumedKeyPresses(var listOfKeys)",
+      "returnType": "void",
+      "description": "Registers a selection of key presses to be consumed by this component.",
+      "parameters": [
+        {
+          "name": "listOfKeys",
+          "type": "var"
+        }
+      ]
+    },
+    "setControlCallback": {
+      "signature": "void setControlCallback(var controlFunction)",
+      "returnType": "void",
+      "description": "Pass a inline function for a custom callback event.",
+      "parameters": [
+        {
+          "name": "controlFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "setKeyPressCallback": {
+      "signature": "void setKeyPressCallback(var keyboardFunction)",
+      "returnType": "void",
+      "description": "Adds a callback to react on key presses (when this component is focused).",
+      "parameters": [
+        {
+          "name": "keyboardFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "setLocalLookAndFeel": {
+      "signature": "void setLocalLookAndFeel(var lafObject)",
+      "returnType": "void",
+      "description": "Attaches the local look and feel to this component.",
+      "parameters": [
+        {
+          "name": "lafObject",
+          "type": "var"
+        }
+      ]
+    },
+    "setPosition": {
+      "signature": "void setPosition(int x, int y, int w, int h)",
+      "returnType": "void",
+      "description": "Sets the position of the component.",
+      "parameters": [
+        {
+          "name": "x",
+          "type": "int"
+        },
+        {
+          "name": "y",
+          "type": "int"
+        },
+        {
+          "name": "w",
+          "type": "int"
+        },
+        {
+          "name": "h",
+          "type": "int"
+        }
+      ]
+    },
+    "setPropertiesFromJSON": {
+      "signature": "void setPropertiesFromJSON(var jsonData)",
+      "returnType": "void",
+      "description": "Restores all properties from a JSON object.",
+      "parameters": [
+        {
+          "name": "jsonData",
+          "type": "var"
+        }
+      ]
+    },
+    "setStyleSheetClass": {
+      "signature": "void setStyleSheetClass(String classIds)",
+      "returnType": "void",
+      "description": "Sets the given class selectors for the component stylesheet.",
+      "parameters": [
+        {
+          "name": "classIds",
+          "type": "String"
+        }
+      ]
+    },
+    "setStyleSheetProperty": {
+      "signature": "void setStyleSheetProperty(String variableId, var value, String type)",
+      "returnType": "void",
+      "description": "Sets a variable for this component that can be queried from a style sheet.",
+      "parameters": [
+        {
+          "name": "variableId",
+          "type": "String"
+        },
+        {
+          "name": "value",
+          "type": "var"
+        },
+        {
+          "name": "type",
+          "type": "String"
+        }
+      ]
+    },
+    "setStyleSheetPseudoState": {
+      "signature": "void setStyleSheetPseudoState(String pseudoState)",
+      "returnType": "void",
+      "description": "Programatically sets a pseudo state (:hover, :active, :checked, :focus, :disabled) that will be used by the CSS renderer.",
+      "parameters": [
+        {
+          "name": "pseudoState",
+          "type": "String"
+        }
+      ]
+    },
+    "setTooltip": {
+      "signature": "void setTooltip(String tooltip)",
+      "returnType": "void",
+      "description": "Shows a informative text on mouse hover.",
+      "parameters": [
+        {
+          "name": "tooltip",
+          "type": "String"
+        }
+      ]
+    },
+    "setValue": {
+      "signature": "void setValue(var newValue)",
+      "returnType": "void",
+      "description": "Sets the current value\nIt is safe to call this on the message callbacks, the control will be updated asynchronously. If you call this method within the onInit callback, it will not restore the value after compilation.\ncomponentIndex\nthe index of the component that was returned at the creation.\nnewValue\nthe new value.",
+      "parameters": [
+        {
+          "name": "newValue",
+          "type": "var"
+        }
+      ]
+    },
+    "setValueNormalized": {
+      "signature": "void setValueNormalized(double normalizedValue)",
+      "returnType": "void",
+      "description": "Sets the current value from a range 0.0 ... 1.0.",
+      "parameters": [
+        {
+          "name": "normalizedValue",
+          "type": "double"
+        }
+      ]
+    },
+    "setValueWithUndo": {
+      "signature": "void setValueWithUndo(var newValue)",
+      "returnType": "void",
+      "description": "Sets the current value and adds it to the undo list. Don't call this from onControl!",
+      "parameters": [
+        {
+          "name": "newValue",
+          "type": "var"
+        }
+      ]
+    },
+    "setZLevel": {
+      "signature": "void setZLevel(String zLevel)",
+      "returnType": "void",
+      "description": "Changes the depth hierarchy (z-axis) of sibling components (Back, Default, Front or AlwaysOnTop).",
+      "parameters": [
+        {
+          "name": "zLevel",
+          "type": "String"
+        }
+      ]
+    },
+    "showControl": {
+      "signature": "void showControl(bool shouldBeVisible)",
+      "returnType": "void",
+      "description": "Hides / Shows the control.",
+      "parameters": [
+        {
+          "name": "shouldBeVisible",
+          "type": "bool"
+        }
+      ]
+    },
+    "updateValueFromProcessorConnection": {
+      "signature": "void updateValueFromProcessorConnection()",
+      "returnType": "void",
+      "description": "Updates the value from the processor connection. Call this method whenever the module state has changed and you want to refresh the knob value to show the current state.",
+      "parameters": []
+    }
+  }
+}

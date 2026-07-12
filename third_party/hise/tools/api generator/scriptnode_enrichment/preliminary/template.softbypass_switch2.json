@@ -1,0 +1,113 @@
+{
+  "factoryPath": "template.softbypass_switch2",
+  "factory": "template",
+  "nodeId": "softbypass_switch2",
+  "description": "A container for serial processing of nodes",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Switch Control",
+      "rationale": "Single parameter that selects which of the N soft-bypassed signal paths is active. Integer steps select a path index. The Switch parameter connects to a control.xfader node (Mode=Switch) which routes bypass states to the individual container.soft_bypass children.",
+      "parameters": [
+        {
+          "id": "Switch",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "Controls the UI layout orientation of the container."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": true,
+    "groupName": "softbypass_switchN",
+    "templateParameter": "number of switch targets (2-8)",
+    "variantValue": "2"
+  },
+
+  "existingDoc": {
+    "path": "phase3/template/softbypass_switch2.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "internal-topology",
+      "category": "signal_path",
+      "question": "The root is container.chain containing: (1) a control.xfader node (Mode=Switch, NumParameters=2) and (2) an sb_container (container.chain) holding N container.soft_bypass children (sb1, sb2). The xfader's SwitchTargets connect to each sb's Bypassed parameter. Confirm: does the xfader in Switch mode activate exactly one soft_bypass child at a time, with smooth crossfading handled by the soft_bypass containers?",
+      "context": "Understanding the switching mechanism is critical. The soft_bypass containers handle the crossfade, while the xfader controls which one is active."
+    },
+    {
+      "id": "crossfade-behaviour",
+      "category": "signal_path",
+      "question": "When the Switch parameter changes, the xfader toggles Bypassed states on the soft_bypass containers. How does the crossfade work? Does one path fade out while the other fades in simultaneously, or is there a brief overlap/gap?",
+      "context": "Users choosing this template over container.branch need to know the switching characteristics -- whether it is click-free and how long the transition takes."
+    },
+    {
+      "id": "soft-bypass-smoothing-time",
+      "category": "parameter_behaviour",
+      "question": "container.soft_bypass uses bypass::smoothed with a smoothingTime property. What is the default smoothing time for the soft_bypass children in this template? Is it user-configurable?",
+      "context": "The crossfade duration directly affects the switching behavior. Users need to know if they can adjust it."
+    },
+    {
+      "id": "xfader-switch-mode",
+      "category": "conditional_logic",
+      "question": "The control.xfader is configured with Mode=Switch and NumParameters=2. In Switch mode, does the xfader send binary 0/1 values to its switch targets based on the integer Value parameter?",
+      "context": "Understanding the xfader's Switch mode behaviour is needed to document how the template achieves mutually exclusive soft-bypassed paths."
+    },
+    {
+      "id": "description-accuracy",
+      "category": "description_accuracy",
+      "question": "The description 'A container for serial processing of nodes' is the generic container.chain description. A more accurate description would reference soft-bypassed switching between N signal paths.",
+      "context": "The generic chain description does not convey the template's specific purpose as a click-free signal path switcher."
+    },
+    {
+      "id": "dummy-placeholder",
+      "category": "signal_path",
+      "question": "Each soft_bypass child contains a math.mul dummy node (Value=1.0). Is this a placeholder for user processing, identical in purpose to the freq_split dummies?",
+      "context": "Users need to know they should replace the dummy nodes with their own processing chains."
+    }
+  ],
+
+  "notes": "Base variant of the softbypass_switchN group. Root is container.chain. Internal structure: control.xfader (Mode=Switch, NumParameters=N) -> sb_container (container.chain, IsVertical=false) containing N container.soft_bypass children (sb1..sbN). The xfader's SwitchTargets connect each target to the Bypassed parameter of the corresponding soft_bypass container. Each soft_bypass holds a math.mul dummy (Value=1.0) as a placeholder. The Switch parameter (max=N-1, step=1) routes to the xfader's Value parameter. The description is inherited from container.chain and does not describe the template's actual purpose. Unlike container.branch which hard-switches, this template provides click-free transitions via soft_bypass crossfading."
+}

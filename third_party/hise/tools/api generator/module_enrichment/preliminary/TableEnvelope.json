@@ -1,0 +1,160 @@
+{
+  "moduleId": "TableEnvelope",
+  "prettyName": "Table Envelope",
+  "type": "Modulator",
+  "subtype": "EnvelopeModulator",
+  "category": "generator",
+
+  "io": {
+    "midiIn": "noteOn+noteOff",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": true,
+    "fxChain": null
+  },
+
+  "voiceContext": "per-voice",
+
+  "interfaces": [
+    {
+      "name": "TableProcessor",
+      "signalFlowRole": "Lookup table step in signal path - defines the envelope shape as a user-drawn curve"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Playback Control",
+      "rationale": "Toggle parameters controlling voice allocation and retriggering behavior",
+      "parameters": [
+        {
+          "id": "Monophonic",
+          "name": "Monophonic",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": "dynamic",
+          "description": "Enables monophonic mode where only one voice is rendered",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Retrigger",
+          "name": "Retrigger",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Restarts the envelope when a new note is triggered in monophonic mode",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Envelope Timing",
+      "rationale": "The two time parameters controlling attack and release duration, with envelope shape determined by the lookup table",
+      "parameters": [
+        {
+          "id": "Attack",
+          "name": "Attack",
+          "range": { "min": 1.0, "max": 20000.0, "step": 0.0 },
+          "default": 20.0,
+          "description": "Controls how long the envelope takes to reach full level after a note-on",
+          "composite": {
+            "type": "modMultiply",
+            "chainName": "AttackTimeModulation",
+            "chainIndex": 0,
+            "constrainer": "VoiceStartModulator"
+          },
+          "modChain": {
+            "name": "AttackTimeModulation",
+            "chainIndex": 0,
+            "constrainer": "VoiceStartModulator",
+            "modulationMode": "gain"
+          }
+        },
+        {
+          "id": "Release",
+          "name": "Release",
+          "range": { "min": 1.0, "max": 20000.0, "step": 0.0 },
+          "default": 20.0,
+          "description": "The time the envelope takes to fall from the sustain level to zero after note-off",
+          "composite": {
+            "type": "modMultiply",
+            "chainName": "ReleaseTimeModulation",
+            "chainIndex": 1,
+            "constrainer": "VoiceStartModulator"
+          },
+          "modChain": {
+            "name": "ReleaseTimeModulation",
+            "chainIndex": 1,
+            "constrainer": "VoiceStartModulator",
+            "modulationMode": "gain"
+          }
+        }
+      ]
+    }
+  ],
+
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "compositeBlocks": [
+    {
+      "type": "modMultiply",
+      "param": "Attack",
+      "details": {
+        "chainName": "AttackTimeModulation",
+        "chainIndex": 0,
+        "constrainer": "VoiceStartModulator"
+      }
+    },
+    {
+      "type": "modMultiply",
+      "param": "Release",
+      "details": {
+        "chainName": "ReleaseTimeModulation",
+        "chainIndex": 1,
+        "constrainer": "VoiceStartModulator"
+      }
+    }
+  ],
+
+  "gaps": [
+    {
+      "id": "signal-path-table-lookup",
+      "category": "signal_path",
+      "question": "How does the table lookup integrate with the attack/release timing? Does the attack phase sweep through the table from left to right over the Attack time, and the release phase sweep from right to left (or a separate table)? Is there one table or two (attack table + release table)?",
+      "context": "The core behavior of this envelope depends on how the table defines the shape - this is the primary signal path question"
+    },
+    {
+      "id": "table-processor-usage",
+      "category": "interface_usage",
+      "question": "How many tables does the TableProcessor provide? Does the user draw one curve that defines the entire envelope, or separate curves for attack and release? What do the X and Y axes represent (X=time position 0-1, Y=amplitude 0-1)?",
+      "context": "Users interact primarily through the table editor - need to document exactly what they are drawing"
+    },
+    {
+      "id": "sustain-behavior-implicit",
+      "category": "parameter_behavior",
+      "question": "There is no Sustain parameter. Does the envelope hold at the value reached at the end of the attack phase (presumably 1.0 or the table's rightmost value) until note-off? Or does the table define a shape that plays through completely regardless of note duration?",
+      "context": "Users need to understand what happens between attack completion and note-off"
+    },
+    {
+      "id": "monophonic-retrigger-interaction",
+      "category": "conditional_logic",
+      "question": "How do Monophonic and Retrigger interact? Same behavior as other EnvelopeModulators, or any table-specific differences?",
+      "context": "Legato behavior documentation"
+    },
+    {
+      "id": "table-shape-vs-timing",
+      "category": "parameter_behavior",
+      "question": "If the table defines the shape and Attack/Release define the timing, does changing Attack time stretch the table lookup linearly? Or is there interpolation that could change the perceived shape at different timings?",
+      "context": "Users need to know if a shape designed at 100ms attack will look/sound the same when scaled to 1000ms"
+    },
+    {
+      "id": "performance-table-resolution",
+      "category": "performance",
+      "question": "What is the table resolution? Is the lookup per-sample? Is there interpolation between table entries? How does performance compare to AHDSR for the same attack/release timing?",
+      "context": "Table lookup performance characteristics affect whether this is viable as a drop-in AHDSR replacement"
+    }
+  ],
+
+  "notes": "TableEnvelope is a table-driven envelope with only Attack and Release time parameters - the envelope shape itself is entirely defined by the TableProcessor lookup table. Key observations: (1) Both Attack and Release have modulation chains, unlike SimpleEnvelope where only Attack is modulatable. (2) Both time parameters have min=1.0 (not 0.0), so zero attack/release is not possible. (3) No curve shape parameters - the table replaces them entirely. (4) The description says 'fully customizable attack and release shapes drawn as lookup tables' (plural), suggesting there may be separate tables for attack and release phases. (5) middlePosition is 2000ms for both parameters, suggesting this envelope is designed for medium-to-long envelope shapes. (6) Monophonic default is 'dynamic'. Cross-reference: This is conceptually the most flexible envelope shape-wise (arbitrary curves), while AHDSR/FlexAHDSR offer parametric control over predefined stage types."
+}

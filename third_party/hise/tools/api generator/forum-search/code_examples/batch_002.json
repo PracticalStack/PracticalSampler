@@ -1,0 +1,512 @@
+[
+  {
+    "title": "Velocity-Sensitive Drum Pad Mouse Callback",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Panel mouse callback that triggers MIDI notes via Synth.addNoteOn and Synth.addNoteOff for chord playback. Mouse Y position maps to velocity, providing velocity-sensitive drum pad behavior with proper note-off on mouse release.",
+    "code": "const var pad = Content.getComponent(\"DrumPad1\");\n\npad.setMouseCallback(function(event)\n{\n\tvar ps = this.data.pitchSet;\n\tvar l = ps.length;\n\n\tif (event.clicked)\n\t{\n\t\tvar velocity = Math.round(event.y / this.getHeight() * 127);\n\t\tfor (var k = 0; k < l; k++)\n\t\t\tSynth.addNoteOn(1, ps[k], velocity, 0);\n\t}\n\n\tif (event.mouseUp)\n\t{\n\t\tfor (var k = 0; k < l; k++)\n\t\t\tSynth.addNoteOff(1, ps[k], 0);\n\t}\n});",
+    "url": "https://forum.hise.audio/topic/11556",
+    "featured": false
+  },
+  {
+    "title": "Server GET Request with Authentication",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "Server.callWithGET used for HTTP authentication with custom Content-Type header via Server.setHttpHeader. Demonstrates passing credentials as GET parameter and POST body to a REST API endpoint.",
+    "code": "Server.setBaseURL(\"https://api.example.com\");\nServer.setHttpHeader(\"Content-Type: text/plain\");\n\nServer.callWithGET(\"/customer/identity/sign-in?email=user@example.com\", \"myPassword\", function(status, obj)\n{\n\tConsole.print(status);\n\tConsole.print(trace(obj));\n});",
+    "url": "https://forum.hise.audio/topic/13634",
+    "featured": false
+  },
+  {
+    "title": "Regex Number Detection in Strings",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Engine.matchesRegex with a digit-only pattern (^\\\\d+$) to filter and parse numeric strings from a mixed array. Uses parseInt to convert matched strings to integers.",
+    "code": "const var strings = [\"brass\", \"001\", \"127\", \"flute\"];\n\nfor (s in strings)\n{\n if (Engine.matchesRegex(s, \"^\\\\d+$\")) Console.print(parseInt(s));\n}",
+    "url": "https://forum.hise.audio/topic/14363",
+    "featured": false
+  },
+  {
+    "title": "Flex AHDSR Envelope Full LAF Customization",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Complete Look and Feel customization for the FlexAHDSR envelope component using registerFunction for background, path, curve points, segments, and position indicator. Demonstrates layered glow rendering with beginLayer, gradient fills, and pulsing animation via Engine.getUptime.",
+    "code": "const var ft_Flex = Content.getComponent(\"ft_Flex\");\nconst var laf_flex = Content.createLocalLookAndFeel();\n\nlaf_flex.registerFunction(\"drawFlexAhdsrBackground\", function(g, obj)\n{\n\tg.setGradientFill([0xFF1a1a1a, 0, 0, 0xFF1a1a1a, 0, obj.area[3], false]);\n\tg.fillRect(obj.area);\n});\n\nlaf_flex.registerFunction(\"drawFlexAhdsrFullPath\", function(g, obj)\n{\n\tg.beginLayer(true);\n\n\tg.setColour(0x3333AAFF);\n\tg.drawPath(obj.path, obj.pathArea, 8.0);\n\n\tg.setColour(0x5533AAFF);\n\tg.drawPath(obj.path, obj.pathArea, 4.0);\n\n\tg.setColour(0xFF33AAFF);\n\tg.drawPath(obj.path, obj.pathArea, 2.0);\n\n\tg.setColour(Colours.white);\n\tg.drawPath(obj.path, obj.pathArea, 1.0);\n\n\tg.endLayer();\n\n\tvar fadeStart = obj.pathArea[1] + obj.pathArea[3] * 0.6;\n\tg.setGradientFill([0x5033AAFF, obj.pathArea[0], obj.pathArea[1],\n\t\t0x00ffffff, obj.pathArea[0], fadeStart, false]);\n\tg.fillPath(obj.path, obj.pathArea);\n});\n\nlaf_flex.registerFunction(\"drawFlexAhdsrCurvePoint\", function(g, obj)\n{\n\tvar pointSize = 8;\n\tvar halfSize = pointSize / 2;\n\n\tg.beginLayer(true);\n\tg.setColour(0x4433AAFF);\n\tg.fillEllipse([obj.curvePoint[0] - halfSize - 3, obj.curvePoint[1] - halfSize - 3,\n\t\tpointSize + 6, pointSize + 6]);\n\tg.endLayer();\n\n\tg.setGradientFill([0xFF66BBFF, obj.curvePoint[0] - halfSize, obj.curvePoint[1] - halfSize,\n\t\t0xFF1A7ACC, obj.curvePoint[0] + halfSize, obj.curvePoint[1] + halfSize, true]);\n\tg.fillEllipse([obj.curvePoint[0] - halfSize, obj.curvePoint[1] - halfSize, pointSize, pointSize]);\n\n\tg.setColour(0xFF33AAFF);\n\tg.drawEllipse([obj.curvePoint[0] - halfSize, obj.curvePoint[1] - halfSize, pointSize, pointSize], 1);\n\n\tvar innerSize = 3;\n\tvar innerHalf = innerSize / 2;\n\tg.setColour(0x88FFFFFF);\n\tg.fillEllipse([obj.curvePoint[0] - innerHalf, obj.curvePoint[1] - innerHalf, innerSize, innerSize]);\n});\n\nlaf_flex.registerFunction(\"drawFlexAhdsrSegment\", function(g, obj)\n{\n\tvar reducedArea = [obj.area[0] + 8, obj.area[1] + 8, obj.area[2] - 16, obj.area[3] - 16];\n\n\tif (obj.active)\n\t{\n\t\tg.setColour(0x4433AAFF);\n\t\tg.fillPath(obj.path, reducedArea);\n\n\t\tg.setColour(0x7733AAFF);\n\t\tg.drawPath(obj.path, reducedArea, 2.0);\n\t}\n\telse\n\t{\n\t\tg.setColour(0x1533AAFF);\n\t\tg.fillPath(obj.path, reducedArea);\n\t}\n});\n\nlaf_flex.registerFunction(\"drawFlexAhdsrPosition\", function(g, obj)\n{\n\tvar markerSize = 14;\n\tvar halfSize = markerSize / 2;\n\tvar pulseSize = markerSize + Math.sin(Engine.getUptime() * 8) * 2;\n\tvar pulseHalf = pulseSize / 2;\n\n\tg.beginLayer(true);\n\tg.setColour(0x4433AAFF);\n\tg.fillEllipse([obj.pointOnPath[0] - pulseHalf - 4, obj.pointOnPath[1] - pulseHalf - 4,\n\t\tpulseSize + 8, pulseSize + 8]);\n\tg.endLayer();\n\n\tg.setGradientFill([0xFF66BBFF, obj.pointOnPath[0] - halfSize, obj.pointOnPath[1] - halfSize,\n\t\t0xFF1A7ACC, obj.pointOnPath[0] + halfSize, obj.pointOnPath[1] + halfSize, true]);\n\tg.fillEllipse([obj.pointOnPath[0] - halfSize, obj.pointOnPath[1] - halfSize, markerSize, markerSize]);\n});\n\nft_Flex.setLocalLookAndFeel(laf_flex);",
+    "url": "https://forum.hise.audio/topic/13133",
+    "featured": true
+  },
+  {
+    "title": "Neural Amp Modeler File Loading",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions"
+    ],
+    "description": "Engine.createNeuralNetwork and loadNAMModel used to load a NAM JSON model file from the AudioFiles folder. Demonstrates the FileSystem API chain for loading neural network models in HISE.",
+    "code": "const var neuralNetwork = Engine.createNeuralNetwork(\"Plasma\");\nconst var namModel = FileSystem.getFolder(FileSystem.AudioFiles).getChildFile(\"Plasma.json\").loadAsObject();\n\nneuralNetwork.loadNAMModel(namModel);",
+    "url": "https://forum.hise.audio/topic/11136",
+    "featured": false
+  },
+  {
+    "title": "Wavetable Loading via Button Text",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Engine.loadAudioFilesIntoPool with Synth.getAudioSampleProcessor to load wavetable files by button name. Uses Content.getAllComponents to batch-assign a single setControlCallback to all matching buttons.",
+    "code": "Engine.loadAudioFilesIntoPool();\nconst var wt = Synth.getAudioSampleProcessor(\"Wavetable Synthesiser1\");\n\ninline function loadWavetable(component, value)\n{\n\twt.setFile(\"{PROJECT_FOLDER}\" + component.get(\"text\") + \".wav\");\n}\n\nfor (b in Content.getAllComponents(\"Button\"))\n\tb.setControlCallback(loadWavetable);",
+    "url": "https://forum.hise.audio/topic/14027",
+    "featured": false
+  },
+  {
+    "title": "Wavetable HWT Export",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Synth.getWavetableController and saveAsHwt used to export a precomputed HWT wavetable file. FileSystem.getFolder(FileSystem.AudioFiles) provides the output directory for the exported file.",
+    "code": "const wc = Synth.getWavetableController(\"Wavetable Synthesiser1\");\nconst dir = FileSystem.getFolder(FileSystem.AudioFiles);\nconst out = dir.getChildFile(\"MyWavetable.hwt\");\nwc.saveAsHwt(out);",
+    "url": "https://forum.hise.audio/topic/14027",
+    "featured": false
+  },
+  {
+    "title": "ComboBox Transparent Popup Menu LAF",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Custom Look and Feel for ComboBox popup menus using drawPopupMenuBackground with transparent fill and drawPopupMenuItem with rounded rectangle highlights. Demonstrates per-item styling with highlight state and custom text alignment.",
+    "code": "Content.makeFrontInterface(200, 200);\n\nconst var laf = Content.createLocalLookAndFeel();\n\nlaf.registerFunction(\"drawPopupMenuBackground\", function(g, obj)\n{\n\tg.setColour(0x00000000);\n\tg.fillRect([0, 0, 200, 200]);\n});\n\nlaf.registerFunction(\"drawPopupMenuItem\", function(g, obj)\n{\n\tvar a = obj.area;\n\tvar padArea = [a[0] + 2, a[1] + 2, a[2] - 4, a[3] - 4];\n\tg.setColour(obj.isHighlighted ? Colours.green : Colours.blue);\n\tg.fillRoundedRectangle(padArea, 8);\n\n\tvar textArea = [padArea[0] + 8, padArea[1], padArea[2] - 16, padArea[3]];\n\tg.setColour(Colours.white);\n\tg.setFont(\"Default\", 14.0);\n\tg.drawAlignedText(obj.text, textArea, \"left\");\n});\n\nconst var ComboBox1 = Content.getComponent(\"ComboBox1\");\nComboBox1.setLocalLookAndFeel(laf);",
+    "url": "https://forum.hise.audio/topic/6494",
+    "featured": false
+  },
+  {
+    "title": "SVG Logo Drawing on Panel",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted",
+      "solved"
+    ],
+    "description": "Content.createSVG with base64-encoded path data drawn on a dynamically created panel via setPaintRoutine and g.drawSVG. Shows the full workflow of creating an SVG, adding a panel with Content.addPanel, and rendering it.",
+    "code": "Content.makeFrontInterface(100, 100);\n\nconst var pathData = \"260.nT6K8CVlCT8A.H0Rk3ATIQOIYSfkMRTT9Afpx.lLtHfB6Z6ksFSUJT0vlJK.EbVJpUguquLTnXHEtqrJPciLg4S+NLGZRXbYf3.Szf9aHlOUJ2NiU7kuPTra3JBT3UJIvAhWP+M7qx3rDPg1YonTJoPtm4w5dbuWDZ.mZ80OUFQHA2M4T1eLBOfSXbhS8mXZ31fVu+5yAaOtSX8+pMvK6rzks.ZPxHJP4cLWy.j0LDpC.fgMhoviJeqv3pQkNdIFRQnm5.0HlJenz.QWMr7cPLCSLfexWqQroCgOsDH8UiH+Fv72EP+kAabjNmZAIYNHjb.xa1hrLd7DvYgazbTtKX1AfTA\";\nconst var pluginLogo = Content.createSVG(pathData);\n\nconst var logoPanel = Content.addPanel(\"logoPanel\", 2, 32);\nlogoPanel.set(\"width\", 96);\nlogoPanel.set(\"height\", 36);\nlogoPanel.set(\"saveInPreset\", false);\n\nlogoPanel.setPaintRoutine(function(g)\n{\n\tvar a = this.getLocalBounds(0);\n\tg.drawSVG(pluginLogo, a, 1.0);\n});",
+    "url": "https://forum.hise.audio/topic/13996",
+    "featured": false
+  },
+  {
+    "title": "Audio Pool File Browser with ComboBox",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted",
+      "solved"
+    ],
+    "description": "Engine.loadAudioFilesIntoPool combined with Synth.getAudioSampleProcessor to populate a ComboBox with pooled audio file names. Strips the PROJECT_FOLDER prefix and file extension for display, then loads the selected file via setFile on selection.",
+    "code": "const var audioFileList = Engine.loadAudioFilesIntoPool();\nconst var AudioReference = Synth.getAudioSampleProcessor(\"AudioReference\");\nconst var cmb_MatchLoader = Content.getComponent(\"cmb_MatchLoader\");\n\ncmb_MatchLoader.set(\"items\", \"\");\n\nfor (file in audioFileList)\n{\n\tvar displayName = file.replace(\"{PROJECT_FOLDER}\", \"\").replace(\".wav\", \"\");\n\tcmb_MatchLoader.addItem(displayName);\n}\n\ninline function oncmb_MatchLoaderControl(component, value)\n{\n\tif (value > 0)\n\t{\n\t\tAudioReference.setFile(audioFileList[value - 1]);\n\t}\n}\n\ncmb_MatchLoader.setControlCallback(oncmb_MatchLoaderControl);",
+    "url": "https://forum.hise.audio/topic/13579",
+    "featured": false
+  },
+  {
+    "title": "Keyboard Key Colour Range Setup",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "Engine.setKeyColour used in loops to visually distinguish active from inactive key ranges on the virtual keyboard. Darkens keys outside the playable range and highlights the active zone with a semi-transparent overlay.",
+    "code": "Content.makeFrontInterface(600, 400);\n\nfor (var i = 0; i < 50; i++)\n\tEngine.setKeyColour(i, 0x88000000);\n\nfor (var i = 50; i < 90; i++)\n\tEngine.setKeyColour(i, 0x22ffffff);\n\nfor (var i = 90; i < 128; i++)\n\tEngine.setKeyColour(i, 0x88000000);",
+    "url": "https://forum.hise.audio/topic/7567",
+    "featured": false
+  },
+  {
+    "title": "Dynamic ScriptNode Effect Chain Ordering",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "Engine.createDspNetwork with dsp.get and setParent to dynamically reorder effects within named container slots at runtime. Demonstrates creating a scriptable signal chain where effects can be moved between slots or removed using index -1.",
+    "code": "// Create a DSP Network\nconst var dsp = Engine.createDspNetwork(\"dsp\") ;\n\n// Create a list of all effects that you want to assign\nconst var fx = [dsp.get(\"reverb\"), dsp.get(\"delay\")];\n\n// Create the ID list for the slots \n// (they are just simple containers but it helps avoiding\n// fiddling with the indexes)\nconst var slots = [\"slot1\", \"slot2\"];\n\n// This function will take an array with slot indexes\n// and move them into the slots defined above\ninline function setOrder(order)\n{\n local i = 0;\n \n for(i = 0; i < order.length; i++)\n { \n local idx = order[i];\n fx[i].setParent(slots[idx], 0);\n }\n}\n\n// Use -1 to remove the effect (not assign it to anything)\nsetOrder([-1, -1]);\n\nsetOrder([0, -1]);\n\nsetOrder([1, 0]);",
+    "url": "https://forum.hise.audio/topic/4540",
+    "featured": true
+  },
+  {
+    "title": "CSS Styled Label with Inline Stylesheet",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Content.createLocalLookAndFeel with setInlineStyleSheet to apply CSS styling to a Label component. Covers label, input, and ::selection selectors with properties like letter-spacing, text-shadow, caret-color, and padding for a fully styled text input.",
+    "code": "Content.makeFrontInterface(200, 50);\n\nconst var Label1 = Content.getComponent(\"Label1\");\n\nconst var lblCss = Content.createLocalLookAndFeel();\n\nLabel1.set(\"text\", \"CSS Label\");\n\n// Email/Key Label Laf\nlblCss.setInlineStyleSheet(\"\n*\n{\n\tletter-spacing: 2px;\n\tfont-weight: regular;\n}\n\n/** Render the default appearance. */\nlabel\n{\n\tbackground-color: var(--bgColour);\n\tcolor: var(--textColour);\t\n\tborder-radius: 5px;\n\tpadding-left: 50px;\n\tpadding-right: 20px;\n\ttext-shadow: 2px 2px 5px rgba(0,0,0,0.3);\n}\n\n/** If you edit the text, it will use this selector. */\ninput\n{\n\n\ttext-align: left;\n\tpadding-top: 0.5px;\n\tpadding-left: 50px;\n\tpadding-right: 20px;\n\tcaret-color: white;\n\tfont-weight: bold;\n}\n\n/** Style the text selection with this selector. */\n::selection\n{\n\tbackground: #50FFFFFF;\n\tcolor: white;\n}\n\");\n\nLabel1.setLocalLookAndFeel(lblCss);",
+    "url": "https://forum.hise.audio/topic/12329",
+    "featured": false
+  },
+  {
+    "title": "Floating Tile Child Tooltips with CSS Selectors",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "setChildTooltips used to assign descriptive tooltips to individual sub-components of a floating tile via CSS-style selectors (.class, #id). Enables targeted tooltip assignment for complex composite UI elements like the modulation matrix.",
+    "code": "const var ft = Content.getComponent(\"Matrix\");\n\nft.setChildTooltips({\n \".search\": \"A search bar that can be used to filter modulation connections\",\n \"#intensity\": \"Changes the intensity of the modulation connection\",\n \".plotter\": \"Displays a histogram of the modulation signal for this connection\"\n});",
+    "url": "https://forum.hise.audio/topic/13417",
+    "featured": false
+  },
+  {
+    "title": "SVG Icon in Peak Meter LAF",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Content.createSVG with drawMatrixPeakMeter LAF callback to render an SVG icon scaled by peak level. Uses g.drawSVG with obj.peaks[0] as the opacity parameter for level-reactive icon display.",
+    "code": "const var pathData = \"120.nT6K8Chk8M..hbDFZ.WRUPRZBsZfxFMXFn5Hz0UGZ5Dowuze8avFFo0Ltmiz9DIEbFjIJkyQ5qYbYlM6RAhDnQ5t2cvBojcT74TrnW8fuibtFBkMJq7QKPBspM0yB.bjjsZJld1bDSdn05ZFOM..Qw.nLCKr30rL\"\nconst icon = Content.createSVG(pathData);\n\nconst peakMeterLaf = Content.createLocalLookAndFeel();\n\npeakMeterLaf.registerFunction(\"drawMatrixPeakMeter\", function(g, obj)\n{\n\tg.drawSVG(icon, obj.area, obj.peaks[0]);\n});",
+    "url": "https://forum.hise.audio/topic/13413",
+    "featured": false
+  },
+  {
+    "title": "Random User Preset Loader",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Engine.getUserPresetList with Math.randInt to load a random user preset on button press via Engine.loadUserPreset. Demonstrates a complete random preset selection pattern with control callback.",
+    "code": "const var myPresetList = Engine.getUserPresetList();\n\ninline function onRandomPresetControl(component, value)\n{\n\tlocal myRandName = myPresetList[Math.randInt(0, myPresetList.length)];\n\tEngine.loadUserPreset(myRandName);\n}\n\nContent.getComponent(\"RandomPreset\").setControlCallback(onRandomPresetControl);",
+    "url": "https://forum.hise.audio/topic/4666",
+    "featured": false
+  },
+  {
+    "title": "Windows Machine GUID via Background Task",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Engine.createBackgroundTask with runProcess to execute a Windows registry query for the MachineGuid. Demonstrates running an external process asynchronously with a completion callback that parses the output string.",
+    "code": "const var BackgroundTask = {};\n\nBackgroundTask.getMachineGuid = Engine.createBackgroundTask(\"GetMachineGUID\");\n\ninline function getMachineGuid()\n{\n\tlocal command = \"reg\";\n\tlocal args =\n\t[\n\t\t\"query\",\n\t\t\"HKEY_LOCAL_MACHINE\\\\SOFTWARE\\\\Microsoft\\\\Cryptography\",\n\t\t\"/v\",\n\t\t\"MachineGuid\"\n\t];\n\n\tlocal logFunction = function(thread, isFinished, data)\n\t{\n\t\tif (!isFinished)\n\t\t{\n\t\t\tvar id = data.substring(data.indexOf(\"REG_SZ\") + 6, data.length).trim();\n\t\t\tConsole.print(id);\n\t\t}\n\t};\n\n\tBackgroundTask.getMachineGuid.runProcess(command, args, logFunction);\n}\n\ngetMachineGuid();",
+    "url": "https://forum.hise.audio/topic/10923",
+    "featured": false
+  },
+  {
+    "title": "Knob with Modulation Arc Display",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "connectToModulatedParameter used to enable modulation arc rendering on a ScriptSlider without changing its control behavior. Requires both the connectToModulatedParameter call and matching processorId/parameterId properties.",
+    "code": "const var Knob1 = Content.getComponent(\"Knob1\");\n\n// This function only enables the modulation display, you'll still need to\n// hook it up to change the parameter below\nKnob1.connectToModulatedParameter(\"Filter1\", \"Frequency\");\n\n// Connect the knob with the properties (or attach a callback)\n// This is still required.\nKnob1.set(\"processorId\", \"Filter1\");\nKnob1.set(\"parameterId\", \"Frequency\");",
+    "url": "https://forum.hise.audio/topic/13298",
+    "featured": false
+  },
+  {
+    "title": "Viewport Scroll Position Timer Workaround",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert"
+    ],
+    "description": "Engine.createTimerObject used as a one-shot timer to set a Viewport scroll position after initialization. Demonstrates the pattern of deferring a property change via a short timer with stopTimer in the callback.",
+    "code": "const var Viewport1 = Content.getComponent(\"Viewport1\");\nconst var t = Engine.createTimerObject();\n\nt.setTimerCallback(function()\n{\n\tViewport1.set(\"viewPositionY\", 0.5);\n\tt.stopTimer();\n});\n\nt.startTimer(100);",
+    "url": "https://forum.hise.audio/topic/11852",
+    "featured": false
+  },
+  {
+    "title": "Modwheel and Pitchwheel Visual Display",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "Panel paint routines driven by onController MIDI callback to display modwheel (CC1) and pitchwheel (CC128) positions as filled bar graphs. Uses Synth.deferCallbacks to safely update graphics from the controller callback, with repaint triggered by setValue/repaint pattern.",
+    "code": "Content.makeFrontInterface(600, 500);\n\nSynth.deferCallbacks(true);\n\nconst var ModwheelDisplay = Content.addPanel(\"ModwheelDisplay\", 38, 60);\nContent.setPropertiesFromJSON(\"ModwheelDisplay\", {\n\t\"width\": 50,\n\t\"height\": 180\n});\n\nconst var PitchWheelDisplay = Content.addPanel(\"PitchWheelDisplay\", 110, 60);\nContent.setPropertiesFromJSON(\"PitchWheelDisplay\", {\n\t\"width\": 50,\n\t\"height\": 180\n});\n\nModwheelDisplay.setPaintRoutine(function(g)\n{\n\tg.fillAll(0xFF222222);\n\tg.setColour(0xFF666666);\n\n\tvar h = this.getValue() * this.getHeight();\n\tg.fillRect([0, this.getHeight() - h, this.getWidth(), h]);\n});\n\nPitchWheelDisplay.setPaintRoutine(function(g)\n{\n\tg.fillAll(0xFF222222);\n\tg.setColour(0xFF666666);\n\n\tvar h = 0.5 - this.getValue();\n\tvar offset = Math.min(1.0 - this.getValue(), 0.5) * this.getHeight();\n\tg.fillRect([0, offset, this.getWidth(), Math.abs(h) * this.getHeight()]);\n});\n\nfunction onController()\n{\n\tif (Message.getControllerNumber() == 1)\n\t{\n\t\tModwheelDisplay.setValue(Message.getControllerValue() / 127.0);\n\t\tModwheelDisplay.repaint();\n\t}\n\tif (Message.getControllerNumber() == 128)\n\t{\n\t\tPitchWheelDisplay.setValue(Message.getControllerValue() / 127.0 / 127.0);\n\t\tPitchWheelDisplay.repaint();\n\t}\n}",
+    "url": "https://forum.hise.audio/topic/445",
+    "featured": true
+  },
+  {
+    "title": "MIDI Player Note Rectangle Display",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Synth.getMidiPlayer with getNoteRectangleList and connectToPanel for a custom MIDI note visualization. Scales note positions to fill the panel height based on pitch range, draws rounded rectangles with outlines, and shows a playback position line updated via setRepaintOnPositionChange.",
+    "code": "Content.makeFrontInterface(300, 200);\n\nconst var MIDIPlayer1 = Synth.getMidiPlayer(\"MIDI Player1\");\nconst var pnl_MidiDisplay = Content.getComponent(\"pnl_MidiDisplay\");\n\npnl_MidiDisplay.setPaintRoutine(function(g)\n{\n\tg.fillAll(this.get(\"bgColour\"));\n\n\tvar noteList = MIDIPlayer1.getNoteRectangleList([0, 0, this.getWidth(), this.getHeight()]);\n\tvar minNote = 127;\n\tvar maxNote = 0;\n\n\tif (!MIDIPlayer1.isEmpty() && noteList.length > 0)\n\t{\n\t\tfor (note in noteList)\n\t\t{\n\t\t\tvar noteNumber = note[1];\n\t\t\tminNote = Math.min(minNote, noteNumber);\n\t\t\tmaxNote = Math.max(maxNote, noteNumber);\n\t\t}\n\n\t\tvar noteRange = Math.max(1, maxNote - minNote);\n\t\tvar panelHeight = this.getHeight();\n\t\tvar availableSpace = panelHeight / (noteRange + 1);\n\t\tvar noteHeight = Math.max(8, availableSpace);\n\n\t\tfor (note in noteList)\n\t\t{\n\t\t\tvar xPos = note[0];\n\t\t\tvar originalNoteNum = note[1];\n\t\t\tvar width = note[2];\n\n\t\t\tvar normalizedPos = (originalNoteNum - minNote) / noteRange;\n\t\t\tvar yPos = normalizedPos * (panelHeight - noteHeight);\n\n\t\t\tvar noteRect = [xPos, yPos, width, noteHeight];\n\n\t\t\tg.setColour(this.get(\"itemColour\"));\n\t\t\tg.fillRoundedRectangle(noteRect, 2.0);\n\n\t\t\tg.setColour(0xAAFFFFFF);\n\t\t\tg.drawRoundedRectangle(noteRect, 1.0, 1.0);\n\t\t}\n\t}\n\n\tvar playbackPos = MIDIPlayer1.getPlaybackPosition() * this.getWidth();\n\tg.setColour(this.get(\"itemColour2\"));\n\tg.drawLine(playbackPos, playbackPos, 0.0, this.getHeight(), 2.0);\n});\n\nMIDIPlayer1.connectToPanel(pnl_MidiDisplay);\nMIDIPlayer1.setRepaintOnPositionChange(true);",
+    "url": "https://forum.hise.audio/topic/13081",
+    "featured": true
+  },
+  {
+    "title": "Global Routing Data Cable Send",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted",
+      "solved"
+    ],
+    "description": "Engine.getGlobalRoutingManager with getCable and sendData to transmit JSON data objects between ScriptFX modules and the UI via global routing cables. Demonstrates the sender side of a cross-module data communication pattern.",
+    "code": "const var RoutingManager = Engine.getGlobalRoutingManager();\nconst var DataCable = RoutingManager.getCable(\"dataCable\");\n\nconst var data = {\"level\": 0.0};\n\ninline function onKnob1Control(component, value)\n{\n\tdata.level = value;\n\tDataCable.sendData(data);\n}\n\nContent.getComponent(\"Knob1\").setControlCallback(onKnob1Control);",
+    "url": "https://forum.hise.audio/topic/10657",
+    "featured": false
+  },
+  {
+    "title": "Effect Bypass with Button Callback",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Synth.getEffect with setBypassed toggled from a button control callback via setControlCallback. Shows the complete pattern for scripted effect bypass control including the generic script reference.",
+    "code": "const var ParametriqEQ1 = Synth.getEffect(\"Parametriq EQ1\");\nconst var Button1 = Content.getComponent(\"Button1\");\n\ninline function onButton1Control(component, value)\n{\n ParametriqEQ1.setBypassed(value);\n};\n\nContent.getComponent(\"Button1\").setControlCallback(onButton1Control);",
+    "url": "https://forum.hise.audio/topic/12902",
+    "featured": false
+  },
+  {
+    "title": "Custom Keyboard Image-Based LAF",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "drawWhiteNote and drawBlackNote LAF functions using loadImage and drawImage to render a custom keyboard with separate up/down state images. Uses a namespace wrapper and FloatingTile local look and feel for the keyboard component.",
+    "code": "namespace LafRealKeyboard\n{\n\tconst var FloatingTile1 = Content.getComponent(\"FloatingTile1\");\n\tconst var Laf_RealKeys = Content.createLocalLookAndFeel();\n\n\tLaf_RealKeys.loadImage(\"{PROJECT_FOLDER}WHITE KEY - UP 11.png\", \"WhiteUp\");\n\tLaf_RealKeys.loadImage(\"{PROJECT_FOLDER}WHITE KEY - DOWN 11.png\", \"WhiteDown\");\n\tLaf_RealKeys.loadImage(\"{PROJECT_FOLDER}BLACK KEY - UP 11.png\", \"BlackUp\");\n\tLaf_RealKeys.loadImage(\"{PROJECT_FOLDER}BLACK KEY - DOWN 11.png\", \"BlackDown\");\n\n\tLaf_RealKeys.registerFunction(\"drawWhiteNote\", function(g, obj)\n\t{\n\t\tvar a = obj.area;\n\n\t\tif (obj.down)\n\t\t\tg.drawImage(\"WhiteDown\", a, 0, 0);\n\t\telse\n\t\t\tg.drawImage(\"WhiteUp\", a, 0, 0);\n\t});\n\n\tLaf_RealKeys.registerFunction(\"drawBlackNote\", function(g, obj)\n\t{\n\t\tvar a = obj.area;\n\n\t\tif (obj.down)\n\t\t\tg.drawImage(\"BlackDown\", [a[0], a[1], a[2], a[3] + 10], 0, 0);\n\t\telse\n\t\t\tg.drawImage(\"BlackUp\", a, 0, 0);\n\t});\n\n\tFloatingTile1.setLocalLookAndFeel(Laf_RealKeys);\n}",
+    "url": "https://forum.hise.audio/topic/12639",
+    "featured": true
+  },
+  {
+    "title": "Background Task Kill Voices",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "Engine.createBackgroundTask with killVoicesAndCall to safely execute heavyweight operations on the sample loading thread after killing all active voices. Used for operations like sample map loading that require voice silence.",
+    "code": "const var bt = Engine.createBackgroundTask(\"MyTask\");\n\nbt.killVoicesAndCall(function()\n{\n\tConsole.print(\"I'm on the sample loading thread\");\n\t\n\t// Uncomment this to verify that the stacktrace is on \n\t// the sample loading thread (only in Debug mode obviously)\n\t//Console.breakInDebugger();\n});",
+    "url": "https://forum.hise.audio/topic/5462",
+    "featured": false
+  },
+  {
+    "title": "Note Range Key Filter",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Message.getNoteNumber with Message.ignoreEvent in onNoteOn to restrict playback to a defined key range. Notes outside the LOW_KEY to HIGH_KEY range are silently ignored.",
+    "code": "const var LOW_KEY = 36;\nconst var HIGH_KEY = 84;\n\nfunction onNoteOn()\n{\n\tlocal note = Message.getNoteNumber();\n\n\tif (note < LOW_KEY || note > HIGH_KEY)\n\t\tMessage.ignoreEvent(true);\n}",
+    "url": "https://forum.hise.audio/topic/12550",
+    "featured": false
+  },
+  {
+    "title": "Panel as DAW Plugin Parameter",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "ScriptPanel configured as a plugin parameter with isPluginParameter and pluginParameterName properties, using Engine.createUserPresetHandler with sendParameterGesture for proper DAW automation gesture reporting. Includes mouse drag interaction with setValue/changed pattern and preprocessor guard for HISE_SEND_PANEL_CHANGED_TO_PLUGIN_PARAMETER.",
+    "code": "Content.makeFrontInterface(600, 600);\n\nconst var Panel1 = Content.addPanel(\"Panel1\", 0, 0);\n\nPanel1.setPaintRoutine(function(g)\n{\n\tg.fillAll(0x22FFFFFF);\n\tg.setColour(Colours.white);\n\tg.drawAlignedText(Engine.doubleToString(this.getValue(), 2), this.getLocalBounds(0), \"centred\");\n});\n\nPanel1.set(\"allowCallbacks\", \"All Callbacks\");\nPanel1.set(\"isPluginParameter\", true);\nPanel1.set(\"pluginParameterName\", \"My Parameter\");\n\nconst var CUSTOM = 0;\nconst var MACRO = 1;\nconst var SCRIPT = 2;\n\nconst var PANEL_PARAMETER_INDEX = Content.getAllComponents(\".*\").indexOf(Panel1);\nconst var uph = Engine.createUserPresetHandler();\n\nPanel1.setMouseCallback(function(event)\n{\n\tif (event.clicked && !event.drag && !event.rightClick)\n\t{\n\t\tthis.data.down = true;\n\t\tthis.data.downValue = this.getValue();\n\t\tuph.sendParameterGesture(SCRIPT, PANEL_PARAMETER_INDEX, true);\n\t}\n\n\tif (event.mouseUp && !event.rightClick && this.data.down)\n\t{\n\t\tuph.sendParameterGesture(SCRIPT, PANEL_PARAMETER_INDEX, false);\n\t\tthis.data.down = false;\n\t}\n\n\tif (event.drag)\n\t{\n\t\tvar nv = Math.range(this.data.downValue - event.dragY / 200.0, 0.0, 1.0);\n\t\tthis.setValue(nv);\n\t\tthis.changed();\n\t}\n});\n\ninline function onPanel1Control(component, value)\n{\n\tConsole.print(value);\n\tcomponent.repaint();\n}\n\nContent.getComponent(\"Panel1\").setControlCallback(onPanel1Control);",
+    "url": "https://forum.hise.audio/topic/12534",
+    "featured": true
+  },
+  {
+    "title": "Broadcaster Tooltip with Delayed Show",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author",
+      "solved"
+    ],
+    "description": "Engine.createBroadcaster with attachToComponentMouseEvents and addDelayedListener to implement a hovering tooltip that appears after 500ms of mouse inactivity. Tracks global mouse position via getGlobalPositionX/Y and repositions a hidden panel on delayed callback.",
+    "code": "const var TooltipWatcher = Engine.createBroadcaster({\n\t\"id\": \"tooltip\",\n\t\"args\": [\"component\", \"event\"]\n});\n\n// Some rando panel\nconst var TooltipPanel = Content.addPanel(\"TooltipPanel\", 0, 0);\n\n// disable it so it doesn't receive mouse events\nTooltipPanel.set(\"enabled\", false);\n\n// attach all components to the mouse event broadcaster (this is a brute force solution and\n// you might want to customize this for larger projects)\nTooltipWatcher.attachToComponentMouseEvents(Content.getAllComponents(\".*\"), \"All Callbacks\", \"mouse events\");\n\n// Keep the mouse position\nvar MOUSE_POS = [0, 0];\n\n// This function will be called whenever the mouse is hovered over a component\n// it stores the (global) mouse position and hides the panel if the mouse exits\n// any component\nTooltipWatcher.addListener(TooltipPanel, \"hide tooltip\", function(component, event)\n{\t\t\n\tMOUSE_POS = [component.getGlobalPositionX() + event.x, \t\n\t\t\t component.getGlobalPositionY() + event.y];\n\t\t\n\tif(!event.hover)\t\n\t\tthis.set(\"visible\", false);\t\n});\n\n// This function will be called after half a second and shows and repositions the\n// tooltip when the mouse position hasn't changed much in the last time\nTooltipWatcher.addDelayedListener(500, TooltipPanel, \"show tooltip\", function(component, event)\n{\t\n\t// if this is true for the last callback, we don't want to show the tooltip\n\tif(!event.hover)\n\t\treturn;\n\t\n\tvar pos = [component.getGlobalPositionX() + event.x, \t\n\t\t\t component.getGlobalPositionY() + event.y];\n\t\n\tif(Math.abs(MOUSE_POS[0] - pos[0]) < 10 &&\n\t Math.abs(MOUSE_POS[0] - pos[0]) < 10)\n\t{\n\t\tthis.set(\"visible\", true);\n\t\tthis.set(\"x\", pos[0]+10);\n\t\tthis.set(\"y\", pos[1]+10);\n\t}\n});",
+    "url": "https://forum.hise.audio/topic/7083",
+    "featured": true
+  },
+  {
+    "title": "Loris Spectral Pitch Lock Function",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "Inline function for Loris spectral processing that locks partial frequencies to the nearest harmonic ratio of the root frequency. Interpolates between locked and original frequencies using a pitchLockAmount factor, with separate noiseGain control for bandwidth.",
+    "code": "inline function pitchLock(obj)\n{\n // Repitch\n obj.frequency *= pitchFactor;\n\t\t\n // Apply noise gain (bandwidth is the noise amount, 1 = full noise, 0 = pure sinusoidal)\n obj.bandwidth *= noiseGain;\n\n // calculate the \"real\" harmonic\n local ratio = Math.round(obj.frequency / obj.rootFrequency);\n\n // calculate the fully locked frequency\n local lockedFrequency = ratio * obj.rootFrequency;\n\n // interpolate between the locked and original frequency \n obj.frequency = pitchLockAmount * lockedFrequency + (1.0 - pitchLockAmount) * obj.frequency;\n}",
+    "url": "https://forum.hise.audio/topic/7434",
+    "featured": false
+  },
+  {
+    "title": "Timestretch Tempo Sync via Transport Handler",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert"
+    ],
+    "description": "Engine.createTransportHandler with setOnTempoChange callback to dynamically adjust Synth.getSampler timestretch ratio based on host tempo. Uses getTimestretchOptions and setTimestretchOptions to configure SkipLatency before enabling tempo-synced playback.",
+    "code": "const var Sampler1 = Synth.getSampler(\"Sampler1\");\n\nconst th = Engine.createTransportHandler();\n\nth.setOnTempoChange(true, updateTimeStretchRatio);\n\n// fetch the current state\nconst var obj = Sampler1.getTimestretchOptions();\n\n// Apply your changes\nobj.SkipLatency = true;\n\n// Update the options\nSampler1.setTimestretchOptions(obj);\n\ninline function updateTimeStretchRatio(newTempo)\n{\n\tlocal ratio = newTempo / 140;\n\tSampler1.setTimestretchRatio(ratio);\t\t\t \n}",
+    "url": "https://forum.hise.audio/topic/11867",
+    "featured": false
+  },
+  {
+    "title": "Quadrilateral Path Drawing",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Content.createPath with addQuadrilateral to draw a four-sided polygon (trapezoid) from corner point arrays. Demonstrates the simplified path construction compared to manual startNewSubPath/lineTo sequences.",
+    "code": "const var Panel1 = Content.getComponent(\"Panel1\");\n\nPanel1.setPaintRoutine(function(g)\n{\n\tg.fillAll(Colours.white);\n\n\tvar p =\n\t[\n\t\t[50, 150],\n\t\t[150, 150],\n\t\t[125, 50],\n\t\t[75, 50]\n\t];\n\n\tvar path = Content.createPath();\n\tpath.addQuadrilateral(p[0], p[1], p[2], p[3]);\n\n\tg.setColour(Colours.blue);\n\tg.fillPath(path, path.getBounds(1.0));\n});",
+    "url": "https://forum.hise.audio/topic/11671",
+    "featured": false
+  },
+  {
+    "title": "Bipolar Pan Slider LAF",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "drawLinearSlider LAF with bipolar fill rendering from center point for a pan-style slider. Calculates fill direction based on whether value is left or right of center, with a draggable handle showing the numeric display value.",
+    "code": "Content.makeFrontInterface(450, 100);\n\nconst var SLIDER = Content.getComponent(\"SLIDER\");\nconst var knblaf = Content.createLocalLookAndFeel();\n\nknblaf.registerFunction(\"drawLinearSlider\", function(g, obj)\n{\n\tvar a = obj.area;\n\tvar handle = a[2] / 6;\n\tvar mid = a[2] / 2;\n\tvar n = (a[2] - handle) / a[2];\n\n\tvar bipolarValue = obj.valueNormalized * 2 - 1;\n\tvar v = mid + (bipolarValue * mid * n);\n\n\tg.setColour(Colours.black);\n\tg.fillRoundedRectangle(a, a[3] * 0.5);\n\n\tif (bipolarValue >= 0)\n\t{\n\t\tg.setColour(Colours.lightgrey);\n\t\tg.fillRoundedRectangle([mid, 0, v - mid, a[3]], a[3] * 0.5);\n\t}\n\telse\n\t{\n\t\tg.setColour(Colours.lightgrey);\n\t\tg.fillRoundedRectangle([v, 0, mid - v, a[3]], a[3] * 0.5);\n\t}\n\n\tg.setColour(Colours.whitesmoke);\n\tg.fillRoundedRectangle([v - handle / 2, 0, handle, a[3]], a[3] * 0.5);\n\n\tg.setColour(Colours.black);\n\tvar displayValue = Math.round(bipolarValue * 100);\n\tg.drawAlignedText(Engine.doubleToString(displayValue, 0), [v - handle / 2, 0, handle, a[3]], \"centred\");\n});\n\nSLIDER.setLocalLookAndFeel(knblaf);\nSLIDER.set(\"min\", -100);\nSLIDER.set(\"max\", 100);\nSLIDER.set(\"mode\", \"Pan\");",
+    "url": "https://forum.hise.audio/topic/11641",
+    "featured": true
+  },
+  {
+    "title": "Audio Waveform Render Options LAF",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "getThumbnailRenderOptions LAF callback to customize audio waveform rendering quality by adjusting manualDownSampleFactor. Allows overriding the default downsampling for smoother waveform display in ScriptAudioWaveform components.",
+    "code": "const var AudioWaveform1 = Content.getComponent(\"AudioWaveform1\");\nconst var laf = Content.createLocalLookAndFeel();\n\nlaf.registerFunction(\"getThumbnailRenderOptions\", function(obj)\n{\n\tobj.manualDownSampleFactor = 4.0;\n\treturn obj;\n});\n\nAudioWaveform1.setLocalLookAndFeel(laf);",
+    "url": "https://forum.hise.audio/topic/8603",
+    "featured": false
+  },
+  {
+    "title": "Broadcaster-Based Tab Switcher Panel",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert",
+      "solved"
+    ],
+    "description": "Namespace utility using Engine.createBroadcaster with attachToComponentValue and addComponentPropertyListener to create a tab-switching system. Automatically discovers child panels via getChildComponents and toggles visibility based on a switcher panel's value.",
+    "code": "namespace SwitcherPanel\n{\n\tinline function create(panelId: string, switcherId: string, componentType: string)\n\t{\n\t\tlocal panel = Content.getComponent(panelId);\n\t\tlocal children = [];\n\t\t\n\t\tfor (x in panel.getChildComponents())\n\t\t{\n\t\t\tif (x.getId() == switcherId)\n\t\t\t\tcontinue;\n\n\t\t\tif ((componentType == \"all\" || x.get(\"type\") == componentType) && x.get(\"parentComponent\") == panelId)\n\t\t\t\tchildren.push(x.getId());\n\t\t}\n\n\t\t// Broadcaster definition\n\t\tpanel.data.bc = Engine.createBroadcaster({id: panelId.replace(\"pnl\") + \"SwitcherPanel\", args: [\"component\", \"value\"]});\n\t\tpanel.data.bc.attachToComponentValue(switcherId, \"Value\");\n\n\t\tpanel.data.bc.addComponentPropertyListener(children, \"visible\", \"Change tab visibility\", function(index, component, value)\n\t\t{\n\t\t\treturn value == index || index == -1;\n\t\t});\n\n\t\treturn panel;\n\t}\n}",
+    "url": "https://forum.hise.audio/topic/11491",
+    "featured": false
+  },
+  {
+    "title": "WebView MIDI Controller Forwarding",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions"
+    ],
+    "description": "WebView callFunction used in onController to forward MIDI CC data to a WebView's JavaScript context. Passes controller number and value as a JSON object for web-based MIDI visualization or control mapping.",
+    "code": "const var WebView1 = Content.getComponent(\"WebView1\");\n\nfunction onController()\n{\n\tWebView1.callFunction(\"updateCC\", {\n\t\t\"cc\": Message.getControllerNumber(),\n\t\t\"value\": Message.getControllerValue()\n\t});\n}",
+    "url": "https://forum.hise.audio/topic/11413",
+    "featured": false
+  },
+  {
+    "title": "Loris Cross-Synthesis Pitch Shift",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions"
+    ],
+    "description": "Engine.getLorisManager with analyse, createEnvelopePaths, and process to perform cross-synthesis between two audio files. Extracts frequency envelopes from one file and applies them as pitch shift to another, then synthesises and exports the result.",
+    "code": "const var lorisManager = Engine.getLorisManager();\n\nconst var file_1 = FileSystem.getFolder(FileSystem.AudioFiles).getChildFile(\"deep_piano_noise.wav\");\nconst var file_2 = FileSystem.getFolder(FileSystem.AudioFiles).getChildFile(\"SonidoVoz.wav\");\n\nlorisManager.set(\"timedomain\", \"0to1\");\nlorisManager.set(\"enablecache\", \"False\");\n\nlorisManager.analyse(file_1, 40);\nvar frequencyEnvelope = lorisManager.createEnvelopePaths(file_1, \"frequency\", -1);\n\nlorisManager.analyse(file_2, 40);\nlorisManager.process(file_2, \"shiftPitch\", frequencyEnvelope);\n\nvar modifiedBuffer = lorisManager.synthesise(file_2);\n\nFileSystem.getFolder(FileSystem.Desktop).getChildFile(\"ChangedAudio.wav\").writeAudioFile(modifiedBuffer, 44100, 24);",
+    "url": "https://forum.hise.audio/topic/11389",
+    "featured": false
+  },
+  {
+    "title": "File Browser for IR Sample Loading",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "FileSystem.browse with a wildcard filter and callback to let users select an IR sample file at runtime. Demonstrates the browse-to-load pattern for impulse response files with an inline function button callback.",
+    "code": "inline function onLoadIRSampleControl(component, value)\n{\n\tif (value)\n\t{\n\t\tFileSystem.browse(FileSystem.getFolder(FileSystem.UserHome), false, \"*.wav\", function(result)\n\t\t{\n\t\t\tif (isDefined(result))\n\t\t\t{\n\t\t\t\tConsole.print(result.toString(0));\n\t\t\t\t// Load the selected IR file into your convolution reverb here\n\t\t\t}\n\t\t});\n\t}\n}\n\nContent.getComponent(\"LoadIRSample\").setControlCallback(onLoadIRSampleControl);",
+    "url": "https://forum.hise.audio/topic/11365",
+    "featured": false
+  },
+  {
+    "title": "Viewport Table Mode with Columns and Callbacks",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "Viewport setTableMode, setTableColumns, and setTableRowData to create a data table with Text, Button, and Slider column types. Includes setTableCallback for handling row click interactions on the table data.",
+    "code": "const var Viewport1 = Content.getComponent(\"Viewport1\");\n\nViewport1.setTableMode({\n\t\"RowHeight\": 24\n});\n\nViewport1.setTableColumns([\n{\n\t\"ID\": \"FirstID\",\n\t\"Label\": \"First Column\",\n\t\"Type\": \"Text\",\n\t\"Width\": 200\n},\n{\n\t\"ID\": \"SecondID\",\n\t\"Label\": \"Buttonz\",\n\t\"Type\": \"Button\",\n\t\"Text\": \"OK\",\n\t\"Toggle\": true,\n\t\"Width\": 60\n},\n{\n\t\"ID\": \"ThirdID\",\n\t\"Type\": \"Slider\",\n\t\"MaxValue\": 5.0,\n\t\"StepSize\": 1.0,\n\t\"Width\": 80\n}]);\n\nViewport1.setTableRowData([\n\t{\"FirstID\": \"Some Text\", \"SecondID\": true, \"ThirdID\": 3.0},\n\t{\"FirstID\": \"Some other Text\", \"SecondID\": false, \"ThirdID\": 1.0},\n\t{\"FirstID\": \"Last line!\", \"SecondID\": true, \"ThirdID\": 4.0}\n]);\n\ninline function onTableCallback(obj)\n{\n\tif (obj.Type == \"Click\")\n\t\tConsole.print(\"Clicked on \" + obj.rowIndex);\n}\n\nViewport1.setTableCallback(onTableCallback);",
+    "url": "https://forum.hise.audio/topic/6026",
+    "featured": true
+  },
+  {
+    "title": "Display Buffer Waveform Visualization",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted",
+      "solved"
+    ],
+    "description": "Synth.getDisplayBufferSource with getDisplayBuffer and setRingBufferProperties to visualize a hardcoded effect's audio output. Uses createPath to generate a waveform path in the panel's paint routine, with a timer-driven repaint for real-time updates.",
+    "code": "const var dp = Synth.getDisplayBufferSource(\"HardcodedMasterFX\");\nconst var gr = dp.getDisplayBuffer(0);\n\ngr.setRingBufferProperties({\n\t\"BufferLength\": 65536,\n\t\"NumChannels\": 1\n});\n\nconst var Panel1 = Content.getComponent(\"Panel1\");\nconst var a = Panel1.getLocalBounds(0);\n\nPanel1.setPaintRoutine(function(g)\n{\n\tg.setColour(this.get(\"bgColour\"));\n\tg.fillRect(a);\n\tg.setColour(this.get(\"itemColour\"));\n\tvar p = gr.createPath(a, [0, 1, 0, -1], 1.0);\n\tg.fillPath(p, a);\n});\n\nconst var Cmpt = Engine.createTimerObject();\n\nCmpt.setTimerCallback(function()\n{\n\tPanel1.repaint();\n});\n\nCmpt.startTimer(40);",
+    "url": "https://forum.hise.audio/topic/9945",
+    "featured": true
+  }
+]

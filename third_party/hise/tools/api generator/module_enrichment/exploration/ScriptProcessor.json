@@ -1,0 +1,140 @@
+{
+  "moduleId": "ScriptProcessor",
+  "nodes": [
+    {
+      "id": "midi_in",
+      "label": "MIDI Input",
+      "type": "input",
+      "importance": 0.9,
+      "group": "input",
+      "description": "Incoming MIDI events (note on, note off, CC, pitch bend, aftertouch, program change, timer)"
+    },
+    {
+      "id": "on_init",
+      "label": "onInit",
+      "type": "process",
+      "importance": 0.9,
+      "group": "callbacks",
+      "description": "Runs once at compile time. Declare variables, create UI components, set up references."
+    },
+    {
+      "id": "on_note_on",
+      "label": "onNoteOn",
+      "type": "process",
+      "importance": 0.9,
+      "group": "callbacks",
+      "description": "Fires on every MIDI note-on event. Access event via Message object."
+    },
+    {
+      "id": "on_note_off",
+      "label": "onNoteOff",
+      "type": "process",
+      "importance": 0.9,
+      "group": "callbacks",
+      "description": "Fires on every MIDI note-off event. Access event via Message object."
+    },
+    {
+      "id": "on_controller",
+      "label": "onController",
+      "type": "process",
+      "importance": 0.9,
+      "group": "callbacks",
+      "description": "Fires on CC, pitch bend, aftertouch, and program change events. Access event via Message object."
+    },
+    {
+      "id": "on_timer",
+      "label": "onTimer",
+      "type": "process",
+      "importance": 0.8,
+      "group": "callbacks",
+      "description": "Fires at interval set by Synth.startTimer(). Sample-accurate in real-time mode."
+    },
+    {
+      "id": "on_control",
+      "label": "onControl",
+      "type": "process",
+      "importance": 0.8,
+      "group": "callbacks",
+      "description": "Fires when a UI component value changes. Receives component reference and new value."
+    },
+    {
+      "id": "event_dispatch",
+      "label": "Event Dispatch",
+      "type": "decision",
+      "importance": 0.7,
+      "group": "routing",
+      "description": "Routes incoming events to the appropriate callback based on event type."
+    },
+    {
+      "id": "deferred_check",
+      "label": "Deferred Mode",
+      "type": "decision",
+      "importance": 0.6,
+      "group": "routing",
+      "description": "If deferred, queue event for message thread processing. Otherwise process on audio thread."
+    },
+    {
+      "id": "midi_out",
+      "label": "MIDI Output",
+      "type": "output",
+      "importance": 0.8,
+      "group": "output",
+      "description": "Modified MIDI events passed to the next processor in the chain."
+    },
+    {
+      "id": "message_obj",
+      "label": "Message",
+      "type": "external",
+      "importance": 0.7,
+      "group": "api",
+      "description": "API object for reading and modifying the current MIDI event."
+    },
+    {
+      "id": "synth_obj",
+      "label": "Synth",
+      "type": "external",
+      "importance": 0.7,
+      "group": "api",
+      "description": "API object for controlling the parent synthesiser, timer, and voice management."
+    },
+    {
+      "id": "engine_obj",
+      "label": "Engine",
+      "type": "external",
+      "importance": 0.5,
+      "group": "api",
+      "description": "API object for global engine functions."
+    },
+    {
+      "id": "content_obj",
+      "label": "Content",
+      "type": "external",
+      "importance": 0.6,
+      "group": "api",
+      "description": "API object for creating and managing UI components."
+    }
+  ],
+  "edges": [
+    { "from": "midi_in", "to": "deferred_check", "type": "signal", "label": "MIDI event" },
+    { "from": "deferred_check", "to": "event_dispatch", "type": "signal", "label": "process" },
+    { "from": "event_dispatch", "to": "on_note_on", "type": "conditional", "label": "NoteOn" },
+    { "from": "event_dispatch", "to": "on_note_off", "type": "conditional", "label": "NoteOff" },
+    { "from": "event_dispatch", "to": "on_controller", "type": "conditional", "label": "CC/PB/AT/PC" },
+    { "from": "event_dispatch", "to": "on_timer", "type": "conditional", "label": "TimerEvent" },
+    { "from": "on_note_on", "to": "midi_out", "type": "signal", "label": null },
+    { "from": "on_note_off", "to": "midi_out", "type": "signal", "label": null },
+    { "from": "on_controller", "to": "midi_out", "type": "signal", "label": null },
+    { "from": "message_obj", "to": "on_note_on", "type": "control", "label": "read/modify event" },
+    { "from": "message_obj", "to": "on_note_off", "type": "control", "label": "read/modify event" },
+    { "from": "message_obj", "to": "on_controller", "type": "control", "label": "read/modify event" },
+    { "from": "synth_obj", "to": "on_timer", "type": "control", "label": "start/stop timer" },
+    { "from": "content_obj", "to": "on_control", "type": "control", "label": "component change" }
+  ],
+  "groups": [
+    { "id": "input", "label": "Input" },
+    { "id": "callbacks", "label": "Script Callbacks" },
+    { "id": "routing", "label": "Event Routing" },
+    { "id": "output", "label": "Output" },
+    { "id": "api", "label": "API Objects" }
+  ]
+}

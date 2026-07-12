@@ -1,0 +1,511 @@
+{
+  "0": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"}
+    ],
+    "verifyScript": null,
+    "notes": "LAF for rotary slider with arc drawing and value text. Compile-only test. Needs Knob1 component to attach LAF to."
+  },
+  "1": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "MB_COMP_B1_RECIEVE"},
+      {"type": "ScriptSlider", "id": "MB_COMP_B2_RECIEVE"},
+      {"type": "ScriptSlider", "id": "MB_COMP_B3_RECIEVE"}
+    ],
+    "verifyScript": null,
+    "notes": "LAF for linear sliders with gradient fill. Three slider components needed. Compile-only test."
+  },
+  "2": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Raycasting 3D game using ScriptPanel created via Content.addPanel, timers, and keyboard callbacks. Self-contained. Compile-only test (mouse/keyboard interactions not simulatable via API)."
+  },
+  "3": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "ComboBox factory function using namespace. Creates ComboBoxes via Content.addComboBox. Self-contained with LAF registration. Compile-only test."
+  },
+  "4": {
+    "tier": 3,
+    "testable": false,
+    "skipReason": "Calls Synth.getDisplayBufferSource('Analyser1') which requires a loaded scriptnode network inside the Analyser effect to provide a display buffer. Without the network, getDisplayBuffer(0) will fail with 'No display buffer available'.",
+    "modules": [
+      {"type": "Analyser", "name": "Analyser1"}
+    ],
+    "components": [
+      {"type": "ScriptPanel", "id": "pnl_Osc1"},
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "Mono oscilloscope with motion trails. Uses display buffer from Analyser module. The Analyser module exists but getDisplayBufferSource requires an internal scriptnode network to provide buffer data."
+  },
+  "5": {
+    "tier": 3,
+    "testable": false,
+    "skipReason": "Calls Synth.getDisplayBufferSource('f1') which requires a loaded scriptnode network inside a HardcodedMasterFX or similar module to provide display buffers. Without the network, getDisplayBuffer() will fail with 'No display buffer available'.",
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "pnl_Osc1"},
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "Stereo oscilloscope with dual buffers. References module named 'f1' via getDisplayBufferSource — requires internal scriptnode network. Both BUFFER_L and BUFFER_R point to same 'f1' module (likely a bug in the example, but untestable regardless)."
+  },
+  "6": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "SimpleGain", "name": "InGain"},
+      {"type": "SimpleGain", "name": "OutGain"}
+    ],
+    "components": [
+      {"type": "ScriptLabel", "id": "lblInGainDB"},
+      {"type": "ScriptLabel", "id": "lblOutGainDB"},
+      {"type": "ScriptLabel", "id": "lblKnob1Value"},
+      {"type": "ScriptLabel", "id": "lblKnob2Value"},
+      {"type": "ScriptSlider", "id": "Knob1"},
+      {"type": "ScriptSlider", "id": "Knob2"}
+    ],
+    "verifyScript": null,
+    "notes": "dB peak meter using getCurrentLevel on SimpleGain effects. Two gain effects named InGain and OutGain needed. Timer-based polling compiles fine."
+  },
+  "7": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "SineSynth", "name": "SineSynth1"},
+      {"type": "TableEnvelope", "name": "OSC1_AHDSR1", "parent": "SineSynth1", "chain": 1}
+    ],
+    "components": [
+      {"type": "ScriptTable", "id": "Table1"},
+      {"type": "ScriptTable", "id": "Table2"},
+      {"type": "ScriptSlider", "id": "knb_Curve"},
+      {"type": "ScriptComboBox", "id": "Type1"},
+      {"type": "ScriptButton", "id": "btn_Invert"}
+    ],
+    "verifyScript": null,
+    "notes": "AHDSR TableEnvelope curve control. Uses Synth.getTableProcessor and Synth.getModulator with same name 'OSC1_AHDSR1'. Uses TableEnvelope (which is an envelope with table control) added to SineSynth gain chain. initializeTables() and updateTableWithKnob() called at end of init. Compile-only due to table interaction callbacks."
+  },
+  "8": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptButton", "id": "Test"}
+    ],
+    "verifyScript": null,
+    "notes": "Panel saveInPreset storage pattern. Creates panels via Content.addPanel (self-contained). References 'Test' button for control callback. Demonstrates deferred saveInPreset via timer. Compile-only."
+  },
+  "9": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "CSS toggle switch button with inline stylesheet. setInlineStyleSheet compiles regardless of visual result. Compile-only test."
+  },
+  "10": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"}
+    ],
+    "verifyScript": null,
+    "notes": "LAF for rotary knob with arc and pointer indicator. Uses Rectangle object from HISE. Needs Knob1 component. Compile-only test."
+  },
+  "11": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"}
+    ],
+    "verifyScript": null,
+    "notes": "Draws multiline text on a panel using g.drawMultiLineText. Compile-only test."
+  },
+  "12": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "Delay", "name": "Delay1"}
+    ],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"},
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "Delay time control with tempo sync toggle. Uses typed inline functions (inline function changeMode(mode: number)). Delay module needed. Compile-only test."
+  },
+  "13": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptButton", "id": "BUTTON0"},
+      {"type": "ScriptButton", "id": "BUTTON1"},
+      {"type": "ScriptButton", "id": "BUTTON2"}
+    ],
+    "verifyScript": null,
+    "notes": "Radio button group using Content.getAllComponents with regex pattern 'BUTTON\\d'. Need at least 3 buttons matching the pattern. Compile-only (callback uses index logic)."
+  },
+  "14": {
+    "tier": 3,
+    "testable": false,
+    "skipReason": "Uses FileSystem.browse() which opens a modal file dialog that blocks execution.",
+    "modules": [
+      {"type": "AudioLooper", "name": "Script FX1"}
+    ],
+    "components": [
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "Audio file browser using FileSystem.browse modal dialog — untestable in automated environment."
+  },
+  "15": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "Chorus", "name": "Chorus1"},
+      {"type": "Chorus", "name": "Chorus2"}
+    ],
+    "components": [
+      {"type": "ScriptSlider", "id": "knbXy0"},
+      {"type": "ScriptSlider", "id": "knbXy1"},
+      {"type": "ScriptPanel", "id": "pnlXY2"}
+    ],
+    "verifyScript": null,
+    "notes": "Circular XY pad with angle/distance mapping to two Chorus effects. mods array (Chorus1/Chorus2) is declared after onpnlXY2Control function but this is fine since inline functions resolve at call time. Compile-only (mouse/drag interaction not simulatable)."
+  },
+  "16": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "knbX"},
+      {"type": "ScriptSlider", "id": "knbY"},
+      {"type": "ScriptButton", "id": "btnLink"},
+      {"type": "ScriptSlider", "id": "knbCursorSize"},
+      {"type": "ScriptSlider", "id": "knbAspectRatio"},
+      {"type": "ScriptPanel", "id": "pnlXY0"},
+      {"type": "ScriptPanel", "id": "pnlXY1"},
+      {"type": "ScriptPanel", "id": "pnlXY2"},
+      {"type": "ScriptPanel", "id": "pnlXY3"},
+      {"type": "ScriptPanel", "id": "pnlXY4"}
+    ],
+    "verifyScript": null,
+    "notes": "XY pad with 5 disc-square coordinate mapping variants. Complex math visualizations. All components from getComponent. Compile-only test (mouse interaction not simulatable)."
+  },
+  "17": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptTable", "id": "Table"}
+    ],
+    "verifyScript": null,
+    "notes": "Table popup function that shows point index. Uses Table.registerAtParent(0) to get a TableData object. Compile-only (table interaction not simulatable via API)."
+  },
+  "18": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptFloatingTile", "id": "FloatingTile1"}
+    ],
+    "verifyScript": null,
+    "notes": "Preset browser FloatingTile control via broadcaster. The createBroadcaster args uses bare identifiers [component, obj] without quotes — this is valid HiseScript (uses variable expressions). attachToComponentMouseEvents passes string array. Compile-only test."
+  },
+  "19": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "Chained broadcasters using attachToOtherBroadcaster. bc1.state is set as a property. Compile-only test. Button1 needed for control callback."
+  },
+  "20": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "ShapeFX", "name": "Bitcrusher"}
+    ],
+    "components": [
+      {"type": "ScriptPanel", "id": "BitcrusherPanel"},
+      {"type": "ScriptSlider", "id": "StepsKnob"}
+    ],
+    "verifyScript": null,
+    "notes": "Bitcrusher staircase visualization. 'Bitcrusher' is the display name — ShapeFX is the module type that supports bit depth parameters. Paint routine draws a staircase pattern. Compile-only test."
+  },
+  "21": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Analog clock using Engine.getSystemTime. Creates panel via Content.addPanel (self-contained). Uses Synth.addNoteOn/addNoteOff inside timer (fires once per second). All helper functions (getSecVector, getMinVector, getHourVector) defined after setPaintRoutine — they are called from within the timer callback which fires after init, so order is fine. Compile-only."
+  },
+  "22": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"}
+    ],
+    "verifyScript": null,
+    "notes": "Diagonal menu with mouse hit detection. Panel needs to exist via getComponent. Compile-only (mouse interaction not simulatable)."
+  },
+  "23": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "TooltipPanel"}
+    ],
+    "verifyScript": null,
+    "notes": "Component position tracker using broadcaster and getAllComponents. References bare getComponent() function (not Content.getComponent) in getComponent() helper — this is a user-defined inline function so no fix needed. TooltipPanel declared after addListener but only used inside hover callback, which is fine. TooltipPanel component needed."
+  },
+  "24": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptFloatingTile", "id": "FloatingTile1"}
+    ],
+    "verifyScript": null,
+    "notes": "Preset browser FloatingTile data property modification. Calls parseAsJSON on Data property — FloatingTile with default Data may return empty/invalid JSON. data.MoreButtonBounds[0] will fail if MoreButtonBounds is not in default Data. Compile-only (will compile, runtime depends on FloatingTile Data content)."
+  },
+  "25": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"},
+      {"type": "ScriptPanel", "id": "Panel2"},
+      {"type": "ScriptPanel", "id": "Panel3"}
+    ],
+    "verifyScript": null,
+    "notes": "HSL colour palette generator with typed inline functions (inline function: Colour, inline function: Array, inline function: number). Valid HiseScript typed function syntax. Three panels with paint routines. Compile-only test."
+  },
+  "26": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "pnlURL"}
+    ],
+    "verifyScript": null,
+    "notes": "Clickable URL panel with hover/click states. Uses Engine.openWebsite inside mouse callback — compiles fine, network call only fires on click. Compile-only test."
+  },
+  "27": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "PolyphonicFilter", "name": "Filter1"}
+    ],
+    "components": [
+      {"type": "ScriptComboBox", "id": "ComboBox1"}
+    ],
+    "verifyScript": [
+      {"type": "REPL", "expression": "filterModes.length", "value": 3, "delay": 0},
+      {"type": "REPL", "expression": "filterNames.length", "value": 3, "delay": 0}
+    ],
+    "notes": "Filter mode selection using Engine.getFilterModeList(). PolyphonicFilter effect needed. ComboBox guard handles index 0 (value-1 = -1 would be safe since index check is >= 0). Simple REPL checks for array setup."
+  },
+  "28": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Broadcaster property sync across knobs. Creates all 4 knobs via Content.addKnob (self-contained). attachToComponentProperties and addComponentPropertyListener used. Compile-only test."
+  },
+  "29": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "Launch external process from button. FileSystem.fromAbsolutePath and startAsProcess — compiles fine, only fires on button click. The path /usr/bin/open exists on macOS but the callback has an early return for value==1 (toggle-off), so startAsProcess only fires on button down. Compile-only test."
+  },
+  "30": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptLabel", "id": "BeatLbl"},
+      {"type": "ScriptButton", "id": "StartClock"}
+    ],
+    "verifyScript": null,
+    "notes": "TransportHandler with beat callbacks and sync modes. Engine.createTransportHandler() is used (instance, not static). Components BeatLbl and StartClock needed. Compile-only test (callbacks fire on transport events, not at init)."
+  },
+  "31": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "Arpeggiator", "name": "Arpeggiator1"}
+    ],
+    "components": [
+      {"type": "ScriptButton", "id": "Button1"},
+      {"type": "ScriptSliderPack", "id": "SLP1"},
+      {"type": "ScriptSliderPack", "id": "SLP2"},
+      {"type": "ScriptSliderPack", "id": "SLP3"}
+    ],
+    "verifyScript": null,
+    "notes": "Arpeggiator SliderPack access. Uses Synth.getSliderPackProcessor('Arpeggiator1'). Three SliderPack components refer to Arpeggiator's internal slider packs. Compile-only test."
+  },
+  "32": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "DetectDragDirection"}
+    ],
+    "verifyScript": null,
+    "notes": "Locked drag direction detection. Paint routine accesses this.data.drag.x and this.data.drag.y before the mouse callback sets them — will crash on first repaint. Fix: add isDefined guard in paint routine: 'if (!isDefined(this.data.drag)) return;' before the drawEllipse call. Compile-only after fix.",
+    "codefix": "Add isDefined guard in paint routine before accessing this.data.drag"
+  },
+  "33": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Global broadcaster with radio buttons. Content.getAllComponents('btn') returns empty array (no btn* components in test environment), so for..in loop does nothing — compiles cleanly. Self-contained pattern demonstration. Compile-only."
+  },
+  "34": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "SineSynth", "name": "SineSynth1"},
+      {"type": "LFO", "name": "LFO Modulator1", "parent": "SineSynth1", "chain": 1}
+    ],
+    "components": [
+      {"type": "ScriptComboBox", "id": "ComboBox1"}
+    ],
+    "verifyScript": null,
+    "notes": "LFO waveform type selection via ComboBox. LFO needs to be in a sound generator's gain modulation chain. ComboBox callback has guard (value - 1 used with 0-based index ComboIndex array). Compile-only test."
+  },
+  "35": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "Open user presets folder using FileSystem.getFolder and dir.show(). Compiles fine — show() only opens Finder on button click. Not FileSystem.browse (which blocks). Compile-only test."
+  },
+  "36": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "SineSynth", "name": "SineSynth1"},
+      {"type": "LFO", "name": "LFO Modulator1", "parent": "SineSynth1", "chain": 1},
+      {"type": "LFO", "name": "LFO Modulator2", "parent": "SineSynth1", "chain": 1},
+      {"type": "LFO", "name": "LFO Modulator3", "parent": "SineSynth1", "chain": 1},
+      {"type": "LFO", "name": "LFO Modulator4", "parent": "SineSynth1", "chain": 1}
+    ],
+    "components": [
+      {"type": "ScriptComboBox", "id": "ComboBox1"},
+      {"type": "ScriptComboBox", "id": "ComboBox2"},
+      {"type": "ScriptComboBox", "id": "ComboBox3"},
+      {"type": "ScriptComboBox", "id": "ComboBox4"}
+    ],
+    "verifyScript": null,
+    "notes": "4 LFOs with ComboBox waveform selection. Panels from getAllComponents('Panel') get paint routines assigned (returns empty array in test env — safe). 4 LFO modulators needed in a sound generator's gain chain. ComboBox callback guard not needed (value-1 is fine, WaveFormType attribute is set directly). Compile-only test."
+  },
+  "37": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Dynamic preset panel factory. createPreset function is called before definition (lines 2-3 call createPreset, defined on line 5). In HISE this should work as inline functions are hoisted, but this is a regular inline function called in init order — may need function-before-definition fix by reordering. Self-contained via Content.addPanel. Compile-only.",
+    "codefix": "Move createPreset function definition before the two const declarations that call it"
+  },
+  "38": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptButton", "id": "prev"},
+      {"type": "ScriptButton", "id": "next"},
+      {"type": "ScriptPanel", "id": "Red"},
+      {"type": "ScriptPanel", "id": "Yellow"},
+      {"type": "ScriptPanel", "id": "Green"},
+      {"type": "ScriptPanel", "id": "Blue"},
+      {"type": "ScriptPanel", "id": "Pink"},
+      {"type": "ScriptComboBox", "id": "ComboBox"}
+    ],
+    "verifyScript": null,
+    "notes": "Panel navigation with prev/next buttons using LAF triangle drawing. LAF uses drawToggleButton. ComboBox controls visibility of 5 named panels. Compile-only test."
+  },
+  "39": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "pnlContainer"},
+      {"type": "ScriptPanel", "id": "pnlSubPanel0"},
+      {"type": "ScriptPanel", "id": "pnlSubPanel1"}
+    ],
+    "verifyScript": null,
+    "notes": "Drop shadow on container panel iterating over sub-panels. pnlSubPanel variable used in paint routine before declaration — fine since paint fires after init completes. getAllComponents('pnlSubPanel') matches components by prefix. Need at least one 'pnlSubPanel*' component to exist. Added pnlSubPanel0 and pnlSubPanel1 as example sub-panels. Compile-only test."
+  }
+}

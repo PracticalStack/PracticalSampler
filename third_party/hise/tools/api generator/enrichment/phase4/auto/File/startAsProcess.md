@@ -1,0 +1,1 @@
+Launches this file as an external process with the given command-line parameters. For executables, this starts the program; for document files, it opens them with the default associated application. Pass an empty string for no parameters. Returns `true` if the process was launched, but does not indicate whether the process itself completed successfully.

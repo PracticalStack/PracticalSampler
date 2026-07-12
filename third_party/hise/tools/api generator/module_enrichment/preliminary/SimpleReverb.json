@@ -1,0 +1,146 @@
+{
+  "moduleId": "SimpleReverb",
+  "prettyName": "Simple Reverb",
+  "type": "Effect",
+  "subtype": "MasterEffect",
+  "category": "reverb",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "stereo",
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "RoutingMatrix",
+      "signalFlowRole": "skip - inferred from type/subtype"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Reverb Character",
+      "rationale": "RoomSize and Damping define the reverb tail behaviour",
+      "parameters": [
+        {
+          "id": "RoomSize",
+          "name": "Room Size",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.8,
+          "description": "Perceived room size from 0 (small) to 1 (large cathedral)",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Damping",
+          "name": "Damping",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.6,
+          "description": "High frequency absorption where higher values create a darker reverb tail",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Mix",
+      "rationale": "Separate wet and dry level controls rather than a single mix knob",
+      "parameters": [
+        {
+          "id": "WetLevel",
+          "name": "Wet Level",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.2,
+          "description": "Wet/dry mix where 0 is fully dry and 1 is fully wet",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "DryLevel",
+          "name": "Dry Level",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.8,
+          "description": "Level of the dry signal mixed into the output",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Stereo",
+      "rationale": "Width controls the stereo spread of the reverb output",
+      "parameters": [
+        {
+          "id": "Width",
+          "name": "Width",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.8,
+          "description": "Stereo width of the reverb where 0 is mono and 1 is full stereo",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Special",
+      "rationale": "FreezeMode sustains the reverb tail indefinitely",
+      "parameters": [
+        {
+          "id": "FreezeMode",
+          "name": "Freeze Mode",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.1,
+          "description": "Freeze mode that sustains the reverb tail indefinitely",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+
+  "standaloneModChains": [],
+
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-order",
+      "category": "signal_path",
+      "question": "What is the processing order? Does it use the JUCE Reverb class (Freeverb algorithm) directly, or a custom implementation? What is the internal structure (comb filters, allpass filters)?",
+      "context": "Need to understand the reverb topology at a high level for the pseudo-code."
+    },
+    {
+      "id": "freeze-mode-behavior",
+      "category": "parameter_behavior",
+      "question": "FreezeMode has a continuous range 0-1 with default 0.1, not a toggle. How does this parameter actually work? Is it a threshold (above X = frozen), or does it continuously affect the feedback amount?",
+      "context": "The continuous range is unusual for a 'freeze' function - users need to understand how it works."
+    },
+    {
+      "id": "wet-dry-interaction",
+      "category": "parameter_behavior",
+      "question": "WetLevel and DryLevel are independent. Are they simple linear gain multipliers? Can both be set to 1.0 (boosted output)?",
+      "context": "Separate wet/dry controls behave differently from a single mix knob."
+    },
+    {
+      "id": "width-implementation",
+      "category": "parameter_behavior",
+      "question": "How is the Width parameter implemented? Mid/side processing, or decorrelated left/right outputs from the algorithm?",
+      "context": "Affects how users understand the stereo behaviour."
+    },
+    {
+      "id": "performance",
+      "category": "performance",
+      "question": "What is the internal complexity? Number of comb/allpass filters? Per-sample processing?",
+      "context": "Determines the CPU cost tier."
+    }
+  ],
+
+  "notes": "SimpleReverb is based on the Freeverb algorithm (per the description). It has separate WetLevel and DryLevel controls rather than a single Mix knob. FreezeMode has a continuous range which is unusual. Known scriptnode equivalent: fx.reverb."
+}

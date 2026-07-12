@@ -1,0 +1,1 @@
+Returns a ChildSynth reference to the child sound generator at the specified index within this synth's child processor list. Only works when the wrapped synth is a Chain type (SynthGroup or SynthChain). Must be called during `onInit`.

@@ -1,0 +1,106 @@
+{
+  "className": "Parameter",
+  "category": "scriptnode",
+  "description": "A parameter of a node.",
+  "methods": {
+    "addConnectionFrom": {
+      "signature": "var addConnectionFrom(var connectionData)",
+      "returnType": "var",
+      "description": "Adds (and/or) returns a connection from the given data.",
+      "parameters": [
+        {
+          "name": "connectionData",
+          "type": "var"
+        }
+      ]
+    },
+    "getId": {
+      "signature": "String getId()",
+      "returnType": "String",
+      "description": "Returns the name of the parameter.",
+      "parameters": []
+    },
+    "getRangeObject": {
+      "signature": "var getRangeObject()",
+      "returnType": "var",
+      "description": "Returns the range properties as JSON object.",
+      "parameters": []
+    },
+    "getValue": {
+      "signature": "double getValue()",
+      "returnType": "double",
+      "description": "Returns the current value.",
+      "parameters": []
+    },
+    "setRangeFromObject": {
+      "signature": "void setRangeFromObject(var propertyObject)",
+      "returnType": "void",
+      "description": "Updates the parameter range from the given object.",
+      "parameters": [
+        {
+          "name": "propertyObject",
+          "type": "var"
+        }
+      ]
+    },
+    "setRangeProperty": {
+      "signature": "void setRangeProperty(String id, var newValue)",
+      "returnType": "void",
+      "description": "Sets a range property.",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "name": "newValue",
+          "type": "var"
+        }
+      ]
+    },
+    "setUseExternalConnection": {
+      "signature": "void setUseExternalConnection(bool usesExternalConnection)",
+      "returnType": "void",
+      "description": "Enables \"external connection mode\" that disables the internal data model.",
+      "parameters": [
+        {
+          "name": "usesExternalConnection",
+          "type": "bool"
+        }
+      ]
+    },
+    "setValue": {
+      "signature": "void setValue(double newValue)",
+      "returnType": "void",
+      "description": "Changes the internal value and optionally stores it in the ValueTree.",
+      "parameters": [
+        {
+          "name": "newValue",
+          "type": "double"
+        }
+      ]
+    },
+    "setValueAsync": {
+      "signature": "void setValueAsync(double newValue)",
+      "returnType": "void",
+      "description": "Sets the value immediately and stores it asynchronously (deprecated).",
+      "parameters": [
+        {
+          "name": "newValue",
+          "type": "double"
+        }
+      ]
+    },
+    "setValueSync": {
+      "signature": "void setValueSync(double newValue)",
+      "returnType": "void",
+      "description": "Stores the value synchronously and calls the callback (deprecated).",
+      "parameters": [
+        {
+          "name": "newValue",
+          "type": "double"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "factoryPath": "core.snex_osc",
+  "factory": "core",
+  "nodeId": "snex_osc",
+  "description": "A custom oscillator node using SNEX",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": true,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Frequency Control",
+      "rationale": "Frequency sets the base oscillator pitch; PitchMultiplier scales it by an integer ratio for harmonic relationships",
+      "parameters": [
+        {
+          "id": "Frequency",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.1, "skew": 0.23 },
+          "default": 220.0,
+          "textConverter": "Frequency",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "PitchMultiplier",
+          "range": { "min": 1.0, "max": 16.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "ClassId",
+      "defaultValue": "",
+      "type": "string",
+      "note": "Selects the SNEX oscillator class to compile and run. Maps to a .h file in DspNetworks/code_library/."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/snex_osc.md",
+    "tier": "STUB",
+    "lines": 6
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "oscillator-callbacks",
+      "category": "signal_path",
+      "question": "Confirm the required callbacks: tick(double uptime) for per-sample generation and process(OscProcessData&) for block generation. Is prepare() optional? How does the wrapper choose between tick() and process()?",
+      "context": "Users need to know the minimum code required for a working oscillator."
+    },
+    {
+      "id": "frequency-tracking",
+      "category": "signal_path",
+      "question": "The SNEX overview describes frequency tracking via handleHiseEvent catching note-on. Confirm: does the Frequency parameter set a manual frequency that is overridden by MIDI note-on events, or are they additive?",
+      "context": "Users need to understand how manual Frequency and MIDI frequency interact."
+    },
+    {
+      "id": "additive-output",
+      "category": "signal_path",
+      "question": "The SNEX overview states the wrapper adds oscillator output to existing signal (data[0] += oscType.tick(uptime)). Confirm this is additive rather than replacing the input signal.",
+      "context": "Users need to know the output behaviour for stacking multiple oscillators."
+    },
+    {
+      "id": "user-parameters",
+      "category": "parameter_behaviour",
+      "question": "User-defined parameters (index >= 2) are forwarded to the inner oscillator's setParameter<P-2>(). Confirm this offset behaviour and maximum parameter count.",
+      "context": "Users need to understand that their first parameter has index 0 in their code but index 2 in the node."
+    },
+    {
+      "id": "template-argument-polyphonic",
+      "category": "parameter_behaviour",
+      "question": "Both IsPolyphonic and TemplateArgumentIsPolyphonic are set. Does the SNEX oscillator class receive the actual NumVoices template parameter, enabling PolyData for per-voice state?",
+      "context": "Unlike snex_node, snex_osc is polyphonic. Users need to understand how per-voice state works in their SNEX code."
+    }
+  ],
+
+  "notes": "snex_osc is the only SNEX node type that supports polyphony and MIDI event handling. It provides automatic frequency tracking from MIDI note-on events, phase accumulator management, and pitch multiplication. The user's SNEX code only needs to implement the waveform generation (tick and process). User-defined parameters start at index 2 (after Frequency and PitchMultiplier). The PitchMultiplier has integer steps 1-16, suitable for harmonic ratios. The Frequency skew (~0.23) creates a logarithmic control curve appropriate for frequency perception."
+}

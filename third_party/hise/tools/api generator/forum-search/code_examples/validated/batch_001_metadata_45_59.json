@@ -1,0 +1,166 @@
+{
+  "45": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "References undefined variable TBLLaf which is defined elsewhere in user's project",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "LAF drawTablePath function registered on TBLLaf which is not defined in the snippet."
+  },
+  "46": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "CustomMessage.NUM_SLOTS", "value": 512, "delay": 0},
+      {"type": "REPL", "expression": "CustomMessage.NUM_PER_SLOT", "value": 16, "delay": 0}
+    ],
+    "notes": "Namespace with MIDI event data storage. Compile + verify constants. Functions use Message.getEventId which is MIDI-callback only."
+  },
+  "47": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);\nContent.addButton(\"Button1\", 0, 0);\nContent.addPanel(\"Panel1\", 100, 0);",
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Modal text input via button callback. Compile-only. showModalTextInput opens modal which can't be automated."
+  },
+  "48": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);\nContent.addKnob(\"Knob1\", 0, 0);\nContent.addKnob(\"Knob2\", 100, 0);\nContent.addKnob(\"Knob3\", 200, 0);\nContent.addKnob(\"Knob4\", 300, 0);\nContent.addKnob(\"Knob5\", 400, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "List.length", "value": 5, "delay": 0},
+      {"type": "REPL", "expression": "textInputBroadcaster != undefined", "value": 1, "delay": 0}
+    ],
+    "notes": "Broadcaster mouse events + modal text input. Compile + verify objects created."
+  },
+  "49": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "FileSystem.browse opens a modal file dialog that cannot be automated",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Expansion user preset save with browse dialog."
+  },
+  "50": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "expHandler != undefined", "value": 1, "delay": 0},
+      {"type": "REPL", "expression": "typeof expNames", "value": "object", "delay": 0}
+    ],
+    "notes": "Expansion handler and names list. Compile + verify. expList may be empty (no expansions installed)."
+  },
+  "51": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Synth.getMidiPlayer requires pre-existing MidiPlayer modules which cannot be dynamically added via script in this context",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "MIDI Player sync. Requires 3 MidiPlayer modules in the module tree."
+  },
+  "52": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);\nContent.addPanel(\"panel\", 0, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "panel != undefined", "value": 1, "delay": 0},
+      {"type": "REPL", "expression": "panel.data.angle", "value": 0, "delay": 0},
+      {"type": "REPL", "expression": "panel.data.state", "value": 0, "delay": 0}
+    ],
+    "notes": "Animated disclosure triangle. Compile + verify initial data state. Mouse/timer interaction is visual-only."
+  },
+  "53": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);\nContent.addButton(\"btnLogout\", 0, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "btnLogout != undefined", "value": 1, "delay": 0},
+      {"type": "REPL", "expression": "isDownloading != undefined", "value": 1, "delay": 0}
+    ],
+    "notes": "Broadcaster with component listener binding. Compile + verify objects created."
+  },
+  "54": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);\nContent.addKnob(\"TestKnob\", 0, 0);\nContent.addSliderPack(\"TestSLP\", 100, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "typeof myObj", "value": "object", "delay": 0}
+    ],
+    "notes": "Serializes all component values including SliderPacks. Needs at least one regular + one SliderPack component."
+  },
+  "55": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "// MODULE_SETUP: Synth.addEffect(\"SimpleGain\", \"Gain_hidden\", -1);\n// MODULE_SETUP: Synth.addEffect(\"SimpleGain\", \"GainVisible\", -1);\nContent.makeFrontInterface(600, 400);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "fx.length", "value": 1, "delay": 0}
+    ],
+    "notes": "Filters effects by ID containing underscore. Setup creates one with underscore (removed) and one without (kept). Expected: 1 remaining."
+  },
+  "56": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "log-output", "values": ["FF007AFF"]}
+    ],
+    "notes": "Pure function: decimal to hex conversion. Console.print output verifiable."
+  },
+  "57": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);",
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Defines inline function removeAllChildren. Compile-only. Requires a Panel with children to test meaningfully."
+  },
+  "58": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "arr[0]", "value": 1, "delay": 0},
+      {"type": "REPL", "expression": "arr[1]", "value": 2, "delay": 0},
+      {"type": "REPL", "expression": "arr[5]", "value": 6, "delay": 0}
+    ],
+    "notes": "Array sort with custom comparator. arr is declared with reg so persists. Verify sorted order."
+  },
+  "59": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "Panel1 != undefined", "value": 1, "delay": 0},
+      {"type": "REPL", "expression": "Panel1.getValue()", "value": 1, "delay": 0}
+    ],
+    "notes": "Self-contained: already has makeFrontInterface and creates Panel1 + Knob1 via Content.addPanel/getComponent."
+  }
+}

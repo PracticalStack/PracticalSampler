@@ -1,0 +1,275 @@
+{
+  "className": "ComplexGroupManager",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "addGroupEventStartOffset": {
+      "signature": "void addGroupEventStartOffset(int layerIndex, int groupIndex, double startOffsetSamples)",
+      "returnType": "void",
+      "description": "Adds a start offset to the event that matches the given layer and group.",
+      "parameters": [
+        {
+          "name": "layerIndex",
+          "type": "int"
+        },
+        {
+          "name": "groupIndex",
+          "type": "int"
+        },
+        {
+          "name": "startOffsetSamples",
+          "type": "double"
+        }
+      ]
+    },
+    "createNoteMap": {
+      "signature": "void createNoteMap(var layerIdOrIndex)",
+      "returnType": "void",
+      "description": "Creates a note map for the given layer.",
+      "parameters": [
+        {
+          "name": "layerIdOrIndex",
+          "type": "var"
+        }
+      ]
+    },
+    "delayGroupEvent": {
+      "signature": "void delayGroupEvent(int layerIndex, int groupIndex, double delayInSamples)",
+      "returnType": "void",
+      "description": "Delays the event that matches the given layer and group.",
+      "parameters": [
+        {
+          "name": "layerIndex",
+          "type": "int"
+        },
+        {
+          "name": "groupIndex",
+          "type": "int"
+        },
+        {
+          "name": "delayInSamples",
+          "type": "double"
+        }
+      ]
+    },
+    "fadeInGroupEvent": {
+      "signature": "void fadeInGroupEvent(int layerIndex, int groupIndex, double fadeInTimeMs, double targetGainDb)",
+      "returnType": "void",
+      "description": "Adds a fade in to the event that matches the given layer and group.",
+      "parameters": [
+        {
+          "name": "layerIndex",
+          "type": "int"
+        },
+        {
+          "name": "groupIndex",
+          "type": "int"
+        },
+        {
+          "name": "fadeInTimeMs",
+          "type": "double"
+        },
+        {
+          "name": "targetGainDb",
+          "type": "double"
+        }
+      ]
+    },
+    "fadeOutGroupEvent": {
+      "signature": "void fadeOutGroupEvent(int layerIndex, int groupIndex, double fadeOutTimeMs)",
+      "returnType": "void",
+      "description": "Fades out all voices that are playing the given layer / group.",
+      "parameters": [
+        {
+          "name": "layerIndex",
+          "type": "int"
+        },
+        {
+          "name": "groupIndex",
+          "type": "int"
+        },
+        {
+          "name": "fadeOutTimeMs",
+          "type": "double"
+        }
+      ]
+    },
+    "getCurrentPeak": {
+      "signature": "float getCurrentPeak(int layerIndex, int groupIndex, int eventId)",
+      "returnType": "float",
+      "description": "Returns the peak volume of the first sound that was started with the given event ID.",
+      "parameters": [
+        {
+          "name": "layerIndex",
+          "type": "int"
+        },
+        {
+          "name": "groupIndex",
+          "type": "int"
+        },
+        {
+          "name": "eventId",
+          "type": "int"
+        }
+      ]
+    },
+    "getLayerIndex": {
+      "signature": "int getLayerIndex(String layerId)",
+      "returnType": "int",
+      "description": "Returns the index of the given layer.",
+      "parameters": [
+        {
+          "name": "layerId",
+          "type": "String"
+        }
+      ]
+    },
+    "getLayerProperty": {
+      "signature": "var getLayerProperty(var layerIdOrIndex, String propertyId)",
+      "returnType": "var",
+      "description": "Returns the value of a given layer property.",
+      "parameters": [
+        {
+          "name": "layerIdOrIndex",
+          "type": "var"
+        },
+        {
+          "name": "propertyId",
+          "type": "String"
+        }
+      ]
+    },
+    "getNumGroupsInLayer": {
+      "signature": "int getNumGroupsInLayer(int layerIndex)",
+      "returnType": "int",
+      "description": "Returns the number of groups in this layer.",
+      "parameters": [
+        {
+          "name": "layerIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "isNoteNumberMapped": {
+      "signature": "bool isNoteNumberMapped(int layerIndex, int noteNumber)",
+      "returnType": "bool",
+      "description": "Checks if the given note number has any samples mapped in this layer.",
+      "parameters": [
+        {
+          "name": "layerIndex",
+          "type": "int"
+        },
+        {
+          "name": "noteNumber",
+          "type": "int"
+        }
+      ]
+    },
+    "registerGroupStartCallback": {
+      "signature": "void registerGroupStartCallback(var layerIdOrIndex, var callback)",
+      "returnType": "void",
+      "description": "Registers a callback that will be executed with each group index that was started.",
+      "parameters": [
+        {
+          "name": "layerIdOrIndex",
+          "type": "var"
+        },
+        {
+          "name": "callback",
+          "type": "var"
+        }
+      ]
+    },
+    "setActiveGroup": {
+      "signature": "void setActiveGroup(int layerIndex, int groupIndex)",
+      "returnType": "void",
+      "description": "Sets the currently active group.",
+      "parameters": [
+        {
+          "name": "layerIndex",
+          "type": "int"
+        },
+        {
+          "name": "groupIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "setEnableGainTracking": {
+      "signature": "void setEnableGainTracking(var layerIdOrIndex, int groupIndex, bool shouldBeActive)",
+      "returnType": "void",
+      "description": "Enables gain tracking of all samples that match the given layer and group.",
+      "parameters": [
+        {
+          "name": "layerIdOrIndex",
+          "type": "var"
+        },
+        {
+          "name": "groupIndex",
+          "type": "int"
+        },
+        {
+          "name": "shouldBeActive",
+          "type": "bool"
+        }
+      ]
+    },
+    "setFixedGroupEventLength": {
+      "signature": "void setFixedGroupEventLength(int layerIndex, int groupIndex, double numSamplesToPlayBeforeFadeout)",
+      "returnType": "void",
+      "description": "Sets the sample to fade out with the given fade-in time after a fixed length.",
+      "parameters": [
+        {
+          "name": "layerIndex",
+          "type": "int"
+        },
+        {
+          "name": "groupIndex",
+          "type": "int"
+        },
+        {
+          "name": "numSamplesToPlayBeforeFadeout",
+          "type": "double"
+        }
+      ]
+    },
+    "setGroupVolume": {
+      "signature": "void setGroupVolume(int layerIndex, int groupIndex, double gainFactor)",
+      "returnType": "void",
+      "description": "Sets the smoothed volume for the given layer / group.",
+      "parameters": [
+        {
+          "name": "layerIndex",
+          "type": "int"
+        },
+        {
+          "name": "groupIndex",
+          "type": "int"
+        },
+        {
+          "name": "gainFactor",
+          "type": "double"
+        }
+      ]
+    },
+    "setLayerProperty": {
+      "signature": "void setLayerProperty(var layerIdOrIndex, String propertyId, var value)",
+      "returnType": "void",
+      "description": "Sets a layer property.",
+      "parameters": [
+        {
+          "name": "layerIdOrIndex",
+          "type": "var"
+        },
+        {
+          "name": "propertyId",
+          "type": "String"
+        },
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    }
+  }
+}

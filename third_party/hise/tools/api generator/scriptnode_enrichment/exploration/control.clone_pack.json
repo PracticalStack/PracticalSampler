@@ -1,0 +1,16 @@
+{
+  "factoryPath": "control.clone_pack",
+  "nodes": [
+    { "id": "value", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Global multiplier (default 1.0) applied to all slider values" },
+    { "id": "numclones", "label": "NumClones", "type": "parameter", "importance": 0.7, "description": "Number of active clones to address" },
+    { "id": "sliderpack", "label": "SliderPack", "type": "external_data", "importance": 1.0, "description": "Slider pack providing per-clone values at each index" },
+    { "id": "multiply", "label": "Multiply", "type": "process", "importance": 1.0, "description": "For each clone i: sliderData[i] * Value" },
+    { "id": "clone_out", "label": "Per-Clone Output", "type": "modulation_out", "importance": 1.0, "description": "Each clone receives its slider value times the global multiplier (normalised)" }
+  ],
+  "edges": [
+    { "from": "sliderpack", "to": "multiply", "type": "signal", "label": "per-index values" },
+    { "from": "value", "to": "multiply", "type": "control", "label": "multiplier" },
+    { "from": "numclones", "to": "multiply", "type": "control", "label": "loop count" },
+    { "from": "multiply", "to": "clone_out", "type": "signal", "label": "per-clone values" }
+  ]
+}

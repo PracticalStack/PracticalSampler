@@ -1,0 +1,104 @@
+{
+  "targetId": "ScriptFX",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [12743, 10657, 13835, 2368, 10725, 4582, 11776, 12943, 3776, 6757, 11432, 14343, 11201, 4146, 4573, 6471, 13749, 13934, 8672, 13587, 13814, 12802, 13922, 13779, 14573, 13760, 13585, 8519, 9826, 5813, 5938, 1182, 13351, 11538],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "HISEScript processBlock mode is legacy and will be removed",
+      "summary": "Using HISEScript callbacks (processBlock, onInit, etc.) directly inside a ScriptFX for DSP processing is the old approach. Christoph Hart has stated it is 'ancient and will be removed at some point in the future'. All new DSP work should use scriptnode networks.",
+      "sources": ["tid:5813"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "HISEScript per-sample DSP is at least 10x slower than scriptnode/SNEX",
+      "summary": "Processing audio on a per-sample basis via the HISEScript processBlock callback is extremely inefficient compared to using a scriptnode network or a SNEX node. The same logic expressed in a scriptnode core.expr node will be far cheaper.",
+      "sources": ["tid:8672"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Only top-level network parameters are connectable via processor/parameter ID",
+      "summary": "When connecting interface controls to a ScriptFX network, only parameters exposed at the top level of the network (via the macro knob section) are available in the processor/parameter ID picker. Internal node parameters are not directly addressable from the interface script.",
+      "sources": ["tid:13585", "tid:12743"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "UI components in the interface connect to network parameters by order of addition",
+      "summary": "When Content.addKnob (scripted UI) components are present in a ScriptFX interface, they connect to the top-level network parameters in the order the parameters were added. Panel1 maps to the first macro parameter, Panel2 to the second, and so on.",
+      "sources": ["tid:12743"],
+      "verify": true,
+      "verify_hint": "check Content.addKnob ordering vs DspNetwork parameter list ordering in ScriptProcessorModules.cpp"
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Use global cables for C++ node -> HISE communication; standard parameters for HISE -> C++ node",
+      "summary": "Standard parameter connections handle HISE->node communication. For node->HISE callbacks (e.g. reporting analysis values), global cables are the correct mechanism. Use Tools -> Create C++ code for global cables to generate the required boilerplate, then subclass your node from the generated cable_manager_t.",
+      "sources": ["tid:10657"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "Global cables do not work for C++ nodes loaded inside a ScriptFX network (only HardcodedFX)",
+      "summary": "When a C++ custom node is used inside a ScriptFX DSP network (interpreted mode), global cable connections from that node back to HISE do not function. The feature works correctly when the network is compiled and loaded into a HardcodedMasterFX module instead.",
+      "sources": ["tid:10657"],
+      "verify": true,
+      "verify_hint": "search GlobalCable or global_cable in hi_scripting scriptnode; check if network-mode vs hardcoded-mode dispatch differs"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Compiled ScriptFX plugins can crash in DAWs if the XML network file is present",
+      "summary": "Including a saved .xml scriptnode network file in the project when exporting can cause the compiled plugin to crash immediately on load in a DAW. The fix is to avoid saving the node (or remove the XML) before export, so the compiled C++ code in AdditionalSourceCode is the only active version.",
+      "sources": ["tid:11201"],
+      "verify": true,
+      "verify_hint": "check network XML loading vs compiled network loading priority in ScriptProcessorModules.cpp and DspNetworkProcessor"
+    },
+    {
+      "type": "API",
+      "title": "Audio files in a scriptnode convolution node must use external audio file slots",
+      "summary": "To set an audio file on a filters.convolution node inside a ScriptFX network from script, you must first assign the node's audio file slot to 'External audio file slot #N' in the node UI. Then fetch the ScriptFX via getAudioSampleProcessor(\"ScriptFX\") and call getAudioFile(N). This approach also works correctly after the network is compiled to C++ and loaded into a HardcodedMasterFX.",
+      "sources": ["tid:14573"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Duplicate a ScriptFX network by copying the XML file and editing the ID",
+      "summary": "To duplicate an existing scriptnode network, copy the .xml file in the DSP Networks folder and open it in a text editor to give it a unique name/ID. Simply duplicating the module in HISE does not always preserve all internal node connections.",
+      "sources": ["tid:13835"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Swap ScriptFX and HardcodedMasterFX at compile time using a preprocessor define",
+      "summary": "Maintain both a ScriptFX (for development) and a HardcodedMasterFX (for export) version of each effect in the module tree, then use a #define USE_HARDCODED_MODULES flag in the interface script to bypass the inactive set via setBypassed() after init. This enables a clean development-to-export workflow without restructuring the project.",
+      "sources": ["tid:14343"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Network state can be loaded from a Base64 string via restoreState()",
+      "summary": "A ScriptFX network's full state can be captured as a Base64 string using exportState() and reloaded at runtime with restoreState(). This can be used inside a ScriptBuilder context to programmatically create and initialize a ScriptFX module with a specific network.",
+      "sources": ["tid:8672"],
+      "verify": true,
+      "verify_hint": "grep restoreState exportState in ScriptProcessorModules or JavascriptProcessor; check HotswappableProcessor interface"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "wet/dry template node introduces an extra attack transient inside a poly ScriptFX network",
+      "summary": "Using the built-in wet/dry template inside a polyphonic ScriptFX network produces an unwanted 'attack' artefact. The fix is to check and adjust the resetValue parameter of the gain nodes inside the template.",
+      "sources": ["tid:12943"],
+      "verify": true,
+      "verify_hint": "check resetValue property of gain nodes in the wet/dry template; search for resetValue in DspNetwork node definitions"
+    }
+  ]
+}

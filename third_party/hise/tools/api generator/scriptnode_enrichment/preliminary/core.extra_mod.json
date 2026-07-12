@@ -1,0 +1,114 @@
+{
+  "factoryPath": "core.extra_mod",
+  "factory": "core",
+  "nodeId": "extra_mod",
+  "description": "",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": true,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Source Selection",
+      "rationale": "Index selects which extra modulation chain to read from",
+      "parameters": [
+        {
+          "id": "Index",
+          "range": { "min": 0.0, "max": 16.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Output Configuration",
+      "rationale": "ProcessSignal controls whether the modulation value is written to the audio output",
+      "parameters": [
+        {
+          "id": "ProcessSignal",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "63.nT6K8ChMwF..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.RT.QoMWXhwVYjoPQtElXrUFY.D1XzklckAP.AH..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "displayBuffers": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/extra_mod.md",
+    "tier": "GOOD",
+    "lines": 75
+  },
+
+  "availableImages": ["extra_mod.png"],
+
+  "gaps": [
+    {
+      "id": "extra-mod-source",
+      "category": "signal_path",
+      "question": "What exactly is an 'extra modulation chain'? Is this the modulation chain from a hardcoded effect's additional parameters (e.g., filter frequency modulation on a hardcoded FX)?",
+      "context": "Users need to understand what connects to extra_mod. The runtime-target infrastructure says it uses fix_hash<5000> (CustomOffset) for ExternalModulatorChain."
+    },
+    {
+      "id": "raw-mode-behaviour",
+      "category": "signal_path",
+      "question": "The infrastructure docs say extra_mod uses TargetMode::Raw (no transformation). Confirm: the modulation signal passes through unmodified, with no intensity scaling or mode selection?",
+      "context": "This is the key simplification vs global_mod -- no Mode/Value/Intensity parameters."
+    },
+    {
+      "id": "index-mapping",
+      "category": "parameter_behaviour",
+      "question": "Index selects which extra modulation chain (0-16). How do these indices map to the parent effect's modulation chains? Is index 0 always the first extra chain, or is there an offset?",
+      "context": "Users need to know how to set the correct Index for their specific hardcoded effect."
+    },
+    {
+      "id": "description-missing",
+      "category": "description_accuracy",
+      "question": "The base JSON has an empty description. What is the correct short description for extra_mod?",
+      "context": "Every node needs a description for the reference page."
+    },
+    {
+      "id": "display-buffer-usage",
+      "category": "signal_path",
+      "question": "The DisplayBuffer shows the modulation signal. Is the display downsampled (DisplayBufferDownsamplingFactor=32 as per modulation.md)?",
+      "context": "Visual feedback is important for modulation debugging."
+    }
+  ],
+
+  "notes": "extra_mod bridges extra modulation chains from hardcoded effects into scriptnode. It is simpler than global_mod: only two parameters (Index, ProcessSignal), fixed Raw mode, no intensity/value controls. The signal passes through unmodified from the HISE modulation system. It uses fix_hash<5000> to connect to ExternalModulatorChain runtime targets. The NeedsModConfig property means it requires modulation configuration in the parent. The existing phase3 doc is GOOD tier (75 lines), which should provide substantial context for the reference page."
+}

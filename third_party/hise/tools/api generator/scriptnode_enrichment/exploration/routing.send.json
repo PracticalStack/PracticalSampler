@@ -1,0 +1,13 @@
+{
+  "factoryPath": "routing.send",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal (passes through unmodified)" },
+    { "id": "copy_to_cable", "label": "Copy to Cable", "type": "process", "importance": 1.0, "description": "Copies audio data into the internal cable buffer for connected receive node(s)" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Original signal continues unchanged" }
+  ],
+  "edges": [
+    { "from": "in", "to": "copy_to_cable", "type": "signal", "label": null },
+    { "from": "in", "to": "out", "type": "signal", "label": "passthrough" },
+    { "from": "copy_to_cable", "to": "out", "type": "signal", "label": null }
+  ]
+}

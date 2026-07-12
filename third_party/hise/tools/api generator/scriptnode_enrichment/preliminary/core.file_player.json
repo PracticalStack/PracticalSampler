@@ -1,0 +1,133 @@
+{
+  "factoryPath": "core.file_player",
+  "factory": "core",
+  "nodeId": "file_player",
+  "description": "A simple file player with multiple playback modes",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": true,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Playback Mode",
+      "rationale": "Selects the overall playback behaviour of the file player",
+      "parameters": [
+        {
+          "id": "PlaybackMode",
+          "range": { "min": 0.0, "max": 2.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "68.nT6K8CxNYG..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.WTvTzEFcoMlBSk1YtEFafjlaJzTRDkD.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Trigger",
+      "rationale": "Controls when playback starts and stops",
+      "parameters": [
+        {
+          "id": "Gate",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Pitch Control",
+      "rationale": "RootFrequency sets the reference pitch for sample playback; FreqRatio scales the playback speed relative to that root",
+      "parameters": [
+        {
+          "id": "RootFrequency",
+          "range": { "min": 20.0, "max": 2000.0, "step": 0.0, "skew": 1.0 },
+          "default": 440.0,
+          "textConverter": "Frequency",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "FreqRatio",
+          "range": { "min": 0.0, "max": 2.0, "step": 0.01, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/file_player.md",
+    "tier": "BRIEF",
+    "lines": 18
+  },
+
+  "availableImages": ["file_player.png"],
+
+  "gaps": [
+    {
+      "id": "playback-modes",
+      "category": "conditional_logic",
+      "question": "PlaybackMode has range 0-2 with step 1 (3 discrete values). What are the three modes and how does each affect playback behaviour (e.g., one-shot, looping, pitch-tracked)?",
+      "context": "The encoded text converter likely has labels but the mode semantics need C++ confirmation for accurate documentation."
+    },
+    {
+      "id": "gate-behaviour",
+      "category": "parameter_behaviour",
+      "question": "How does the Gate parameter interact with MIDI note-on/note-off events? Does Gate=0 stop playback immediately or allow a fade-out? Does note-on override the Gate parameter?",
+      "context": "The node is polyphonic and processes MIDI events, so the Gate parameter likely interacts with voice lifecycle."
+    },
+    {
+      "id": "freq-ratio-pitch-tracking",
+      "category": "signal_path",
+      "question": "How do RootFrequency and FreqRatio interact with MIDI note frequency? Is the playback speed calculated as (noteFrequency / rootFrequency) * freqRatio, or some other formula?",
+      "context": "Users need to understand how pitch tracking works to set up sample-based instruments correctly."
+    },
+    {
+      "id": "audio-file-usage",
+      "category": "signal_path",
+      "question": "How does the AudioFile complex data slot work? Does the node support stereo files? Is interpolation used for non-integer playback speeds? What happens when playback reaches the end of the file?",
+      "context": "Core signal path question for understanding what the node outputs."
+    },
+    {
+      "id": "process-order",
+      "category": "signal_path",
+      "question": "Does process() replace the input signal with the file playback or mix/add to it? What is the per-sample processing logic?",
+      "context": "Users need to know if this is an additive or replacement signal source."
+    }
+  ],
+
+  "notes": "The PlaybackMode text converter is encoded and likely contains labels like 'Static', 'Signal', 'MIDI' or similar. The Gate text converter appears to be a boolean on/off converter. The node is polyphonic and handles MIDI events, suggesting it creates per-voice playback instances triggered by note-on. RootFrequency has a narrower max (2000Hz) than typical frequency parameters, suggesting it is a reference pitch rather than a playback frequency."
+}

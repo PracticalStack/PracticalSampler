@@ -1,0 +1,1 @@
+Creates a static global modulator receiver in the specified modulator chain. Unlike `Effect.addGlobalModulator()` which continuously tracks the source, the static variant captures a constant value snapshot that is only updated at voice start. This is useful for per-voice modulation that should not change mid-note.

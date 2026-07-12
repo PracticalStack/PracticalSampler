@@ -1,0 +1,146 @@
+{
+  "moduleId": "HardcodedSynth",
+  "prettyName": "Hardcoded Synthesiser",
+  "type": "SoundGenerator",
+  "subtype": "SoundGenerator",
+  "category": "custom",
+
+  "io": {
+    "midiIn": "noteOn+noteOff",
+    "audioIn": null,
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": "*"
+  },
+
+  "voiceContext": "per-voice",
+
+  "interfaces": [
+    { "name": "SlotFX", "signalFlowRole": "hot-swappable network slot (selects which compiled network to load)" },
+    { "name": "RoutingMatrix", "signalFlowRole": "skip - inferred from type/subtype" },
+    { "name": "TableProcessor", "signalFlowRole": "complex data exposed from compiled network" },
+    { "name": "SliderPackProcessor", "signalFlowRole": "complex data exposed from compiled network" },
+    { "name": "AudioSampleProcessor", "signalFlowRole": "complex data exposed from compiled network" },
+    { "name": "DisplayBufferSource", "signalFlowRole": "skip - UI communication only" }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Output",
+      "rationale": "Standard ModulatorSynth output controls inherited from the base class",
+      "parameters": [
+        {
+          "id": "Gain",
+          "name": "Gain",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.25,
+          "description": "The output volume as normalised linear gain (0.0 to 1.0)",
+          "composite": {
+            "type": "modMultiply",
+            "chainName": "Gain Modulation",
+            "chainIndex": 1,
+            "constrainer": "*"
+          },
+          "modChain": {
+            "name": "Gain Modulation",
+            "chainIndex": 1,
+            "constrainer": "*",
+            "modulationMode": "gain"
+          }
+        },
+        {
+          "id": "Balance",
+          "name": "Balance",
+          "range": { "min": -1.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "The stereo balance",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "VoiceLimit",
+          "name": "VoiceLimit",
+          "range": { "min": 1.0, "max": 256.0, "step": 1.0 },
+          "default": 256.0,
+          "description": "The maximum number of voices",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "KillFadeTime",
+          "name": "KillFadeTime",
+          "range": { "min": 0.0, "max": 20000.0, "step": 1.0 },
+          "default": 20.0,
+          "description": "The fade out time in milliseconds when voices are killed",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "standaloneModChains": [
+    {
+      "name": "Pitch Modulation",
+      "chainIndex": 2,
+      "modulationMode": "pitch",
+      "constrainer": "*",
+      "note": "Modulates the implicit base pitch of all voices"
+    }
+  ],
+
+  "disabledModChains": [],
+
+  "compositeBlocks": [
+    {
+      "type": "modMultiply",
+      "param": "Gain",
+      "details": {
+        "chainName": "Gain Modulation",
+        "chainIndex": 1,
+        "constrainer": "*"
+      }
+    }
+  ],
+
+  "gaps": [
+    {
+      "id": "network-loading",
+      "category": "signal_path",
+      "question": "How does the synthesiser load and initialise a compiled C++ network for per-voice processing?",
+      "context": "Users need to understand the loading workflow and how voices are managed."
+    },
+    {
+      "id": "voice-rendering",
+      "category": "signal_path",
+      "question": "How does the voice rendering pipeline work? How does the compiled network integrate with the standard ModulatorSynth voice architecture (gain modulation, pitch modulation, FX chain)?",
+      "context": "The voice rendering order determines how the compiled network output integrates with the HISE module tree."
+    },
+    {
+      "id": "parameter-exposure",
+      "category": "parameter_behavior",
+      "question": "How are compiled network parameters exposed alongside the fixed Gain/Balance/VoiceLimit/KillFadeTime parameters? What is the parameter offset mechanism?",
+      "context": "Users need to understand the dual parameter system."
+    },
+    {
+      "id": "modulation-chain-mapping",
+      "category": "signal_path",
+      "question": "How do additional modulation chains (beyond Gain and Pitch) map to compiled network parameters? What is NUM_HARDCODED_SYNTH_MODS?",
+      "context": "Extra modulation chains are a key feature for parameter automation from the module tree."
+    },
+    {
+      "id": "complex-data-exposure",
+      "category": "interface_usage",
+      "question": "How are Tables, SliderPacks, and AudioFiles from the compiled network exposed?",
+      "context": "Complex data access is essential for many synthesis algorithms."
+    },
+    {
+      "id": "compiled-vs-interpreted",
+      "category": "signal_path",
+      "question": "How does this differ from ScriptSynth?",
+      "context": "Disambiguation between Hardcoded and Script variants."
+    }
+  ],
+
+  "notes": "Inherits standard ModulatorSynth parameters (Gain, Balance, VoiceLimit, KillFadeTime) and modulation chains (Gain, Pitch). Additional network parameters appear after the base parameter offset. Extra modulation chains are added via NUM_HARDCODED_SYNTH_MODS preprocessor."
+}

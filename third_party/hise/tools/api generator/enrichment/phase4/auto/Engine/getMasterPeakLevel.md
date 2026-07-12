@@ -1,0 +1,1 @@
+Returns the current peak output level (0.0 to 1.0) for the given channel. Pass 0 for the left channel and 1 for the right channel. Typically polled from a timer callback to drive a peak meter display.

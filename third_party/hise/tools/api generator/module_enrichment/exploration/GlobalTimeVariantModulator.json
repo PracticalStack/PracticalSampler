@@ -1,0 +1,68 @@
+{
+  "moduleId": "GlobalTimeVariantModulator",
+  "nodes": [
+    {
+      "id": "connection",
+      "type": "external",
+      "label": "Source TimeVariant Buffer (in Container)",
+      "importance": 1,
+      "detail": "Pre-computed per-block buffer from GlobalModulatorContainer, rendered during preVoiceRendering()"
+    },
+    {
+      "id": "disconnected",
+      "type": "decision",
+      "label": "Connected?",
+      "importance": 1,
+      "detail": "Disconnected: fills buffer with 1.0 (unity/pass-through)."
+    },
+    {
+      "id": "buffer_copy",
+      "type": "process",
+      "label": "Buffer Copy / Table Lookup",
+      "importance": 1,
+      "detail": "Non-table: FloatVectorOperations::copy(). Table: per-sample getInterpolatedValue()."
+    },
+    {
+      "id": "use_table_param",
+      "type": "parameter",
+      "label": "UseTable",
+      "importance": 2
+    },
+    {
+      "id": "inversion",
+      "type": "process",
+      "label": "Inversion (invertBuffer)",
+      "importance": 2,
+      "detail": "Applied after buffer copy. BUG: never executes in table path (numSamples consumed by loop)."
+    },
+    {
+      "id": "inverted_param",
+      "type": "parameter",
+      "label": "Inverted",
+      "importance": 2,
+      "detail": "Functional in non-table path only. Table path has inversion bug."
+    },
+    {
+      "id": "mod_output",
+      "type": "output",
+      "label": "Modulation Output",
+      "importance": 1
+    }
+  ],
+  "edges": [
+    { "from": "disconnected", "to": "connection", "type": "conditional", "label": "connected" },
+    { "from": "disconnected", "to": "mod_output", "type": "conditional", "label": "disconnected (1.0)" },
+    { "from": "connection", "to": "buffer_copy" },
+    { "from": "use_table_param", "to": "buffer_copy", "type": "control" },
+    { "from": "buffer_copy", "to": "inversion" },
+    { "from": "inverted_param", "to": "inversion", "type": "control" },
+    { "from": "inversion", "to": "mod_output" }
+  ],
+  "groups": [
+    {
+      "id": "value_processing",
+      "label": "Value Processing",
+      "nodes": ["buffer_copy", "use_table_param", "inversion", "inverted_param"]
+    }
+  ]
+}

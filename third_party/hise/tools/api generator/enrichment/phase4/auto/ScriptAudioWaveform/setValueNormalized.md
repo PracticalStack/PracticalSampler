@@ -1,0 +1,1 @@
+Sets the value using a normalised 0.0 to 1.0 range.

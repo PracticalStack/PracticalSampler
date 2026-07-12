@@ -1,0 +1,82 @@
+{
+  "factoryPath": "control.normaliser",
+  "factory": "control",
+  "nodeId": "normaliser",
+  "description": "normalises the input value",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input Signal",
+      "rationale": "Value is the sole input parameter. The node passes it through to the output, relying on the connection system's range conversion to normalise it.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/normaliser.md",
+    "tier": "BRIEF",
+    "lines": 11
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "normaliser-passthrough-verification",
+      "category": "signal_path",
+      "question": "Is control.normaliser a simple pass-through that relies on the normalised connection system (Pattern 1 from control-infrastructure), or does it perform any active transformation of the input value?",
+      "context": "The description says 'normalises the input value' but it may simply be a normalised cable node that lets the connection layer do the range mapping."
+    },
+    {
+      "id": "normaliser-not-polyphonic",
+      "category": "parameter_behaviour",
+      "question": "The cppProperties do not include IsPolyphonic. Does normaliser use the simple_parameter pattern instead of multi_parameter? Is it a locked_mod variant or a standalone simple node?",
+      "context": "Unlike most control nodes in this batch, normaliser is monophonic. Need to confirm the implementation pattern."
+    }
+  ],
+
+  "notes": "normaliser is notably monophonic (no IsPolyphonic flag) unlike most other control nodes in this batch. It appears to be a simple pass-through cable that relies on the normalised modulation connection system to convert raw values to 0..1 range. Similar to control.locked_mod but potentially with different connection semantics. The control-infrastructure doc lists it under Pattern 1 (simple pass-through)."
+}

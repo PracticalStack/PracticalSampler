@@ -1,0 +1,63 @@
+{
+  "factoryPath": "math.add",
+  "factory": "math",
+  "nodeId": "add",
+  "description": "Adds a scalar value to the signal",
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+  "parameterGroups": [
+    {
+      "label": "Operation",
+      "rationale": "Single Value parameter controlling the math operation: s += value",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": {
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.0,
+            "skew": 1.0
+          },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+  "properties": [],
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/math/add.md",
+    "tier": "BRIEF",
+    "lines": 13
+  },
+  "availableImages": [],
+  "gaps": [],
+  "notes": "Uses vadds for SIMD-accelerated block processing. Default value 0.0 means no effect until parameter is changed."
+}

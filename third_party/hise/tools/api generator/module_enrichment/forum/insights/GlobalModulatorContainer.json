@@ -1,0 +1,96 @@
+{
+  "targetId": "GlobalModulatorContainer",
+  "domain": "modules",
+  "generatedAt": "2026-03-31",
+  "topicIds": [12543, 9778, 12107, 12633, 5782, 1583, 6813, 7925, 4440, 5255, 10724, 10709, 13523, 14031, 12851, 2150, 11919, 1015, 4889, 11824, 617, 9641, 6390, 11721, 8929, 9370, 12872, 10633, 13318, 13600, 13637, 12854, 12904, 12895],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Container must be placed above all consumers in the module tree",
+      "summary": "Consumer modules can only access a GlobalModulatorContainer that is higher in the tree than themselves. Placing it below or beside the consumer silently breaks all connections. Best practice is to place it at the very top of the instrument.",
+      "sources": ["tid:1015", "tid:5255"],
+      "verify": false
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Global Cables must be created in HiseScript; scriptnode nodes cannot create them",
+      "summary": "Compiled scriptnode networks and C++ nodes cannot call getCable() to create new cables. All cables must be instantiated via Engine.getGlobalRoutingManager().getCable() in the main script's onInit before any node tries to use them. Failing to do so causes the cable to silently not connect in the compiled plugin.",
+      "sources": ["tid:10724", "tid:11919", "tid:12543"],
+      "verify": false
+    },
+    {
+      "type": "API",
+      "title": "connectToGlobalModulator() returns true on success and throws a script error on invalid target",
+      "summary": "The scripting method connectToGlobalModulator(containerId, modulatorId) returns a boolean indicating whether the connection was established. Passing an invalid container or modulator ID does not silently fail - it throws a script error at runtime.",
+      "sources": ["tid:5782"],
+      "verify": true,
+      "verify_hint": "grep connectToGlobalModulator in hi_scripting/scripting/api; check return value and error path"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "setNoteNumber() in a script breaks global modulator event lookup; use setTransposeAmount() instead",
+      "summary": "Global modulators identify the event they belong to by note number and event ID. If a script remaps note numbers with Message.setNoteNumber(), the consumer module can no longer match the stored modulation value to the new note number, and the modulation is silently lost. Message.setTransposeAmount() preserves the original note number and does not break this lookup.",
+      "sources": ["tid:6390"],
+      "verify": false
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Global LFO retriggers on every note-on; suppress with Message.ignoreEvent(true) for free-running behaviour",
+      "summary": "Every incoming note-on event resets the global LFO phase. To achieve a free-running global LFO that is unaffected by new notes, add a script processor before the container that calls Message.ignoreEvent(true) inside the onNoteOn callback.",
+      "sources": ["tid:6813"],
+      "verify": false
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Mod chain must be processed before the target filter to avoid a buffer-size delay",
+      "summary": "If the global modulator chain is processed after the filter in the signal flow, the 'reset' signal is sent after the buffer has already been filtered, introducing an LFO delay equal to the buffer size. Place the modulation chain before the filter and set filter smoothing to zero to eliminate the delay.",
+      "sources": ["tid:7925"],
+      "verify": false
+    },
+    {
+      "type": "API",
+      "title": "Hard limit of 32 modulators per chain, configurable via HISE_NUM_MODULATORS_PER_CHAIN",
+      "summary": "The GlobalModulatorContainer chain (and all modulator chains) is limited to 32 entries by the HISE_NUM_MODULATORS_PER_CHAIN compile-time constant. This limit can be raised by setting the define to a higher value (e.g. 64) in project Extra Definitions and recompiling HISE.",
+      "sources": ["tid:11721"],
+      "verify": true,
+      "verify_hint": "grep HISE_NUM_MODULATORS_PER_CHAIN in hi_core or hi_tools headers"
+    },
+    {
+      "type": "API",
+      "title": "Global Cables copy data across DLL boundaries; multiple callbacks share one object inside HISE",
+      "summary": "When a global cable value crosses the DLL boundary of a compiled scriptnode network, the data is copied (not referenced) to prevent crashes. Once back inside the HISE process, all registered callbacks share the same underlying data object. For large data payloads, this copy overhead is non-trivial; throttle update rate accordingly.",
+      "sources": ["tid:12633"],
+      "verify": false
+    },
+    {
+      "type": "API",
+      "title": "Global Cables have no built-in persistence; values are lost on DAW load",
+      "summary": "Global cables do not store their last value in the preset or session. To restore the last cable value on DAW load, implement persistence manually: use a hidden panel to store the current value as JSON in its data property (updated asynchronously via a cable callback), and push the stored value back to the cable in onInit.",
+      "sources": ["tid:13637"],
+      "verify": false
+    },
+    {
+      "type": "GOTCHA",
+      "title": "global_cable node and global_send node serve different purposes",
+      "summary": "The global_send node routes audio signals between network positions. The global_cable node routes a single scalar parameter/modulation value. Using global_send where global_cable is needed (or vice versa) produces no error but no modulation effect.",
+      "sources": ["tid:9778"],
+      "verify": false
+    },
+    {
+      "type": "BUG",
+      "title": "Using a second GlobalModulatorContainer may cause glitches in the mod matrix",
+      "summary": "The system was designed with a single GlobalModulatorContainer in mind. Internal code frequently calls getFirstModulatorContainer() which will ignore the second container. A second container can be used to hold 'private' modulators hidden from the mod matrix, but it must be placed second in the tree, and edge cases are expected.",
+      "sources": ["tid:14031"],
+      "verify": true,
+      "verify_hint": "grep getFirstModulatorContainer in hi_core or hi_scripting"
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Envelope follower with modulated Attack parameter fails to drive a global cable in DLL builds",
+      "summary": "An envelope follower node whose Attack parameter is itself modulated does not output a usable signal to a global cable when compiled to a DLL; the cable receives near-zero values. Workaround: connect the envelope follower's output directly to the cable parameter without an additional modulator on the Attack.",
+      "sources": ["tid:12107"],
+      "verify": true,
+      "verify_hint": "check envelope_follower node in scriptnode source for modulated-parameter passthrough in DLL mode"
+    }
+  ]
+}

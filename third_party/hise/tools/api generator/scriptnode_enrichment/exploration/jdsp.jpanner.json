@@ -1,0 +1,16 @@
+{
+  "factoryPath": "jdsp.jpanner",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal (per-voice, mono or stereo)" },
+    { "id": "panner", "label": "Panner", "type": "process", "importance": 1.0, "description": "Applies stereo panning with selectable panning law" },
+    { "id": "pan", "label": "Pan", "type": "parameter", "importance": 0.9, "description": "Stereo position from -1 (left) to 1 (right), default 0 (centre)" },
+    { "id": "rule", "label": "Rule", "type": "parameter", "importance": 0.7, "description": "Panning law: Linear, Balanced, Sine3dB, Sine4.5dB, Sine6dB, Sqrt3dB, Sqrt4p5dB" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Panned stereo audio signal" }
+  ],
+  "edges": [
+    { "from": "in", "to": "panner", "type": "signal", "label": null },
+    { "from": "pan", "to": "panner", "type": "control", "label": null },
+    { "from": "rule", "to": "panner", "type": "control", "label": null },
+    { "from": "panner", "to": "out", "type": "signal", "label": null }
+  ]
+}

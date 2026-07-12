@@ -1,0 +1,1 @@
+Returns the number of output channels configured for the plugin (default 2 for stereo). This is a compile-time constant set at export time and cannot be changed at runtime.

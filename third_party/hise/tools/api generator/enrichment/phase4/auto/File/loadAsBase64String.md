@@ -1,0 +1,1 @@
+Reads the file as raw binary data and returns a Base64-encoded string. No compression is applied - the file bytes are encoded directly. Base64 encoding increases the data size by approximately 33%. Returns an empty string if the file does not exist.

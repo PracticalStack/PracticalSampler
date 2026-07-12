@@ -1,0 +1,1 @@
+Resolves a string layer ID to its zero-based numeric index. If a number is passed, it is returned as-is. Useful when you store layer references by name but need the numeric index for other API calls.

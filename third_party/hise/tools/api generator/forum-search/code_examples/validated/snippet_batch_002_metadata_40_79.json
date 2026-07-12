@@ -1,0 +1,530 @@
+{
+  "40": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "pnlContainer"},
+      {"type": "ScriptPanel", "id": "pnlSubPanel"}
+    ],
+    "verifyScript": null,
+    "notes": "Paint routine — compile-only. Uses getAllComponents('pnlSubPanel') so needs at least one ScriptPanel with that name prefix. drawSubPanel is defined after setPaintRoutine call — forward reference; should be fine in HiseScript as inline functions are hoisted."
+  },
+  "41": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "MidiPlayer", "name": "Midi Controller1"}
+    ],
+    "components": [
+      {"type": "ScriptTable", "id": "Table1"},
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "Uses Synth.getTableProcessor('Midi Controller1') — MidiPlayer has table data so it works as a TableProcessor. Table1.set('processorId') links the UI table to the module. Compile-only; button callback only fires on user interaction."
+  },
+  "42": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "MidiPlayer", "name": "Midi Controller1"}
+    ],
+    "components": [
+      {"type": "ScriptTable", "id": "Table1"},
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "Engine.createAndRegisterTableData is self-contained. Synth.getTableProcessor('Midi Controller1') used as an ExternalDataHolder for getTable(0).linkTo(). Button callback is interaction-only. Compile-only test."
+  },
+  "43": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptComboBox", "id": "cmb"}
+    ],
+    "verifyScript": null,
+    "notes": "getAllComponents('cmb') returns ScriptComboBoxes with that name prefix. const items array is mutated (clear/push) not reassigned — valid in HiseScript. Callback fires with ComboBox value (1-based), so value-1 can be 0 (first item) or -1 (nothing selected, deactivate=-1 handled by guard). Compile-only."
+  },
+  "44": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptComboBox", "id": "cmb"}
+    ],
+    "verifyScript": null,
+    "notes": "Same pattern as index 43 but adds LAF with drawPopupMenuItem and drawComboBox. setLocalLookAndFeel compile-only. Needs at least one ComboBox with 'cmb' prefix."
+  },
+  "45": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "CmbPnl"}
+    ],
+    "verifyScript": null,
+    "notes": "getAllComponents('CmbPnl') fetches ScriptPanels used as custom combo boxes. Uses popupMenuItems property, setDraggingBounds, setMouseCallback, and setControlCallback. CmbPnls[!CmbPnls.indexOf(component)] uses boolean-coerced index to pick the other panel. Compile-only."
+  },
+  "46": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptFloatingTile", "id": "FloatingTile1"}
+    ],
+    "verifyScript": null,
+    "notes": "LAF for keyboard: registers drawBlackNote and drawWhiteNote via createLocalLookAndFeel. FloatingTile needs to contain a Keyboard content type for LAF to actually render, but compile test is valid regardless."
+  },
+  "47": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"}
+    ],
+    "verifyScript": null,
+    "notes": "Dispatches function calls via object key lookup. f1/f2 are referenced in the functions object before they are defined — in HiseScript inline functions are hoisted so this compiles fine. Mouse callback only, compile-only test."
+  },
+  "48": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Self-contained performance benchmark using Console.startBenchmark/stopBenchmark. Runs 1M iterations per test — may be slow but should complete. No observable state to verify beyond console output (benchmark timings vary per run). Compile-only."
+  },
+  "49": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Server.* API calls — requires external network connectivity (Server.setBaseURL, Server.callWithGET to pastebin.com). Cannot be tested in isolated environment.",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Also uses eval() on server-returned strings. Legitimate skip per skip policy."
+  },
+  "50": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "CurveEq", "name": "Parametriq EQ1"}
+    ],
+    "components": [
+      {"type": "ScriptSlider", "id": "FREQ"},
+      {"type": "ScriptSlider", "id": "GAIN"},
+      {"type": "ScriptSlider", "id": "Q"},
+      {"type": "ScriptFloatingTile", "id": "FloatingTile1"}
+    ],
+    "verifyScript": null,
+    "notes": "CurveEq is the correct module type for 'Parametriq EQ1'. Uses ParametriqEQ1.Freq, .Gain, .Q, .BandOffset attribute constants. LAF registers drawFilterPath, drawFilterDragHandle, drawPopupMenuBackground — compile-only."
+  },
+  "51": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"},
+      {"type": "ScriptSlider", "id": "Knob2"}
+    ],
+    "verifyScript": null,
+    "notes": "LAF for linear slider with bidirectional fill logic. Knob1 and Knob2 get the custom LAF applied. Compile-only — visual output only."
+  },
+  "52": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptButton", "id": "Button1"},
+      {"type": "ScriptButton", "id": "Button2"},
+      {"type": "ScriptButton", "id": "Button3"},
+      {"type": "ScriptButton", "id": "Button4"},
+      {"type": "ScriptPanel", "id": "Panel1"},
+      {"type": "ScriptPanel", "id": "Panel2"},
+      {"type": "ScriptPanel", "id": "Panel3"},
+      {"type": "ScriptPanel", "id": "Panel4"}
+    ],
+    "verifyScript": null,
+    "notes": "Page navigation using Broadcaster with attachToRadioGroup. Buttons have radioGroup 9001. Broadcaster listens and controls Panel visibility. pageBroadcaster.sendAsyncMessage([0]) fires at init to show first page. Compile-only."
+  },
+  "53": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"}
+    ],
+    "verifyScript": null,
+    "notes": "Paint routine draws repeated diagonal line pattern. Self-contained beyond needing Panel1. Compile-only."
+  },
+  "54": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Pnl"}
+    ],
+    "verifyScript": null,
+    "notes": "Ellipse hit detection using math (distance formula). Paint routine draws a chartreuse ellipse and stores its bounds in panel data. Mouse callback checks hover coordinates. Compile-only."
+  },
+  "55": {
+    "tier": 4,
+    "testable": false,
+    "invalid": true,
+    "skipReason": "Truncated snippet — code ends mid-string-literal: g.drawAlignedText(\"k  — paint routine function body is incomplete. Will cause a compile error.",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "The snippet was extracted with incomplete content. Should be removed from the dataset."
+  },
+  "56": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Pnl"}
+    ],
+    "verifyScript": null,
+    "notes": "Creates a star path and uses p.contains() for hit testing in the mouse callback. Self-contained path drawing with mouse-driven repaint. Compile-only."
+  },
+  "57": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Pnl"}
+    ],
+    "verifyScript": null,
+    "notes": "Animated text-on-path using panel timer and trigonometric positioning. Timer fires at 30ms intervals. Compile-only — visual animation test."
+  },
+  "58": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"}
+    ],
+    "verifyScript": null,
+    "notes": "Draws an SVG from a base64-encoded string using Content.createSVG and g.drawSVG. SVG data is embedded inline. Compile-only."
+  },
+  "59": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptedViewport", "id": "Viewport1"},
+      {"type": "ScriptedViewport", "id": "Viewport2"},
+      {"type": "ScriptPanel", "id": "ScriptPanel1"}
+    ],
+    "verifyScript": null,
+    "notes": "Custom scrollable list with keyboard navigation. ScriptPanel1 height is set dynamically based on list.length. Requires Viewport1 to calculate visible area for scroll position. Viewport2 is referenced but not used in the code — may be a placeholder. Compile-only."
+  },
+  "60": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptLabel", "id": "Label1"},
+      {"type": "ScriptLabel", "id": "Label2"},
+      {"type": "ScriptLabel", "id": "Label3"},
+      {"type": "ScriptLabel", "id": "Label4"},
+      {"type": "ScriptLabel", "id": "Label5"},
+      {"type": "ScriptLabel", "id": "Label6"},
+      {"type": "ScriptButton", "id": "decBtn0"},
+      {"type": "ScriptButton", "id": "incBtn0"},
+      {"type": "ScriptButton", "id": "decBtn1"},
+      {"type": "ScriptButton", "id": "incBtn1"},
+      {"type": "ScriptButton", "id": "decBtn2"},
+      {"type": "ScriptButton", "id": "incBtn2"},
+      {"type": "ScriptButton", "id": "decBtn3"},
+      {"type": "ScriptButton", "id": "incBtn3"},
+      {"type": "ScriptButton", "id": "decBtn4"},
+      {"type": "ScriptButton", "id": "incBtn4"},
+      {"type": "ScriptButton", "id": "decBtn5"},
+      {"type": "ScriptButton", "id": "incBtn5"}
+    ],
+    "verifyScript": null,
+    "notes": "Increment/decrement button pairs controlling label values. Labels are also editable (setControlCallback on labels reads parseInt from text). Callback guards prevent out-of-range values via Math.range. Compile-only."
+  },
+  "61": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptButton", "id": "Button1"},
+      {"type": "ScriptButton", "id": "Button2"},
+      {"type": "ScriptButton", "id": "Button3"},
+      {"type": "ScriptButton", "id": "Button4"},
+      {"type": "ScriptButton", "id": "btnQuery"}
+    ],
+    "verifyScript": null,
+    "notes": "Bitmask encoding of button states using bitwise operations. reg num accumulates the bitmask. btnQuery prints a human-readable summary. Compile-only — interaction-driven."
+  },
+  "62": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "TooltipPnl"},
+      {"type": "ScriptPanel", "id": "MousePanel"}
+    ],
+    "verifyScript": null,
+    "notes": "Tooltip panel that tracks mouse position across all components. Uses Content.getAllComponents('') to get all components and records their positions. Engine.createTimerObject used to re-enable MousePanel after mouse leaves an enabled component. Content.getComponentUnderMouse() returns JUCE component ID. Compile-only."
+  },
+  "63": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"},
+      {"type": "ScriptPanel", "id": "Panel1"}
+    ],
+    "verifyScript": null,
+    "notes": "Radial knob label layout using g.rotate. Panel1 draws labels rotated around the center. Knob callback updates panel data and triggers repaint. Compile-only."
+  },
+  "64": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"},
+      {"type": "ScriptPanel", "id": "Panel1"}
+    ],
+    "verifyScript": null,
+    "notes": "Variant of radial label layout with aspect ratio correction via conformToSquare helper. Uses Arabic mode names as labels. Compile-only."
+  },
+  "65": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptLabel", "id": "Label1"},
+      {"type": "ScriptSlider", "id": "Knob1"}
+    ],
+    "verifyScript": null,
+    "notes": "Knob value display with timer-based reset. Knob1CB references t before it is defined on the next line — but t is only called at runtime (when callback fires), at which point t is fully initialized. Engine.createTimerObject callback resets label after 1 second. Compile-only."
+  },
+  "66": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "Toggle slider button LAF using drawToggleButton. Renders a pill-shaped toggle with different text and handle position per state. obj.text.split('.') used to extract on/off labels. Compile-only."
+  },
+  "67": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "panel"}
+    ],
+    "verifyScript": null,
+    "notes": "Animated rotating triangle using panel timer and g.rotate. Panel data stores angle and state. Mouse click toggles rotation direction. Timer updates angle by 10 deg per 30ms tick. Compile-only."
+  },
+  "68": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"},
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "Animation namespace with increase/decrease helpers using setTimerCallback on Panel1. Timer references Button1 which is defined after the setTimerCallback call — this is safe because Button1 is assigned before any timer fires (timer only starts from Button1 callback). Compile-only."
+  },
+  "69": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "SlotFX", "name": "HardcodedMasterFX1"}
+    ],
+    "components": [
+      {"type": "ScriptPanel", "id": "MainPanel"},
+      {"type": "ScriptPanel", "id": "FXPanel1"},
+      {"type": "ScriptPanel", "id": "FXPanel2"},
+      {"type": "ScriptPanel", "id": "FXPanel3"},
+      {"type": "ScriptPanel", "id": "FXPanel4"},
+      {"type": "ScriptPanel", "id": "FXPanel5"},
+      {"type": "ScriptPanel", "id": "FXPanel6"}
+    ],
+    "verifyScript": null,
+    "notes": "Drag-and-drop FX panel reorder. getSlotFX('HardcodedMasterFX1') called 6 times for the same name (all refs point to same slot). fx_panel_grid() references 'event' variable — this is defined as a parameter in the anonymous mouse callback function, so fx_panel_grid(this) is called with 'event' from the outer closure scope. In HiseScript, 'event' is accessible as a local in the mouse callback so the closure should capture it. Compile-only."
+  },
+  "70": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "MainPanel"},
+      {"type": "ScriptPanel", "id": "FXPanel"}
+    ],
+    "verifyScript": null,
+    "notes": "Live-swap FX panel reorder using drag. getAllComponents('FXPanel') needs multiple panels with that name prefix. MainPanel stores order array as its value. Dragging panels swaps Y positions. Compile-only."
+  },
+  "71": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "ShapeFX", "name": "Shape FX1"}
+    ],
+    "components": [
+      {"type": "ScriptTable", "id": "Table1"},
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "Uses Synth.getTableProcessor('Shape FX1') — ShapeFX is an ExternalDataHolder with table data. Variable is named 'GlobalTimeVariantModulator1' but holds the ShapeFX table processor handle. Calls reset(0), setTablePoint, and addTablePoint on it. Table1 component displays the table data. Compile-only — button callback randomizes table points."
+  },
+  "72": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptComboBox", "id": "ComboBox1"}
+    ],
+    "verifyScript": null,
+    "notes": "LAF for popup menu item size via getIdealPopupMenuItemSize. Returns 60 (height only). Console.print(trace(obj)) fires during item measurement. LAF compile-only."
+  },
+  "73": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"}
+    ],
+    "verifyScript": null,
+    "notes": "Hue cycling animation using Colours.withHue and panel timer. Timer fires every 30ms, increments hue via Math.fmod. Self-contained paint routine. Compile-only."
+  },
+  "74": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptButton", "id": "btnNumber0"},
+      {"type": "ScriptButton", "id": "btnNumber1"},
+      {"type": "ScriptButton", "id": "btnNumber2"},
+      {"type": "ScriptButton", "id": "btnNumber3"},
+      {"type": "ScriptButton", "id": "btnNumber4"},
+      {"type": "ScriptButton", "id": "btnNumber5"}
+    ],
+    "verifyScript": null,
+    "notes": "Demonstrates indexOf for identifying which button in an array was clicked. Prints 1-based button index on press. Compile-only — interaction driven."
+  },
+  "75": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptLabel", "id": "lblDisplay"},
+      {"type": "ScriptButton", "id": "btnClear"},
+      {"type": "ScriptButton", "id": "btnNumber0"},
+      {"type": "ScriptButton", "id": "btnNumber1"},
+      {"type": "ScriptButton", "id": "btnNumber2"},
+      {"type": "ScriptButton", "id": "btnNumber3"},
+      {"type": "ScriptButton", "id": "btnNumber4"},
+      {"type": "ScriptButton", "id": "btnNumber5"},
+      {"type": "ScriptButton", "id": "btnNumber6"},
+      {"type": "ScriptButton", "id": "btnNumber7"},
+      {"type": "ScriptButton", "id": "btnNumber8"},
+      {"type": "ScriptButton", "id": "btnNumber9"},
+      {"type": "ScriptButton", "id": "btnOperator0"},
+      {"type": "ScriptButton", "id": "btnOperator1"},
+      {"type": "ScriptButton", "id": "btnOperator2"},
+      {"type": "ScriptButton", "id": "btnOperator3"},
+      {"type": "ScriptButton", "id": "btnEquals"}
+    ],
+    "verifyScript": null,
+    "notes": "Calculator using eval() to evaluate arithmetic expressions. clear() called at init to reset display. Compile-only — interaction driven."
+  },
+  "76": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "SineSynth", "name": "SineSynth1"},
+      {"type": "LFO", "name": "LFO Modulator1", "parent": "SineSynth1", "chain": 1}
+    ],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"}
+    ],
+    "verifyScript": null,
+    "notes": "LFO SliderPack display callback visualization. Needs an LFO modulator named 'LFO Modulator1' accessible via both Synth.getModulator and Synth.getSliderPackProcessor. LFO is an ExternalDataHolder so getSliderPackProcessor finds it. setDisplayCallback fires when display index changes (driven by playback). In the callback, 'this' refers to the SliderPackData object so getNumSliders(), getCurrentlyDisplayedIndex(), and getValue() are valid. Paint routine visualizes current LFO position. Compile-only."
+  },
+  "77": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Panel1"},
+      {"type": "ScriptLabel", "id": "Label1"},
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "Dynamic child panel creation using Panel1.addChildPanel() and removeFromParent(). Panel1 height grows dynamically. Label1.getValue() reads entered text. Compile-only — interaction driven (button adds items)."
+  },
+  "78": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "WaveSynth", "name": "Waveform Generator1"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Uses Synth.getChildSynth('Waveform Generator1') then WG1.addModulator(4, ...). Chain 4 may be invalid on a WaveSynth (valid chains per API: 1=Gain, 2=Pitch — chain 0 is disallowed). Also uses 'GlobalTimeVariantModulator' as type name — this is the C++ class name for GlobalTimeVariantModulator. Chain 4 likely fails silently or errors; code may still compile. Synth.removeModulator(mod) removes the first modulator (returned from addModulator). Potential partial failure — mark testable, expect possible runtime warning."
+  },
+  "79": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "AudioLooper", "name": "LoopPlayer"}
+    ],
+    "components": [
+      {"type": "ScriptPanel", "id": "SampleBrowser"},
+      {"type": "ScriptLabel", "id": "SelectedSampleName"},
+      {"type": "ScriptSlider", "id": "SampleBrowserScroll"},
+      {"type": "ScriptButton", "id": "PrevSample"},
+      {"type": "ScriptButton", "id": "NextSample"},
+      {"type": "ScriptButton", "id": "RandomSample"}
+    ],
+    "verifyScript": null,
+    "notes": "Grid sample browser with navigation buttons. Synth.getAudioSampleProcessor('LoopPlayer') returns the AudioLooper handle (not used beyond init). SampleBrowser panel draws a grid and handles mouse clicks. Timer updates the visual selection every 250ms. SampleBrowserScroll controls panel Y position. Nav buttons cycle through 350 samples. sampleVal starts at -1 so sampleNameUpdate is only called from buttons. Compile-only."
+  }
+}

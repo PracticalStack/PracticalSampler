@@ -1,0 +1,20 @@
+{
+  "factoryPath": "control.tempo_sync",
+  "nodes": [
+    { "id": "bpm", "label": "BPM Input", "type": "input", "importance": 0.9, "description": "Current tempo from DAW/host via TempoListener" },
+    { "id": "tempo", "label": "Tempo", "type": "parameter", "importance": 1.0, "description": "Musical time value (1/1 through 1/64T)" },
+    { "id": "multiplier", "label": "Multiplier", "type": "parameter", "importance": 0.7, "description": "Multiplier for the tempo duration" },
+    { "id": "enabled", "label": "Enabled", "type": "parameter", "importance": 0.8, "description": "Toggle between synced and manual time" },
+    { "id": "unsynced", "label": "UnsyncedTime", "type": "parameter", "importance": 0.7, "description": "Manual time in ms (used when Enabled=off)" },
+    { "id": "mode_switch", "label": "Sync/Manual", "type": "decision", "importance": 0.8, "description": "If Enabled: tempo-synced ms; else: UnsyncedTime" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Duration in milliseconds (unnormalised)" }
+  ],
+  "edges": [
+    { "from": "bpm", "to": "mode_switch", "type": "signal", "label": null },
+    { "from": "tempo", "to": "mode_switch", "type": "control", "label": null },
+    { "from": "multiplier", "to": "mode_switch", "type": "control", "label": null },
+    { "from": "enabled", "to": "mode_switch", "type": "control", "label": "selects mode" },
+    { "from": "unsynced", "to": "mode_switch", "type": "control", "label": "manual fallback" },
+    { "from": "mode_switch", "to": "mod_out", "type": "signal", "label": "ms value" }
+  ]
+}

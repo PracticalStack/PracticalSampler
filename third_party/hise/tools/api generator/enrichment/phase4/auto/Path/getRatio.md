@@ -1,0 +1,1 @@
+Returns the width-to-height aspect ratio of the path's bounding box. A ratio of 1.0 means the path is as wide as it is tall. Useful for preserving proportions when scaling a path into a target area with `scaleToFit`.

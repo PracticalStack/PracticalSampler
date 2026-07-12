@@ -1,0 +1,18 @@
+{
+  "factoryPath": "jdsp.jlinkwitzriley",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "filter", "label": "Linkwitz-Riley Filter", "type": "process", "importance": 1.0, "description": "4th-order (24 dB/oct) Linkwitz-Riley filter" },
+    { "id": "frequency", "label": "Frequency", "type": "parameter", "importance": 0.9, "description": "Cutoff frequency in Hz (20-20000, default 2000)" },
+    { "id": "type", "label": "Type", "type": "parameter", "importance": 0.9, "description": "Filter mode: 0=LP, 1=HP, 2=AP" },
+    { "id": "filter_display", "label": "Filter Display", "type": "external_data", "importance": 0.5, "description": "Filter coefficient data for UI curve display" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Filtered audio signal" }
+  ],
+  "edges": [
+    { "from": "in", "to": "filter", "type": "signal", "label": null },
+    { "from": "frequency", "to": "filter", "type": "control", "label": null },
+    { "from": "type", "to": "filter", "type": "control", "label": null },
+    { "from": "filter", "to": "filter_display", "type": "signal", "label": "coefficients" },
+    { "from": "filter", "to": "out", "type": "signal", "label": null }
+  ]
+}

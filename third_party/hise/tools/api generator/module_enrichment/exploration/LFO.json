@@ -1,0 +1,231 @@
+{
+  "moduleId": "LFO",
+  "nodes": [
+    {
+      "id": "phase_acc",
+      "label": "Phase Accumulator",
+      "type": "input",
+      "importance": 0.5,
+      "group": "oscillator",
+      "description": "Tracks the current position in the waveform cycle via the uptime counter"
+    },
+    {
+      "id": "waveform_select",
+      "label": "Waveform Select",
+      "type": "decision",
+      "importance": 0.9,
+      "group": "oscillator",
+      "description": "Selects the waveform generation method based on WaveformType"
+    },
+    {
+      "id": "param_waveformtype",
+      "label": "WaveformType",
+      "type": "parameter",
+      "importance": 0.8,
+      "group": "oscillator",
+      "description": "Selects between Sine, Triangle, Saw, Square, Random, Custom, or Steps"
+    },
+    {
+      "id": "table_lookup",
+      "label": "Table Lookup",
+      "type": "process",
+      "importance": 0.7,
+      "group": "oscillator",
+      "description": "Interpolated lookup from a pre-computed waveform table (Sine/Triangle/Saw/Square) or user-drawn table (Custom)"
+    },
+    {
+      "id": "random_gen",
+      "label": "Random Value",
+      "type": "process",
+      "importance": 0.5,
+      "group": "oscillator",
+      "description": "Generates a new random value once per cycle"
+    },
+    {
+      "id": "step_read",
+      "label": "Step Sequencer",
+      "type": "process",
+      "importance": 0.7,
+      "group": "oscillator",
+      "description": "Reads the current step value from the slider pack, advancing on each cycle"
+    },
+    {
+      "id": "param_numsteps",
+      "label": "NumSteps",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": "oscillator",
+      "description": "Number of steps in the step sequencer"
+    },
+    {
+      "id": "fadein",
+      "label": "Fade-In Envelope",
+      "type": "process",
+      "importance": 0.8,
+      "group": "envelope",
+      "description": "Exponential fade-in envelope that ramps LFO intensity after note trigger"
+    },
+    {
+      "id": "param_fadein",
+      "label": "FadeIn",
+      "type": "parameter",
+      "importance": 0.7,
+      "group": "envelope",
+      "description": "Fade-in time in milliseconds"
+    },
+    {
+      "id": "mode_output",
+      "label": "Mode Output Mapping",
+      "type": "process",
+      "importance": 0.6,
+      "group": "output",
+      "description": "Transforms the waveform+envelope value based on modulation mode (Gain/Pitch/Pan) and bipolar setting"
+    },
+    {
+      "id": "smoothing",
+      "label": "Smoothing",
+      "type": "process",
+      "importance": 0.7,
+      "group": "output",
+      "description": "Low-pass smoothing filter to reduce discontinuities"
+    },
+    {
+      "id": "param_smoothingtime",
+      "label": "SmoothingTime",
+      "type": "parameter",
+      "importance": 0.6,
+      "group": "output",
+      "description": "Smoothing time in milliseconds"
+    },
+    {
+      "id": "intensity_mod",
+      "label": "LFO Intensity Mod",
+      "type": "modulation",
+      "importance": 0.8,
+      "group": "output",
+      "description": "Scales the LFO output depth"
+    },
+    {
+      "id": "freq_calc",
+      "label": "Frequency Calculation",
+      "type": "process",
+      "importance": 0.8,
+      "group": "frequency",
+      "description": "Calculates the phase increment (angleDelta) from frequency, tempo sync, and frequency modulation"
+    },
+    {
+      "id": "param_frequency",
+      "label": "Frequency",
+      "type": "parameter",
+      "importance": 0.8,
+      "group": "frequency",
+      "description": "LFO rate in Hz or tempo-synced note division"
+    },
+    {
+      "id": "param_temposync",
+      "label": "TempoSync",
+      "type": "parameter",
+      "importance": 0.7,
+      "group": "frequency",
+      "description": "Switches Frequency between Hz and tempo division"
+    },
+    {
+      "id": "host_bpm",
+      "label": "Host BPM",
+      "type": "external",
+      "importance": 0.5,
+      "group": "frequency",
+      "description": "Host tempo used for tempo-synced frequency calculation"
+    },
+    {
+      "id": "freq_mod",
+      "label": "LFO Frequency Mod",
+      "type": "modulation",
+      "importance": 0.7,
+      "group": "frequency",
+      "description": "Modulates the LFO frequency"
+    },
+    {
+      "id": "param_phaseoffset",
+      "label": "PhaseOffset",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": "oscillator",
+      "description": "Initial phase offset applied on reset"
+    },
+    {
+      "id": "param_legato",
+      "label": "Legato",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": "triggering",
+      "description": "Prevents phase reset on overlapping notes"
+    },
+    {
+      "id": "param_ignorenote",
+      "label": "IgnoreNoteOn",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": "triggering",
+      "description": "Free-run mode, no note-triggered phase reset"
+    },
+    {
+      "id": "param_loopenabled",
+      "label": "LoopEnabled",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": "output",
+      "description": "Enables waveform looping (only affects Custom and Steps modes)"
+    },
+    {
+      "id": "param_syncclock",
+      "label": "SyncToMasterClock",
+      "type": "parameter",
+      "importance": 0.4,
+      "group": "frequency",
+      "description": "Syncs phase to host transport position (requires TempoSync)"
+    },
+    {
+      "id": "mod_output",
+      "label": "Modulation Output",
+      "type": "output",
+      "importance": 0.9,
+      "group": null,
+      "description": "Final modulation value sent to the parent modulation chain"
+    }
+  ],
+  "edges": [
+    { "from": "phase_acc", "to": "waveform_select", "type": "signal", "label": null },
+    { "from": "param_waveformtype", "to": "waveform_select", "type": "control", "label": null },
+    { "from": "waveform_select", "to": "table_lookup", "type": "conditional", "label": "Sine/Tri/Saw/Sq/Custom" },
+    { "from": "waveform_select", "to": "random_gen", "type": "conditional", "label": "Random" },
+    { "from": "waveform_select", "to": "step_read", "type": "conditional", "label": "Steps" },
+    { "from": "param_numsteps", "to": "step_read", "type": "control", "label": null },
+    { "from": "table_lookup", "to": "fadein", "type": "signal", "label": null },
+    { "from": "random_gen", "to": "fadein", "type": "signal", "label": null },
+    { "from": "step_read", "to": "fadein", "type": "signal", "label": null },
+    { "from": "param_fadein", "to": "fadein", "type": "control", "label": null },
+    { "from": "fadein", "to": "mode_output", "type": "signal", "label": null },
+    { "from": "mode_output", "to": "smoothing", "type": "signal", "label": null },
+    { "from": "param_smoothingtime", "to": "smoothing", "type": "control", "label": null },
+    { "from": "smoothing", "to": "mod_output", "type": "signal", "label": null },
+    { "from": "intensity_mod", "to": "mod_output", "type": "control", "label": "post-multiply" },
+    { "from": "param_frequency", "to": "freq_calc", "type": "control", "label": null },
+    { "from": "param_temposync", "to": "freq_calc", "type": "conditional", "label": "Hz or tempo division" },
+    { "from": "host_bpm", "to": "freq_calc", "type": "control", "label": "when synced" },
+    { "from": "freq_mod", "to": "freq_calc", "type": "control", "label": "multiply" },
+    { "from": "freq_calc", "to": "phase_acc", "type": "control", "label": "angleDelta" },
+    { "from": "param_phaseoffset", "to": "phase_acc", "type": "control", "label": "on reset" },
+    { "from": "param_legato", "to": "phase_acc", "type": "conditional", "label": "gates reset" },
+    { "from": "param_ignorenote", "to": "phase_acc", "type": "conditional", "label": "gates reset" },
+    { "from": "param_loopenabled", "to": "waveform_select", "type": "conditional", "label": "Custom/Steps only" },
+    { "from": "param_syncclock", "to": "phase_acc", "type": "conditional", "label": "resyncs to transport" }
+  ],
+  "groups": [
+    { "id": "oscillator", "label": "Waveform Generation" },
+    { "id": "envelope", "label": "Fade-In Envelope" },
+    { "id": "output", "label": "Output Processing" },
+    { "id": "frequency", "label": "Frequency Control" },
+    { "id": "triggering", "label": "Note Triggering" }
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "targetId": "LFO",
+  "domain": "modules",
+  "generatedAt": "2026-03-30",
+  "topicIds": [6446, 1445, 4696, 9736, 6813, 13793, 3712, 5148, 913, 3062, 3639, 4468, 4620, 9582, 11860, 3245, 2286, 2029, 3485, 2786, 7693, 4833, 9179, 2811, 4368, 11220, 12904, 10297, 8825, 7804, 4674, 842, 1521, 2193, 3540, 3808, 5575, 7518, 7666, 8417, 2448, 2991, 11118],
+  "questions": [
+    {
+      "id": "max-slow-tempo-sync",
+      "question": "What is the maximum slow tempo-sync speed the LFO supports, and what options exist for rates slower than 1/1 bar (e.g., 2/1, 4/1)?",
+      "gap_type": "edge_case",
+      "sources": ["tid:6446", "tid:4696"],
+      "maps_to_existing_gap": "tempo-sync-mechanism"
+    },
+    {
+      "id": "phase-parameter-behaviour",
+      "question": "What exactly does the Phase parameter control, and does it only affect the start position on reset or does it shift the running phase continuously?",
+      "gap_type": "behaviour",
+      "sources": ["tid:1445"],
+      "maps_to_existing_gap": "note-trigger-behaviour"
+    },
+    {
+      "id": "phase-reset-timing",
+      "question": "When does the LFO reset its phase - is it per note-on, per voice, or continuously running - and how does placement in the module tree affect this?",
+      "gap_type": "behaviour",
+      "sources": ["tid:1445"],
+      "maps_to_existing_gap": "note-trigger-behaviour"
+    },
+    {
+      "id": "ignore-note-on-discovery",
+      "question": "How do you prevent the LFO from retriggering on each note-on, and what is the IgnoreNoteOn attribute (parameter index 10)?",
+      "gap_type": "workflow",
+      "sources": ["tid:6813", "tid:13793"],
+      "maps_to_existing_gap": "note-trigger-behaviour"
+    },
+    {
+      "id": "clock-sync-vs-transport",
+      "question": "What does the SyncToMasterClock mode actually do, and how does it differ from using Engine.createTransportHandler() to lock to DAW playback position?",
+      "gap_type": "behaviour",
+      "sources": ["tid:9582"],
+      "maps_to_existing_gap": null
+    },
+    {
+      "id": "loop-mode-per-waveform",
+      "question": "Does Loop Mode work with all LFO waveform types, or only Custom and Pattern waveforms?",
+      "gap_type": "behaviour",
+      "sources": ["tid:3062"],
+      "maps_to_existing_gap": "loop-behaviour"
+    },
+    {
+      "id": "high-frequency-degradation",
+      "question": "What happens to LFO quality and accuracy above ~30-40 Hz, and can reducing HISE_EVENT_RASTER fix the degradation?",
+      "gap_type": "performance",
+      "sources": ["tid:3639"],
+      "maps_to_existing_gap": "performance"
+    },
+    {
+      "id": "filter-click-on-retrigger",
+      "question": "Why does LFO-modulated filter frequency produce an audible click or pop on note retrigger, and how can it be avoided?",
+      "gap_type": "interaction",
+      "sources": ["tid:3245"],
+      "maps_to_existing_gap": "signal-path-order"
+    },
+    {
+      "id": "phase-randomization",
+      "question": "How do you randomize the LFO start phase per voice without scaling the LFO's output range?",
+      "gap_type": "workflow",
+      "sources": ["tid:13793"],
+      "maps_to_existing_gap": null
+    },
+    {
+      "id": "lfo-vs-scriptnode",
+      "question": "What is the difference between using the built-in LFO, a scriptnode time-variant modulator, and a scriptnode envelope for retrigger and polyphony behaviour?",
+      "gap_type": "interaction",
+      "sources": ["tid:6813"],
+      "maps_to_existing_gap": null
+    },
+    {
+      "id": "module-tree-placement",
+      "question": "How does LFO placement in the module tree (root container vs inside sampler) affect phase reset and FadeIn behaviour?",
+      "gap_type": "interaction",
+      "sources": ["tid:1445", "tid:3808"],
+      "maps_to_existing_gap": null
+    }
+  ]
+}

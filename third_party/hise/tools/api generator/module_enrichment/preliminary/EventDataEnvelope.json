@@ -1,0 +1,130 @@
+{
+  "moduleId": "EventDataEnvelope",
+  "prettyName": "EventData Envelope",
+  "type": "Modulator",
+  "subtype": "EnvelopeModulator",
+  "category": "routing",
+
+  "io": {
+    "midiIn": "noteOn+noteOff",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": true,
+    "fxChain": null
+  },
+
+  "voiceContext": "per-voice",
+
+  "interfaces": [],
+
+  "parameterGroups": [
+    {
+      "label": "Event Data",
+      "rationale": "Both parameters define which event data slot to read and what value to use when the slot is empty",
+      "parameters": [
+        {
+          "id": "SlotIndex",
+          "name": "SlotIndex",
+          "range": { "min": 0.0, "max": 16.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "The event data slot index to read from (0-15)",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "DefaultValue",
+          "name": "DefaultValue",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "The value to use when the event data slot hasn't been written",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Smoothing",
+      "rationale": "Controls temporal smoothing for continuous value changes, preventing zipper noise when event data updates mid-voice",
+      "parameters": [
+        {
+          "id": "SmoothingTime",
+          "name": "SmoothingTime",
+          "range": { "min": 0.0, "max": 2000.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "Smoothing time for value changes in milliseconds",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Voice Mode",
+      "rationale": "These parameters control monophonic behavior and note retriggering, which are standard EnvelopeModulator parameters",
+      "parameters": [
+        {
+          "id": "Monophonic",
+          "name": "Monophonic",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": "dynamic",
+          "description": "Enables monophonic mode where only one voice is rendered",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Retrigger",
+          "name": "Retrigger",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Restarts the envelope when a new note is triggered in monophonic mode",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "standaloneModChains": [],
+  "disabledModChains": [],
+  "compositeBlocks": [],
+
+  "gaps": [
+    {
+      "id": "continuous-vs-voicestart-reading",
+      "category": "signal_path",
+      "question": "How does continuous event data reading work in the EnvelopeModulator version vs. the VoiceStartModulator (EventDataModulator)? Does this module poll the event data slot every audio block, or does it respond to change events?",
+      "context": "This is the key differentiator from EventDataModulator - the 'envelope' nature implies time-varying behavior rather than sample-and-hold"
+    },
+    {
+      "id": "smoothing-algorithm",
+      "category": "parameter_behavior",
+      "question": "What smoothing algorithm is used? Is it the same exponential/linear smoother used by other modulators (PitchWheel, MidiController), or a custom implementation? Default is 0ms - does that mean no smoothing (instant jumps)?",
+      "context": "With default smoothing at 0ms, users may experience stepping artifacts unless they know to increase this value"
+    },
+    {
+      "id": "event-data-write-mechanism",
+      "category": "signal_path",
+      "question": "How are event data slots written for continuous modulation? Is the same GlobalRoutingManager API used as for EventDataModulator? Can slots be updated mid-note?",
+      "context": "The continuous reading only makes sense if slots can be written to after note-on"
+    },
+    {
+      "id": "slot-index-range-discrepancy",
+      "category": "description_accuracy",
+      "question": "Same as EventDataModulator: description says '0-15' but range max is 16.0. Is slot 16 valid?",
+      "context": "Should be consistent with EventDataModulator's answer"
+    },
+    {
+      "id": "envelope-lifecycle",
+      "category": "parameter_behavior",
+      "question": "How does the note-on/note-off lifecycle work for this modulator? Does it continue reading event data during the release phase, or does it freeze the value at note-off?",
+      "context": "EnvelopeModulator subtype implies lifecycle management - users need to know if release-phase voices still respond to data changes"
+    },
+    {
+      "id": "monophonic-retrigger-behavior",
+      "category": "conditional_logic",
+      "question": "In monophonic mode with Retrigger enabled, does the modulator reset to DefaultValue and re-read the slot, or does it just continue reading the same slot from the new voice's perspective?",
+      "context": "Retrigger behavior for a data-reading modulator (vs. a stage-based envelope) is non-obvious"
+    }
+  ],
+
+  "notes": "This is the EnvelopeModulator (continuous, per-voice) counterpart to EventDataModulator (VoiceStartModulator, sample-and-hold). The key architectural question is how 'continuous reading' works - either polling the slot each block or responding to events. SmoothingTime default of 0ms means no smoothing by default, unlike PitchWheel/MidiController which default to 200ms. Monophonic default is 'dynamic' suggesting it may be set programmatically. Natural seeAlso candidates: EventDataModulator (VoiceStart version), GlobalRoutingManager (write side)."
+}

@@ -1,0 +1,1 @@
+Previews an audio buffer through the engine's main output with a progress callback. Pass a single Buffer (mono, auto-duplicated to stereo) or an array of Buffer objects (one per channel). The callback fires periodically with `(isPlaying, position)` where position is normalised 0.0 to 1.0. Calling `playBuffer` again stops the current preview and starts a new one.

@@ -1,0 +1,82 @@
+{
+  "factoryPath": "control.locked_mod",
+  "factory": "control",
+  "nodeId": "locked_mod",
+  "description": "Adds a scaled modulation dragger to its immediate locked node container parent",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input",
+      "rationale": "The normalised input value to be forwarded to the parent container's parameter.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/locked_mod.md",
+    "tier": "GOOD",
+    "lines": 23
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "locked-container-interaction",
+      "category": "signal_path",
+      "question": "How does locked_mod discover and connect to its parent locked node container? What happens if it is not inside a locked container?",
+      "context": "The description mentions 'immediate locked node container parent' -- users need to know the placement requirements."
+    },
+    {
+      "id": "passthrough-behaviour",
+      "category": "parameter_behaviour",
+      "question": "Does locked_mod simply pass through the Value unchanged (like normaliser), or does it apply any transformation? Is the output range always 0..1?",
+      "context": "Since it is normalised (no UseUnnormalisedModulation), the target range should apply. But the exact passthrough behaviour needs confirmation."
+    }
+  ],
+
+  "notes": "locked_mod is the normalised variant; locked_mod_unscaled is the unnormalised variant. These form a disambiguation pair. No IsPolyphonic flag means monophonic only. The existing doc is GOOD tier (23 lines) so may already contain useful information."
+}

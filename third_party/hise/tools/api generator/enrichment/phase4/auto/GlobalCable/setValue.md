@@ -1,0 +1,3 @@
+Converts the input value from the local input range to normalised 0..1, then sends it to all cable targets. Without a configured range (default 0..1 identity), this behaves identically to `setValueNormalised()`.
+
+> [!Warning:Requires configured range to be meaningful] The value is only meaningful if a range has been configured with `setRange()`, `setRangeWithSkew()`, or `setRangeWithStep()`. Without a range, this is equivalent to `setValueNormalised()`.

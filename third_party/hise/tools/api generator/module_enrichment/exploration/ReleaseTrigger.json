@@ -1,0 +1,158 @@
+{
+  "moduleId": "ReleaseTrigger",
+  "nodes": [
+    {
+      "id": "midi_in",
+      "type": "input",
+      "label": "MIDI In",
+      "importance": 1.0,
+      "description": "Incoming MIDI noteOn and noteOff events"
+    },
+    {
+      "id": "noteon_capture",
+      "type": "process",
+      "label": "NoteOn Capture",
+      "importance": 0.9,
+      "group": "note_tracking",
+      "description": "Stores the noteOn HiseEvent per note number and records uptime; ignores the original noteOn"
+    },
+    {
+      "id": "noteoff_ignore",
+      "type": "process",
+      "label": "NoteOff Consume",
+      "importance": 0.7,
+      "group": "release_gen",
+      "description": "Ignores the original noteOff event"
+    },
+    {
+      "id": "time_attenuate_check",
+      "type": "decision",
+      "label": "TimeAttenuate?",
+      "importance": 0.8,
+      "group": "release_gen",
+      "description": "Checks if time-based velocity attenuation is enabled"
+    },
+    {
+      "id": "time_calc",
+      "type": "process",
+      "label": "Time Normalisation",
+      "importance": 0.8,
+      "group": "attenuation",
+      "description": "Computes elapsed hold time, normalises by Time parameter, clamps to 0-1"
+    },
+    {
+      "id": "table_lookup",
+      "type": "process",
+      "label": "Table Lookup",
+      "importance": 0.9,
+      "group": "attenuation",
+      "description": "Looks up normalised time in the attenuation curve table, returns velocity multiplier 0-1"
+    },
+    {
+      "id": "no_attenuation",
+      "type": "process",
+      "label": "No Attenuation",
+      "importance": 0.5,
+      "group": "release_gen",
+      "description": "Sets attenuationLevel to 1.0 (full velocity passthrough)"
+    },
+    {
+      "id": "mpe_check",
+      "type": "decision",
+      "label": "MPE Mode?",
+      "importance": 0.6,
+      "group": "release_gen",
+      "description": "Selects velocity source: original noteOn velocity (normal) or noteOff velocity (MPE)"
+    },
+    {
+      "id": "velocity_scale",
+      "type": "process",
+      "label": "Velocity Scaling",
+      "importance": 0.9,
+      "group": "release_gen",
+      "description": "Multiplies chosen velocity by attenuationLevel, casts to int"
+    },
+    {
+      "id": "velocity_gate",
+      "type": "decision",
+      "label": "Velocity > 0?",
+      "importance": 0.7,
+      "group": "release_gen",
+      "description": "If velocity is 0, no noteOn is generated (silent drop)"
+    },
+    {
+      "id": "event_inject",
+      "type": "process",
+      "label": "Inject Artificial NoteOn",
+      "importance": 1.0,
+      "group": "release_gen",
+      "description": "Creates artificial noteOn from stored event with scaled velocity and noteOff timestamp, injects via Synth.addMessageFromHolder"
+    },
+    {
+      "id": "time_attenuate_param",
+      "type": "parameter",
+      "label": "TimeAttenuate",
+      "importance": 0.8,
+      "description": "Toggle: enables time-based velocity attenuation"
+    },
+    {
+      "id": "time_param",
+      "type": "parameter",
+      "label": "Time",
+      "importance": 0.8,
+      "group": "attenuation",
+      "description": "Normalisation window in seconds (0-20s)"
+    },
+    {
+      "id": "time_table",
+      "type": "external",
+      "label": "TimeTable",
+      "importance": 0.9,
+      "group": "attenuation",
+      "description": "Attenuation curve: maps normalised hold time to velocity multiplier"
+    },
+    {
+      "id": "midi_out",
+      "type": "output",
+      "label": "MIDI Out",
+      "importance": 1.0,
+      "description": "Artificial noteOn events on key release (original noteOn/noteOff consumed)"
+    }
+  ],
+  "edges": [
+    { "from": "midi_in", "to": "noteon_capture", "type": "signal", "label": "noteOn events" },
+    { "from": "midi_in", "to": "noteoff_ignore", "type": "signal", "label": "noteOff events" },
+    { "from": "noteoff_ignore", "to": "time_attenuate_check", "type": "signal" },
+    { "from": "time_attenuate_param", "to": "time_attenuate_check", "type": "control" },
+    { "from": "time_attenuate_check", "to": "time_calc", "type": "conditional", "label": "enabled" },
+    { "from": "time_attenuate_check", "to": "no_attenuation", "type": "conditional", "label": "disabled" },
+    { "from": "time_param", "to": "time_calc", "type": "control" },
+    { "from": "time_calc", "to": "table_lookup", "type": "signal" },
+    { "from": "time_table", "to": "table_lookup", "type": "control", "label": "curve shape" },
+    { "from": "table_lookup", "to": "velocity_scale", "type": "signal", "label": "attenuationLevel" },
+    { "from": "no_attenuation", "to": "velocity_scale", "type": "signal", "label": "attenuationLevel = 1.0" },
+    { "from": "noteon_capture", "to": "mpe_check", "type": "signal", "label": "stored noteOn" },
+    { "from": "mpe_check", "to": "velocity_scale", "type": "signal", "label": "velocity source" },
+    { "from": "velocity_scale", "to": "velocity_gate", "type": "signal" },
+    { "from": "velocity_gate", "to": "event_inject", "type": "conditional", "label": "v > 0" },
+    { "from": "velocity_gate", "to": "midi_out", "type": "conditional", "label": "v == 0 (drop)" },
+    { "from": "event_inject", "to": "midi_out", "type": "signal" }
+  ],
+  "groups": [
+    {
+      "id": "note_tracking",
+      "label": "Note Tracking",
+      "nodes": ["noteon_capture"]
+    },
+    {
+      "id": "attenuation",
+      "label": "Time Attenuation",
+      "nodes": ["time_calc", "table_lookup", "time_param", "time_table"]
+    },
+    {
+      "id": "release_gen",
+      "label": "Release NoteOn Generation",
+      "nodes": ["noteoff_ignore", "time_attenuate_check", "no_attenuation", "mpe_check", "velocity_scale", "velocity_gate", "event_inject"]
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "targetId": "dynamics.limiter",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [12229, 7102, 3499, 7143, 3490, 2015, 2701, 817, 2857, 2329, 4705, 8165, 12215, 13300, 12992, 12884, 407],
+  "insights": [
+    {
+      "type": "BUG",
+      "title": "Limiter introduces significant latency that varies with attack time",
+      "summary": "The dynamics.limiter is a lookahead limiter, and its latency is tied to the attack time setting — a longer attack means more lookahead delay. This variable latency is not automatically reported to the DAW host, causing noticeable audio delay during offline rendering and misalignment in DAWs that apply latency compensation. Workaround: measure max latency at the longest attack time and report it via `Engine.setLatencySamples(MAX_LATENCY)`. Confirmed by multiple trusted members and the author (Christoph Hart) as an inherent design property.",
+      "sources": ["tid:13300", "tid:2857", "tid:12229"],
+      "verify": true,
+      "verify_hint": "Measure the actual latency introduced at various attack settings using Tools > Check Latency of Signal, and document the relationship between attack time and introduced samples."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Limiter knob ranges do not map correctly when connected via parameter/processor ID",
+      "summary": "When connecting UI knobs to the limiter via processor ID (standard HISE scripting connection), the parameter ranges do not behave as expected — the value popup is meaningless and the mapping is incorrect. This was independently reported by David Healey (expert) in 2021 and again in 2023. Workaround used in practice: switch to the limiter inside the Dynamics module instead, which has properly configured ranges.",
+      "sources": ["tid:3499", "tid:7143"],
+      "verify": true,
+      "verify_hint": "Check whether the standalone Limiter FX parameter ranges have been fixed in recent HISE versions (knob modes and ranges in the attribute definitions)."
+    },
+    {
+      "type": "BUG",
+      "title": "Changing limiter attack time during playback causes clicks and large delay spikes",
+      "summary": "Modifying the attack parameter at runtime causes an internal processing mode switch that introduces a sudden large delay (several milliseconds) and audible clicks. The author confirmed this is expected given the attack-dependent lookahead design. Limiter attack should be treated as a non-automatable parameter in live use.",
+      "sources": ["tid:2857"],
+      "verify": true,
+      "verify_hint": "Confirm whether attack time automation has been smoothed or debounced in recent versions to avoid the click and delay artifact."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Makeup gain in Dynamics module is enabled by default and affects the limiter ceiling",
+      "summary": "If the 'Makeup' button is enabled in the Dynamics module, the limiter's effective ceiling is shifted — keeping the threshold at 0 dB with makeup active does not mean 0 dBFS output. Community practice is to run limiters at -0.1 dB threshold rather than 0.0, and to take the input signal down 3 dB before the limiter and bring it back up afterward to maintain headroom.",
+      "sources": ["tid:12215"],
+      "verify": true,
+      "verify_hint": "Confirm that makeup gain is enabled by default in the Dynamics module and document which buttons control it."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Lookahead limiter C++ node available as community resource",
+      "summary": "griffinboy (trusted) shared a free third-party C++ scriptnode lookahead limiter ('Griffin_Limiter') in 2025 with lower distortion than the stock limiter. Setup requires creating a third-party C++ node named 'Griffin_Limiter', compiling once to generate the stub header, replacing it with the provided header, and recompiling the DLL. Supports true peak limiting when oversampling is applied. The latency still changes with attack time but the distortion profile is substantially better.",
+      "sources": ["tid:12229"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Prefer dynamics.limiter over the standalone Limiter FX module",
+      "summary": "The standalone 'Limiter FX' module (non-Dynamics) was marked as deprecated by the author (Christoph Hart, 2019) and should not be used in new projects. Use the limiter within the Dynamics module instead. The Dynamics module limiter is the actively maintained version and supports proper GainReduction attribute access.",
+      "sources": ["tid:2015", "tid:4705"],
+      "verify": true,
+      "verify_hint": "Confirm that the standalone Limiter FX has been fully removed or is still present but deprecated in recent HISE builds."
+    },
+    {
+      "type": "API",
+      "title": "Reading LimiterReduction: same pattern as CompressorReduction and GateReduction",
+      "summary": "The `Dynamics.LimiterReduction` attribute follows the same pattern as the other reduction parameters: poll it via a timer, convert the linear value with `Engine.getDecibelsForGainFactor()`, and push to a display component. The attribute naming convention is consistent across all three dynamics types.",
+      "sources": ["tid:12992"],
+      "verify": true,
+      "verify_hint": "Confirm the exact attribute constant names (LimiterReduction, CompressorReduction, GateReduction) on the Dynamics module effect reference."
+    }
+  ]
+}

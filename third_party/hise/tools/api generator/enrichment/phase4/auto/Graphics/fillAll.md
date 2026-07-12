@@ -1,0 +1,1 @@
+Fills the entire component area with the specified colour. This is typically the first drawing call in a paint routine to set the background colour. Unlike most other drawing methods, `fillAll` takes the colour directly as a parameter and does not require `setColour` to be called first.

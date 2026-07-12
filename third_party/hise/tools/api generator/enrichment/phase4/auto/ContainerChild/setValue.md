@@ -1,0 +1,1 @@
+Sets this component's value in the Values tree without triggering the control callback. Call `changed()` afterward to fire the callback and refresh the visual state. This method always bypasses the undo manager - use `setValueWithUndo()` for undoable value changes.

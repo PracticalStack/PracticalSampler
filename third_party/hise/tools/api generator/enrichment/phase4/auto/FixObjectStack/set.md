@@ -1,0 +1,1 @@
+Upsert operation: if an element matching the given object exists (by the factory's compare function), it is replaced in place. If no match exists and the stack is not full, the object is inserted at the end. Use `set()` when you want to update existing entries or add new ones in a single call, and `insert()` when duplicates should be rejected.

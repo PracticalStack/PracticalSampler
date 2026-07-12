@@ -1,0 +1,1 @@
+Returns whether this modulator reference is still valid. Use this to verify references before calling other methods, particularly when the modulator may have been removed dynamically with `Synth.removeModulator()`.

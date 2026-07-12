@@ -1,0 +1,17 @@
+{
+  "factoryPath": "envelope.silent_killer",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal (passed through unmodified)" },
+    { "id": "silence_check", "label": "Silence Detection", "type": "process", "importance": 1.0, "description": "Per-block isSilent() check. Only triggers after note-off." },
+    { "id": "voice_reset", "label": "Voice Reset", "type": "process", "importance": 0.9, "description": "Sends sendVoiceResetMessage(false) to kill the current voice" },
+    { "id": "active", "label": "Active", "type": "parameter", "importance": 0.7, "description": "Enable/disable silence detection (Off/On)" },
+    { "id": "threshold", "label": "Threshold", "type": "parameter", "importance": 0.4, "description": "Threshold in dB (-120 to -60). Stored but not used by isSilent()." },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Audio passes through unchanged" }
+  ],
+  "edges": [
+    { "from": "in", "to": "silence_check", "type": "signal", "label": null },
+    { "from": "active", "to": "silence_check", "type": "control", "label": "enable check" },
+    { "from": "silence_check", "to": "voice_reset", "type": "conditional", "label": "if silent and note-off" },
+    { "from": "in", "to": "out", "type": "signal", "label": "passthrough" }
+  ]
+}

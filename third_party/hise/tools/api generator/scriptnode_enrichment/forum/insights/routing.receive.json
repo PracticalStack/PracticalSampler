@@ -1,0 +1,48 @@
+{
+  "targetId": "routing.receive",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [1766, 4553, 10600],
+  "insights": [
+    {
+      "type": "API",
+      "title": "Each routing.receive node accepts exactly one input source",
+      "body": "A routing.receive node can only be connected to a single routing.send source. To receive from multiple sources at the same destination, add multiple routing.receive nodes inside a split container — each connected to a different send — so their signals are summed at the split output.",
+      "source": "tid:4553, tid:10600",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "routing.receive must come after routing.send in the processing graph",
+      "body": "Scriptnode serialises the graph top-down, left-to-right. Placing a routing.receive before its paired routing.send (e.g., in the first branch of a split node while the send is in the second branch) means the send has not yet copied the signal when the receive runs. The result is clicks, silence, or garbage at note on/off. Fix by reordering the branches so the send branch executes first.",
+      "source": "tid:1766",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Oversample containers may break send/receive ordering",
+      "body": "The author notes that oversample container nodes create an oversampled copy of the signal internally, which may cause ordering problems between routing.send and routing.receive nodes placed inside or around them. Chain and multi nodes handle the ordering correctly.",
+      "source": "tid:1766",
+      "author": "Christoph Hart [author]",
+      "confidence": "medium"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Receive node connection is identified by colour, not just name",
+      "body": "When a routing.receive is properly connected to its routing.send, both nodes are tinted the same colour in the scriptnode graph as a visual indicator. If the colours do not match, the connection is broken — typically because the send node's ID was changed after the receive was linked. Fix by opening the send node's properties and reselecting the target from the dropdown.",
+      "source": "tid:1766",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Networks with global receive nodes cannot be compiled",
+      "body": "Scriptnode networks that use global receive nodes (the cross-network variant of routing.receive) cannot be compiled to a DLL. This is a known limitation and affects the entire network — not just the node. If compilation is required, routing must be restructured to stay within a single network.",
+      "source": "tid:10600",
+      "author": "Lindon [trusted]",
+      "confidence": "high"
+    }
+  ]
+}

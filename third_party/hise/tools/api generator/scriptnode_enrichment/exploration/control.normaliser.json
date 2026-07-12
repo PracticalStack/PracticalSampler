@@ -1,0 +1,12 @@
+{
+  "factoryPath": "control.normaliser",
+  "nodes": [
+    { "id": "value_in", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Normalised 0..1 input signal" },
+    { "id": "passthrough", "label": "Pass-through", "type": "process", "importance": 1.0, "description": "Forwards value unchanged; connection system applies target ranges" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Normalised 0..1 output with target range conversion applied by connection layer" }
+  ],
+  "edges": [
+    { "from": "value_in", "to": "passthrough", "type": "signal", "label": null },
+    { "from": "passthrough", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

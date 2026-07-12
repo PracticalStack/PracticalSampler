@@ -1,0 +1,1 @@
+Sets a global transparency level for all subsequent drawing operations. The `alphaValue` ranges from `0.0` (fully transparent) to `1.0` (fully opaque). Unlike `setColour` which sets a complete colour including alpha, `setOpacity` modifies only the transparency independently of the current fill colour or gradient.

@@ -1,0 +1,136 @@
+{
+  "factoryPath": "filters.svf_eq",
+  "factory": "filters",
+  "nodeId": "svf_eq",
+  "description": "A filter node",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Filter Response",
+      "rationale": "These parameters define the filter's frequency response curve: where it acts, how narrow/wide, and gain for peaking/shelving modes.",
+      "parameters": [
+        {
+          "id": "Frequency",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0, "skew": 0.2299045622348785 },
+          "default": 1000.0,
+          "textConverter": "Frequency",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Q",
+          "range": { "min": 0.300000011920929, "max": 9.899999618530273, "step": 0.0, "skew": 0.2647178173065186 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Gain",
+          "range": { "min": -18.0, "max": 18.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Decibel",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Filter Configuration",
+      "rationale": "Mode selects the EQ band type, Smoothing controls coefficient interpolation speed, Enabled toggles the filter on/off.",
+      "parameters": [
+        {
+          "id": "Mode",
+          "range": { "min": 0.0, "max": 4.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "83.nT6K8ChSUI..jOfUgwVckMzatYWYxQWYxAP.BjFck01b.DfJEvza2AUXyMmBHk1Ynwza2MEZkwlYPUVXqAPXiQWZ1UF.ADf..L..sLfZdby1xS.",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Smoothing",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 0.3010300099849701 },
+          "default": 0.009999999776482582,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Enabled",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "filterCoefficients": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/filters/svf_eq.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "svf-eq-mode-values",
+      "category": "conditional_logic",
+      "question": "Mode parameter has range 0-4 (5 discrete values). The longer TextToValueConverter encoding suggests EQ-specific types. What filter types do values 0-4 correspond to? Expected: LowShelf, HighShelf, Peak, Notch, BandPass or similar EQ band types.",
+      "context": "svf_eq is positioned as an EQ variant of svf. Users need to know how its modes differ from the standard svf modes."
+    },
+    {
+      "id": "svf-eq-vs-svf-difference",
+      "category": "signal_path",
+      "question": "What is the architectural difference between filters.svf and filters.svf_eq? Do they share the same underlying SVF algorithm but with different mode selections, or is the coefficient calculation different (e.g., optimised for parametric EQ use)?",
+      "context": "Users need clear guidance on when to use svf vs svf_eq. The 'eq' suffix suggests EQ-optimised modes but the underlying mechanism needs confirmation."
+    },
+    {
+      "id": "svf-eq-gain-relevance",
+      "category": "parameter_behaviour",
+      "question": "For svf_eq, which modes actually use the Gain parameter? In a typical parametric EQ, shelving and peaking modes use gain while LP/HP do not. Which modes respond to Gain?",
+      "context": "If svf_eq modes are all gain-dependent (shelving/peaking), this is a key differentiator from svf."
+    },
+    {
+      "id": "description-accuracy",
+      "category": "description_accuracy",
+      "question": "The base description is 'A filter node' which is identical to svf and provides no differentiation. The phase3 doc says 'state-variable-filder equaliser' (note typo: 'filder'). Confirm the correct characterisation as a parametric EQ filter.",
+      "context": "Users need to understand this is an EQ-oriented variant, not just another generic filter."
+    }
+  ],
+
+  "notes": "svf_eq shares the same parameter signature as all standard filter nodes but is positioned as an EQ-oriented variant with presumably shelving/peaking modes rather than the typical LP/HP/BP/Notch set. The phase3 doc has a typo ('filder' instead of 'filter'). The longer TextToValueConverter encoding for Mode (83 chars vs 69 for svf) suggests more descriptive mode names. References filter-base-architecture and smoothing-units gaps from filters.svf."
+}

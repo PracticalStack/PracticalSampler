@@ -1,0 +1,1 @@
+Creates a timer object for periodic callback execution at a configurable interval. After creation, use `setTimerCallback()` to register a function and `startTimer()` to begin. The callback runs on the UI thread, making it suitable for display updates, polling, animation, and deferred processing. Multiple independent timers can coexist.

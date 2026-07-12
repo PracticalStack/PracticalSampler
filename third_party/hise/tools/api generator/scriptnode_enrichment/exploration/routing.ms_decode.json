@@ -1,0 +1,12 @@
+{
+  "factoryPath": "routing.ms_decode",
+  "nodes": [
+    { "id": "in", "label": "Stereo In (M/S)", "type": "input", "importance": 1.0, "description": "Mid/Side encoded stereo signal" },
+    { "id": "decode", "label": "MS Decode", "type": "process", "importance": 1.0, "description": "L = M+S, R = M-S" },
+    { "id": "out", "label": "Stereo Out (L/R)", "type": "output", "importance": 1.0, "description": "Channel 0 = Left, Channel 1 = Right" }
+  ],
+  "edges": [
+    { "from": "in", "to": "decode", "type": "signal", "label": null },
+    { "from": "decode", "to": "out", "type": "signal", "label": null }
+  ]
+}

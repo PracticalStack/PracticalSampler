@@ -1,0 +1,1 @@
+Defines the tag categories that appear in the user preset browser for filtering presets. Call during `onInit` before the user interacts with the preset system.

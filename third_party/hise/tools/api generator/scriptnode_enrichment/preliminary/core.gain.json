@@ -1,0 +1,114 @@
+{
+  "factoryPath": "core.gain",
+  "factory": "core",
+  "nodeId": "gain",
+  "description": "A gain module with decibel range and parameter smoothing",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Gain",
+      "rationale": "Gain sets the target amplitude; Smoothing controls transition time to avoid clicks",
+      "parameters": [
+        {
+          "id": "Gain",
+          "range": { "min": -100.0, "max": 0.0, "step": 0.1, "skew": 5.422270774841309 },
+          "default": 0.0,
+          "textConverter": "Decibel",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Smoothing",
+          "range": { "min": 0.0, "max": 1000.0, "step": 0.1, "skew": 0.3010300099849701 },
+          "default": 20.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Voice reset",
+      "rationale": "ResetValue sets the gain value applied when a voice starts (before smoothing ramps to the target)",
+      "parameters": [
+        {
+          "id": "ResetValue",
+          "range": { "min": -100.0, "max": 0.0, "step": 0.1, "skew": 5.422270774841309 },
+          "default": 0.0,
+          "textConverter": "Decibel",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/gain.md",
+    "tier": "BRIEF",
+    "lines": 10
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "processing-model",
+      "category": "signal_path",
+      "question": "Does core.gain multiply all channels by the same gain value? Is it block-based (using sfloat/sdouble smoothing) or frame-based?",
+      "context": "Users need to know whether gain is applied per-sample with smoothing or per-block."
+    },
+    {
+      "id": "db-to-linear-conversion",
+      "category": "parameter_behaviour",
+      "question": "The Gain parameter is in decibels (-100 to 0 dB). Is -100 dB treated as silence (0.0 linear) or as the actual -100 dB value?",
+      "context": "Important for users who want true silence at the minimum setting."
+    },
+    {
+      "id": "reset-value-usage",
+      "category": "parameter_behaviour",
+      "question": "When exactly is ResetValue applied? On voice start (reset() callback)? Does it jump immediately to ResetValue and then smooth to the current Gain?",
+      "context": "Users need to know how ResetValue interacts with polyphonic voice lifecycle."
+    },
+    {
+      "id": "smoothing-mechanism",
+      "category": "parameter_behaviour",
+      "question": "What smoothing algorithm is used -- sfloat (exponential ramp) or linear ramp? Is the 20ms default suitable for click-free gain changes?",
+      "context": "Helps users understand audio quality implications of the smoothing time setting."
+    }
+  ],
+
+  "notes": "core.gain is one of the most fundamental and frequently used scriptnode nodes. The decibel range (-100 to 0) means it can only attenuate, not amplify. The high skew value (5.42) creates a logarithmic feel on the parameter slider. IsPolyphonic but not IsProcessingHiseEvent -- gain is per-voice but not MIDI-driven. ResetValue likely handles the common case where gain should start at a specific value on voice start."
+}

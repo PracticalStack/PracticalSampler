@@ -1,0 +1,88 @@
+{
+  "targetId": "Random",
+  "domain": "modules",
+  "generatedAt": "2026-04-08",
+  "topicIds": [12333, 1377, 3707, 9494, 3901, 4666, 2210, 149, 13793, 9526, 13720, 9484, 12730, 1500, 6854, 1899, 9383, 9866, 1525, 5154],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Dual reference required when using Random as both TableProcessor and Modulator",
+      "summary": "Synth.getTableProcessor() and Synth.getModulator() return different typed references to the same Random module. To access both the table manipulation API and the modulator API (e.g. setAttribute, getCurrentLevel), create two separate const var references.",
+      "sources": ["tid:1377"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Sample Start Modulator offset is capped by the preloaded sample buffer size",
+      "summary": "When using a Random modulator as a sample start modulator, the maximum usable offset is limited by the number of samples loaded into RAM (the preload buffer size). Setting a large start offset with a small preload buffer silently clamps the actual offset.",
+      "sources": ["tid:9526"],
+      "verify": true,
+      "verify_hint": "grep preloadSize or StartModBuffer in Sampler source; check how start mod value is clamped against preload buffer"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Engine.loadUserPreset requires the .preset extension appended to the name",
+      "summary": "Engine.getUserPresetList() returns names without the .preset extension. Passing the raw name to Engine.loadUserPreset() will silently fail on some builds. Always append + \".preset\" to the name before loading.",
+      "sources": ["tid:4666", "tid:9866"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Math.random() returns [0, 1]; use (Math.random() * 2) - 1 for bipolar range",
+      "summary": "Math.random() is the float equivalent of Math.randInt() but always returns values in [0.0, 1.0]. For a bipolar range [-1.0, 1.0], multiply by 2 and subtract 1. This is the scripting-side approach when the Random modulator's unipolar output is not sufficient.",
+      "sources": ["tid:12333"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Sampler.getAttribute(7) returns the number of RR groups for the current samplemap",
+      "summary": "There is no dedicated method to query the active RR group count. Use Sampler.getAttribute(7) as a workaround. This magic number corresponds to the NumActiveGroups property. The value is only valid after a samplemap has fully loaded.",
+      "sources": ["tid:1500"],
+      "verify": true,
+      "verify_hint": "grep getAttribute in Sampler scripting API; look for property index 7 in SamplerProperties enum"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Sampler group count is only valid after the loading callback fires",
+      "summary": "Calling Sampler.getAttribute(7) to read the RR group count in onInit returns 0 if a samplemap is loaded asynchronously. Use ScriptPanel.setLoadingCallback() to react to the end of preloading and read the group count there.",
+      "sources": ["tid:1500"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use shuffle-and-cycle for no-repeat random round robin instead of while loops",
+      "summary": "Rather than using a while loop that retries until a new value is found (which has theoretically unbounded runtime), build an ordered array of group indices, cycle through it sequentially, and shuffle the array when the cycle completes. This approach is recommended by Christoph Hart as faster and more predictable.",
+      "sources": ["tid:149", "tid:1500"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Component.changed() must be called after setValue() to propagate values to connected modules",
+      "summary": "Calling Component.setValue() only updates the UI widget state. To trigger the control callback and propagate the value to connected audio modules (e.g., via setAttribute), Component.changed() must be called explicitly afterwards.",
+      "sources": ["tid:1525"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Random pitch detune via modulator only works for instrument plugins, not FX plugins",
+      "summary": "Placing a Random modulator on the pitch parameter is only possible inside an instrument synth chain. In an FX plugin there is no note chain to host voice-start modulators, so pitch randomization requires script-based transposition via Message.setTransposeAmount().",
+      "sources": ["tid:2210"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use ScriptPanel.setLoadingCallback to detect samplemap swap completion",
+      "summary": "There is no dedicated callback for the end of a Sampler.loadSampleMap() operation. The recommended pattern is to add a hidden ScriptPanel and attach a setLoadingCallback function to it; this fires after each preload task completes, allowing safe access to samplemap-dependent data like RR group count.",
+      "sources": ["tid:1500"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

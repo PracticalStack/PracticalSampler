@@ -1,0 +1,1 @@
+Returns a `ScriptSliderPackProcessor` handle to the processor with the given name that holds slider pack data. Processors that expose slider pack data include LFO modulators (in slider pack mode), Step modulators, and scriptnode containers with slider pack nodes.

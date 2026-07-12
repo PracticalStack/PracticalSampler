@@ -1,0 +1,168 @@
+{
+  "moduleId": "SimpleEnvelope",
+  "nodes": [
+    {
+      "id": "note_on",
+      "label": "Note On",
+      "type": "input",
+      "importance": 0.9,
+      "group": null,
+      "description": "MIDI note-on event triggers startVoice(), initializing the envelope"
+    },
+    {
+      "id": "attack_chain",
+      "label": "Attack Time Modulation",
+      "type": "modulation",
+      "importance": 0.8,
+      "group": "voice_start",
+      "description": "VoiceStartModulator chain evaluated once at note-on to scale the attack time"
+    },
+    {
+      "id": "param_attack",
+      "label": "Attack",
+      "type": "parameter",
+      "importance": 0.8,
+      "group": "voice_start",
+      "description": "Base attack time in milliseconds (0-20000, default 5)"
+    },
+    {
+      "id": "attack_time_calc",
+      "label": "Attack Time Calculation",
+      "type": "process",
+      "importance": 0.7,
+      "group": "voice_start",
+      "description": "Multiplies Attack parameter by chain modulation value, then computes per-voice coefficients (linear delta or exponential coef/base)"
+    },
+    {
+      "id": "mode_decision",
+      "label": "LinearMode",
+      "type": "decision",
+      "importance": 0.7,
+      "group": null,
+      "description": "Selects between linear ramp and exponential curve formulas for both attack and release"
+    },
+    {
+      "id": "param_linearmode",
+      "label": "LinearMode",
+      "type": "parameter",
+      "importance": 0.6,
+      "group": null,
+      "description": "Toggle: 1=linear ramps, 0=exponential curves (default 1)"
+    },
+    {
+      "id": "attack_stage",
+      "label": "Attack Stage",
+      "type": "process",
+      "importance": 0.9,
+      "group": "envelope",
+      "description": "Per-sample ramp from 0 to 1. Linear: value += delta. Exponential: value = base + value * coef. Transitions to SUSTAIN when value >= 1.0"
+    },
+    {
+      "id": "sustain_stage",
+      "label": "Sustain Stage",
+      "type": "process",
+      "importance": 0.8,
+      "group": "envelope",
+      "description": "Holds at 1.0 using SIMD fill (no per-sample loop). Active while note is held after attack completes"
+    },
+    {
+      "id": "note_off",
+      "label": "Note Off",
+      "type": "input",
+      "importance": 0.8,
+      "group": null,
+      "description": "MIDI note-off event triggers stopVoice(), transitioning envelope to release"
+    },
+    {
+      "id": "param_release",
+      "label": "Release",
+      "type": "parameter",
+      "importance": 0.8,
+      "group": "envelope",
+      "description": "Release time in milliseconds (0-20000, default 10). Shared across all voices (not modulatable)"
+    },
+    {
+      "id": "release_stage",
+      "label": "Release Stage",
+      "type": "process",
+      "importance": 0.9,
+      "group": "envelope",
+      "description": "Per-sample ramp from current value to 0. Linear: value -= delta. Exponential: value = base + value * coef. Transitions to IDLE when value <= threshold"
+    },
+    {
+      "id": "idle_stage",
+      "label": "Idle",
+      "type": "process",
+      "importance": 0.3,
+      "group": "envelope",
+      "description": "Output is 0.0 via SIMD fill. Voice is marked as finished (isPlaying returns false)"
+    },
+    {
+      "id": "mod_output",
+      "label": "Modulation Output",
+      "type": "output",
+      "importance": 0.9,
+      "group": null,
+      "description": "Per-sample envelope value (0-1) written to the internal buffer for the parent modulation chain"
+    },
+    {
+      "id": "param_monophonic",
+      "label": "Monophonic",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": "voice_control",
+      "description": "When enabled, all voices share a single envelope state"
+    },
+    {
+      "id": "param_retrigger",
+      "label": "Retrigger",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": "voice_control",
+      "description": "When enabled in monophonic mode, new notes restart the envelope from current value"
+    },
+    {
+      "id": "retrigger_stage",
+      "label": "Retrigger",
+      "type": "process",
+      "importance": 0.5,
+      "group": "envelope",
+      "description": "Monophonic retrigger: immediately transitions to ATTACK from current value (no ramp to zero)"
+    }
+  ],
+  "edges": [
+    { "from": "note_on", "to": "attack_chain", "type": "signal", "label": null },
+    { "from": "attack_chain", "to": "attack_time_calc", "type": "control", "label": "attackModValue" },
+    { "from": "param_attack", "to": "attack_time_calc", "type": "control", "label": "base attack time" },
+    { "from": "attack_time_calc", "to": "attack_stage", "type": "signal", "label": "per-voice coefficients" },
+    { "from": "param_linearmode", "to": "mode_decision", "type": "control", "label": null },
+    { "from": "mode_decision", "to": "attack_stage", "type": "conditional", "label": "selects linear or exponential formula" },
+    { "from": "mode_decision", "to": "release_stage", "type": "conditional", "label": "selects linear or exponential formula" },
+    { "from": "attack_stage", "to": "sustain_stage", "type": "signal", "label": "when value >= 1.0" },
+    { "from": "note_off", "to": "release_stage", "type": "signal", "label": "triggers RELEASE state" },
+    { "from": "sustain_stage", "to": "release_stage", "type": "signal", "label": "on note-off" },
+    { "from": "param_release", "to": "release_stage", "type": "control", "label": "shared release coefficients" },
+    { "from": "release_stage", "to": "idle_stage", "type": "signal", "label": "when value <= threshold" },
+    { "from": "attack_stage", "to": "mod_output", "type": "signal", "label": null },
+    { "from": "sustain_stage", "to": "mod_output", "type": "signal", "label": null },
+    { "from": "release_stage", "to": "mod_output", "type": "signal", "label": null },
+    { "from": "idle_stage", "to": "mod_output", "type": "signal", "label": null },
+    { "from": "param_monophonic", "to": "retrigger_stage", "type": "conditional", "label": "enables shared state" },
+    { "from": "param_retrigger", "to": "retrigger_stage", "type": "conditional", "label": "enables retrigger on new note" },
+    { "from": "retrigger_stage", "to": "attack_stage", "type": "signal", "label": "continues from current value" }
+  ],
+  "groups": [
+    {
+      "id": "voice_start",
+      "label": "Voice Start (Note-On)"
+    },
+    {
+      "id": "envelope",
+      "label": "Envelope Stages"
+    },
+    {
+      "id": "voice_control",
+      "label": "Voice Allocation Control"
+    }
+  ]
+}

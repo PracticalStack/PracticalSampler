@@ -1,0 +1,26 @@
+{
+  "factoryPath": "filters.one_pole",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "one_pole", "label": "One-Pole Filter", "type": "process", "importance": 1.0, "description": "First-order IIR filter, 6 dB/oct slope" },
+    { "id": "freq", "label": "Frequency", "type": "parameter", "importance": 1.0, "description": "Cutoff frequency (20-20000 Hz), smoothed" },
+    { "id": "q", "label": "Q", "type": "parameter", "importance": 0.2, "description": "Ignored -- one-pole filters have no resonance" },
+    { "id": "gain", "label": "Gain", "type": "parameter", "importance": 0.2, "description": "Ignored -- one-pole filters have no gain control" },
+    { "id": "mode", "label": "Mode", "type": "parameter", "importance": 0.8, "description": "Filter type: LP (6 dB/oct lowpass) or HP (6 dB/oct highpass)" },
+    { "id": "smoothing", "label": "Smoothing", "type": "parameter", "importance": 0.5, "description": "Parameter interpolation time in seconds" },
+    { "id": "enabled", "label": "Enabled", "type": "parameter", "importance": 0.5, "description": "Hard bypass toggle" },
+    { "id": "coeffs", "label": "Filter Display", "type": "external_data", "importance": 0.4, "description": "FilterCoefficients with custom plot function" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Filtered audio signal" }
+  ],
+  "edges": [
+    { "from": "in", "to": "one_pole", "type": "signal", "label": null },
+    { "from": "freq", "to": "one_pole", "type": "control", "label": null },
+    { "from": "q", "to": "one_pole", "type": "control", "label": "ignored" },
+    { "from": "gain", "to": "one_pole", "type": "control", "label": "ignored" },
+    { "from": "mode", "to": "one_pole", "type": "control", "label": null },
+    { "from": "smoothing", "to": "one_pole", "type": "control", "label": null },
+    { "from": "enabled", "to": "one_pole", "type": "control", "label": null },
+    { "from": "one_pole", "to": "coeffs", "type": "control", "label": "display update" },
+    { "from": "one_pole", "to": "out", "type": "signal", "label": null }
+  ]
+}

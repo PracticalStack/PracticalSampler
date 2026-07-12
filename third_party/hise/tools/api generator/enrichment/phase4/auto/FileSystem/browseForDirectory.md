@@ -1,0 +1,1 @@
+Opens a native directory browser dialog for selecting a single folder. The dialog runs asynchronously and delivers the selected folder as a `File` object to the callback. The `startFolder` parameter accepts a `SpecialLocations` constant or a `File` object.

@@ -1,0 +1,118 @@
+{
+  "factoryPath": "core.matrix_mod",
+  "nodes": [
+    {
+      "id": "source_in",
+      "label": "Source Modulator Signal",
+      "type": "input",
+      "importance": 1.0,
+      "description": "Raw modulation signal from the selected source modulator in the GlobalModulatorContainer"
+    },
+    {
+      "id": "aux_in",
+      "label": "Aux Modulator Signal",
+      "type": "input",
+      "importance": 0.8,
+      "description": "Auxiliary modulation signal from the selected aux modulator in the GlobalModulatorContainer"
+    },
+    {
+      "id": "source_index",
+      "label": "SourceIndex",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Selects the primary modulation source (-1 = disconnected)"
+    },
+    {
+      "id": "aux_index",
+      "label": "AuxIndex",
+      "type": "parameter",
+      "importance": 0.8,
+      "description": "Selects the auxiliary modulation source (-1 = disconnected)"
+    },
+    {
+      "id": "invert",
+      "label": "Invert Source",
+      "type": "process",
+      "importance": 0.7,
+      "description": "Optionally flips source signal (1 - signal) when Inverted is enabled"
+    },
+    {
+      "id": "inverted_param",
+      "label": "Inverted",
+      "type": "parameter",
+      "importance": 0.7,
+      "description": "Normal or Inverted -- flips source signal before mode application"
+    },
+    {
+      "id": "combine",
+      "label": "Apply Mode + Aux",
+      "type": "process",
+      "importance": 1.0,
+      "description": "Combines source and aux signals using selected mode formula (Scale/Unipolar/Bipolar) with zero position offset"
+    },
+    {
+      "id": "mode",
+      "label": "Mode",
+      "type": "parameter",
+      "importance": 0.9,
+      "description": "Scale (multiplicative), Unipolar (additive), or Bipolar (centered additive)"
+    },
+    {
+      "id": "intensity",
+      "label": "Intensity",
+      "type": "parameter",
+      "importance": 0.9,
+      "description": "Overall modulation depth -- sets the aux channel's base value"
+    },
+    {
+      "id": "aux_intensity",
+      "label": "AuxIntensity",
+      "type": "parameter",
+      "importance": 0.7,
+      "description": "Controls how much the aux modulator signal affects intensity scaling (0-1)"
+    },
+    {
+      "id": "zero_pos",
+      "label": "ZeroPosition",
+      "type": "parameter",
+      "importance": 0.6,
+      "description": "Left (0.0) or Center (0.5) -- shifts modulation center in Scale mode"
+    },
+    {
+      "id": "mod_out",
+      "label": "Modulation Output",
+      "type": "modulation_out",
+      "importance": 1.0,
+      "description": "Normalised modulation value sent to connected parameter targets"
+    },
+    {
+      "id": "audio_out",
+      "label": "Audio Out",
+      "type": "output",
+      "importance": 0.8,
+      "description": "Audio channel 0 with modulation applied (always writes -- no ProcessSignal toggle)"
+    },
+    {
+      "id": "display",
+      "label": "Display Buffer",
+      "type": "external_data",
+      "importance": 0.3,
+      "description": "Ring buffer for ModPlotter visualisation (always enabled)"
+    }
+  ],
+  "edges": [
+    { "from": "source_in", "to": "invert", "type": "signal", "label": null },
+    { "from": "source_index", "to": "source_in", "type": "control", "label": "slot selection" },
+    { "from": "inverted_param", "to": "invert", "type": "control", "label": null },
+    { "from": "invert", "to": "combine", "type": "signal", "label": "source" },
+    { "from": "aux_in", "to": "combine", "type": "signal", "label": "aux (intensity)" },
+    { "from": "aux_index", "to": "aux_in", "type": "control", "label": "slot selection" },
+    { "from": "mode", "to": "combine", "type": "control", "label": null },
+    { "from": "intensity", "to": "combine", "type": "control", "label": "base value for aux" },
+    { "from": "aux_intensity", "to": "combine", "type": "control", "label": "aux depth" },
+    { "from": "zero_pos", "to": "combine", "type": "control", "label": "Scale mode only" },
+    { "from": "combine", "to": "mod_out", "type": "signal", "label": null },
+    { "from": "combine", "to": "audio_out", "type": "signal", "label": null },
+    { "from": "combine", "to": "display", "type": "signal", "label": null }
+  ]
+}

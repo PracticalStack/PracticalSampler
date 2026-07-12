@@ -1,0 +1,3 @@
+Copies the named property from each element into a target Buffer or Array. The target must have at least `length` elements.
+
+> [!Warning:Copies all slots including unused ones] Reads from all allocated slots (the full `length` capacity), not just the used portion. Unused slots produce default values (0 for numbers, `false` for booleans). Pass the current `size()` to downstream consumers so they know how many entries are valid.

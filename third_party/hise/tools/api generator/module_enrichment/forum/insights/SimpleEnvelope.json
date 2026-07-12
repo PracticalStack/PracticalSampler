@@ -1,0 +1,32 @@
+{
+  "targetId": "SimpleEnvelope",
+  "domain": "modules",
+  "generatedAt": "2026-04-08",
+  "topicIds": [1241, 9290],
+  "insights": [
+    {
+      "type": "API",
+      "title": "SimpleEnvelope has no loop stage - looping requires scriptnode",
+      "summary": "SimpleEnvelope only provides Attack and Release stages with no sustain or loop. If a looping envelope behaviour is needed (e.g., to retrigger or cycle the envelope while a note is held), scriptnode must be used instead.",
+      "sources": ["tid:9290"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Release not triggering can indicate missing note-off event when using Synth.playNote",
+      "summary": "When artificially triggering notes with Synth.playNote() inside a script, the note-off must be sent via Synth.noteOffByEventId() using the stored event ID. If the note-off is lost, the SimpleEnvelope never reaches the Release stage.",
+      "sources": ["tid:1241"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use MIDIList to track event IDs when playing multiple artificial notes",
+      "summary": "When using Synth.playNote() to trigger multiple simultaneous notes (e.g., chord generation), store the returned event IDs in a MIDIList rather than a single reg variable. Each note needs its own event ID to send a correct note-off and trigger Release.",
+      "sources": ["tid:1241"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

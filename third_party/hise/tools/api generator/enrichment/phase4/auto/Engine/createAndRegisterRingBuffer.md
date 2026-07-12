@@ -1,0 +1,1 @@
+Creates a ScriptRingBuffer and registers it at the given slot index in the ExternalData system. Ring buffers hold circular audio data for oscilloscope-style visualisations or FFT displays. Other modules can access this buffer through the same slot index.

@@ -1,0 +1,14 @@
+{
+  "factoryPath": "container.sidechain",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal (N channels)" },
+    { "id": "double", "label": "Channel doubling", "type": "process", "importance": 1.0, "description": "Creates 2N channels: original + zeroed sidechain channels" },
+    { "id": "serial", "label": "Serial dispatch", "type": "process", "importance": 0.8, "description": "Children process all 2N channels serially" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Original N channels returned to parent" }
+  ],
+  "edges": [
+    { "from": "in", "to": "double", "type": "signal", "label": null },
+    { "from": "double", "to": "serial", "type": "signal", "label": "2N channels" },
+    { "from": "serial", "to": "out", "type": "signal", "label": "N channels" }
+  ]
+}

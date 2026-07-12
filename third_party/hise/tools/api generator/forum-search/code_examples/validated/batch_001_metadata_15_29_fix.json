@@ -1,0 +1,38 @@
+{
+  "15": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "CSS on FloatingTile requires the tile to have a configured content type (keyboard). Cannot set up programmatically.",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "CSS rotate on keyboard FloatingTile. CSS resolution fails without proper tile content type."
+  },
+  "18": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "CSS preset browser styling requires FloatingTile configured as PresetBrowser content type. Cannot set up programmatically.",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "CSS tr/tr:hover selectors only work with a configured preset browser FloatingTile."
+  },
+  "19": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "UserPresetHandler.setPostCallback is not available in this HISE runtime version",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "setPostCallback may be deprecated or version-specific."
+  },
+  "25": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "CSS popup styling on ComboBox triggers CSS resolution error without proper runtime context",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "CSS .popup/.popup-item selectors require a fully configured ComboBox context."
+  }
+}

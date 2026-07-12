@@ -1,0 +1,150 @@
+{
+  "moduleId": "MPEModulator",
+  "prettyName": "MPE Modulator",
+  "type": "Modulator",
+  "subtype": "EnvelopeModulator",
+  "category": "input",
+
+  "io": {
+    "midiIn": "noteOn+noteOff",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": true,
+    "fxChain": null
+  },
+
+  "voiceContext": "per-voice",
+
+  "interfaces": [
+    {
+      "name": "TableProcessor",
+      "signalFlowRole": "Lookup table step in signal path - maps MPE gesture values through a user-defined curve"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "MPE Source",
+      "rationale": "These parameters select the MPE gesture type and define the fallback value when no MPE data is available",
+      "parameters": [
+        {
+          "id": "GestureCC",
+          "name": "GestureCC",
+          "range": { "min": 1.0, "max": 5.0, "step": 1.0 },
+          "default": "dynamic",
+          "description": "The MPE gesture type to use for this modulator",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "DefaultValue",
+          "name": "DefaultValue",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": "dynamic",
+          "description": "The default value when no MPE data is available",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Smoothing",
+      "rationale": "These parameters control how the raw MPE gesture value is temporally smoothed and how much the smoothed signal contributes to the output",
+      "parameters": [
+        {
+          "id": "SmoothingTime",
+          "name": "SmoothingTime",
+          "range": { "min": 0.0, "max": 2000.0, "step": 0.1 },
+          "default": 200.0,
+          "description": "The smoothing time for the modulation value",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "SmoothedIntensity",
+          "name": "SmoothedIntensity",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 1.0,
+          "description": "The intensity of the modulation with smoothing applied",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Voice Mode",
+      "rationale": "These parameters control monophonic behavior and note retriggering, which are standard EnvelopeModulator parameters",
+      "parameters": [
+        {
+          "id": "Monophonic",
+          "name": "Monophonic",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": "dynamic",
+          "description": "Enables monophonic mode where only one voice is rendered",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Retrigger",
+          "name": "Retrigger",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Restarts the envelope when a new note is triggered in monophonic mode",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "standaloneModChains": [],
+  "disabledModChains": [],
+  "compositeBlocks": [],
+
+  "gaps": [
+    {
+      "id": "gesture-cc-mapping",
+      "category": "signal_path",
+      "question": "How do the 5 gesture types (Press, Slide, Glide, Stroke, Lift) map to actual MIDI CC or MPE dimensions? Press=CC74 (brightness)? Slide=CC74? Glide=pitch bend per channel? Stroke and Lift are less standard - what MIDI data do they read?",
+      "context": "Users need to know which MPE dimension each gesture type corresponds to, especially since MPE spec only defines 3 dimensions (pressure, slide, pitch per-note)"
+    },
+    {
+      "id": "signal-path-order",
+      "category": "signal_path",
+      "question": "What is the processing order? MPE gesture -> normalize -> table lookup -> smooth -> intensity scale? Where does the table fit relative to smoothing?",
+      "context": "The pseudo-code must show the correct transformation chain"
+    },
+    {
+      "id": "smoothed-intensity-role",
+      "category": "parameter_behavior",
+      "question": "What exactly does SmoothedIntensity control? Is it a mix between the raw (unsmoothed) and smoothed signal, or a simple gain on the smoothed output? Does setting it to 0 bypass smoothing entirely?",
+      "context": "The parameter name and description are ambiguous - 'intensity of modulation with smoothing applied' could mean several things"
+    },
+    {
+      "id": "per-voice-mpe-routing",
+      "category": "signal_path",
+      "question": "How does the per-voice MPE routing work? Does the module use per-channel MIDI to associate gestures with specific voices, following the MPE channel-per-note model?",
+      "context": "MPE's per-note expression via per-channel routing is the key differentiator from regular CC modulators"
+    },
+    {
+      "id": "envelope-lifecycle",
+      "category": "parameter_behavior",
+      "question": "Since this is an EnvelopeModulator (not TimeVariantModulator), how does the note-on/note-off lifecycle work? Does the modulation value persist after note-off, or does it release to zero?",
+      "context": "EnvelopeModulator subtype implies per-voice lifecycle management that affects how the modulation behaves during release phase"
+    },
+    {
+      "id": "monophonic-mpe-interaction",
+      "category": "conditional_logic",
+      "question": "How does Monophonic mode interact with MPE's per-note model? In monophonic mode, which channel's gesture data is used when multiple notes are active?",
+      "context": "This is a potentially confusing combination - MPE is inherently polyphonic but this setting forces monophonic behavior"
+    },
+    {
+      "id": "table-usage",
+      "category": "interface_usage",
+      "question": "Is there a UseTable parameter or is the table always active? The base data shows no UseTable parameter unlike PitchWheel/MidiController.",
+      "context": "Need to clarify how the TableProcessor interface is activated without an explicit UseTable toggle"
+    }
+  ],
+
+  "notes": "This is an EnvelopeModulator (per-voice) unlike PitchWheel/MidiController which are TimeVariantModulators (monophonic). This makes sense because MPE is inherently per-note. The 5 gesture types (Press/Slide/Glide/Stroke/Lift) exceed the 3 standard MPE dimensions - Stroke and Lift may be HISE-specific extensions or alternative names. No UseTable parameter despite implementing TableProcessor - the table may be always-on or controlled differently. Dynamic defaults on Monophonic, GestureCC, and DefaultValue suggest these may be set programmatically. Natural seeAlso candidates: PitchWheel, MidiController, Aftertouch."
+}

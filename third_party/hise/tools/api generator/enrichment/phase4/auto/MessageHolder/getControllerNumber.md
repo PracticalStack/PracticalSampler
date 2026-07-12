@@ -1,0 +1,1 @@
+Returns the controller number for this event. For standard CC events, this is the MIDI controller number (0-127). For PitchBend events it returns 128, and for Aftertouch events it returns 129 - these virtual CC numbers match the convention used by `setControllerNumber()`.

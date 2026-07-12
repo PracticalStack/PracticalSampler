@@ -1,0 +1,184 @@
+{
+  "moduleId": "MacroModulationSource",
+  "prettyName": "Macro Modulation Source",
+  "type": "SoundGenerator",
+  "subtype": "SoundGenerator",
+  "category": "routing",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": null,
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "RoutingMatrix",
+      "signalFlowRole": "skip - inferred from type/subtype"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Output (Inherited)",
+      "rationale": "Inherited from ModulatorSynth base class. May be vestigial since this module does not generate audio.",
+      "parameters": [
+        {
+          "id": "Gain",
+          "name": "Gain",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.25,
+          "description": "The output volume as normalised linear gain (0.0 to 1.0), not decibels.",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Balance",
+          "name": "Balance",
+          "range": { "min": -1.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "The stereo balance",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Voice Management (Inherited)",
+      "rationale": "Inherited from ModulatorSynth base class. May be vestigial since voices produce no audio.",
+      "parameters": [
+        {
+          "id": "VoiceLimit",
+          "name": "Voice Limit",
+          "range": { "min": 1.0, "max": 256.0, "step": 1.0 },
+          "default": 256.0,
+          "description": "The maximum number of voices",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "KillFadeTime",
+          "name": "Kill Fade Time",
+          "range": { "min": 0.0, "max": 20000.0, "step": 1.0 },
+          "default": 20.0,
+          "description": "The fade out time in milliseconds when voices are killed",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+
+  "standaloneModChains": [
+    {
+      "name": "Macro 1",
+      "chainIndex": 4,
+      "modulationMode": "gain",
+      "constrainer": "*",
+      "note": "Modulation source for macro control 1. Output drives macro slot 1 via setMacroControl()."
+    },
+    {
+      "name": "Macro 2",
+      "chainIndex": 5,
+      "modulationMode": "gain",
+      "constrainer": "*",
+      "note": "Modulation source for macro control 2"
+    },
+    {
+      "name": "Macro 3",
+      "chainIndex": 6,
+      "modulationMode": "gain",
+      "constrainer": "*",
+      "note": "Modulation source for macro control 3"
+    },
+    {
+      "name": "Macro 4",
+      "chainIndex": 7,
+      "modulationMode": "gain",
+      "constrainer": "*",
+      "note": "Modulation source for macro control 4"
+    },
+    {
+      "name": "Macro 5",
+      "chainIndex": 8,
+      "modulationMode": "gain",
+      "constrainer": "*",
+      "note": "Modulation source for macro control 5"
+    },
+    {
+      "name": "Macro 6",
+      "chainIndex": 9,
+      "modulationMode": "gain",
+      "constrainer": "*",
+      "note": "Modulation source for macro control 6"
+    },
+    {
+      "name": "Macro 7",
+      "chainIndex": 10,
+      "modulationMode": "gain",
+      "constrainer": "*",
+      "note": "Modulation source for macro control 7"
+    },
+    {
+      "name": "Macro 8",
+      "chainIndex": 11,
+      "modulationMode": "gain",
+      "constrainer": "*",
+      "note": "Modulation source for macro control 8"
+    }
+  ],
+
+  "disabledModChains": [
+    {
+      "name": "Gain Modulation",
+      "chainIndex": 1,
+      "note": "Disabled in constructor. Not applicable - this module does not generate audio."
+    },
+    {
+      "name": "Pitch Modulation",
+      "chainIndex": 2,
+      "note": "Disabled in constructor. Not applicable - this module has no oscillator."
+    }
+  ],
+
+  "gaps": [
+    {
+      "id": "signal-flow",
+      "category": "signal_path",
+      "question": "How do the macro chains drive the macro control system? What is the signal flow from modulator chain output to macro slot?",
+      "context": "Need to understand the complete path: chain rendering -> value extraction -> macro system update."
+    },
+    {
+      "id": "vestigial-params",
+      "category": "parameter_behavior",
+      "question": "Are the inherited parameters (Gain, Balance, VoiceLimit, KillFadeTime) functional or vestigial? Does this module generate any audio?",
+      "context": "Similar to SendContainer - need to determine if inherited params have any effect."
+    },
+    {
+      "id": "voice-behavior",
+      "category": "signal_path",
+      "question": "What do the voices do? Does calculateBlock() produce audio, or is the voice model just structural overhead?",
+      "context": "Need to clarify that this is not an audio generator despite being a SoundGenerator type."
+    },
+    {
+      "id": "macro-chain-rendering",
+      "category": "parameter_behavior",
+      "question": "How are the macro chain values sampled? Per-sample, per-block, or just the first sample? How does expandMonophonicValuesToAudioRate work here?",
+      "context": "Users need to know the update rate of the macro modulation."
+    },
+    {
+      "id": "macro-count",
+      "category": "conditional_logic",
+      "question": "Is the number of macro chains fixed at 8 or configurable? What is HISE_NUM_MACROS?",
+      "context": "Need to know if the 8-chain count is always 8 or if it can vary."
+    }
+  ],
+
+  "notes": "MacroModulationSource is a SoundGenerator that does not generate sound. It hosts modulation chains whose output values drive the global macro control system. Similar to SendContainer, it uses the SoundGenerator infrastructure for structural reasons. The FX chain is disabled in the constructor. Gain and Pitch modulation chains are also disabled. The 8 Macro chains are the only user-facing feature."
+}

@@ -1,0 +1,1 @@
+Serialises this component's data properties and children into a Base64-encoded string. When `includeValues` is true, the current runtime values of this component and all descendants are included. The resulting string can be passed to `fromBase64()` to restore the state, or used with `addStateToUserPreset()` for automatic preset persistence.

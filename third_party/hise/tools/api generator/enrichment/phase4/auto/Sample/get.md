@@ -1,0 +1,1 @@
+Returns the value of the specified property. All properties return integers except `Sample.FileName`, which returns a String containing the audio file path. Note that Volume and Pan are also returned as integers, not floats.

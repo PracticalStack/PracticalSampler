@@ -1,0 +1,1 @@
+Saves the current wavetable as an HWT file (HISE Wavetable binary format). This is the native format loaded directly by WavetableSynth and is more compact than WAV export. The parameter must be a ScriptFile object - string paths are not accepted (unlike `saveAsAudioFile()` which accepts both).

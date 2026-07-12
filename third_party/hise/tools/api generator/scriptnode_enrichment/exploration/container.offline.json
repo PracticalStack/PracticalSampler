@@ -1,0 +1,11 @@
+{
+  "factoryPath": "container.offline",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 0.5, "description": "Input audio (passes through unmodified)" },
+    { "id": "offline", "label": "Offline processing", "type": "process", "importance": 1.0, "description": "Children are prepared but do not process during realtime callback" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 0.5, "description": "Audio passes through unchanged" }
+  ],
+  "edges": [
+    { "from": "in", "to": "out", "type": "signal", "label": "passthrough (no processing)" }
+  ]
+}

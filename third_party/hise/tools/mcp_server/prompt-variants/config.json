@@ -1,0 +1,22 @@
+{
+  "activeVariant": "v2-explicit-format",
+  "variants": {
+    "v1-baseline": {
+      "toolDescriptions": "tool-descriptions/v1-baseline.json",
+      "systemPrompt": "system-prompts/v1-minimal.md"
+    },
+    "v2-explicit-format": {
+      "toolDescriptions": "tool-descriptions/v2-explicit-format.json",
+      "systemPrompt": "system-prompts/v2-guided.md"
+    },
+    "v3-negative-examples": {
+      "toolDescriptions": "tool-descriptions/v3-negative-examples.json",
+      "systemPrompt": "system-prompts/v2-guided.md"
+    }
+  },
+  "testConfig": {
+    "modelId": "claude-sonnet-4-20250514",
+    "maxTokens": 1024,
+    "temperature": 0
+  }
+}

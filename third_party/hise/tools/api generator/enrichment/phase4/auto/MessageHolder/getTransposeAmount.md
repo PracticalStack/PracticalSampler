@@ -1,0 +1,1 @@
+Returns the transpose amount in semitones stored on this event. Transpose shifts the effective pitch without changing the original note number, so NoteOn and NoteOff events still match automatically. The sounding note is `getNoteNumber() + getTransposeAmount()`.

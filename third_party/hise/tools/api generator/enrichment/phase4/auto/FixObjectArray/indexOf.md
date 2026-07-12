@@ -1,0 +1,1 @@
+Returns the index of the first element matching the given object, or -1 if not found. The comparison uses the factory's compare function. With a property-based comparator (e.g. `factory.setCompareFunction("id")`), only the specified property is compared. The argument must be a FixObject from the same factory layout; passing any other type returns -1 immediately.

@@ -1,0 +1,1 @@
+Returns an array of all active property IDs for this component. ScriptAudioWaveform hides the usual text, scalar-range, and parameter-link properties because it works with audio-slot data instead of one numeric parameter.

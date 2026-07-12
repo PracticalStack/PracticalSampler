@@ -1,0 +1,1 @@
+Converts a sample count to milliseconds using the current sample rate. This is the inverse of `Engine.getSamplesForMilliSeconds()`.

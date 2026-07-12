@@ -1,0 +1,14 @@
+{
+  "factoryPath": "routing.local_cable",
+  "nodes": [
+    { "id": "value_param", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Normalised 0..1 control value input" },
+    { "id": "broadcast", "label": "Broadcast to Peers", "type": "process", "importance": 1.0, "description": "Sends value to all local_cable nodes with the same LocalId via setValueAsync()" },
+    { "id": "recursion_guard", "label": "Recursion Guard", "type": "decision", "importance": 0.7, "description": "Prevents feedback loops when receiving values from peer cables" },
+    { "id": "mod_out", "label": "Modulation Output", "type": "modulation_out", "importance": 1.0, "description": "Forwards value to connected parameter targets" }
+  ],
+  "edges": [
+    { "from": "value_param", "to": "recursion_guard", "type": "control", "label": null },
+    { "from": "recursion_guard", "to": "broadcast", "type": "conditional", "label": "if not recursion" },
+    { "from": "recursion_guard", "to": "mod_out", "type": "conditional", "label": "if not recursion" }
+  ]
+}

@@ -1,0 +1,1 @@
+Returns the raw stored value without normalisation to a 0-1 range. For ScriptComboBox, this behaves identically to `getValue()` because the base implementation does not map from the 1..N item range. Use `getValue()` instead for clarity.

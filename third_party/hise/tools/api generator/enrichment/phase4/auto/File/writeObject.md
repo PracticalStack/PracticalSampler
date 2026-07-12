@@ -1,0 +1,1 @@
+Serialises a JSON value to a formatted text string and writes it to this file, replacing any existing content. This is the inverse of `loadAsObject`. The output uses indented, human-readable JSON formatting. Returns `true` on success. To update a single key without losing other data, load the existing object first, modify it, then write it back.

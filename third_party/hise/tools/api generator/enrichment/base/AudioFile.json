@@ -1,0 +1,144 @@
+{
+  "className": "AudioFile",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "getContent": {
+      "signature": "var getContent()",
+      "returnType": "var",
+      "description": "Returns the current audio data as array of channels.",
+      "parameters": []
+    },
+    "getCurrentlyDisplayedIndex": {
+      "signature": "float getCurrentlyDisplayedIndex()",
+      "returnType": "float",
+      "description": "Returns the current sample position (from 0 to numSamples).",
+      "parameters": []
+    },
+    "getCurrentlyLoadedFile": {
+      "signature": "String getCurrentlyLoadedFile()",
+      "returnType": "String",
+      "description": "Returns the reference string for the currently loaded file.",
+      "parameters": []
+    },
+    "getLoopRange": {
+      "signature": "var getLoopRange(bool subtractStart)",
+      "returnType": "var",
+      "description": "Returns the current loop range in the form [start, end].",
+      "parameters": [
+        {
+          "name": "subtractStart",
+          "type": "bool"
+        }
+      ]
+    },
+    "getNumSamples": {
+      "signature": "int getNumSamples()",
+      "returnType": "int",
+      "description": "returns the amount of samples.",
+      "parameters": []
+    },
+    "getRange": {
+      "signature": "var getRange()",
+      "returnType": "var",
+      "description": "Returns the audio file's current range in the form [start, end].",
+      "parameters": []
+    },
+    "getSampleRate": {
+      "signature": "double getSampleRate()",
+      "returnType": "double",
+      "description": "Returns the samplerate of the audio file.",
+      "parameters": []
+    },
+    "getTotalLengthInSamples": {
+      "signature": "var getTotalLengthInSamples()",
+      "returnType": "var",
+      "description": "Returns the length of the original audio file in samples.",
+      "parameters": []
+    },
+    "linkTo": {
+      "signature": "void linkTo(var other)",
+      "returnType": "void",
+      "description": "Links this audio file to the other",
+      "parameters": [
+        {
+          "name": "other",
+          "type": "var"
+        }
+      ]
+    },
+    "loadBuffer": {
+      "signature": "void loadBuffer(var bufferData, double sampleRate, var loopRange)",
+      "returnType": "void",
+      "description": "Loads a buffer into the audio sample slot.",
+      "parameters": [
+        {
+          "name": "bufferData",
+          "type": "var"
+        },
+        {
+          "name": "sampleRate",
+          "type": "double"
+        },
+        {
+          "name": "loopRange",
+          "type": "var"
+        }
+      ]
+    },
+    "loadFile": {
+      "signature": "void loadFile(String filePath)",
+      "returnType": "void",
+      "description": "Loads an audio file from the given reference.",
+      "parameters": [
+        {
+          "name": "filePath",
+          "type": "String"
+        }
+      ]
+    },
+    "setContentCallback": {
+      "signature": "void setContentCallback(var contentFunction)",
+      "returnType": "void",
+      "description": "Sets a callback that is being executed when a new file is loaded (or the sample range changed).",
+      "parameters": [
+        {
+          "name": "contentFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "setDisplayCallback": {
+      "signature": "void setDisplayCallback(var displayFunction)",
+      "returnType": "void",
+      "description": "Sets a callback that is being executed when the playback position changes.",
+      "parameters": [
+        {
+          "name": "displayFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "setRange": {
+      "signature": "void setRange(int min, int max)",
+      "returnType": "void",
+      "description": "Sets a new sample range.",
+      "parameters": [
+        {
+          "name": "min",
+          "type": "int"
+        },
+        {
+          "name": "max",
+          "type": "int"
+        }
+      ]
+    },
+    "update": {
+      "signature": "void update()",
+      "returnType": "void",
+      "description": "Sends an update message to all registered listeners.",
+      "parameters": []
+    }
+  }
+}

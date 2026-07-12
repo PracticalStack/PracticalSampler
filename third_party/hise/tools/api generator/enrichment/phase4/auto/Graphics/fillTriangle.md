@@ -1,0 +1,1 @@
+Fills a triangle within the specified area, rotated by the given angle in radians. The base orientation is an upward-pointing isosceles triangle. Pass `Math.PI` for a downward-pointing triangle. To draw only the outline, use `drawTriangle` instead.

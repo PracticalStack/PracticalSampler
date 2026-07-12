@@ -1,0 +1,1 @@
+Enables or disables the ring buffer. When disabled, the DSP writer skips writing to the buffer, reducing CPU overhead for visualisations that are not currently visible. Tie this to page or tab switching so that only the active display buffer consumes processing resources.

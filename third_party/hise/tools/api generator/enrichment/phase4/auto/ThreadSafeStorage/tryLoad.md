@@ -1,0 +1,3 @@
+Non-blocking read designed for audio-thread use. Returns the stored value if no write is in progress, or the fallback value if a writer currently holds the lock.
+
+> [!Warning:Choose a valid operational default as fallback] The fallback is returned whenever a concurrent write is in progress, not only when no data has been stored. Design it as a valid default for the consumer (e.g. `0.0` for gain, `[]` for a data list) rather than a sentinel like `-1` that requires special handling downstream.

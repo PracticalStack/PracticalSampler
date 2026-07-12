@@ -1,0 +1,1 @@
+Returns the transpose amount in semitones applied to the current event. The transposed pitch is `Message.getNoteNumber() + Message.getTransposeAmount()`, since transpose does not alter the raw note number. When a note-off is matched to its note-on, the transpose amount is automatically copied, so you only need to set it in `onNoteOn`.

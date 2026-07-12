@@ -1,0 +1,1 @@
+Reads metadata directly from an `.hr` archive package file without installing it. Returns a JSON object containing the package properties, including the `HxiName` field that identifies the target expansion. Use this to display package information to the user before starting the installation.

@@ -1,0 +1,1 @@
+Creates and returns a `Builder` object for programmatic construction and modification of the module tree at runtime. The typical workflow is to call `builder.clear()` to reset, use `builder.create()` to add modules, configure them, then call `builder.flush()` to apply all changes atomically. Audio processing is suspended during the flush operation.

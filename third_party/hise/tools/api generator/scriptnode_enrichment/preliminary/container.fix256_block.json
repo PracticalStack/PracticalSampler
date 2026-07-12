@@ -1,0 +1,69 @@
+{
+  "factoryPath": "container.fix256_block",
+  "factory": "container",
+  "nodeId": "fix256_block",
+  "description": "Split the audio signal into fixed length chunks of 256 samples.",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "UI-only: controls whether the container is displayed vertically or horizontally in the scriptnode graph. No effect on audio processing."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": true,
+    "groupName": "fixN_block",
+    "templateParameter": "block size",
+    "variantValue": "256"
+  },
+
+  "existingDoc": {
+    "path": "phase3/container/fix256_block.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "variant-difference",
+      "category": "signal_path",
+      "question": "Is the processing logic of fix_block<256> identical to fix_block<8> except for the template parameter N=256? Are there any block-size-specific optimisations or edge cases?",
+      "context": "If identical, the doc can reference the base variant (fix8_block) and note only the block size difference."
+    }
+  ],
+
+  "notes": "Variant of fixN_block group with N=256. References fix8_block exploration for all shared logic. Existing phase3 doc is a bare stub with no content (summary placeholder not filled in)."
+}

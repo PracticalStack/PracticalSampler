@@ -1,0 +1,1 @@
+Returns the current text content of the system clipboard. Returns an empty string if the clipboard is empty or does not contain text.

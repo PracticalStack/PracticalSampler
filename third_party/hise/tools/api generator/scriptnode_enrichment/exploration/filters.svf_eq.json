@@ -1,0 +1,26 @@
+{
+  "factoryPath": "filters.svf_eq",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "svf_eq", "label": "SVF Parametric EQ", "type": "process", "importance": 1.0, "description": "Zavalishin TPT SVF with mixing matrix for EQ modes" },
+    { "id": "freq", "label": "Frequency", "type": "parameter", "importance": 1.0, "description": "Cutoff/center frequency (20-20000 Hz), smoothed" },
+    { "id": "q", "label": "Q", "type": "parameter", "importance": 1.0, "description": "Bandwidth/resonance (0.3-9.9)" },
+    { "id": "gain", "label": "Gain", "type": "parameter", "importance": 1.0, "description": "Boost/cut in dB for LowShelf, HighShelf, Peak modes" },
+    { "id": "mode", "label": "Mode", "type": "parameter", "importance": 1.0, "description": "EQ type: LowPass, HighPass, LowShelf, HighShelf, Peak" },
+    { "id": "smoothing", "label": "Smoothing", "type": "parameter", "importance": 0.5, "description": "Parameter interpolation time in seconds" },
+    { "id": "enabled", "label": "Enabled", "type": "parameter", "importance": 0.5, "description": "Hard bypass toggle" },
+    { "id": "coeffs", "label": "Filter Display", "type": "external_data", "importance": 0.4, "description": "FilterCoefficients for frequency response display" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Filtered audio signal" }
+  ],
+  "edges": [
+    { "from": "in", "to": "svf_eq", "type": "signal", "label": null },
+    { "from": "freq", "to": "svf_eq", "type": "control", "label": null },
+    { "from": "q", "to": "svf_eq", "type": "control", "label": null },
+    { "from": "gain", "to": "svf_eq", "type": "control", "label": "LowShelf/HighShelf/Peak only" },
+    { "from": "mode", "to": "svf_eq", "type": "control", "label": null },
+    { "from": "smoothing", "to": "svf_eq", "type": "control", "label": null },
+    { "from": "enabled", "to": "svf_eq", "type": "control", "label": null },
+    { "from": "svf_eq", "to": "coeffs", "type": "control", "label": "display update" },
+    { "from": "svf_eq", "to": "out", "type": "signal", "label": null }
+  ]
+}

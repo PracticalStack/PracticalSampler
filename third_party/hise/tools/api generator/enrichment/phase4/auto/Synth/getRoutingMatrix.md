@@ -1,0 +1,1 @@
+Returns a `ScriptRoutingMatrix` handle that provides script-level access to the multi-channel output routing of the named processor. This method searches the entire module tree, not just the parent synth's subtree. Use it to dynamically remap stereo pairs to different output buses at runtime.

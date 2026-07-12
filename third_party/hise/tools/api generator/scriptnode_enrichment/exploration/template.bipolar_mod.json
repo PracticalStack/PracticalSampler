@@ -1,0 +1,24 @@
+{
+  "factoryPath": "template.bipolar_mod",
+  "nodes": [
+    { "id": "in", "label": "Control Signal In", "type": "input", "importance": 0.8, "description": "Audio/control signal entering the modchain (processed at control rate, mono)" },
+    { "id": "mod_signal", "label": "mod_signal (user source)", "type": "process", "importance": 1.0, "description": "User-replaceable modulation source chain. Default: core.ramp (1Hz sawtooth). User replaces with desired modulation source." },
+    { "id": "sig2mod", "label": "sig2mod", "type": "process", "importance": 0.8, "description": "Converts audio range (-1..1) to modulation range (0..1): output = (input + 1) * 0.5" },
+    { "id": "peak", "label": "peak", "type": "process", "importance": 0.8, "description": "Captures signal value and outputs as modulation to bipolar.Value" },
+    { "id": "bipolar", "label": "bipolar", "type": "process", "importance": 1.0, "description": "Converts 0..1 input to bipolar range (-Scale..+Scale) with optional gamma curve" },
+    { "id": "pma", "label": "pma", "type": "process", "importance": 1.0, "description": "Computes Value * Multiply + Add. User connects modulation output to target parameter." },
+    { "id": "value_param", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Base/centre value (0..1). Routes to pma.Value." },
+    { "id": "intensity_param", "label": "Intensity", "type": "parameter", "importance": 1.0, "description": "Modulation depth (0..1). Routes to bipolar.Scale." },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "pma output: user connects to target parameter" }
+  ],
+  "edges": [
+    { "from": "in", "to": "mod_signal", "type": "signal", "label": null },
+    { "from": "mod_signal", "to": "sig2mod", "type": "signal", "label": null },
+    { "from": "sig2mod", "to": "peak", "type": "signal", "label": null },
+    { "from": "peak", "to": "bipolar", "type": "control", "label": "modulates Value" },
+    { "from": "bipolar", "to": "pma", "type": "control", "label": "modulates Add" },
+    { "from": "value_param", "to": "pma", "type": "control", "label": "-> pma.Value" },
+    { "from": "intensity_param", "to": "bipolar", "type": "control", "label": "-> bipolar.Scale" },
+    { "from": "pma", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

@@ -1,0 +1,170 @@
+{
+  "0": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "FileSystem.browse opens a modal file dialog that cannot be automated",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Defines savePresetAs() inline function. Compiles fine but calling it blocks on dialog."
+  },
+  "1": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);\nContent.addKnob(\"TestKnob1\", 0, 0);\nContent.addButton(\"TestBtn1\", 100, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "typeof comp", "value": "object", "delay": 0},
+      {"type": "REPL", "expression": "comp.TestKnob1 != undefined", "value": 1, "delay": 0},
+      {"type": "REPL", "expression": "comp.TestBtn1 != undefined", "value": 1, "delay": 0}
+    ],
+    "notes": "getAllComponents maps all components by ID. We create 2 components to verify the map works."
+  },
+  "2": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "// MODULE_SETUP: Synth.addEffect(\"SimpleGain\", \"Simple Gain1\", -1);\n// MODULE_SETUP: Synth.addEffect(\"SimpleGain\", \"Simple Gain2\", -1);\nContent.addKnob(\"knbVolume1\", 0, 0);\nContent.addKnob(\"knbVolume2\", 100, 0);",
+    "testOnlyCode": "SampleVolumeKnobs[0].setValue(-6.0);\nSampleVolumeKnobs[0].changed();",
+    "verifyScript": [
+      {"type": "REPL", "expression": "TheGains.length", "value": 2, "delay": 0},
+      {"type": "REPL", "expression": "SampleVolumeKnobs.length", "value": 2, "delay": 0},
+      {"type": "REPL", "expression": "TheGains[0].getAttribute(0)", "value": -6.0, "delay": 100}
+    ],
+    "notes": "Example already has makeFrontInterface. Setup creates 2 SimpleGain effects and 2 knobs matching the prefix patterns."
+  },
+  "3": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.addKnob(\"Knob1\", 0, 0);\nContent.addKnob(\"Knob2\", 100, 0);\nContent.addKnob(\"Knob3\", 200, 0);\nContent.addKnob(\"Knob4\", 300, 0);\nContent.addKnob(\"Knob5\", 400, 0);\nContent.addKnob(\"Knob6\", 500, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "knobs.length", "value": 6, "delay": 0},
+      {"type": "REPL", "expression": "mods.length", "value": 6, "delay": 0}
+    ],
+    "notes": "Example already has makeFrontInterface. createModifiers/setModifiers are visual-only but we verify arrays populated."
+  },
+  "4": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "References obj.path and obj.pathArea from FFT analyser connection that cannot be set up programmatically",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "FFT display paint routine. The obj variable is populated by an external FFT analyser module wired to the panel."
+  },
+  "5": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "C++ template code, not HiseScript - cannot be compiled by HISE scripting engine",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "This is C++ code for third-party DLL nodes, not HiseScript."
+  },
+  "6": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);\nContent.addFloatingTile(\"FloatingTile1\", 0, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "FloatingTile1 != undefined", "value": 1, "delay": 0},
+      {"type": "REPL", "expression": "Waterfall_BC != undefined", "value": 1, "delay": 0}
+    ],
+    "notes": "Broadcaster setup with mouse events. Compile + verify objects created. Can't trigger mouse events via REPL."
+  },
+  "7": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);",
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Defines an inline function copyMidiFile(). Compile-only test - function requires a real File object to call."
+  },
+  "8": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Engine.loadFontAs requires actual font files on disk which are not available in test environment",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Scans filesystem for font files and loads them. Requires actual TTF/OTF files."
+  },
+  "9": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "fft != undefined", "value": 1, "delay": 0},
+      {"type": "REPL", "expression": "b.length", "value": 44100, "delay": 0},
+      {"type": "REPL", "expression": "options.ColourScheme", "value": 2, "delay": 0}
+    ],
+    "notes": "Self-contained: creates buffer, FFT, panel via Content.addPanel. Already has makeFrontInterface."
+  },
+  "10": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "FileSystem.browse opens a modal file dialog that cannot be automated",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Button callback triggers FileSystem.browse dialog. Also references undefined arrayOfBuffers."
+  },
+  "11": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.addKnob(\"Knob1\", 0, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "steps.length", "value": 5, "delay": 0},
+      {"type": "REPL", "expression": "steps[2]", "value": 5, "delay": 0}
+    ],
+    "notes": "Example already has makeFrontInterface. Verify array is correct. Skipping callback trigger because default knob range 0-1 won't produce integer indices for the steps array."
+  },
+  "12": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);\nContent.addPanel(\"pnl_DETECT\", 0, 0);\nContent.addFloatingTile(\"tile_DRAGROP\", 200, 0);\nContent.addPanel(\"pnl_BLOCK\", 400, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "pnl_DETECT != undefined", "value": 1, "delay": 0},
+      {"type": "REPL", "expression": "pnl_BLOCK != undefined", "value": 1, "delay": 0}
+    ],
+    "notes": "Mouse callback panel. Compile + verify components exist. Can't trigger mouse events via REPL."
+  },
+  "13": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.addKnob(\"LF\", 0, 0);\nContent.addKnob(\"HF\", 100, 0);\nContent.addKnob(\"SATURATION\", 200, 0);\nContent.addKnob(\"WIDTH\", 300, 0);\nContent.addKnob(\"MAIN\", 400, 0);",
+    "testOnlyCode": "Content.getComponent(\"MAIN\").setValue(0.5);\nContent.getComponent(\"MAIN\").changed();",
+    "verifyScript": [
+      {"type": "REPL", "expression": "LF.getValue()", "value": 3.5, "delay": 100},
+      {"type": "REPL", "expression": "HF.getValue()", "value": 3.5, "delay": 0},
+      {"type": "REPL", "expression": "SATURATION.getValue()", "value": 0.5, "delay": 0},
+      {"type": "REPL", "expression": "WIDTH.getValue()", "value": 135, "delay": 0}
+    ],
+    "notes": "Example already has makeFrontInterface. MAIN=0.5 -> normalisedToRange(0.5, 0, 7)=3.5, (0.5, 0, 1)=0.5, (0.5, 100, 170)=135."
+  },
+  "14": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "typeof myObj", "value": "object", "delay": 0},
+      {"type": "REPL", "expression": "myObj.name", "value": "Dave", "delay": 0},
+      {"type": "REPL", "expression": "myObj.age", "value": 38, "delay": 0}
+    ],
+    "notes": "Defines save/load functions and a const object. Functions reference Desktop which exists. Compile + verify object creation. Don't call saveObject/loadObject as they write to disk."
+  }
+}

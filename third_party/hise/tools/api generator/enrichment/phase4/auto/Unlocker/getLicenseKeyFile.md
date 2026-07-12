@@ -1,0 +1,1 @@
+Returns the full file path where the licence key file is expected on disk. The path is determined by the project's company name, project name, and file extension. This returns the expected location regardless of whether the file actually exists - use `keyFileExists()` to check.

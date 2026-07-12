@@ -1,0 +1,14 @@
+{
+  "factoryPath": "analyse.specs",
+  "nodes": [
+    {"id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio (monitoring context only)"},
+    {"id": "display", "label": "Display PrepareSpecs", "type": "process", "importance": 0.8, "description": "Render processing context: sample rate, block size, channels, MIDI/polyphony status"},
+    {"id": "specs_data", "label": "PrepareSpecs context", "type": "parameter", "importance": 0.6, "description": "sampleRate, blockSize, numChannels, voiceIndex, shouldProcessHiseEvent"},
+    {"id": "out", "label": "Audio Out (pass-through)", "type": "output", "importance": 1.0, "description": "Input signal unchanged"}
+  ],
+  "edges": [
+    {"from": "in", "to": "display", "type": "signal", "label": null},
+    {"from": "specs_data", "to": "display", "type": "control", "label": null},
+    {"from": "in", "to": "out", "type": "signal", "label": "pass-through"}
+  ]
+}

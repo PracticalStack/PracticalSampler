@@ -1,0 +1,14 @@
+{
+  "factoryPath": "math.expr",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "expr", "label": "SNEX Expression", "type": "process", "importance": 1.0, "description": "Applies user-defined op(input, value) per sample" },
+    { "id": "value", "label": "Value", "type": "parameter", "importance": 0.8, "description": "Second argument passed to the expression function" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Processed output signal" }
+  ],
+  "edges": [
+    { "from": "in", "to": "expr", "type": "signal", "label": null },
+    { "from": "value", "to": "expr", "type": "control", "label": "value arg" },
+    { "from": "expr", "to": "out", "type": "signal", "label": null }
+  ]
+}

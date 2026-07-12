@@ -1,0 +1,205 @@
+{
+  "moduleId": "PitchWheel",
+  "nodes": [
+    {
+      "id": "midi_in",
+      "label": "MIDI Pitch Bend",
+      "type": "input",
+      "importance": 0.9,
+      "group": "event_processing",
+      "description": "Incoming MIDI pitch bend event (14-bit, 0-16383). Filtered by isPitchWheel(). In MPE mode, only channel 1 is accepted."
+    },
+    {
+      "id": "normalize",
+      "label": "Normalize to 0-1",
+      "type": "process",
+      "importance": 0.9,
+      "group": "event_processing",
+      "description": "Divides raw pitch wheel value by 16383.0 to produce 0.0-1.0 range. Center (8192) maps to ~0.5."
+    },
+    {
+      "id": "table_lookup",
+      "label": "Table Lookup",
+      "type": "process",
+      "importance": 0.7,
+      "group": "event_processing",
+      "description": "512-point interpolated lookup table maps normalized input to custom output curve. Runs per-event, not per-sample."
+    },
+    {
+      "id": "invert",
+      "label": "Invert (1 - value)",
+      "type": "process",
+      "importance": 0.6,
+      "group": "event_processing",
+      "description": "Applies 1.0 - value after table lookup. Center (0.5) is unchanged; up/down are swapped."
+    },
+    {
+      "id": "target_value",
+      "label": "Target Value",
+      "type": "process",
+      "importance": 0.5,
+      "group": "event_processing",
+      "description": "Stores the processed value as the smoothing target. Initial value is 0.5 (center)."
+    },
+    {
+      "id": "smoother",
+      "label": "Exponential Smoother",
+      "type": "process",
+      "importance": 0.8,
+      "group": "block_processing",
+      "description": "One-pole IIR lowpass filter smooths currentValue toward targetValue per-sample at control rate. Deactivates when SmoothTime=0. Fast-path constant fill when converged."
+    },
+    {
+      "id": "output",
+      "label": "Modulation Output",
+      "type": "output",
+      "importance": 1.0,
+      "group": "block_processing",
+      "description": "Per-sample modulation values written to internalBuffer, then applied to parent chain via applyTimeModulation() with intensity scaling."
+    },
+    {
+      "id": "param_inverted",
+      "label": "Inverted",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": null,
+      "description": "Boolean toggle. When true, applies 1-value after table lookup."
+    },
+    {
+      "id": "param_use_table",
+      "label": "UseTable",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": null,
+      "description": "Boolean toggle. When true, routes normalized value through lookup table."
+    },
+    {
+      "id": "param_smooth_time",
+      "label": "SmoothTime",
+      "type": "parameter",
+      "importance": 0.6,
+      "group": null,
+      "description": "Smoothing time in milliseconds (0-1000, default 200). Controls one-pole lowpass cutoff. 0 disables smoothing."
+    },
+    {
+      "id": "decision_use_table",
+      "label": "UseTable?",
+      "type": "decision",
+      "importance": 0.4,
+      "group": "event_processing",
+      "description": "Branches signal path: if UseTable is enabled, value passes through table; otherwise bypasses to inversion check."
+    },
+    {
+      "id": "decision_inverted",
+      "label": "Inverted?",
+      "type": "decision",
+      "importance": 0.4,
+      "group": "event_processing",
+      "description": "Branches signal path: if Inverted is enabled, applies 1-value; otherwise passes value through."
+    },
+    {
+      "id": "mpe_filter",
+      "label": "MPE Channel Filter",
+      "type": "decision",
+      "importance": 0.3,
+      "group": "event_processing",
+      "description": "When MPE mode is active, rejects pitch bend events not on channel 1."
+    }
+  ],
+  "edges": [
+    {
+      "from": "midi_in",
+      "to": "mpe_filter",
+      "type": "signal",
+      "label": null
+    },
+    {
+      "from": "mpe_filter",
+      "to": "normalize",
+      "type": "conditional",
+      "label": "channel 1 or MPE off"
+    },
+    {
+      "from": "normalize",
+      "to": "decision_use_table",
+      "type": "signal",
+      "label": null
+    },
+    {
+      "from": "decision_use_table",
+      "to": "table_lookup",
+      "type": "conditional",
+      "label": "UseTable = true"
+    },
+    {
+      "from": "decision_use_table",
+      "to": "decision_inverted",
+      "type": "conditional",
+      "label": "UseTable = false"
+    },
+    {
+      "from": "table_lookup",
+      "to": "decision_inverted",
+      "type": "signal",
+      "label": null
+    },
+    {
+      "from": "decision_inverted",
+      "to": "invert",
+      "type": "conditional",
+      "label": "Inverted = true"
+    },
+    {
+      "from": "decision_inverted",
+      "to": "target_value",
+      "type": "conditional",
+      "label": "Inverted = false"
+    },
+    {
+      "from": "invert",
+      "to": "target_value",
+      "type": "signal",
+      "label": null
+    },
+    {
+      "from": "target_value",
+      "to": "smoother",
+      "type": "signal",
+      "label": null
+    },
+    {
+      "from": "smoother",
+      "to": "output",
+      "type": "signal",
+      "label": "per-sample at control rate"
+    },
+    {
+      "from": "param_use_table",
+      "to": "decision_use_table",
+      "type": "control",
+      "label": null
+    },
+    {
+      "from": "param_inverted",
+      "to": "decision_inverted",
+      "type": "control",
+      "label": null
+    },
+    {
+      "from": "param_smooth_time",
+      "to": "smoother",
+      "type": "control",
+      "label": "sets lowpass cutoff"
+    }
+  ],
+  "groups": [
+    {
+      "id": "event_processing",
+      "label": "Event Processing (handleHiseEvent)"
+    },
+    {
+      "id": "block_processing",
+      "label": "Block Processing (calculateBlock)"
+    }
+  ]
+}

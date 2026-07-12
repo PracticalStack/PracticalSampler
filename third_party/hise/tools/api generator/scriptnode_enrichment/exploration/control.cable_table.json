@@ -1,0 +1,14 @@
+{
+  "factoryPath": "control.cable_table",
+  "nodes": [
+    { "id": "value_param", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Normalised input (0..1) used as table lookup position" },
+    { "id": "table_data", "label": "Table", "type": "external_data", "importance": 1.0, "description": "512-float lookup table" },
+    { "id": "lookup", "label": "Table Lookup", "type": "process", "importance": 1.0, "description": "Normalised index with linear interpolation between table entries" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Table value at input position (normalised)" }
+  ],
+  "edges": [
+    { "from": "value_param", "to": "lookup", "type": "control", "label": "normalised position" },
+    { "from": "table_data", "to": "lookup", "type": "signal", "label": "512-float data" },
+    { "from": "lookup", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

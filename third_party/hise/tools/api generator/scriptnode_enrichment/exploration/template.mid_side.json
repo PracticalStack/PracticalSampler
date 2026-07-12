@@ -1,0 +1,23 @@
+{
+  "factoryPath": "template.mid_side",
+  "nodes": [
+    { "id": "in", "label": "Stereo In (L/R)", "type": "input", "importance": 1.0, "description": "Stereo input signal (requires 2 channels)" },
+    { "id": "decoder", "label": "ms_decode", "type": "process", "importance": 1.0, "description": "Converts L/R to Mid/Side: Mid=L+R, Side=L-R" },
+    { "id": "mid_chain", "label": "mid_chain (user processing)", "type": "process", "importance": 1.0, "description": "Mono processing chain for mid (centre) signal. Contains mid_gain placeholder." },
+    { "id": "side_chain", "label": "side_chain (user processing)", "type": "process", "importance": 1.0, "description": "Mono processing chain for side (stereo width) signal. Contains side_gain placeholder." },
+    { "id": "encoder", "label": "ms_encode", "type": "process", "importance": 1.0, "description": "Converts Mid/Side back to L/R: L=(M+S)/2, R=(M-S)/2" },
+    { "id": "mid_gain_param", "label": "mid_gain.Value", "type": "parameter", "importance": 0.6, "description": "Internal gain for mid signal (0..1, default 1.0)" },
+    { "id": "side_gain_param", "label": "side_gain.Value", "type": "parameter", "importance": 0.6, "description": "Internal gain for side signal (0..1, default 1.0)" },
+    { "id": "out", "label": "Stereo Out (L/R)", "type": "output", "importance": 1.0, "description": "Re-encoded stereo output after M/S processing" }
+  ],
+  "edges": [
+    { "from": "in", "to": "decoder", "type": "signal", "label": null },
+    { "from": "decoder", "to": "mid_chain", "type": "signal", "label": "ch0 (mid)" },
+    { "from": "decoder", "to": "side_chain", "type": "signal", "label": "ch1 (side)" },
+    { "from": "mid_chain", "to": "encoder", "type": "signal", "label": "ch0 (mid)" },
+    { "from": "side_chain", "to": "encoder", "type": "signal", "label": "ch1 (side)" },
+    { "from": "encoder", "to": "out", "type": "signal", "label": null },
+    { "from": "mid_gain_param", "to": "mid_chain", "type": "control", "label": "-> math.mul Value" },
+    { "from": "side_gain_param", "to": "side_chain", "type": "control", "label": "-> math.mul Value" }
+  ]
+}

@@ -1,0 +1,9 @@
+#pragma once
+
+namespace drs::engine::generated
+{
+inline constexpr char workspaceRepoRoot[] = "@CMAKE_SOURCE_DIR@";
+inline constexpr char workspaceHiseProjectRoot[] = "@CMAKE_SOURCE_DIR@/content/hise_project";
+inline constexpr char runtimeCompanyName[] = "Decent Rhapsody";
+inline constexpr char runtimeProductName[] = "Decent Rhapsody Studio";
+} // namespace drs::engine::generated

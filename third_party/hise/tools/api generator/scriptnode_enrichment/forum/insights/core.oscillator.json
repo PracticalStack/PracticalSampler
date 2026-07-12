@@ -1,0 +1,56 @@
+{
+  "targetId": "core.oscillator",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [1934, 10696, 11455, 9277, 13426, 12679],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Oscillator responds to MIDI note input and will retune itself",
+      "summary": "When a `core.oscillator` node receives a MIDI message, it tunes itself to the incoming note frequency. If you want to use it as a fixed-frequency LFO or modulation source, wrap it inside a `container.no_midi` node to prevent note messages from affecting its frequency.",
+      "sources": ["tid:13426"],
+      "verify": true,
+      "verify_hint": "Test in a scriptnode synth context: oscillator without no_midi wrapper should retune on note-on."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "core.oscillator is monophonic — use container.multi for stereo",
+      "summary": "Like most oscillator nodes in scriptnode, `core.oscillator` operates on a single channel. To produce stereo output, place two instances inside a `container.multi` which automatically splits the processing per channel.",
+      "sources": ["tid:6287"],
+      "verify": true,
+      "verify_hint": "Confirm core.oscillator is single-channel; verify container.multi splits per channel."
+    },
+    {
+      "type": "BUG",
+      "title": "Oscillator uptime counter can blow up after extended playback",
+      "summary": "A bug was reported where a `core.oscillator` running on the second channel caused the internal uptime counter to overflow/explode after several minutes of continuous playback, producing an audio artefact. The issue was reproduced inside a modchain context as well.",
+      "sources": ["tid:10696"],
+      "verify": true,
+      "verify_hint": "Check if uptime counter overflow bug has been fixed in recent HISE commits."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Build a hand-drawn oscillator by feeding a table into the oscillator",
+      "summary": "A custom waveform oscillator can be created by connecting a user-editable table to the oscillator node. The table data drives the waveform shape, allowing users to draw arbitrary waveforms at runtime. See aaronventure's snippet (tid:12679) for a complete implementation with UI and smoothing.",
+      "sources": ["tid:12679"],
+      "verify": false,
+      "verify_hint": "Verify that core.oscillator accepts external table data to define the waveform shape."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Amplitude-modulating an oscillator at audio rate requires a frame context",
+      "summary": "When modulating an oscillator's amplitude at very high speeds (audio-rate AM), the modulation will only update once per buffer unless the processing is moved into a frame-processing context. Use `container.frame2_block` or similar to get sample-accurate modulation. Additionally, compile the patch before checking the CPU overhead.",
+      "sources": ["tid:11455"],
+      "verify": true,
+      "verify_hint": "Confirm that oscillator AM without frame processing produces stepped/staircase artefacts at audio rates."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Randomise oscillator start phase per voice using a polyphonic delay node",
+      "summary": "To avoid phase-locked stacking of multiple oscillator voices, a polyphonic C++ node can apply a small random delay offset to each voice on note-on. Christoph confirmed that random phase offset is straightforward to implement in scriptnode using a small snippet.",
+      "sources": ["tid:12679"],
+      "verify": false,
+      "verify_hint": "Christoph posted a HiseSnippet for this pattern in tid:12679 (content truncated in cache)."
+    }
+  ]
+}

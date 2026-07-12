@@ -1,0 +1,228 @@
+{
+  "moduleId": "SimpleGain",
+  "prettyName": "Simple Gain",
+  "type": "Effect",
+  "subtype": "MasterEffect",
+  "category": "mixing, utility",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "stereo",
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "RoutingMatrix",
+      "signalFlowRole": "skip - inferred from type/subtype"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Level",
+      "rationale": "Gain and InvertPolarity control the output level and phase",
+      "parameters": [
+        {
+          "id": "Gain",
+          "name": "Gain",
+          "range": { "min": -100.0, "max": 36.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Output gain in decibels, where 0 dB is unity and negative values attenuate the signal",
+          "composite": {
+            "type": "modMultiply",
+            "details": {
+              "chainName": "Gain Modulation",
+              "chainIndex": 0,
+              "constrainer": "*"
+            }
+          },
+          "modChain": {
+            "name": "Gain Modulation",
+            "chainIndex": 0,
+            "modulationMode": "gain",
+            "constrainer": "*"
+          }
+        },
+        {
+          "id": "InvertPolarity",
+          "name": "Invert Polarity",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Inverts the signal polarity for phase correction or mid-side processing",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Delay",
+      "rationale": "Static delay time for timing alignment",
+      "parameters": [
+        {
+          "id": "Delay",
+          "name": "Delay",
+          "range": { "min": 0.0, "max": 500.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "Static delay time in milliseconds applied to both channels",
+          "composite": {
+            "type": "modMultiply",
+            "details": {
+              "chainName": "Delay Modulation",
+              "chainIndex": 1,
+              "constrainer": "*"
+            }
+          },
+          "modChain": {
+            "name": "Delay Modulation",
+            "chainIndex": 1,
+            "modulationMode": "gain",
+            "constrainer": "*"
+          }
+        }
+      ]
+    },
+    {
+      "label": "Stereo",
+      "rationale": "Width and Balance control the stereo image",
+      "parameters": [
+        {
+          "id": "Width",
+          "name": "Width",
+          "range": { "min": 0.0, "max": 200.0, "step": 1.0 },
+          "default": 100.0,
+          "description": "Stereo width percentage where 0 is mono, 100 is unchanged, and higher values exaggerate the sides",
+          "composite": {
+            "type": "modMultiply",
+            "details": {
+              "chainName": "Width Modulation",
+              "chainIndex": 2,
+              "constrainer": "*"
+            }
+          },
+          "modChain": {
+            "name": "Width Modulation",
+            "chainIndex": 2,
+            "modulationMode": "gain",
+            "constrainer": "*"
+          }
+        },
+        {
+          "id": "Balance",
+          "name": "Balance",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "Stereo pan position of the output signal",
+          "composite": {
+            "type": "modMultiply",
+            "details": {
+              "chainName": "Pan Modulation",
+              "chainIndex": 3,
+              "constrainer": "*"
+            }
+          },
+          "modChain": {
+            "name": "Pan Modulation",
+            "chainIndex": 3,
+            "modulationMode": "pan",
+            "constrainer": "*"
+          }
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [
+    {
+      "type": "modMultiply",
+      "param": "Gain",
+      "details": {
+        "chainName": "Gain Modulation",
+        "chainIndex": 0,
+        "constrainer": "*"
+      }
+    },
+    {
+      "type": "modMultiply",
+      "param": "Delay",
+      "details": {
+        "chainName": "Delay Modulation",
+        "chainIndex": 1,
+        "constrainer": "*"
+      }
+    },
+    {
+      "type": "modMultiply",
+      "param": "Width",
+      "details": {
+        "chainName": "Width Modulation",
+        "chainIndex": 2,
+        "constrainer": "*"
+      }
+    },
+    {
+      "type": "modMultiply",
+      "param": "Balance",
+      "details": {
+        "chainName": "Pan Modulation",
+        "chainIndex": 3,
+        "constrainer": "*"
+      }
+    }
+  ],
+
+  "standaloneModChains": [],
+
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-order",
+      "category": "signal_path",
+      "question": "What is the processing order? Is it: delay -> gain -> polarity -> width -> balance -> output? Or a different order?",
+      "context": "Need to determine the exact processing chain for the pseudo-code."
+    },
+    {
+      "id": "delay-implementation",
+      "category": "signal_path",
+      "question": "How is the delay implemented? Simple buffer delay with crossfade on time change? Is it applied before or after gain?",
+      "context": "Users need to know if the delay is a simple latency offset or a more complex delay line."
+    },
+    {
+      "id": "width-implementation",
+      "category": "parameter_behavior",
+      "question": "How is Width implemented? Mid/side encoding where Width < 100 reduces sides and Width > 100 boosts sides? What formula is used?",
+      "context": "Width values above 100% are unusual - users need to understand the stereo effect."
+    },
+    {
+      "id": "balance-implementation",
+      "category": "parameter_behavior",
+      "question": "Balance range is 0-1 with Pan mode. How is this mapped? 0 = left, 0.5 = centre, 1 = right? Or 0 = centre?",
+      "context": "The default of 0 with Pan mode is ambiguous - need to clarify the panning law."
+    },
+    {
+      "id": "polarity-inversion-point",
+      "category": "signal_path",
+      "question": "Where in the processing chain is InvertPolarity applied? Before or after gain?",
+      "context": "Polarity inversion placement matters for mid-side setups."
+    },
+    {
+      "id": "modulation-resolution",
+      "category": "parameter_behavior",
+      "question": "How are the 4 modulation chains applied? Per-sample or per-block? How does the Pan modulation chain interact with Balance?",
+      "context": "Four modulation chains is unusually many - users need to understand the modulation resolution."
+    },
+    {
+      "id": "performance",
+      "category": "performance",
+      "question": "With delay at 0ms, is the delay line bypassed? Does Width processing add significant overhead?",
+      "context": "SimpleGain should be lightweight but the delay and width features may add cost."
+    }
+  ],
+
+  "notes": "SimpleGain is a utility module with 4 modulation chains - one per major parameter (Gain, Delay, Width, Balance). The Pan Modulation chain uses 'pan' modulationMode rather than 'gain'. Balance default of 0 with Pan mode likely means centre (needs verification). Despite being called 'Simple', it has delay, stereo width, balance, and polarity features beyond basic gain."
+}

@@ -1,0 +1,32 @@
+{
+  "targetId": "core.fm",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [14257, 6287],
+  "insights": [
+    {
+      "type": "API",
+      "title": "core.fm takes the input signal as the frequency modulator",
+      "summary": "The `core.fm` node uses its audio input signal as the modulation source. The `modulator` parameter is an additional gain applied to the incoming signal before FM is computed. The basic 2-operator pattern is: `oscillator -> ahdsr -> fm -> ahdsr`. For 3+ operators, chain additional fm nodes: `... -> fm -> ahdsr -> fm -> ahdsr`.",
+      "sources": ["tid:14257"],
+      "verify": true,
+      "verify_hint": "Confirm that core.fm input signal = modulator source, and modulator parameter = gain multiplier."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Implement FM feedback by routing signal back with a frame_block to minimise latency",
+      "summary": "To achieve FM feedback (carrier modulating itself), route the signal back to the input using a feedback path and wrap it in a `frame_block` to reduce the feedback latency to one sample. Without the frame_block the feedback delay equals the buffer size. This network should be compiled for acceptable CPU performance.",
+      "sources": ["tid:14257"],
+      "verify": true,
+      "verify_hint": "Test feedback FM patch: confirm frame_block reduces feedback delay to 1 sample vs. buffer-size delay without it."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "core.fm is monophonic — use container.multi for stereo FM",
+      "summary": "Like most oscillator/synthesis nodes in scriptnode, `core.fm` processes a single channel. For stereo FM synthesis, place two `core.fm` nodes inside a `container.multi` which splits processing per channel.",
+      "sources": ["tid:6287"],
+      "verify": true,
+      "verify_hint": "Confirm core.fm is single-channel by checking its channel configuration in the HISE source."
+    }
+  ]
+}

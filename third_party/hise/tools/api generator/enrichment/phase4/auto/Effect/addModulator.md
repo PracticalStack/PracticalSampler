@@ -1,0 +1,1 @@
+Adds a new modulator of the given type to one of the effect's internal modulator chains. The `chainIndex` selects which chain to target (typically 0 for the first modulation chain), and `typeName` must be a valid modulator type name (e.g. `"LFO"`, `"Velocity"`, `"Constant"`). Returns a `Modulator` handle to the newly created modulator.

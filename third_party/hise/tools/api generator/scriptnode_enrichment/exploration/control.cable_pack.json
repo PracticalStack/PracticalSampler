@@ -1,0 +1,14 @@
+{
+  "factoryPath": "control.cable_pack",
+  "nodes": [
+    { "id": "value_param", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Normalised input (0..1) used as slider pack lookup position" },
+    { "id": "pack_data", "label": "SliderPack", "type": "external_data", "importance": 1.0, "description": "Variable-size slider pack data" },
+    { "id": "lookup", "label": "Pack Lookup", "type": "process", "importance": 1.0, "description": "Normalised index, nearest-neighbour (no interpolation), dynamic bounds" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Slider value at lookup position (normalised)" }
+  ],
+  "edges": [
+    { "from": "value_param", "to": "lookup", "type": "control", "label": "normalised position" },
+    { "from": "pack_data", "to": "lookup", "type": "signal", "label": "slider data" },
+    { "from": "lookup", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

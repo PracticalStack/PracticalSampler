@@ -1,0 +1,18 @@
+{
+  "className": "SliderPackProcessor",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "getSliderPack": {
+      "signature": "var getSliderPack(int sliderPackIndex)",
+      "returnType": "var",
+      "description": "Creates a data reference to the given index.",
+      "parameters": [
+        {
+          "name": "sliderPackIndex",
+          "type": "int"
+        }
+      ]
+    }
+  }
+}

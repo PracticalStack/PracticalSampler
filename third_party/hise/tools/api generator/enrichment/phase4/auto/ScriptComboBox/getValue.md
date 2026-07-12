@@ -1,0 +1,1 @@
+Returns the current value as a 1-based integer index. Value 1 is the first item, value 0 means nothing is selected. Use `getItemText()` to get the display text of the selected item instead of the numeric index.

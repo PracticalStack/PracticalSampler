@@ -1,0 +1,15 @@
+{
+  "factoryPath": "container.fix32_block",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio block" },
+    { "id": "chunk", "label": "Split into 32-sample chunks", "type": "process", "importance": 1.0, "description": "ChunkableProcessData splits buffer into chunks of max 32 samples" },
+    { "id": "serial", "label": "Serial child processing", "type": "process", "importance": 0.8, "description": "Each chunk processed by children in series" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Reassembled output" }
+  ],
+  "edges": [
+    { "from": "in", "to": "chunk", "type": "signal", "label": null },
+    { "from": "chunk", "to": "serial", "type": "signal", "label": "N chunks of 32" },
+    { "from": "serial", "to": "chunk", "type": "feedback", "label": "next chunk" },
+    { "from": "chunk", "to": "out", "type": "signal", "label": "all chunks done" }
+  ]
+}

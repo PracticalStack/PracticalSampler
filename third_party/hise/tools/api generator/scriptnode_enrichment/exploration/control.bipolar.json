@@ -1,0 +1,16 @@
+{
+  "factoryPath": "control.bipolar",
+  "nodes": [
+    { "id": "value_in", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Normalised 0..1 input signal" },
+    { "id": "scale", "label": "Scale", "type": "parameter", "importance": 1.0, "description": "Bipolar scaling depth and direction (-1..1)" },
+    { "id": "gamma", "label": "Gamma", "type": "parameter", "importance": 0.8, "description": "Non-linear curve shaping (0.5..2.0, 1.0 = linear)" },
+    { "id": "bipolar_op", "label": "Bipolar Transform", "type": "process", "importance": 1.0, "description": "Centres value around 0, applies gamma curve, scales, re-centres around 0.5" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Normalised output centred around 0.5" }
+  ],
+  "edges": [
+    { "from": "value_in", "to": "bipolar_op", "type": "signal", "label": null },
+    { "from": "scale", "to": "bipolar_op", "type": "control", "label": null },
+    { "from": "gamma", "to": "bipolar_op", "type": "control", "label": null },
+    { "from": "bipolar_op", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

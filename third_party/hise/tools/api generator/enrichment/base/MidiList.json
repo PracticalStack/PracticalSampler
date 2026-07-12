@@ -1,0 +1,120 @@
+{
+  "className": "MidiList",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "clear": {
+      "signature": "void clear()",
+      "returnType": "void",
+      "description": "Clears the MidiList to -1.",
+      "parameters": []
+    },
+    "fill": {
+      "signature": "void fill(int valueToFill)",
+      "returnType": "void",
+      "description": "Fills the MidiList with a number specified with valueToFill.",
+      "parameters": [
+        {
+          "name": "valueToFill",
+          "type": "int"
+        }
+      ]
+    },
+    "getBase64String": {
+      "signature": "String getBase64String()",
+      "returnType": "String",
+      "description": "Encodes all values into a base64 encoded string for storage.",
+      "parameters": []
+    },
+    "getIndex": {
+      "signature": "int getIndex(int value)",
+      "returnType": "int",
+      "description": "Returns the first index that contains this value.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "int"
+        }
+      ]
+    },
+    "getNumSetValues": {
+      "signature": "int getNumSetValues()",
+      "returnType": "int",
+      "description": "Returns the number of values that are not -1.",
+      "parameters": []
+    },
+    "getValue": {
+      "signature": "int getValue(int index)",
+      "returnType": "int",
+      "description": "Returns the value at the given number.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "getValueAmount": {
+      "signature": "int getValueAmount(int valueToCheck)",
+      "returnType": "int",
+      "description": "Returns the number of occurences of 'valueToCheck'",
+      "parameters": [
+        {
+          "name": "valueToCheck",
+          "type": "int"
+        }
+      ]
+    },
+    "isEmpty": {
+      "signature": "bool isEmpty()",
+      "returnType": "bool",
+      "description": "Checks if the list contains any data.",
+      "parameters": []
+    },
+    "restoreFromBase64String": {
+      "signature": "void restoreFromBase64String(String base64encodedValues)",
+      "returnType": "void",
+      "description": "Restore the values from a String that was created with getBase64String().",
+      "parameters": [
+        {
+          "name": "base64encodedValues",
+          "type": "String"
+        }
+      ]
+    },
+    "setRange": {
+      "signature": "void setRange(int startIndex, int numToFill, int value)",
+      "returnType": "void",
+      "description": "Sets a range of items to the same value.",
+      "parameters": [
+        {
+          "name": "startIndex",
+          "type": "int"
+        },
+        {
+          "name": "numToFill",
+          "type": "int"
+        },
+        {
+          "name": "value",
+          "type": "int"
+        }
+      ]
+    },
+    "setValue": {
+      "signature": "void setValue(int index, int value)",
+      "returnType": "void",
+      "description": "Sets the number to something between -127 and 128.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        },
+        {
+          "name": "value",
+          "type": "int"
+        }
+      ]
+    }
+  }
+}

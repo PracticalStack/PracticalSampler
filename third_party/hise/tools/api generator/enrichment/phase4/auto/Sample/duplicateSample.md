@@ -1,0 +1,1 @@
+Creates a copy of this sample within the same sampler and returns a new Sample object pointing to the copy. The new sample is appended to the end of the sample map with identical property values. Audio processing is briefly suspended during the operation.

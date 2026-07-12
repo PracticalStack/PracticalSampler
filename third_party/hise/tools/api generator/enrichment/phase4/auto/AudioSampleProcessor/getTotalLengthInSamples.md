@@ -1,0 +1,1 @@
+Returns the total length of the loaded audio file in samples, regardless of the current sample range. Use this to set the range to the full file: `asp.setSampleRange(0, asp.getTotalLengthInSamples())`.

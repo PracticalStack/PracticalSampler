@@ -1,0 +1,33 @@
+{
+  "version": "v1-baseline",
+  "description": "Original minimal tool descriptions",
+  "tools": {
+    "search_hise": {
+      "description": "Search across all HISE documentation: API methods, UI properties, module parameters, and code snippets."
+    },
+    "query_ui_property": {
+      "description": "Query UI component properties. Use \"Component.property\" format (e.g., \"ScriptButton.filmstripImage\")."
+    },
+    "query_scripting_api": {
+      "description": "Query Scripting API methods. Use \"Namespace.method\" format (e.g., \"Math.round()\", \"Knob.setValue()\")."
+    },
+    "query_module_parameter": {
+      "description": "Query module parameter IDs. Use \"Module.parameterId\" format (e.g., \"HardcodedSynth.Gain\")."
+    },
+    "list_snippets": {
+      "description": "List all available code snippets with metadata."
+    },
+    "get_snippet": {
+      "description": "Get full details and code for a specific snippet by ID."
+    },
+    "list_ui_components": {
+      "description": "List all available UI component types."
+    },
+    "list_scripting_namespaces": {
+      "description": "List all available Scripting API namespaces."
+    },
+    "list_module_types": {
+      "description": "List all available module types."
+    }
+  }
+}

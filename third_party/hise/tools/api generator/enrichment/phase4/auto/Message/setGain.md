@@ -1,0 +1,1 @@
+Sets the per-event gain in decibels, clamped to -100 to 36 dB. A value of -100 produces effective silence. Unlike `Message.setVelocity()` which only works on note-on events, `setGain()` works on any event type, making it the more flexible option for per-event volume adjustment.

@@ -1,0 +1,16 @@
+{
+  "factoryPath": "routing.global_cable",
+  "nodes": [
+    { "id": "value_param", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Normalised 0..1 control value input" },
+    { "id": "send", "label": "Send to Cable", "type": "process", "importance": 1.0, "description": "Broadcasts value to all other global_cable nodes on the same Connection via GlobalRoutingManager" },
+    { "id": "receive", "label": "Receive from Cable", "type": "process", "importance": 1.0, "description": "Receives values sent by other global_cable nodes on the same cable" },
+    { "id": "recursion_guard", "label": "Recursion Guard", "type": "decision", "importance": 0.7, "description": "Prevents feedback loop -- a node does not forward values it just sent" },
+    { "id": "mod_out", "label": "Modulation Output", "type": "modulation_out", "importance": 1.0, "description": "Forwards received cable value to connected parameter targets" }
+  ],
+  "edges": [
+    { "from": "value_param", "to": "send", "type": "control", "label": "setValue()" },
+    { "from": "send", "to": "receive", "type": "feedback", "label": "Cable broadcast (other nodes)" },
+    { "from": "receive", "to": "recursion_guard", "type": "signal", "label": null },
+    { "from": "recursion_guard", "to": "mod_out", "type": "conditional", "label": "if not recursion" }
+  ]
+}

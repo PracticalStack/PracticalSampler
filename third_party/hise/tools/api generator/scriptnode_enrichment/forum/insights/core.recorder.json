@@ -1,0 +1,32 @@
+{
+  "targetId": "core.recorder",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [7947, 11131],
+  "insights": [
+    {
+      "type": "API",
+      "title": "core.recorder workflow: assign external slot, set length, set parameter 1 to On",
+      "summary": "The recording workflow for `core.recorder` is: (1) assign the node an external audio slot shared with a playback node (e.g. file_player or granulator), (2) configure the recording length in milliseconds, (3) set the first parameter to On to begin recording the predetermined length. When recording completes, the buffer in the shared slot is immediately available to the connected playback node.",
+      "sources": ["tid:7947"],
+      "verify": true,
+      "verify_hint": "Confirm the three-step recorder API: external slot assignment, length parameter, and the On/Off trigger parameter."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Build a looper with core.recorder + SNEX playback node sharing an external slot",
+      "summary": "A complete looper effect requires `core.recorder` for capture and a custom SNEX node for playback/slicing, both sharing the same external audio slot. The SNEX node handles custom playback logic (reverse, loop start/end, slicing). A tutorial project is available in the `hise_tutorial` GitHub repository as a starting point.",
+      "sources": ["tid:7947"],
+      "verify": false,
+      "verify_hint": "Check hise_tutorial repo for the looper demo project to confirm it is still up-to-date and buildable."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Write recorded audio to disk and load into an Audio Loop Player for immediate use",
+      "summary": "A complete stereo recording workflow is: record audio using `core.recorder`, write the buffer to a WAV file on disk, then load the file into an Audio Loop Player for immediate playback. ustk published a snippet (tid:11131) demonstrating this full pipeline with a 6-upvote community-confirmed implementation.",
+      "sources": ["tid:11131"],
+      "verify": false,
+      "verify_hint": "ustk's snippet in tid:11131 provides the full pattern — load and verify it still works in current HISE."
+    }
+  ]
+}

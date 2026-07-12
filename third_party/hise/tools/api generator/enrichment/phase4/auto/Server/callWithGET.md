@@ -1,0 +1,1 @@
+Sends an HTTP GET request to the given sub-URL with the specified parameters encoded as query-string arguments. The `parameters` argument must be a flat JSON object (no nested objects) - the keys and values are automatically appended to the URL. Pass an empty string `""` or `{}` when there are no query arguments.

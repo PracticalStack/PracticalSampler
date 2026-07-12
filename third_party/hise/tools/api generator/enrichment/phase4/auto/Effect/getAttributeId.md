@@ -1,0 +1,1 @@
+Returns the name of the parameter at the given index as a string. Useful for building dynamic UIs or debugging parameter mappings where you need to display which parameter a given index corresponds to.

@@ -1,0 +1,1 @@
+Shows an informational message as an overlay on the plugin interface with an OK button.

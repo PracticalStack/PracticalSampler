@@ -1,0 +1,1 @@
+Bypasses the grid callback for this TransportHandler instance. When bypassed, no grid callbacks fire for this handler. When unbypassed, the next grid callback will have `firstGridInPlayback` set to `true`. This is local to this instance - other TransportHandler instances are not affected.

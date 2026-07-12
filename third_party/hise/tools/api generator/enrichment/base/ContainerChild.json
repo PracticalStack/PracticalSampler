@@ -1,0 +1,284 @@
+{
+  "className": "ContainerChild",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "addChildComponent": {
+      "signature": "var addChildComponent(var childData)",
+      "returnType": "var",
+      "description": "Adds a child component from the given JSON data.",
+      "parameters": [
+        {
+          "name": "childData",
+          "type": "var"
+        }
+      ]
+    },
+    "addStateToUserPreset": {
+      "signature": "void addStateToUserPreset(bool shouldAdd)",
+      "returnType": "void",
+      "description": "Stores / restores the values & components from this component in the user preset.",
+      "parameters": [
+        {
+          "name": "shouldAdd",
+          "type": "bool"
+        }
+      ]
+    },
+    "changed": {
+      "signature": "void changed()",
+      "returnType": "void",
+      "description": "causes the control callback to fire.",
+      "parameters": []
+    },
+    "fromBase64": {
+      "signature": "void fromBase64(String b64)",
+      "returnType": "void",
+      "description": "Restores this component and all its children with the given Base64 encoded state.",
+      "parameters": [
+        {
+          "name": "b64",
+          "type": "String"
+        }
+      ]
+    },
+    "get": {
+      "signature": "var get(String id)",
+      "returnType": "var",
+      "description": "Returns the given property (or the default value for the property).",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "String"
+        }
+      ]
+    },
+    "getAllComponents": {
+      "signature": "var getAllComponents(String regex)",
+      "returnType": "var",
+      "description": "Recursively searches all child components and returns all matches.",
+      "parameters": [
+        {
+          "name": "regex",
+          "type": "String"
+        }
+      ]
+    },
+    "getChildComponentIndex": {
+      "signature": "int getChildComponentIndex(var childIdOrComponent)",
+      "returnType": "int",
+      "description": "Returns the index of the child component (or ID).",
+      "parameters": [
+        {
+          "name": "childIdOrComponent",
+          "type": "var"
+        }
+      ]
+    },
+    "getComponent": {
+      "signature": "var getComponent(String childId)",
+      "returnType": "var",
+      "description": "Recursively searches the child components and returns the first with the given ID.",
+      "parameters": [
+        {
+          "name": "childId",
+          "type": "String"
+        }
+      ]
+    },
+    "getLocalBounds": {
+      "signature": "var getLocalBounds(int margin)",
+      "returnType": "var",
+      "description": "Returns the component bounds at the origin with the given margin.",
+      "parameters": [
+        {
+          "name": "margin",
+          "type": "int"
+        }
+      ]
+    },
+    "getNumChildComponents": {
+      "signature": "int getNumChildComponents()",
+      "returnType": "int",
+      "description": "Returns the number of child components.",
+      "parameters": []
+    },
+    "getParent": {
+      "signature": "var getParent()",
+      "returnType": "var",
+      "description": "Returns a reference object to the component's parent.",
+      "parameters": []
+    },
+    "getValue": {
+      "signature": "var getValue()",
+      "returnType": "var",
+      "description": "Returns the value of this component (or the defaultValue property if not initialised).",
+      "parameters": []
+    },
+    "isEqual": {
+      "signature": "bool isEqual(var other)",
+      "returnType": "bool",
+      "description": "Checks if the other object (either ID or child reference) points to the same component.",
+      "parameters": [
+        {
+          "name": "other",
+          "type": "var"
+        }
+      ]
+    },
+    "isValid": {
+      "signature": "bool isValid()",
+      "returnType": "bool",
+      "description": "Checks whether this reference points to a valid component within the component tree.",
+      "parameters": []
+    },
+    "loseFocus": {
+      "signature": "void loseFocus(bool recursive)",
+      "returnType": "void",
+      "description": "Sends a message to the component to lose the keyboard focus.",
+      "parameters": [
+        {
+          "name": "recursive",
+          "type": "bool"
+        }
+      ]
+    },
+    "removeAllChildren": {
+      "signature": "void removeAllChildren()",
+      "returnType": "void",
+      "description": "Removes all child components.",
+      "parameters": []
+    },
+    "removeFromParent": {
+      "signature": "void removeFromParent()",
+      "returnType": "void",
+      "description": "Removes the component.",
+      "parameters": []
+    },
+    "resetValueToDefault": {
+      "signature": "void resetValueToDefault(bool recursive)",
+      "returnType": "void",
+      "description": "Sends a message to the component to reset its value.",
+      "parameters": [
+        {
+          "name": "recursive",
+          "type": "bool"
+        }
+      ]
+    },
+    "sendRepaintMessage": {
+      "signature": "void sendRepaintMessage(bool recursive)",
+      "returnType": "void",
+      "description": "Sends a repaint message to this component.",
+      "parameters": [
+        {
+          "name": "recursive",
+          "type": "bool"
+        }
+      ]
+    },
+    "set": {
+      "signature": "void set(String id, var newValue)",
+      "returnType": "void",
+      "description": "Sets the component property.",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "name": "newValue",
+          "type": "var"
+        }
+      ]
+    },
+    "setBounds": {
+      "signature": "void setBounds(var area)",
+      "returnType": "void",
+      "description": "Sets the component bounds from the given rectangle.",
+      "parameters": [
+        {
+          "name": "area",
+          "type": "var"
+        }
+      ]
+    },
+    "setChildCallback": {
+      "signature": "void setChildCallback(var newChildCallback)",
+      "returnType": "void",
+      "description": "Attaches a callback that is executed whenever a child component is added / removed to this component.",
+      "parameters": [
+        {
+          "name": "newChildCallback",
+          "type": "var"
+        }
+      ]
+    },
+    "setControlCallback": {
+      "signature": "void setControlCallback(var controlCallback)",
+      "returnType": "void",
+      "description": "Attaches a value callback to this child reference.",
+      "parameters": [
+        {
+          "name": "controlCallback",
+          "type": "var"
+        }
+      ]
+    },
+    "setPaintRoutine": {
+      "signature": "void setPaintRoutine(var newPaintRoutine)",
+      "returnType": "void",
+      "description": "Registers a paint routine that draws the panel's content.",
+      "parameters": [
+        {
+          "name": "newPaintRoutine",
+          "type": "var"
+        }
+      ]
+    },
+    "setValue": {
+      "signature": "void setValue(var newValue)",
+      "returnType": "void",
+      "description": "Sets the value of this component without causing a control callback.",
+      "parameters": [
+        {
+          "name": "newValue",
+          "type": "var"
+        }
+      ]
+    },
+    "setValueWithUndo": {
+      "signature": "void setValueWithUndo(var newValue)",
+      "returnType": "void",
+      "description": "Undoably sets the value of this component without causing a control callback.",
+      "parameters": [
+        {
+          "name": "newValue",
+          "type": "var"
+        }
+      ]
+    },
+    "toBase64": {
+      "signature": "String toBase64(bool includeValue)",
+      "returnType": "String",
+      "description": "Returns a Base64 encoded state of this component and all of its children.",
+      "parameters": [
+        {
+          "name": "includeValue",
+          "type": "bool"
+        }
+      ]
+    },
+    "updateValueFromProcessorConnection": {
+      "signature": "void updateValueFromProcessorConnection(bool recursive)",
+      "returnType": "void",
+      "description": "Causes a value update from the processor connection.",
+      "parameters": [
+        {
+          "name": "recursive",
+          "type": "bool"
+        }
+      ]
+    }
+  }
+}

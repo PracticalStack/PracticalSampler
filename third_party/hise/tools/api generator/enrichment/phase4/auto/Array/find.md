@@ -1,0 +1,1 @@
+Returns the first element for which the callback returns a truthy value, or `undefined` if no match is found. The callback receives up to three arguments: `element`, `index`, and `array`. Check the result with `isDefined()` before use.

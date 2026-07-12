@@ -1,0 +1,1 @@
+Returns `true` if the array contains the specified value, `false` otherwise. Uses loose comparison, so `1` matches `1.0`. Performs a linear scan. See also `includes()`, which is an alias for this method.

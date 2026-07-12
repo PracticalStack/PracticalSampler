@@ -1,0 +1,1 @@
+Returns the current sample preload progress as a value from 0.0 to 1.0. Typically polled from a timer alongside `Engine.getPreloadMessage()` to display a loading bar.

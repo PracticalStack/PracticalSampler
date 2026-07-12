@@ -1,0 +1,121 @@
+{
+  "factoryPath": "core.phasor_fm",
+  "factory": "core",
+  "nodeId": "phasor_fm",
+  "description": "A ramp oscillator with FM modulation from the input signal",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": true,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Pitch",
+      "rationale": "Frequency and Freq Ratio together determine the base ramp speed; Phase sets the start offset",
+      "parameters": [
+        {
+          "id": "Frequency",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.1, "skew": 0.2299045622348785 },
+          "default": 220.0,
+          "textConverter": "Frequency",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Freq Ratio",
+          "range": { "min": 1.0, "max": 16.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Phase",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "NormalizedPercentage",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Voice control",
+      "rationale": "Gate enables/disables the phasor output",
+      "parameters": [
+        {
+          "id": "Gate",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/phasor_fm.md",
+    "tier": "GOOD",
+    "lines": 21
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "fm-signal-usage",
+      "category": "signal_path",
+      "question": "How does the input signal modulate the phase? Is it added to the phase increment (phase modulation) or does it multiply the frequency (true FM)?",
+      "context": "Critical for users to understand the FM modulation model and how to set modulation depth."
+    },
+    {
+      "id": "processing-order",
+      "category": "signal_path",
+      "question": "Does the phasor_fm read the input signal for FM, then replace the output with its ramp, or does it read and write to different channels?",
+      "context": "Users need to know how to route the modulator signal into this node."
+    },
+    {
+      "id": "gate-midi-interaction",
+      "category": "parameter_behaviour",
+      "question": "Does handleHiseEvent set Gate from note-on/note-off, or is it purely for pitch tracking?",
+      "context": "Same question as core.phasor -- determines MIDI interaction model."
+    },
+    {
+      "id": "output-range",
+      "category": "signal_path",
+      "question": "Is the output still 0..1 like core.phasor, or does FM modulation cause the output to exceed that range?",
+      "context": "Determines whether downstream nodes can expect a normalised signal."
+    }
+  ],
+
+  "notes": "This is the FM variant of core.phasor. The key difference is that the input signal modulates the oscillator phase/frequency. Same parameter set as core.phasor. Useful for FM synthesis where the modulator output drives the carrier phase."
+}

@@ -1,0 +1,1 @@
+Returns a reference to the component with the given name. If no matching component exists, an error is logged and undefined is returned. Cache the result as `const var` at init time and reuse the variable in callbacks, timer functions, and paint routines - each call performs a linear search through all components, which adds up in plugins with hundreds of controls.

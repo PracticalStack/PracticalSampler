@@ -1,0 +1,33 @@
+{
+  "moduleId": "StereoFX",
+  "nodes": [
+    { "id": "audio_in", "type": "input", "label": "Audio In (L/R)", "importance": 1.0, "group": null, "description": "Per-voice stereo audio buffer" },
+    { "id": "pan_param", "type": "parameter", "label": "Pan", "importance": 0.8, "group": "pan", "description": "Modulation range scaler (-100..+100, default 100). Defines max pan extent, not a static position." },
+    { "id": "pan_mod", "type": "modulation", "label": "Pan Modulation", "importance": 0.9, "group": "pan", "description": "Per-voice pan position (PanMode, audio-rate capable). Drives the actual pan position." },
+    { "id": "pan_check", "type": "decision", "label": "Chain has modulators?", "importance": 0.7, "group": "pan", "description": "If no modulators in BalanceChain, skip pan entirely" },
+    { "id": "pan_scale", "type": "process", "label": "Scale pan value", "importance": 0.6, "group": "pan", "description": "scaledPan = modValue * (pan - 0.5) * 200" },
+    { "id": "pan_apply", "type": "process", "label": "Equal-power pan", "importance": 1.0, "group": "pan", "description": "L *= sqrt(2)*cos(angle), R *= sqrt(2)*sin(angle) via BalanceCalculator" },
+    { "id": "width_param", "type": "parameter", "label": "Width", "importance": 0.8, "group": "width", "description": "Stereo width percentage (0=mono, 100=passthrough, 200=exaggerated)" },
+    { "id": "width_check", "type": "decision", "label": "Width != 100%?", "importance": 0.5, "group": "width", "description": "Skip mid/side processing if width is 1.0" },
+    { "id": "width_ms", "type": "process", "label": "Mid/Side width", "importance": 0.9, "group": "width", "description": "M=(L+R)*0.5, S=(R-L)*w*0.5, L=M-S, R=M+S. Applied to combined output buffer." },
+    { "id": "audio_out", "type": "output", "label": "Audio Out (L/R)", "importance": 1.0, "group": null, "description": "Processed stereo output" }
+  ],
+  "edges": [
+    { "from": "audio_in", "to": "pan_check", "type": "signal", "label": "per-voice" },
+    { "from": "pan_mod", "to": "pan_check", "type": "control", "label": null },
+    { "from": "pan_check", "to": "pan_scale", "type": "conditional", "label": "has modulators" },
+    { "from": "pan_check", "to": "width_check", "type": "conditional", "label": "no modulators (bypass)" },
+    { "from": "pan_param", "to": "pan_scale", "type": "control", "label": "range scaler" },
+    { "from": "pan_mod", "to": "pan_scale", "type": "control", "label": "position value" },
+    { "from": "pan_scale", "to": "pan_apply", "type": "signal", "label": null },
+    { "from": "pan_apply", "to": "width_check", "type": "signal", "label": "combined buffer" },
+    { "from": "width_param", "to": "width_check", "type": "control", "label": null },
+    { "from": "width_check", "to": "width_ms", "type": "conditional", "label": "width != 1.0" },
+    { "from": "width_check", "to": "audio_out", "type": "conditional", "label": "width == 1.0 (bypass)" },
+    { "from": "width_ms", "to": "audio_out", "type": "signal", "label": null }
+  ],
+  "groups": [
+    { "id": "pan", "label": "Pan (per-voice)" },
+    { "id": "width", "label": "Width (shared)" }
+  ]
+}

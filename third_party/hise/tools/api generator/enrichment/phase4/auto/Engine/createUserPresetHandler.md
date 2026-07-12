@@ -1,0 +1,1 @@
+Creates a user preset handler for customising the preset lifecycle. The handler exposes methods for intercepting preset load/save events, implementing custom preset models (where the script manages serialisation), attaching pre/post callbacks, and querying or modifying preset state. This is the central object for customising how user presets behave in a plugin.

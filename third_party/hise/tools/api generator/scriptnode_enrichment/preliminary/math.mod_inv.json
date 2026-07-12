@@ -1,0 +1,63 @@
+{
+  "factoryPath": "math.mod_inv",
+  "factory": "math",
+  "nodeId": "mod_inv",
+  "description": "Inverts a modulation signal from 0-1 to 1-0",
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+  "parameterGroups": [
+    {
+      "label": "Operation",
+      "rationale": "Single Value parameter controlling the math operation: s = 1.0 - s",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": {
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.0,
+            "skew": 1.0
+          },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+  "properties": [],
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/math/mod_inv.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+  "availableImages": [],
+  "gaps": [],
+  "notes": "Value parameter is ignored in processing. Inverts within 0-1 range using s = 1.0 - s. Different from inv which negates (-s). Uses vmuls(-1.0) + vadds(1.0) for SIMD block path."
+}

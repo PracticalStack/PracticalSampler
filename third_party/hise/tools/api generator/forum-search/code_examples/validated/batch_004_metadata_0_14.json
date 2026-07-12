@@ -1,0 +1,147 @@
+{
+  "0": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "LAF drawDialogButton, compile-only"
+  },
+  "1": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "References undefined function getRenderLengthSamples() from a larger project context",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "2": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Content.addPanel/addKnob/addButton creates components programmatically"
+  },
+  "3": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Function definition only, never called during init"
+  },
+  "4": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "UserPresetHandler with custom automation slots"
+  },
+  "5": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Engine.createAndRegisterRingBuffer, compile-only"
+  },
+  "6": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Panel1.data.buffer0 is undefined - requires pre-configured display buffer data on the panel",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "7": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "SNEX C++ template code, not HiseScript",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "8": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "TransportHandler setup, compile-only"
+  },
+  "9": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSliderPack", "id": "SliderPack1"},
+      {"type": "ScriptSliderPack", "id": "SliderPack2"}
+    ],
+    "verifyScript": null,
+    "notes": "LAF caches SliderPack references, compile-only"
+  },
+  "10": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "SlotFX", "name": "SlotFX0"},
+      {"type": "SlotFX", "name": "SlotFX1"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Inline function never called during init, compile-only"
+  },
+  "11": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Utility function definition, compile-only"
+  },
+  "12": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptedViewport", "id": "MidiFileListViewPort"}
+    ],
+    "verifyScript": null,
+    "notes": "ExpansionHandler returns null when no expansion loaded, isDefined check handles it"
+  },
+  "13": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Creates own components via Content.addKnob, self-contained"
+  },
+  "14": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptFloatingTile", "id": "tile_eq"}
+    ],
+    "verifyScript": null,
+    "notes": "Local LAF for filter drag handle, compile-only"
+  }
+}

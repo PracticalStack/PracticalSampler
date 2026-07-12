@@ -1,0 +1,1 @@
+Returns an array of Expansion references representing all currently available expansion packs. Each element can be used to query expansion properties and manage expansion-specific resources.

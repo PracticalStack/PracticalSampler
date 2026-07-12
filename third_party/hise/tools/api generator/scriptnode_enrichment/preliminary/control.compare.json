@@ -1,0 +1,108 @@
+{
+  "factoryPath": "control.compare",
+  "factory": "control",
+  "nodeId": "compare",
+  "description": "compares the input signals and outputs either 1.0 or 0.0",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Comparison Inputs",
+      "rationale": "Left and Right are the two values to be compared. They form a pair of operands for the selected comparison operator.",
+      "parameters": [
+        {
+          "id": "Left",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Right",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Operator Selection",
+      "rationale": "Comparator selects which comparison operation to apply between Left and Right.",
+      "parameters": [
+        {
+          "id": "Comparator",
+          "range": { "min": 0.0, "max": 7.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "75.nT6K8ChPQH..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.dTPQQofSEEkBGQkBLQkBGQUQJvDUEoPSI4jBMEDV.D1XzklckAP.AH..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/compare.md",
+    "tier": "STUB",
+    "lines": 0
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "compare-operator-list",
+      "category": "conditional_logic",
+      "question": "The Comparator parameter has range 0..7 (8 discrete values) with a text converter. What are the 8 comparison operators? Expected candidates: ==, !=, <, <=, >, >=, and possibly logical combinations. What is the complete list and their index mapping?",
+      "context": "All 8 comparator modes must be documented. The encoded text converter likely contains the labels."
+    },
+    {
+      "id": "compare-output-values",
+      "category": "signal_path",
+      "question": "The description says output is 1.0 or 0.0. Is this strictly binary, or can intermediate values occur? Is the comparison exact floating-point or does it use an epsilon tolerance?",
+      "context": "Need to confirm the output is strictly binary 0/1 for accurate documentation."
+    },
+    {
+      "id": "compare-formula",
+      "category": "signal_path",
+      "question": "In multilogic::compare::getValue(), what is the exact implementation? Does it evaluate the selected comparator on Left vs Right and return 1.0 if true, 0.0 if false?",
+      "context": "Confirm the straightforward comparison pattern and whether any clamping or normalisation is applied."
+    }
+  ],
+
+  "notes": "compare is a binary comparison node that outputs 1.0 or 0.0 based on comparing Left and Right with a selectable operator. The Comparator parameter has 8 options (range 0..7) with an encoded text converter. Output is normalised. This node is useful for conditional logic in control signal chains -- triggering behaviour based on value comparisons. The existing doc is empty (0 lines, STUB). Paired with control.logic_op for building complex conditional logic."
+}

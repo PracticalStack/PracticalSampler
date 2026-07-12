@@ -1,0 +1,133 @@
+{
+  "factoryPath": "control.clone_cable",
+  "factory": "control",
+  "nodeId": "clone_cable",
+  "description": "Send different values to cloned nodes",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": true,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Clone configuration",
+      "rationale": "NumClones defines how many clones are addressed; auto-updated from clone container",
+      "parameters": [
+        {
+          "id": "NumClones",
+          "range": { "min": 1.0, "max": 16.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Distribution control",
+      "rationale": "Value is the input signal distributed to clones; Gamma shapes the distribution curve",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Gamma",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "Mode",
+      "defaultValue": "Spread",
+      "type": "enum",
+      "note": "Selects the distribution algorithm (duplilogic mode). Available modes: Spread, Scale, Triangle, Harmonics, Nyquist, Fixed, Ducker, Random, Toggle. Maps to C++ template argument via HasModeTemplateArgument."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/clone_cable.md",
+    "tier": "GOOD",
+    "lines": 32
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "distribution-formulas",
+      "category": "signal_path",
+      "question": "What is the exact mathematical formula for each duplilogic mode's getValue(index, numUsed, inputValue, gamma)? The infrastructure doc lists mode names and brief descriptions, but the exact per-clone calculation for each mode needs verification from logic_classes.h.",
+      "context": "Accurate per-mode documentation requires the exact formula. The existing phase3 doc gives high-level descriptions but lacks formulas."
+    },
+    {
+      "id": "gamma-effect-per-mode",
+      "category": "parameter_behaviour",
+      "question": "How does the Gamma parameter affect each distribution mode? The infrastructure doc mentions sine curve blending for spread, power curve for scale, sine^2 for triangle, rolloff steepness for nyquist, and power curve for ducker. Which modes ignore Gamma entirely?",
+      "context": "Users need to know when Gamma has an effect and when it is ignored."
+    },
+    {
+      "id": "midi-reactive-modes-detail",
+      "category": "conditional_logic",
+      "question": "For MIDI-reactive modes (harmonics, nyquist, fixed), how exactly does the note-on frequency update the input value? Does it replace the Value parameter or multiply with it? What happens when no MIDI context is present?",
+      "context": "The existing doc warns about frequency range but does not clarify the exact interaction between MIDI frequency and the Value parameter."
+    },
+    {
+      "id": "toggle-mode-behaviour",
+      "category": "parameter_behaviour",
+      "question": "The toggle mode sends 0.0 or 1.0 based on a threshold. What is the threshold logic? Does the index determine which clones are on/off, or is it based on the Value parameter?",
+      "context": "Toggle mode is listed in the infrastructure doc but not in the existing phase3 doc at all."
+    },
+    {
+      "id": "numclones-auto-sync",
+      "category": "parameter_behaviour",
+      "question": "When clone_cable connects to a clone container, the NumClones parameter is auto-synced via clone_manager::Listener. Is the NumClones parameter then read-only from the user's perspective, or can the user override it?",
+      "context": "The existing doc mentions this auto-sync but the exact behaviour needs clarification for accurate documentation."
+    },
+    {
+      "id": "normalised-output",
+      "category": "signal_path",
+      "question": "clone_cable does not have UseUnnormalisedModulation in its cppProperties. Confirm that the output is normalised (0..1) and that target parameter ranges are applied to the distributed values.",
+      "context": "Important for users connecting to parameters with custom ranges."
+    }
+  ],
+
+  "notes": "clone_cable is the most feature-rich clone control node, with 9 distribution modes selectable via Mode property (HasModeTemplateArgument). The IsProcessingHiseEvent flag is always set because the dynamic (interpreted) version can switch to MIDI-reactive modes at runtime, even though only harmonics/nyquist/fixed/random actually use MIDI events. The IsCloneCableNode cppProperty is also set. The existing phase3 doc is the most complete of this batch (GOOD tier) and includes a mode table, but lacks formulas and does not mention toggle mode."
+}

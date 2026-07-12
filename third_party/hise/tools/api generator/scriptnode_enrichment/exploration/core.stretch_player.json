@@ -1,0 +1,78 @@
+{
+  "factoryPath": "core.stretch_player",
+  "nodes": [
+    {
+      "id": "audio_file",
+      "label": "Audio File",
+      "type": "external_data",
+      "importance": 1.0,
+      "description": "Stereo audio file source (AudioFile slot). SampleMap and SFZ sources are disabled."
+    },
+    {
+      "id": "read",
+      "label": "Read Position",
+      "type": "process",
+      "importance": 0.8,
+      "description": "Reads samples from the audio file at the current playback position with loop wrapping."
+    },
+    {
+      "id": "stretch",
+      "label": "Time Stretcher",
+      "type": "process",
+      "importance": 1.0,
+      "description": "Signalsmith Stretch phase-vocoder algorithm. Stretches/compresses time independently of pitch. Bypassed when Enable=0."
+    },
+    {
+      "id": "gate",
+      "label": "Gate",
+      "type": "parameter",
+      "importance": 0.8,
+      "description": "Start/stop playback. Transition to On seeks to position 0."
+    },
+    {
+      "id": "time_ratio",
+      "label": "TimeRatio",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Playback speed multiplier (0.5-2.0). Overridden by ClockSync."
+    },
+    {
+      "id": "pitch",
+      "label": "Pitch",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Pitch shift in semitones (-12 to +12), independent of time."
+    },
+    {
+      "id": "enable",
+      "label": "Enable",
+      "type": "parameter",
+      "importance": 0.8,
+      "description": "Toggles timestretching on/off. Off = direct playback."
+    },
+    {
+      "id": "clocksync",
+      "label": "ClockSync",
+      "type": "parameter",
+      "importance": 0.7,
+      "description": "Syncs speed and position to DAW tempo/transport."
+    },
+    {
+      "id": "out",
+      "label": "Audio Out",
+      "type": "output",
+      "importance": 1.0,
+      "description": "Stereo audio output (fixed 2 channels)"
+    }
+  ],
+  "edges": [
+    { "from": "audio_file", "to": "read", "type": "signal", "label": null },
+    { "from": "gate", "to": "read", "type": "control", "label": "start/stop" },
+    { "from": "read", "to": "stretch", "type": "signal", "label": null },
+    { "from": "time_ratio", "to": "stretch", "type": "control", "label": null },
+    { "from": "pitch", "to": "stretch", "type": "control", "label": null },
+    { "from": "enable", "to": "stretch", "type": "conditional", "label": "on/off" },
+    { "from": "clocksync", "to": "stretch", "type": "control", "label": "overrides TimeRatio" },
+    { "from": "stretch", "to": "out", "type": "signal", "label": null }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "factoryPath": "container.multi",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input signal with N total channels" },
+    { "id": "slice", "label": "Channel slicing", "type": "process", "importance": 1.0, "description": "Each child receives a non-overlapping slice of channels via pointer offset" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "All channels modified in-place by their respective children" }
+  ],
+  "edges": [
+    { "from": "in", "to": "slice", "type": "signal", "label": null },
+    { "from": "slice", "to": "out", "type": "signal", "label": "N children, each with own channels" }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "factoryPath": "template.freq_split3",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input signal, duplicated to 3 bands by container.split" },
+    { "id": "split", "label": "Split (3 bands)", "type": "process", "importance": 0.7, "description": "container.split copies input to band1, band2, band3" },
+    { "id": "band1_filters", "label": "band1: LP1 + AP2", "type": "process", "importance": 1.0, "description": "Low band: LP at crossover 1, AP at crossover 2" },
+    { "id": "dummy1", "label": "dummy1 (user)", "type": "process", "importance": 0.9, "description": "User processing placeholder (low band)" },
+    { "id": "band2_filters", "label": "band2: HP1 + LP2", "type": "process", "importance": 1.0, "description": "Mid band: HP at crossover 1, LP at crossover 2 (bandpass)" },
+    { "id": "dummy2", "label": "dummy2 (user)", "type": "process", "importance": 0.9, "description": "User processing placeholder (mid band)" },
+    { "id": "band3_filters", "label": "band3: AP1 + HP2", "type": "process", "importance": 1.0, "description": "High band: AP at crossover 1, HP at crossover 2" },
+    { "id": "dummy3", "label": "dummy3 (user)", "type": "process", "importance": 0.9, "description": "User processing placeholder (high band)" },
+    { "id": "sum", "label": "Sum bands", "type": "process", "importance": 0.8, "description": "container.split sums all 3 band outputs" },
+    { "id": "band1_param", "label": "Band 1", "type": "parameter", "importance": 1.0, "description": "Low-mid crossover frequency (~68 Hz default)" },
+    { "id": "band2_param", "label": "Band 2", "type": "parameter", "importance": 1.0, "description": "Mid-high crossover frequency (1000 Hz default)" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Reconstructed full-spectrum output" }
+  ],
+  "edges": [
+    { "from": "in", "to": "split", "type": "signal", "label": null },
+    { "from": "split", "to": "band1_filters", "type": "signal", "label": "band1" },
+    { "from": "band1_filters", "to": "dummy1", "type": "signal", "label": null },
+    { "from": "split", "to": "band2_filters", "type": "signal", "label": "band2" },
+    { "from": "band2_filters", "to": "dummy2", "type": "signal", "label": null },
+    { "from": "split", "to": "band3_filters", "type": "signal", "label": "band3" },
+    { "from": "band3_filters", "to": "dummy3", "type": "signal", "label": null },
+    { "from": "dummy1", "to": "sum", "type": "signal", "label": null },
+    { "from": "dummy2", "to": "sum", "type": "signal", "label": null },
+    { "from": "dummy3", "to": "sum", "type": "signal", "label": null },
+    { "from": "sum", "to": "out", "type": "signal", "label": null },
+    { "from": "band1_param", "to": "band1_filters", "type": "control", "label": "-> lr*_1.Frequency" },
+    { "from": "band1_param", "to": "band2_filters", "type": "control", "label": "-> lr*_1.Frequency" },
+    { "from": "band1_param", "to": "band3_filters", "type": "control", "label": "-> lr*_1.Frequency" },
+    { "from": "band2_param", "to": "band1_filters", "type": "control", "label": "-> lr*_2.Frequency" },
+    { "from": "band2_param", "to": "band2_filters", "type": "control", "label": "-> lr*_2.Frequency" },
+    { "from": "band2_param", "to": "band3_filters", "type": "control", "label": "-> lr*_2.Frequency" }
+  ]
+}

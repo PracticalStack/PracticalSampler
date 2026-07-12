@@ -1,0 +1,75 @@
+{
+  "moduleId": "SlotFX",
+  "prettyName": "Effect Slot",
+  "type": "Effect",
+  "subtype": "MasterEffect",
+  "category": "utility, routing",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "stereo",
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "SlotFX",
+      "signalFlowRole": "Hot-swappable effect slot - hosts a single child effect that can be replaced at runtime"
+    },
+    {
+      "name": "RoutingMatrix",
+      "signalFlowRole": "skip - inferred from type/subtype"
+    }
+  ],
+
+  "parameterGroups": [],
+
+  "compositeBlocks": [],
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "delegation-mechanism",
+      "category": "signal_path",
+      "question": "How does SlotFX delegate audio processing to its wrapped effect? Does it use renderWholeBuffer() or applyEffect()?",
+      "context": "Need to describe the signal flow accurately - whether SlotFX processes audio itself or fully delegates."
+    },
+    {
+      "id": "empty-state-behaviour",
+      "category": "conditional_logic",
+      "question": "What happens when no effect is loaded (isClear = true)? Does audio pass through or is it silenced?",
+      "context": "Users need to know if an empty slot passes audio through or blocks it."
+    },
+    {
+      "id": "swap-mechanism",
+      "category": "parameter_behavior",
+      "question": "How does the effect swapping work? Is there a crossfade or does it cut immediately? What happens to the audio during a swap?",
+      "context": "Important for live use cases where effects are swapped during playback."
+    },
+    {
+      "id": "constrainer-details",
+      "category": "signal_path",
+      "question": "What effect types can be loaded into the slot? Confirm the constrainer excludes RouteEffect and SlotFX (no nesting).",
+      "context": "Users need to know which effects are available in the slot."
+    },
+    {
+      "id": "midi-forwarding",
+      "category": "signal_path",
+      "question": "Does SlotFX forward MIDI events to the hosted effect?",
+      "context": "Script effects hosted in a slot may need MIDI events."
+    },
+    {
+      "id": "bypass-delegation",
+      "category": "conditional_logic",
+      "question": "How does bypass work? Does SlotFX bypass itself or delegate bypass to the wrapped effect?",
+      "context": "Users need to know if bypassing a SlotFX also bypasses the hosted effect."
+    }
+  ],
+
+  "notes": "SlotFX has hasChildren=true with constrainer '*' and child_fx_constrainer 'MasterEffect|!RouteEffect|!SlotFX'. It hosts exactly one child effect (getNumChildProcessors() = 1). The SlotFX interface (HotswappableProcessor) allows runtime effect swapping via setEffect(). No parameters of its own - all parameters belong to the hosted child effect. applyEffect() is empty - processing is delegated via renderWholeBuffer()."
+}

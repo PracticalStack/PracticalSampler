@@ -1,0 +1,1 @@
+Returns whether the underlying module reference is still valid. If the module has been deleted or the reference was created with an invalid ID, this returns false and prints an error message to the console.

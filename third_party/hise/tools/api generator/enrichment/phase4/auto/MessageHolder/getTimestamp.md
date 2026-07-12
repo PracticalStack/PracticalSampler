@@ -1,0 +1,1 @@
+Returns the sample-accurate timestamp of the event. The meaning depends on context: within an audio callback it represents a sample offset from the buffer start; in a MidiPlayer event list it may represent an absolute sample or tick position depending on `MidiPlayer.setUseTimestampInTicks()`.

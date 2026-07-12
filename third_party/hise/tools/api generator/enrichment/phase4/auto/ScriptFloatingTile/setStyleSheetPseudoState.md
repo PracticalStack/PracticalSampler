@@ -1,0 +1,1 @@
+Sets CSS pseudo-state selectors on this component, such as `":hover"`, `":active"`, `":focus"`, `":checked"`, or `":disabled"`. Multiple states can be combined (e.g. `":hover:active"`). Pass an empty string to clear all pseudo-states.

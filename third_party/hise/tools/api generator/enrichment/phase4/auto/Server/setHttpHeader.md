@@ -1,0 +1,1 @@
+Adds a custom string to the HTTP header for all subsequent requests. Use this to set authentication tokens, API keys, or custom headers required by your server. The header string is appended to the default headers - pass it in standard HTTP header format (e.g. `"Authorization: Bearer my_token"`).

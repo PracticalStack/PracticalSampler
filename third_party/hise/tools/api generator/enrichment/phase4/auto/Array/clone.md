@@ -1,0 +1,3 @@
+Creates a deep copy of the array. Nested arrays, JSON objects, and component references are recursively cloned - the returned copy is fully independent of the original. This method is inherited from the base object prototype and works on any object type, not just arrays.
+
+> [!Warning:Assignment copies the reference, not the data] `var b = a;` makes `b` point to the same underlying array. Modifying `b` also modifies `a`. Use `clone()` when you need an independent copy, for example when creating multiple objects from a template.

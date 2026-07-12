@@ -1,0 +1,73 @@
+{
+  "moduleId": "HardcodedPolyphonicFX",
+  "prettyName": "Hardcoded Polyphonic FX",
+  "type": "Effect",
+  "subtype": "VoiceEffect",
+  "category": "custom",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "voice",
+    "audioOut": "voice",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "per-voice",
+
+  "interfaces": [
+    { "name": "SlotFX", "signalFlowRole": "hot-swappable network slot (selects which compiled network to load)" },
+    { "name": "RoutingMatrix", "signalFlowRole": "skip - inferred from type/subtype" },
+    { "name": "TableProcessor", "signalFlowRole": "complex data exposed from compiled network" },
+    { "name": "SliderPackProcessor", "signalFlowRole": "complex data exposed from compiled network" },
+    { "name": "AudioSampleProcessor", "signalFlowRole": "complex data exposed from compiled network" },
+    { "name": "DisplayBufferSource", "signalFlowRole": "skip - UI communication only" }
+  ],
+
+  "parameterGroups": [],
+
+  "standaloneModChains": [],
+  "disabledModChains": [],
+  "compositeBlocks": [],
+
+  "gaps": [
+    {
+      "id": "network-loading",
+      "category": "signal_path",
+      "question": "How does the polyphonic FX load a compiled network and apply it per-voice?",
+      "context": "Per-voice effects need independent state per voice."
+    },
+    {
+      "id": "voice-lifecycle",
+      "category": "signal_path",
+      "question": "How does startVoice/reset/handleHiseEvent interact with the compiled network's per-voice state?",
+      "context": "Voice management is critical for polyphonic effects."
+    },
+    {
+      "id": "parameter-exposure",
+      "category": "parameter_behavior",
+      "question": "How are compiled network parameters exposed? This module has no fixed parameters.",
+      "context": "All parameters come from the network."
+    },
+    {
+      "id": "modulation-chain-mapping",
+      "category": "signal_path",
+      "question": "How do modulation chains map to compiled network parameters? What is NUM_HARDCODED_POLY_FX_MODS?",
+      "context": "Modulation chain support for per-voice effect parameters."
+    },
+    {
+      "id": "complex-data-exposure",
+      "category": "interface_usage",
+      "question": "How are Tables, SliderPacks, and AudioFiles from the compiled network exposed?",
+      "context": "Complex data access for polyphonic effects."
+    },
+    {
+      "id": "tail-handling",
+      "category": "signal_path",
+      "question": "How does the tail/voice reset mechanism work with the compiled network?",
+      "context": "Polyphonic effects may need to continue processing after note-off (tail)."
+    }
+  ],
+
+  "notes": "This module has no fixed parameters. All parameters come from the loaded compiled network. Runs per-voice with per-voice state managed by a VoiceDataStack. NUM_HARDCODED_POLY_FX_MODS controls modulation chain count."
+}

@@ -1,0 +1,1 @@
+Returns the duration in milliseconds for a tempo subdivision index at the current host BPM. The index maps to standard musical divisions (0 = whole note, 5 = quarter note, 8 = eighth note, etc.). Use `Engine.getTempoName()` to get the human-readable name for the same index.

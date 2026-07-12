@@ -1,0 +1,136 @@
+{
+  "factoryPath": "filters.biquad",
+  "factory": "filters",
+  "nodeId": "biquad",
+  "description": "A filter node",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Filter Response",
+      "rationale": "These parameters define the filter's frequency response curve: cutoff/center frequency, resonance width, and gain for peaking/shelving modes.",
+      "parameters": [
+        {
+          "id": "Frequency",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0, "skew": 0.2299045622348785 },
+          "default": 1000.0,
+          "textConverter": "Frequency",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Q",
+          "range": { "min": 0.300000011920929, "max": 9.899999618530273, "step": 0.0, "skew": 0.2647178173065186 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Gain",
+          "range": { "min": -18.0, "max": 18.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Decibel",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Filter Configuration",
+      "rationale": "Mode selects the biquad filter type, Smoothing controls coefficient interpolation speed, Enabled toggles the filter on/off.",
+      "parameters": [
+        {
+          "id": "Mode",
+          "range": { "min": 0.0, "max": 5.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "91.nT6K8ChVUJ..RRTDX.XwJvnjmoHFCY6gzSP3QbXEYFMWV3koTjFUyCYujMibBw8MN.1qTZecfhbBsVXEmtWUjSBCZ1A9iYzz8m6PALwGzVj.C.fKI3lsyqP4I.",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Smoothing",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 0.3010300099849701 },
+          "default": 0.009999999776482582,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Enabled",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "filterCoefficients": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/filters/biquad.md",
+    "tier": "STUB",
+    "lines": 6
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "biquad-mode-values",
+      "category": "conditional_logic",
+      "question": "Mode parameter has range 0-5 (6 discrete values) - the most modes of any filter node. What filter types do values 0-5 correspond to? The longer TextToValueConverter (91 chars) suggests descriptive names. Expected possibilities: LP, HP, BP, Notch, Allpass, Peak/Shelf.",
+      "context": "With 6 modes, biquad offers the widest selection. Users need to know all available types to choose between biquad and more specialised filter nodes."
+    },
+    {
+      "id": "biquad-vs-svf",
+      "category": "signal_path",
+      "question": "What is the implementation difference between filters.biquad and filters.svf? Biquad typically uses Direct Form I/II (second-order IIR) while SVF uses a state-variable topology. Does the biquad use Robert Bristow-Johnson's Audio EQ Cookbook formulas or another implementation?",
+      "context": "Users choosing between biquad and svf need to understand the trade-offs: biquad has more modes but SVF may be more stable at high frequencies and better for modulation."
+    },
+    {
+      "id": "biquad-stability",
+      "category": "performance",
+      "question": "Biquad filters can become unstable with rapid frequency modulation due to coefficient discontinuities. Does the Smoothing parameter prevent instability, or can the filter blow up with fast modulation and low Smoothing values?",
+      "context": "This is a practical concern for users who want to modulate filter frequency. If biquad is less stable than svf for modulation, this should be documented."
+    },
+    {
+      "id": "description-accuracy",
+      "category": "description_accuracy",
+      "question": "The base description 'A filter node' is generic and identical to most other filter nodes. Confirm the correct characterisation as a biquad (second-order IIR) filter.",
+      "context": "The vague description does not help users distinguish between the 9 different filter nodes."
+    }
+  ],
+
+  "notes": "filters.biquad has the most Mode values (6) of any filter node, suggesting it is the most versatile in terms of available filter types. It shares the standard filter parameter signature. The biquad is a classic DSP building block (Direct Form IIR) and understanding its relationship to the SVF variant is important for the seeAlso cross-references. References filter-base-architecture, smoothing-units, gain-parameter-relevance, and enabled-bypass-behaviour gaps from filters.svf."
+}

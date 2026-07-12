@@ -1,0 +1,1 @@
+Kills all active voices at the next audio buffer boundary. The voices are not stopped immediately - the engine processes the kill at the start of the next block. Unlike `Synth.allNotesOff()`, this affects all synthesisers in the module tree globally.

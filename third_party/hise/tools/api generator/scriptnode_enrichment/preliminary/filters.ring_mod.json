@@ -1,0 +1,142 @@
+{
+  "factoryPath": "filters.ring_mod",
+  "factory": "filters",
+  "nodeId": "ring_mod",
+  "description": "A filter node",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Filter Response",
+      "rationale": "Frequency sets the internal oscillator or modulation frequency, Q and Gain are present for interface consistency but their effect on a ring modulator needs verification.",
+      "parameters": [
+        {
+          "id": "Frequency",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0, "skew": 0.2299045622348785 },
+          "default": 1000.0,
+          "textConverter": "Frequency",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Q",
+          "range": { "min": 0.300000011920929, "max": 9.899999618530273, "step": 0.0, "skew": 0.2647178173065186 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Gain",
+          "range": { "min": -18.0, "max": 18.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Decibel",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Filter Configuration",
+      "rationale": "Mode selects the ring modulation variant (max 1.0, step 0.0 - needs C++ verification), Smoothing controls parameter interpolation speed, Enabled toggles the effect on/off.",
+      "parameters": [
+        {
+          "id": "Mode",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "54.nT6K8CRKoE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.ITfTo41YM8FY.D1XzklckAP.AH..",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Smoothing",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 0.3010300099849701 },
+          "default": 0.009999999776482582,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Enabled",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "filterCoefficients": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/filters/ring_mod.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "ring-mod-signal-path",
+      "category": "signal_path",
+      "question": "How does this ring modulator work? Classic ring modulation multiplies the input signal by an internal sine oscillator at the Frequency parameter. Does this node use that approach, or does it use a different modulation scheme? Is the internal oscillator a sine wave or another waveform?",
+      "context": "Ring modulation is fundamentally different from traditional filtering. It creates sum and difference frequencies rather than attenuating existing ones."
+    },
+    {
+      "id": "ring-mod-mode-values",
+      "category": "conditional_logic",
+      "question": "Mode parameter has range 0-1 with StepSize=0.0. The TextToValueConverter (54 chars) suggests 2 discrete modes. What do these correspond to? Possible: ring mod vs amplitude mod, or sine vs square carrier.",
+      "context": "The two modes likely represent different modulation types which produce very different sonic results."
+    },
+    {
+      "id": "ring-mod-q-and-gain-effect",
+      "category": "parameter_behaviour",
+      "question": "Does Q affect the ring modulator? In a classic ring mod, there is no Q parameter. Does Gain scale the modulation depth, or is it non-functional? These parameters may exist only for interface consistency with filter_base.",
+      "context": "Ring modulation does not have traditional filter parameters. Users need to know which parameters actually do something."
+    },
+    {
+      "id": "ring-mod-filter-coefficients",
+      "category": "signal_path",
+      "question": "Ring_mod has FilterCoefficients ComplexData like other filter nodes. What does the filter display show for a ring modulator? It cannot show a traditional frequency response. Is this just for UI consistency, or does it display something meaningful?",
+      "context": "The presence of filter coefficient data on a ring modulator is unexpected and needs explanation."
+    },
+    {
+      "id": "ring-mod-factory-placement",
+      "category": "description_accuracy",
+      "question": "Ring modulation is typically classified as an effect rather than a filter. Why is ring_mod in the filters factory? Is it implemented using the filter_base infrastructure with a special filter type, or is it a separate implementation that shares the filter parameter interface?",
+      "context": "The factory placement may confuse users who expect ring modulation under fx. Understanding why it is here helps explain the architecture."
+    }
+  ],
+
+  "notes": "filters.ring_mod is an unusual member of the filters factory. Ring modulation is not traditionally a filter operation - it multiplies the input by a carrier oscillator, creating sum and difference frequencies. Its placement in the filters factory (rather than fx) and its use of the standard filter parameter interface (Frequency, Q, Gain, Smoothing, Mode, Enabled) with FilterCoefficients ComplexData suggests it may be implemented within the filter_base framework using a special 'filter type'. The Mode parameter has the same anomalous zero-step pattern as ladder and allpass. The phase3 doc describes it as 'A ring-modulator node'. References filter-base-architecture, smoothing-units, and enabled-bypass-behaviour gaps from filters.svf."
+}

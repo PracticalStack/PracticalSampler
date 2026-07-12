@@ -1,0 +1,1 @@
+Sets the controller value for this event. For standard CC events, pass a value from 0-127. For PitchBend events, pass a 14-bit value (0-16383) which is automatically split across the internal number and value bytes.

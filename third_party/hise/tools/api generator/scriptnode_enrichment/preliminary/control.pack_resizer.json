@@ -1,0 +1,94 @@
+{
+  "factoryPath": "control.pack_resizer",
+  "factory": "control",
+  "nodeId": "pack_resizer",
+  "description": "Dynamically resizes a slider pack",
+
+  "classification": {
+    "signalPathRole": "utility",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Size control",
+      "rationale": "NumSliders sets the number of active entries in the connected SliderPack",
+      "parameters": [
+        {
+          "id": "NumSliders",
+          "range": { "min": 0.0, "max": 128.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 1,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/pack_resizer.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "resize-mechanism",
+      "category": "signal_path",
+      "question": "How does pack_resizer resize the SliderPack? Does it call setNumSliders() on the SliderPackData object? Does it preserve existing values when resizing up or down?",
+      "context": "Users need to know whether resizing preserves or clears existing slider values."
+    },
+    {
+      "id": "zero-default-behaviour",
+      "category": "parameter_behaviour",
+      "question": "The NumSliders parameter defaults to 0. What does a size of 0 mean -- empty pack, or does it leave the pack at its current size?",
+      "context": "The default of 0 is unusual and needs clarification for user documentation."
+    },
+    {
+      "id": "embedded-data-initial",
+      "category": "description_accuracy",
+      "question": "The base data shows EmbeddedData as '4....f+.' which appears to be a non-empty initial state. What does this embedded data represent?",
+      "context": "The other packN_writer nodes have EmbeddedData=-1 (empty). pack_resizer has actual embedded data, which may indicate a default pack configuration."
+    },
+    {
+      "id": "realtime-safety",
+      "category": "performance",
+      "question": "Is the resize operation realtime-safe? Does it allocate memory on the audio thread, or is the resize deferred?",
+      "context": "Resizing a slider pack may involve memory allocation, which would not be realtime-safe."
+    }
+  ],
+
+  "notes": "pack_resizer is NOT a variant of the packN_writer group -- it has a fundamentally different purpose. Rather than writing individual values into slider positions, it changes the size of the connected SliderPack. It has a single NumSliders parameter with range 0-128 (integer steps). Like packN_writer, it is classified as utility (OutsideSignalPath=true, IsControlNode=false) and uses 1 SliderPack ComplexData slot. The EmbeddedData field in the base JSON is non-empty ('4....f+.'), unlike the packN_writer variants which all have EmbeddedData=-1."
+}

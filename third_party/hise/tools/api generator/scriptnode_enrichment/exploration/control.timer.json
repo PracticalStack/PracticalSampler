@@ -1,0 +1,16 @@
+{
+  "factoryPath": "control.timer",
+  "nodes": [
+    { "id": "active", "label": "Active", "type": "parameter", "importance": 0.8, "description": "Enables/disables the timer" },
+    { "id": "interval", "label": "Interval", "type": "parameter", "importance": 0.9, "description": "Time between triggers in milliseconds" },
+    { "id": "counter", "label": "Sample Counter", "type": "process", "importance": 1.0, "description": "Counts samples in process()/processFrame() against interval" },
+    { "id": "timer_logic", "label": "Timer Logic", "type": "process", "importance": 0.9, "description": "Mode-dependent value generator (ping=1.0, random, toggle)" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Normalised value via wrap::mod on each tick" }
+  ],
+  "edges": [
+    { "from": "active", "to": "counter", "type": "control", "label": "enable/disable" },
+    { "from": "interval", "to": "counter", "type": "control", "label": "samples between ticks" },
+    { "from": "counter", "to": "timer_logic", "type": "signal", "label": "on tick" },
+    { "from": "timer_logic", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

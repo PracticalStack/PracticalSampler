@@ -1,0 +1,32 @@
+{
+  "targetId": "filters.ladder",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [7834, 2687],
+  "insights": [
+    {
+      "type": "BUG",
+      "title": "The Moog filter node produces sudden loud noise bursts, especially under modulation — use filters.ladder instead",
+      "summary": "Multiple trusted posters independently warn that the HISE Moog filter is buggy and can produce extreme noise transients. DanH: 'NEVER MODULATE THE MOOG FILTER!!!!'. Lindon: 'HISE Moog filter seems very weird and buggy to me. Sudden horrible noise gave me shock.' The standing community recommendation for several years has been to use filters.ladder as the safe replacement. hisefilo confirmed it sounds better than a FAUST moog port as well.",
+      "sources": ["tid:7834"],
+      "verify": true,
+      "verify_hint": "Check current HISE source to determine if the Moog filter bug has been fixed in recent versions, or if the recommendation to prefer filters.ladder still holds."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "filters.ladder is the recommended safe alternative to the Moog filter for modulated use",
+      "summary": "When a 4-pole Moog-style ladder response is needed with modulation, filters.ladder is the correct choice. The filters.moog node has a well-documented instability under modulation and should be avoided in production work. This has been the consensus recommendation for multiple years across community discussions.",
+      "sources": ["tid:7834"],
+      "verify": false,
+      "verify_hint": "No additional verification needed beyond the Moog bug note above."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Trademark caution: label Moog-style filters as 'Moog-style', not 'Moog'",
+      "summary": "When shipping a product that uses filters.ladder as a Moog-style filter, David Healey (expert) advises calling it 'Moog style' rather than 'Moog filter' to avoid trademark confusion. Using the term 'Moog style' makes clear there is no affiliation or endorsement from Moog Music.",
+      "sources": ["tid:7834"],
+      "verify": false,
+      "verify_hint": "Legal guidance only — no engine verification needed."
+    }
+  ]
+}

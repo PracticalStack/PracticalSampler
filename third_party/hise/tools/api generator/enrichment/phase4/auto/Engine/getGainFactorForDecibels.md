@@ -1,0 +1,1 @@
+Converts a decibel value to a linear gain factor. 0 dB returns 1.0, -6 dB returns approximately 0.5, and values at or below -100 dB return 0.0. This is the inverse of `Engine.getDecibelsForGainFactor()`.

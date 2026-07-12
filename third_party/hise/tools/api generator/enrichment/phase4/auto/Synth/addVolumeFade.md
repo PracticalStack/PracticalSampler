@@ -1,0 +1,3 @@
+Applies a volume fade to an active voice identified by its event ID. The fade transitions from the current volume to the target (in decibels) over the specified time. When `targetVolume` is exactly `-100`, the method triggers an automatic fade-to-silence-and-kill sequence: a volume fade plus an auto-generated note-off one sample after the fade completes. This is the recommended way to stop an artificial note with a smooth fade-out in a single call.
+
+> [!Warning:Auto-kill only for artificial events] The auto-kill behaviour (`-100`) only works on artificial events. Attempting it on a real (non-artificial) event produces an error.

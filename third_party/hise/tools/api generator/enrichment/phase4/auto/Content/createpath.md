@@ -1,0 +1,3 @@
+Creates a new Path object for vector drawing. Build the shape programmatically with `startNewSubPath()`, `lineTo()`, `quadraticTo()`, and `cubicTo()`, or load it from base64-encoded data exported from the HISE path editor via `Path.loadFromData()`. Use the path with `Graphics.fillPath()` or `Graphics.drawPath()` in paint routines and LAF callbacks.
+
+Store path objects as `const var` at init or namespace scope. Creating paths inside paint routines causes a heap allocation on every repaint.

@@ -1,0 +1,3 @@
+Returns the display text of the currently selected item. When `useCustomPopup` is enabled, section headers and separators are filtered out before indexing, and submenu prefixes (text before `::`) are stripped from the result. Returns an empty string when the value is 0, and `"No options"` when the value exceeds the item count.
+
+> [!Warning:Submenu prefixes stripped from result] With custom popup menus, submenu prefixes are stripped. An item stored as `"Filters::LowPass"` returns `"LowPass"`, not the full path. If you need the full path for lookup purposes, maintain a parallel data array indexed by `parseInt(value) - 1` instead.

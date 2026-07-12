@@ -1,0 +1,56 @@
+{
+  "targetId": "core.granulator",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [5221, 6779, 7812, 8030, 7388, 8621, 10127, 8724],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "core.granulator is designed for monophonic use — polyphonic context distributes grains across voices",
+      "summary": "The granulator does not maintain separate polyphonic state per voice. When placed in a polyphonic context (e.g. a scriptnode synth), it distributes grains across the active notes in a chord rather than providing independent per-voice granulation. The recommended placement is inside a `Script FX` (monophonic).",
+      "sources": ["tid:7388"],
+      "verify": true,
+      "verify_hint": "Confirm that granulator has no per-voice state and that placing it in a ScriptFX is the standard approach."
+    },
+    {
+      "type": "API",
+      "title": "Load a sample map into the granulator using the {XYZ::SampleMap} wildcard",
+      "summary": "To load a samplemap into the granulator's audio file slot, use the `{XYZ::SampleMap}MySampleMap` wildcard string with `loadFile()`. The `{PROJECT_FOLDER}` wildcard only works for single audio files, not samplemaps. To load via a ComboBox selection: `af.loadFile(\"{XYZ::SampleMap}\" + component.getItemText())`.",
+      "sources": ["tid:5221"],
+      "verify": true,
+      "verify_hint": "Confirm XYZ::SampleMap wildcard syntax and that PROJECT_FOLDER fails for multi-sample sets."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Set the granulator audio slot to External to expose it for UI waveform display",
+      "summary": "To connect the granulator's audio content to an `AudioWaveform` UI component (for drag-and-drop file loading and waveform display), the node's audio file slot must be set to External mode. Without this, the waveform cannot be accessed from outside the scriptnode network.",
+      "sources": ["tid:5221", "tid:7812"],
+      "verify": true,
+      "verify_hint": "Confirm External slot setting requirement for granulator AudioWaveform UI connection."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Granulator envelope attack/release parameters exist in C++ but are not exposed as sliders",
+      "summary": "The granulator's internal amplitude ADSR has Attack and Release parameters present in the C++ code but they are not surfaced as user-accessible sliders. Custom attack/decay/sustain can be approximated using an external envelope curve node feeding the granulator. Release through the internal ADSR is not currently controllable from the scriptnode graph.",
+      "sources": ["tid:8724"],
+      "verify": true,
+      "verify_hint": "Check HISE C++ source for granulator ADSR parameter exposure — confirm Attack/Release are internal only."
+    },
+    {
+      "type": "BUG",
+      "title": "Audio files shorter than the grain length cause crashes or artefacts",
+      "summary": "When an audio file shorter than the configured grain length is loaded into the granulator, the node produces audio artefacts or crashes. The edge case of audio shorter than grain length was not handled. Christoph acknowledged this as an unfixed issue.",
+      "sources": ["tid:8030"],
+      "verify": true,
+      "verify_hint": "Test granulator with a very short audio file (shorter than grain size) to confirm crash/artefact behaviour."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use a Broadcaster to detect file drops and propagate to the granulator",
+      "summary": "To react when a user drags an audio file onto an `AudioWaveform` and automatically load it into the granulator, attach a `Engine.createBroadcaster()` to the `AudioFile.Content` complex data event. In the callback, read the new file path and call `loadFile()` on the granulator's audio slot.",
+      "sources": ["tid:10127"],
+      "verify": true,
+      "verify_hint": "Verify attachToComplexData with AudioFile.Content event type works for file-drop detection."
+    }
+  ]
+}

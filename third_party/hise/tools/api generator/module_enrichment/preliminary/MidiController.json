@@ -1,0 +1,135 @@
+{
+  "moduleId": "MidiController",
+  "prettyName": "Midi Controller",
+  "type": "Modulator",
+  "subtype": "TimeVariantModulator",
+  "category": "input",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": true,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "TableProcessor",
+      "signalFlowRole": "Lookup table step in signal path - maps CC input through a user-defined curve when UseTable is enabled"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Controller Selection",
+      "rationale": "These parameters define which MIDI source is read and what value is used before any message arrives",
+      "parameters": [
+        {
+          "id": "ControllerNumber",
+          "name": "ControllerNumber",
+          "range": { "min": 0.0, "max": 129.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "The MIDI controller number to respond to (1-127 for CC, 128 for aftertouch, 129 for pitch wheel)",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "DefaultValue",
+          "name": "DefaultValue",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "The initial value before any MIDI CC message is received",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Response",
+      "rationale": "These parameters shape how the raw MIDI value is transformed: inversion flips the direction, and the table provides a custom mapping curve",
+      "parameters": [
+        {
+          "id": "Inverted",
+          "name": "Inverted",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Inverts the modulation signal (1 - value)",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "UseTable",
+          "name": "UseTable",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Enables a lookup table for custom MIDI CC response curves",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Smoothing",
+      "rationale": "Controls temporal smoothing to reduce zipper noise from discrete 7-bit MIDI CC values",
+      "parameters": [
+        {
+          "id": "SmoothTime",
+          "name": "SmoothTime",
+          "range": { "min": 0.0, "max": 2000.0, "step": 0.0 },
+          "default": 200.0,
+          "description": "Smoothing time in milliseconds to reduce zipper noise on value changes",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "standaloneModChains": [],
+  "disabledModChains": [],
+  "compositeBlocks": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-order",
+      "category": "signal_path",
+      "question": "What is the exact processing order? Specifically: MIDI CC -> normalize (0-127 to 0-1) -> invert -> table lookup -> smooth, or a different order?",
+      "context": "The pseudo-code must show the correct transformation chain from raw CC value to final modulation value"
+    },
+    {
+      "id": "special-controller-modes",
+      "category": "conditional_logic",
+      "question": "How do ControllerNumber 128 (aftertouch) and 129 (pitch wheel) work? For aftertouch, is it channel or polyphonic? For pitch wheel, how is the 14-bit value normalized compared to the dedicated PitchWheel modulator?",
+      "context": "These special modes change the MIDI source entirely and users need to understand the differences vs. dedicated modulators"
+    },
+    {
+      "id": "cc-normalization",
+      "category": "parameter_behavior",
+      "question": "How are 7-bit CC values (0-127) normalized to 0-1? Simple division by 127, or some other mapping?",
+      "context": "Determines whether CC 64 maps to exactly 0.5 or slightly off"
+    },
+    {
+      "id": "table-lookup-position",
+      "category": "interface_usage",
+      "question": "Where does the TableProcessor lookup occur in the signal path? Does it receive the normalized (and possibly inverted) value?",
+      "context": "The table input domain determines what the X axis represents to the user"
+    },
+    {
+      "id": "default-value-behavior",
+      "category": "parameter_behavior",
+      "question": "Is DefaultValue used only at initialization, or does it reset when all-notes-off is received? Does it go through the same inversion/table/smoothing chain?",
+      "context": "Users need to know when and how the default value applies, especially for instruments that need a specific starting state"
+    },
+    {
+      "id": "smoothing-implementation",
+      "category": "parameter_behavior",
+      "question": "What smoothing algorithm is used (exponential, linear ramp, low-pass filter)? Is it the same implementation as PitchWheel's SmoothTime?",
+      "context": "The smoothing type affects the feel of controller response"
+    }
+  ],
+
+  "notes": "Very similar structure to PitchWheel but with additional ControllerNumber selector and DefaultValue. The special controller numbers 128/129 effectively turn this into an aftertouch or pitch wheel modulator, creating overlap with dedicated modules. The ControllerNumber range starts at 0, not 1 as the user-facing description suggests - CC 0 (Bank Select) is valid. Natural seeAlso candidates: PitchWheel, Aftertouch, Velocity."
+}

@@ -1,0 +1,104 @@
+{
+  "targetId": "MidiController",
+  "domain": "modules",
+  "generatedAt": "2026-04-08",
+  "topicIds": [7122, 1847, 10095, 12919, 12335, 2392, 3179, 933, 5268, 3076, 14278, 13641, 12615, 11531],
+  "insights": [
+    {
+      "type": "BUG",
+      "title": "Assigning the same MIDI CC to two controls — only the first responds",
+      "summary": "A regression introduced around June 2022 caused only the first control mapped to a given CC number to respond; subsequent controls on the same CC were silently ignored. Christoph confirmed and fixed the bug in late January 2023.",
+      "sources": ["tid:7122"],
+      "verify": true,
+      "verify_hint": "Check git history around 2022-06-10 for MIDI CC dispatch logic; grep MidiController or CCMap in hi_scripting/scripting/modules"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "CC display index is 1-based in UI but 0-based in code",
+      "summary": "The MidiController UI shows CC numbers starting at #1, but the actual zero-based CC index is used internally. This off-by-one affects setAttribute() calls and scripted CC number comparisons. Confirmed by Christoph: 'I incremented the display value, but the actual system is zero-based.'",
+      "sources": ["tid:5268"],
+      "verify": true,
+      "verify_hint": "grep ControllerNumber or getControllerNumber in hi_scripting/scripting/modules; check display offset logic"
+    },
+    {
+      "type": "API",
+      "title": "Aftertouch (128) and pitch wheel (129) are appended after CC 0-127",
+      "summary": "The ControllerNumber parameter uses indices 128 for aftertouch and 129 for pitch wheel, following the same convention as Kontakt. Christoph noted this was a deliberate design choice to mirror that convention.",
+      "sources": ["tid:5268"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Synth.sendController() drives MidiController modulators from script",
+      "summary": "To control a MidiController modulator from a UI element or script, use Synth.sendController(ccNumber, value) inside any MIDI callback or deferred callback. This sends an internal controller message that the modulator will respond to.",
+      "sources": ["tid:3179"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use onController callback with Message.getControllerNumber() for manual CC routing",
+      "summary": "To route a CC value to a UI slider with a custom range (not 0-127), use Message.getControllerNumber() to filter by CC number, then call slider.setValueNormalized(Message.getControllerValue() / 127.0). Christoph confirmed this works with all slider ranges.",
+      "sources": ["tid:933"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "MidiController module always also responds to pitch wheel when ControllerNumber is set",
+      "summary": "A user confirmed that a MidiController module set to a specific CC still responds to pitch wheel input in addition to the assigned CC. This is an unintended side-effect, listed as a known bug.",
+      "sources": ["tid:2392"],
+      "verify": true,
+      "verify_hint": "grep pitch wheel or pitchWheel handling in MidiController module; check if CC filtering excludes pitch wheel"
+    },
+    {
+      "type": "BUG",
+      "title": "MIDI CC events are ignored inside a scriptnode envelope modulator",
+      "summary": "CC messages (including sustain pedal CC 64) that work correctly with a flex envelope modulator placed outside scriptnode do not reach the modulator when it is placed inside a scriptnode graph. Confirmed as a bug by the reporter.",
+      "sources": ["tid:13641"],
+      "verify": true,
+      "verify_hint": "grep CC or controller handling in scriptnode envelope/modulator nodes; check MIDI message routing into scriptnode containers"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "DAW buffer size >= 1024 can cause MIDI CC handling to break in plugins",
+      "summary": "A user reported that MIDI input (including CC) stopped responding in their plugin until they lowered the DAW buffer size below 1024 samples. The root cause is a known MIDI timing/delivery issue at high buffer sizes.",
+      "sources": ["tid:12919"],
+      "verify": true,
+      "verify_hint": "grep buffer size or MIDI block handling in hi_core; check if MIDI events are dropped or delayed at large block sizes"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "isPluginParameter=true on a CC-mapped control prevents DAW automation lane recording",
+      "summary": "When a control is both MIDI-CC mapped and has isPluginParameter=true, DAW automation recording does not write to the parameter automation lane — it only records to the MIDI CC lane. Setting setConsumeAutomatedControllers(false) is required but may not fully resolve the conflict.",
+      "sources": ["tid:10095"],
+      "verify": true,
+      "verify_hint": "grep setConsumeAutomatedControllers or isPluginParameter in automation handler; check plugin parameter vs MIDI CC dispatch"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use Engine.loadUserPreset() in onController to switch presets via CC",
+      "summary": "To load presets via MIDI CC, combine the onController callback with Engine.loadUserPreset(). Filter on the desired CC number, then map the CC value to a preset name or index.",
+      "sources": ["tid:12615"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "No built-in MIDI learn API — custom learn requires manual CC tracking in script",
+      "summary": "There is no scripting API to trigger HISE's built-in MIDI Learn system. Custom MIDI learn must be implemented manually: store the last received CC in onController, then assign it via MidiController.setAttribute() or a custom data model.",
+      "sources": ["tid:1847"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Factory CC assignments must be saved into a preset — no dedicated API",
+      "summary": "To ship a plugin with default CC assignments (e.g., mod wheel pre-assigned to vibrato), the workflow is to assign them via the MIDI learn context menu in HISE, then save the preset. There is no scripting API to set factory default CC assignments at build time.",
+      "sources": ["tid:12335"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

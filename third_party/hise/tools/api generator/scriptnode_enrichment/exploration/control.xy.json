@@ -1,0 +1,13 @@
+{
+  "factoryPath": "control.xy",
+  "nodes": [
+    { "id": "x_in", "label": "X", "type": "parameter", "importance": 1.0, "description": "Horizontal axis input (0..1)" },
+    { "id": "y_in", "label": "Y", "type": "parameter", "importance": 1.0, "description": "Vertical axis input (-1..1, bipolar)" },
+    { "id": "x_out", "label": "X Output", "type": "modulation_out", "importance": 1.0, "description": "Output slot 0: X value passthrough" },
+    { "id": "y_out", "label": "Y Output", "type": "modulation_out", "importance": 1.0, "description": "Output slot 1: Y value passthrough" }
+  ],
+  "edges": [
+    { "from": "x_in", "to": "x_out", "type": "signal", "label": "direct" },
+    { "from": "y_in", "to": "y_out", "type": "signal", "label": "direct" }
+  ]
+}

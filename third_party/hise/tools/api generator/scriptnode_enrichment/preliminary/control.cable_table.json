@@ -1,0 +1,88 @@
+{
+  "factoryPath": "control.cable_table",
+  "factory": "control",
+  "nodeId": "cable_table",
+  "description": "Modify a modulation signal using a lookup table",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input value",
+      "rationale": "The normalised input value (0..1) used as the lookup position in the table.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 1,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/cable_table.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "table-lookup-interpolation",
+      "category": "signal_path",
+      "question": "Confirm that cable_table uses the standard table lookup pattern: index::lerp<index::normalised<double, index::clamped<512>>> with linear interpolation. Does the lookup produce a 0..1 output from the table values?",
+      "context": "The index-types infrastructure doc describes the standard table lookup pattern. Need to confirm cable_table uses this exact pattern."
+    },
+    {
+      "id": "table-display-value",
+      "category": "parameter_behaviour",
+      "question": "Does cable_table call setDisplayedValue() to show the current lookup position in the table UI?",
+      "context": "Visual feedback of the current lookup position is a common UX feature for table nodes."
+    },
+    {
+      "id": "table-empty-behaviour",
+      "category": "parameter_behaviour",
+      "question": "What happens when the table data is empty or not connected? Does the node output 0, pass through the input, or produce undefined behaviour?",
+      "context": "Users need to know the default behaviour before editing the table."
+    }
+  ],
+
+  "notes": "cable_table is a value transformation node (Pattern 2 from control-infrastructure) that uses a 512-float lookup table to reshape a control signal. Input is normalised (0..1), table lookup with linear interpolation maps it to a new value, output is also normalised. This is the control-rate equivalent of core.table (which operates on audio signals). The index-types doc confirms the standard pattern: index::lerp<index::normalised<double, index::clamped<SAMPLE_LOOKUP_TABLE_SIZE>>>."
+}

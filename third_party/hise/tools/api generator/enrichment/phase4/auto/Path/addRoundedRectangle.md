@@ -1,0 +1,1 @@
+Adds a closed rectangle with uniformly rounded corners. The `cornerSize` controls the radius applied equally to all four corners. A value of 0.0 produces sharp corners, identical to `addRectangle`. For per-corner control of which corners are rounded, use `addRoundedRectangleCustomisable`.

@@ -1,0 +1,87 @@
+{
+  "factoryPath": "routing.matrix",
+  "factory": "routing",
+  "nodeId": "matrix",
+  "description": "A dynamic routing matrix for any arbitrary channel routing",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "EmbeddedData",
+      "defaultValue": "",
+      "type": "string",
+      "note": "Serialised routing matrix configuration. Encodes the source-to-destination channel mapping. Edited via the matrix UI, not typed manually."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/routing/matrix.md",
+    "tier": "BRIEF",
+    "lines": 14
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "matrix-processing-logic",
+      "category": "signal_path",
+      "question": "How does the routing matrix apply the channel mapping? Does it copy channels, swap them, or mix them? Is it a simple 1-to-1 mapping or can multiple sources be summed into one destination?",
+      "context": "Users need to understand what operations the matrix supports to plan their channel routing."
+    },
+    {
+      "id": "embedded-data-format",
+      "category": "conditional_logic",
+      "question": "What is the format of the EmbeddedData string? Is it a base64-encoded binary blob, a JSON structure, or something else? How does the matrix UI populate it?",
+      "context": "While users edit via UI, understanding the format helps with programmatic network generation and debugging."
+    },
+    {
+      "id": "channel-count-flexibility",
+      "category": "signal_path",
+      "question": "Does the matrix adapt to the channel count of the signal path, or does it have a fixed channel count? What happens if the signal has fewer channels than the matrix expects?",
+      "context": "Important for understanding how the matrix behaves in different channel configurations."
+    },
+    {
+      "id": "processing-overhead",
+      "category": "performance",
+      "question": "Does the matrix copy audio buffers or use pointer swapping for simple 1-to-1 channel remapping? What is the CPU cost for pass-through configurations?",
+      "context": "Users may want to know if leaving a matrix in place with identity routing has any cost."
+    }
+  ],
+
+  "notes": "routing.matrix has no parameters -- all configuration is through the EmbeddedData property which stores a serialised routing matrix. The matrix UI provides a visual grid for connecting source channels to destination channels. No cppProperties flags are set, suggesting this is a simple monophonic audio processor."
+}

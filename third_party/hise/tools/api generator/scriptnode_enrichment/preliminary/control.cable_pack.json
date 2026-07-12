@@ -1,0 +1,94 @@
+{
+  "factoryPath": "control.cable_pack",
+  "factory": "control",
+  "nodeId": "cable_pack",
+  "description": "Uses a slider pack to modify a modulation signal",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input value",
+      "rationale": "The normalised input value (0..1) used as the lookup position in the slider pack.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 1,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/cable_pack.md",
+    "tier": "STUB",
+    "lines": 6
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "pack-lookup-interpolation",
+      "category": "signal_path",
+      "question": "Does cable_pack use interpolation between slider pack elements, or does it use nearest-neighbour (step) lookup? The index-types doc shows the slider pack pattern uses index::normalised<double, index::clamped<0>> without lerp wrapper.",
+      "context": "Table lookup uses interpolation but slider packs typically use discrete steps. This affects how the modulation signal is shaped."
+    },
+    {
+      "id": "pack-size-behaviour",
+      "category": "parameter_behaviour",
+      "question": "How does the slider pack size affect the lookup? With 8 sliders and Value=0.5, does it read slider index 4? Confirm the normalised-to-index mapping with dynamic bounds.",
+      "context": "Users need to understand the relationship between input position and which slider value is read."
+    },
+    {
+      "id": "pack-display-value",
+      "category": "parameter_behaviour",
+      "question": "Does cable_pack call setDisplayedValue() to highlight the current lookup position in the slider pack UI?",
+      "context": "Visual feedback is important for understanding which slider is currently being read."
+    },
+    {
+      "id": "pack-value-range",
+      "category": "parameter_behaviour",
+      "question": "What is the output range? Are slider pack values normalised to 0..1, or can they be arbitrary? Does the node clamp the output?",
+      "context": "Determines whether the output is always in 0..1 range or can exceed it based on slider pack configuration."
+    }
+  ],
+
+  "notes": "cable_pack is a value transformation node (Pattern 2 from control-infrastructure) that uses a slider pack for discrete-step lookup. Unlike cable_table which uses linear interpolation on a 512-float table, cable_pack reads from a variable-size slider pack without interpolation (nearest-neighbour). The input is normalised (0..1), scaled to the pack size. The index-types doc confirms the pattern: index::normalised<double, index::clamped<0>> with dynamic bounds (0) because slider packs have variable size."
+}

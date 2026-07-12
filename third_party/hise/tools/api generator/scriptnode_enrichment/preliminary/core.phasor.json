@@ -1,0 +1,121 @@
+{
+  "factoryPath": "core.phasor",
+  "factory": "core",
+  "nodeId": "phasor",
+  "description": "A oscillator that creates a naive ramp from 0...1",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": true,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Pitch",
+      "rationale": "Frequency and Freq Ratio together determine the ramp speed; Phase sets the start offset",
+      "parameters": [
+        {
+          "id": "Frequency",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.1, "skew": 0.2299045622348785 },
+          "default": 220.0,
+          "textConverter": "Frequency",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Freq Ratio",
+          "range": { "min": 1.0, "max": 16.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Phase",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "NormalizedPercentage",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Voice control",
+      "rationale": "Gate enables/disables the phasor output",
+      "parameters": [
+        {
+          "id": "Gate",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/phasor.md",
+    "tier": "BRIEF",
+    "lines": 15
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "processing-order",
+      "category": "signal_path",
+      "question": "Does the phasor write to the output (replacing input) or add to the existing signal? Is it frame-based or block-based?",
+      "context": "Determines whether this is a pure generator that replaces the signal or can be mixed."
+    },
+    {
+      "id": "naive-waveform",
+      "category": "description_accuracy",
+      "question": "The description says 'naive ramp'. Does this mean it has no anti-aliasing, producing a raw sawtooth-like ramp with potential aliasing at high frequencies?",
+      "context": "The word 'naive' is important for users to understand the aliasing characteristics."
+    },
+    {
+      "id": "gate-midi-interaction",
+      "category": "parameter_behaviour",
+      "question": "Does the phasor's handleHiseEvent respond to note-on/note-off to control Gate, or does it use MIDI events for pitch tracking only?",
+      "context": "Determines whether Gate is automatically driven by MIDI or must be connected manually."
+    },
+    {
+      "id": "output-range",
+      "category": "signal_path",
+      "question": "Is the output strictly 0 to 1 (unipolar ramp) and what happens at the wrap point -- is there a discontinuity?",
+      "context": "Users need to know the exact output range for downstream processing (e.g., table lookup)."
+    }
+  ],
+
+  "notes": "The phasor is closely related to core.oscillator but outputs a raw 0..1 ramp rather than a shaped waveform. This makes it useful as a phase source for table-based waveshaping or as a modulation source. The 'naive' qualifier in the description suggests no anti-aliasing. Compare with core.phasor_fm which adds FM modulation input."
+}

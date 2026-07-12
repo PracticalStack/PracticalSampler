@@ -1,0 +1,3 @@
+Creates a new anonymous ScriptPanel as a child of this panel and returns it. Child panels can be added and removed at any time (not just during onInit), but they are not listed in the component list and cannot store or restore values with user presets. Each child is a full ScriptPanel instance with its own paint routine, mouse callbacks, timers, and `data` object.
+
+Use `getChildPanelList()` to retrieve all children, `getParentPanel()` to navigate upward, and `removeFromParent()` to delete a child and any nested panels beneath it. This method is the foundation for dynamic UI patterns such as scrollable lists, effect slot strips, and modulation connection tables where the number of elements varies at runtime.

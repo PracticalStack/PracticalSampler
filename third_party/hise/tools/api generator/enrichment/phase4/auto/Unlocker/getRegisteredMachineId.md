@@ -1,0 +1,1 @@
+Returns the machine ID extracted from the loaded licence key file. The machine ID is parsed from the key file during `loadKeyFile()`. Returns an empty string if no key file has been loaded or if the key file does not contain a machine ID entry.

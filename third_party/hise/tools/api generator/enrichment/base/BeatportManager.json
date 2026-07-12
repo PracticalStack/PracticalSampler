@@ -1,0 +1,41 @@
+{
+  "className": "BeatportManager",
+  "category": "object",
+  "description": "A wrapper around the beatport authentication system.",
+  "methods": {
+    "isBeatportAccess": {
+      "signature": "bool isBeatportAccess()",
+      "returnType": "bool",
+      "description": "Checks if the beatport access is valid.",
+      "parameters": []
+    },
+    "setProductId": {
+      "signature": "void setProductId(String productId)",
+      "returnType": "void",
+      "description": "Sets the product ID dynamically.",
+      "parameters": [
+        {
+          "name": "productId",
+          "type": "String"
+        }
+      ]
+    },
+    "validate": {
+      "signature": "var validate()",
+      "returnType": "var",
+      "description": "Requests DRM validation and returns a JSON object with the validation result.",
+      "parameters": []
+    },
+    "getBeatportProjectFolder": {
+      "signature": "File getBeatportProjectFolder(MainController * mc)",
+      "returnType": "File",
+      "description": "Returns the folder inside the project repository where the beatport SDK is located.",
+      "parameters": [
+        {
+          "name": "mc",
+          "type": "MainController *"
+        }
+      ]
+    }
+  }
+}

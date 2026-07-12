@@ -1,0 +1,1 @@
+Per-event variant of `Sampler.setMultiGroupIndex()`. Pass an event ID to bind the multi-group state to a specific note, or `-1` for the global state. Accepts the same groupIndex types (integer, array, or `MidiList`).

@@ -1,0 +1,85 @@
+{
+  "moduleId": "MidiMuter",
+  "prettyName": "MidiMuter",
+  "type": "MidiProcessor",
+  "subtype": "MidiProcessor",
+  "category": "routing, mixing",
+
+  "io": {
+    "midiIn": "MIDI in",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [],
+
+  "parameterGroups": [
+    {
+      "label": "Mute Control",
+      "rationale": "Both parameters control the note muting behavior: ignoreButton enables/disables muting, fixStuckNotes provides safety handling for notes that were sounding when mute was engaged",
+      "parameters": [
+        {
+          "id": "ignoreButton",
+          "name": "Ignore Button",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Ignores incoming note-on events",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "fixStuckNotes",
+          "name": "Fix Stuck Notes",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Allows note-offs for notes that were previously heard",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "event-filtering-logic",
+      "category": "signal_path",
+      "question": "What exactly does processHiseEvent() do? Does ignoreButton=1 block only noteOn events, or also noteOff? What about other MIDI messages (CC, pitch bend, aftertouch)?",
+      "context": "The description says 'mutes incoming note-on events while allowing other MIDI messages' but need to verify exactly which event types are passed through vs blocked."
+    },
+    {
+      "id": "stuck-note-tracking",
+      "category": "parameter_behavior",
+      "question": "How does fixStuckNotes track which notes were 'previously heard'? Does it maintain an active-notes list? When fixStuckNotes=0 and ignoreButton=1, are note-offs also blocked (causing stuck notes)?",
+      "context": "Users need to understand the stuck-note scenario: if notes are sounding when mute engages, fixStuckNotes determines whether their note-offs get through."
+    },
+    {
+      "id": "mute-toggle-midstream",
+      "category": "conditional_logic",
+      "question": "What happens when ignoreButton is toggled while notes are sounding? Does the module send artificial note-offs for currently held notes when mute engages? Does it send note-ons for notes held on the input when mute disengages?",
+      "context": "Real-time mute toggling is the primary use case - users need to know the transition behavior to avoid stuck notes or unexpected voice triggering."
+    },
+    {
+      "id": "fix-stuck-notes-interaction",
+      "category": "conditional_logic",
+      "question": "Does fixStuckNotes have any effect when ignoreButton=0 (mute off)? Is it only meaningful during muted state, or does it also affect unmute transitions?",
+      "context": "Users need to understand whether fixStuckNotes is a 'while muted' behavior or a transition behavior."
+    },
+    {
+      "id": "description-verify-other-midi",
+      "category": "description_accuracy",
+      "question": "The base description says 'allowing other MIDI messages' - verify that CC, pitch bend, aftertouch, and program change messages are indeed passed through unmodified when muted.",
+      "context": "If certain non-note messages are also blocked, the description is misleading."
+    }
+  ],
+
+  "notes": "MidiMuter is a simple MIDI gate processor. Its primary use case is real-time muting of note input (e.g., for mute buttons in a mixer-style UI). The fixStuckNotes parameter suggests the module has awareness of note state, implying some form of active-note tracking. No modulation chains, no interfaces, no children - this is one of the simplest possible MIDI processors."
+}

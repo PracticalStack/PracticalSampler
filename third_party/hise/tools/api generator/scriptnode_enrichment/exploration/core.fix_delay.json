@@ -1,0 +1,46 @@
+{
+  "factoryPath": "core.fix_delay",
+  "nodes": [
+    {
+      "id": "in",
+      "label": "Audio In",
+      "type": "input",
+      "importance": 1.0,
+      "description": "Input audio signal (one or more channels)"
+    },
+    {
+      "id": "delay",
+      "label": "Delay Line",
+      "type": "process",
+      "importance": 1.0,
+      "description": "Non-interpolating circular buffer delay. One delay line per channel reads from an integer sample offset behind the write head."
+    },
+    {
+      "id": "delay_time",
+      "label": "DelayTime",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Delay duration in milliseconds (0-1000). Quantised to integer samples internally."
+    },
+    {
+      "id": "fade_time",
+      "label": "FadeTime",
+      "type": "parameter",
+      "importance": 0.7,
+      "description": "Crossfade length in samples (0-1024) when delay time changes, to avoid clicks."
+    },
+    {
+      "id": "out",
+      "label": "Audio Out",
+      "type": "output",
+      "importance": 1.0,
+      "description": "Delayed audio signal"
+    }
+  ],
+  "edges": [
+    { "from": "in", "to": "delay", "type": "signal", "label": null },
+    { "from": "delay_time", "to": "delay", "type": "control", "label": null },
+    { "from": "fade_time", "to": "delay", "type": "control", "label": null },
+    { "from": "delay", "to": "out", "type": "signal", "label": null }
+  ]
+}

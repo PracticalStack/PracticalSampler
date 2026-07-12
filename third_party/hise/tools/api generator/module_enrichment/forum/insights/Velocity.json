@@ -1,0 +1,88 @@
+{
+  "targetId": "Velocity",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [2259, 687, 1023, 10815, 6259, 624, 824, 670, 885, 888, 1534, 4134, 10714, 6271, 200, 8933, 10415, 333, 13798, 13517, 13050],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Global Velocity Modulator does not capture velocity for scripted artificial notes",
+      "summary": "When notes are created via Synth.playNote(), the Global Velocity Modulator cannot connect to them because it has already processed the original MIDI event. The velocity for artificial notes is effectively undefined or zero, causing silence when a velocity modulator is in the gain chain.",
+      "sources": ["tid:2259"],
+      "verify": true,
+      "verify_hint": "grep playNote and GlobalVoiceStartModulator in hi_scripting/scripting/modules; check how event IDs are tracked"
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Use Script Voice Start Modulator as a Global Velocity Modulator replacement when notes are remapped",
+      "summary": "When artificial notes are created via Synth.playNote(), replace the Global Velocity Modulator with a Script Voice Start Modulator that reads Message.getVelocity() and optionally applies a table. Always return 1.0 as a fallback for artificial events to avoid silence.",
+      "sources": ["tid:2259", "tid:10815"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Use event.gain property to pass real velocity to downstream artificial notes",
+      "summary": "When scripts remap notes and need to preserve the original MIDI velocity for gain modulation, store the velocity in the event's gain property via a script processor near the top of the chain. Downstream modulators can then read this value. Requires Engine.createAndRegisterTableData() to expose the table to the main interface.",
+      "sources": ["tid:2259"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "A Velocity Modulator table cannot be shared between two modules",
+      "summary": "There is no way to connect one velocity modulator's table to two separate modules, even via scripting. The correct approach is to use the Global Modulator system, where one Global Voice Start Modulator drives multiple Global Modulator Receiver instances.",
+      "sources": ["tid:687"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Synth.getModulator() cannot find modulators higher in the chain than the calling script",
+      "summary": "A script processor can only look up modulators that are at the same level or below it in the hierarchy. Attempting to retrieve a Global Velocity Modulator from a child script will fail silently or return null.",
+      "sources": ["tid:624"],
+      "verify": true,
+      "verify_hint": "grep getModulator in hi_scripting/scripting/engine/JavascriptApiClass.cpp; check scope of processor lookup"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Global Velocity Modulator combined with Arpeggiator causes note dropouts",
+      "summary": "Using a Global Velocity Modulator alongside the built-in Arpeggiator produces note dropouts. Placing velocity modulators directly inside individual samplers (local scope) avoids this issue. Alternatively, setting the velocity modulation intensity to zero when the arp is active works as a workaround.",
+      "sources": ["tid:6271"],
+      "verify": true,
+      "verify_hint": "grep GlobalVoiceStartModulator and Arpeggiator interaction in hi_scripting/scripting/modules"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Sampler velocity mapping range controls sample selection, not volume",
+      "summary": "The LoVel/HiVel mapping in the sampler's mapping window determines which sample is triggered for a given velocity — it has no effect on output volume. A separate Velocity Modulator must be added to the sampler's gain modulation chain to scale volume by velocity.",
+      "sources": ["tid:13050"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "Velocity Modulator on very short envelope attack time produces silence at high velocities",
+      "summary": "When a Velocity Modulator drives an envelope's attack time and the attack value is very short (under approximately 25ms), high velocities produce silence. This occurs because the engine takes the initial interpolated value rather than processing the modulation correctly at such short times. The bug was acknowledged and fixed.",
+      "sources": ["tid:200"],
+      "verify": true,
+      "verify_hint": "grep calculateVoiceStartValue or attack time modulation in hi_modules/modulators; check if fix is present in TableEnvelope"
+    },
+    {
+      "type": "API",
+      "title": "Modulator intensity is scriptable via setIntensity(); right-click header generates the declaration",
+      "summary": "The gain/intensity of any modulator (including the Velocity Modulator) can be controlled from a script using modulator.setIntensity(value). Right-clicking the module's header bar and choosing 'Create Script Variable Declaration' generates the required const var reference automatically.",
+      "sources": ["tid:333"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Separate MIDI processors for velocity manipulation vs UI logic in deferred scripts",
+      "summary": "Message.setVelocity() must not be called from a deferred script, as MIDI processing cannot happen in the deferred context. The recommended pattern is to use a separate non-deferred MIDI processor for velocity manipulation, keeping all UI state changes in the deferred interface script.",
+      "sources": ["tid:13798"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

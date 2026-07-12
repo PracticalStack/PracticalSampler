@@ -1,0 +1,1 @@
+Sets or clears the execute permission on this file. Returns `true` on success. This is primarily useful on macOS and Linux - on Windows, executability is determined by file extension rather than permissions.

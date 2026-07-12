@@ -1,0 +1,102 @@
+{
+  "15": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Builder API creates its own modules"
+  },
+  "16": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Builder API creates drum kit module tree"
+  },
+  "17": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Function definition only, compile-only"
+  },
+  "18": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "loadImage with {PROJECT_FOLDER} path - file doesn't exist in test environment",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "19": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "AudioLooper", "name": "Audio Loop Player1"}
+    ],
+    "components": [
+      {"type": "ScriptLabel", "id": "Label1"}
+    ],
+    "verifyScript": null,
+    "notes": "Broadcaster watches AudioFile changes, compile-only test"
+  },
+  "20": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "rootnoteKNOB"}
+    ],
+    "verifyScript": null,
+    "notes": "Fixed: added 'const var rootnoteKNOB = Content.getComponent(\"rootnoteKNOB\");' to resolve undefined reference"
+  },
+  "21": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Timer runs asynchronously, compile-only test"
+  },
+  "22": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Function definition only, compile-only"
+  },
+  "23": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Fixed: added 'const var laf = Engine.createGlobalScriptLookAndFeel();' at top"
+  },
+  "24": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "CurveEq", "name": "ParametriqEQ"}
+    ],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"}
+    ],
+    "verifyScript": null,
+    "notes": "Uses CurveEq module constants BandOffset and Freq"
+  }
+}

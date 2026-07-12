@@ -1,0 +1,94 @@
+{
+  "factoryPath": "routing.receive",
+  "factory": "routing",
+  "nodeId": "receive",
+  "description": "A signal target for a send node with adjustable feedback",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Mix Control",
+      "rationale": "Single parameter controlling how much of the received signal is mixed into the output.",
+      "parameters": [
+        {
+          "id": "Feedback",
+          "range": { "min": 0, "max": 1, "step": 0, "skew": 1.0 },
+          "default": 0,
+          "textConverter": "NormalizedPercentage",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/routing/receive.md",
+    "tier": "BRIEF",
+    "lines": 19
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "feedback-mixing-behaviour",
+      "category": "signal_path",
+      "question": "Does the Feedback parameter control a wet/dry mix between the node's input signal and the received signal, or does it scale only the received signal which is then added to the input?",
+      "context": "The parameter name 'Feedback' suggests this is used in feedback loops (send after processing, receive before). Users need to know the exact mixing formula."
+    },
+    {
+      "id": "receive-without-send",
+      "category": "signal_path",
+      "question": "What happens when a receive node has no connected send node? Does it output silence, pass through its input unchanged, or produce an error?",
+      "context": "Important for understanding default behaviour and error handling."
+    },
+    {
+      "id": "feedback-loop-latency",
+      "category": "signal_path",
+      "question": "When used in a feedback loop (send after processing, receive before), is there inherent latency (one block delay) or is the feedback instantaneous within the same block?",
+      "context": "Critical for feedback delay designs and understanding signal flow timing."
+    },
+    {
+      "id": "polyphonic-receive-routing",
+      "category": "signal_path",
+      "question": "With IsPolyphonic true, does each voice receive only from the same voice's send, or from all voices?",
+      "context": "Determines whether send/receive pairs maintain voice isolation."
+    }
+  ],
+
+  "notes": "routing.receive is the companion to routing.send. The 'Feedback' parameter name strongly suggests this is designed for feedback loop topologies where the signal is sent after processing and received before, with the parameter controlling feedback amount. Marked IsRoutingNode. NormalizedPercentage converter displays Feedback as 0-100%."
+}

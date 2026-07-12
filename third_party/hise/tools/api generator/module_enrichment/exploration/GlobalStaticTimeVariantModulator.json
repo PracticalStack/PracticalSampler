@@ -1,0 +1,67 @@
+{
+  "moduleId": "GlobalStaticTimeVariantModulator",
+  "nodes": [
+    {
+      "id": "connection",
+      "type": "external",
+      "label": "Source TimeVariant Last Value (in Container)",
+      "importance": 1,
+      "detail": "Captures getLastConstantValue() from source TimeVariantModulator. Block-quantised, not sample-accurate."
+    },
+    {
+      "id": "disconnected",
+      "type": "decision",
+      "label": "Connected?",
+      "importance": 1,
+      "detail": "Disconnected: returns 1.0 (unity/pass-through)."
+    },
+    {
+      "id": "table_lookup",
+      "type": "decision",
+      "label": "Table Lookup",
+      "importance": 2,
+      "detail": "Optional response curve applied to captured value. Input 0-1, output defined by table."
+    },
+    {
+      "id": "use_table_param",
+      "type": "parameter",
+      "label": "UseTable",
+      "importance": 2
+    },
+    {
+      "id": "inversion",
+      "type": "process",
+      "label": "Inversion (1 - value)",
+      "importance": 2,
+      "detail": "Applied after table lookup when Inverted is enabled."
+    },
+    {
+      "id": "inverted_param",
+      "type": "parameter",
+      "label": "Inverted",
+      "importance": 2
+    },
+    {
+      "id": "mod_output",
+      "type": "output",
+      "label": "Modulation Output",
+      "importance": 1
+    }
+  ],
+  "edges": [
+    { "from": "disconnected", "to": "connection", "type": "conditional", "label": "connected" },
+    { "from": "disconnected", "to": "mod_output", "type": "conditional", "label": "disconnected (1.0)" },
+    { "from": "connection", "to": "table_lookup" },
+    { "from": "use_table_param", "to": "table_lookup", "type": "control" },
+    { "from": "table_lookup", "to": "inversion" },
+    { "from": "inverted_param", "to": "inversion", "type": "control" },
+    { "from": "inversion", "to": "mod_output" }
+  ],
+  "groups": [
+    {
+      "id": "value_processing",
+      "label": "Value Processing",
+      "nodes": ["table_lookup", "use_table_param", "inversion", "inverted_param"]
+    }
+  ]
+}

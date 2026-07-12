@@ -1,0 +1,117 @@
+{
+  "moduleId": "MatrixModulator",
+  "nodes": [
+    {
+      "id": "container_source",
+      "type": "external",
+      "label": "GlobalModulatorContainer",
+      "importance": 1,
+      "detail": "Source of modulator connections. Selected via MatrixContent table UI or drag-and-drop."
+    },
+    {
+      "id": "value_param",
+      "type": "parameter",
+      "label": "Value",
+      "importance": 1,
+      "detail": "Base value normalised through inputRange to [0..1]. Starting point before connections are applied."
+    },
+    {
+      "id": "smoothing_time_param",
+      "type": "parameter",
+      "label": "SmoothingTime",
+      "importance": 2,
+      "detail": "Controls sfloat ramp duration. Default 50ms, range 0-2000ms. 0 = instant."
+    },
+    {
+      "id": "base_value_smoother",
+      "type": "process",
+      "label": "Base Value Smoother",
+      "importance": 1,
+      "detail": "sfloat at control rate. Per-sample interpolation when ramping, constant fill when converged."
+    },
+    {
+      "id": "scale_mods",
+      "type": "process",
+      "label": "Scale Mods (multiplicative)",
+      "importance": 1,
+      "detail": "Each scale connection multiplies the buffer sequentially. Uses matrix_mod DSP nodes."
+    },
+    {
+      "id": "add_mods",
+      "type": "process",
+      "label": "Add Mods (additive)",
+      "importance": 1,
+      "detail": "Each add connection adds to the buffer sequentially. Bipolar mode is additive with bipolar range."
+    },
+    {
+      "id": "output_range_skew",
+      "type": "decision",
+      "label": "Output Range Skew",
+      "importance": 2,
+      "detail": "Applied per-sample when output range is non-default."
+    },
+    {
+      "id": "monophonic_param",
+      "type": "parameter",
+      "label": "Monophonic",
+      "importance": 2,
+      "detail": "Skips inner node reset in monophonic mode to maintain continuous signal."
+    },
+    {
+      "id": "retrigger_param",
+      "type": "parameter",
+      "label": "Retrigger",
+      "importance": 2,
+      "detail": "Handled by EnvelopeModulator framework."
+    },
+    {
+      "id": "auto_bypass",
+      "type": "decision",
+      "label": "Auto-Bypass",
+      "importance": 2,
+      "detail": "When all connections removed, modulator bypasses itself."
+    },
+    {
+      "id": "mod_output",
+      "type": "output",
+      "label": "Modulation Output",
+      "importance": 1,
+      "detail": "output = (baseValue * scaleMod1 * ... * scaleModN) + addMod1 + ... + addModM"
+    }
+  ],
+  "edges": [
+    { "from": "value_param", "to": "base_value_smoother" },
+    { "from": "smoothing_time_param", "to": "base_value_smoother", "type": "control" },
+    { "from": "base_value_smoother", "to": "scale_mods" },
+    { "from": "container_source", "to": "scale_mods", "type": "control" },
+    { "from": "container_source", "to": "add_mods", "type": "control" },
+    { "from": "scale_mods", "to": "add_mods" },
+    { "from": "add_mods", "to": "output_range_skew" },
+    { "from": "output_range_skew", "to": "auto_bypass" },
+    { "from": "auto_bypass", "to": "mod_output" },
+    { "from": "monophonic_param", "to": "base_value_smoother", "type": "control" },
+    { "from": "retrigger_param", "to": "base_value_smoother", "type": "control" }
+  ],
+  "groups": [
+    {
+      "id": "base_value",
+      "label": "Base Value",
+      "nodes": ["value_param", "smoothing_time_param", "base_value_smoother"]
+    },
+    {
+      "id": "modulation_matrix",
+      "label": "Modulation Matrix",
+      "nodes": ["container_source", "scale_mods", "add_mods"]
+    },
+    {
+      "id": "output_processing",
+      "label": "Output Processing",
+      "nodes": ["output_range_skew", "auto_bypass"]
+    },
+    {
+      "id": "voice_management",
+      "label": "Voice Management",
+      "nodes": ["monophonic_param", "retrigger_param"]
+    }
+  ]
+}

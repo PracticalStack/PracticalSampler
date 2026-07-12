@@ -1,0 +1,1 @@
+Returns the sample rate of the loaded audio file in Hz, which may differ from `Engine.getSampleRate()` (the audio driver or DAW rate). Divide the file rate by the engine rate to calculate the playback speed ratio needed to preserve the original pitch - though most HISE modules that play back samples handle this automatically.

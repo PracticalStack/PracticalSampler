@@ -1,0 +1,1 @@
+Creates a global modulator receiver in the specified modulator chain and connects it to an existing global modulator from a `GlobalModulatorContainer`. The receiver continuously tracks the source modulator's output value. Returns a `Modulator` handle to the newly created receiver.

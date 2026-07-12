@@ -1,0 +1,143 @@
+{
+  "className": "Unlocker",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "canExpire": {
+      "signature": "var canExpire()",
+      "returnType": "var",
+      "description": "Checks if the unlocker's license system has an expiration date.",
+      "parameters": []
+    },
+    "checkExpirationData": {
+      "signature": "var checkExpirationData(String encodedTimeString)",
+      "returnType": "var",
+      "description": "If the unlocker has an expiration date, it will check it against the RSA encoded time string from the server.",
+      "parameters": [
+        {
+          "name": "encodedTimeString",
+          "type": "String"
+        }
+      ]
+    },
+    "checkMuseHub": {
+      "signature": "void checkMuseHub(var resultCallback)",
+      "returnType": "void",
+      "description": "If you use the MuseHub SDK this will try to activate the plugin using their SDK.",
+      "parameters": [
+        {
+          "name": "resultCallback",
+          "type": "var"
+        }
+      ]
+    },
+    "contains": {
+      "signature": "bool contains(String otherString)",
+      "returnType": "bool",
+      "description": "Checks if the string contains the given substring.",
+      "parameters": [
+        {
+          "name": "otherString",
+          "type": "String"
+        }
+      ]
+    },
+    "getLicenseKeyFile": {
+      "signature": "var getLicenseKeyFile()",
+      "returnType": "var",
+      "description": "Returns the license key file as File object.",
+      "parameters": []
+    },
+    "getRegisteredMachineId": {
+      "signature": "String getRegisteredMachineId()",
+      "returnType": "String",
+      "description": "Returns the machine ID that is encoded into the license file. This does not look in the encrypted blob, but just parses the header string.",
+      "parameters": []
+    },
+    "getUserEmail": {
+      "signature": "String getUserEmail()",
+      "returnType": "String",
+      "description": "Returns the user email that was used for the registration.",
+      "parameters": []
+    },
+    "isUnlocked": {
+      "signature": "var isUnlocked()",
+      "returnType": "var",
+      "description": "Checks if the registration went OK.",
+      "parameters": []
+    },
+    "isValidKeyFile": {
+      "signature": "bool isValidKeyFile(var possibleKeyData)",
+      "returnType": "bool",
+      "description": "Checks if the possibleKeyData might contain a key file.",
+      "parameters": [
+        {
+          "name": "possibleKeyData",
+          "type": "var"
+        }
+      ]
+    },
+    "keyFileExists": {
+      "signature": "bool keyFileExists()",
+      "returnType": "bool",
+      "description": "Checks whether the key file exists.",
+      "parameters": []
+    },
+    "loadExpansionList": {
+      "signature": "bool loadExpansionList()",
+      "returnType": "bool",
+      "description": "Reloads the expansion list if the unlocker manages expansions.",
+      "parameters": []
+    },
+    "loadKeyFile": {
+      "signature": "var loadKeyFile()",
+      "returnType": "var",
+      "description": "This checks if there is a key file and applies it.",
+      "parameters": []
+    },
+    "setProductCheckFunction": {
+      "signature": "void setProductCheckFunction(var f)",
+      "returnType": "void",
+      "description": "Sets a function that performs a product name check and expects to return true or false for a match.",
+      "parameters": [
+        {
+          "name": "f",
+          "type": "var"
+        }
+      ]
+    },
+    "unlockExpansionList": {
+      "signature": "bool unlockExpansionList(var expansionIdList)",
+      "returnType": "bool",
+      "description": "Unlocks the given expansion IDs in HISE.",
+      "parameters": [
+        {
+          "name": "expansionIdList",
+          "type": "var"
+        }
+      ]
+    },
+    "writeExpansionKeyFile": {
+      "signature": "var writeExpansionKeyFile(String keyData)",
+      "returnType": "var",
+      "description": "Writes the expansion license key data to the location.",
+      "parameters": [
+        {
+          "name": "keyData",
+          "type": "String"
+        }
+      ]
+    },
+    "writeKeyFile": {
+      "signature": "var writeKeyFile(String keyData)",
+      "returnType": "var",
+      "description": "Writes the key data to the location.",
+      "parameters": [
+        {
+          "name": "keyData",
+          "type": "String"
+        }
+      ]
+    }
+  }
+}

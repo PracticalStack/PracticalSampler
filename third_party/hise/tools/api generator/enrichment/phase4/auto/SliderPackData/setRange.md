@@ -1,0 +1,1 @@
+Sets the value range and step size for all sliders. The range constrains values entered through the ScriptSliderPack UI, and the step size controls value quantisation. Defaults to [0.0, 1.0] with step size 0.01. Existing values are not clamped - only new values entered through the UI are constrained.

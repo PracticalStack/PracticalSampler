@@ -1,0 +1,64 @@
+{
+  "9": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Synth.getAudioSampleProcessor requires an AudioSampleProcessor module not available via Builder API",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "13": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "setChildTooltips function not available on ScriptFloatingTile in test environment",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "15": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptButton", "id": "RandomPreset"}
+    ],
+    "verifyScript": null,
+    "notes": "Compile-only - user preset loading may fail at runtime but script compiles"
+  },
+  "22": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "CurveEq", "name": "Parametriq EQ1"}
+    ],
+    "components": [
+      {"type": "ScriptButton", "id": "Button1"}
+    ],
+    "verifyScript": null,
+    "notes": "ParametriqEQ type doesn't exist - trying CurveEq as closest match"
+  },
+  "37": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptedViewport", "id": "Viewport1"}
+    ],
+    "verifyScript": null,
+    "notes": "Viewport table mode - compile-only, getTableRowData not accessible via REPL"
+  },
+  "38": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Synth.getDisplayBufferSource requires a HardcodedMasterFX scriptnode module not available via Builder API",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  }
+}

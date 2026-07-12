@@ -1,0 +1,136 @@
+{
+  "factoryPath": "dynamics.updown_comp",
+  "nodes": [
+    {
+      "id": "in",
+      "label": "Audio In",
+      "type": "input",
+      "importance": 1.0,
+      "description": "Stereo input audio (fixed 2 channels)"
+    },
+    {
+      "id": "peak_detect",
+      "label": "Peak Detect",
+      "type": "process",
+      "importance": 0.8,
+      "description": "Computes max(abs(sample)) across both channels"
+    },
+    {
+      "id": "rms",
+      "label": "RMS Detector",
+      "type": "process",
+      "importance": 0.7,
+      "description": "Optional 30ms running RMS smoothing of peak value"
+    },
+    {
+      "id": "envelope",
+      "label": "Envelope Follower",
+      "type": "process",
+      "importance": 0.8,
+      "description": "Attack/release envelope with low-threshold fast-track"
+    },
+    {
+      "id": "transfer",
+      "label": "Dual-Threshold Transfer",
+      "type": "process",
+      "importance": 1.0,
+      "description": "5-zone transfer function: upward compression below LowThreshold, unity between, downward above HighThreshold"
+    },
+    {
+      "id": "apply_gain",
+      "label": "Apply Gain",
+      "type": "process",
+      "importance": 0.9,
+      "description": "Multiplies audio by computed gain ratio (output/input)"
+    },
+    {
+      "id": "low_threshold",
+      "label": "LowThreshold",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Threshold for upward compression in dB (-100 to 0)"
+    },
+    {
+      "id": "low_ratio",
+      "label": "LowRatio",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Upward compression ratio (0.2 to 100)"
+    },
+    {
+      "id": "high_threshold",
+      "label": "HighThreshold",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Threshold for downward compression in dB (-100 to 0)"
+    },
+    {
+      "id": "high_ratio",
+      "label": "HighRatio",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Downward compression ratio (0.2 to 100)"
+    },
+    {
+      "id": "knee",
+      "label": "Knee",
+      "type": "parameter",
+      "importance": 0.8,
+      "description": "Soft knee width (0 to 0.3), applies to both thresholds"
+    },
+    {
+      "id": "attack",
+      "label": "Attack",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Envelope attack time in ms (0 to 1000)"
+    },
+    {
+      "id": "release",
+      "label": "Release",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Envelope release time in ms (0 to 1000)"
+    },
+    {
+      "id": "rms_toggle",
+      "label": "RMS",
+      "type": "parameter",
+      "importance": 0.8,
+      "description": "Detection mode: Off=peak, On=RMS (30ms window)"
+    },
+    {
+      "id": "out",
+      "label": "Audio Out",
+      "type": "output",
+      "importance": 1.0,
+      "description": "Compressed stereo audio output"
+    },
+    {
+      "id": "mod_out",
+      "label": "Gain Ratio",
+      "type": "modulation_out",
+      "importance": 0.7,
+      "description": "Applied gain ratio clamped to 0..1"
+    }
+  ],
+  "edges": [
+    { "from": "in", "to": "peak_detect", "type": "signal", "label": null },
+    { "from": "peak_detect", "to": "rms", "type": "signal", "label": null },
+    { "from": "rms_toggle", "to": "rms", "type": "control", "label": "enable/disable" },
+    { "from": "rms", "to": "envelope", "type": "signal", "label": null },
+    { "from": "attack", "to": "envelope", "type": "control", "label": null },
+    { "from": "release", "to": "envelope", "type": "control", "label": null },
+    { "from": "low_threshold", "to": "envelope", "type": "control", "label": "fast-track threshold" },
+    { "from": "envelope", "to": "transfer", "type": "signal", "label": null },
+    { "from": "low_threshold", "to": "transfer", "type": "control", "label": null },
+    { "from": "low_ratio", "to": "transfer", "type": "control", "label": null },
+    { "from": "high_threshold", "to": "transfer", "type": "control", "label": null },
+    { "from": "high_ratio", "to": "transfer", "type": "control", "label": null },
+    { "from": "knee", "to": "transfer", "type": "control", "label": null },
+    { "from": "transfer", "to": "apply_gain", "type": "signal", "label": "gain ratio" },
+    { "from": "in", "to": "apply_gain", "type": "signal", "label": "original audio" },
+    { "from": "apply_gain", "to": "out", "type": "signal", "label": null },
+    { "from": "apply_gain", "to": "mod_out", "type": "signal", "label": "clamped 0..1" }
+  ]
+}

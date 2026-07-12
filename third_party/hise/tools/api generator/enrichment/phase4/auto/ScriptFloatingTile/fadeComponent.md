@@ -1,0 +1,1 @@
+Toggles visibility with a fade animation over the specified duration in milliseconds. Pass `1` for the first argument to fade in, `0` to fade out. Only triggers if the target visibility differs from the current state. For an instant toggle, use `showControl()` instead.

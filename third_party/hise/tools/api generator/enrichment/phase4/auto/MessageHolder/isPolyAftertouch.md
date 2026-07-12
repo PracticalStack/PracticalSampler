@@ -1,0 +1,1 @@
+Returns true if this event has the Aftertouch type. Functionally identical to `isMonophonicAfterTouch()` - both check for the same event type. To distinguish between channel pressure and polyphonic aftertouch, check whether the note number field is zero (monophonic) or non-zero (polyphonic).

@@ -1,0 +1,105 @@
+{
+  "moduleId": "PitchWheel",
+  "prettyName": "Pitch Wheel Modulator",
+  "type": "Modulator",
+  "subtype": "TimeVariantModulator",
+  "category": "input",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": true,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "TableProcessor",
+      "signalFlowRole": "Lookup table step in signal path - maps pitch wheel input through a user-defined curve when UseTable is enabled"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Pitch Wheel Response",
+      "rationale": "These parameters control how the raw pitch wheel value is transformed: inversion flips the direction, and the table provides a custom mapping curve",
+      "parameters": [
+        {
+          "id": "Inverted",
+          "name": "Inverted",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Inverts the modulation signal so pitch bend up produces lower values",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "UseTable",
+          "name": "UseTable",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Enables a lookup table for custom pitch wheel response curves",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Smoothing",
+      "rationale": "Controls the temporal smoothing applied to the pitch wheel signal to reduce stepping artifacts from discrete MIDI values",
+      "parameters": [
+        {
+          "id": "SmoothTime",
+          "name": "SmoothTime",
+          "range": { "min": 0.0, "max": 1000.0, "step": 0.0 },
+          "default": 200.0,
+          "description": "Smoothing time in milliseconds to reduce stepping on fast pitch wheel movements",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "standaloneModChains": [],
+  "disabledModChains": [],
+  "compositeBlocks": [],
+
+  "gaps": [
+    {
+      "id": "pitchbend-to-normalized-mapping",
+      "category": "signal_path",
+      "question": "How is the 14-bit MIDI pitch bend value (0-16383) mapped to the 0-1 modulation range? Is center position (8192) mapped to 0.5?",
+      "context": "Users need to know the exact mapping to understand what modulation values correspond to pitch bend positions - especially whether center = 0.5 or some other convention"
+    },
+    {
+      "id": "signal-path-order",
+      "category": "signal_path",
+      "question": "What is the exact processing order? Specifically: MIDI pitch bend -> normalize -> invert -> table lookup -> smooth, or a different order?",
+      "context": "The pseudo-code must show the correct transformation chain from raw pitch bend to final modulation value"
+    },
+    {
+      "id": "table-lookup-position",
+      "category": "interface_usage",
+      "question": "Where does the TableProcessor lookup occur in the signal path? Does it receive the normalized (and possibly inverted) value, or the raw normalized value before inversion?",
+      "context": "The table input domain determines what the X axis represents to the user"
+    },
+    {
+      "id": "smoothing-implementation",
+      "category": "parameter_behavior",
+      "question": "What smoothing algorithm is used (exponential, linear ramp, low-pass filter)? Is smoothing applied per-sample or per-block?",
+      "context": "The smoothing type affects the feel of pitch wheel response and is relevant for performance considerations"
+    },
+    {
+      "id": "inversion-formula",
+      "category": "parameter_behavior",
+      "question": "Does inversion use 1.0 - value, or does it mirror around center (0.5)? This matters because pitch bend is bipolar.",
+      "context": "For a bipolar controller, simple 1-x inversion and center-mirroring have very different musical results"
+    }
+  ],
+
+  "notes": "TimeVariantModulator with MIDI input type 'none' per inference table, but the module clearly reads pitch bend MIDI messages. The inference table 'none' means no noteOn/noteOff dependency - the module still receives all MIDI via the general MIDI callback. Natural seeAlso candidates: MidiController (similar structure, different MIDI source), Aftertouch."
+}

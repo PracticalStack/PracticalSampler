@@ -1,0 +1,1 @@
+Parses the string from the beginning as an integer. Returns 0 if the string does not start with a digit or minus sign. Handles values beyond the 32-bit range. Use `String.getTrailingIntValue()` when you need to extract a number from the end of a string instead.

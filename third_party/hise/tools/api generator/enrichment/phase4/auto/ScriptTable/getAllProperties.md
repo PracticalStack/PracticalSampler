@@ -1,0 +1,1 @@
+Returns an array of all active property IDs for this component. ScriptTable hides the usual scalar-range and parameter-link properties because it binds to table data rather than a single numeric value.

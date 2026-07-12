@@ -1,0 +1,18 @@
+{
+  "factoryPath": "core.recorder",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio (read for recording, passed through)" },
+    { "id": "record", "label": "Record", "type": "process", "importance": 1.0, "description": "Copies input samples to internal buffer when State=On" },
+    { "id": "state", "label": "State", "type": "parameter", "importance": 1.0, "description": "On/Off recording toggle" },
+    { "id": "length", "label": "RecordingLength", "type": "parameter", "importance": 0.9, "description": "Recording duration in ms" },
+    { "id": "audiofile", "label": "AudioFile", "type": "external_data", "importance": 0.8, "description": "Target audio file slot (receives recording on completion)" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 0.7, "description": "Audio passes through unmodified" }
+  ],
+  "edges": [
+    { "from": "in", "to": "record", "type": "signal", "label": null },
+    { "from": "state", "to": "record", "type": "control", "label": null },
+    { "from": "length", "to": "record", "type": "control", "label": "buffer size" },
+    { "from": "record", "to": "audiofile", "type": "signal", "label": "flush on complete" },
+    { "from": "in", "to": "out", "type": "signal", "label": "passthrough" }
+  ]
+}

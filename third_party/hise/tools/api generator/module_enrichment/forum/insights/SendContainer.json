@@ -1,0 +1,88 @@
+{
+  "targetId": "SendContainer",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [1223, 6353, 10182, 9393, 9104, 8682, 13113, 5558, 5673],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "SendContainer must be placed AFTER its SendFX in the module tree",
+      "summary": "If a SendContainer is positioned before the SendFX that feeds it, the send signal is delayed by one full audio buffer. The container must come after all SendFX modules that route to it in the module tree order.",
+      "sources": ["tid:1223", "tid:10182"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "Phase coherence is broken when SendContainer precedes the source module",
+      "summary": "Placing a SendContainer before the source sound generator (e.g., a Sampler) in the module tree breaks phase coherence between the dry and wet signals due to the one-buffer delay. Christoph Hart noted this should trigger a warning in the module UI and cannot be used for feedback loops at the HISE module level.",
+      "sources": ["tid:10182"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Send routing in effect plugins introduces a one-buffer delay",
+      "summary": "In compiled effect plugins, the SendContainer/SendFX pattern introduces a delay of one buffer size. The author-recommended workaround is to use a 4-channel master FX chain, put SendFX on channels 1/2 and route the SendContainer output to 3/4, then fold back to stereo via the master routing matrix.",
+      "sources": ["tid:6353"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Effect plugins require 'Enable Sound Generators FX' project setting",
+      "summary": "SendContainers (and Global Modulation Containers) only process audio in compiled effect plugins if the 'Enable Sound Generators FX' flag is enabled in the project settings.",
+      "sources": ["tid:6353"],
+      "verify": true,
+      "verify_hint": "grep EnableSoundGeneratorsFX or similar in project settings / CompileExporter; check RouteFX or EffectProcessor handling for effect plugin type"
+    },
+    {
+      "type": "API",
+      "title": "Gain and Balance parameters on the SendContainer are non-functional",
+      "summary": "The inherited Gain, Balance, and Pitch Modulation parameters shown in the SendContainer header are not applied in its render path. Output level is controlled entirely by the SendFX gain parameters and effects inside the FX chain. David Healey confirmed this observation.",
+      "sources": ["tid:9104"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Polyphonic effects cannot be used inside a SendContainer",
+      "summary": "SendContainer is not polyphonic (it is initialised with 1 voice). Any polyphonic effects placed in its FX chain are forced into monophonic processing. Effects that require polyphony will not behave as expected.",
+      "sources": ["tid:8682"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "Effects with modulators did not work inside SendContainer (fixed)",
+      "summary": "Prior to a 2024 fix, effects requiring modulation (e.g., Phaser with LFO, Degrade with any modulator) did not process correctly inside a SendContainer. This was confirmed and fixed by Christoph Hart. If you are on an older HISE build you may encounter this.",
+      "sources": ["tid:8682"],
+      "verify": true,
+      "verify_hint": "check RouteFX.h SendContainer constructor for effectChain modulation setup; look for processModulators or similar flag set after the 2024 fix"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Not routing the SendFX output away causes signal doubling",
+      "summary": "When a SendFX is added to a module's chain, the original dry signal continues to pass through unless the module's routing is configured to silence it. Failing to do so results in the dry signal being heard twice: once directly and once through the SendContainer.",
+      "sources": ["tid:9393"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "SendIndex parameter can be scripted to dynamically switch the target SendContainer",
+      "summary": "The SendFX 'SendIndex' parameter (attribute index 2) can be set via setAttribute() to dynamically change which SendContainer receives the signal at runtime. Each SendContainer is addressed by its position index among all SendContainers in the chain.",
+      "sources": ["tid:13113"],
+      "verify": true,
+      "verify_hint": "grep SendIndex in RouteFX.h/.cpp; check attribute enum and the container-scan logic (RouteFX.h:465-486)"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use channel offset for multiple parallel send busses in one SendContainer",
+      "summary": "Rather than adding multiple SendContainers, a single SendContainer can be used with an increased channel count. Each SendFX uses a different channel offset parameter to target a distinct stereo pair inside the container, keeping the module tree flat.",
+      "sources": ["tid:1223", "tid:13113"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

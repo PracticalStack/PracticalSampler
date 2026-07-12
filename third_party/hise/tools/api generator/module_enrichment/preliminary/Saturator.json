@@ -1,0 +1,136 @@
+{
+  "moduleId": "Saturator",
+  "prettyName": "Saturator",
+  "type": "Effect",
+  "subtype": "MasterEffect",
+  "category": "dynamics",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "stereo",
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "RoutingMatrix",
+      "signalFlowRole": "skip - inferred from type/subtype"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Saturation",
+      "rationale": "The main saturation amount control",
+      "parameters": [
+        {
+          "id": "Saturation",
+          "name": "Saturation",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "Amount of saturation applied to the signal where 0 is none and 1 is maximum",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Gain Staging",
+      "rationale": "PreGain drives the signal into the saturator, PostGain compensates for the added level",
+      "parameters": [
+        {
+          "id": "PreGain",
+          "name": "Pre Gain",
+          "range": { "min": 0.0, "max": 24.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "Input gain in decibels applied before saturation",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "PostGain",
+          "name": "Post Gain",
+          "range": { "min": -24.0, "max": 0.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "Output gain in decibels applied after saturation",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Mix",
+      "rationale": "Dry/wet balance for parallel saturation",
+      "parameters": [
+        {
+          "id": "WetAmount",
+          "name": "Wet Amount",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 1.0,
+          "description": "Dry/wet mix where 0 is fully dry and 1 is fully wet",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+
+  "standaloneModChains": [
+    {
+      "name": "Saturation Modulation",
+      "chainIndex": 0,
+      "modulationMode": "gain",
+      "constrainer": "*",
+      "note": "Modulates the saturation amount. No parameterIndex - standalone chain."
+    }
+  ],
+
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-order",
+      "category": "signal_path",
+      "question": "What is the exact processing order? Is it: input -> preGain -> saturation -> postGain -> wet/dry mix -> output?",
+      "context": "Need to confirm the gain staging order for the pseudo-code."
+    },
+    {
+      "id": "waveshaping-algorithm",
+      "category": "signal_path",
+      "question": "What waveshaping function is used? tanh, soft clip, polynomial? How does the Saturation parameter control the curve shape?",
+      "context": "The waveshaping algorithm determines the harmonic character."
+    },
+    {
+      "id": "modulation-application",
+      "category": "parameter_behavior",
+      "question": "How is the Saturation Modulation chain applied? Does it multiply the Saturation parameter value, or replace it? Per-sample or per-block?",
+      "context": "Users need to understand modulation resolution and behaviour."
+    },
+    {
+      "id": "pregain-range",
+      "category": "description_accuracy",
+      "question": "PreGain range is 0-24 dB (boost only). Is 0 dB truly unity, or is there an offset? PostGain range is -24 to 0 dB (cut only). Verify these ranges match actual behaviour.",
+      "context": "Unusual that PreGain cannot cut and PostGain cannot boost."
+    },
+    {
+      "id": "wet-mix-implementation",
+      "category": "parameter_behavior",
+      "question": "How is WetAmount applied? Is it a linear crossfade between dry and saturated signal?",
+      "context": "Need to document the mixing behaviour accurately."
+    },
+    {
+      "id": "performance",
+      "category": "performance",
+      "question": "Is the saturation per-sample? Any oversampling? Does the waveshaping function vary in cost with the Saturation parameter?",
+      "context": "Determines the CPU cost tier."
+    }
+  ],
+
+  "notes": "Saturator has a standalone modulation chain (Saturation Modulation) with no parameterIndex. PreGain is boost-only (0-24 dB), PostGain is cut-only (-24 to 0 dB), suggesting a gain-staging workflow where you drive the signal in and compensate on the way out."
+}

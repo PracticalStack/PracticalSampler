@@ -1,0 +1,101 @@
+{
+  "factoryPath": "control.intensity",
+  "factory": "control",
+  "nodeId": "intensity",
+  "description": "applies the HISE modulation intensity to the value",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input Signal",
+      "rationale": "Value is the primary 0..1 normalised modulation input.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Intensity Control",
+      "rationale": "Intensity controls how much the modulation signal affects the output, following the HISE intensity formula.",
+      "parameters": [
+        {
+          "id": "Intensity",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/intensity.md",
+    "tier": "BRIEF",
+    "lines": 17
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "intensity-formula",
+      "category": "signal_path",
+      "question": "In multilogic::intensity::getValue(), what is the exact HISE intensity formula? Is it (1.0 - intensity + intensity * value) like the HISE Gain modulation mode, or something different?",
+      "context": "The description says 'HISE modulation intensity' which implies a specific formula from the HISE modulation system. Need to confirm whether this matches the Gain mode formula from modulation.md."
+    },
+    {
+      "id": "intensity-zero-behaviour",
+      "category": "parameter_behaviour",
+      "question": "When Intensity is 0.0, does the output become 1.0 (full passthrough, no modulation effect) or 0.0 (no signal)?",
+      "context": "The HISE intensity convention is that Intensity=0 means no modulation (output=1.0), but this needs verification for this specific node."
+    },
+    {
+      "id": "intensity-output-clamping",
+      "category": "signal_path",
+      "question": "Is the output clamped to 0..1? Since the formula should produce values in 0..1 for valid inputs, is there any edge-case clamping?",
+      "context": "Normalised output node -- need to confirm the output always stays within 0..1."
+    }
+  ],
+
+  "notes": "intensity applies the classic HISE modulation intensity scaling. This is the scriptnode equivalent of the intensity knob on HISE modulation connections. At Intensity=1.0, the input passes through unchanged. At Intensity=0.0, the output should be 1.0 (no modulation effect). This follows the HISE convention where modulation intensity scales between 'no effect' and 'full effect'. Normalised output."
+}

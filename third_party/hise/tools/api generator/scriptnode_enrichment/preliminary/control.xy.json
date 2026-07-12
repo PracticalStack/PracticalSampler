@@ -1,0 +1,102 @@
+{
+  "factoryPath": "control.xy",
+  "factory": "control",
+  "nodeId": "xy",
+  "description": "A XY-Controller for two parameters",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "XY Coordinates",
+      "rationale": "The two input parameters map directly to the X and Y axes of the controller, each sent to a separate output.",
+      "parameters": [
+        {
+          "id": "X",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Y",
+          "range": { "min": -1.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "NumParameters",
+      "defaultValue": 2,
+      "type": "integer",
+      "note": "Fixed at 2 for XY (X output and Y output). The xy node forces this to 2 during initialise()."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": ["X", "Y"]
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": true,
+    "count": 2
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/xy.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "output-routing",
+      "category": "signal_path",
+      "question": "Does X input map directly to the X SwitchTarget output and Y input to the Y SwitchTarget output? Or is there any transformation applied?",
+      "context": "Users need to know the input-to-output mapping to wire targets correctly."
+    },
+    {
+      "id": "y-range-difference",
+      "category": "parameter_behaviour",
+      "question": "X has range [0,1] but Y has range [-1,1]. Why the asymmetry? Is this intentional for a specific use case (e.g., bipolar vertical axis)?",
+      "context": "The different ranges may confuse users and need explanation."
+    },
+    {
+      "id": "ui-presentation",
+      "category": "parameter_behaviour",
+      "question": "Does the xy node have a special UI (2D pad display) in the scriptnode editor, or is it just two sliders?",
+      "context": "UI presentation affects how users interact with this node."
+    }
+  ],
+
+  "notes": "xy is a multi-output node with 2 named outputs (X, Y) via SwitchTargets. NumParameters is forced to 2. Uses dynamic_list as ParameterType. Y has a bipolar range [-1, 1] while X is unipolar [0, 1]. No IsPolyphonic flag."
+}

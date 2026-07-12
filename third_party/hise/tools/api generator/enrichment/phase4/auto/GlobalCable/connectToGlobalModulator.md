@@ -1,0 +1,3 @@
+Connects the cable to a global modulator (LFO, envelope, or voice start modulator) inside a `GlobalModulatorContainer` as a source. When connected, the modulator's output value is sent to the cable each processing block. Pass `addToMod=false` to disconnect.
+
+> [!Warning:Requires GlobalModulatorContainer parent] The modulator must be inside a `GlobalModulatorContainer`. If the modulator exists but its parent is not a `GlobalModulatorContainer`, the call silently does nothing.

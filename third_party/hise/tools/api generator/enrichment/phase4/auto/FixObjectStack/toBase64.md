@@ -1,0 +1,1 @@
+Serialises the entire memory block (all allocated slots) as a Base64-encoded string. The position pointer is not included in the output - store `size()` separately if you need to restore occupancy.

@@ -1,0 +1,1 @@
+Returns a reference to the host transport information object. The properties of this object are not populated in the current implementation. Use `Engine.createTransportHandler()` for reliable host transport data, or `Engine.getHostBpm()` for the current BPM.

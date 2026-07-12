@@ -1,0 +1,1 @@
+Returns a typed MidiProcessor reference for the underlying module, giving access to `setAttribute()` and `getAttribute()` for parameters like `CurrentPosition`, `CurrentSequence`, `CurrentTrack`, `LoopEnabled`, `LoopStart`, `LoopEnd`, and `PlaybackSpeed`.

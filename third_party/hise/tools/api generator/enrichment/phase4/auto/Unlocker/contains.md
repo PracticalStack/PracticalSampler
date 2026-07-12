@@ -1,0 +1,1 @@
+Checks whether the loaded key file data contains the given substring. Use this to detect feature flags, product tiers, or other custom data embedded in the key file by your licence server. Requires a key file to be loaded first via `loadKeyFile()`.

@@ -1,0 +1,189 @@
+{
+  "className": "Console",
+  "category": "namespace",
+  "description": "A set of handy function to debug the script.",
+  "methods": {
+    "assertEqual": {
+      "signature": "void assertEqual(var v1, var v2)",
+      "returnType": "void",
+      "description": "Throws an error message if the values are not equal.",
+      "parameters": [
+        {
+          "name": "v1",
+          "type": "var"
+        },
+        {
+          "name": "v2",
+          "type": "var"
+        }
+      ]
+    },
+    "assertIsDefined": {
+      "signature": "void assertIsDefined(var value)",
+      "returnType": "void",
+      "description": "Throws an error message if the value is undefined.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "assertIsObjectOrArray": {
+      "signature": "void assertIsObjectOrArray(var value)",
+      "returnType": "void",
+      "description": "Throws an error message if the value is not an object or array.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "assertLegalNumber": {
+      "signature": "void assertLegalNumber(var value)",
+      "returnType": "void",
+      "description": "Throws an error message if the value is not a legal number (eg. string or array or infinity or NaN).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "assertNoString": {
+      "signature": "void assertNoString(var value)",
+      "returnType": "void",
+      "description": "Throws an error message if the value is a string.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "assertTrue": {
+      "signature": "void assertTrue(var condition)",
+      "returnType": "void",
+      "description": "Throws an error message if the condition is not true.",
+      "parameters": [
+        {
+          "name": "condition",
+          "type": "var"
+        }
+      ]
+    },
+    "assertWithMessage": {
+      "signature": "void assertWithMessage(bool condition, String errorMessage)",
+      "returnType": "void",
+      "description": "Throws the given error message if the condition isn't met.",
+      "parameters": [
+        {
+          "name": "condition",
+          "type": "bool"
+        },
+        {
+          "name": "errorMessage",
+          "type": "String"
+        }
+      ]
+    },
+    "blink": {
+      "signature": "void blink()",
+      "returnType": "void",
+      "description": "Sends a blink message to the current editor.",
+      "parameters": []
+    },
+    "breakInDebugger": {
+      "signature": "void breakInDebugger()",
+      "returnType": "void",
+      "description": "Throws an assertion in the attached debugger.",
+      "parameters": []
+    },
+    "clear": {
+      "signature": "void clear()",
+      "returnType": "void",
+      "description": "Clears the console.",
+      "parameters": []
+    },
+    "print": {
+      "signature": "void print(var debug)",
+      "returnType": "void",
+      "description": "Prints a message to the console.",
+      "parameters": [
+        {
+          "name": "debug",
+          "type": "var"
+        }
+      ]
+    },
+    "sample": {
+      "signature": "void sample(String label, var dataToSample)",
+      "returnType": "void",
+      "description": "Stores the current state of the given data into the current sampling session.",
+      "parameters": [
+        {
+          "name": "label",
+          "type": "String"
+        },
+        {
+          "name": "dataToSample",
+          "type": "var"
+        }
+      ]
+    },
+    "startBenchmark": {
+      "signature": "void startBenchmark()",
+      "returnType": "void",
+      "description": "Starts the benchmark. You can give it a name that will be displayed with the result if desired.",
+      "parameters": []
+    },
+    "startSampling": {
+      "signature": "void startSampling(String sessionId)",
+      "returnType": "void",
+      "description": "Starts a sampling session with the given ID.",
+      "parameters": [
+        {
+          "name": "sessionId",
+          "type": "String"
+        }
+      ]
+    },
+    "stop": {
+      "signature": "void stop(bool condition)",
+      "returnType": "void",
+      "description": "Causes the execution to stop().",
+      "parameters": [
+        {
+          "name": "condition",
+          "type": "bool"
+        }
+      ]
+    },
+    "stopBenchmark": {
+      "signature": "void stopBenchmark()",
+      "returnType": "void",
+      "description": "Stops the benchmark and prints the result.",
+      "parameters": []
+    },
+    "testCallback": {
+      "signature": "void testCallback(var obj, String callbackId, var argList)",
+      "returnType": "void",
+      "description": "Synchronously tests a callback of a given object for automated testing cycles.",
+      "parameters": [
+        {
+          "name": "obj",
+          "type": "var"
+        },
+        {
+          "name": "callbackId",
+          "type": "String"
+        },
+        {
+          "name": "argList",
+          "type": "var"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "factoryPath": "core.pitch_mod",
+  "factory": "core",
+  "nodeId": "pitch_mod",
+  "description": "Picks up the pitch modulation signal from the parent sound generator",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": true,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Output Configuration",
+      "rationale": "ProcessSignal controls whether the pitch modulation value is written to the audio output",
+      "parameters": [
+        {
+          "id": "ProcessSignal",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "63.nT6K8ChMwF..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.RT.QoMWXhwVYjoPQtElXrUFY.D1XzklckAP.AH..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "displayBuffers": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": true,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/pitch_mod.md",
+    "tier": "GOOD",
+    "lines": 21
+  },
+
+  "availableImages": ["pitch_mod.png"],
+
+  "gaps": [
+    {
+      "id": "pitch-factor-range",
+      "category": "signal_path",
+      "question": "The runtime-target.md says pitch_mod outputs pitch factor values (unnormalised, TargetMode::Pitch). What is the typical range? Is 1.0 = no pitch change, 0.5 = octave down, 2.0 = octave up?",
+      "context": "Users need to understand the output range to use the modulation value correctly."
+    },
+    {
+      "id": "mid-position-zero",
+      "category": "signal_path",
+      "question": "The pitch_config uses useMidPositionAsZero=true. How does this affect the modulation value? Does it center around 0.5 for display purposes only, or does it affect the actual modulation math?",
+      "context": "The mid-position flag has specific implications per the infrastructure docs."
+    },
+    {
+      "id": "display-transform",
+      "category": "signal_path",
+      "question": "The runtime-target.md mentions pitchFactorToNormalisedRange is installed as a display transform. What does this transform do for the ModPlotter display?",
+      "context": "The display shows transformed values while the actual output is raw pitch factors."
+    },
+    {
+      "id": "fixed-connection",
+      "category": "signal_path",
+      "question": "pitch_mod uses fix_hash<90001> (PitchModulation constant). Does this automatically connect to the parent sound generator's pitch modulation chain without any configuration? What happens if the parent has no pitch modulation?",
+      "context": "Users need to know if pitch_mod 'just works' or requires specific parent configuration."
+    }
+  ],
+
+  "notes": "pitch_mod is the simplest of the modulation bridge nodes -- only one parameter (ProcessSignal). It automatically connects to the parent sound generator's pitch modulation chain via fix_hash<90001>. The output is unnormalised (UseUnnormalisedModulation), meaning it sends raw pitch factor values rather than 0-1 normalised values. The display uses a special transform (pitchFactorToNormalisedRange) to show sensible visual values. Unlike global_mod and extra_mod, pitch_mod does NOT go through indexable_mod_base and does not have NeedsModConfig. The existing phase3 doc is GOOD tier (21 lines)."
+}

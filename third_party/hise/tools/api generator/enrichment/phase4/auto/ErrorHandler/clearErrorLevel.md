@@ -1,0 +1,3 @@
+Clears a single error state. If other errors remain active, the error callback fires immediately with the next highest-priority error, enabling cascading error resolution in your UI.
+
+> [!Warning:No callback when last error clears] When the cleared state was the only active error, the callback does not fire. Check `getNumActiveErrors() == 0` after calling this method to detect the all-clear transition and dismiss your error UI.

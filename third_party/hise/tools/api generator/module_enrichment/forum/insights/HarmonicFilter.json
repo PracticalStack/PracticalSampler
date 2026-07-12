@@ -1,0 +1,56 @@
+{
+  "targetId": "HarmonicFilter",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [13836, 671, 1150, 1213, 1494],
+  "insights": [
+    {
+      "type": "BUG",
+      "title": "Monophonic Harmonic Filter with >1 bands produces silence",
+      "summary": "Using the monophonic version of the Harmonic Filter with band count set to more than 1 results in complete silence. The polyphonic version does not exhibit this issue. Reported as still unresolved.",
+      "sources": ["tid:1213", "tid:1150"],
+      "verify": true,
+      "verify_hint": "grep MasterEffectProcessor or monophonic path in HarmonicFilter.cpp; check processSamples for non-VoiceEffect path"
+    },
+    {
+      "type": "BUG",
+      "title": "Monophonic Harmonic Filter can kill system audio on Linux/JACK",
+      "summary": "Adding the monophonic Harmonic Filter to a project can silence all audio system-wide on Linux with JACK — not just HISE output, but other apps too. The problem only occurs with the monophonic version and only when band count > 1.",
+      "sources": ["tid:1150"],
+      "verify": true,
+      "verify_hint": "grep JACK or audio device initialisation in HISE core; check if monophonic HarmonicFilter has an uninitialized buffer or divide-by-zero on Linux"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "FilterDisplay FloatingTile cannot display the Harmonic Filter",
+      "summary": "The FilterDisplay content type does not support the Harmonic Filter. The SliderPack components (A, B, Mix) must be promoted to the interface and placed manually on the panel to build a UI for this module.",
+      "sources": ["tid:671"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Cannot apply Harmonic Filter per-voice on a Sampler",
+      "summary": "The Harmonic Filter operates on a single synthesiser voice. There is no way to insert it so that it filters individual sampler voices differently — it can only be placed in the FX chain where it processes the mixed output or a single voice at a time.",
+      "sources": ["tid:1494"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "SliderPack components can be promoted to the interface",
+      "summary": "The three internal SliderPack components (A, B, Mix) can be promoted to the plugin interface via the normal HISE interface builder workflow. This allows custom colouring and layout. Prior to a 2018 fix, parameter IDs were missing and promotion was not supported.",
+      "sources": ["tid:671"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Polyphonic version is significantly more CPU-intensive than monophonic",
+      "summary": "The polyphonic Harmonic Filter scales linearly with voice count — every active voice runs the full filter bank independently. The author has confirmed it is 'quite a CPU hog, especially in the polyphonic version'. With 16 bands and high polyphony, CPU cost can be prohibitive.",
+      "sources": ["tid:671"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

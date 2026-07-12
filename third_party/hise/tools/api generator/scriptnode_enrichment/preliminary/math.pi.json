@@ -1,0 +1,70 @@
+{
+  "factoryPath": "math.pi",
+  "factory": "math",
+  "nodeId": "pi",
+  "description": "Multiplies the signal with PI (3.13)",
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+  "parameterGroups": [
+    {
+      "label": "Operation",
+      "rationale": "Single Value parameter controlling the math operation: s *= PI * value",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": {
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.0,
+            "skew": 1.0
+          },
+          "default": 2.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+  "properties": [],
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/math/pi.md",
+    "tier": "BRIEF",
+    "lines": 15
+  },
+  "availableImages": [],
+  "gaps": [
+    {
+      "id": "pi-description-typo",
+      "category": "description_accuracy",
+      "question": "The base description says 'PI (3.13)' but the actual value of PI is 3.14159... Is this a typo in the SN_DESCRIPTION macro?",
+      "context": "The reference page should show the correct value of PI."
+    }
+  ],
+  "notes": "Default value 2.0 means s *= 2*PI (one full cycle). Typically used before math.sin to convert a normalised ramp into a sine wave. Description contains typo: says '3.13' but PI is 3.14159..."
+}

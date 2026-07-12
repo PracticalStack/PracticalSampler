@@ -1,0 +1,288 @@
+{
+  "className": "UserPresetHandler",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "attachAutomationCallback": {
+      "signature": "void attachAutomationCallback(String automationId, var updateCallback, var isSynchronous)",
+      "returnType": "void",
+      "description": "Attaches a callback to automation changes. Pass a non-function as updateCallback to remove the callback for the given automation ID.",
+      "parameters": [
+        {
+          "name": "automationId",
+          "type": "String"
+        },
+        {
+          "name": "updateCallback",
+          "type": "var"
+        },
+        {
+          "name": "isSynchronous",
+          "type": "var"
+        }
+      ]
+    },
+    "clearAttachedCallbacks": {
+      "signature": "void clearAttachedCallbacks()",
+      "returnType": "void",
+      "description": "Clears all attached callbacks.",
+      "parameters": []
+    },
+    "createObjectForAutomationValues": {
+      "signature": "var createObjectForAutomationValues()",
+      "returnType": "var",
+      "description": "Creates an object containing the values for every automation ID.",
+      "parameters": []
+    },
+    "createObjectForSaveInPresetComponents": {
+      "signature": "var createObjectForSaveInPresetComponents()",
+      "returnType": "var",
+      "description": "Creates an object containing all values of components with the `saveInPreset` flag.",
+      "parameters": []
+    },
+    "getAutomationIndex": {
+      "signature": "int getAutomationIndex(String automationID)",
+      "returnType": "int",
+      "description": "Returns the automation index.",
+      "parameters": [
+        {
+          "name": "automationID",
+          "type": "String"
+        }
+      ]
+    },
+    "getSecondsSinceLastPresetLoad": {
+      "signature": "double getSecondsSinceLastPresetLoad()",
+      "returnType": "double",
+      "description": "Returns the amount of seconds since the last preset has been loaded.",
+      "parameters": []
+    },
+    "isCurrentlyLoadingPreset": {
+      "signature": "bool isCurrentlyLoadingPreset()",
+      "returnType": "bool",
+      "description": "Returns true if this is called somewhere inside a preset load. This takes the thread ID into account to avoid false positives when calling this on another thread.",
+      "parameters": []
+    },
+    "isInternalPresetLoad": {
+      "signature": "bool isInternalPresetLoad()",
+      "returnType": "bool",
+      "description": "Returns true if the user preset that is about to be loaded is a DAW state (or initial state). This function is only useful during the pre / post load callbacks.",
+      "parameters": []
+    },
+    "isOldVersion": {
+      "signature": "bool isOldVersion(String version)",
+      "returnType": "bool",
+      "description": "Checks if the given version string is a older version than the current project version number.",
+      "parameters": [
+        {
+          "name": "version",
+          "type": "String"
+        }
+      ]
+    },
+    "resetToDefaultUserPreset": {
+      "signature": "void resetToDefaultUserPreset()",
+      "returnType": "void",
+      "description": "Loads the default user preset (if it's defined in the project).",
+      "parameters": []
+    },
+    "runTest": {
+      "signature": "void runTest()",
+      "returnType": "void",
+      "description": "Runs a few tests that catches data persistency issues.",
+      "parameters": []
+    },
+    "sendParameterGesture": {
+      "signature": "bool sendParameterGesture(int automationType, int indexWithinType, bool gestureActive)",
+      "returnType": "bool",
+      "description": "Sends a parameter gesture change message to the host. Returns true if the parameter exists.",
+      "parameters": [
+        {
+          "name": "automationType",
+          "type": "int"
+        },
+        {
+          "name": "indexWithinType",
+          "type": "int"
+        },
+        {
+          "name": "gestureActive",
+          "type": "bool"
+        }
+      ]
+    },
+    "setAutomationValue": {
+      "signature": "bool setAutomationValue(int automationIndex, float newValue)",
+      "returnType": "bool",
+      "description": "Sends an automation value change for the given index.",
+      "parameters": [
+        {
+          "name": "automationIndex",
+          "type": "int"
+        },
+        {
+          "name": "newValue",
+          "type": "float"
+        }
+      ]
+    },
+    "setCustomAutomation": {
+      "signature": "void setCustomAutomation(var automationData)",
+      "returnType": "void",
+      "description": "Enables host / MIDI automation with the custom user preset model.",
+      "parameters": [
+        {
+          "name": "automationData",
+          "type": "var"
+        }
+      ]
+    },
+    "setEnableUserPresetPreprocessing": {
+      "signature": "void setEnableUserPresetPreprocessing(bool processBeforeLoading, bool shouldUnpackComplexData)",
+      "returnType": "void",
+      "description": "Enables a preprocessing of every user preset that is being loaded.",
+      "parameters": [
+        {
+          "name": "processBeforeLoading",
+          "type": "bool"
+        },
+        {
+          "name": "shouldUnpackComplexData",
+          "type": "bool"
+        }
+      ]
+    },
+    "setParameterGestureCallback": {
+      "signature": "void setParameterGestureCallback(var callbackFunction)",
+      "returnType": "void",
+      "description": "Attaches a callback to the begin and end of parameter gestures.",
+      "parameters": [
+        {
+          "name": "callbackFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "setPluginParameterGroupNames": {
+      "signature": "void setPluginParameterGroupNames(var pluginParameterGroupNames)",
+      "returnType": "void",
+      "description": "Sets the available group names for plugin parameter groups.",
+      "parameters": [
+        {
+          "name": "pluginParameterGroupNames",
+          "type": "var"
+        }
+      ]
+    },
+    "setPluginParameterSortFunction": {
+      "signature": "void setPluginParameterSortFunction(var customSortFunction)",
+      "returnType": "void",
+      "description": "Sets a custom sort function for the plugin parameter order.",
+      "parameters": [
+        {
+          "name": "customSortFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "setPostCallback": {
+      "signature": "void setPostCallback(var presetPostCallback)",
+      "returnType": "void",
+      "description": "Sets a callback that will be executed after the preset has been loaded.",
+      "parameters": [
+        {
+          "name": "presetPostCallback",
+          "type": "var"
+        }
+      ]
+    },
+    "setPostSaveCallback": {
+      "signature": "void setPostSaveCallback(var presetPostSaveCallback)",
+      "returnType": "void",
+      "description": "Sets a callback that will be executed after a preset has been saved.",
+      "parameters": [
+        {
+          "name": "presetPostSaveCallback",
+          "type": "var"
+        }
+      ]
+    },
+    "setPreCallback": {
+      "signature": "void setPreCallback(var presetPreCallback)",
+      "returnType": "void",
+      "description": "Sets a callback that will be executed synchronously before the preset was loaded",
+      "parameters": [
+        {
+          "name": "presetPreCallback",
+          "type": "var"
+        }
+      ]
+    },
+    "setUseCustomUserPresetModel": {
+      "signature": "void setUseCustomUserPresetModel(var loadCallback, var saveCallback, bool usePersistentObject)",
+      "returnType": "void",
+      "description": "Disables the default user preset data model and allows a manual data handling.",
+      "parameters": [
+        {
+          "name": "loadCallback",
+          "type": "var"
+        },
+        {
+          "name": "saveCallback",
+          "type": "var"
+        },
+        {
+          "name": "usePersistentObject",
+          "type": "bool"
+        }
+      ]
+    },
+    "setUseUndoForPresetLoading": {
+      "signature": "void setUseUndoForPresetLoading(bool shouldUseUndoManager)",
+      "returnType": "void",
+      "description": "Enables Engine.undo() to restore the previous user preset (default is disabled).",
+      "parameters": [
+        {
+          "name": "shouldUseUndoManager",
+          "type": "bool"
+        }
+      ]
+    },
+    "updateAutomationValues": {
+      "signature": "void updateAutomationValues(var data, var sendMessage, bool useUndoManager)",
+      "returnType": "void",
+      "description": "Updates the given automation values and optionally sends out a message.",
+      "parameters": [
+        {
+          "name": "data",
+          "type": "var"
+        },
+        {
+          "name": "sendMessage",
+          "type": "var"
+        },
+        {
+          "name": "useUndoManager",
+          "type": "bool"
+        }
+      ]
+    },
+    "updateConnectedComponentsFromModuleState": {
+      "signature": "void updateConnectedComponentsFromModuleState()",
+      "returnType": "void",
+      "description": "Restores the values for all UI elements that are connected to a processor with the `processorID` / `parameterId` properties.",
+      "parameters": []
+    },
+    "updateSaveInPresetComponents": {
+      "signature": "void updateSaveInPresetComponents(var obj)",
+      "returnType": "void",
+      "description": "Restores all values of components with the `saveInPreset` flag.",
+      "parameters": [
+        {
+          "name": "obj",
+          "type": "var"
+        }
+      ]
+    }
+  }
+}

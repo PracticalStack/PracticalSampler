@@ -1,0 +1,1 @@
+Returns the downsampling factor used for the modulation signal (control rate). This is a compile-time constant (default 8), meaning the modulation system processes at `sampleRate / factor` Hz. At 44100 Hz with factor 8, the control rate is 5512.5 Hz.

@@ -1,0 +1,1 @@
+Creates a neural network object wrapping RTNeural for lightweight inference of pre-trained models. After creation, load a trained model before processing audio. Typically used for amp modelling, effects emulation, or other ML-based audio processing within scriptnode.

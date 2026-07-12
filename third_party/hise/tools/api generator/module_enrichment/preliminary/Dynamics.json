@@ -1,0 +1,260 @@
+{
+  "moduleId": "Dynamics",
+  "prettyName": "Dynamics",
+  "type": "Effect",
+  "subtype": "MasterEffect",
+  "category": "dynamics, mixing",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "stereo",
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "RoutingMatrix",
+      "signalFlowRole": "skip - inferred from type/subtype"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Gate",
+      "rationale": "Noise gate stage - attenuates signal below a threshold. Enable toggle gates the entire stage.",
+      "parameters": [
+        {
+          "id": "GateEnabled",
+          "name": "GateEnabled",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Enables the noise gate to attenuate signals below the threshold",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "GateThreshold",
+          "name": "GateThreshold",
+          "range": { "min": -100.0, "max": 0.0, "step": 0.01 },
+          "default": 0.0,
+          "description": "The level threshold in dB below which the gate attenuates the signal",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "GateAttack",
+          "name": "GateAttack",
+          "range": { "min": 0.0, "max": 100.0, "step": 0.01 },
+          "default": 1.0,
+          "description": "Attack time in milliseconds for the gate to open when the signal exceeds the threshold",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "GateRelease",
+          "name": "GateRelease",
+          "range": { "min": 0.0, "max": 300.0, "step": 0.01 },
+          "default": 100.0,
+          "description": "Release time in milliseconds for the gate to close when the signal falls below the threshold",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "GateReduction",
+          "name": "GateReduction",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "A read-only slot for reading out the gate gain reduction",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Compressor",
+      "rationale": "Compressor stage - reduces dynamic range above a threshold. Enable toggle gates the entire stage.",
+      "parameters": [
+        {
+          "id": "CompressorEnabled",
+          "name": "CompressorEnabled",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Enables the compressor to reduce dynamic range of signals above the threshold",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "CompressorThreshold",
+          "name": "CompressorThreshold",
+          "range": { "min": -100.0, "max": 0.0, "step": 0.1 },
+          "default": 0.0,
+          "description": "The level threshold in dB above which compression begins",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "CompressorRatio",
+          "name": "CompressorRatio",
+          "range": { "min": 1.0, "max": 32.0, "step": 0.1 },
+          "default": 1.0,
+          "description": "Compression ratio where higher values apply more aggressive gain reduction",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "CompressorAttack",
+          "name": "CompressorAttack",
+          "range": { "min": 0.0, "max": 100.0, "step": 0.01 },
+          "default": 10.0,
+          "description": "Attack time in milliseconds for the compressor to respond to signals above the threshold",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "CompressorRelease",
+          "name": "CompressorRelease",
+          "range": { "min": 0.0, "max": 300.0, "step": 0.01 },
+          "default": 100.0,
+          "description": "Release time in milliseconds for the compressor to return to normal gain after compression",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "CompressorReduction",
+          "name": "CompressorReduction",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "A read-only slot for reading out the compressor gain reduction",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "CompressorMakeup",
+          "name": "CompressorMakeup",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Automatically applies makeup gain to compensate for compression gain reduction",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Limiter",
+      "rationale": "Limiter stage - prevents signal from exceeding a ceiling. Enable toggle gates the entire stage.",
+      "parameters": [
+        {
+          "id": "LimiterEnabled",
+          "name": "LimiterEnabled",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Enables the limiter to prevent signals from exceeding the threshold",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "LimiterThreshold",
+          "name": "LimiterThreshold",
+          "range": { "min": -100.0, "max": 0.0, "step": 0.1 },
+          "default": 0.0,
+          "description": "The ceiling level in dB that the limiter prevents the signal from exceeding",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "LimiterAttack",
+          "name": "LimiterAttack",
+          "range": { "min": 0.0, "max": 100.0, "step": 0.01 },
+          "default": 1.0,
+          "description": "Attack time in milliseconds for the limiter to respond to signals above the threshold",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "LimiterRelease",
+          "name": "LimiterRelease",
+          "range": { "min": 0.0, "max": 300.0, "step": 0.01 },
+          "default": 10.0,
+          "description": "Release time in milliseconds for the limiter to return to normal gain after limiting",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "LimiterReduction",
+          "name": "LimiterReduction",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "A read-only slot for reading out the limiter gain reduction",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "LimiterMakeup",
+          "name": "LimiterMakeup",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Automatically applies makeup gain to compensate for limiter gain reduction",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+
+  "standaloneModChains": [],
+
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-order",
+      "category": "signal_path",
+      "question": "What is the processing order of the three stages (gate, compressor, limiter) in applyEffect()? Are they always in this fixed order, or can they be reordered?",
+      "context": "Need to confirm the serial chain order for the pseudo-code and to document stage interaction."
+    },
+    {
+      "id": "stage-independence",
+      "category": "conditional_logic",
+      "question": "When a stage is disabled, is it fully bypassed (zero CPU) or does it still process silently? Do the three stages operate independently on the same buffer in series?",
+      "context": "Users need to know whether disabled stages consume CPU and whether stages interact."
+    },
+    {
+      "id": "makeup-gain-calculation",
+      "category": "parameter_behavior",
+      "question": "How are the compressor and limiter makeup gain values calculated? Is it based on threshold and ratio, or on measured gain reduction?",
+      "context": "Users enabling makeup gain need to understand what compensation is applied."
+    },
+    {
+      "id": "reduction-metering",
+      "category": "parameter_behavior",
+      "question": "How are GateReduction, CompressorReduction, and LimiterReduction updated? Per-sample peak tracking with decay? What is the decay rate?",
+      "context": "These read-only parameters are used for metering display - need to document their behaviour."
+    },
+    {
+      "id": "limiter-pending-logic",
+      "category": "conditional_logic",
+      "question": "What is the limiterPending flag for? Is there a crossfade when the limiter is enabled/disabled?",
+      "context": "The limiter enable toggle may have special transition behaviour to avoid clicks."
+    },
+    {
+      "id": "per-sample-processing",
+      "category": "performance",
+      "question": "Are all three stages per-sample processors? What is the approximate CPU cost of each stage?",
+      "context": "Need to assess CPU profile and document whether this is a lightweight or heavyweight effect."
+    },
+    {
+      "id": "compressor-ratio-inversion",
+      "category": "parameter_behavior",
+      "question": "The CompressorRatio range is 1-32 but the code passes 1/ratio to the compressor. Is the user-facing value the standard ratio (e.g. 4:1) or the inverse?",
+      "context": "Need to confirm the parameter table describes the ratio correctly from the user perspective."
+    }
+  ],
+
+  "notes": "Dynamics has no modulation chains at all - purely parameter-driven. The three stages (gate, compressor, limiter) each have enable toggles suggesting conditional processing paths. The Reduction parameters are read-only metering outputs. CompressorMakeup and LimiterMakeup are auto-calculated compensation toggles, not gain sliders. All stages default to disabled (0.0), and all thresholds default to 0 dB."
+}

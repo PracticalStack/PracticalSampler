@@ -1,0 +1,147 @@
+{
+  "factoryPath": "dynamics.comp",
+  "factory": "dynamics",
+  "nodeId": "comp",
+  "description": "A compressor with the ducking amount as modulation signal",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Dynamics detection",
+      "rationale": "Threshhold sets the level above which compression begins. Attack and Release control how quickly the compressor responds to level changes.",
+      "parameters": [
+        {
+          "id": "Threshhold",
+          "range": { "min": -100.0, "max": 0.0, "step": 0.0, "skew": 5.42 },
+          "default": 0.0,
+          "textConverter": "Decibel",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Attack",
+          "range": { "min": 0.0, "max": 250.0, "step": 0.0, "skew": 1.0 },
+          "default": 50.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Release",
+          "range": { "min": 0.0, "max": 250.0, "step": 0.0, "skew": 1.0 },
+          "default": 50.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Compression amount",
+      "rationale": "Ratio determines how much the signal above the threshold is reduced.",
+      "parameters": [
+        {
+          "id": "Ratio",
+          "range": { "min": 1.0, "max": 32.0, "step": 0.0, "skew": 0.30 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Sidechain routing",
+      "rationale": "Sidechain selects the detection source. The encoded converter indicates 3 discrete options.",
+      "parameters": [
+        {
+          "id": "Sidechain",
+          "range": { "min": 0.0, "max": 2.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "encoded_converter_3_options",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "displayBuffers": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/dynamics/comp.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "processing-order",
+      "category": "signal_path",
+      "question": "How does process() work? Does it use per-sample envelope detection or per-block RMS? What is the gain reduction formula (hard knee, soft knee)?",
+      "context": "Needed to describe the compression algorithm and signal flow in the reference page."
+    },
+    {
+      "id": "ducking-modulation-output",
+      "category": "description_accuracy",
+      "question": "The description says 'ducking amount as modulation signal' but ModulationTargets is empty in the base data. Does this node actually produce a modulation output (via wrap::mod or similar)? If so, what value does it output -- the gain reduction in dB, a normalised 0-1 value, or the raw envelope level?",
+      "context": "Critical discrepancy: description implies modulation output but base data shows none. Need to verify whether the modulation capability exists and how it is exposed."
+    },
+    {
+      "id": "sidechain-modes",
+      "category": "parameter_behaviour",
+      "question": "The Sidechain parameter has 3 options (encoded converter, range 0-2). What are the 3 sidechain modes? Likely candidates: internal (self), external (sidechain input), or mid/side detection. What does each option route as the detection signal?",
+      "context": "Users need to know how to configure sidechain detection. The encoded converter labels are not decoded."
+    },
+    {
+      "id": "display-buffer-content",
+      "category": "signal_path",
+      "question": "The node has 1 DisplayBuffer. What does it display -- the gain reduction curve, the input envelope, or the transfer function?",
+      "context": "Determines what visual feedback users see in the scriptnode UI."
+    },
+    {
+      "id": "shared-base-with-gate-limiter",
+      "category": "signal_path",
+      "question": "dynamics.comp, dynamics.gate, and dynamics.limiter share identical parameter sets. Do they share a base class or template? What differentiates the compression algorithm (comp vs gate vs limiter) in the C++ implementation?",
+      "context": "Understanding the relationship enables accurate cross-referencing between the three node reference pages."
+    },
+    {
+      "id": "attack-release-smoothing",
+      "category": "parameter_behaviour",
+      "question": "How are Attack and Release times implemented? Are they exponential ballistics (like analog compressors) or linear ramps? Is there parameter smoothing on the time controls themselves?",
+      "context": "Important for describing the dynamic response character of the compressor."
+    }
+  ],
+
+  "notes": "dynamics.comp shares identical parameters with dynamics.gate and dynamics.limiter -- these three likely share a base class with only the gain computation differing. The description mentions 'ducking amount as modulation signal' but ModulationTargets is empty in the base data, which is a significant discrepancy that needs C++ verification. The 'Threshhold' spelling (double h) appears to be intentional in the HISE codebase. Ratio default of 1 means no compression by default (1:1 ratio). The skew of 5.42 on Threshhold concentrates the UI control range near 0 dB."
+}

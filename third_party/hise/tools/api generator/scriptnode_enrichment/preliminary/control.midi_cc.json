@@ -1,0 +1,114 @@
+{
+  "factoryPath": "control.midi_cc",
+  "factory": "control",
+  "nodeId": "midi_cc",
+  "description": "sends a MIDI cc value",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "CC Configuration",
+      "rationale": "Selects which CC number to listen for and MPE behaviour.",
+      "parameters": [
+        {
+          "id": "CCNumber",
+          "range": { "min": 0.0, "max": 131.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "278.nT6K8C1bBTFB.H+yv.BPqw8FixZjgrMURhqMYtCLwgX8Rg1TRYx8jL7DbXlsEbjffb7Mz7Vrb7PKuyiP5Wn4dIRLKhZO2+TPfDimOAlEulCRqLyLyLQDQDQDwdoXEMQE2c2c2cu6t6t6t6khWcsVqdo3mlkGTThjpTJEyLyLyLu6t6t6tppppppZuT7pIpj8RwqlOsFHn2wvCDjTPu+FQNMEIEuJBFK4zbumFCAya4cCjb9mwAFsBRJHXr..vfjCnF+qIA4v8O22vSi8QNKJBjGpAQ95Hnne..aEDPADXbc.T0ik7nVfcxQlIXwkXJ0Lg7qnN8yXfHUHnyk3h30dSMyneVB9HUD8JIofpK.IHcHfgIFfDe.",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "EnableMPE",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvStovSlYF.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Default",
+      "rationale": "Fallback value sent when no CC has been received.",
+      "parameters": [
+        {
+          "id": "DefaultValue",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/midi_cc.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "cc-listening-mechanism",
+      "category": "signal_path",
+      "question": "How does midi_cc receive MIDI events? It does not have IsProcessingHiseEvent. Does it use a different mechanism (e.g., polling from the event buffer, or a callback registered elsewhere)?",
+      "context": "Without IsProcessingHiseEvent, the event reception mechanism is non-obvious and critical to document."
+    },
+    {
+      "id": "cc-range-mapping",
+      "category": "parameter_behaviour",
+      "question": "CCNumber goes to 131 (beyond MIDI's 0-127). Values 128-131 likely map to special controllers (pitchwheel=128, aftertouch=129, etc). What are the exact mappings?",
+      "context": "Users need to know what CC numbers map to which MIDI messages, especially for values above 127."
+    },
+    {
+      "id": "mpe-behaviour",
+      "category": "conditional_logic",
+      "question": "What does EnableMPE=true change? Does it filter by MPE zone channels, or does it make the CC per-voice?",
+      "context": "MPE handling is important for users building MPE-compatible instruments."
+    },
+    {
+      "id": "default-value-trigger",
+      "category": "parameter_behaviour",
+      "question": "When is DefaultValue sent? On initialisation only, or also on voice start? Can it be modulated?",
+      "context": "Users need to know the initial state behaviour."
+    }
+  ],
+
+  "notes": "CCNumber max of 131 suggests virtual CC numbers for pitch wheel (128), aftertouch (129), and possibly program change (130) and channel pressure (131). The encoded TextToValueConverter for CCNumber likely contains CC name labels. No IsPolyphonic flag. No IsProcessingHiseEvent -- unusual for a MIDI-reactive node."
+}

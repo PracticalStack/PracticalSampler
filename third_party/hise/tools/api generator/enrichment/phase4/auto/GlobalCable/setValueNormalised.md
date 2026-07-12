@@ -1,0 +1,1 @@
+Sends a normalised value (0..1) directly to all cable targets, bypassing the local input range. The value is clamped to 0..1 internally.

@@ -1,0 +1,44 @@
+{
+  "moduleId": "SimpleGain",
+  "nodes": [
+    { "id": "audio_in", "type": "input", "label": "Audio In (L/R)", "importance": 1.0 },
+    { "id": "polarity_param", "type": "parameter", "label": "InvertPolarity", "importance": 0.5, "group": "polarity" },
+    { "id": "polarity", "type": "decision", "label": "Invert?", "importance": 0.5, "description": "Multiplies entire buffer by -1 if enabled", "group": "polarity" },
+    { "id": "delay_param", "type": "parameter", "label": "Delay", "importance": 0.7, "group": "delay" },
+    { "id": "delay_mod", "type": "modulation", "label": "Delay Modulation", "importance": 0.5, "description": "Scales delay time per-block", "group": "delay" },
+    { "id": "delay_line", "type": "process", "label": "Delay Line", "importance": 0.7, "description": "Static delay with crossfade on time change (skipped if 0ms)", "group": "delay" },
+    { "id": "gain_param", "type": "parameter", "label": "Gain", "importance": 0.9, "group": "gain" },
+    { "id": "gain_mod", "type": "modulation", "label": "Gain Modulation", "importance": 0.7, "description": "Scales gain per-block", "group": "gain" },
+    { "id": "gain", "type": "process", "label": "Smoothed Gain", "importance": 1.0, "description": "dB-to-linear gain with 50ms smoothing ramp", "group": "gain" },
+    { "id": "width_param", "type": "parameter", "label": "Width", "importance": 0.7, "group": "stereo" },
+    { "id": "width_mod", "type": "modulation", "label": "Width Modulation", "importance": 0.5, "description": "Interpolates between 1.0 and width value", "group": "stereo" },
+    { "id": "ms_decoder", "type": "process", "label": "Mid/Side Width", "importance": 0.7, "description": "M/S encode -> scale sides -> decode (skipped if width=100%)", "group": "stereo" },
+    { "id": "balance_param", "type": "parameter", "label": "Balance", "importance": 0.7, "group": "stereo" },
+    { "id": "balance_mod", "type": "modulation", "label": "Pan Modulation", "importance": 0.5, "description": "Scales balance value per-block", "group": "stereo" },
+    { "id": "balance", "type": "process", "label": "Balance (Pan)", "importance": 0.7, "description": "L/R gain factors from BalanceCalculator with 1000ms smoothing", "group": "stereo" },
+    { "id": "audio_out", "type": "output", "label": "Audio Out (L/R)", "importance": 1.0 }
+  ],
+  "edges": [
+    { "from": "audio_in", "to": "polarity", "type": "signal" },
+    { "from": "polarity_param", "to": "polarity", "type": "control" },
+    { "from": "polarity", "to": "delay_line", "type": "signal" },
+    { "from": "delay_param", "to": "delay_line", "type": "control" },
+    { "from": "delay_mod", "to": "delay_line", "type": "control" },
+    { "from": "delay_line", "to": "gain", "type": "signal" },
+    { "from": "gain_param", "to": "gain", "type": "control" },
+    { "from": "gain_mod", "to": "gain", "type": "control" },
+    { "from": "gain", "to": "ms_decoder", "type": "signal" },
+    { "from": "width_param", "to": "ms_decoder", "type": "control" },
+    { "from": "width_mod", "to": "ms_decoder", "type": "control" },
+    { "from": "ms_decoder", "to": "balance", "type": "signal" },
+    { "from": "balance_param", "to": "balance", "type": "control" },
+    { "from": "balance_mod", "to": "balance", "type": "control" },
+    { "from": "balance", "to": "audio_out", "type": "signal" }
+  ],
+  "groups": [
+    { "id": "polarity", "label": "Polarity" },
+    { "id": "delay", "label": "Delay" },
+    { "id": "gain", "label": "Gain" },
+    { "id": "stereo", "label": "Stereo Image" }
+  ]
+}

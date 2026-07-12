@@ -1,0 +1,87 @@
+{
+  "factoryPath": "analyse.oscilloscope",
+  "factory": "analyse",
+  "nodeId": "oscilloscope",
+  "description": "an oscilloscope with optional MIDI input sync",
+
+  "classification": {
+    "signalPathRole": "analysis",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "displayBuffers": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/analyse/oscilloscope.md",
+    "tier": "BRIEF",
+    "lines": 11
+  },
+
+  "availableImages": ["oscilloscope.png"],
+
+  "gaps": [
+    {
+      "id": "signal-path-passthrough",
+      "category": "signal_path",
+      "question": "Does the oscilloscope pass audio through unmodified or does it consume/modify the signal?",
+      "context": "Users need to know if inserting this node affects their audio chain."
+    },
+    {
+      "id": "midi-sync-mechanism",
+      "category": "signal_path",
+      "question": "The description mentions 'optional MIDI input sync'. How does this work? Does it detect the pitch from MIDI note-on events and resize the buffer to show one cycle? Is the cppProperties missing IsProcessingHiseEvent or is the MIDI handled differently?",
+      "context": "The existing doc mentions dynamic buffer resizing in MIDI context. Need to understand the mechanism."
+    },
+    {
+      "id": "channel-handling",
+      "category": "signal_path",
+      "question": "How does the oscilloscope handle stereo input -- does it display left channel only, both channels, or sum to mono?",
+      "context": "Users working with stereo signals need to know what they will see."
+    },
+    {
+      "id": "buffer-size",
+      "category": "signal_path",
+      "question": "What is the default buffer size for the oscilloscope display? Is it configurable via display buffer properties like the FFT node?",
+      "context": "Affects the time window shown in the oscilloscope."
+    },
+    {
+      "id": "cpu-profile",
+      "category": "performance",
+      "question": "Is the display buffer fill operation per-sample or per-block? What is the approximate CPU cost?",
+      "context": "Users need to know the performance impact."
+    }
+  ],
+
+  "notes": "Existing phase3 doc mentions MIDI context buffer resizing. The description says 'optional MIDI input sync' but cppProperties does not include IsProcessingHiseEvent -- this needs investigation. Has a screenshot available (oscilloscope.png)."
+}

@@ -1,0 +1,1 @@
+Adds a send connection from `sourceIndex` to `destinationIndex` in the parallel send bus. Send connections operate independently of primary connections, so the same source can feed both a main destination and a send destination simultaneously. Returns `true` on success.

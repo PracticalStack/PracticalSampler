@@ -1,0 +1,1 @@
+Removes all geometry from the path, resetting it to an empty state. The bounding box is also reset. Use this to reuse an existing Path object for new geometry rather than creating a new one - particularly useful inside timer callbacks or paint routines where the shape changes on each update. Remember to re-anchor the bounds after clearing if you are working in normalised space.

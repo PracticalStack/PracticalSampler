@@ -1,0 +1,1 @@
+Exports the current values of all UI components that have the `saveInPreset` flag enabled. Returns a JSON object suitable for storing inside custom preset data. Use `updateSaveInPresetComponents` to restore values from this object - the two methods form a round-trip pair for selectively including component state in a custom data model.

@@ -1,0 +1,1 @@
+Returns the current global pitch offset in semitones as set by `Engine.setGlobalPitchFactor()`. Returns 0.0 when no pitch shift has been applied.

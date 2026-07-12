@@ -1,0 +1,1 @@
+Sets or clears the read-only attribute on this file or directory. When `applyRecursively` is `true` and this is a directory, the attribute is applied to all contained files and subdirectories. Does not return a success indicator - use `hasWriteAccess()` afterwards to verify the change took effect.

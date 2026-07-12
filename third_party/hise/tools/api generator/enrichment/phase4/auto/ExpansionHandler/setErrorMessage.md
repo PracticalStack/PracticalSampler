@@ -1,0 +1,1 @@
+Manually triggers the error function callback with the given message and `isCritical` set to `false`. Use this to inject custom warning messages into the expansion error handling pipeline. If no error function has been set via `setErrorFunction()`, the message is silently discarded.

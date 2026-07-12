@@ -1,0 +1,1 @@
+Returns the character at the given zero-based position as a single-character string. Returns an empty string if the position is out of bounds. Use `String.charCodeAt()` if you need the numeric Unicode code point instead.

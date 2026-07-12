@@ -1,0 +1,79 @@
+{
+  "factoryPath": "dynamics.envelope_follower",
+  "nodes": [
+    {
+      "id": "in",
+      "label": "Audio In",
+      "type": "input",
+      "importance": 1.0,
+      "description": "Input audio signal (mono or stereo)"
+    },
+    {
+      "id": "peak_detect",
+      "label": "Peak Detect",
+      "type": "process",
+      "importance": 0.8,
+      "description": "Computes max(abs(sample)) across all channels per frame"
+    },
+    {
+      "id": "envelope",
+      "label": "Attack/Release Follower",
+      "type": "process",
+      "importance": 1.0,
+      "description": "Per-voice envelope follower with configurable attack and release times"
+    },
+    {
+      "id": "attack",
+      "label": "Attack",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Envelope attack time in ms (0 to 1000)"
+    },
+    {
+      "id": "release",
+      "label": "Release",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Envelope release time in ms (0 to 1000)"
+    },
+    {
+      "id": "process_signal",
+      "label": "ProcessSignal",
+      "type": "parameter",
+      "importance": 0.8,
+      "description": "Off: pass audio through; On: replace audio with envelope value"
+    },
+    {
+      "id": "replace",
+      "label": "Replace Audio",
+      "type": "decision",
+      "importance": 0.7,
+      "description": "When ProcessSignal=On, all audio channels are replaced with envelope value"
+    },
+    {
+      "id": "out",
+      "label": "Audio Out",
+      "type": "output",
+      "importance": 1.0,
+      "description": "Original audio (ProcessSignal=Off) or envelope signal (ProcessSignal=On)"
+    },
+    {
+      "id": "mod_out",
+      "label": "Envelope Value",
+      "type": "modulation_out",
+      "importance": 1.0,
+      "description": "Tracked envelope amplitude (0.0 to 1.0, normalised)"
+    }
+  ],
+  "edges": [
+    { "from": "in", "to": "peak_detect", "type": "signal", "label": null },
+    { "from": "peak_detect", "to": "envelope", "type": "signal", "label": null },
+    { "from": "attack", "to": "envelope", "type": "control", "label": null },
+    { "from": "release", "to": "envelope", "type": "control", "label": null },
+    { "from": "envelope", "to": "mod_out", "type": "signal", "label": null },
+    { "from": "process_signal", "to": "replace", "type": "control", "label": null },
+    { "from": "in", "to": "replace", "type": "signal", "label": "original audio" },
+    { "from": "envelope", "to": "replace", "type": "signal", "label": "envelope value" },
+    { "from": "replace", "to": "out", "type": "conditional", "label": "Off: pass-through, On: envelope" }
+  ]
+}

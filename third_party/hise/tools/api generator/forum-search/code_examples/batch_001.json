@@ -1,0 +1,959 @@
+[
+  {
+    "title": "Save User Preset with Validation",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert",
+      "solved"
+    ],
+    "description": "FileSystem.browse and Engine.saveUserPreset used to implement a save-as dialog for user presets. Validates the chosen path is within the UserPresets folder and inside a subfolder before saving.",
+    "code": "inline function savePresetAs()\n\t{\n\t\tFileSystem.browse(FileSystem.getFolder(FileSystem.UserPresets), true, \"*.preset\", function(f)\n\t\t{\n\t\t\tvar filePath = f.toString(File.FullPath);\n\t\t\tvar parentDirectory = f.getParentDirectory().toString(File.FullPath);\n\t\t\tvar userPresetsDirectory = FileSystem.getFolder(FileSystem.UserPresets).toString(File.FullPath);\n\t\t\t\n\t\t\tif (parentDirectory == userPresetsDirectory)\n\t\t\t\treturn Engine.showMessageBox(\"Invalid Location\", \"Please choose a sub folder to store the preset.\", 0);\n\t\t\t\t\n\t\t\tif (!filePath.contains(userPresetsDirectory))\n\t\t\t\treturn Engine.showMessageBox(\"Invalid Location\", \"Please save the preset within the User Presets folder.\", 0);\n\n\t\t\tEngine.saveUserPreset(f.toString(File.FullPath).replace(\".preset\"));\n\t\t});\n\t}",
+    "url": "https://forum.hise.audio/topic/7486",
+    "featured": true
+  },
+  {
+    "title": "Component Lookup Map from getAllComponents",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "Content.getAllComponents with an empty prefix builds a dictionary keyed by component ID for O(1) lookups. Useful alternative to individual Content.getComponent calls when many components need referencing.",
+    "code": "const comp = {};\n\nfor (x in Content.getAllComponents(\"\"))\n comp[x.getId()] = x;",
+    "url": "https://forum.hise.audio/topic/14175",
+    "featured": false
+  },
+  {
+    "title": "Batch Component Callback with getAllComponents",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted",
+      "solved"
+    ],
+    "description": "Synth.getAllEffects and Content.getAllComponents with a shared prefix to batch-wire knobs to SimpleGain effects. Compact alternative to index-based loops using prefix matching.",
+    "code": "Content.makeFrontInterface(600, 400);\n\nconst var TheGains = Synth.getAllEffects(\"Simple Gain\");\nconst var SampleVolumeKnobs = Content.getAllComponents(\"knbVolume\");\n\nfor (k in SampleVolumeKnobs)\n\tk.setControlCallback(onSampleVolumeKnobsControl);\n\ninline function onSampleVolumeKnobsControl(component, value)\n{\n\tlocal idx = SampleVolumeKnobs.indexOf(component);\n\tTheGains[idx].setAttribute(0, value);\n}",
+    "url": "https://forum.hise.audio/topic/13791",
+    "featured": true
+  },
+  {
+    "title": "Disable Shift-Click Knob Text Input",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "Component modifiers API used to disable text input and double-click reset on knobs. createModifiers and setModifiers with the disabled flag prevent shift-click editing and default-value reset.",
+    "code": "Content.makeFrontInterface(600, 400);\n\nconst var knobs = [Content.getComponent(\"Knob1\"),\n\tContent.getComponent(\"Knob2\"),\n\tContent.getComponent(\"Knob3\"),\n\tContent.getComponent(\"Knob4\"),\n\tContent.getComponent(\"Knob5\"),\n\tContent.getComponent(\"Knob6\")];\n\nconst var mods = [];\n\nfor (x in knobs)\n\tmods.push(x.createModifiers());\n\nfor (i = 0; i < knobs.length; i++)\n{\n\tknobs[i].setModifiers(mods[i].TextInput, [mods[i].disabled, mods[i].disabled]);\n\tknobs[i].setModifiers(mods[i].ResetToDefault, [mods[i].disabled, mods[i].disabled]);\n}",
+    "url": "https://forum.hise.audio/topic/2998",
+    "featured": true
+  },
+  {
+    "title": "Flipped FFT Spectrum Display",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted",
+      "solved"
+    ],
+    "description": "Custom FFT visualization using Graphics.flip to mirror the spectrum path vertically with gradient fills and layered rendering. Uses beginLayer/endLayer for composited drawing of mirrored FFT paths.",
+    "code": "const var Panel1 = Content.getComponent(\"Panel1\");\n\nPanel1.setPaintRoutine(function(g)\n{\n\tvar a = this.getLocalBounds(0);\n\tvar path2 = Content.createPath();\n\tpath2 = obj.path;\n\tg.flip(false, a);\n\tg.setGradientFill([Colours.withAlpha(Colours.antiquewhite, 0.5), a[2] / 2, 0, Colours.withAlpha(Colours.black, 1.0), a[2] / 2, 250]);\n\tg.fillPath(path2, obj.pathArea);\n\n\tg.beginLayer(false);\n\tg.flip(false, a);\n\tg.setGradientFill([Colours.withAlpha(Colours.antiquewhite, 1.0), a[2] / 2, 0, Colours.withAlpha(Colours.black, 1.0), a[2] / 2, 250]);\n\tg.fillPath(obj.path, obj.pathArea);\n\tg.endLayer();\n});",
+    "url": "https://forum.hise.audio/topic/13674",
+    "featured": false
+  },
+  {
+    "title": "DllTimer and DllAsyncUpdater for Third-Party Nodes",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "author"
+    ],
+    "description": "hise::DllTimer and hise::DllAsyncUpdater as replacements for juce::Timer and juce::AsyncUpdater in third-party C++ nodes. Required because DLL processes cannot use JUCE timers directly.",
+    "code": "template <int NV> my_node: public juce::Timer // nope\n{\n\n};\n\ntemplate <int NV> my_node: public hise::DllTimer // this will work\n{\n my_node()\n {\n startTimer(30);\n }\n\n void timerCallback() override { ... }\n};\n\ntemplate <int NV> my_node: public juce::AsyncUpdater // nope\n{\n\n};\n\ntemplate <int NV> my_node: public hise::DllAsyncUpdater // this will work\n{\n my_node()\n {\n \n }\n\n void process(ProcessData<2>& data) {\n triggerAsyncUpdate();\n }\n\n void handleAsyncUpdate() override {}\n};",
+    "url": "https://forum.hise.audio/topic/13600",
+    "featured": false
+  },
+  {
+    "title": "Broadcaster Mouse Event Listener",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "Engine.createBroadcaster with attachToComponentMouseEvents to track mouse drag on a FloatingTile. Converts vertical drag distance to a normalized 0-1 range using Math.range.",
+    "code": "const var FloatingTile1 = Content.getComponent(\"FloatingTile1\");\n\nconst var Waterfall_BC = Engine.createBroadcaster({\n \"id\": \"Waterfall_BC\",\n \"args\": [\"component\", \"event\"],\n \"tags\": []\n});\n\nWaterfall_BC.attachToComponentMouseEvents([\"FloatingTile1\"], \"Clicks, Hover & Dragging\", \"\");\n\nWaterfall_BC.addListener(\"\", \"md\", function(component, event)\n{\n\tif (event.drag)\n\t\tConsole.print(Math.range(event.dragY / -component.getHeight(), 0.0, 1.0));\n\t\n});",
+    "url": "https://forum.hise.audio/topic/13388",
+    "featured": false
+  },
+  {
+    "title": "Copy MIDI File to AppData",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert",
+      "solved"
+    ],
+    "description": "File.copy used to duplicate a MIDI file into the AppData folder. Extracts the filename from the source File object and constructs a destination path via FileSystem.getFolder and getChildFile.",
+    "code": "inline function copyMidiFile(original)\n{\n local filename = original.toString(original.Filename);\n local newFile = FileSystem.getFolder(FileSystem.AppData).getChildFile(filename);\n original.copy(newFile);\n}",
+    "url": "https://forum.hise.audio/topic/13354",
+    "featured": false
+  },
+  {
+    "title": "Auto-Load All Fonts from Folder",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "FileSystem.findFiles scans the Fonts folder for TTF/OTF files and loads each via Engine.loadFontAs. Strips the '-Regular' suffix from font names for cleaner references while preserving style suffixes like Bold and Italic.",
+    "code": "// this will load all of your fonts which are stored in the projectFolder/Images/Fonts\ninline function loadAllFontsFromProjectFolder()\n{\n\tlocal appDataFolder = FileSystem.getFolder(FileSystem.AppData);\n\tlocal fontsFolder = appDataFolder.getChildFile(\"Fonts\");\n\tlocal fontFiles = FileSystem.findFiles(fontsFolder, \"*.ttf;*.otf\", false);\n\n\tfor (file in fontFiles)\n\t{\n\t\tlocal fontPath = file.toString(File.FullPath);\n\t\tlocal fontName = file.toString(File.Filename);\n\t\tlocal targetName = \"\";\n\n\t\t// if the file name suffix is \"-Regular\", loadAs will use just the prefix\n\t\tif (fontName.endsWith(\"-Regular.ttf\") || fontName.endsWith(\"-Regular.otf\"))\n\t\t\ttargetName = fontName.substring(0, fontName.lastIndexOf(\"-Regular.\"));\n\t\telse if (fontName.endsWith(\".ttf\") || fontName.endsWith(\".otf\"))\n\t\t\ttargetName = fontName.substring(0, fontName.lastIndexOf(\".\"));\n\n\t\tEngine.loadFontAs(fontPath, targetName);\n\t}\n}",
+    "url": "https://forum.hise.audio/topic/13352",
+    "featured": true
+  },
+  {
+    "title": "Offline FFT Spectrum Generation and Display",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "author"
+    ],
+    "description": "Engine.createFFT with setEnableSpectrum2D to generate and render a 2D spectrum from a synthesized buffer. Configures FFT parameters (size, oversampling, gamma, colour scheme) and paints the result with drawFFTSpectrum on a Panel.",
+    "code": "Content.makeFrontInterface(600, 600);\n\n// Create a buffer with a second length\nconst var b = Buffer.create(44100.0);\n\n// fill it up with some random signal - two sine sweeps and some noise\nreg uptime = 0.0;\nreg delta = 0.01;\n\nfor(s in b)\n{\n\ts = Math.sin(uptime);\n\ts += 0.5 * Math.sin(uptime * 2.0);\n\ts += 0.3 * Math.random();\n\t\n\tuptime += delta;\n\tdelta += 0.00003;\n}\n\n// Create the FFT object that is used to create the spectrum\nconst var fft = Engine.createFFT();\n\n// Enable the spectrum generation\nfft.setEnableSpectrum2D(true);\n\n// Setup the FFT processing (FFT size & channel count)\nfft.prepare(1024, 1);\n\n// Fetch the spectrum options\nconst var options = fft.getSpectrum2DParameters();\n\n// Dump that\nConsole.print(trace(options));\n\n// change whatever property you want.\noptions.ColourScheme = 2;\noptions.Oversampling = 8;\noptions.Gamma = 30;\noptions.ResamplingQuality = \"High\";\n\n// Send it back\nfft.setSpectrum2DParameters(options);\n\n// process the buffer. This creates the spectrum\n// that can then be painted\nfft.process(b);\n\n// create a panel\nconst var p = Content.addPanel(\"P1\", 0, 0);\n\np.set(\"width\", 600);\np.set(\"height\", 600);\n\np.setPaintRoutine(function(g)\n{\n\t// This function paints the FFT spectrum on the panel\n\tg.drawFFTSpectrum(fft, this.getLocalBounds(0));\n});",
+    "url": "https://forum.hise.audio/topic/13231",
+    "featured": true
+  },
+  {
+    "title": "Browse and Load Audio File as Buffer",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "FileSystem.browse with loadAsAudioFile to let the user pick an audio file from Desktop and load it into an array of buffers. Button callback triggers the file dialog with a completion handler.",
+    "code": "inline function onButton1Control(component, value)\n{\n\tif (value)\n\t{\n\t\tFileSystem.browse(FileSystem.Desktop, false, \"\", function(result)\n\t\t{\n\t\t\tarrayOfBuffers = result.loadAsAudioFile();\n\t\t\t\n\t\t\t// do fft with this array of buffers\n\t\t});\n\t}\n};\n\nContent.getComponent(\"Button1\").setControlCallback(onButton1Control);",
+    "url": "https://forum.hise.audio/topic/13231",
+    "featured": false
+  },
+  {
+    "title": "Array-Indexed Knob Step Values",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "Lookup array maps discrete knob positions to arbitrary step values. The knob value serves as an array index, enabling non-linear value mappings like musical intervals or power-of-two steps.",
+    "code": "Content.makeFrontInterface(600, 400);\n\nconst var steps = [1, 3, 5, 7, 9];\n\ninline function onKnobControl(component, value)\n{\n\tlocal stepValue = steps[value];\n\tConsole.print(stepValue);\n}\n\nContent.getComponent(\"Knob1\").setControlCallback(onKnobControl);",
+    "url": "https://forum.hise.audio/topic/13189",
+    "featured": false
+  },
+  {
+    "title": "Mouse Drag Detection Panel Overlay",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "setMouseCallback on a detection panel tracks drag state to show/hide a blocking overlay. Compares mouse coordinates against panel bounds and previous position to distinguish dragging from hovering.",
+    "code": "const var pnl_DETECT = Content.getComponent(\"pnl_DETECT\");\nconst var tile_DRAGROP = Content.getComponent(\"tile_DRAGROP\");\nconst var pnl_BLOCK = Content.getComponent(\"pnl_BLOCK\");\n\npnl_DETECT.setMouseCallback(function(event)\n{\n var w = this.getWidth();\n var h = this.getHeight();\n var isMouseOver = (event.x >= 0 && event.x <= w && event.y >= 0 && event.y <= h);\n\n var isDragging = event.drag || event.mouseDown || (event.x != this.data.lastX || event.y != this.data.lastY);\n \n this.data.lastX = event.x;\n this.data.lastY = event.y;\n \n if (isMouseOver && isDragging)\n {\n pnl_BLOCK.showControl(false);\n }\n else\n {\n pnl_BLOCK.showControl(true);\n }\n});",
+    "url": "https://forum.hise.audio/topic/13085",
+    "featured": false
+  },
+  {
+    "title": "Macro Knob Controlling Multiple Parameters",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "Normalised-to-range helper maps a single macro knob to multiple parameters with different ranges. Uses setValue/changed pattern to programmatically update knob values from a control callback.",
+    "code": "Content.makeFrontInterface(600, 400);\n\nconst var LF = Content.getComponent(\"LF\");\nconst var HF = Content.getComponent(\"HF\");\nconst var SATURATION = Content.getComponent(\"SATURATION\");\nconst var WIDTH = Content.getComponent(\"WIDTH\");\n\ninline function normalisedToRange(normalisedValue, min, max)\n{\n\treturn min + normalisedValue * (max - min);\n}\n\ninline function onMAINControl(component, value)\n{\n\tlocal v1 = normalisedToRange(value, 0, 7);\n\tlocal v2 = normalisedToRange(value, 0, 7);\n\tlocal v3 = normalisedToRange(value, 0, 1);\n\tlocal v4 = normalisedToRange(value, 100, 170);\n\n\tLF.setValue(v1);\n\tHF.setValue(v2);\n\tSATURATION.setValue(v3);\n\tWIDTH.setValue(v4);\n\n\tLF.changed();\n\tHF.changed();\n\tSATURATION.changed();\n\tWIDTH.changed();\n}\n\nContent.getComponent(\"MAIN\").setControlCallback(onMAINControl);",
+    "url": "https://forum.hise.audio/topic/5385",
+    "featured": true
+  },
+  {
+    "title": "Read and Write JSON File",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert",
+      "solved"
+    ],
+    "description": "FileSystem.getFolder with getChildFile, writeObject, and loadAsObject for persistent JSON storage. Includes save and load utility functions with file-existence validation before reading.",
+    "code": "// Create an object\nconst myObj = {\"name\": \"Dave\", \"age\": 38, \"country\": \"England\"};\n\n// Save object to a file on desktop\ninline function saveObject(obj)\n{\n local f = FileSystem.getFolder(FileSystem.Desktop).getChildFile(\"myFile.json\"); \n f.writeObject(obj);\n}\n\n// Load the file \ninline function loadObject()\n{\n local f = FileSystem.getFolder(FileSystem.Desktop).getChildFile(\"myFile.json\"); \n \n if (!f.isFile())\n return {}; // Invalid file, return empty object\n\n return f.loadAsObject(); // What you will have here is the same as the object you started with\n}",
+    "url": "https://forum.hise.audio/topic/13022",
+    "featured": true
+  },
+  {
+    "title": "CSS Rotate Keyboard Floating Tile",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted",
+      "solved"
+    ],
+    "description": "setInlineStyleSheet with CSS transform rotate(90deg) applied to a keyboard FloatingTile via setLocalLookAndFeel. Demonstrates CSS transforms on HISE floating tile components.",
+    "code": "const var ft_Keyboard = Content.getComponent(\"ft_Keyboard\");\nconst var laf_Keyboard = Content.createLocalLookAndFeel();\n\nft_Keyboard.setLocalLookAndFeel(laf_Keyboard);\n\nlaf_Keyboard.setInlineStyleSheet(\"\n.keyboard \n{ \n\tbackground: red; \n\ttransform: rotate(90deg);\n}\n\");",
+    "url": "https://forum.hise.audio/topic/12942",
+    "featured": false
+  },
+  {
+    "title": "PNG Linear Slider LAF",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "LAF.loadImage and registerFunction drawLinearSlider for a custom image-based vertical slider. Calculates thumb position from valueNormalized and draws background and cap images at computed offsets.",
+    "code": "const var LAF = Content.createLocalLookAndFeel();\nconst var SliderBackground = LAF.loadImage(\"{PROJECT_FOLDER}SliderBackground.png\", \"Background\");\nconst var SliderCap = LAF.loadImage(\"{PROJECT_FOLDER}SliderCap.png\", \"SliderCap\");\nconst var Knob1 = Content.getComponent(\"Knob1\");\n\nLAF.registerFunction(\"drawLinearSlider\", function(g, obj)\n{\n\t\tvar a = obj.area;\n\n\t\tvar h = a[3] / 13;\n\t\tvar y = a[3] - a[3] * obj.valueNormalized - (h + 10) + (h + 10) * obj.valueNormalized;\n\t\t\t\n\t\tg.drawImage(\"Background\", [0,0, 80, 560], 0, 0);\t\t\n\t\tg.drawImage(\"SliderCap\", [-10, y, a[2] + 20, h + 20],0 , 0);\n});\nContent.getComponent(\"Knob1\").setLocalLookAndFeel(LAF);",
+    "url": "https://forum.hise.audio/topic/12925",
+    "featured": true
+  },
+  {
+    "title": "Dynamic Slider Creation Loop",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "Content.addKnob in a loop to dynamically create multiple sliders with indexed names. Returns an array of component references and extracts IDs via the Array.map function.",
+    "code": "// a loop to create sliders\ninline function createSliders(stringName, numOfSliders)\n{\n\tlocal sliders = [];\n\n\tfor (i = 0; i < numOfSliders; i++)\n\t{\n\t\t// this appends the index to the slider name: \"stringName + i\"\n\t\tlocal slider = Content.addKnob(stringName + i, 50 + i * 125, 50);\n\t\t// this stores the component object inside an array\n\t\tsliders[i] = slider;\n\t\tslider.set(\"style\", \"vertical\");\n\t}\n\treturn sliders;\n}\n\n// call the function to create the sliders\nconst mySliders = createSliders(\"MySlider\", 4);\n// a separate array for the names (\"Id\")\nconst mySlidersIdArray = mySliders.map(function(element){return element.getId();});\n\nConsole.print(\"mySlidersIdArray: \" + trace(mySlidersIdArray));",
+    "url": "https://forum.hise.audio/topic/12903",
+    "featured": true
+  },
+  {
+    "title": "CSS Preset Browser Hover Styling",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "author"
+    ],
+    "description": "setInlineStyleSheet using HTML table row selectors (tr, tr:hover) to style preset browser list items. Applies background colour changes on hover via CSS pseudo-classes on a FloatingTile.",
+    "code": "const var laf = Content.createLocalLookAndFeel();\n\nContent.getComponent(\"FloatingTile1\").setLocalLookAndFeel(laf);\n\nlaf.setInlineStyleSheet(\"\n\ntr /** HTML table row => preset browser list item */\n{\n\tbackground: red;\n}\n\ntr:hover\n{\n\tbackground: green;\n}\n\n\")",
+    "url": "https://forum.hise.audio/topic/12893",
+    "featured": false
+  },
+  {
+    "title": "Preset Change Callback Label Update",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting"
+    ],
+    "description": "UserPresetHandler.setPostCallback updates a label with Engine.getCurrentUserPresetName after each preset load. Simple pattern for displaying the active user preset name in a custom UI element.",
+    "code": "//PresetDisplay\nconst var PresetNameLabel = Content.getComponent(\"PresetNameLabel\");\nUserPresetHandler.setPostCallback(function()\n{\n\tPresetNameLabel.set(\"text\", Engine.getCurrentUserPresetName());\n});",
+    "url": "https://forum.hise.audio/topic/12873",
+    "featured": false
+  },
+  {
+    "title": "CSS-Styled Label with Selection",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "setInlineStyleSheet for a Label component with CSS selectors for default, input, and ::selection states. Configures letter-spacing, padding, caret colour, text shadow, and selection highlight via inline CSS.",
+    "code": "Content.makeFrontInterface(200, 50);\n\nconst var Label1 = Content.getComponent(\"Label1\");\n\nconst var lblCss = Content.createLocalLookAndFeel();\n\nLabel1.set(\"text\", \"CSS Label\");\n\n// Email/Key Label Laf\nlblCss.setInlineStyleSheet(\"\n*\n{\n\tletter-spacing: 2px;\n\tfont-weight: regular;\n}\n\n/** Render the default appearance. */\nlabel\n{\n\tbackground-color: var(--bgColour);\n\tcolor: var(--textColour);\t\n\tborder-radius: 5px;\n\tpadding-left: 50px;\n\tpadding-right: 20px;\n\ttext-shadow: 2px 2px 5px rgba(0,0,0,0.3);\n}\n\n/** If you edit the text, it will use this selector. */\ninput\n{\n\n\ttext-align: left;\n\tpadding-top: 0.5px;\n\tpadding-left: 50px;\n\tpadding-right: 20px;\n\tcaret-color: white;\n\tfont-weight: bold;\n}\n\n/** Style the text selection with this selector. */\n::selection\n{\n\tbackground: #50FFFFFF;\n\tcolor: white;\n}\n\");\n\nLabel1.setLocalLookAndFeel(lblCss);",
+    "url": "https://forum.hise.audio/topic/12796",
+    "featured": true
+  },
+  {
+    "title": "Configurable Grid Overlay Panel",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "Panel setPaintRoutine draws a configurable grid with adjustable line count, thickness, and colours. Useful as a layout helper during UI development for aligning components to a visual grid.",
+    "code": "const var Grid1 = Content.getComponent(\"Grid1\");\n\nGrid1.setPaintRoutine(function(g)\n{\n\tvar a = this.getLocalBounds(0);\n\n\tvar NumBarsX = 10;\n\tvar NumBarsY = 10;\n\tvar BarHeight = 1;\n\tvar BarWidth = 1;\n\n\tvar BarColour = Colours.withAlpha(Colours.black, 0.5);\n\tvar BackgroundColour = Colours.withAlpha(Colours.pink, 0.5);\n\n\tvar spacerY = a[3] / NumBarsY;\n\tvar spacerX = a[2] / NumBarsX;\n\n\tg.fillAll(BackgroundColour);\n\tg.setFont(\"ArialBOLD\", 12);\n\tg.drawAlignedText(\"GRIDHELPER1.0\", [5, 5, 100, 5], \"left\");\n\n\tfor (i = 0; i <= NumBarsX; i++)\n\t{\n\t\tvar x = i * spacerX - (BarWidth / 2);\n\t\tg.setColour(BarColour);\n\t\tg.fillRect([x, 0, BarWidth, a[3]]);\n\t}\n\n\tfor (i = 0; i <= NumBarsY; i++)\n\t{\n\t\tvar y = i * spacerY - (BarHeight / 2);\n\t\tg.setColour(BarColour);\n\t\tg.fillRect([0, y, a[2], BarHeight]);\n\t}\n});",
+    "url": "https://forum.hise.audio/topic/12785",
+    "featured": true
+  },
+  {
+    "title": "Find Child Components by Parent",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "Content.getAllComponents with parentComponent property check to find all children of a specific panel. Iterates all components and filters by their parentComponent property string.",
+    "code": "for (c in Content.getAllComponents(\"\"))\n{\n\tif (c.get(\"parentComponent\") == \"Panel1\")\n\t\tConsole.print(c.getId() + \" is a child of the panel\");\n\telse\n\t\tConsole.print(c.getId() + \" is not a child of the panel\");\n}",
+    "url": "https://forum.hise.audio/topic/12584",
+    "featured": false
+  },
+  {
+    "title": "Level-Driven Image Alpha with Timer",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted",
+      "solved"
+    ],
+    "description": "Engine.createTimerObject polling Synth.getEffect getCurrentLevel to drive image opacity. Converts gain factor to decibels with Engine.getDecibelsForGainFactor and maps the value to setAlpha for visual feedback.",
+    "code": "const var Image8 = Content.getComponent(\"Image8\");\nconst var t4 = Engine.createTimerObject();\nconst var InGain = Synth.getEffect(\"InGain\");\nt4.setTimerCallback(function()\n{\t\n\tvar v4 = InGain.getCurrentLevel([0,1]);\n\tv4 = Engine.getDecibelsForGainFactor(v4);\n\tif (v4 > -12)\n\t{\n\tImage8.setAlpha(v4 * v4 / 101);\t\t\n\t}\n\t\n});\n\nt4.startTimer(11);",
+    "url": "https://forum.hise.audio/topic/12557",
+    "featured": false
+  },
+  {
+    "title": "Sampler Timestretch Configuration",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "Synth.getSampler with getTimestretchOptions and setTimestretchOptions to modify timestretch behaviour. Fetches the current options object, modifies SkipLatency, and applies the updated settings back to the sampler.",
+    "code": "const var Sampler1 = Synth.getSampler(\"Sampler1\");\n\n// fetch the current state\nconst var obj = Sampler1.getTimestretchOptions();\n\n// Apply your changes\nobj.SkipLatency = false;\n\n// Update the options\nSampler1.setTimestretchOptions(obj);",
+    "url": "https://forum.hise.audio/topic/11966",
+    "featured": false
+  },
+  {
+    "title": "Hybrid Script and CSS ComboBox Styling",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "author",
+      "solved"
+    ],
+    "description": "registerFunction drawComboBox for the main combobox appearance combined with setInlineStyleSheet for popup menu CSS. Demonstrates how script LAF and CSS coexist with CSS taking precedence for popup menus.",
+    "code": "const var laf = Content.createLocalLookAndFeel();\n\n// Combobox is styled by a function\nlaf.registerFunction(\"drawComboBox\", function(g, obj)\n{\n\tg.setColour(obj.bgColour);\n\tg.fillRect(obj.area);\n\tg.setFont(\"Comic Sans MS\", 21);\n\tg.setColour(Colours.blue);\n\tg.drawAlignedText(obj.text, obj.area, \"centred\");\n});\n\n// Popup menu is styled by CSS\nlaf.setInlineStyleSheet(\"\n.popup\n{\n\tbackground: #333;\n}\n\n.popup-item\n{\n\tbackground: transparent;\n\tcolor: #999;\n\tpadding: 10px;\n}\n\n.popup-item:hover\n{\n\tbackground: rgba(255,255,255, 0.2);\n}\n\n.popup-item:active\n{\n\tcolor: white;\n\tfont-weight: bold;\n}\n\");\n\nContent.getComponent(\"ComboBox1\").setLocalLookAndFeel(laf);",
+    "url": "https://forum.hise.audio/topic/12043",
+    "featured": true
+  },
+  {
+    "title": "Path Rotation by Angle",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "Content.createPath with manual rotation transform using Math.cos and Math.sin. Rotates an array of [x,y] points around the area centre by a given angle and builds a closed path from the result.",
+    "code": "inline function createRotatedPath(pathArray, area, angle)\n{\n\tlocal rad = Math.toRadians(angle);\n\tlocal cosA = Math.cos(rad);\n\tlocal sinA = Math.sin(rad);\n\n\tlocal path = Content.createPath();\n\n\tlocal rotationCenterX = area[0] + (area[2] * 0.5);\n\tlocal rotationCenterY = area[1] + (area[3] * 0.5);\n\n\tfor (i = 0; i < pathArray.length; i++)\n\t{\n\t\tlocal x = pathArray[i][0];\n\t\tlocal y = pathArray[i][1];\n\n\t\tlocal newX = (x - rotationCenterX) * cosA - (y - rotationCenterY) * sinA + rotationCenterX;\n\t\tlocal newY = (x - rotationCenterX) * sinA + (y - rotationCenterY) * cosA + rotationCenterY;\n\n\t\tif (i == 0)\n\t\t\tpath.startNewSubPath(newX, newY);\n\t\telse\n\t\t\tpath.lineTo(newX, newY);\n\t}\n\n\tpath.closeSubPath();\n\treturn path;\n}",
+    "url": "https://forum.hise.audio/topic/12264",
+    "featured": true
+  },
+  {
+    "title": "CSS Cursor Styling for Components",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "author"
+    ],
+    "description": "setInlineStyleSheet with CSS cursor property to set pointer cursor on buttons and text cursor on labels. Applies different cursor types per component type via CSS selectors and setLocalLookAndFeel.",
+    "code": "const var laf = Content.createLocalLookAndFeel();\n\nlaf.setInlineStyleSheet(\"\n\nbutton\n{\n\tcursor: pointer;\n}\n\nlabel\n{\n\tbackground: #444;\n\ttext-align: center;\n\tcursor: text;\n}\n\n\");\n\nContent.getComponent(\"Button2\").setLocalLookAndFeel(laf);\nContent.getComponent(\"Label1\").setLocalLookAndFeel(laf);",
+    "url": "https://forum.hise.audio/topic/10780",
+    "featured": false
+  },
+  {
+    "title": "Audio File Content Callback",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert",
+      "solved"
+    ],
+    "description": "Synth.getAudioSampleProcessor with getAudioFile and setContentCallback to respond when an AudioLoopPlayer's audio file content changes. Useful for triggering analysis or UI updates after file loading.",
+    "code": "const AudioLoopPlayer1 = Synth.getAudioSampleProcessor(\"Audio Loop Player1\");\nconst af = AudioLoopPlayer1.getAudioFile(0);\n\naf.setContentCallback(function()\n{\n Console.print(\"HELLO WORLD\");\n});",
+    "url": "https://forum.hise.audio/topic/12129",
+    "featured": false
+  },
+  {
+    "title": "Label Key Press Callback Setup",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "setConsumedKeyPresses with 'all' and setKeyPressCallback on a Label to capture and log keyboard events. Starting point for implementing custom keyboard shortcuts on input components.",
+    "code": "const var Label1 = Content.getComponent(\"Label1\");\n\nLabel1.setConsumedKeyPresses(\"all\");\n\nLabel1.setKeyPressCallback(function(event)\n{\n\tConsole.print(trace(event));\n});",
+    "url": "https://forum.hise.audio/topic/11450",
+    "featured": false
+  },
+  {
+    "title": "Key Press Callback with Focus Detection",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "setConsumedKeyPresses with a specific keyCode object to capture only the Escape key. setKeyPressCallback distinguishes focus changes from key presses via isFocusChange for targeted keyboard handling.",
+    "code": "const var Label1 = Content.getComponent(\"Label1\");\n\nLabel1.setConsumedKeyPresses({keyCode: 27});\n\nLabel1.setKeyPressCallback(function(event)\n{\n\tif (event.isFocusChange)\n\t{\n\t\t// Respond to focus changes here\n\t\tConsole.print(\"FOCUS CHANGE\");\n\t\treturn;\n\t}\n\t\n\t// If we get to here, then the escape key (27) must have been pressed\n\tConsole.print(\"ESC PRESSED!!!\");\n\t\n});",
+    "url": "https://forum.hise.audio/topic/11450",
+    "featured": true
+  },
+  {
+    "title": "Sampler Selection Filter by Properties",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "Synth.getSampler createSelectionWithFilter using Sampler.Root, Sampler.HiVel, and Sampler.RRGroup to query sample properties. Enables runtime access to sample metadata like SampleEnd for specific samples matching filter criteria.",
+    "code": "const var Sampler1 = Synth.getSampler(\"Sampler1\");\n\nconst list = Sampler1.createSelectionWithFilter(function()\n{\n return this.get(Sampler.Root) == 72 && this.get(Sampler.HiVel) > 20 && this.get(Sampler.RRGroup) == 1;\n});\n\nConsole.print(list[0].get(Sampler.SampleEnd));",
+    "url": "https://forum.hise.audio/topic/11921",
+    "featured": false
+  },
+  {
+    "title": "Monophonic Note Handling with Artificial Events",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "Message.ignoreEvent with Synth.playNote and noteOffByEventId for monophonic voice management. Checks isArtificialEventActive before killing previous notes and applies noteOffDelayedByEventId for timed release.",
+    "code": "reg eventIds = Engine.createMidiList();\n\nfunction onNoteOn()\n{\n\tlocal n = Message.getNoteNumber();\n\tlocal v = Message.getVelocity();\n\n\tMessage.ignoreEvent(true);\n\n\tif (Synth.isArtificialEventActive(eventIds.getValue(n)))\n\t\tSynth.noteOffByEventId(eventIds.getValue(n));\n\n\teventIds.setValue(n, Synth.playNote(n, v));\n\tSynth.noteOffDelayedByEventId(eventIds.getValue(n), 1000);\n}",
+    "url": "https://forum.hise.audio/topic/11796",
+    "featured": false
+  },
+  {
+    "title": "Bitcrusher Staircase Visualization",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "Panel setPaintRoutine drawing a dynamic staircase pattern driven by a knob value. StepsKnob controls both the visual step count and Bitcrusher.BitDepth attribute, with repaintImmediately in the control callback for real-time feedback.",
+    "code": "const var Bitcrusher = Synth.getEffect(\"Bitcrusher\");\nconst var BitcrusherPanel = Content.getComponent(\"BitcrusherPanel\");\nconst var StepsKnob = Content.getComponent(\"StepsKnob\");\nStepsKnob.setRange(4, 16, 1);\nStepsKnob.set(\"stepSize\", 0.1);\n\nBitcrusherPanel.setPaintRoutine(function(g) \n{\n var steps = StepsKnob.getValue(); // Get the number of steps from the knob\n var width = this.getWidth();\n var height = this.getHeight();\n var stepWidth = width / steps;\n var stepHeight = height / steps;\n\t\n g.fillAll(Colours.black);\n\t\n // Draw the staircase\n g.setColour(Colours.white);\n for (i = 0; i < steps; i++) \n {\n var x1 = i * stepWidth;\n var x2 = (i + 1) * stepWidth;\n var y = height - i * stepHeight;\n g.drawLine(x1, x2, y, y, 2); // Horizontal line\n if (i < steps - 1) \n {\n g.drawLine(x2, x2, y, height - (i + 1) * stepHeight, 2); // Vertical line\n }\n }\n});\n\n// Repaint the panel based on Knob value, attach it to the FX\ninline function onStepsKnobControl(component, value)\n{\n\tBitcrusherPanel.repaintImmediately();\n\tBitcrusher.setAttribute(Bitcrusher.BitDepth, value);\n};\n\nContent.getComponent(\"StepsKnob\").setControlCallback(onStepsKnobControl);",
+    "url": "https://forum.hise.audio/topic/11733",
+    "featured": false
+  },
+  {
+    "title": "LayoutBuilder Dynamic UI Factory",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "Recursive stack-based component builder that processes a JSON tree of component definitions. Uses Content.addKnob/addButton/addPanel etc. to create components dynamically and applies all properties from the JSON, enabling portable UI layouts between projects.",
+    "code": "/*\n* Author: David Healey\n* License: CC0\n* Last updated: 08/12/2024\n*/\n\nnamespace LayoutBuilder\n{\n\tconst data = [];\n\n\tinline function add(arr: Array)\n\t{\n data.concat(arr);\n\t}\n\n\tinline function process()\n\t{\n\t\tlocal stack = data.clone();\n\t\t\n\t\twhile (stack.length > 0)\n\t\t{\n\t\t\t//local node = stack.shift();\n\t\t\tlocal node = stack.pop();\n\t\t\t\n\t\t\tif (!isDefined(node.type) || !isDefined(node.id))\n\t\t\t\tcontinue;\n\n\t\t\taddComponent(node.id, node);\n\n\t\t\tif (!isDefined(node.childComponents))\n\t\t\t\tcontinue;\n\n\t\t\tfor (x in node.childComponents)\n\t\t\t\tx.parentComponent = node.id;\n\n\t\t\tfor (i = node.childComponents.length - 1; i >= 0; i--)\n\t\t\t{\n\t\t\t\tstack.push(node.childComponents[i]);\n\t\t\t}\n\n\t\t\t//stack.concat(node.childComponents);\n\t\t}\n\t}\n\t\n\tinline function: object addComponent(id: string, properties: JSON)\n\t{\n\t\tlocal c = Content.getComponent(id);\n\n\t\tif (!isDefined(c))\n\t\t{\n\t\t\tlocal type = properties.type.replace(\"Scripted\").replace(\"Script\");\n\n\t\t\tswitch (type)\n\t\t\t{\n\t\t\t\tcase \"Slider\": c = Content.addKnob(id, properties.x, properties.y); break;\n\t\t\t\tcase \"Button\": c = Content.addButton(id, properties.x, properties.y); break;\n\t\t\t\tcase \"Table\": c = Content.addTable(id, properties.x, properties.y); break;\n\t\t\t\tcase \"ComboBox\": c = Content.addComboBox(id, properties.x, properties.y); break;\n\t\t\t\tcase \"Label\": c = Content.addLabel(id, properties.x, properties.y); break;\n\t\t\t\tcase \"Image\": c = Content.addImage(id, properties.x, properties.y); break;\n\t\t\t\tcase \"Viewport\": c = Content.addViewport(id, properties.x, properties.y); break;\n\t\t\t\tcase \"Panel\": c = Content.addPanel(id, properties.x, properties.y); break;\n\t\t\t\tcase \"AudioWaveform\": c = Content.addAudioWaveform(id, properties.x, properties.y); break;\n\t\t\t\tcase \"SliderPack\": c = Content.addSliderPack(id, properties.x, properties.y); break;\n\t\t\t\tcase \"WebView\": c = Content.addWebView(id, properties.x, properties.y); break;\n\t\t\t\tcase \"FloatingTile\": c = Content.addFloatingTile(id, properties.x, properties.y); break;\n\t\t\t}\n\t\t}\n\t\t\n\t\tlocal allProperties = c.getAllProperties();\n\t\n\t\tfor (x in properties)\n\t\t{\n\t\t\tif (!allProperties.contains(x) || [\"id\"].contains(x))\n\t\t\t\tcontinue;\n\n\t\t\tc.set(x, properties[x]);\n\t\t}\n\n\t\treturn c;\n\t}",
+    "url": "https://forum.hise.audio/topic/11321",
+    "featured": true
+  },
+  {
+    "title": "TransportHandler Beat Callback",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "TransportHandler onBeat callback using isNewBar flag to trigger different notes on bar boundaries. Synth.addNoteOn with noteOffDelayedByEventId creates timed note events synchronized to the host transport.",
+    "code": "inline function onBeat(beat, isNewBar) \n{\n if(isNewBar)\n {\n\t Console.print(\"new bar\");\n }\n local id = Synth.addNoteOn(1, 80 + isNewBar * 12, 127, 0);\n Synth.noteOffDelayedByEventId(id, 800);\n}",
+    "url": "https://forum.hise.audio/topic/11064",
+    "featured": false
+  },
+  {
+    "title": "Arpeggiator SliderPack Direct Access",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "Synth.getSliderPackProcessor with getSliderPack and ScriptSliderPack.referToData to bind UI slider packs directly to Arpeggiator data. Enables direct manipulation of arpeggiator velocity, length, and semitone packs.",
+    "code": "const var Arpeggiator1 = Synth.getSliderPackProcessor(\"Arpeggiator1\");\n\n//\tUse sliderpack components for direct access to the arp\n//\tyou can hide them if you don't want them in your ui\n//\tit's possible to access them anyway\nconst var SLPs = [Content.getComponent(\"SLP1\"),\n Content.getComponent(\"SLP2\"),\n Content.getComponent(\"SLP3\")];\n\nfor (i = 0; i < 3; i++)\n\tSLPs[i].referToData(Arpeggiator1.getSliderPack(i));",
+    "url": "https://forum.hise.audio/topic/8573",
+    "featured": false
+  },
+  {
+    "title": "Broadcaster Global Fallback Pattern",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "author",
+      "solved"
+    ],
+    "description": "isDefined check on a global namespace broadcaster with fallback to Engine.createBroadcaster for modular code. Allows namespaces to share a broadcaster if it exists globally or create a local one for standalone use.",
+    "code": "namespace Something\n{\n const var someBroadcaster = isDefined(DataGlobal.someBroadcaster) ?\n DataGlobal.someBroadcaster : \n Engine.createBroadcaster({});\n}",
+    "url": "https://forum.hise.audio/topic/9746",
+    "featured": false
+  },
+  {
+    "title": "JWT License Activation with Server API",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting"
+    ],
+    "description": "Server.setBaseURL and Server.callWithPOST for a complete JWT authentication and license activation workflow. Chains token retrieval, validation via Server.setHttpHeader with Bearer token, and WooCommerce license activation through sequential POST requests.",
+    "code": "// Server Address\nServer.setBaseURL(\"\n\n// Credentials for authentication\nconst var credentials = \n{\n \"username\": \"you.com\",\n \"password\": \"yourpassword\"\n}\n\n// Relevant references\nconst var authUrl = \"/wp-json/jwt-auth/v1/token\";\nconst var validateUrl = \"/wp-json/jwt-auth/v1/token/validate\";\nconst var activateUrl = \"/wp-json/wclm/v3/activate\";\n\nreg jwtToken = \"\";\n\n// Some debug stuff\nConsole.clear();\nif (Server.isOnline()) Console.print(\"Server is Online!\" + \"\\n\");\nConsole.print(\"Authorization URL: \" + authUrl);\nConsole.print(\"Validate URL: \" + validateUrl);\nConsole.print(\"Activate URL: \" + activateUrl + \"\\n\");\n\n// Authenticate and retrieve token\ninline function authenticateUser() \n{\n Console.print(\"Starting authentication process...\");\n \n Server.callWithPOST(authUrl, credentials, printResponse);\n};\n\ninline function printResponse(status, response) \n{\n Console.print(\"Received response: \" + JSON.stringify(response));\n \n if (response.token != \"\") \n {\n jwtToken = response.token;\n \n validateToken();\n } \n else \n {\n Console.print(\"Authentication failed: \" + response.message);\n }\n};\n\n// Validate the JWT token\ninline function validateToken() \n{\n\tConsole.print(\"atempting to validate\");\n\n if (jwtToken != \"\") \n {\n Server.setHttpHeader(\"Authorization: Bearer \" + jwtToken);\n\n Server.callWithPOST(validateUrl, {}, function(status, response) \n {\n Console.print(\"Validation response: \" + JSON.stringify(response));\n\n if (response.code == \"jwt_auth_valid_token\") \n {\n Console.print(\"Token is valid!\");\n \n activateLicense();\n } \n else \n {\n Console.print(\"Token validation failed: \" + response.message);\n }\n });\n } \n else \n {\n Console.print(\"No JWT token found.\");\n }\n}\n\n// License activation details\nconst var licenseData = \n{\n \"license_key\": \"your-prod-key-lic\"\n};\n\n// Activate the license\ninline function activateLicense() \n{\n Console.print(\"Starting license activation...\" + licenseData.license_key);\n\n // Set the Authorization header with the JWT token\n Server.setHttpHeader(\"Authorization: Bearer \" + jwtToken);\n\n // Send the POST request to activate the license\n Server.callWithPOST(activateUrl, licenseData, handleActivationResponse);\n\n};\n\n// Function to handle the response from license activation\ninline function handleActivationResponse(status, response)\n{\n\tConsole.print(response.signature);\n\t\n if (response[\"response\"][\"result\"] == \"success\") \n {\n Console.print(response[\"response\"][\"message\"] + \"!\");\n } \n else \n {\n Console.print(response[\"response\"][\"message\"] + \"!\");\n }\n};\n\n// Example: Trigger authentication when a button is clicked\ninline function onButton1Control(component, value) \n{\n if (value) authenticateUser();\n}\nContent.getComponent(\"Button1\").setControlCallback(onButton1Control);",
+    "url": "https://forum.hise.audio/topic/10284",
+    "featured": true
+  },
+  {
+    "title": "Hardcode Development Audio Setup",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "Settings.getAvailableDeviceNames, setAudioDevice, setBufferSize, and toggleMidiInput inside an Engine.isHISE guard to auto-configure audio and MIDI devices during development. Prevents repeated manual setup after crashes or hardware changes.",
+    "code": "// Default HISE Audio Setup\nif (Engine.isHISE() && Engine.isPlugin() == false)\n{\n\t// Set Default Audio Device\n\tfor (x in Settings.getAvailableDeviceNames())\n\t{\n\t\tif (x.contains(\"Babyface Pro\") && Settings.getCurrentAudioDevice() != x)\n\t\t{\n\t\t\tSettings.setAudioDevice(x);\n\t\t\tSettings.setBufferSize(256);\n\t\t\tbreak;\n\t\t}\n\t}\n\t\n\t// Set Default MIDI Device\n\tfor (x in Settings.getMidiInputDevices())\n\t{\n\t\tif (x == \"SL STUDIO Port 1\") Settings.toggleMidiInput(x, true);\n\t\tif (x == \"SL STUDIO Port 2\") Settings.toggleMidiInput(x, false);\n\t}\n}",
+    "url": "https://forum.hise.audio/topic/9722",
+    "featured": false
+  },
+  {
+    "title": "Broadcaster Module Parameter Watcher",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "author"
+    ],
+    "description": "Engine.createBroadcaster with attachToModuleParameter to listen for changes to an Audio Loop Player's RootNote parameter. addListener callback receives the new value whenever the module attribute changes.",
+    "code": "const var bc = Engine.createBroadcaster({\n\t\"id\": \"root watcher\",\n\t\"args\": [\"processor\", \"parameter\", \"value\"]\n});\n\nbc.attachToModuleParameter(\"Audio Loop Player1\", \"RootNote\", \"watch attribute\");\n\nbc.addListener(\"\", \"update something\", function(u1, u2, value)\n{\n\tConsole.print(value);\n});",
+    "url": "https://forum.hise.audio/topic/8741",
+    "featured": false
+  },
+  {
+    "title": "Toggle Knob Mode via Button",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "setMode on a knob to switch between TempoSync and Frequency modes from a button callback. Demonstrates runtime mode switching using the ternary operator with setControlCallback.",
+    "code": "const var Knob1 = Content.getComponent(\"Knob1\");\n\ninline function onButton1Control(component, value)\n{\n\tKnob1.setMode(value == 0 ? \"TempoSync\" : \"Frequency\");\n};\n\nContent.getComponent(\"Button1\").setControlCallback(onButton1Control);",
+    "url": "https://forum.hise.audio/topic/9250",
+    "featured": false
+  },
+  {
+    "title": "Keyboard LAF Black and White Notes",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "registerFunction drawBlackNote and drawWhiteNote to customise a keyboard FloatingTile's appearance. Sets per-note fill colours and adjusts area dimensions for custom keyboard rendering via setLocalLookAndFeel.",
+    "code": "const laf = Content.createLocalLookAndFeel();\n\nlaf.registerFunction(\"drawBlackNote\", function(g, obj)\n{\t\n\tvar a = obj.area;\n\n\tg.setColour(Colours.black);\n\tg.fillRect([a[0], a[1], a[2] + 4, a[3]]);\n\t\n});\n\nlaf.registerFunction(\"drawWhiteNote\", function(g, obj)\n{\n\tvar a = obj.area;\n\n\tg.setColour(Colours.white);\n\tg.fillRect([a[0], a[1], a[2], a[3]]);\n});\n\nconst var FloatingTile1 = Content.getComponent(\"FloatingTile1\");\nFloatingTile1.setLocalLookAndFeel(laf);",
+    "url": "https://forum.hise.audio/topic/9394",
+    "featured": false
+  },
+  {
+    "title": "Error Handler for Missing Samples",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "Engine.createErrorHandler with setErrorCallback to detect missing samples at runtime. Checks state code 9 to trigger a custom overlay, with getNumActiveErrors and getCurrentErrorLevel for detailed error reporting.",
+    "code": "const var errorHandler = Engine.createErrorHandler();\n\t\n\terrorHandler.setErrorCallback(function(state, message)\n\t{\n\t\t ErrorHandler.errorLabel.set(\"text\", errorHandler.getNumActiveErrors() + \" \" + errorHandler.getCurrentErrorLevel() + \" \" + state + \" \" + message);\n\t\t \n\t\tif (state == 9) // if samples not detected\n\t\t{\n\t\t\t// show your own overlay here\n\t\t}\n\t\t \n\t});",
+    "url": "https://forum.hise.audio/topic/8971",
+    "featured": false
+  },
+  {
+    "title": "Browse and Set Sample Folder",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "FileSystem.browseForDirectory with Settings.setSampleFolder and Engine.reloadAllSamples to let users relocate missing samples at runtime. Includes an init-guard pattern to prevent the callback from firing on component initialization.",
+    "code": "inline function onlocateSamplesButtonControl(component, value)\n\t{\n\t\tif (canExecute.locateButton) // prevent execution on init\n\t\t{\n\t\t\tFileSystem.browseForDirectory(FileSystem.UserHome, function(result)\n\t\t\t{\n\t\t\t\tSettings.setSampleFolder(result);\n\t\t\t\t// remove overlay\n\t\t\t\tEngine.reloadAllSamples();\n\t\t\t\t\n\t\t\t});\n\t\t}\n\t\telse canExecute.locateButton = true;\n\t};\n\t\n\tContent.getComponent(\"locateSamplesButton\").setControlCallback(onlocateSamplesButtonControl);",
+    "url": "https://forum.hise.audio/topic/8971",
+    "featured": false
+  },
+  {
+    "title": "Custom Table Path LAF",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "registerFunction drawTablePath with path string parsing to customize the table curve rendering. Manipulates the SVG path string via split/join and fromString to modify the default table path shape before drawing.",
+    "code": "TBLLaf.registerFunction(\"drawTablePath\", function(g, obj)\n{\n\tvar p = Content.createPath();\n\tp.clear();\n\tvar str = obj.path.toString();\n\tvar arr = [];\n\t\n\tif (str.contains(\"q\"))\n\t{\n\t\tstr = str.substring(0, str.lastIndexOf(\"l\"));\n\t\tvar arr = str.split(\" \");\n\t}\n\t\n\telse\n\t{\n\t\tarr = str.split(\" \");\n\t\tfor (i = 0; i < 3; i++)\n\t\t\tarr.pop();\n\t}\n\t\n\tarr[10] = arr[13];\n\t\n\tstr = arr.join(\" \");\n\t\n\tp.fromString(str);\n\tg.setColour(Colours.withAlpha(Colours.cadetblue, 1));\n\tg.drawPath(p, p.getBounds(1), 1.5);\n});",
+    "url": "https://forum.hise.audio/topic/8333",
+    "featured": false
+  },
+  {
+    "title": "Custom MIDI Event Data Storage",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "author"
+    ],
+    "description": "Global 2D array indexed by Message.getEventId modulo slot count to attach custom data to MIDI events. Provides setCustomValue and getCustomValue accessors that survive across MIDI processor boundaries using a shared global namespace.",
+    "code": "namespace CustomMessage\n{\nconst var NUM_SLOTS = 512;\nconst var NUM_PER_SLOT = 16;\n\nif(!isDefined(GLOBAL_STORAGE))\n{\n global GLOBAL_STORAGE = [];\n GLOBAL_STORAGE.reserve(512);\n\n for(i = 0; i < NUM_SLOTS; i++)\n {\n GLOBAL_STORAGE[i] = [];\n for(j = 0; j < NUM_PER_SLOT; j++)\n GLOBAL_STORAGE[i][j] = 0;\n }\n}\n\ninline function setCustomValue(index, value)\n{\n GLOBAL_STORAGE[Message.getEventId() % NUM_SLOTS][index] = value;\n}\n\ninline function getCustomValue(index)\n{\n return GLOBAL_STORAGE[Message.getEventId() % NUM_SLOTS][index];\n}\n}",
+    "url": "https://forum.hise.audio/topic/8610",
+    "featured": false
+  },
+  {
+    "title": "Modal Text Input with Custom Properties",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "author"
+    ],
+    "description": "Content.showModalTextInput with a properties object to configure font, position, colours, and initial text for a popup text field. Callback receives ok/cancel state and the entered text for validation.",
+    "code": "const var prop =\n{\n\t\"parentComponent\": \"Panel1\", // use an empty string for global coordinates\n\t\"fontName\": \"Comic Sans MS\", \n\t\"x\": 10,\t\t\t\t\t // these positions are relative to the parentComponent\n\t\"y\": 10,\t\t\t\t\t // if you omit these and the area is empty, it will use\n\t\"width\": 90,\t\t\t\t // the default positioning from the slider text box\n\t\"height\": 24,\n\t\"fontSize\": 18,\n\t\"alignment\": \"right\",\n\t\"fontStyle\": \"Bold\",\n\t\"bgColour\": 0xFF00FF00,\n\t\"itemColour\": 16679297,\n\t\"textColour\": 4287455585,\n\t\"text\": \"funkyboy\"\t\t\t// the initial text to display\n};\n\n// the minimum properties will show the default slider popup\nconst var minProp = \n{\n\t\"text\": \"some text\"\n};\n\ninline function onButton1Control(component, value)\n{\n\tContent.showModalTextInput(prop, function(ok, input)\n\t{\n\t\tConsole.print(ok);\n\t\tConsole.print(input);\n\t});\n};\n\nContent.getComponent(\"Button1\").setControlCallback(onButton1Control);",
+    "url": "https://forum.hise.audio/topic/8068",
+    "featured": false
+  },
+  {
+    "title": "Shift-Click Text Input for Knobs",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "author"
+    ],
+    "description": "Engine.createBroadcaster with attachToComponentMouseEvents to show Content.showModalTextInput on shift-click for multiple knobs. Calculates popup position from getGlobalPositionX/Y and formats the initial value using Engine.doubleToString with step-size precision.",
+    "code": "const var textInputBroadcaster = Engine.createBroadcaster({\n\t\"id\": \"text-input\",\n\t\"args\": [\"component\", \"value\"],\n\t\"tags\": [\"text-input\"]\n});\n\nconst var List = [Content.getComponent(\"Knob5\"),\n Content.getComponent(\"Knob4\"),\n Content.getComponent(\"Knob3\"),\n Content.getComponent(\"Knob2\"),\n Content.getComponent(\"Knob1\")];\n\ntextInputBroadcaster.attachToComponentMouseEvents(List, \"Clicks Only\", \"\");\n\ntextInputBroadcaster.addListener(\"\", \"show textbox\", function(component, event)\n{\n\tif(event.shiftDown && !event.mouseUp)\n\t{\n\t\tvar obj = {\n\t\t\t\"text\": Engine.doubleToString(component.getValue(), parseInt(Math.log10(component.get(\"stepSize\")) * -1)) + \" \" + component.get(\"suffix\"),\n\t\t\t\"x\": component.getGlobalPositionX() + component.get(\"width\") / 2 - 30,\n\t\t\t\"y\": component.getGlobalPositionY() + component.get(\"height\") / 2 - 12,\n\t\t\t\"width\": 60,\n\t\t\t\"height\": 24\n\t\t};\n\t\t\n\t\tvar c = component;\n\t\t\n\t\tContent.showModalTextInput(obj, function[c](ok, input)\n\t\t{\n\t\t\tif(ok)\n\t\t\t{\n\t\t\t\tc.setValue(parseFloat(input));\n\t\t\t\tc.changed();\n\t\t\t}\n\t\t});\n\t}\n});",
+    "url": "https://forum.hise.audio/topic/8068",
+    "featured": false
+  },
+  {
+    "title": "Save Expansion User Preset with Path Validation",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "FileSystem.browse with Expansions.getCurrentUserPresetsFolder to save user presets within the correct expansion hierarchy. Validates the chosen path is nested at least three directories deep using getParentDirectory chain before calling Engine.saveUserPreset.",
+    "code": "inline function createNewPreset()\n {\n\t\tlocal userPresetsFolder = Expansions.getCurrentUserPresetsFolder();\n\n\t\tif (!isDefined(userPresetsFolder))\n\t\t\treturn;\n\n\t FileSystem.browse(userPresetsFolder, true, \"*.preset\", function[userPresetsFolder](f)\n\t {\n\t\t\tvar grandparent = f.getParentDirectory().getParentDirectory().getParentDirectory();\n\n\t\t\tif (!userPresetsFolder.isSameFileAs(grandparent))\n\t\t\t\treturn Engine.showMessageBox(\"Invalid Location\", \"Presets must be saved in a bank and category folder within the instrument's user presets folder.\", 0);\n\t\t\tEngine.saveUserPreset(f.toString(f.FullPath).replace(\".preset\"));\n\t });\n }",
+    "url": "https://forum.hise.audio/topic/5913",
+    "featured": false
+  },
+  {
+    "title": "Get Expansion Names List",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "Engine.createExpansionHandler with getExpansionList and getProperties to extract expansion names into an array. Iterates installed expansions and collects their Name property for UI display or logic.",
+    "code": "const var expHandler = Engine.createExpansionHandler();\nconst var expList = expHandler.getExpansionList();\nconst var expNames = [];\n\nfor (e in expList)\n\texpNames.push(e.getProperties().Name);",
+    "url": "https://forum.hise.audio/topic/7772",
+    "featured": false
+  },
+  {
+    "title": "MIDI Player Sync to Master Clock",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted",
+      "solved"
+    ],
+    "description": "Synth.getMidiPlayer with setUseTimestampInTicks and setSyncToMasterClock to configure multiple MIDI players for synchronized tick-based playback. Iterates an array of player references to apply shared timing settings.",
+    "code": "const var yourMidiPlayers = [Synth.getMidiPlayer(\"myMidiPlayer1\"),\n\t\t\t Synth.getMidiPlayer(\"myMidiPlayer2\"),\n\t\t\t Synth.getMidiPlayer(\"myMidiPlayer3\")];\n\nfor (p in yourMidiPlayers)\n{\n\tp.setUseTimestampInTicks();\n\tp.setSyncToMasterClock();\n}",
+    "url": "https://forum.hise.audio/topic/7396",
+    "featured": false
+  },
+  {
+    "title": "Animated Disclosure Triangle Panel",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "Panel with setPaintRoutine using Graphics.rotate for an animated triangle, setMouseCallback for toggle, and setTimerCallback for smooth 90-degree rotation animation. Uses panel data object for state and angle tracking with timer-driven repaint.",
+    "code": "const var panel = Content.getComponent(\"panel\");\npanel.data.angle = 0;\npanel.data.state = false;\n\n// Paint Routine\npanel.setPaintRoutine(function(g)\n{\n\tg.setColour(Colours.whitesmoke);\n\t\n\tg.rotate(Math.toRadians(this.data.angle), [this.getWidth()/2, this.getHeight()/2]);\n\t\n\t// triangle reduced by 30% to avoid edge collision (sqrt((w*w)+(h*h)) = 0.707)\n\tvar area = [this.getWidth()*0.15, this.getWidth()*0.15, this.getWidth()*0.7, this.getHeight()*0.7];\n\t\n\tg.fillTriangle(area, Math.PI/2);\n});\n\n// Mouse CB\npanel.setMouseCallback(function(event)\n{\n\tif (event.clicked)\n\t{\n\t\tthis.data.state = !this.data.state;\n\t\tthis.startTimer(30);\n\t}\n});\n\n// Timer\npanel.setTimerCallback(function()\n{\n\tif (this.data.state)\n\t{\n\t\tif (panel.data.angle < 90)\n\t\t\tpanel.data.angle += 10;\n\t\telse\n\t\t\tthis.stopTimer();\n\t}\n\telse\n\t{\t\n\t\tif (panel.data.angle > 0)\n\t\t\tpanel.data.angle -= 10;\n\t\telse\n\t\t\tthis.stopTimer();\n\t}\n\t\n\tthis.repaint();\n});",
+    "url": "https://forum.hise.audio/topic/7335",
+    "featured": false
+  },
+  {
+    "title": "Broadcaster Listener with Component Binding",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "author"
+    ],
+    "description": "Engine.createBroadcaster with addListener binding 'this' to a UI component for state-driven updates. The listener callback uses the component passed as first argument to addListener, enabling direct property changes via this.set.",
+    "code": "const var btnLogout = Content.getComponent(\"btnLogout\");\n\nconst var isDownloading = Engine.createBroadcaster({\n\t\"id\": \"Download Status\",\n\t\"args\": [\"state\"]\n});\n\nisDownloading.addListener(btnLogout, \"Disable the Logout Button during download\", function(state)\n{\n\tthis.set(\"enabled\", !state);\n});",
+    "url": "https://forum.hise.audio/topic/6467",
+    "featured": false
+  },
+  {
+    "title": "Serialize Component Values with SliderPack Support",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "Content.getAllComponents with type check for ScriptSliderPack to correctly serialize multi-value components. Uses getNumSliders and getSliderValueAt to capture individual slider values as arrays alongside standard component values.",
+    "code": "const var myObj = {};\n\nfor (c in Content.getAllComponents(\"\"))\n{\n\tif (c.get(\"type\") == \"ScriptSliderPack\")\n\t{\n\t\tvar values = [];\n\n\t\tfor (j = 0; j < c.getNumSliders(); j++)\n\t\t\tvalues.push(c.getSliderValueAt(j));\n\n\t\tmyObj[c.get(\"id\")] = values;\n\t}\n\telse\n\t{\n\t\tmyObj[c.get(\"id\")] = c.getValue();\n\t}\n}",
+    "url": "https://forum.hise.audio/topic/5818",
+    "featured": false
+  },
+  {
+    "title": "Filter Effects Array by ID Pattern",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "Synth.getAllEffects with indexOf check to remove effects whose IDs contain an underscore. Demonstrates runtime effect list filtering by naming convention for selective processing.",
+    "code": "const fx = Synth.getAllEffects(\"\");\n\nfor (i = 0; i < fx.length; i++)\n if (fx[i].getId().indexOf(\"_\") != -1) fx.remove(fx[i]);",
+    "url": "https://forum.hise.audio/topic/4690",
+    "featured": false
+  },
+  {
+    "title": "Decimal to Hex String Converter",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting"
+    ],
+    "description": "Bitwise right-shift and AND operations to convert a decimal ARGB colour value to a hex string. Useful for colour manipulation and debugging when working with HISE's integer-based colour representation.",
+    "code": "inline function toHex(num, digits) \n{\n\tlocal hexTable = [\"0\", \"1\", \"2\", \"3\", \"4\", \"5\", \"6\", \"7\", \"8\", \"9\", \"A\", \"B\", \"C\", \"D\", \"E\", \"F\"];\n\tlocal n = num;\n\tlocal s = digits;\n\tlocal result = \"\";\n\twhile (s--)\n\t{\n\t\tresult = hexTable[n & 0xF] + result;\n\t\tn = n >> 4;\n\t}\n\treturn result;\n}\n\nConsole.print(toHex(4278221567, 8)); \n// output: FF007AFF",
+    "url": "https://forum.hise.audio/topic/5678",
+    "featured": false
+  },
+  {
+    "title": "Remove All Child Panels",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "getChildPanelList and removeFromParent to clean up dynamically created child panels. Call during onInit to prevent stale child panels from accumulating across script recompiles.",
+    "code": "inline function removeAllChildren(panel)\n{\n local children = panel.getChildPanelList();\n\n if (children.length > 0)\n\tfor (x in children) x.removeFromParent();\n}",
+    "url": "https://forum.hise.audio/topic/4652",
+    "featured": false
+  },
+  {
+    "title": "Custom Array Sort Function",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "Engine.sortWithFunction with a comparator callback for numeric array sorting. The comparator returns -1 for less-than and boolean coercion for greater-than, following the standard comparison function pattern.",
+    "code": "reg arr = [5, 3, 6, 4, 1, 2];\n\nEngine.sortWithFunction(arr, function(a, b)\n{\n if (a < b) return -1 else return a > b;\n});\n\nConsole.print(trace(arr));",
+    "url": "https://forum.hise.audio/topic/5147",
+    "featured": false
+  },
+  {
+    "title": "Animated Circle Radar with Blur Effects",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "author"
+    ],
+    "description": "Panel setPaintRoutine using beginLayer, gaussianBlur, addNoise, and applyMask for a sci-fi radar effect. Draws concentric ellipses scaled by panel value, applies post-processing blur and noise, then masks to a circular path.",
+    "code": "Content.makeFrontInterface(150, 150);\n\nconst var Panel1 = Content.getComponent(\"Panel1\");\nPanel1.setValue(1);\n\nconst var circlePath = Content.createPath();\n\ncirclePath.addArc([0.0, 0.0, 1.0, 1.0], 0.0, Math.PI * 2);\n\nPanel1.setPaintRoutine(function(g)\n{\n g.beginLayer(true);\n g.setColour(Colours.white);\n \n var area = [1, 1, this.getWidth() - 2, this.getHeight() - 2];\n \n g.drawEllipse(area, 2);\n \n var radius = this.getWidth() / 2 * this.getValue();\n var diameter;\n var pos;\n\n for (i = 1; i < 4; i++)\n {\n diameter = (radius * 2 / 4 * i);\n pos = this.getWidth() / 2 - diameter / 2;\n if (pos > 0)\n g.drawEllipse([pos + 1, pos + 1, diameter - 2, diameter - 2], 2);\n } \n \n g.gaussianBlur(1.0 / this.getValue() * 12.0);\n g.addNoise(0.2);\n g.applyMask(circlePath, area, false);\n g.endLayer();\n});\n\ninline function onKnob1Control(component, value)\n{\n\tPanel1.setValue(component.get(\"max\") + 1 - value);\n\tPanel1.repaint();\n};\n\nContent.getComponent(\"Knob1\").setControlCallback(onKnob1Control);",
+    "url": "https://forum.hise.audio/topic/3507",
+    "featured": true
+  },
+  {
+    "title": "Colour Saturation Gradient Paint Routine",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "author"
+    ],
+    "description": "Bitwise colour manipulation in a ColourOps namespace to multiply saturation of an ARGB integer. Combined with a gradient fill loop in setPaintRoutine to create a horizontal desaturation fade effect.",
+    "code": "const var Panel1 = Content.getComponent(\"Panel1\");\n\nnamespace ColourOps\n{\n\tinline function withMultipliedSaturation(colour, saturation)\n\t{\n\t\tlocal a = (colour & 0xFF000000);\n\t\tlocal r = (colour & 0x00FF0000) >> 16;\n\t\tlocal g = (colour & 0x0000FF00) >> 8;\n\t\tlocal b = (colour & 0x000000FF);\n\n\t\tlocal max = Math.max(r, Math.max(g, b));\n\n\t\tlocal rDiff = max - r;\n\t\tlocal gDiff = max - g;\n\t\tlocal bDiff = max - b;\n\n\t\tlocal invSat = 1.0 - saturation;\n\n\t\tr = parseInt(r + invSat * rDiff);\n\t\tg = parseInt(g + invSat * gDiff);\n\t\tb = parseInt(b + invSat * bDiff);\n\n\t\treturn a | (r << 16) | (g << 8) | b;\n\t}\n}\n\nPanel1.setPaintRoutine(function(g)\n{\n\tvar c = this.get(\"itemColour\");\n\tvar area = [0, 0, 6.0, this.getHeight()];\n\tvar gradientData = [undefined, undefined, 0.0, Colours.black, undefined, this.getHeight()];\n\n\tfor (var x = 0; x < this.getWidth(); x += 4)\n\t{\n\t\tgradientData[0] = ColourOps.withMultipliedSaturation(c, x / this.getWidth());\n\t\tgradientData[1] = x;\n\t\tgradientData[4] = x;\n\n\t\tarea[0] = x;\n\n\t\tg.setGradientFill(gradientData);\n\t\tg.fillRect(area);\n\t}\n});",
+    "url": "https://forum.hise.audio/topic/4009",
+    "featured": false
+  },
+  {
+    "title": "Sequential Server File Download",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "Server.downloadFile with recursive downloadCallback to chain sequential downloads. Each completed download triggers the next via startNextDownload, avoiding concurrent download limits by processing the image list one at a time.",
+    "code": "Content.makeFrontInterface(600, 500);\n\nConsole.clear();\n\nServer.setBaseURL(\"\n\nconst images = [\"12-profileimg.jpg\", \"67-profileavatar.jpeg\", \"121-profileimg.jpg\", \"338-profileavatar.png\"];\n\nfunction downloadCallback()\n{\n if (this.data.finished)\n { \n if (count < images.length-1)\n {\n count++;\n startNextDownload(images[count]);\n }\n }\n}\n\ninline function startNextDownload(fileName)\n{\n Console.print(fileName);\n local f = FileSystem.getFolder(FileSystem.Downloads).getChildFile(fileName);\n Server.downloadFile(fileName, {}, f, downloadCallback);\n}\n\nreg count = 0;\nstartNextDownload(images[0]);",
+    "url": "https://forum.hise.audio/topic/3849",
+    "featured": false
+  },
+  {
+    "title": "Deep Nested User Preset Save",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "author"
+    ],
+    "description": "FileSystem.getFile with getChildFile using a deeply nested path string to save user presets in custom subfolder hierarchies. Engine.saveUserPreset accepts a File object for arbitrary preset storage locations.",
+    "code": "const var f = FileSystem.getFile(FileSystem.UserPresets).getChildFile(\"MyFunkySubFolder/AnotherSubFolder/3LevelSubfolder/Mindblowing4LevelSubfolder/Preset.preset\");\n\nEngine.saveUserPreset(f);",
+    "url": "https://forum.hise.audio/topic/844",
+    "featured": false
+  },
+  {
+    "title": "Browse and Load or Save User Preset",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "author"
+    ],
+    "description": "FileSystem.browse with Engine.loadUserPreset and Engine.saveUserPreset for a minimal custom preset browser. Uses a boolean flag to switch between load (false) and save (true) browse modes with .preset file filtering.",
+    "code": "function load(file)\n{\n Engine.loadUserPreset(file);\n}\n\nfunction save(file)\n{\n Engine.saveUserPreset(file);\n}\n\n// Place this anyway you like (button callbacks, whatever)...\nvar shouldLoad = true;\n\nif(shouldLoad)\n FileSystem.browse(FileSystem.UserPresets, false, \"*.preset\", load);\nelse\n FileSystem.browse(FileSystem.UserPresets, true, \"*.preset\", save);",
+    "url": "https://forum.hise.audio/topic/844",
+    "featured": false
+  },
+  {
+    "title": "Save MIDI Player to File",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "author"
+    ],
+    "description": "FileSystem.browse with MIDIPlayer.saveAsMidiFile to export MIDI data to a user-chosen .mid file. Combines file dialog with the MIDI player's save method for user-initiated MIDI export.",
+    "code": "FileSystem.browse(FileSystem.Desktop, true, \"*.mid\", function(f)\n{\n MIDIPlayer1.saveAsMidiFile(f.toString(0), 1);\n});",
+    "url": "https://forum.hise.audio/topic/3273",
+    "featured": false
+  },
+  {
+    "title": "A/B Preset Comparison Toggle",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "trusted"
+    ],
+    "description": "Button callback swaps between two stored states (A and B) of all UI components. Captures current values before restoring the alternate set, with changed() calls to propagate updates through the signal chain.",
+    "code": "Content.makeFrontInterface(600, 400);\n\nconst var Compare_Elements_Array = Content.getAllComponents(\"\");\nconst var Compare_A = [];\nconst var Compare_B = [];\n\nfor (i = 0; i < Compare_Elements_Array.length; i++)\n{\n\tCompare_A[i] = 0;\n\tCompare_B[i] = 0;\n}\n\ninline function onCompareControl(component, value)\n{\n\tif (!value)\n\t{\n\t\tfor (i = 0; i < Compare_Elements_Array.length; i++)\n\t\t{\n\t\t\tCompare_A[i] = Compare_Elements_Array[i].getValue();\n\t\t\tCompare_Elements_Array[i].setValue(Compare_B[i]);\n\t\t}\n\t}\n\telse\n\t{\n\t\tfor (i = 0; i < Compare_Elements_Array.length; i++)\n\t\t{\n\t\t\tCompare_B[i] = Compare_Elements_Array[i].getValue();\n\t\t\tCompare_Elements_Array[i].setValue(Compare_A[i]);\n\t\t}\n\t}\n\n\tfor (comp in Compare_Elements_Array)\n\t\tcomp.changed();\n}\n\nContent.getComponent(\"Compare\").setControlCallback(onCompareControl);",
+    "url": "https://forum.hise.audio/topic/1197",
+    "featured": true
+  },
+  {
+    "title": "Persistent Data via Hidden Panel",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "Hidden ScriptPanel with saveInPreset and a control callback to persist arbitrary key-value data across preset loads. PersistentData namespace provides get/set accessors that store data in the panel's value, leveraging HISE's built-in preset serialization.",
+    "code": "namespace PersistentData\n{\n //The data object. This will be overwritten by the onControl callback of the restorer\n reg _persistentData = {};\n \n /*This panel will restore the storage object in its control callback. \n If the value is not an object, it won't do anything but use the given\n storage variable as value*/\n const var pnlDataRestorer = Content.addPanel(\"pnlDataRestorer\", 0, 0);\n pnlDataRestorer.set(\"saveInPreset\", true);\n pnlDataRestorer.set(\"visible\", false);\n \n pnlDataRestorer.setControlCallback(onpnlDataRestorerControl); \n inline function onpnlDataRestorerControl(component, value)\n {\n // Check if the panel's value is an object\n // If not, set the value to the storage object\n \n if (typeof(value) == \"object\")\n _persistentData = value; //Copy the object from the panel to the storage object\n else \n component.setValue(_persistentData); //Initialize the restorer\n };\n \n inline function set(id, value)\n {\n _persistentData[id] = value;\n pnlDataRestorer.setValue(_persistentData);\n }\n \n inline function get(id)\n {\n return _persistentData[id];\n }\n}",
+    "url": "https://forum.hise.audio/topic/52",
+    "featured": true
+  },
+  {
+    "title": "Local Iterator Variable in Inline Functions",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "author"
+    ],
+    "description": "Declaring local i before a for loop inside inline functions to prevent shared global iterator conflicts. Without the local declaration, nested inline function calls share the same loop counter causing infinite loops.",
+    "code": "inline function one()\n{\n local i = 0;\n for (i = 0; i < 20; i++)\n {\n two();\n }\n}\n\ninline function two()\n{\n local i = 0;\n for (i = 0; i < 10; i++)\n {\n Console.print(i);\n }\n}",
+    "url": "https://forum.hise.audio/topic/2157",
+    "featured": false
+  },
+  {
+    "title": "Panel Timer Countdown with Label",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "Panel setTimerCallback for a counting animation that updates a Label and hides the panel at completion. Uses panel value as counter, startTimer/stopTimer for timed execution, and showControl for visibility toggling.",
+    "code": "Content.makeFrontInterface(600, 500);\n\nconst var Label1 = Content.getComponent(\"Label1\");\nLabel1.set(\"text\", \"0\");\n\nconst var Panel1 = Content.getComponent(\"Panel1\");\nPanel1.setValue(0);\n\nPanel1.setTimerCallback(function()\n{\n\tthis.setValue(this.getValue() + 1);\n\tLabel1.set(\"text\", this.getValue());\n\n\tif (this.getValue() == 10)\n\t{\n\t\tthis.showControl(false);\n\t\tthis.stopTimer();\n\t}\n});\n\ninline function onbtnStartControl(component, value)\n{\n\tlocal rate = 500;\n\tLabel1.set(\"text\", \"0\");\n\tPanel1.showControl(true);\n\tPanel1.setValue(0);\n\tPanel1.startTimer(rate);\n}\n\nContent.getComponent(\"btnStart\").setControlCallback(onbtnStartControl);",
+    "url": "https://forum.hise.audio/topic/1489",
+    "featured": false
+  },
+  {
+    "title": "Set Keyboard Key Colour",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "Engine.setKeyColour with an ARGB hex value to highlight a specific MIDI note on the on-screen keyboard. Sets note 60 (middle C) to a semi-transparent cyan colour.",
+    "code": "Content.makeFrontInterface(600, 500);\n\nconst var key_low = 0x6000ffff;\nEngine.setKeyColour(60, key_low);",
+    "url": "https://forum.hise.audio/topic/1043",
+    "featured": false
+  },
+  {
+    "title": "Interactive ARGB Colour Picker",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "Four Content.addKnob sliders for ARGB channels with a convertToHex utility and live panel preview. Updates a colour string and repaints a preview panel on each knob change, displaying the hex colour code in a label.",
+    "code": "/**\n * Title: colourPicker.js\n * Author: David Healey\n * Date: 07/09/2017\n * Modified: 07/09/2017\n * License: Public Domain\n*/\n\nContent.setHeight(175);\n\nreg colour = [];\nreg colourString;\n\nconst var alpha = Content.addKnob(\"Alpha\", 0, 0);\nalpha.setRange(0, 255, 1);\nalpha.set(\"style\", \"Vertical\");\nalpha.set(\"itemColour\", 0xFFAAAAAA);\nalpha.set(\"bgColour\", 0xFF000000);\nconst var red = Content.addKnob(\"Red\", 150, 0);\nred.setRange(0, 255, 1);\nred.set(\"style\", \"Vertical\");\nred.set(\"itemColour\", 0xFFFF0000);\nred.set(\"bgColour\", 0xFF000000);\nconst var green = Content.addKnob(\"Green\", 300, 0);\ngreen.setRange(0, 255, 1);\ngreen.set(\"itemColour\", 0xFF64FF4E);\ngreen.set(\"bgColour\", 0xFF000000);\ngreen.set(\"style\", \"Vertical\");\nconst var blue = Content.addKnob(\"Blue\", 450, 0);\nblue.setRange(0, 255, 1);\nblue.set(\"style\", \"Vertical\");\nblue.set(\"itemColour\", 0xFF1C00FF);\nblue.set(\"bgColour\", 0xFF000000);\n\nconst var code = Content.addLabel(\"code\", 600, 10);\ncode.set(\"bgColour\", 0xFF000000);\n\nconst var pnlColour = Content.addPanel(\"pnlColour\", 0, 50);\npnlColour.set(\"width\", 750);\npnlColour.set(\"height\", 100);\npnlColour.setPaintRoutine(function(g){g.fillAll(parseInt(colourString));});\n\ninline function convertToHex(v)\n{\n\treg hexTable = [\"0\", \"1\", \"2\", \"3\", \"4\", \"5\", \"6\", \"7\", \"8\", \"9\", \"A\", \"B\", \"C\", \"D\", \"E\", \"F\"];\n\treg d1 = hexTable[Math.floor(v/16)];\n\treg d2 = hexTable[Math.floor(v % 16)];\n\t\n\treturn d1 + d2;\n}\n\ninline function updateCode()\n{\n\tcode.set(\"text\", \"0x\" + colour[0] + colour[1] + colour[2] + colour[3]);\n\tcolourString = \"0x\" + colour[0] + colour[1] + colour[2] + colour[3];\t\n}function onNoteOn()\n{\n\t\n}\nfunction onNoteOff()\n{\n\t\n}\nfunction onController()\n{\n\t\n}\nfunction onTimer()\n{\n\t\n}\nfunction onControl(number, value)\n{\n\tswitch (number)\n\t{\n\t\tcase alpha:\n\t\t\tcolour[0] = convertToHex(parseInt(value));\n\t\t\tupdateCode();\n\t\t\tpnlColour.repaintImmediately();\n\t\tbreak;\n\t\t\n\t\tcase red:\n\t\t\tcolour[1] = convertToHex(parseInt(value));\n\t\t\tupdateCode();\n\t\t\tpnlColour.repaintImmediately();\n\t\tbreak;\n\t\t\n\t\tcase green:\n\t\t\tcolour[2] = convertToHex(parseInt(value));\n\t\t\tupdateCode();\n\t\t\tpnlColour.repaintImmediately();\n\t\tbreak;\n\t\t\n\t\tcase blue:\n\t\t\tcolour[3] = convertToHex(parseInt(value));\n\t\t\tupdateCode();\n\t\t\tpnlColour.repaintImmediately();\n\t\tbreak;\t\t\n\t}\n}",
+    "url": "https://forum.hise.audio/topic/395",
+    "featured": true
+  },
+  {
+    "title": "Basic Graphics Drawing Primitives",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "expert"
+    ],
+    "description": "Panel setPaintRoutine with drawEllipse, drawTriangle, and drawLine to render basic shapes. Shows the area array format [x, y, width, height] and border-size parameter for each Graphics drawing method.",
+    "code": "Content.setHeight(150);\n\nvar area = Content.addPanel(\"area\", 0, 0);\n\n// [/JSON area]\narea.set(\"width\", 150);\narea.set(\"height\", 150);\n\n// Define a paint routine\narea.setPaintRoutine(function(g)\n{\n\tg.setColour(4294901730);\n\tg.drawEllipse([10, 10, 100, 100], 5); //x, y, width, height, border size\n\tg.drawEllipse([30, 40, 20, 20], 5); //x, y, width, height, border size\t\n\tg.drawEllipse([70, 40, 20, 20], 5); //x, y, width, height, border size\t\n\tg.drawTriangle([55, 60, 10, 10], 0, 3);\n\tg.drawLine(45, 75, 90, 90, 5);\n});",
+    "url": "https://forum.hise.audio/topic/169",
+    "featured": false
+  },
+  {
+    "title": "Knob Configuration with setPropertiesFromJSON",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "Scripting",
+      "author"
+    ],
+    "description": "Content.setPropertiesFromJSON to configure a knob's min, max, mode, stepSize, middlePosition, and suffix in a single call. Shows the JSON property object format for batch-setting component properties including Decibel mode.",
+    "code": "Content.makeFrontInterface(600, 500);\nconst var Knob = Content.addKnob(\"Knob\", 76, 19);\n// [JSON Knob]\nContent.setPropertiesFromJSON(\"Knob\", {\n \"min\": -100,\n \"max\": 0,\n \"saveInPreset\": 0,\n \"mode\": \"Decibel\",\n \"stepSize\": 0.1,\n \"middlePosition\": -12,\n \"suffix\": \" dB\"\n});\n// [/JSON Knob]\n\nKnob.set(\"saveInPreset\", false);;\nKnob.setValue(-18.0);\nConsole.print(Knob.getValueNormalized()); // 0.34...",
+    "url": "https://forum.hise.audio/topic/380",
+    "featured": false
+  }
+]

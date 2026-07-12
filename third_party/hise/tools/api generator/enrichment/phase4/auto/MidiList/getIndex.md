@@ -1,0 +1,1 @@
+Scans the array from index 0 upward and returns the first slot that contains the given value, or `-1` if not found. This is the MidiList equivalent of `Array.indexOf()` - useful for reverse-lookups like finding which MIDI note is mapped to a particular value.

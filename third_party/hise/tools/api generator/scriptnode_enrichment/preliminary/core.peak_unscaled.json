@@ -1,0 +1,80 @@
+{
+  "factoryPath": "core.peak_unscaled",
+  "factory": "core",
+  "nodeId": "peak_unscaled",
+  "description": "create a raw modulation signal from the input",
+
+  "classification": {
+    "signalPathRole": "analysis",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/peak_unscaled.md",
+    "tier": "GOOD",
+    "lines": 38
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "raw-vs-scaled",
+      "category": "signal_path",
+      "question": "How does peak_unscaled differ from core.peak? The description says 'raw' -- does this mean no abs() is applied, or no normalisation to 0..1, or both? Does it pass through negative values?",
+      "context": "The key disambiguation between peak and peak_unscaled must be precise."
+    },
+    {
+      "id": "unnormalised-output",
+      "category": "signal_path",
+      "question": "Despite no UseUnnormalisedModulation flag in cppProperties, the name says 'unscaled'. Does the modulation output truly send unnormalised values? If so, what range can the output have?",
+      "context": "Receiving parameters need compatible ranges if the output is not 0..1."
+    },
+    {
+      "id": "audio-passthrough",
+      "category": "signal_path",
+      "question": "Does core.peak_unscaled pass the audio signal through unchanged?",
+      "context": "Same question as core.peak -- determines inline vs split usage."
+    },
+    {
+      "id": "detection-algorithm",
+      "category": "signal_path",
+      "question": "Does peak_unscaled use the same detection algorithm as core.peak (just without scaling), or is the measurement fundamentally different?",
+      "context": "Users choosing between the two variants need to know all differences."
+    }
+  ],
+
+  "notes": "core.peak_unscaled is the raw/unscaled variant of core.peak. The description says 'raw modulation signal from the input' vs peak's 'absolute input magnitude'. Notably, the cppProperties do not include UseUnnormalisedModulation, which is unexpected for an 'unscaled' node -- this needs verification in C++ exploration. Has ModulationTargets and DisplayBuffer like core.peak."
+}

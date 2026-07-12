@@ -1,0 +1,3 @@
+Adds a primary channel connection from `sourceIndex` to `destinationIndex` and returns `true` on success. If the source already has a connection, the previous destination is overwritten. When routing to higher output pairs (channels 4+), always check the return value - the host DAW determines how many output channels are available, and the method returns `false` if the destination is not supported.
+
+> [!Warning:Stereo constraint auto-removes third connection] Under the default stereo constraint, adding a third connection automatically removes an existing one. Call `setNumChannels()` first to relax this limit for multichannel routing.

@@ -1,0 +1,104 @@
+{
+  "targetId": "envelope.ahdsr",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [5492, 10818, 2926, 7890, 13481, 3582, 8757, 4626, 9615, 9608, 13641, 8677],
+  "insights": [
+    {
+      "type": "BUG",
+      "title": "Monophonic mode disables voice killing",
+      "summary": "Switching an envelope to monophonic mode causes it to lose its ability to kill voices. The envelope slips through the normal detection that would throw an error when the envelope is not in the signal chain. Workaround: add a second envelope left in polyphonic mode to handle voice lifecycle.",
+      "sources": ["tid:9608"],
+      "verify": true,
+      "verify_hint": "Search EnvelopeNodes.h for monophonic handling and voice kill logic; grep for 'monophonic' and 'kill' near envelope state transitions"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Attack, Decay, Release time values are internally doubled",
+      "summary": "The Attack, Decay, and Release parameter values are multiplied by 2.0 internally before being passed to the state setters, because modValues[] are initialised to 0.5 (simulating a modulation chain at half intensity). This means the displayed value is halved relative to the actual coefficient calculation, which can cause confusion when comparing envelope timing with external tools.",
+      "sources": [],
+      "verify": true,
+      "verify_hint": "In EnvelopeNodes.h, search for 'v * 2.0f' or 'modValues' near parameter setters for Attack/Decay/Release"
+    },
+    {
+      "type": "BUG",
+      "title": "Attack level bug: envelope stalls if attack level is below sustain level",
+      "summary": "If the AttackLevel parameter is set below the Sustain level, the envelope never advances past the attack phase and remains stuck. Additionally, modulating the AttackLevel via a modulator gives a 0-100% normalised value rather than the expected dB value.",
+      "sources": ["tid:3582"],
+      "verify": true,
+      "verify_hint": "In EnvelopeNodes.h, check ATTACK state transition condition: 'current_value >= attackLevel'; verify what happens when attackLevel < sustain"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Retrigger in monophonic mode does not restart from zero by default",
+      "summary": "When Retrigger is enabled, the RETRIGGER state immediately jumps back to ATTACK and continues from the current envelope value — it does not reset to zero. Restarting from zero requires the compile-time define HISE_RAMP_RETRIGGER_ENVELOPES_FROM_ZERO, which ramps down at 0.005/sample before re-entering attack.",
+      "sources": ["tid:13481"],
+      "verify": true,
+      "verify_hint": "Search EnvelopeNodes.h for 'HISE_RAMP_RETRIGGER_ENVELOPES_FROM_ZERO' and the RETRIGGER state handler"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Envelope cannot be used as a global modulator on container-level FX",
+      "summary": "Envelopes cannot modulate parameters on effects placed at the container (root FX) level because containers have no concept of voices. To use an envelope as a global modulator across multiple sound generators, a uniform voice handler must be enabled via Synth.setUseUniformVoiceHandler() so that voices are allocated synchronously.",
+      "sources": ["tid:7890"],
+      "verify": false,
+      "verify_hint": "Confirmed by Christoph Hart [author]"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use pma node for envelope-to-filter-cutoff modulation",
+      "summary": "To modulate filter cutoff with an AHDSR while still exposing a usable cutoff knob, the recommended pattern is to use a pma (piecewise multiply-add) node. Alternatively, chain a math.add (for the base cutoff value, in its own modchain) with a math.mul (scaled by the envelope) and a peak node to drive the target parameter.",
+      "sources": ["tid:9615"],
+      "verify": false,
+      "verify_hint": "No engine claim; pattern confirmed by trusted/expert posters"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Both envelope and target node must be inside the midichain container for sample-accurate modulation",
+      "summary": "Placing the envelope or target node outside the midichain container causes it to lose sample accuracy — only the value from the last MIDI message is applied to the entire buffer. Both the modulation source and its target must reside inside the midichain container to benefit from buffer chopping on MIDI events.",
+      "sources": ["tid:7890"],
+      "verify": false,
+      "verify_hint": "Confirmed by Christoph Hart [author]; architectural detail"
+    },
+    {
+      "type": "BUG",
+      "title": "Sustain CC (CC64) ignored inside a scriptnode envelope modulator",
+      "summary": "The sustain pedal (MIDI CC 64) works correctly with the flex envelope outside of scriptnode, but is ignored when the envelope is used inside a scriptnode network. This was flagged as a likely bug by a trusted poster.",
+      "sources": ["tid:13641"],
+      "verify": true,
+      "verify_hint": "Search handleHiseEvent() in EnvelopeNodes.h for CC64 / sustain pedal handling; check if MIDI CC events are forwarded into scriptnode networks"
+    },
+    {
+      "type": "BUG",
+      "title": "Occasional click on hold phase start",
+      "summary": "A click can appear at the transition into the hold phase. Wiggling the Hold knob sometimes resolves it, suggesting a transient coefficient calculation glitch rather than a steady-state issue.",
+      "sources": ["tid:2926"],
+      "verify": true,
+      "verify_hint": "Search EnvelopeNodes.h for HOLD state entry and holdTimeSamples initialisation; check calculateCoefficients() for the hold phase"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "AHDSR visual display only works when attached to an active sound generator",
+      "summary": "The AHDSR graphical display does not update unless the node is connected to an active (playing) sound generator. Opening the display on an idle or disconnected envelope shows no animation.",
+      "sources": ["tid:4351"],
+      "verify": false,
+      "verify_hint": "Confirmed by David Healey [expert]; related to ExecutionLimiter throttle in ahdsr_base display buffer"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Removing stage indicators requires a Global LAF override",
+      "summary": "AHDSR stage indicators (the animated ball and phase highlights) can only be suppressed via a Global Look and Feel, not a Local one. Override drawAhdsrBall, drawAhdsrPath, and drawAhdsrBackground with empty functions, and convert obj.path to string to selectively skip the unwanted paint calls.",
+      "sources": ["tid:8677"],
+      "verify": false,
+      "verify_hint": "UI/LAF pattern; no engine behaviour claimed"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "AHDSR envelope curves in the legacy module may not match displayed shape",
+      "summary": "A trusted contributor noted that the visual curves of the original AHDSR module do not always reflect the actual audio curve, and that one or more knobs may be disconnected. This was partially fixed in a community contribution but the changes were never merged due to internal refactoring.",
+      "sources": ["tid:4626"],
+      "verify": true,
+      "verify_hint": "Search ahdsr_base::setAttackCurve and calculateCoefficients in EnvelopeNodes.h; compare the displayed curve math with the actual coefficient formula"
+    }
+  ]
+}

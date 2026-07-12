@@ -1,0 +1,1 @@
+Returns an array of sample map reference strings for this expansion. The `.xml` extension is stripped from each entry, so the strings are ready to pass to `Sampler.loadSampleMap()`. Does not scan the filesystem - returns maps already known to the pool from initialisation.

@@ -1,0 +1,64 @@
+{
+  "factoryPath": "container.oversample",
+  "nodes": [
+    {
+      "id": "in",
+      "label": "Audio In",
+      "type": "input",
+      "importance": 1.0,
+      "description": "Input audio signal at original sample rate"
+    },
+    {
+      "id": "upsample",
+      "label": "Upsample",
+      "type": "process",
+      "importance": 1.0,
+      "description": "JUCE dsp::Oversampling upsamples signal by configured factor (1x-16x)"
+    },
+    {
+      "id": "child_chain",
+      "label": "Serial Child Chain",
+      "type": "process",
+      "importance": 1.0,
+      "description": "Children process serially at upsampled rate (sampleRate * factor, blockSize * factor)"
+    },
+    {
+      "id": "downsample",
+      "label": "Downsample",
+      "type": "process",
+      "importance": 1.0,
+      "description": "JUCE dsp::Oversampling downsamples signal back to original rate with anti-aliasing filter"
+    },
+    {
+      "id": "oversampling",
+      "label": "Oversampling",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Oversampling factor exponent (0=None/1x, 1=2x, 2=4x, 3=8x, 4=16x). Dynamic variant only."
+    },
+    {
+      "id": "filter_type",
+      "label": "FilterType",
+      "type": "parameter",
+      "importance": 0.8,
+      "description": "Anti-aliasing filter type: 0=Polyphase (lower latency), 1=FIR (steeper rolloff)"
+    },
+    {
+      "id": "out",
+      "label": "Audio Out",
+      "type": "output",
+      "importance": 1.0,
+      "description": "Output audio signal at original sample rate"
+    }
+  ],
+  "edges": [
+    { "from": "in", "to": "upsample", "type": "signal", "label": null },
+    { "from": "upsample", "to": "child_chain", "type": "signal", "label": "numSamples * factor" },
+    { "from": "child_chain", "to": "downsample", "type": "signal", "label": null },
+    { "from": "downsample", "to": "out", "type": "signal", "label": null },
+    { "from": "oversampling", "to": "upsample", "type": "control", "label": "factor" },
+    { "from": "oversampling", "to": "downsample", "type": "control", "label": "factor" },
+    { "from": "filter_type", "to": "upsample", "type": "control", "label": "filter" },
+    { "from": "filter_type", "to": "downsample", "type": "control", "label": "filter" }
+  ]
+}

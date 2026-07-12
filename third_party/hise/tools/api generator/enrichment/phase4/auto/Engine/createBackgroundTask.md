@@ -1,0 +1,1 @@
+Creates a background task that can run heavyweight operations on a separate thread without blocking the audio or UI thread. The returned object provides methods for running processes, tracking progress, sending abort signals, and forwarding status to the loading overlay. The background thread is automatically aborted when the script is recompiled.

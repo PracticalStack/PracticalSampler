@@ -1,0 +1,1 @@
+Reads a JSON file from disk and returns the parsed object. Relative paths are resolved against the UserPresets directory. Returns `undefined` silently if the file does not exist - check the return value with `isDefined()` before accessing properties.

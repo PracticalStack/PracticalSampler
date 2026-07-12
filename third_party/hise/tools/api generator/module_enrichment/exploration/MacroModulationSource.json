@@ -1,0 +1,53 @@
+{
+  "moduleId": "MacroModulationSource",
+  "nodes": [
+    {
+      "id": "macro_chains",
+      "type": "modulation",
+      "label": "Macro Chains (1-8)",
+      "importance": 1,
+      "detail": "Modulation chains whose output drives macro control slots. Any modulator type accepted."
+    },
+    {
+      "id": "chain_render",
+      "type": "process",
+      "label": "Chain Rendering",
+      "importance": 1,
+      "detail": "Renders all macro chains via preVoiceRendering(). Reads first sample of each chain output."
+    },
+    {
+      "id": "delta_check",
+      "type": "decision",
+      "label": "Delta Check",
+      "importance": 2,
+      "detail": "Only sends update if value changed from previous block"
+    },
+    {
+      "id": "scale_to_127",
+      "type": "process",
+      "label": "Scale to 0-127",
+      "importance": 2,
+      "detail": "Multiplies 0-1 modulation output by 127 for the macro system"
+    },
+    {
+      "id": "macro_system",
+      "type": "external",
+      "label": "Macro Control System",
+      "importance": 1,
+      "detail": "Global macro slots that distribute values to connected parameters and MacroModulators"
+    }
+  ],
+  "edges": [
+    { "from": "macro_chains", "to": "chain_render" },
+    { "from": "chain_render", "to": "delta_check" },
+    { "from": "delta_check", "to": "scale_to_127", "type": "conditional", "label": "value changed" },
+    { "from": "scale_to_127", "to": "macro_system" }
+  ],
+  "groups": [
+    {
+      "id": "chain_processing",
+      "label": "Modulation Processing",
+      "nodes": ["macro_chains", "chain_render", "delta_check", "scale_to_127"]
+    }
+  ]
+}

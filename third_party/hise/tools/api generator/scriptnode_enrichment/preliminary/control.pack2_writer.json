@@ -1,0 +1,107 @@
+{
+  "factoryPath": "control.pack2_writer",
+  "factory": "control",
+  "nodeId": "pack2_writer",
+  "description": "Writes the values from the parameter sliders into a slider pack",
+
+  "classification": {
+    "signalPathRole": "utility",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Value inputs",
+      "rationale": "Each Value parameter writes to the corresponding index in the connected SliderPack",
+      "parameters": [
+        {
+          "id": "Value1",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Value2",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 1,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": true,
+    "groupName": "packN_writer",
+    "templateParameter": "number of Value parameters",
+    "variantValue": "2"
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/pack2_writer.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "write-mechanism",
+      "category": "signal_path",
+      "question": "How does packN_writer write values into the SliderPack? Does it call setSliderPackData or write directly to the float array? Does it trigger UI updates (ComplexDataUIUpdaterBase notifications)?",
+      "context": "Need to understand the exact write mechanism for accurate documentation of how parameter changes propagate to the slider pack."
+    },
+    {
+      "id": "slider-pack-size-mismatch",
+      "category": "parameter_behaviour",
+      "question": "What happens if the connected SliderPack has fewer entries than the number of Value parameters (e.g., a 1-element pack connected to pack2_writer)? Are extra values silently dropped?",
+      "context": "Users need to know if the pack must be pre-sized to match the parameter count."
+    },
+    {
+      "id": "no-iscontrolnode-flag",
+      "category": "description_accuracy",
+      "question": "packN_writer has OutsideSignalPath=true but IsControlNode is NOT set. This means it is a utility node with no modulation output. Confirm from C++ that packN_writer does not inherit from parameter_node_base and has no output cable.",
+      "context": "Important classification distinction: packN_writer writes to ComplexData rather than sending to parameter targets."
+    },
+    {
+      "id": "value-range-handling",
+      "category": "parameter_behaviour",
+      "question": "All Value parameters have range 0..1. Are incoming modulated values clamped to this range, or can values outside 0..1 be written to the slider pack?",
+      "context": "Determines whether users can use custom ranges on the input connections."
+    },
+    {
+      "id": "concurrent-write-safety",
+      "category": "performance",
+      "question": "Is there any locking when writing to the SliderPack from parameter callbacks? Could concurrent writes from multiple modulation sources cause issues?",
+      "context": "Relevant for real-time safety documentation."
+    }
+  ],
+
+  "notes": "pack2_writer is the base variant of the packN_writer group (N=2 through 8). All variants are structurally identical except for the number of Value parameters. The node is classified as utility (OutsideSignalPath=true, IsControlNode=false) because it writes to a SliderPack ComplexData slot rather than sending values through the parameter cable system. This is the reverse operation of cable_pack (which reads from a SliderPack). Each ValueN parameter writes to slider index N-1."
+}

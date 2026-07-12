@@ -1,0 +1,1 @@
+Returns `true` if the array has no elements. HISE-specific method not available in standard JavaScript. Safe to call on the audio thread.

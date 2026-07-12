@@ -1,0 +1,598 @@
+{
+  "className": "Broadcaster",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "addComponentPropertyListener": {
+      "signature": "bool addComponentPropertyListener(var object, var propertyList, var metadata, var optionalFunction)",
+      "returnType": "bool",
+      "description": "Adds a listener that sets the properties of the given components when the broadcaster receives a message.",
+      "parameters": [
+        {
+          "name": "object",
+          "type": "var"
+        },
+        {
+          "name": "propertyList",
+          "type": "var"
+        },
+        {
+          "name": "metadata",
+          "type": "var"
+        },
+        {
+          "name": "optionalFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "addComponentRefreshListener": {
+      "signature": "bool addComponentRefreshListener(var componentIds, String refreshType, var metadata)",
+      "returnType": "bool",
+      "description": "Adds a listener that will cause a refresh message (eg. repaint(), changed()) to be send out to the given components.",
+      "parameters": [
+        {
+          "name": "componentIds",
+          "type": "var"
+        },
+        {
+          "name": "refreshType",
+          "type": "String"
+        },
+        {
+          "name": "metadata",
+          "type": "var"
+        }
+      ]
+    },
+    "addComponentValueListener": {
+      "signature": "bool addComponentValueListener(var object, var metadata, var optionalFunction)",
+      "returnType": "bool",
+      "description": "Adds a listener that sets the value of the given components when the broadcaster receives a message.",
+      "parameters": [
+        {
+          "name": "object",
+          "type": "var"
+        },
+        {
+          "name": "metadata",
+          "type": "var"
+        },
+        {
+          "name": "optionalFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "addDelayedListener": {
+      "signature": "bool addDelayedListener(int delayInMilliSeconds, var obj, var metadata, var function)",
+      "returnType": "bool",
+      "description": "Adds a listener that will be executed with a delay.",
+      "parameters": [
+        {
+          "name": "delayInMilliSeconds",
+          "type": "int"
+        },
+        {
+          "name": "obj",
+          "type": "var"
+        },
+        {
+          "name": "metadata",
+          "type": "var"
+        },
+        {
+          "name": "function",
+          "type": "var"
+        }
+      ]
+    },
+    "addListener": {
+      "signature": "bool addListener(var object, var metadata, var function)",
+      "returnType": "bool",
+      "description": "Adds a listener that is notified when a message is send. The object can be either a JSON object, a script object or a simple string.",
+      "parameters": [
+        {
+          "name": "object",
+          "type": "var"
+        },
+        {
+          "name": "metadata",
+          "type": "var"
+        },
+        {
+          "name": "function",
+          "type": "var"
+        }
+      ]
+    },
+    "addModuleParameterSyncer": {
+      "signature": "bool addModuleParameterSyncer(String moduleId, var parameterIndex, var metadata)",
+      "returnType": "bool",
+      "description": "Adds a listener that will sync module parameters from the attached module parameter source.",
+      "parameters": [
+        {
+          "name": "moduleId",
+          "type": "String"
+        },
+        {
+          "name": "parameterIndex",
+          "type": "var"
+        },
+        {
+          "name": "metadata",
+          "type": "var"
+        }
+      ]
+    },
+    "attachToComplexData": {
+      "signature": "void attachToComplexData(String dataTypeAndEvent, var moduleIds, var dataIndexes, var optionalMetadata)",
+      "returnType": "void",
+      "description": "Registers this broadcaster to be notified when a complex data object changes.",
+      "parameters": [
+        {
+          "name": "dataTypeAndEvent",
+          "type": "String"
+        },
+        {
+          "name": "moduleIds",
+          "type": "var"
+        },
+        {
+          "name": "dataIndexes",
+          "type": "var"
+        },
+        {
+          "name": "optionalMetadata",
+          "type": "var"
+        }
+      ]
+    },
+    "attachToComponentMouseEvents": {
+      "signature": "void attachToComponentMouseEvents(var componentIds, var callbackLevel, var optionalMetadata)",
+      "returnType": "void",
+      "description": "Registers this broadcaster to be notified for mouse events for the given components.",
+      "parameters": [
+        {
+          "name": "componentIds",
+          "type": "var"
+        },
+        {
+          "name": "callbackLevel",
+          "type": "var"
+        },
+        {
+          "name": "optionalMetadata",
+          "type": "var"
+        }
+      ]
+    },
+    "attachToComponentProperties": {
+      "signature": "void attachToComponentProperties(var componentIds, var propertyIds, var optionalMetadata)",
+      "returnType": "void",
+      "description": "Registers this broadcaster to be called when one of the properties of the given components change.",
+      "parameters": [
+        {
+          "name": "componentIds",
+          "type": "var"
+        },
+        {
+          "name": "propertyIds",
+          "type": "var"
+        },
+        {
+          "name": "optionalMetadata",
+          "type": "var"
+        }
+      ]
+    },
+    "attachToComponentValue": {
+      "signature": "void attachToComponentValue(var componentIds, var optionalMetadata)",
+      "returnType": "void",
+      "description": "Registers this broadcaster to be called when the value of the given components change.",
+      "parameters": [
+        {
+          "name": "componentIds",
+          "type": "var"
+        },
+        {
+          "name": "optionalMetadata",
+          "type": "var"
+        }
+      ]
+    },
+    "attachToComponentVisibility": {
+      "signature": "void attachToComponentVisibility(var componentIds, var optionalMetadata)",
+      "returnType": "void",
+      "description": "Registers this broadcaster to be called when the visibility of one of the components (or one of its parent component) changes.",
+      "parameters": [
+        {
+          "name": "componentIds",
+          "type": "var"
+        },
+        {
+          "name": "optionalMetadata",
+          "type": "var"
+        }
+      ]
+    },
+    "attachToContextMenu": {
+      "signature": "void attachToContextMenu(var componentIds, var stateFunction, var itemList, var optionalMetadata, var useLeftClick)",
+      "returnType": "void",
+      "description": "Registers this broadcaster to be notified when a context menu item from the given components was selected.",
+      "parameters": [
+        {
+          "name": "componentIds",
+          "type": "var"
+        },
+        {
+          "name": "stateFunction",
+          "type": "var"
+        },
+        {
+          "name": "itemList",
+          "type": "var"
+        },
+        {
+          "name": "optionalMetadata",
+          "type": "var"
+        },
+        {
+          "name": "useLeftClick",
+          "type": "var"
+        }
+      ]
+    },
+    "attachToEqEvents": {
+      "signature": "void attachToEqEvents(var moduleIds, var eventTypes, var optionalMetadata)",
+      "returnType": "void",
+      "description": "Registers this broadcaster to be notified about changes to the EQ (adding / removing / selecting filter bands).",
+      "parameters": [
+        {
+          "name": "moduleIds",
+          "type": "var"
+        },
+        {
+          "name": "eventTypes",
+          "type": "var"
+        },
+        {
+          "name": "optionalMetadata",
+          "type": "var"
+        }
+      ]
+    },
+    "attachToInterfaceSize": {
+      "signature": "void attachToInterfaceSize(var optionalMetadata)",
+      "returnType": "void",
+      "description": "Registers the broadcaster to be notified when the interface size changes.",
+      "parameters": [
+        {
+          "name": "optionalMetadata",
+          "type": "var"
+        }
+      ]
+    },
+    "attachToModuleParameter": {
+      "signature": "void attachToModuleParameter(var moduleIds, var parameterIds, var optionalMetadata)",
+      "returnType": "void",
+      "description": "Registers this broadcaster to be notified when a module parameter changes.",
+      "parameters": [
+        {
+          "name": "moduleIds",
+          "type": "var"
+        },
+        {
+          "name": "parameterIds",
+          "type": "var"
+        },
+        {
+          "name": "optionalMetadata",
+          "type": "var"
+        }
+      ]
+    },
+    "attachToNonRealtimeChange": {
+      "signature": "void attachToNonRealtimeChange(var optionalMetadata)",
+      "returnType": "void",
+      "description": "Attaches this broadcaster to receive realtime / nonrealtime render change events.",
+      "parameters": [
+        {
+          "name": "optionalMetadata",
+          "type": "var"
+        }
+      ]
+    },
+    "attachToOtherBroadcaster": {
+      "signature": "void attachToOtherBroadcaster(var otherBroadcaster, var argTransformFunction, bool async, var optionalMetadata)",
+      "returnType": "void",
+      "description": "Attaches this broadcaster to another broadcaster(s) to forward the messages.",
+      "parameters": [
+        {
+          "name": "otherBroadcaster",
+          "type": "var"
+        },
+        {
+          "name": "argTransformFunction",
+          "type": "var"
+        },
+        {
+          "name": "async",
+          "type": "bool"
+        },
+        {
+          "name": "optionalMetadata",
+          "type": "var"
+        }
+      ]
+    },
+    "attachToProcessingSpecs": {
+      "signature": "void attachToProcessingSpecs(var optionalMetadata)",
+      "returnType": "void",
+      "description": "Attaches this broadcaster to changes of the audio processing specs (samplerate / buffer size).",
+      "parameters": [
+        {
+          "name": "optionalMetadata",
+          "type": "var"
+        }
+      ]
+    },
+    "attachToRadioGroup": {
+      "signature": "void attachToRadioGroup(int radioGroupIndex, var optionalMetadata)",
+      "returnType": "void",
+      "description": "Registers this broadcaster to be notified when a button of a radio group is clicked.",
+      "parameters": [
+        {
+          "name": "radioGroupIndex",
+          "type": "int"
+        },
+        {
+          "name": "optionalMetadata",
+          "type": "var"
+        }
+      ]
+    },
+    "attachToRoutingMatrix": {
+      "signature": "void attachToRoutingMatrix(var moduleIds, var optionalMetadata)",
+      "returnType": "void",
+      "description": "Attaches this broadcaster to a routing matrix and listens for changes.",
+      "parameters": [
+        {
+          "name": "moduleIds",
+          "type": "var"
+        },
+        {
+          "name": "optionalMetadata",
+          "type": "var"
+        }
+      ]
+    },
+    "attachToSampleMap": {
+      "signature": "void attachToSampleMap(var samplerIds, var eventTypes, var optionalMetadata)",
+      "returnType": "void",
+      "description": "Attaches the broadcaster to events of a samplemap (loading, changing, adding samples).",
+      "parameters": [
+        {
+          "name": "samplerIds",
+          "type": "var"
+        },
+        {
+          "name": "eventTypes",
+          "type": "var"
+        },
+        {
+          "name": "optionalMetadata",
+          "type": "var"
+        }
+      ]
+    },
+    "callWithDelay": {
+      "signature": "void callWithDelay(int delayInMilliseconds, var argArray, var function)",
+      "returnType": "void",
+      "description": "Calls a function after a short period of time. This is exclusive, so if you pass in a new function while another is pending, the first will be replaced.",
+      "parameters": [
+        {
+          "name": "delayInMilliseconds",
+          "type": "int"
+        },
+        {
+          "name": "argArray",
+          "type": "var"
+        },
+        {
+          "name": "function",
+          "type": "var"
+        }
+      ]
+    },
+    "isBypassed": {
+      "signature": "bool isBypassed()",
+      "returnType": "bool",
+      "description": "Checks if the broadcaster is bypassed.",
+      "parameters": []
+    },
+    "refreshContextMenuState": {
+      "signature": "void refreshContextMenuState()",
+      "returnType": "void",
+      "description": "If this broadcaster is attached to a context menu, calling this method will update the states for the menu items.",
+      "parameters": []
+    },
+    "removeAllListeners": {
+      "signature": "void removeAllListeners()",
+      "returnType": "void",
+      "description": "Removes all listeners.",
+      "parameters": []
+    },
+    "removeAllSources": {
+      "signature": "void removeAllSources()",
+      "returnType": "void",
+      "description": "Removes all sources.",
+      "parameters": []
+    },
+    "removeListener": {
+      "signature": "bool removeListener(var idFromMetadata)",
+      "returnType": "bool",
+      "description": "Removes the listener that was assigned with the given object.",
+      "parameters": [
+        {
+          "name": "idFromMetadata",
+          "type": "var"
+        }
+      ]
+    },
+    "removeSource": {
+      "signature": "bool removeSource(var metadata)",
+      "returnType": "bool",
+      "description": "Removes the source with the given metadata.",
+      "parameters": [
+        {
+          "name": "metadata",
+          "type": "var"
+        }
+      ]
+    },
+    "resendLastMessage": {
+      "signature": "void resendLastMessage(var isSync)",
+      "returnType": "void",
+      "description": "Resends the current state.",
+      "parameters": [
+        {
+          "name": "isSync",
+          "type": "var"
+        }
+      ]
+    },
+    "reset": {
+      "signature": "void reset()",
+      "returnType": "void",
+      "description": "Resets the state.",
+      "parameters": []
+    },
+    "sendAsyncMessage": {
+      "signature": "void sendAsyncMessage(var args)",
+      "returnType": "void",
+      "description": "Sends an asynchronous message to all listeners. the length of args must match the default value list.",
+      "parameters": [
+        {
+          "name": "args",
+          "type": "var"
+        }
+      ]
+    },
+    "sendMessage": {
+      "signature": "void sendMessage(var args, bool isSync)",
+      "returnType": "void",
+      "description": "deprecated function (use sendSyncMessage / sendAsyncMessage instead).",
+      "parameters": [
+        {
+          "name": "args",
+          "type": "var"
+        },
+        {
+          "name": "isSync",
+          "type": "bool"
+        }
+      ]
+    },
+    "sendMessageWithDelay": {
+      "signature": "void sendMessageWithDelay(var args, int delayInMilliseconds)",
+      "returnType": "void",
+      "description": "Sends a message to all listeners with a delay.",
+      "parameters": [
+        {
+          "name": "args",
+          "type": "var"
+        },
+        {
+          "name": "delayInMilliseconds",
+          "type": "int"
+        }
+      ]
+    },
+    "sendSyncMessage": {
+      "signature": "void sendSyncMessage(var args)",
+      "returnType": "void",
+      "description": "Sends a synchronous message to all listeners (same as the dot assignment operator). the length of args must match the default value list.",
+      "parameters": [
+        {
+          "name": "args",
+          "type": "var"
+        }
+      ]
+    },
+    "setBypassed": {
+      "signature": "void setBypassed(bool shouldBeBypassed, bool sendMessageIfEnabled, bool async)",
+      "returnType": "void",
+      "description": "Deactivates the broadcaster so that it will not send messages. If sendMessageIfEnabled is true, it will send the last value when unbypassed.",
+      "parameters": [
+        {
+          "name": "shouldBeBypassed",
+          "type": "bool"
+        },
+        {
+          "name": "sendMessageIfEnabled",
+          "type": "bool"
+        },
+        {
+          "name": "async",
+          "type": "bool"
+        }
+      ]
+    },
+    "setEnableQueue": {
+      "signature": "void setEnableQueue(bool shouldUseQueue)",
+      "returnType": "void",
+      "description": "If this is enabled, the broadcaster will keep an internal queue of all messages and will guarantee to send them all.",
+      "parameters": [
+        {
+          "name": "shouldUseQueue",
+          "type": "bool"
+        }
+      ]
+    },
+    "setForceSynchronousExecution": {
+      "signature": "void setForceSynchronousExecution(bool shouldExecuteSynchronously)",
+      "returnType": "void",
+      "description": "Forces every message to be sent synchronously.",
+      "parameters": [
+        {
+          "name": "shouldExecuteSynchronously",
+          "type": "bool"
+        }
+      ]
+    },
+    "setRealtimeMode": {
+      "signature": "void setRealtimeMode(bool enableRealTimeMode)",
+      "returnType": "void",
+      "description": "Guarantees that the synchronous execution of the listener callbacks can be called from the audio thread.",
+      "parameters": [
+        {
+          "name": "enableRealTimeMode",
+          "type": "bool"
+        }
+      ]
+    },
+    "setReplaceThisReference": {
+      "signature": "void setReplaceThisReference(bool shouldReplaceThisReference)",
+      "returnType": "void",
+      "description": "This will control whether the `this` reference for the listener function will be replaced with the object passed into `addListener`.",
+      "parameters": [
+        {
+          "name": "shouldReplaceThisReference",
+          "type": "bool"
+        }
+      ]
+    },
+    "setSendMessageForUndefinedArgs": {
+      "signature": "void setSendMessageForUndefinedArgs(bool shouldSendWhenUndefined)",
+      "returnType": "void",
+      "description": "Forces the broadcaster to also send a message when a parameter is undefined.",
+      "parameters": [
+        {
+          "name": "shouldSendWhenUndefined",
+          "type": "bool"
+        }
+      ]
+    }
+  }
+}

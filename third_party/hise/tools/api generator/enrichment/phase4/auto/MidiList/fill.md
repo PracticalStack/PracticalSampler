@@ -1,0 +1,1 @@
+Sets all 128 slots to the same value in a single native operation. This is the fastest way to initialise a MidiList - significantly faster than looping through slots with `setValue()`. Passing `-1` is equivalent to calling `clear()`.

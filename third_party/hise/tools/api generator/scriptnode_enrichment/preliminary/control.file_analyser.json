@@ -1,0 +1,81 @@
+{
+  "factoryPath": "control.file_analyser",
+  "factory": "control",
+  "nodeId": "file_analyser",
+  "description": "Extracts file information (pitch, length, etc) and sends it as modulation signal on file load",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "Mode",
+      "defaultValue": "Peak",
+      "type": "enum",
+      "note": "Selects which file property to extract (Peak, pitch, length, etc). Maps to a C++ template argument (HasModeTemplateArgument is true)."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": true,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/file_analyser.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "mode-variants",
+      "category": "conditional_logic",
+      "question": "What Mode values are available (Peak, Pitch, Length, others)? What does each mode extract from the audio file, and what units/range does the output value use?",
+      "context": "The Mode property is a template argument. Users need to know all available modes and what each outputs."
+    },
+    {
+      "id": "trigger-mechanism",
+      "category": "signal_path",
+      "question": "When exactly does the analysis trigger? Is it on setExternalData() (file load), or does it also re-trigger when the file content changes? Does it run synchronously or asynchronously?",
+      "context": "Users need to know when the modulation output fires to wire it correctly."
+    },
+    {
+      "id": "output-range",
+      "category": "parameter_behaviour",
+      "question": "What range do the output values have for each mode? For example, does Peak output in dB or linear? Does Length output in samples, milliseconds, or seconds?",
+      "context": "Since output is unnormalised, users need to know the raw value ranges to connect targets appropriately."
+    }
+  ],
+
+  "notes": "No parameters at all -- this node is purely driven by the audio file and Mode property. The HasModeTemplateArgument flag means Mode selects a C++ template specialization. The node has no IsPolyphonic flag, confirming monophonic operation."
+}

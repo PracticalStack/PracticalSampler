@@ -1,0 +1,1 @@
+Emits a deprecation warning to the console for Engine methods that have been replaced by the Settings class. This is an internal helper and serves no practical purpose in user scripts.

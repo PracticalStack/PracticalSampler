@@ -1,0 +1,3 @@
+Registers an inline function that is called when a voice starts for the specified layer. The callback receives the zero-based group index as its argument, which you can use to react to which group was triggered.
+
+> [!Warning:Handle IgnoreFlag value explicitly] The callback receives `ComplexGroupManager.IgnoreFlag` (255) as the group index when the started sample has no assignment in this layer. Handle this value explicitly rather than treating it as a regular group index.

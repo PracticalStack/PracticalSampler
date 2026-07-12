@@ -1,0 +1,114 @@
+{
+  "factoryPath": "container.repitch",
+  "factory": "container",
+  "nodeId": "repitch",
+  "description": "Resamples the audio signal and processes its child nodes with a different sample rate",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Resampling Configuration",
+      "rationale": "Both parameters control the resampling behavior: the pitch ratio and the interpolation quality.",
+      "parameters": [
+        {
+          "id": "RepitchFactor",
+          "range": { "min": 0.5, "max": 2.0, "step": 0.0, "skew": 0.6309297680854797 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Interpolation",
+          "range": { "min": 0.0, "max": 2.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "64.nT6K8CxM4F..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.STvP0IVZio.So4VYgImBN8lakAPXiQWZ1UF.ADf...",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "UI-only layout hint. Does not affect processing."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/container/repitch.md",
+    "tier": "BRIEF",
+    "lines": 17
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "resampling-flow",
+      "category": "signal_path",
+      "question": "Confirm the wrap::repitch processing flow: (1) compute internal sample count = round(numSamples / ratio), (2) downsample input into internal buffer per channel, (3) child processes internal buffer, (4) upsample result back to original buffer. Is the internal buffer allocated during prepare() (blockSize * MaxDownsampleFactor = blockSize * 2)?",
+      "context": "The resampling flow is the core feature. Users need to understand the relationship between RepitchFactor and effective sample rate."
+    },
+    {
+      "id": "interpolation-types",
+      "category": "parameter_behaviour",
+      "question": "Confirm the three interpolation types: 0=Cubic (CatmullRom, highest quality), 1=Linear (mid quality), 2=None (ZeroOrderHold, lowest quality). The base data has an encoded TextToValueConverter for the Interpolation parameter -- confirm these labels match.",
+      "context": "Users need clear guidance on quality vs CPU tradeoff for each interpolation type."
+    },
+    {
+      "id": "channel-limitation",
+      "category": "signal_path",
+      "question": "The infrastructure doc says repitch only works with 1 or 2 channels (hardcoded switch in process()). Confirm this limitation. What happens if placed in a multi-channel context (>2 channels)?",
+      "context": "Critical constraint that must be documented."
+    },
+    {
+      "id": "frame-processing-limitation",
+      "category": "signal_path",
+      "question": "Confirm that repitch asserts false in processFrame(). This means repitch containers cannot be nested inside frame-based containers.",
+      "context": "Important constraint for users building nested container hierarchies."
+    },
+    {
+      "id": "repitch-factor-direction",
+      "category": "parameter_behaviour",
+      "question": "The phase3 doc says factor > 1.0 upsamples internally so child sees lower frequency, and factor < 1.0 does the opposite. Confirm this inverse relationship: higher factor = more internal samples = children perceive lower pitch.",
+      "context": "The non-intuitive direction of the factor needs clear documentation."
+    }
+  ],
+
+  "notes": "Repitch wraps DynamicSerialProcessor in wrap::repitch<T, wrap::interpolators::dynamic>. HasFixedParameters=true in cppProperties. The skew of 0.63 on RepitchFactor creates a logarithmic feel centered around 1.0 (no change). The range is limited to one octave (0.5-2.0) but the phase3 doc notes that stacking repitch containers can extend the range. The Interpolation parameter has an encoded TextToValueConverter for the three mode labels. Uses SimpleReadWriteLock for thread-safe parameter changes."
+}

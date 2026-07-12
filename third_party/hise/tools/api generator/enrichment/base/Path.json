@@ -1,0 +1,485 @@
+{
+  "className": "Path",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "addArc": {
+      "signature": "void addArc(var area, var fromRadians, var toRadians)",
+      "returnType": "void",
+      "description": "Adds an arc to the path.",
+      "parameters": [
+        {
+          "name": "area",
+          "type": "var"
+        },
+        {
+          "name": "fromRadians",
+          "type": "var"
+        },
+        {
+          "name": "toRadians",
+          "type": "var"
+        }
+      ]
+    },
+    "addArrow": {
+      "signature": "void addArrow(var start, var end, var thickness, var headWidth, var headLength)",
+      "returnType": "void",
+      "description": "Adds an arrow to the path from start [x, y] and end [x, y].",
+      "parameters": [
+        {
+          "name": "start",
+          "type": "var"
+        },
+        {
+          "name": "end",
+          "type": "var"
+        },
+        {
+          "name": "thickness",
+          "type": "var"
+        },
+        {
+          "name": "headWidth",
+          "type": "var"
+        },
+        {
+          "name": "headLength",
+          "type": "var"
+        }
+      ]
+    },
+    "addEllipse": {
+      "signature": "void addEllipse(var area)",
+      "returnType": "void",
+      "description": "Adds an ellipse to the path.",
+      "parameters": [
+        {
+          "name": "area",
+          "type": "var"
+        }
+      ]
+    },
+    "addPieSegment": {
+      "signature": "void addPieSegment(var area, var fromRadians, var toRadians, var innerCircleProportionalSize)",
+      "returnType": "void",
+      "description": "Adds a pie segment to the path.",
+      "parameters": [
+        {
+          "name": "area",
+          "type": "var"
+        },
+        {
+          "name": "fromRadians",
+          "type": "var"
+        },
+        {
+          "name": "toRadians",
+          "type": "var"
+        },
+        {
+          "name": "innerCircleProportionalSize",
+          "type": "var"
+        }
+      ]
+    },
+    "addPolygon": {
+      "signature": "void addPolygon(var center, var numSides, var radius, var angle)",
+      "returnType": "void",
+      "description": "Adds a polygon to the path from the center [x, y].",
+      "parameters": [
+        {
+          "name": "center",
+          "type": "var"
+        },
+        {
+          "name": "numSides",
+          "type": "var"
+        },
+        {
+          "name": "radius",
+          "type": "var"
+        },
+        {
+          "name": "angle",
+          "type": "var"
+        }
+      ]
+    },
+    "addQuadrilateral": {
+      "signature": "void addQuadrilateral(var xy1, var xy2, var xy3, var xy4)",
+      "returnType": "void",
+      "description": "Adds a addQuadrilateral to the path.",
+      "parameters": [
+        {
+          "name": "xy1",
+          "type": "var"
+        },
+        {
+          "name": "xy2",
+          "type": "var"
+        },
+        {
+          "name": "xy3",
+          "type": "var"
+        },
+        {
+          "name": "xy4",
+          "type": "var"
+        }
+      ]
+    },
+    "addRectangle": {
+      "signature": "void addRectangle(var area)",
+      "returnType": "void",
+      "description": "Adds a rectangle to the path.",
+      "parameters": [
+        {
+          "name": "area",
+          "type": "var"
+        }
+      ]
+    },
+    "addRoundedRectangle": {
+      "signature": "void addRoundedRectangle(var area, var cornerSize)",
+      "returnType": "void",
+      "description": "Adds a rounded rectangle to the path.",
+      "parameters": [
+        {
+          "name": "area",
+          "type": "var"
+        },
+        {
+          "name": "cornerSize",
+          "type": "var"
+        }
+      ]
+    },
+    "addRoundedRectangleCustomisable": {
+      "signature": "void addRoundedRectangleCustomisable(var area, var cornerSizeXY, var boolCurves)",
+      "returnType": "void",
+      "description": "Adds a fully customisable rounded rectangle to the path. area[x,y,w,h], cornerSizeXY[x,y], boolCurves[bool,bool,bool,bool]",
+      "parameters": [
+        {
+          "name": "area",
+          "type": "var"
+        },
+        {
+          "name": "cornerSizeXY",
+          "type": "var"
+        },
+        {
+          "name": "boolCurves",
+          "type": "var"
+        }
+      ]
+    },
+    "addStar": {
+      "signature": "void addStar(var center, var numPoints, var innerRadius, var outerRadius, var angle)",
+      "returnType": "void",
+      "description": "Adds a star to the path from the center [x, y].",
+      "parameters": [
+        {
+          "name": "center",
+          "type": "var"
+        },
+        {
+          "name": "numPoints",
+          "type": "var"
+        },
+        {
+          "name": "innerRadius",
+          "type": "var"
+        },
+        {
+          "name": "outerRadius",
+          "type": "var"
+        },
+        {
+          "name": "angle",
+          "type": "var"
+        }
+      ]
+    },
+    "addTriangle": {
+      "signature": "void addTriangle(var xy1, var xy2, var xy3)",
+      "returnType": "void",
+      "description": "Adds a triangle to the path.",
+      "parameters": [
+        {
+          "name": "xy1",
+          "type": "var"
+        },
+        {
+          "name": "xy2",
+          "type": "var"
+        },
+        {
+          "name": "xy3",
+          "type": "var"
+        }
+      ]
+    },
+    "clear": {
+      "signature": "void clear()",
+      "returnType": "void",
+      "description": "Clears the Path.",
+      "parameters": []
+    },
+    "closeSubPath": {
+      "signature": "void closeSubPath()",
+      "returnType": "void",
+      "description": "Closes the Path.",
+      "parameters": []
+    },
+    "contains": {
+      "signature": "var contains(var point)",
+      "returnType": "var",
+      "description": "Checks whether a point lies within the path. This is only relevant for closed paths.",
+      "parameters": [
+        {
+          "name": "point",
+          "type": "var"
+        }
+      ]
+    },
+    "createStrokedPath": {
+      "signature": "var createStrokedPath(var strokeData, var dotData)",
+      "returnType": "var",
+      "description": "Creates a fillable path using the provided strokeData (with optional dot.",
+      "parameters": [
+        {
+          "name": "strokeData",
+          "type": "var"
+        },
+        {
+          "name": "dotData",
+          "type": "var"
+        }
+      ]
+    },
+    "cubicTo": {
+      "signature": "void cubicTo(var cxy1, var cxy2, var x, var y)",
+      "returnType": "void",
+      "description": "Adds a cubic bezier curve with two sets of control point arrays [cx1,cy1] and [cx2,cy2], and the end point [x,y].",
+      "parameters": [
+        {
+          "name": "cxy1",
+          "type": "var"
+        },
+        {
+          "name": "cxy2",
+          "type": "var"
+        },
+        {
+          "name": "x",
+          "type": "var"
+        },
+        {
+          "name": "y",
+          "type": "var"
+        }
+      ]
+    },
+    "fromString": {
+      "signature": "void fromString(String stringPath)",
+      "returnType": "void",
+      "description": "Restores a path that has been converted into a string.",
+      "parameters": [
+        {
+          "name": "stringPath",
+          "type": "String"
+        }
+      ]
+    },
+    "getBounds": {
+      "signature": "var getBounds(var scaleFactor)",
+      "returnType": "var",
+      "description": "Returns the area ([x, y, width, height]) that the path is occupying with the scale factor applied.",
+      "parameters": [
+        {
+          "name": "scaleFactor",
+          "type": "var"
+        }
+      ]
+    },
+    "getIntersection": {
+      "signature": "var getIntersection(var start, var end, bool keepSectionOutsidePath)",
+      "returnType": "var",
+      "description": "Returns the point where a line ([x1, y1], [x2, y2]) intersects the path when appropriate. Returns false otherwise.",
+      "parameters": [
+        {
+          "name": "start",
+          "type": "var"
+        },
+        {
+          "name": "end",
+          "type": "var"
+        },
+        {
+          "name": "keepSectionOutsidePath",
+          "type": "bool"
+        }
+      ]
+    },
+    "getLength": {
+      "signature": "var getLength()",
+      "returnType": "var",
+      "description": "Returns the length of the path.",
+      "parameters": []
+    },
+    "getPointOnPath": {
+      "signature": "var getPointOnPath(var distanceFromStart)",
+      "returnType": "var",
+      "description": "Returns the point at a certain distance along the path.",
+      "parameters": [
+        {
+          "name": "distanceFromStart",
+          "type": "var"
+        }
+      ]
+    },
+    "getRatio": {
+      "signature": "var getRatio()",
+      "returnType": "var",
+      "description": "Returns the size ratio W/H of the path.",
+      "parameters": []
+    },
+    "getYAt": {
+      "signature": "var getYAt(float xPos)",
+      "returnType": "var",
+      "description": "Returns the y coordinate of the first intersection at the given X position or undefined if no match.",
+      "parameters": [
+        {
+          "name": "xPos",
+          "type": "float"
+        }
+      ]
+    },
+    "lineTo": {
+      "signature": "void lineTo(var x, var y)",
+      "returnType": "void",
+      "description": "Adds a line to [x,y].",
+      "parameters": [
+        {
+          "name": "x",
+          "type": "var"
+        },
+        {
+          "name": "y",
+          "type": "var"
+        }
+      ]
+    },
+    "loadFromData": {
+      "signature": "void loadFromData(var data)",
+      "returnType": "void",
+      "description": "Loads a path from a data array.",
+      "parameters": [
+        {
+          "name": "data",
+          "type": "var"
+        }
+      ]
+    },
+    "quadraticTo": {
+      "signature": "void quadraticTo(var cx, var cy, var x, var y)",
+      "returnType": "void",
+      "description": "Adds a quadratic bezier curve with the control point [cx,cy] and the end point [x,y].",
+      "parameters": [
+        {
+          "name": "cx",
+          "type": "var"
+        },
+        {
+          "name": "cy",
+          "type": "var"
+        },
+        {
+          "name": "x",
+          "type": "var"
+        },
+        {
+          "name": "y",
+          "type": "var"
+        }
+      ]
+    },
+    "roundCorners": {
+      "signature": "void roundCorners(var radius)",
+      "returnType": "void",
+      "description": "Creates a version of this path where all sharp corners have been replaced by curves.",
+      "parameters": [
+        {
+          "name": "radius",
+          "type": "var"
+        }
+      ]
+    },
+    "scaleToFit": {
+      "signature": "void scaleToFit(var x, var y, var width, var height, bool preserveProportions)",
+      "returnType": "void",
+      "description": "Rescales the path to make it fit neatly into a given space. preserveProportions keeps the w/h ratio.",
+      "parameters": [
+        {
+          "name": "x",
+          "type": "var"
+        },
+        {
+          "name": "y",
+          "type": "var"
+        },
+        {
+          "name": "width",
+          "type": "var"
+        },
+        {
+          "name": "height",
+          "type": "var"
+        },
+        {
+          "name": "preserveProportions",
+          "type": "bool"
+        }
+      ]
+    },
+    "setBounds": {
+      "signature": "void setBounds(var boundingBox)",
+      "returnType": "void",
+      "description": "Sets a (minimal) bounding box for the path.",
+      "parameters": [
+        {
+          "name": "boundingBox",
+          "type": "var"
+        }
+      ]
+    },
+    "startNewSubPath": {
+      "signature": "void startNewSubPath(var x, var y)",
+      "returnType": "void",
+      "description": "Starts a new Path. It does not clear the path, so use 'clear()' if you want to start all over again.",
+      "parameters": [
+        {
+          "name": "x",
+          "type": "var"
+        },
+        {
+          "name": "y",
+          "type": "var"
+        }
+      ]
+    },
+    "toBase64": {
+      "signature": "String toBase64()",
+      "returnType": "String",
+      "description": "Creates a base64 encoded representation of the path.",
+      "parameters": []
+    },
+    "toString": {
+      "signature": "String toString()",
+      "returnType": "String",
+      "description": "Creates a string representation of this path.",
+      "parameters": []
+    }
+  }
+}

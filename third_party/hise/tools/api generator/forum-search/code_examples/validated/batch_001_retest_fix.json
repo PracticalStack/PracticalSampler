@@ -1,0 +1,52 @@
+{
+  "19": {
+    "tier": 4,
+    "testable": false,
+    "invalid": true,
+    "skipReason": "Invalid code: UserPresetHandler.setPostCallback called as static method on namespace, but it's an instance method — must use Engine.createUserPresetHandler() first",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "25": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "CSS resolution error on ComboBox without proper FloatingTile context",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "31": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "StreamingSampler", "name": "Sampler1"}
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "createSelectionWithFilter returns empty list (no samples loaded) — compiles but list[0].get() fails at runtime. Compile-only would pass if HISE didn't eagerly evaluate."
+  },
+  "34": {
+    "tier": 4,
+    "testable": false,
+    "invalid": true,
+    "skipReason": "Invalid code: missing closing brace for namespace LayoutBuilder — incomplete snippet",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "51": {
+    "tier": 4,
+    "testable": false,
+    "invalid": true,
+    "skipReason": "Invalid code: setSyncToMasterClock called with 0 arguments, expects 1 (Integer shouldSyncToMasterClock)",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  }
+}

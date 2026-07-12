@@ -1,0 +1,1 @@
+Draws the 2D spectrum image of an FFT object into the specified area. The FFT object must be created via `Engine.createFFT()` and configured with `setSpectrum2DParameters`. The spectrum image is a non-blocking snapshot of the current analysis state.

@@ -1,0 +1,99 @@
+{
+  "moduleId": "SendFX",
+  "nodes": [
+    {
+      "id": "audio_in",
+      "type": "input",
+      "label": "Audio In (L/R)",
+      "importance": 1
+    },
+    {
+      "id": "gain_calc",
+      "type": "process",
+      "label": "Send Gain",
+      "importance": 1,
+      "detail": "Decibel gain converted to linear, with optional 80ms smoothing ramp"
+    },
+    {
+      "id": "gain_param",
+      "type": "parameter",
+      "label": "Gain",
+      "importance": 1
+    },
+    {
+      "id": "smoothing_param",
+      "type": "parameter",
+      "label": "Smoothing",
+      "importance": 2
+    },
+    {
+      "id": "send_mod",
+      "type": "modulation",
+      "label": "Send Modulation",
+      "importance": 2,
+      "detail": "Scales the send gain per-block (start/end values for ramp)"
+    },
+    {
+      "id": "bypass_logic",
+      "type": "decision",
+      "label": "Bypass Ramp",
+      "importance": 3,
+      "detail": "Ramps gain to/from zero over one block on bypass state change"
+    },
+    {
+      "id": "add_to_container",
+      "type": "process",
+      "label": "Add to Container",
+      "importance": 1,
+      "detail": "Additively mixes the gained signal into the target SendContainer's internal buffer"
+    },
+    {
+      "id": "send_index_param",
+      "type": "parameter",
+      "label": "SendIndex",
+      "importance": 1
+    },
+    {
+      "id": "channel_offset_param",
+      "type": "parameter",
+      "label": "ChannelOffset",
+      "importance": 2
+    },
+    {
+      "id": "container",
+      "type": "external",
+      "label": "Send Container",
+      "importance": 1
+    },
+    {
+      "id": "audio_out",
+      "type": "output",
+      "label": "Audio Out (passthrough)",
+      "importance": 1
+    }
+  ],
+  "edges": [
+    { "from": "audio_in", "to": "gain_calc" },
+    { "from": "gain_param", "to": "gain_calc" },
+    { "from": "smoothing_param", "to": "gain_calc" },
+    { "from": "send_mod", "to": "gain_calc" },
+    { "from": "gain_calc", "to": "bypass_logic" },
+    { "from": "bypass_logic", "to": "add_to_container" },
+    { "from": "send_index_param", "to": "add_to_container" },
+    { "from": "channel_offset_param", "to": "add_to_container" },
+    { "from": "add_to_container", "to": "container" },
+    { "from": "audio_in", "to": "audio_out" }
+  ],
+  "groups": [
+    {
+      "id": "gain_stage",
+      "label": "Send Gain",
+      "nodes": ["gain_calc", "gain_param", "smoothing_param", "send_mod", "bypass_logic"]
+    },
+    {
+      "id": "routing",
+      "label": "Routing",
+      "nodes": ["add_to_container", "send_index_param", "channel_offset_param", "container"]
+    }
+  ]
+}

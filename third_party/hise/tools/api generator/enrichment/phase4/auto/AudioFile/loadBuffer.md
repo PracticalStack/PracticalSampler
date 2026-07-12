@@ -1,0 +1,1 @@
+Loads audio data from script-created Buffer objects into the audio file slot. Pass a single Buffer for mono or an array of Buffers for multi-channel audio. The sample rate must be specified explicitly. Optionally pass a two-element array `[start, end]` to set loop points, or an empty array to skip loop configuration.

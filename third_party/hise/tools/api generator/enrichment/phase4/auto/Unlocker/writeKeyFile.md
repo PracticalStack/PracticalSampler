@@ -1,0 +1,1 @@
+Writes key file content to the licence key file location on disk. This does not validate or load the key - call `loadKeyFile()` afterwards to validate the RSA signature and unlock the plugin. Use `isValidKeyFile()` to pre-validate the data format before writing.

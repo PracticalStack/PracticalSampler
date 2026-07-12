@@ -1,0 +1,1 @@
+Creates a new Buffer resampled from the read buffer to the specified number of samples. When downsampling significantly, the algorithm finds the min/max in each window and takes the midpoint to preserve peaks. Returns an empty buffer if `numDestSamples` is zero or negative.

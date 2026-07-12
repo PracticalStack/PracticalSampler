@@ -1,0 +1,32 @@
+{
+  "targetId": "KeyNumber",
+  "domain": "modules",
+  "generatedAt": "2026-04-08",
+  "topicIds": [12781, 398],
+  "insights": [
+    {
+      "type": "BUG",
+      "title": "exportState does not visually refresh key/table display after restore",
+      "summary": "After calling exportState/restoreState on a KeyNumber modulator, the note-value assignments or table data are saved and restored correctly, but the UI graphics are not updated until the user makes a manual change to the modulator. This means the display can show stale values while the engine uses the correct ones.",
+      "sources": ["tid:398"],
+      "verify": true,
+      "verify_hint": "grep exportState or restoreState in KeyNumberModulator source; check if repaint/update is triggered after state restore"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Prefer Array Modulator over KeyNumber for per-note value mapping",
+      "summary": "The Array Modulator provides the same per-note value mapping capability as KeyNumber but with a more convenient interface. Christoph Hart (the author) recommends it as the preferred alternative.",
+      "sources": ["tid:398", "tid:12781"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "KeyNumber sub-modulator state is restored correctly via parent modulator restore",
+      "summary": "When KeyNumber is used as a sub-modulator inside a parent modulator chain, restoring the parent modulator's state also correctly restores the KeyNumber sub-modulator. The visual glitch (stale graphics) is still present, but the data integrity is intact.",
+      "sources": ["tid:398"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

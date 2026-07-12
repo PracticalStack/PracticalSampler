@@ -1,0 +1,522 @@
+{
+  "className": "ScriptMultipageDialog",
+  "category": "component",
+  "description": "",
+  "methods": {
+    "add": {
+      "signature": "int add(int parentIndex, String type, var properties)",
+      "returnType": "int",
+      "description": "Adds an element to the parent with the given type and properties.",
+      "parameters": [
+        {
+          "name": "parentIndex",
+          "type": "int"
+        },
+        {
+          "name": "type",
+          "type": "String"
+        },
+        {
+          "name": "properties",
+          "type": "var"
+        }
+      ]
+    },
+    "addModalPage": {
+      "signature": "int addModalPage()",
+      "returnType": "int",
+      "description": "Adds a modal page to the dialog that can be populated like a normal page and shown using showModalPage().",
+      "parameters": []
+    },
+    "addPage": {
+      "signature": "int addPage()",
+      "returnType": "int",
+      "description": "Adds a page to the dialog and returns the element index of the page.",
+      "parameters": []
+    },
+    "addToMacroControl": {
+      "signature": "void addToMacroControl(int macroIndex)",
+      "returnType": "void",
+      "description": "Adds the knob / button to a macro controller (from 0 to 7).",
+      "parameters": [
+        {
+          "name": "macroIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "bindCallback": {
+      "signature": "String bindCallback(String id, var callback, var notificationType)",
+      "returnType": "String",
+      "description": "Registers a callable object to the dialog and returns the codestring that calls it from within the dialogs Javascript engine.",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "name": "callback",
+          "type": "var"
+        },
+        {
+          "name": "notificationType",
+          "type": "var"
+        }
+      ]
+    },
+    "cancel": {
+      "signature": "void cancel()",
+      "returnType": "void",
+      "description": "Closes the dialog (as if the user pressed the cancel button).",
+      "parameters": []
+    },
+    "changed": {
+      "signature": "void changed()",
+      "returnType": "void",
+      "description": "Call this to indicate that the value has changed (the onControl callback will be executed.",
+      "parameters": []
+    },
+    "exportAsMonolith": {
+      "signature": "String exportAsMonolith(var optionalFile)",
+      "returnType": "String",
+      "description": "Exports the entire dialog.",
+      "parameters": [
+        {
+          "name": "optionalFile",
+          "type": "var"
+        }
+      ]
+    },
+    "fadeComponent": {
+      "signature": "void fadeComponent(bool shouldBeVisible, int milliseconds)",
+      "returnType": "void",
+      "description": "Toggles the visibility and fades a component using the global animator.",
+      "parameters": [
+        {
+          "name": "shouldBeVisible",
+          "type": "bool"
+        },
+        {
+          "name": "milliseconds",
+          "type": "int"
+        }
+      ]
+    },
+    "get": {
+      "signature": "var get(String propertyName)",
+      "returnType": "var",
+      "description": "returns the value of the property.",
+      "parameters": [
+        {
+          "name": "propertyName",
+          "type": "String"
+        }
+      ]
+    },
+    "getAllProperties": {
+      "signature": "var getAllProperties()",
+      "returnType": "var",
+      "description": "Returns a list of all property IDs as array.",
+      "parameters": []
+    },
+    "getChildComponents": {
+      "signature": "var getChildComponents()",
+      "returnType": "var",
+      "description": "Returns list of component's children",
+      "parameters": []
+    },
+    "getElementProperty": {
+      "signature": "var getElementProperty(int elementId, String propertyId)",
+      "returnType": "var",
+      "description": "Returns the value for the given element ID.",
+      "parameters": [
+        {
+          "name": "elementId",
+          "type": "int"
+        },
+        {
+          "name": "propertyId",
+          "type": "String"
+        }
+      ]
+    },
+    "getGlobalPositionX": {
+      "signature": "int getGlobalPositionX()",
+      "returnType": "int",
+      "description": "Returns the absolute x-position relative to the interface.",
+      "parameters": []
+    },
+    "getGlobalPositionY": {
+      "signature": "int getGlobalPositionY()",
+      "returnType": "int",
+      "description": "Returns the absolute y-position relative to the interface.",
+      "parameters": []
+    },
+    "getHeight": {
+      "signature": "var getHeight()",
+      "returnType": "var",
+      "description": "Returns the height of the component.",
+      "parameters": []
+    },
+    "getId": {
+      "signature": "String getId()",
+      "returnType": "String",
+      "description": "Returns the ID of the component.",
+      "parameters": []
+    },
+    "getLocalBounds": {
+      "signature": "var getLocalBounds(float reduceAmount)",
+      "returnType": "var",
+      "description": "Returns a [x, y, w, h] array that was reduced by the given amount.",
+      "parameters": [
+        {
+          "name": "reduceAmount",
+          "type": "float"
+        }
+      ]
+    },
+    "getState": {
+      "signature": "var getState()",
+      "returnType": "var",
+      "description": "returns the state object for the dialog.",
+      "parameters": []
+    },
+    "getValueNormalized": {
+      "signature": "double getValueNormalized()",
+      "returnType": "double",
+      "description": "Returns the normalized value.",
+      "parameters": []
+    },
+    "getWidth": {
+      "signature": "var getWidth()",
+      "returnType": "var",
+      "description": "Returns the width of the component.",
+      "parameters": []
+    },
+    "grabFocus": {
+      "signature": "void grabFocus()",
+      "returnType": "void",
+      "description": "Call this method in order to grab the keyboard focus for this component.",
+      "parameters": []
+    },
+    "loadFromDataFile": {
+      "signature": "void loadFromDataFile(var fileObject)",
+      "returnType": "void",
+      "description": "Loads the dialog from a file (on the disk).",
+      "parameters": [
+        {
+          "name": "fileObject",
+          "type": "var"
+        }
+      ]
+    },
+    "loseFocus": {
+      "signature": "void loseFocus()",
+      "returnType": "void",
+      "description": "Call this method in order to give away the focus for this component.",
+      "parameters": []
+    },
+    "navigate": {
+      "signature": "bool navigate(int pageIndex, bool submitCurrentPage)",
+      "returnType": "bool",
+      "description": "Navigates to the given page index.",
+      "parameters": [
+        {
+          "name": "pageIndex",
+          "type": "int"
+        },
+        {
+          "name": "submitCurrentPage",
+          "type": "bool"
+        }
+      ]
+    },
+    "resetDialog": {
+      "signature": "void resetDialog()",
+      "returnType": "void",
+      "description": "Clears the dialog.",
+      "parameters": []
+    },
+    "set": {
+      "signature": "void set(String propertyName, var value)",
+      "returnType": "void",
+      "description": "Sets the property.",
+      "parameters": [
+        {
+          "name": "propertyName",
+          "type": "String"
+        },
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "setConsumedKeyPresses": {
+      "signature": "void setConsumedKeyPresses(var listOfKeys)",
+      "returnType": "void",
+      "description": "Registers a selection of key presses to be consumed by this component.",
+      "parameters": [
+        {
+          "name": "listOfKeys",
+          "type": "var"
+        }
+      ]
+    },
+    "setControlCallback": {
+      "signature": "void setControlCallback(var controlFunction)",
+      "returnType": "void",
+      "description": "Pass a inline function for a custom callback event.",
+      "parameters": [
+        {
+          "name": "controlFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "setElementProperty": {
+      "signature": "void setElementProperty(int elementId, String propertyId, var newValue)",
+      "returnType": "void",
+      "description": "Sets the property for the given element ID and updates the dialog.",
+      "parameters": [
+        {
+          "name": "elementId",
+          "type": "int"
+        },
+        {
+          "name": "propertyId",
+          "type": "String"
+        },
+        {
+          "name": "newValue",
+          "type": "var"
+        }
+      ]
+    },
+    "setElementValue": {
+      "signature": "void setElementValue(int elementId, var value)",
+      "returnType": "void",
+      "description": "Sets the value of the given element ID and calls the callback.",
+      "parameters": [
+        {
+          "name": "elementId",
+          "type": "int"
+        },
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "setKeyPressCallback": {
+      "signature": "void setKeyPressCallback(var keyboardFunction)",
+      "returnType": "void",
+      "description": "Adds a callback to react on key presses (when this component is focused).",
+      "parameters": [
+        {
+          "name": "keyboardFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "setLocalLookAndFeel": {
+      "signature": "void setLocalLookAndFeel(var lafObject)",
+      "returnType": "void",
+      "description": "Attaches the local look and feel to this component.",
+      "parameters": [
+        {
+          "name": "lafObject",
+          "type": "var"
+        }
+      ]
+    },
+    "setOnFinishCallback": {
+      "signature": "void setOnFinishCallback(var onFinish)",
+      "returnType": "void",
+      "description": "Registers a function that will be called when the dialog is finished.",
+      "parameters": [
+        {
+          "name": "onFinish",
+          "type": "var"
+        }
+      ]
+    },
+    "setOnPageLoadCallback": {
+      "signature": "void setOnPageLoadCallback(var onPageLoad)",
+      "returnType": "void",
+      "description": "Registers a function that will be called when the dialog shows a new page.",
+      "parameters": [
+        {
+          "name": "onPageLoad",
+          "type": "var"
+        }
+      ]
+    },
+    "setPosition": {
+      "signature": "void setPosition(int x, int y, int w, int h)",
+      "returnType": "void",
+      "description": "Sets the position of the component.",
+      "parameters": [
+        {
+          "name": "x",
+          "type": "int"
+        },
+        {
+          "name": "y",
+          "type": "int"
+        },
+        {
+          "name": "w",
+          "type": "int"
+        },
+        {
+          "name": "h",
+          "type": "int"
+        }
+      ]
+    },
+    "setPropertiesFromJSON": {
+      "signature": "void setPropertiesFromJSON(var jsonData)",
+      "returnType": "void",
+      "description": "Restores all properties from a JSON object.",
+      "parameters": [
+        {
+          "name": "jsonData",
+          "type": "var"
+        }
+      ]
+    },
+    "setStyleSheetClass": {
+      "signature": "void setStyleSheetClass(String classIds)",
+      "returnType": "void",
+      "description": "Sets the given class selectors for the component stylesheet.",
+      "parameters": [
+        {
+          "name": "classIds",
+          "type": "String"
+        }
+      ]
+    },
+    "setStyleSheetProperty": {
+      "signature": "void setStyleSheetProperty(String variableId, var value, String type)",
+      "returnType": "void",
+      "description": "Sets a variable for this component that can be queried from a style sheet.",
+      "parameters": [
+        {
+          "name": "variableId",
+          "type": "String"
+        },
+        {
+          "name": "value",
+          "type": "var"
+        },
+        {
+          "name": "type",
+          "type": "String"
+        }
+      ]
+    },
+    "setStyleSheetPseudoState": {
+      "signature": "void setStyleSheetPseudoState(String pseudoState)",
+      "returnType": "void",
+      "description": "Programatically sets a pseudo state (:hover, :active, :checked, :focus, :disabled) that will be used by the CSS renderer.",
+      "parameters": [
+        {
+          "name": "pseudoState",
+          "type": "String"
+        }
+      ]
+    },
+    "setTooltip": {
+      "signature": "void setTooltip(String tooltip)",
+      "returnType": "void",
+      "description": "Shows a informative text on mouse hover.",
+      "parameters": [
+        {
+          "name": "tooltip",
+          "type": "String"
+        }
+      ]
+    },
+    "setValueNormalized": {
+      "signature": "void setValueNormalized(double normalizedValue)",
+      "returnType": "void",
+      "description": "Sets the current value from a range 0.0 ... 1.0.",
+      "parameters": [
+        {
+          "name": "normalizedValue",
+          "type": "double"
+        }
+      ]
+    },
+    "setValueWithUndo": {
+      "signature": "void setValueWithUndo(var newValue)",
+      "returnType": "void",
+      "description": "Sets the current value and adds it to the undo list. Don't call this from onControl!",
+      "parameters": [
+        {
+          "name": "newValue",
+          "type": "var"
+        }
+      ]
+    },
+    "setZLevel": {
+      "signature": "void setZLevel(String zLevel)",
+      "returnType": "void",
+      "description": "Changes the depth hierarchy (z-axis) of sibling components (Back, Default, Front or AlwaysOnTop).",
+      "parameters": [
+        {
+          "name": "zLevel",
+          "type": "String"
+        }
+      ]
+    },
+    "show": {
+      "signature": "void show(bool clearState)",
+      "returnType": "void",
+      "description": "Shows the dialog (with optionally clearing the state.",
+      "parameters": [
+        {
+          "name": "clearState",
+          "type": "bool"
+        }
+      ]
+    },
+    "showControl": {
+      "signature": "void showControl(bool shouldBeVisible)",
+      "returnType": "void",
+      "description": "Hides / Shows the control.",
+      "parameters": [
+        {
+          "name": "shouldBeVisible",
+          "type": "bool"
+        }
+      ]
+    },
+    "showModalPage": {
+      "signature": "void showModalPage(int pageIndex, var modalState, var finishCallback)",
+      "returnType": "void",
+      "description": "Shows a modal page with the given index and the state object.",
+      "parameters": [
+        {
+          "name": "pageIndex",
+          "type": "int"
+        },
+        {
+          "name": "modalState",
+          "type": "var"
+        },
+        {
+          "name": "finishCallback",
+          "type": "var"
+        }
+      ]
+    },
+    "updateValueFromProcessorConnection": {
+      "signature": "void updateValueFromProcessorConnection()",
+      "returnType": "void",
+      "description": "Updates the value from the processor connection. Call this method whenever the module state has changed and you want to refresh the knob value to show the current state.",
+      "parameters": []
+    }
+  }
+}

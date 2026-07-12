@@ -1,0 +1,134 @@
+{
+  "factoryPath": "core.clock_ramp",
+  "factory": "core",
+  "nodeId": "clock_ramp",
+  "description": "Creates a ramp signal that is synced to the HISE clock",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": true,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Tempo",
+      "rationale": "Tempo selects the musical note value; Multiplier scales the tempo period",
+      "parameters": [
+        {
+          "id": "Tempo",
+          "range": { "min": 0.0, "max": 18.0, "step": 1.0, "skew": 1.0 },
+          "default": 5.0,
+          "textConverter": "101.nT6K8ChgkK..TOfUgwVckMzatYWYxQWYxAP.BjFck01b.DfXEDyKwnPLuHCQTQCQ3fSL1PzLxPjMzPDU.D1XzklckAP.AH..QfJDuc8+N.oanG.LpO.30hWR6PnRHFr.MzFBGTJ",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Multiplier",
+          "range": { "min": 1.0, "max": 16.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Output mode",
+      "rationale": "AddToSignal controls whether the ramp is added to the audio output; UpdateMode selects continuous vs synced ramp calculation; Inactive sets behaviour when transport is stopped",
+      "parameters": [
+        {
+          "id": "AddToSignal",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTfSuoPVkMG.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "UpdateMode",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "64.nT6K8CxM4F..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.STvPu4Fco4VcuU2bJLUdtMVYjAPXiQWZ1UF.ADf...",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Inactive",
+          "range": { "min": 0.0, "max": 2.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "63.nT6K8ChMwF..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.RTvP0Imbk4FcJnUYx8lBO4VY.D1XzklckAP.AH..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/clock_ramp.md",
+    "tier": "BRIEF",
+    "lines": 20
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "update-mode-difference",
+      "category": "conditional_logic",
+      "question": "What are the two UpdateMode options and how do they differ? From the tempo.md infrastructure: Continuous uses fmod((uptime + offset*factor) * delta * factor, 1.0) while Synced uses fmod((offset + uptime*delta) * factor, 1.0). What is the practical difference?",
+      "context": "Users need to understand when to use each mode for different musical applications."
+    },
+    {
+      "id": "inactive-modes",
+      "category": "conditional_logic",
+      "question": "The Inactive parameter has range 0-2 (3 values). From tempo.md: LastValue(0), Zero(1), One(2). Confirm these are the modes and what each outputs when transport is stopped.",
+      "context": "Users need to know what happens when the DAW is not playing."
+    },
+    {
+      "id": "add-to-signal-behaviour",
+      "category": "parameter_behaviour",
+      "question": "When AddToSignal=1, is the ramp added to the existing audio signal or does it replace it? When AddToSignal=0, is the ramp only sent via modulation output?",
+      "context": "Determines whether the node modifies audio or only outputs modulation."
+    },
+    {
+      "id": "tempo-sync-mechanism",
+      "category": "signal_path",
+      "question": "How does the ramp synchronize to the HISE clock? Does it use PPQ position from TempoListener callbacks to align the phase, or does it just match the period?",
+      "context": "Important for users expecting bar-aligned ramp cycles in their DAW."
+    },
+    {
+      "id": "hise-event-usage",
+      "category": "parameter_behaviour",
+      "question": "What MIDI events does handleHiseEvent respond to? Does note-on reset the ramp phase?",
+      "context": "Since IsProcessingHiseEvent is true, users need to know which events affect the ramp."
+    }
+  ],
+
+  "notes": "clock_ramp is the tempo-synced variant of core.ramp. It registers as a TempoListener (per tempo.md infrastructure) and uses PPQ position for synchronisation. The Tempo parameter (0-18) maps to TempoSyncer enum values (1/1 through 1/64T). Multiplier provides additional period scaling. The encoded TextToValueConverters for AddToSignal, UpdateMode, and Inactive indicate named option lists rather than numeric values. This node has both IsProcessingHiseEvent (for MIDI) and UseRingBuffer (for display)."
+}

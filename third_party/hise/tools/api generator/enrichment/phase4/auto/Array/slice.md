@@ -1,0 +1,1 @@
+Returns a shallow copy of a portion of the array from index `start` up to (but not including) index `end`. Supports negative indices: `-1` refers to the last element, `-2` to the second-to-last. If `end` is omitted, extracts through the end of the array.

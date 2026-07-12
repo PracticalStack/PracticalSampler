@@ -1,0 +1,114 @@
+{
+  "factoryPath": "container.clone",
+  "factory": "container",
+  "nodeId": "clone",
+  "description": "An array of equal nodes with dynamic resizing",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Clone Configuration",
+      "rationale": "Both parameters control the clone array behavior: how many clones are active and how audio is routed through them.",
+      "parameters": [
+        {
+          "id": "NumClones",
+          "range": { "min": 1.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "SplitSignal",
+          "range": { "min": 0.0, "max": 2.0, "step": 1.0, "skew": 1.0 },
+          "default": 2.0,
+          "textConverter": "67.nT6K8ChNQG..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.VTvTkIWZgwlBPElbgwFakwlBC8Fb4APXiQWZ1UF.ADf...",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": false,
+      "type": "boolean",
+      "note": "UI-only layout hint. Default is false (horizontal) for clone. The interpreted CloneNode also updates this based on SplitSignal: Serial=vertical, Parallel/Copy=horizontal."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/container/clone.md",
+    "tier": "GOOD",
+    "lines": 50
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "split-signal-modes",
+      "category": "signal_path",
+      "question": "Confirm the three CloneProcessType modes and their exact audio routing: Serial (chain through clones), Parallel (clones get silence, output added to original), Copy (clones get copy of input, outputs summed, original discarded). The SplitSignal parameter maps 0=Serial, 1=Parallel, 2=Copy. Default is 2 (Copy).",
+      "context": "The three processing modes are the core of clone's functionality. Each has different CPU and signal implications."
+    },
+    {
+      "id": "clone-resize-threading",
+      "category": "performance",
+      "question": "Confirm the thread safety model: audio processing uses ScopedTryReadLock (silently skips if resize in progress), prepare uses blocking read lock. What is the audible effect of a clone resize -- a brief silence/gap?",
+      "context": "Users modulating NumClones need to know that brief audio dropouts may occur during resize."
+    },
+    {
+      "id": "inactive-clone-handling",
+      "category": "signal_path",
+      "question": "In the interpreted CloneNode, inactive clones (index >= numClones) are bypassed rather than destroyed. Are bypassed clones still prepared? Do they consume memory/CPU?",
+      "context": "Users need to know the resource cost of having many total clones but few active."
+    },
+    {
+      "id": "frame-processing-support",
+      "category": "signal_path",
+      "question": "The infrastructure doc says CloneNode processFrame() asserts false. Confirm that clone containers cannot be used inside frame-based containers (frameN_block, framex_block).",
+      "context": "Important constraint for users building nested container hierarchies."
+    },
+    {
+      "id": "numclones-range-dynamic",
+      "category": "parameter_behaviour",
+      "question": "The NumClones parameter has max=1 in the base data (because there is only one child at instantiation). Confirm that this range is dynamically updated when clones are added via the UI toolbar. The max becomes nodes.size().",
+      "context": "The base data max of 1 is misleading -- it is dynamic. Documentation should clarify this."
+    }
+  ],
+
+  "notes": "Clone has HasFixedParameters=true in cppProperties. The NumClones max of 1 in base data reflects the initial state with a single clone_child; it grows dynamically. SplitSignal has an encoded TextToValueConverter mapping 0/1/2 to Serial/Split/Copy labels. The base data shows a default child node (clone_child, a container.chain with pink color). Clone requires control.clone_cable, control.clone_forward, or control.clone_pack for per-clone parameter differentiation. The ShowClones=true field in the base data is a UI state flag."
+}

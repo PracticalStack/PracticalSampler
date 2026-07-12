@@ -1,0 +1,1 @@
+Returns a new array containing only the elements for which the callback returns a truthy value. The original array is not modified. The callback receives up to three arguments: `element`, `index`, and `array`. Use the `[capture]` syntax to bring local variables into the callback scope.

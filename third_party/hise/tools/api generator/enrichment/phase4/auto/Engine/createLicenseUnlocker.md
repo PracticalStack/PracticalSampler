@@ -1,0 +1,1 @@
+Creates a reference to the built-in RSA-based copy protection system. The returned object provides methods for checking licence status, registering product keys, and managing trial/demo modes. Requires the `USE_COPY_PROTECTION` preprocessor flag.

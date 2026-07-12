@@ -1,0 +1,1 @@
+Creates an array of `Sample` objects by evaluating a filter function for each sample. The function is called with `this` set to a `Sample` object - return a non-zero value to include the sample in the result. This is the most flexible selection method, allowing property-based filtering beyond filename matching.

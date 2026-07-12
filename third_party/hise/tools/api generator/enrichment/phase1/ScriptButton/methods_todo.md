@@ -1,0 +1,42 @@
+# ScriptButton -- Method Workbench
+
+## Progress
+- [x] addToMacroControl (inherited from ScriptComponent)
+- [x] changed (inherited from ScriptComponent)
+- [x] fadeComponent (inherited from ScriptComponent)
+- [x] get (inherited from ScriptComponent)
+- [x] getAllProperties (inherited from ScriptComponent)
+- [x] getChildComponents (inherited from ScriptComponent)
+- [x] getGlobalPositionX (inherited from ScriptComponent)
+- [x] getGlobalPositionY (inherited from ScriptComponent)
+- [x] getHeight (inherited from ScriptComponent)
+- [x] getId (inherited from ScriptComponent)
+- [x] getLocalBounds (inherited from ScriptComponent)
+- [x] getValue (inherited from ScriptComponent)
+- [x] getValueNormalized (inherited from ScriptComponent)
+- [x] getWidth (inherited from ScriptComponent)
+- [x] grabFocus (inherited from ScriptComponent)
+- [x] loseFocus (inherited from ScriptComponent)
+- [x] sendRepaintMessage (inherited from ScriptComponent)
+- [x] set (inherited from ScriptComponent)
+- [x] setConsumedKeyPresses (inherited from ScriptComponent)
+- [x] setControlCallback (inherited from ScriptComponent)
+- [x] setKeyPressCallback (inherited from ScriptComponent)
+- [x] setLocalLookAndFeel (inherited from ScriptComponent)
+- [x] setPopupData (ScriptButton-specific)
+- [x] setPosition (inherited from ScriptComponent)
+- [x] setPropertiesFromJSON (inherited from ScriptComponent)
+- [x] setStyleSheetClass (inherited from ScriptComponent)
+- [x] setStyleSheetProperty (inherited from ScriptComponent)
+- [x] setStyleSheetPseudoState (inherited from ScriptComponent)
+- [x] setTooltip (inherited from ScriptComponent)
+- [x] setValue (inherited from ScriptComponent)
+- [x] setValueNormalized (inherited from ScriptComponent)
+- [x] setValueWithUndo (inherited from ScriptComponent)
+- [x] setZLevel (inherited from ScriptComponent)
+- [x] showControl (inherited from ScriptComponent)
+- [x] updateValueFromProcessorConnection (inherited from ScriptComponent)
+
+## Forced Parameter Types
+
+No `ADD_TYPED_API_METHOD_N` registrations found in ScriptButton. The single ScriptButton-specific method (`setPopupData`) uses `ADD_API_METHOD_2` (non-typed). All inherited methods use the type registrations from ScriptComponent (see ScriptComponent_base.md).

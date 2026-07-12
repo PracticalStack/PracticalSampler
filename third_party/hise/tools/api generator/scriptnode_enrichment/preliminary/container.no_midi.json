@@ -1,0 +1,75 @@
+{
+  "factoryPath": "container.no_midi",
+  "factory": "container",
+  "nodeId": "no_midi",
+  "description": "Prevents child nodes from processing MIDI events",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "UI-only layout hint. Does not affect processing."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/container/no_midi.md",
+    "tier": "BRIEF",
+    "lines": 15
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "midi-blocking-mechanism",
+      "category": "signal_path",
+      "question": "Confirm that no_midi uses wrap::no_midi<T> which makes handleHiseEvent() a no-op. Audio processing is completely unaffected -- children process audio normally but receive zero MIDI events. Is this the only difference from a regular chain?",
+      "context": "Users need to know that no_midi is purely about event blocking, not audio modification."
+    },
+    {
+      "id": "polyphonic-context-use-case",
+      "category": "signal_path",
+      "question": "The phase3 doc highlights preventing oscillators from receiving MIDI frequency changes when used as LFOs. In a polyphonic synthesiser context where MIDI is enabled by default, confirm that no_midi is the correct way to shield nodes from MIDI events. Does it block ALL event types (note-on, note-off, CC, pitch wheel, aftertouch)?",
+      "context": "The LFO-oscillator use case is important for documentation. Need to confirm comprehensive event blocking."
+    }
+  ],
+
+  "notes": "No_midi wraps DynamicSerialProcessor in wrap::no_midi<T>. It is the inverse of midichain: where midichain enables MIDI processing, no_midi disables it. The phase3 doc has a good practical example (preventing oscillator frequency changes from MIDI in polyphonic contexts). Serial processing is identical to chain for audio."
+}

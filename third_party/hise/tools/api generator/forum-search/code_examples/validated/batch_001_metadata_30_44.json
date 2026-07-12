@@ -1,0 +1,149 @@
+{
+  "30": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);\nContent.addLabel(\"Label1\", 0, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "Label1 != undefined", "value": 1, "delay": 0}
+    ],
+    "notes": "Key press callback with focus detection. Compile + verify. Can't trigger key events via REPL."
+  },
+  "31": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Requires a Sampler module in the module tree which cannot be dynamically added via script",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Synth.getSampler with createSelectionWithFilter. Samplers are child synths, not addable effects."
+  },
+  "32": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "eventIds != undefined", "value": 1, "delay": 0}
+    ],
+    "notes": "MIDI callback (onNoteOn). Compile + verify MidiList created. Can't trigger MIDI via REPL."
+  },
+  "33": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Requires a Bitcrusher effect module which is not in the available module types for dynamic creation",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Bitcrusher is not available in list_module_types. Cannot create dynamically."
+  },
+  "34": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "LayoutBuilder.data.length", "value": 0, "delay": 0}
+    ],
+    "notes": "Self-contained namespace with dynamic component builder. Compile + verify namespace created."
+  },
+  "35": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);",
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "TransportHandler onBeat callback. Defines an inline function. Compile-only, can't trigger transport via REPL."
+  },
+  "36": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Requires an Arpeggiator module in the module tree. Synth.getSliderPackProcessor needs a pre-existing module.",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Arpeggiator SliderPack access. Also needs SliderPack UI components (SLP1-3)."
+  },
+  "37": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "Something.someBroadcaster != undefined", "value": 1, "delay": 0}
+    ],
+    "notes": "Broadcaster global fallback pattern. isDefined check falls through to createBroadcaster. Verify broadcaster created."
+  },
+  "38": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Server.setBaseURL and Server.callWithPOST require external server connectivity",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "JWT license activation workflow. Requires external server."
+  },
+  "39": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);",
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Guarded by Engine.isHISE() && !Engine.isPlugin(). Compile-only. Device names are hardware-specific."
+  },
+  "40": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "attachToModuleParameter requires a pre-existing Audio Loop Player module which cannot be dynamically added",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Broadcaster watches Audio Loop Player parameter. Module not dynamically addable."
+  },
+  "41": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);\nContent.addKnob(\"Knob1\", 0, 0);\nContent.addButton(\"Button1\", 100, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "Knob1 != undefined", "value": 1, "delay": 0}
+    ],
+    "notes": "Toggle knob mode via button callback. Compile + verify. Can't easily verify mode change via REPL."
+  },
+  "42": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "setupCode": "Content.makeFrontInterface(600, 400);\nContent.addFloatingTile(\"FloatingTile1\", 0, 0);",
+    "testOnlyCode": null,
+    "verifyScript": [
+      {"type": "REPL", "expression": "FloatingTile1 != undefined", "value": 1, "delay": 0}
+    ],
+    "notes": "LAF drawBlackNote/drawWhiteNote on FloatingTile. Compile + verify. Visual-only."
+  },
+  "43": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "References undefined ErrorHandler.errorLabel namespace that would cause compile error",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Error callback references ErrorHandler.errorLabel which is defined in user's project but not available here."
+  },
+  "44": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "FileSystem.browseForDirectory opens a modal dialog that cannot be automated",
+    "setupCode": null,
+    "testOnlyCode": null,
+    "verifyScript": null,
+    "notes": "Browse for sample folder. Modal dialog + Settings.setSampleFolder."
+  }
+}

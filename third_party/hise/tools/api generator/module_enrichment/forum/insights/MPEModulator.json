@@ -1,0 +1,56 @@
+{
+  "targetId": "MPEModulator",
+  "domain": "modules",
+  "generatedAt": "2026-04-08",
+  "topicIds": [11871, 1245, 6132],
+  "insights": [
+    {
+      "type": "API",
+      "title": "MPE modulators are controlled by the end user via the MPE panel, not via script",
+      "summary": "MPE modulators are designed to be activated and configured by the end user through a dedicated MPE panel widget in the UI. Developers drop them into modulator chains to expose MPE control; the MPE panel provides the global bypass toggle and per-gesture routing.",
+      "sources": ["tid:1245"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "MPE bypass button on the MPE panel is the global kill switch for all MPE modulators",
+      "summary": "There is a global bypass for the entire MPE system controlled through the MPE panel widget. When MPE is bypassed, all MPE modulators are inactive regardless of their individual settings.",
+      "sources": ["tid:1245"],
+      "verify": true,
+      "verify_hint": "grep MpeBypass or MPEPanel in hi_scripting/scripting/scriptnode or HISE frontend source; look for MPE enable state propagation"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "MPE modulators are disabled on project open until the MPE panel activates them",
+      "summary": "MPE modulators start disabled. They only activate when the end user interacts with the MPE panel widget. Instruments without an MPE panel widget in the UI will never have their MPE modulators activated.",
+      "sources": ["tid:1245"],
+      "verify": true,
+      "verify_hint": "grep MPEModulator enableBypass or initial state in hi_scripting/scripting/modules"
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Default MPE to off in presets to avoid release trigger issues",
+      "summary": "When MPE is enabled by default in presets, it can interfere with the release trigger mechanism. Setting MPE off by default in presets and letting the user opt-in reduces this breakage.",
+      "sources": ["tid:11871"],
+      "verify": true,
+      "verify_hint": "grep release trigger MPE interaction in hi_sampler or envelope modulator source; check if MPE per-voice data interferes with release start logic"
+    },
+    {
+      "type": "API",
+      "title": "No scripting API to read or set individual MPE modulator values",
+      "summary": "There is no scripting API to check or set the current value of an MPE modulator. The only related API is Engine.isMpeEnabled() which checks global MPE state. Per-modulator access is not available.",
+      "sources": ["tid:6132"],
+      "verify": true,
+      "verify_hint": "search Engine.isMpeEnabled in hi_scripting/scripting/engine; check if getMpeModulator or similar exists in ScriptingApi"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Dual reference required when using MPEModulator as both TableProcessor and Modulator",
+      "summary": "Like other HISE modules with multiple interfaces, accessing MPEModulator as a TableProcessor requires Synth.getTableProcessor(), while modulator control requires Synth.getModulator(). Both calls are needed to use the full API surface.",
+      "sources": ["tid:1245"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

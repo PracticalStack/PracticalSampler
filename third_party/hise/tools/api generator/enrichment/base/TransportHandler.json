@@ -1,0 +1,220 @@
+{
+  "className": "TransportHandler",
+  "category": "namespace",
+  "description": "",
+  "methods": {
+    "getGridLengthInSamples": {
+      "signature": "double getGridLengthInSamples()",
+      "returnType": "double",
+      "description": "Returns the number of samples for the current grid duration.",
+      "parameters": []
+    },
+    "getGridPosition": {
+      "signature": "int getGridPosition(int timestamp)",
+      "returnType": "int",
+      "description": "Returns the current grid position.",
+      "parameters": [
+        {
+          "name": "timestamp",
+          "type": "int"
+        }
+      ]
+    },
+    "isNonRealtime": {
+      "signature": "bool isNonRealtime()",
+      "returnType": "bool",
+      "description": "This will return true if the DAW is currently bouncing the audio to a file. You can use this in the transport change callback to modify your processing chain.",
+      "parameters": []
+    },
+    "isPlaying": {
+      "signature": "bool isPlaying()",
+      "returnType": "bool",
+      "description": "Returns whether the transport has been started.",
+      "parameters": []
+    },
+    "sendGridSyncOnNextCallback": {
+      "signature": "void sendGridSyncOnNextCallback()",
+      "returnType": "void",
+      "description": "sends a message on the next grid callback to resync the external clock.",
+      "parameters": []
+    },
+    "setEnableGrid": {
+      "signature": "void setEnableGrid(bool shouldBeEnabled, int tempoFactor)",
+      "returnType": "void",
+      "description": "Enables a high precision grid timer.",
+      "parameters": [
+        {
+          "name": "shouldBeEnabled",
+          "type": "bool"
+        },
+        {
+          "name": "tempoFactor",
+          "type": "int"
+        }
+      ]
+    },
+    "setLinkBpmToSyncMode": {
+      "signature": "void setLinkBpmToSyncMode(bool shouldPrefer)",
+      "returnType": "void",
+      "description": "If enabled, this will link the internal / external BPM to the sync mode.",
+      "parameters": [
+        {
+          "name": "shouldPrefer",
+          "type": "bool"
+        }
+      ]
+    },
+    "setLocalGridBypassed": {
+      "signature": "void setLocalGridBypassed(bool shouldBeBypassed)",
+      "returnType": "void",
+      "description": "Bypasses the grid callback for this transport handler.",
+      "parameters": [
+        {
+          "name": "shouldBeBypassed",
+          "type": "bool"
+        }
+      ]
+    },
+    "setLocalGridMultiplier": {
+      "signature": "void setLocalGridMultiplier(int factor)",
+      "returnType": "void",
+      "description": "Adds a multiplier to slow down the grid callbacks for this transport handler.",
+      "parameters": [
+        {
+          "name": "factor",
+          "type": "int"
+        }
+      ]
+    },
+    "setOnBeatChange": {
+      "signature": "void setOnBeatChange(var sync, var f)",
+      "returnType": "void",
+      "description": "Registers a callback to changes in the musical position (bars / beats).",
+      "parameters": [
+        {
+          "name": "sync",
+          "type": "var"
+        },
+        {
+          "name": "f",
+          "type": "var"
+        }
+      ]
+    },
+    "setOnBypass": {
+      "signature": "void setOnBypass(var f)",
+      "returnType": "void",
+      "description": "Registers a callback that will be executed asynchronously when the plugin's bypass state changes.",
+      "parameters": [
+        {
+          "name": "f",
+          "type": "var"
+        }
+      ]
+    },
+    "setOnGridChange": {
+      "signature": "void setOnGridChange(var sync, var f)",
+      "returnType": "void",
+      "description": "Registers a callback to changes in the grid.",
+      "parameters": [
+        {
+          "name": "sync",
+          "type": "var"
+        },
+        {
+          "name": "f",
+          "type": "var"
+        }
+      ]
+    },
+    "setOnSignatureChange": {
+      "signature": "void setOnSignatureChange(var sync, var f)",
+      "returnType": "void",
+      "description": "Registers a callback to time signature changes.",
+      "parameters": [
+        {
+          "name": "sync",
+          "type": "var"
+        },
+        {
+          "name": "f",
+          "type": "var"
+        }
+      ]
+    },
+    "setOnTempoChange": {
+      "signature": "void setOnTempoChange(var sync, var f)",
+      "returnType": "void",
+      "description": "Registers a callback to tempo changes.",
+      "parameters": [
+        {
+          "name": "sync",
+          "type": "var"
+        },
+        {
+          "name": "f",
+          "type": "var"
+        }
+      ]
+    },
+    "setOnTransportChange": {
+      "signature": "void setOnTransportChange(var sync, var f)",
+      "returnType": "void",
+      "description": "Registers a callback to transport state changes (playing / stopping).",
+      "parameters": [
+        {
+          "name": "sync",
+          "type": "var"
+        },
+        {
+          "name": "f",
+          "type": "var"
+        }
+      ]
+    },
+    "setSyncMode": {
+      "signature": "void setSyncMode(int syncMode)",
+      "returnType": "void",
+      "description": "Sets the sync mode for the global clock.",
+      "parameters": [
+        {
+          "name": "syncMode",
+          "type": "int"
+        }
+      ]
+    },
+    "startInternalClock": {
+      "signature": "void startInternalClock(int timestamp)",
+      "returnType": "void",
+      "description": "Starts the internal master clock.",
+      "parameters": [
+        {
+          "name": "timestamp",
+          "type": "int"
+        }
+      ]
+    },
+    "stopInternalClock": {
+      "signature": "void stopInternalClock(int timestamp)",
+      "returnType": "void",
+      "description": "Stops the internal master clock.",
+      "parameters": [
+        {
+          "name": "timestamp",
+          "type": "int"
+        }
+      ]
+    },
+    "stopInternalClockOnExternalStop": {
+      "signature": "void stopInternalClockOnExternalStop(bool shouldStop)",
+      "returnType": "void",
+      "description": "Sets the internal clock to stop when the external clock was stopped.",
+      "parameters": [
+        {
+          "name": "shouldStop",
+          "type": "bool"
+        }
+      ]
+    }
+  }
+}

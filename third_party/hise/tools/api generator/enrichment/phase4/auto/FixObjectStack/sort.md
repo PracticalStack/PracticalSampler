@@ -1,0 +1,1 @@
+Sorts the used portion of the stack using the factory's compare function. Useful for restoring a specific ordering after swap-and-pop removals have disrupted the original sequence.

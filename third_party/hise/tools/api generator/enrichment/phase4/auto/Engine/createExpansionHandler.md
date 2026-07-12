@@ -1,0 +1,1 @@
+Creates and activates the expansion handler, which provides scripting access to the expansion pack system. The returned object allows installing, loading, and managing expansion packs, listening for expansion changes, and querying expansion properties.

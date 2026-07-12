@@ -1,0 +1,1 @@
+Returns a JSON object containing system hardware and OS information, including CPU model, core count, RAM, OS name, dark mode status, and user locale. Useful for telemetry, system requirement checks, or adapting UI to the OS theme via the `isDarkMode` property.

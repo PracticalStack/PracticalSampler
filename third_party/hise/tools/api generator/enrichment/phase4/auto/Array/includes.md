@@ -1,0 +1,1 @@
+Alias for `contains()`. Returns `true` if the array contains the specified value. Provided for JavaScript API compatibility.

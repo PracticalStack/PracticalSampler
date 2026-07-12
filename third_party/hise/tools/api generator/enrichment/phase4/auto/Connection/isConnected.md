@@ -1,0 +1,1 @@
+Returns whether this connection is still active in the scriptnode graph. Returns false after `disconnect()` has been called or if the connected node was deleted.

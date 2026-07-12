@@ -1,0 +1,167 @@
+{
+  "0": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "Knob1"},
+      {"type": "ScriptSlider", "id": "Knob2"},
+      {"type": "ScriptSlider", "id": "Knob3"},
+      {"type": "ScriptLabel", "id": "valuePopupLbl"}
+    ],
+    "verifyScript": null,
+    "notes": "Broadcaster mouse events on knobs, compile-only"
+  },
+  "1": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "loadImage with {PROJECT_FOLDER} path - file doesn't exist in test environment",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "2": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptButton", "id": "btnDemo1"},
+      {"type": "ScriptButton", "id": "btnDemo2"},
+      {"type": "ScriptButton", "id": "btnDemo3"}
+    ],
+    "verifyScript": null,
+    "notes": "getAllComponents('btnDemo\\d') regex match"
+  },
+  "3": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptPanel", "id": "Canvas"}
+    ],
+    "verifyScript": null,
+    "notes": "Arc drawing paint routine, compile-only"
+  },
+  "4": {
+    "tier": 1,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Creates own panel, self-contained 3D cube renderer"
+  },
+  "5": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "knbMacro1"},
+      {"type": "ScriptSlider", "id": "knbMacro2"},
+      {"type": "ScriptLabel", "id": "lblMacro1"},
+      {"type": "ScriptLabel", "id": "lblMacro2"}
+    ],
+    "verifyScript": null,
+    "notes": "Fixed: moved inline function before setControlCallback. Macro controls compile-only."
+  },
+  "6": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSlider", "id": "ModWheel"}
+    ],
+    "verifyScript": null,
+    "notes": "ModWheel LAF, compile-only"
+  },
+  "7": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "MidiPlayer", "name": "midiplayer_Playback"}
+    ],
+    "components": [
+      {"type": "ScriptPanel", "id": "panel_DragPointMIDI"}
+    ],
+    "verifyScript": null,
+    "notes": "Mouse callback won't fire during compile, compile-only"
+  },
+  "8": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSliderPack", "id": "SliderPack1"},
+      {"type": "ScriptSliderPack", "id": "SliderPack2"}
+    ],
+    "verifyScript": null,
+    "notes": "SliderPack radio button behavior, compile-only"
+  },
+  "9": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "SineSynth", "name": "SineSynth1"},
+      {"type": "LFO", "name": "LFO1", "parent": "SineSynth1", "chain": 1},
+      {"type": "LFO", "name": "LFO2", "parent": "SineSynth1", "chain": 1}
+    ],
+    "components": [
+      {"type": "ScriptSliderPack", "id": "SliderPack1"}
+    ],
+    "verifyScript": null,
+    "notes": "LFOs added to SineSynth1 gain mod chain. Shared SliderPack data."
+  },
+  "10": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "ScriptFX needs scriptnode network to provide AudioSampleProcessor interface with audio file slots",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": null
+  },
+  "11": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptSliderPack", "id": "SliderPack1"}
+    ],
+    "verifyScript": null,
+    "notes": "SliderPack LAF with step grid, compile-only"
+  },
+  "12": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {"type": "WavetableSynth", "name": "WT_SYNTH_LAY1"}
+    ],
+    "components": [
+      {"type": "ScriptPanel", "id": "pnlWtDraggerLay1"}
+    ],
+    "verifyScript": null,
+    "notes": "Mouse callback won't fire during compile, compile-only"
+  },
+  "13": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {"type": "ScriptedViewport", "id": "Viewport1"}
+    ],
+    "verifyScript": null,
+    "notes": "Viewport callback, compile-only"
+  }
+}

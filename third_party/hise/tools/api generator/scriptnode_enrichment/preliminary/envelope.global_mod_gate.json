@@ -1,0 +1,100 @@
+{
+  "factoryPath": "envelope.global_mod_gate",
+  "factory": "envelope",
+  "nodeId": "global_mod_gate",
+  "description": "Sends a On-Off modulation signal while the global modulator is active.",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Source Selection",
+      "rationale": "Index selects which global modulator slot to monitor for active/inactive state.",
+      "parameters": [
+        {
+          "id": "Index",
+          "range": { "min": 0.0, "max": 16.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/envelope/global_mod_gate.md",
+    "tier": "STUB",
+    "lines": 0
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "gate-signal-derivation",
+      "category": "signal_path",
+      "question": "How does global_mod_gate determine whether the global modulator is 'active'? Does it check if the envelope source has ClearState::Playing, or does it check the signal amplitude, or some other indicator?",
+      "context": "The on-off behaviour is the node's core purpose. Need to know exactly what 'active' means for different modulator types (VoiceStart, TimeVariant, Envelope)."
+    },
+    {
+      "id": "runtime-target-connection",
+      "category": "signal_path",
+      "question": "global_mod_gate has IsFixRuntimeTarget but no IsControlNode. How does it connect to the GlobalModulatorContainer? Does it use the same mod_base infrastructure as core.global_mod, or a different mechanism?",
+      "context": "The IsFixRuntimeTarget flag indicates it uses runtime_target to connect to a HISE-side modulator source. Need to verify the connection path."
+    },
+    {
+      "id": "modulation-output-type",
+      "category": "signal_path",
+      "question": "The ModulationTargets field is present but empty. Does global_mod_gate output modulation via handleModulation()/ModValue, and if so, what is the output -- strictly 0/1, or can it be intermediate values?",
+      "context": "Users need to know whether the output is strictly binary or can have intermediate states."
+    },
+    {
+      "id": "index-to-modulator-mapping",
+      "category": "parameter_behaviour",
+      "question": "The Index parameter (0-16) selects which global modulator. Is this the same index system as core.global_mod (position in GlobalModulatorContainer's gain chain)?",
+      "context": "Users need to know how to match the index to their GlobalModulatorContainer setup."
+    },
+    {
+      "id": "polyphonic-gate-behaviour",
+      "category": "signal_path",
+      "question": "global_mod_gate is polyphonic. Does it track envelope activity per-voice (so each voice gets its own gate state from the corresponding voice of the global modulator)?",
+      "context": "Per-voice gate tracking is essential for polyphonic envelope-based voice management."
+    }
+  ],
+
+  "notes": "global_mod_gate bridges the GlobalModulatorContainer's active state into scriptnode as a gate signal. It uses IsFixRuntimeTarget (like core.global_mod) but is NOT marked IsControlNode. It is polyphonic, suggesting per-voice gate tracking. The ModulationTargets field is present but empty in the base data -- the actual modulation output may be configured dynamically. This node is a companion to core.global_mod: global_mod gives the continuous modulation value, while global_mod_gate gives the binary active/inactive state. The description has a minor grammar issue ('a On-Off' should be 'an On-Off')."
+}

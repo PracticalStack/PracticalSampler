@@ -1,0 +1,14 @@
+{
+  "factoryPath": "control.xfader",
+  "nodes": [
+    { "id": "value_param", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Normalised crossfade position (0..1)" },
+    { "id": "mode", "label": "Mode", "type": "decision", "importance": 0.8, "description": "Fade curve type: Linear, Switch, RMS, Cosine, etc." },
+    { "id": "fade_calc", "label": "Compute Fade Coefficients", "type": "process", "importance": 1.0, "description": "Computes per-output fade value using FaderClass::getFadeValue()" },
+    { "id": "mod_out", "label": "Modulation Outputs", "type": "modulation_out", "importance": 1.0, "description": "Multiple outputs, each receiving its fade coefficient (normalised)" }
+  ],
+  "edges": [
+    { "from": "value_param", "to": "fade_calc", "type": "control", "label": "normalised input" },
+    { "from": "mode", "to": "fade_calc", "type": "conditional", "label": "curve type" },
+    { "from": "fade_calc", "to": "mod_out", "type": "signal", "label": "per-output coefficients" }
+  ]
+}

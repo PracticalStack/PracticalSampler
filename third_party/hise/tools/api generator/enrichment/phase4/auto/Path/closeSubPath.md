@@ -1,0 +1,1 @@
+Closes the current sub-path by drawing a straight line from the current position back to the sub-path's starting point. Closing a sub-path is necessary when you intend to fill the shape with `Graphics.fillPath` - open sub-paths are implicitly closed during fill, but explicitly closing makes the intent clear and avoids unexpected closing lines.

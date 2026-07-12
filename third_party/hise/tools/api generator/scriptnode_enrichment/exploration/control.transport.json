@@ -1,0 +1,12 @@
+{
+  "factoryPath": "control.transport",
+  "nodes": [
+    { "id": "daw_transport", "label": "DAW Transport", "type": "input", "importance": 1.0, "description": "Play/stop state from host transport" },
+    { "id": "detect_change", "label": "Change Detect", "type": "process", "importance": 0.8, "description": "Detects transport state changes per voice" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "1.0 when playing, 0.0 when stopped (normalised)" }
+  ],
+  "edges": [
+    { "from": "daw_transport", "to": "detect_change", "type": "signal", "label": "isPlaying" },
+    { "from": "detect_change", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

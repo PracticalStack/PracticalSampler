@@ -1,0 +1,1 @@
+Sets the node's bypass state. When bypassed, the node's processing is skipped and the signal passes through unmodified. The exact bypass behaviour depends on the node type. For programmatic bypass control via connections, see `connectToBypass()`.

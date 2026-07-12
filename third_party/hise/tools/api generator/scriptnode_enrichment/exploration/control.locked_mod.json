@@ -1,0 +1,12 @@
+{
+  "factoryPath": "control.locked_mod",
+  "nodes": [
+    { "id": "value_in", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Normalised input value (0..1)" },
+    { "id": "pass", "label": "Passthrough", "type": "process", "importance": 0.8, "description": "Forwards value unchanged" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Normalised output (target range applied by connection)" }
+  ],
+  "edges": [
+    { "from": "value_in", "to": "pass", "type": "control", "label": null },
+    { "from": "pass", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

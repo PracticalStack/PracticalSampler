@@ -1,0 +1,1 @@
+Creates an array of `Sample` objects by matching a regex pattern against sample file names. This is the preferred way to select samples for property editing - use it instead of the legacy `selectSounds()` workflow.

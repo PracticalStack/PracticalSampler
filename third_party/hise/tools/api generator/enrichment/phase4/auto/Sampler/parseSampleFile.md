@@ -1,0 +1,1 @@
+Parses an audio file and returns its metadata as a JSON object compatible with `Sampler.loadSampleMapFromJSON()`. The returned object contains properties like `Root`, `SampleStart`, `SampleEnd`, and a relative file reference if the file is in the project's Samples folder. Returns `undefined` if parsing fails.

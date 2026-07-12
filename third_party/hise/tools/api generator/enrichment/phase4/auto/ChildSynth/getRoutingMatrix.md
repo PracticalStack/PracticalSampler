@@ -1,0 +1,1 @@
+Returns a RoutingMatrix handle for this synth's channel routing configuration. Use it with `RoutingMatrix.addConnection()` to assign output channels - for example, routing different child synths to separate stereo output pairs in a multi-output plugin.

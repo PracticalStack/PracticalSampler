@@ -1,0 +1,1 @@
+Plays an artificial note with an explicit MIDI channel and sample start offset, returning the event ID. The start offset tells the sampler to begin playback at the specified sample position within the audio file rather than from the beginning. This is essential for audio slicing and skip-ahead playback. The maximum offset is 65535 samples.

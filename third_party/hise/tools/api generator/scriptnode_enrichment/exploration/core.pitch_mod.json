@@ -1,0 +1,62 @@
+{
+  "factoryPath": "core.pitch_mod",
+  "nodes": [
+    {
+      "id": "in",
+      "label": "Pitch Modulation Chain Signal",
+      "type": "input",
+      "importance": 1.0,
+      "description": "Pitch modulation signal from the parent sound generator's pitch modulation chain, received via fixed runtime_target connection (hash 90001)"
+    },
+    {
+      "id": "upsample",
+      "label": "Rate Matching",
+      "type": "process",
+      "importance": 0.5,
+      "description": "Linear interpolation to upsample control-rate signal to audio rate (when needed)"
+    },
+    {
+      "id": "passthrough",
+      "label": "Pitch Factor Passthrough",
+      "type": "process",
+      "importance": 0.8,
+      "description": "Signal passes through unmodified as raw pitch factor values (Pitch mode -- no transformation)"
+    },
+    {
+      "id": "process_signal",
+      "label": "ProcessSignal",
+      "type": "parameter",
+      "importance": 0.7,
+      "description": "When enabled, writes pitch modulation signal to audio channel 0"
+    },
+    {
+      "id": "mod_out",
+      "label": "Modulation Output",
+      "type": "modulation_out",
+      "importance": 1.0,
+      "description": "Unnormalised pitch factor values (0.5 = octave down, 1.0 = no change, 2.0 = octave up)"
+    },
+    {
+      "id": "audio_out",
+      "label": "Audio Out",
+      "type": "output",
+      "importance": 0.5,
+      "description": "Audio channel 0 output (only active when ProcessSignal is enabled)"
+    },
+    {
+      "id": "display",
+      "label": "Display Buffer",
+      "type": "external_data",
+      "importance": 0.3,
+      "description": "Ring buffer with pitchFactorToNormalisedRange transform for display"
+    }
+  ],
+  "edges": [
+    { "from": "in", "to": "upsample", "type": "signal", "label": null },
+    { "from": "upsample", "to": "passthrough", "type": "signal", "label": null },
+    { "from": "passthrough", "to": "mod_out", "type": "signal", "label": null },
+    { "from": "passthrough", "to": "audio_out", "type": "conditional", "label": "ProcessSignal enabled" },
+    { "from": "process_signal", "to": "audio_out", "type": "control", "label": null },
+    { "from": "passthrough", "to": "display", "type": "signal", "label": "transformed for display" }
+  ]
+}

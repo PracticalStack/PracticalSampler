@@ -1,0 +1,1 @@
+Returns the type name string of the currently loaded effect (e.g. `"SimpleReverb"`), or `"No Effect"` if the slot is empty. Useful for checking which effect is active before deciding whether to reload.

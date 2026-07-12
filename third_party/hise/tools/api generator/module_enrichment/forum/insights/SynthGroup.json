@@ -1,0 +1,88 @@
+{
+  "targetId": "SynthGroup",
+  "domain": "modules",
+  "generatedAt": "2026-03-31",
+  "topicIds": [3508, 2871, 13030, 13134, 3512, 3523, 1937, 669, 1415, 539, 5146, 6135, 5479, 5770, 7162, 14141, 452, 3340],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Unison causes clicks on note-on; fix with short attack",
+      "summary": "When UnisonoVoiceAmount > 1, each child voice is given a random start offset (up to ~10ms at 44.1kHz) to prevent phase cancellation between unison voices. This offset causes an audible click when no amplitude envelope is present. Adding a ~5ms attack time on the group's gain envelope eliminates the click.",
+      "sources": ["tid:2871"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Unison voice count changes do not apply to currently held notes",
+      "summary": "Changing UnisonoVoiceAmount while notes are held has no immediate effect on those voices. Only new note-on events use the updated count. The only workaround is to kill all active notes via scripting and retrigger them.",
+      "sources": ["tid:13030"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Detune and spread parameters only take effect on new notes",
+      "summary": "The UnisonoDetune and UnisonoSpread parameter values (and octave/transpose) are read at note-on time and applied to the voice. Changing them during held notes has no effect on those voices. To update these values in real-time, drive them via the Detune Modulation or Spread Modulation chains rather than changing the parameter directly.",
+      "sources": ["tid:14141"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Child synth pitch modulation chains are bypassed and hidden",
+      "summary": "When a synth is added as a child of a SynthGroup, its own pitch modulation chain is bypassed and made invisible in the UI. Pitch modulation for all children is driven exclusively by the SynthGroup's shared Pitch Modulation chain. Independent per-child pitch modulation is not possible.",
+      "sources": ["tid:669"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Setting child module gain directly causes zipper noise",
+      "summary": "Changing the Gain parameter of a child module inside a SynthGroup causes audible zipper noise when the change is rapid or modulated. Use a gain modulator (which operates in the 0-1 range, not dB) on the child instead for smooth, artifact-free gain changes.",
+      "sources": ["tid:1415"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use MidiMuter to silence children, not module bypass or -100dB gain",
+      "summary": "To dynamically silence a child synth within a SynthGroup, use a MidiMuter processor rather than bypassing the module or setting its gain to -100dB. A bypassed or silenced module still allocates voices on note-on; a MidiMuter prevents voice allocation entirely, keeping the voice pool available.",
+      "sources": ["tid:2871"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Monophonic unison: use Legato with Retrigger MIDI script",
+      "summary": "To achieve monophonic behaviour with unison voices active, add the built-in 'Legato with Retrigger' MIDI script to the SynthGroup. This is the recommended approach; no additional scripting is required.",
+      "sources": ["tid:539"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Scriptnode core.pitch_mod does not receive unison detune offsets",
+      "summary": "Inside a scriptnode network used as a child of a SynthGroup, the core.pitch_mod node reads pitch modulation values before the SynthGroup has applied its per-voice unison detune amounts. The detune offset is therefore not visible to scriptnode nodes. For fully scriptnode-based unison with per-voice detune, use the clone container instead of a SynthGroup.",
+      "sources": ["tid:13030"],
+      "verify": true,
+      "verify_hint": "Check ModulatorSynthGroup.cpp: order of preVoiceRendering vs detune multiplier application to pitch values"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Clone container as scriptnode alternative to SynthGroup unison",
+      "summary": "If a sound generator is built entirely in scriptnode, the clone container provides unison-style voice duplication with detune without requiring a SynthGroup wrapper. The author notes it is 'finicky' to configure but avoids the SynthGroup's limitation of no per-voice detune visibility inside scriptnode.",
+      "sources": ["tid:13030"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Supersaw with samplers: use multiple children with pre-detuned single-cycle waveforms",
+      "summary": "A practical supersaw/hypersaw effect can be achieved by placing multiple sampler children inside a SynthGroup, each loaded with the same single-cycle waveform at slightly different tuning offsets and non-aligned phase starts. This gives more control over individual voice tuning than the built-in UnisonoDetune linear spread.",
+      "sources": ["tid:3508"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

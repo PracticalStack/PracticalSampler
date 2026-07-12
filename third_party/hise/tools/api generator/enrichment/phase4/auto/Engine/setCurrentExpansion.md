@@ -1,0 +1,1 @@
+Sets the active expansion by name and updates the preset browser. Returns `true` if the expansion was found, `false` otherwise. Pass an empty string to deactivate the current expansion.

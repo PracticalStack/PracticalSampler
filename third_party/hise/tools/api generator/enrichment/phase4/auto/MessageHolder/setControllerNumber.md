@@ -1,0 +1,3 @@
+Sets the controller number for this event. For standard MIDI CC events, pass a value from 0-127. Passing 128 changes the event type to PitchBend, and 129 changes it to Aftertouch - this type coercion lets you construct pitch wheel and aftertouch events through the controller API without a separate `setType()` call.
+
+> [!Warning:Values 128-129 change event type] Values 128 and 129 change the event type, not just the controller number. This is intentional but may be surprising if you expect only the number field to change.

@@ -1,0 +1,113 @@
+{
+  "factoryPath": "jdsp.jdelay",
+  "factory": "jdsp",
+  "nodeId": "jdelay",
+  "description": "A linear interpolating delay line with low computational cost and a low-pass filtering effect.",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Delay Configuration",
+      "rationale": "Limit sets the maximum buffer size (affects memory), DelayTime sets the actual delay within that limit.",
+      "parameters": [
+        {
+          "id": "Limit",
+          "range": { "min": 0.0, "max": 1000.0, "step": 0.0, "skew": 0.3010300099849701 },
+          "default": 1000.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "DelayTime",
+          "range": { "min": 0.0, "max": 1000.0, "step": 0.0, "skew": 0.3010300099849701 },
+          "default": 0.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": true,
+    "groupName": "jdelay_interpolation",
+    "templateParameter": "interpolation algorithm (linear, cubic Lagrange, Thiran)",
+    "variantValue": "linear"
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/jdsp/jdelay.md",
+    "tier": "GOOD",
+    "lines": 22
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-processing",
+      "category": "signal_path",
+      "question": "How does the node wrap JUCE's DelayLine? Does process() iterate channels or use frame processing? Is the delay applied per-channel independently?",
+      "context": "Need to describe the signal flow accurately in the reference page."
+    },
+    {
+      "id": "limit-parameter-behaviour",
+      "category": "parameter_behaviour",
+      "question": "Does changing the Limit parameter at runtime reallocate the delay buffer? Is it safe to change during processing or only at init?",
+      "context": "Phase3 doc says Limit resizes buffers and impacts memory. Need to clarify whether this is a prepare-time or runtime operation."
+    },
+    {
+      "id": "delay-time-smoothing",
+      "category": "parameter_behaviour",
+      "question": "Is there any built-in smoothing on the DelayTime parameter, or is it applied raw? The phase3 doc says there is no smoothing.",
+      "context": "Critical for usage guidance about whether users need external smoothing."
+    },
+    {
+      "id": "linear-interpolation-lowpass",
+      "category": "description_accuracy",
+      "question": "The description says 'low-pass filtering effect'. Is this an inherent artefact of linear interpolation at high frequencies, or is there an explicit filter?",
+      "context": "Need to accurately describe the tonal character vs the other delay variants."
+    },
+    {
+      "id": "polyphonic-state",
+      "category": "signal_path",
+      "question": "How is the per-voice delay buffer managed? Does each voice get its own delay line instance via PolyData?",
+      "context": "IsPolyphonic is true -- need to confirm per-voice isolation."
+    },
+    {
+      "id": "cpu-profile",
+      "category": "performance",
+      "question": "What is the relative CPU cost compared to the cubic and Thiran variants? The descriptions suggest linear is cheapest.",
+      "context": "Need to set cpuProfile baseline and document the performance trade-off between variants."
+    }
+  ],
+
+  "notes": "The three jdelay variants (jdelay, jdelay_cubic, jdelay_thiran) share identical parameters and differ only in interpolation algorithm. jdelay uses linear interpolation (cheapest, but has low-pass colouring). Phase3 docs are nearly identical across all three variants with only the interpolation description differing. The phase3 jdelay.md has incorrect frontmatter (says 'jdelay_thiran' in keywords and summary)."
+}

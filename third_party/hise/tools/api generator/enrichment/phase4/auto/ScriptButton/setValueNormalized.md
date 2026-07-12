@@ -1,0 +1,1 @@
+Sets the value using a normalised 0.0 to 1.0 range. For ScriptButton this is equivalent to `setValue()` since the button's range is already 0 to 1.

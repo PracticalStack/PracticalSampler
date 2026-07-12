@@ -1,0 +1,1 @@
+Returns true if this event is a controller-like message: a standard MIDI CC, a pitch wheel event, or an aftertouch event. This matches the HISE convention where the `onController` callback receives all three event types. Use `getControllerNumber()` to distinguish between them when filtering event lists.

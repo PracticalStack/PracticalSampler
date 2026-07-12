@@ -1,0 +1,1 @@
+Delays the voice start for a layer/group combination on the next noteOn by the specified number of samples. Use this together with `addGroupEventStartOffset()` and `fadeInGroupEvent()` to stagger or shape how layered voices enter.

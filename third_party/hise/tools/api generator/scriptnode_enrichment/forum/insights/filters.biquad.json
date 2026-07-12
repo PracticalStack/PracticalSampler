@@ -1,0 +1,16 @@
+{
+  "targetId": "filters.biquad",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [1381],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Biquad filter in the monophonic filter unit is restricted to the top of the FX chain",
+      "summary": "The native monophonic filter module in HISE (which uses biquad internals) can only be placed at the top of the FX chain. To use biquad-style filtering at any arbitrary position in the signal path, the filter must be reimplemented inside a Script FX. Trusted poster 'orange' shared a standalone Script FX implementation of a biquad (LP, HP, LS, HS, Peak) for this purpose. The scriptnode filters.biquad node was presumably introduced to address this structural limitation.",
+      "sources": ["tid:1381"],
+      "verify": true,
+      "verify_hint": "Verify whether the scriptnode filters.biquad node resolves the FX-chain-position restriction that existed for the older monophonic filter module, making the Script FX workaround obsolete."
+    }
+  ]
+}

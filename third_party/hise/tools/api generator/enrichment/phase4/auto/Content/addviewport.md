@@ -1,0 +1,1 @@
+Creates a ScriptedViewport component for scrollable content areas. Accepts 1 argument (name only, position defaults to 0,0) or 3 arguments (name, x, y). The call is idempotent - if a component with that name already exists, the existing component is returned. Whether the position is updated for existing components depends on `Content.setUpdateExistingPosition()`.

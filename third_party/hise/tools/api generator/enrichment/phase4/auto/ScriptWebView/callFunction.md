@@ -1,0 +1,3 @@
+Calls a JavaScript function in the webview's global scope, passing the given arguments. The call runs asynchronously on the UI thread, so the JavaScript function will not have executed by the time the next HiseScript line runs. The target function must be attached to the global `window` object in the webview.
+
+> [!Warning:Persistence records and replays all calls] With `enablePersistence` set to `true`, all `callFunction` calls are recorded and replayed when a new webview instance is created. Timer-driven calls replay only the most recent value for each function name, but other calls accumulate.

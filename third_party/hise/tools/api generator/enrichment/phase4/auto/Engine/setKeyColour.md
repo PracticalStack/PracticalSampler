@@ -1,0 +1,3 @@
+Sets the colour of a single key on the on-screen MIDI keyboard. The colour is specified as a 32-bit integer in `0xAARRGGBB` format. Pass `0x00000000` to clear a key's custom colour. See the Colours API and Keyboard floating tile documentation for additional context.
+
+> [!Warning:Set all 128 keys to avoid stale colours] When colouring keyboard zones, always iterate all 128 keys and set a dim colour for unmapped notes. Skipping keys leaves stale colours from previous states.

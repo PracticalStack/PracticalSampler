@@ -1,0 +1,1 @@
+Registers a paint callback for custom drawing. The callback receives a Graphics object as its single argument. Inside the callback, `this` refers to the ContainerChild, so you can call `this.getLocalBounds()` or `this.get()` to access component data. An initial repaint is triggered automatically upon registration.

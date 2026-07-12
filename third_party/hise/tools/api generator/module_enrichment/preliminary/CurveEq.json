@@ -1,0 +1,133 @@
+{
+  "moduleId": "CurveEq",
+  "prettyName": "Parametriq EQ",
+  "type": "Effect",
+  "subtype": "MasterEffect",
+  "category": "filter, mixing",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "stereo",
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "RoutingMatrix",
+      "signalFlowRole": "skip - inferred from type/subtype"
+    },
+    {
+      "name": "DisplayBufferSource",
+      "signalFlowRole": "UI communication point (FFT spectrum display). Not in the signal path itself but fed from the output of the filter chain."
+    }
+  ],
+
+  "parameterGroups": [],
+
+  "dynamicBands": {
+    "note": "CurveEq has no fixed parameters in moduleList.json. Bands are added and removed dynamically at runtime. Each band exposes 5 parameters accessed via a flat index scheme: bandIndex * 5 + parameterOffset.",
+    "perBandParameters": [
+      {
+        "id": "Gain",
+        "offset": 0,
+        "range": { "min": -18.0, "max": 18.0 },
+        "default": 0.0,
+        "unit": "dB",
+        "description": "The gain in decibels. Only applies to LowShelf, HighShelf, and Peak types. Disabled for LowPass and HighPass."
+      },
+      {
+        "id": "Freq",
+        "offset": 1,
+        "range": { "min": 20.0, "max": 20000.0 },
+        "default": 1500.0,
+        "unit": "Hz",
+        "description": "The centre frequency of the filter band."
+      },
+      {
+        "id": "Q",
+        "offset": 2,
+        "range": { "min": 0.3, "max": 8.0 },
+        "default": 1.0,
+        "unit": "",
+        "description": "The bandwidth (Q factor) of the filter band."
+      },
+      {
+        "id": "Enabled",
+        "offset": 3,
+        "range": { "min": 0.0, "max": 1.0 },
+        "default": 1.0,
+        "unit": "",
+        "description": "Enables or disables the filter band. Disabled bands are skipped during processing."
+      },
+      {
+        "id": "Type",
+        "offset": 4,
+        "range": { "min": 0.0, "max": 4.0 },
+        "default": 4.0,
+        "unit": "",
+        "description": "The filter type: 0=LowPass, 1=HighPass, 2=LowShelf, 3=HighShelf, 4=Peak."
+      }
+    ]
+  },
+
+  "compositeBlocks": [],
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-order",
+      "category": "signal_path",
+      "question": "Are filter bands processed in series (cascaded) or in parallel? What is the processing order within applyEffect()?",
+      "context": "Users need to know whether band order matters and whether filters interact with each other's output."
+    },
+    {
+      "id": "fixed-block-processing",
+      "category": "performance",
+      "question": "The applyEffect() method appears to use a fixed internal block size. What is it, and why? Does this affect parameter smoothing resolution?",
+      "context": "Important for understanding CPU cost and smoothing behaviour when automating band parameters."
+    },
+    {
+      "id": "band-management",
+      "category": "parameter_behavior",
+      "question": "How are bands added and removed? What is the scripting API for managing bands? How does the flat parameter index scheme work?",
+      "context": "Since bands are dynamic, users need to understand the API for creating and addressing bands from HISEScript."
+    },
+    {
+      "id": "filter-types-detail",
+      "category": "parameter_behavior",
+      "question": "What are the exact filter types available per band? Are they biquad or SVF? What does HISE_USE_SVF_FOR_CURVE_EQ control?",
+      "context": "Users need to know the filter characteristics, especially for modulation scenarios where SVF would behave differently."
+    },
+    {
+      "id": "fft-display",
+      "category": "interface_usage",
+      "question": "How does the FFT display work? What is the DisplayBufferSource interface's role? Is it fed pre- or post-filter? Can it be enabled/disabled?",
+      "context": "The spectrum analyser is a key feature. Users need to know what signal it shows and how to control it."
+    },
+    {
+      "id": "gain-disabled-for-types",
+      "category": "conditional_logic",
+      "question": "The Gain parameter is reportedly disabled for LowPass and HighPass types. How is this enforced - is it just metadata or does the DSP also ignore it?",
+      "context": "Users setting Gain on a LowPass/HighPass band need to know it has no effect."
+    },
+    {
+      "id": "smoothing-time",
+      "category": "performance",
+      "question": "What is the parameter smoothing time for band parameters (frequency, gain, Q)? Is it per-sample or per-block?",
+      "context": "Important for automation and modulation use cases."
+    },
+    {
+      "id": "band-limit",
+      "category": "parameter_behavior",
+      "question": "Is there a maximum number of bands? The module claims 'unlimited bands' - is this truly unlimited?",
+      "context": "Users building complex EQ curves need to know if there is a practical limit."
+    }
+  ],
+
+  "notes": "CurveEq is unusual among HISE modules in having no fixed parameters. The band count is entirely dynamic, with bands added/removed at runtime. The prettyName uses a deliberate misspelling: 'Parametriq EQ'. The module implements ProcessorFilterStatistics::Holder for the shared filter drag overlay UI. The scripting API exposes constants (Gain, Freq, Q, Enabled, Type, BandOffset) for addressing band parameters via setAttribute(bandIndex * BandOffset + parameterType, value). No modulation chains exist - all parameter changes are direct."
+}

@@ -1,0 +1,90 @@
+{
+  "factoryPath": "template.freq_split4",
+  "factory": "template",
+  "nodeId": "freq_split4",
+  "description": "Processes each node independently and sums up the output.",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Crossover Frequencies",
+      "rationale": "Three crossover frequency parameters define the boundaries between four frequency bands. Each parameter routes to four LR filters (one per band) at that crossover point.",
+      "parameters": [
+        {
+          "id": "Band 1",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0, "skew": 0.2299045584686382 },
+          "default": 38.21100310467008,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Band 2",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0, "skew": 0.2299045584686382 },
+          "default": 391.2814714605185,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Band 3",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0, "skew": 0.2299045584686382 },
+          "default": 2185.884433596789,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": true,
+    "groupName": "freq_splitN",
+    "templateParameter": "number of frequency bands (2-5)",
+    "variantValue": "4"
+  },
+
+  "existingDoc": {
+    "path": "phase3/template/freq_split4.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": ["lr4_3.png", "split.png"],
+
+  "gaps": [
+    {
+      "id": "variant-difference",
+      "category": "signal_path",
+      "question": "freq_split4 has 4 bands and 3 crossover parameters vs freq_split2's 2 bands and 1 crossover. Each crossover parameter connects to 4 LR filters (lr1_N through lr4_N). Is the internal logic identical to freq_split2 except for additional bands and crossovers, with interior bands using cascaded HP+LP stages?",
+      "context": "If identical in structure, the doc can reference the base variant and note only the band count and parameter count difference."
+    }
+  ],
+
+  "notes": "Variant of freq_splitN with N=4. Three crossover parameters (Band 1, Band 2, Band 3) each connect to 4 LR filters. Default crossover frequencies are spaced roughly logarithmically: ~38 Hz, ~391 Hz, ~2186 Hz."
+}

@@ -1,0 +1,130 @@
+{
+  "factoryPath": "template.mid_side",
+  "factory": "template",
+  "nodeId": "mid_side",
+  "description": "A container for serial processing of nodes",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "UI layout orientation for the root container"
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/template/mid_side.md",
+    "tier": "BRIEF",
+    "lines": 10
+  },
+
+  "availableImages": ["ms_after.png"],
+
+  "internalStructure": {
+    "rootContainer": "container.chain",
+    "signalFlow": "Serial chain: routing.ms_decode (decoder) -> container.multi (ms_splitter with mid_chain on ch0, side_chain on ch1) -> routing.ms_encode (encoder). Stereo L/R is decoded to M/S, processed separately in the multi container, then re-encoded to L/R.",
+    "internalConnections": [],
+    "childNodes": [
+      { "id": "decoder", "factory": "routing.ms_decode", "purpose": "Converts stereo L/R signal to Mid/Side encoding. Mid = (L+R)/2, Side = (L-R)/2 (or similar matrix). Outputs mid on channel 0, side on channel 1." },
+      {
+        "id": "ms_splitter",
+        "factory": "container.multi",
+        "purpose": "Splits the 2-channel M/S signal so that mid_chain processes channel 0 (mid) and side_chain processes channel 1 (side) independently.",
+        "children": [
+          {
+            "id": "mid_chain",
+            "factory": "container.chain",
+            "purpose": "Processing chain for the mid (centre) signal. Contains math.mul (mid_gain) as a placeholder. User adds mid-specific processing here.",
+            "children": [
+              { "id": "mid_gain", "factory": "math.mul", "purpose": "Gain control for the mid signal (default Value=1.0, passthrough). User can adjust or replace." }
+            ]
+          },
+          {
+            "id": "side_chain",
+            "factory": "container.chain",
+            "purpose": "Processing chain for the side (stereo difference) signal. Contains math.mul (side_gain) as a placeholder. User adds side-specific processing here.",
+            "children": [
+              { "id": "side_gain", "factory": "math.mul", "purpose": "Gain control for the side signal (default Value=1.0, passthrough). User can adjust or replace." }
+            ]
+          }
+        ]
+      },
+      { "id": "encoder", "factory": "routing.ms_encode", "purpose": "Converts Mid/Side signal back to stereo L/R encoding. L = Mid+Side, R = Mid-Side (or similar inverse matrix)." }
+    ],
+    "internalParameters": [
+      { "nodeId": "mid_gain", "parameterId": "Value", "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 }, "default": 1.0, "value": 1.0, "textConverter": "Undefined", "purpose": "Gain multiplier for the mid signal" },
+      { "nodeId": "side_gain", "parameterId": "Value", "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 }, "default": 1.0, "value": 1.0, "textConverter": "Undefined", "purpose": "Gain multiplier for the side signal" }
+    ]
+  },
+
+  "gaps": [
+    {
+      "id": "ms-decode-encode-algorithm",
+      "category": "signal_path",
+      "question": "What is the exact M/S matrix used by routing.ms_decode and routing.ms_encode? Is it the standard Mid=(L+R)*0.5, Side=(L-R)*0.5 with inverse L=Mid+Side, R=Mid-Side? Or does it use a different scaling factor?",
+      "context": "The encoding/decoding matrix determines whether the round-trip is unity gain and whether the mid and side signals have the expected amplitude relationship."
+    },
+    {
+      "id": "multi-container-channel-split",
+      "category": "signal_path",
+      "question": "The container.multi (ms_splitter) contains two chains, each presumably getting one channel. Does container.multi assign channel 0 to mid_chain and channel 1 to side_chain? Are the chains mono (1 channel each)?",
+      "context": "Users need to know that mid_chain processes mono mid signal and side_chain processes mono side signal."
+    },
+    {
+      "id": "no-exposed-parameters",
+      "category": "parameter_behaviour",
+      "question": "This template has no exposed top-level parameters. The internal mid_gain and side_gain (math.mul) nodes have Value parameters at default 1.0. Is the intended workflow for users to expose these as macro parameters, or to add their own processing nodes in the mid/side chains?",
+      "context": "Documentation should explain how users control mid/side balance and add processing."
+    },
+    {
+      "id": "description-accuracy",
+      "category": "description_accuracy",
+      "question": "The base description 'A container for serial processing of nodes' describes the generic container.chain, not the M/S processing template. The phase3 doc has a better summary: 'A node template for a Mid / Side processing setup'. Should the description reflect this?",
+      "context": "The description is inherited from container.chain and completely fails to describe the template's M/S processing purpose."
+    },
+    {
+      "id": "stereo-requirement",
+      "category": "signal_path",
+      "question": "Does this template require exactly 2-channel (stereo) input to function correctly? What happens if placed in a mono or multichannel context?",
+      "context": "M/S encoding is inherently a stereo concept. Users need to know the channel requirement."
+    }
+  ],
+
+  "notes": "This is a COMPOSITE template node implementing a mid/side processing framework. The cppProperties field is empty because template nodes have no direct C++ implementation. The root is container.chain with three stages: (1) routing.ms_decode converts stereo L/R to M/S, (2) container.multi splits the two channels so mid_chain processes channel 0 (mid) and side_chain processes channel 1 (side), (3) routing.ms_encode converts back to L/R. Both mid_chain and side_chain contain math.mul placeholder nodes (gain=1.0, passthrough). No top-level parameters are exposed -- users control the template by adding processing nodes in the mid/side chains or exposing the internal gain controls. The phase3 doc confirms this purpose: 'a M/S processing algorithm - a multi container and M/S encoders'. This is the only template node with a non-stub existing doc (BRIEF, 10 lines). Requires stereo input."
+}

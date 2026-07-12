@@ -1,0 +1,145 @@
+{
+  "DspNetwork": {
+    "brief": "The top-level container that manages a ScriptNode DSP graph, providing methods to create, retrieve, and process nodes.",
+    "domain": "scriptnode",
+    "role": "container",
+    "baseClass": "ConstScriptingObject",
+    "creates": ["Node", "NetworkTest"],
+    "references": [],
+    "seeAlso": [
+      {
+        "class": "Builder",
+        "distinction": "DspNetwork manages the ScriptNode DSP graph (create/connect nodes); Builder programmatically creates the HISE module tree (synths, effects, modulators) -- different systems entirely."
+      },
+      {
+        "class": "DspModule",
+        "distinction": "DspNetwork is the modern ScriptNode graph container; DspModule is the legacy API for loading external DSP libraries."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.42,
+    "threadingExposure": 0.25
+  },
+  "DspModule": {
+    "brief": "Legacy API for loading and controlling an external DSP module instance from a DspFactory, predating the ScriptNode system.",
+    "domain": "scriptnode",
+    "role": "processor",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": [],
+    "seeAlso": [
+      {
+        "class": "Node",
+        "distinction": "DspModule is the legacy API for external DSP libraries with manual processBlock calls; Node is the modern ScriptNode graph API where processing is managed by the network."
+      },
+      {
+        "class": "DspNetwork",
+        "distinction": "DspModule processes audio via an external library; DspNetwork hosts the entire ScriptNode graph that contains Node objects."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.5,
+    "threadingExposure": 0.31
+  },
+  "Node": {
+    "brief": "A processing unit within a ScriptNode DSP network that can be connected, bypassed, and configured with parameters.",
+    "domain": "scriptnode",
+    "role": "processor",
+    "baseClass": "ConstScriptingObject",
+    "creates": ["Parameter", "Connection"],
+    "references": ["DspNetwork"],
+    "seeAlso": [
+      {
+        "class": "DspModule",
+        "distinction": "Node is a unit in the modern ScriptNode graph with automatic signal routing; DspModule is the legacy API requiring manual processBlock calls on external libraries."
+      },
+      {
+        "class": "DspNetwork",
+        "distinction": "Node is a single processing element; DspNetwork is the container that holds and manages all nodes."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.5,
+    "threadingExposure": 0.4
+  },
+  "Parameter": {
+    "brief": "A named parameter of a ScriptNode Node that holds a value with range properties and can receive modulation connections.",
+    "domain": "scriptnode",
+    "role": "handle",
+    "baseClass": "ConstScriptingObject",
+    "creates": ["Connection"],
+    "references": ["Node"],
+    "seeAlso": [
+      {
+        "class": "Node",
+        "distinction": "Parameter controls a single value on a Node; Node is the processing unit that owns one or more Parameters."
+      },
+      {
+        "class": "Connection",
+        "distinction": "Parameter is the target endpoint that holds a value; Connection is the link object that routes modulation from a source node to a Parameter."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.75,
+    "threadingExposure": 0.38
+  },
+  "Connection": {
+    "brief": "A modulation or signal connection between a source node and a target parameter within a ScriptNode graph.",
+    "domain": "scriptnode",
+    "role": "handle",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": ["Node", "Parameter"],
+    "seeAlso": [
+      {
+        "class": "Parameter",
+        "distinction": "Connection is the link object that routes a signal to a Parameter; Parameter is the endpoint that receives the value."
+      },
+      {
+        "class": "Node",
+        "distinction": "Connection represents the wiring between nodes; Node is the processing unit that produces or consumes the signal."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.33,
+    "threadingExposure": 0.33
+  },
+  "ContainerChild": {
+    "brief": "A reference to a child component inside a ScriptDynamicContainer, providing property access, hierarchy traversal, and value/paint callbacks.",
+    "domain": "ui",
+    "role": "component",
+    "baseClass": "ConstScriptingObject",
+    "creates": ["ContainerChild"],
+    "references": ["ScriptDynamicContainer"],
+    "seeAlso": [
+      {
+        "class": "ScriptDynamicContainer",
+        "distinction": "ContainerChild is a reference to a single child within a dynamic container; ScriptDynamicContainer is the parent component that owns and manages all children."
+      },
+      {
+        "class": "ScriptPanel",
+        "distinction": "ContainerChild is a lightweight child reference within a dynamic container; ScriptPanel is a standalone UI component with full paint and mouse callback support."
+      }
+    ],
+    "callbackDensity": 0.11,
+    "statefulness": 0.52,
+    "threadingExposure": 0.0
+  },
+  "NetworkTest": {
+    "brief": "A test harness for verifying ScriptNode DSP network output by running processing with configurable specs, runtime functions, and buffer comparison.",
+    "domain": "scriptnode",
+    "role": "utility",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": ["DspNetwork"],
+    "seeAlso": [
+      {
+        "class": "DspNetwork",
+        "distinction": "NetworkTest is a test harness created from a DspNetwork to verify its audio output; DspNetwork is the live DSP graph that produces audio."
+      }
+    ],
+    "callbackDensity": 0.07,
+    "statefulness": 0.29,
+    "threadingExposure": 0.14
+  }
+}

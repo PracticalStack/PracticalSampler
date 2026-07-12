@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<ContentProperties DeviceType="Desktop">
+  <Component type="ScriptPanel" id="BackgroundPanel" x="0" y="0" width="920"
+             height="540" bgColour="4279375651"/>
+  <Component type="ScriptLabel" id="Header" x="36" y="28" width="360" height="32"
+             text="Decent Rhapsody Studio" fontName="Oxygen" fontSize="28"
+             textColour="4294246888" bgColour="0" editable="0"/>
+  <Component type="ScriptLabel" id="Subheader" x="36" y="64" width="360" height="24"
+             text="Phase 0 frontend shell" fontName="Oxygen" fontSize="16"
+             textColour="4288132026" bgColour="0" editable="0"/>
+  <Component type="ScriptComboBox" id="SampleMapSelector" x="36" y="126" width="260"
+             height="40" items="DRS_SinePad&#10;DRS_TriangleLead" max="2"
+             text="Sample Map"/>
+  <Component type="ScriptComboBox" id="FactoryPresetSelector" x="328" y="126"
+             width="260" height="40"
+             items="DRS Init&#10;DRS Triangle Motion" max="2"
+             text="Factory Preset"/>
+  <Component type="ScriptKnob" id="ToneKnob" x="36" y="212" width="128" height="128"
+             text="Tone" min="0" max="1" middlePosition="0.5" stepSize="0.01"/>
+  <Component type="ScriptKnob" id="MotionKnob" x="196" y="212" width="128" height="128"
+             text="Motion" min="0" max="1" middlePosition="0.5" stepSize="0.01"/>
+  <Component type="ScriptKnob" id="SpaceKnob" x="356" y="212" width="128" height="128"
+             text="Space" min="0" max="1" middlePosition="0.5" stepSize="0.01"/>
+  <Component type="ScriptPanel" id="HeroPanel" x="612" y="126" width="272" height="248"
+             bgColour="4280100148" itemColour="4292917323" textColour="4294246888"/>
+  <Component type="ScriptLabel" id="StatusLabel" x="36" y="432" width="848" height="28"
+             text="Map: DRS_SinePad | Preset: DRS Init | Tone: 0.50 | Motion: 0.25 | Space: 0.18 | Sampler: DRS Main Sampler | Gain: DRS Output Gain"
+             fontName="Oxygen" fontSize="16" textColour="4294246888"
+             bgColour="4280100148" editable="0"/>
+  <Component type="ScriptLabel" id="FooterLabel" x="36" y="470" width="848" height="24"
+             text="Sample maps and factory presets are coming from content/hise_project."
+             fontName="Oxygen" fontSize="15" textColour="4288132026"
+             bgColour="0" editable="0"/>
+</ContentProperties>

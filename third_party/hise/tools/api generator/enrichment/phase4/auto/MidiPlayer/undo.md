@@ -1,0 +1,1 @@
+Undoes the last MIDI edit operation. Each MidiPlayer has its own per-player undo manager by default, so this works without any extra setup. Call `setUseGlobalUndoManager(true)` to switch to the global undo stack shared with `Engine.undo()` instead.

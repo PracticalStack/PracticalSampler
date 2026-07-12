@@ -1,0 +1,79 @@
+{
+  "moduleId": "HardcodedMasterFX",
+  "prettyName": "Hardcoded Master FX",
+  "type": "Effect",
+  "subtype": "MasterEffect",
+  "category": "custom",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "stereo",
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    { "name": "SlotFX", "signalFlowRole": "hot-swappable network slot (selects which compiled network to load)" },
+    { "name": "RoutingMatrix", "signalFlowRole": "skip - inferred from type/subtype" },
+    { "name": "TableProcessor", "signalFlowRole": "complex data exposed from compiled network" },
+    { "name": "SliderPackProcessor", "signalFlowRole": "complex data exposed from compiled network" },
+    { "name": "AudioSampleProcessor", "signalFlowRole": "complex data exposed from compiled network" },
+    { "name": "DisplayBufferSource", "signalFlowRole": "skip - UI communication only" }
+  ],
+
+  "parameterGroups": [],
+
+  "standaloneModChains": [],
+  "disabledModChains": [],
+  "compositeBlocks": [],
+
+  "gaps": [
+    {
+      "id": "network-loading",
+      "category": "signal_path",
+      "question": "How does the module load a compiled C++ network? What is the factory/DLL mechanism? How does the user select which network to use?",
+      "context": "Central to understanding what this module does - it is a framework, not a fixed effect."
+    },
+    {
+      "id": "parameter-exposure",
+      "category": "parameter_behavior",
+      "question": "How are parameters declared in the compiled network exposed to the HISE module tree? How does setAttribute/getAttribute work with dynamic parameters?",
+      "context": "Users need to understand that parameters come from the network, not the module itself."
+    },
+    {
+      "id": "modulation-chain-mapping",
+      "category": "signal_path",
+      "question": "How do parent modulation chains connect to compiled network parameters? What is the NUM_HARDCODED_FX_MODS preprocessor and how does it control modulation slot count?",
+      "context": "Key differentiator from Script* variants - modulation chains can drive compiled network parameters."
+    },
+    {
+      "id": "complex-data-exposure",
+      "category": "interface_usage",
+      "question": "How are Tables, SliderPacks, and AudioFiles from the compiled network exposed through the processor interfaces?",
+      "context": "Users need to access complex data types from their compiled networks."
+    },
+    {
+      "id": "compiled-vs-interpreted",
+      "category": "signal_path",
+      "question": "How does this differ from ScriptFX in terms of loading mechanism? ScriptFX loads XML scriptnode networks; this loads compiled C++ code from a DLL.",
+      "context": "Disambiguation between Hardcoded and Script variants is essential."
+    },
+    {
+      "id": "channel-count",
+      "category": "parameter_behavior",
+      "question": "How does multi-channel routing work? The module checks channel count matches between the routing matrix and the compiled network.",
+      "context": "Channel mismatch errors are a common user issue."
+    },
+    {
+      "id": "performance",
+      "category": "performance",
+      "question": "What is the CPU overhead of the framework itself (excluding the loaded network)?",
+      "context": "Users need to know the framework cost is negligible compared to the loaded network."
+    }
+  ],
+
+  "notes": "This is a custom-category module. All parameters are dynamic and come from the loaded compiled network. The module has no fixed parameters of its own. NUM_HARDCODED_FX_MODS preprocessor controls how many modulation chain slots are available."
+}

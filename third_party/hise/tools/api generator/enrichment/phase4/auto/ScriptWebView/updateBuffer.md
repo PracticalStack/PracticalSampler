@@ -1,0 +1,1 @@
+Marks the buffer at the given slot index as dirty so it will be sent to the webview on the next WebSocket communication cycle. The buffer must have been previously registered via `addBufferToWebSocket()`.

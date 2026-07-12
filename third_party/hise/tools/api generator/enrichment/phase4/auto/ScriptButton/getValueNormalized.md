@@ -1,0 +1,1 @@
+Returns the normalised value (0.0 to 1.0). For ScriptButton this is equivalent to `getValue()` since the button's range is already 0 to 1.

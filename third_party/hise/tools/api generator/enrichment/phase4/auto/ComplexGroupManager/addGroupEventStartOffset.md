@@ -1,0 +1,1 @@
+Sets the sample start offset for voices matching a layer/group combination on the next noteOn. Playback begins from the specified sample position instead of the sample's default start point.

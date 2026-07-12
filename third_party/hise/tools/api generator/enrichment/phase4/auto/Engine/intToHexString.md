@@ -1,0 +1,1 @@
+Converts an integer to its hexadecimal string representation using lowercase digits without a `0x` prefix (e.g., 255 returns `"ff"`).

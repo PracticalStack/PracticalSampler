@@ -1,0 +1,21 @@
+{
+  "moduleId": "EmptyFX",
+  "nodes": [
+    {
+      "id": "audio_in",
+      "type": "input",
+      "label": "Audio In (L/R)",
+      "importance": 1.0
+    },
+    {
+      "id": "audio_out",
+      "type": "output",
+      "label": "Audio Out (passthrough)",
+      "importance": 1.0
+    }
+  ],
+  "edges": [
+    { "from": "audio_in", "to": "audio_out", "type": "signal", "label": "passthrough" }
+  ],
+  "groups": []
+}

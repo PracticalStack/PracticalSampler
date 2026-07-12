@@ -1,0 +1,53 @@
+{
+  "moduleId": "RouteFX",
+  "nodes": [
+    {
+      "id": "audio_in",
+      "type": "input",
+      "label": "Audio In (multichannel)",
+      "importance": 1.0
+    },
+    {
+      "id": "pre_meter",
+      "type": "process",
+      "label": "Pre-Routing Metering",
+      "importance": 0.2,
+      "description": "Captures per-channel magnitude for the routing matrix editor display"
+    },
+    {
+      "id": "send_routing",
+      "type": "process",
+      "label": "Channel Send Routing",
+      "importance": 1.0,
+      "description": "For each source channel with a send target, additively copies the source signal to the target channel"
+    },
+    {
+      "id": "routing_matrix",
+      "type": "external",
+      "label": "Routing Matrix",
+      "importance": 0.9,
+      "description": "User-configured source-to-destination send mapping"
+    },
+    {
+      "id": "post_meter",
+      "type": "process",
+      "label": "Post-Routing Metering",
+      "importance": 0.2,
+      "description": "Captures per-channel magnitude after routing for the editor display"
+    },
+    {
+      "id": "audio_out",
+      "type": "output",
+      "label": "Audio Out (multichannel)",
+      "importance": 1.0
+    }
+  ],
+  "edges": [
+    { "from": "audio_in", "to": "pre_meter", "type": "signal" },
+    { "from": "pre_meter", "to": "send_routing", "type": "signal" },
+    { "from": "routing_matrix", "to": "send_routing", "type": "control" },
+    { "from": "send_routing", "to": "post_meter", "type": "signal" },
+    { "from": "post_meter", "to": "audio_out", "type": "signal" }
+  ],
+  "groups": []
+}

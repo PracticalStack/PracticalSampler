@@ -1,0 +1,16 @@
+{
+  "factoryPath": "envelope.global_mod_gate",
+  "nodes": [
+    { "id": "runtime_source", "label": "GlobalModulatorContainer", "type": "input", "importance": 0.8, "description": "Runtime target connection to HISE GlobalModulatorContainer (hash=1)" },
+    { "id": "midi", "label": "MIDI Note-On", "type": "input", "importance": 0.7, "description": "Note-on stores per-voice EventData for the selected modulator" },
+    { "id": "voice_check", "label": "Voice Active Check", "type": "process", "importance": 1.0, "description": "Checks ClearState resetFlag per voice. Returns true unless Reset." },
+    { "id": "index", "label": "Index", "type": "parameter", "importance": 0.8, "description": "Selects which global modulator slot to monitor (0-16)" },
+    { "id": "mod_out", "label": "Gate Output", "type": "modulation_out", "importance": 1.0, "description": "1.0 while voice active, 0.0 when voice released" }
+  ],
+  "edges": [
+    { "from": "runtime_source", "to": "voice_check", "type": "signal", "label": "SignalSource with EventData" },
+    { "from": "midi", "to": "voice_check", "type": "signal", "label": "note-on stores EventData" },
+    { "from": "index", "to": "voice_check", "type": "control", "label": "modulator slot" },
+    { "from": "voice_check", "to": "mod_out", "type": "signal", "label": "binary 0/1" }
+  ]
+}

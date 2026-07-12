@@ -1,0 +1,72 @@
+{
+  "targetId": "Chorus",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [980, 4525, 12406, 5107, 13017, 1607, 14072],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Both channels share the same LFO phase — no inherent stereo widening",
+      "summary": "The internal LFO uses identical phase for both L and R delay lines. The module does not widen the stereo image through phase differences; any stereo effect comes solely from different feedback histories accumulating in each channel's buffer. Users expecting a wide stereo chorus from this module will be disappointed.",
+      "sources": ["tid:4525"],
+      "verify": true,
+      "verify_hint": "Chorus.cpp processReplacing() — confirm phi is shared and no per-channel offset is applied"
+    },
+    {
+      "type": "API",
+      "title": "Wet/dry mix is hardcoded at ~47% wet — the Mix parameter does not exist",
+      "summary": "Despite what users expect, there is no Mix parameter on the Chorus module. The wet level is fixed at 0.47 in the constructor and cannot be changed from script or the UI. To blend the chorus effect, use a send/return routing or bypass the module programmatically.",
+      "sources": ["tid:4525"],
+      "verify": true,
+      "verify_hint": "Chorus constructor — look for parameterMix = 0.47; confirm no setAttribute path modifies it"
+    },
+    {
+      "type": "API",
+      "title": "Wet signal is subtracted from dry, not added — subtractive comb-filter mixing",
+      "summary": "The output is computed as `dry * input - wet * delayed`. This inverted mix creates a comb-filter cancellation pattern characteristic of the mda chorus algorithm. The tonal effect is different from a classic additive chorus blend.",
+      "sources": ["tid:980"],
+      "verify": true,
+      "verify_hint": "Chorus.cpp processReplacing() — confirm `output = dry * input - wet * delayed`"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Default Feedback value (0.3) produces negative feedback, not positive",
+      "summary": "The Feedback parameter maps to the range -0.95 to +0.95 via `1.9 * feedback - 0.95`. At the default value of 0.3, the actual coefficient is -0.38 (negative feedback). Feedback only becomes positive above 0.5. Users adjusting Feedback below 0.5 are increasing negative feedback, which cancels rather than reinforces.",
+      "sources": ["tid:980"],
+      "verify": true,
+      "verify_hint": "Chorus.cpp calculateInternalValues() — check feedback coefficient formula; confirm default parameter value"
+    },
+    {
+      "type": "API",
+      "title": "Rate < 0.01 freezes the LFO at a static delay position",
+      "summary": "When the Rate parameter falls below 0.01, the engine forces rat=0 and resets the LFO phase. This stops all modulation, turning the chorus into a static comb filter. This threshold is not documented and can surprise users who set Rate very low expecting slow modulation.",
+      "sources": ["tid:980"],
+      "verify": true,
+      "verify_hint": "Chorus.cpp calculateInternalValues() or processReplacing() — check `if (rate < 0.01)` branch"
+    },
+    {
+      "type": "API",
+      "title": "Chorus is based on the mda FX open-source suite",
+      "summary": "The Chorus module is a wrapper around the mda FX chorus algorithm, which uses a parabolic LFO waveform and a fixed 2048-sample delay buffer (approx. 45ms maximum depth at 44.1kHz). The algorithm is intentionally simple and was not designed by HISE developers.",
+      "sources": ["tid:980"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use scriptnode for a higher-quality or more flexible chorus",
+      "summary": "Multiple experienced users recommend building a chorus in scriptnode instead of using the built-in module when wider stereo, BBD simulation, independent L/R LFO phases, or additional saturation/filtering stages are needed. The scriptnode `jchorus` node was specifically highlighted as a good alternative.",
+      "sources": ["tid:12406", "tid:1607", "tid:14072"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Modulate delay lines in a fixBlock, not a frameBlock, in scriptnode choruses",
+      "summary": "When building a custom chorus in scriptnode, the modulation of delay time must be done inside a `fix_block` container. Using a `frame_block` for this purpose produces incorrect results.",
+      "sources": ["tid:5107"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+Returns the number of groups (tokens) defined in the specified layer. Use this to determine valid group index ranges before calling methods like `setActiveGroup()`.

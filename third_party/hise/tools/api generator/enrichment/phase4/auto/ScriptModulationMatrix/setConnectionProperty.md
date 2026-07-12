@@ -1,0 +1,1 @@
+Sets the value of a property on the connection between the given source and target. Returns `true` if the property was set, `false` if the source, connection, or property ID was not found. The change is recorded in the undo manager for undo/redo support.

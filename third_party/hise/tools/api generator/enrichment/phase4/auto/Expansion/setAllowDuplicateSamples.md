@@ -1,0 +1,1 @@
+Controls whether this expansion's sample pool allows duplicate sample file references. When set to `true`, the same sample files can be referenced by multiple sample maps within the expansion. When `false` (the default), the pool rejects duplicate references.

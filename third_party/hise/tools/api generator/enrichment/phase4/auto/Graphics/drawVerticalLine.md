@@ -1,0 +1,1 @@
+Draws a pixel-snapped vertical line at the specified x-coordinate from `y1` to `y2` using the current colour. The x-coordinate is an integer for pixel-perfect alignment; the y positions are floats. The line width is always 1 pixel - for thicker vertical lines, use `drawLine` instead.

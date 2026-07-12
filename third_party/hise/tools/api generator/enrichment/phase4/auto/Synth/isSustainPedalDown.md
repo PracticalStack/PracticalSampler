@@ -1,0 +1,1 @@
+Returns `true` if the sustain pedal (MIDI CC #64) is currently pressed. The state is already updated before the `onController` callback fires. Script-generated controller events do not affect this state.

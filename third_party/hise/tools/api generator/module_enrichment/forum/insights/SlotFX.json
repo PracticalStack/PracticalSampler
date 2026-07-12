@@ -1,0 +1,96 @@
+{
+  "targetId": "SlotFX",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [13661, 5947, 4691, 3776, 13671, 13907, 12563, 9732, 12292, 11005, 1816, 1222, 3700, 2243, 13353, 12467, 2536, 10260],
+  "insights": [
+    {
+      "type": "BUG",
+      "title": "SlotFX.setBypassed() is not functional",
+      "summary": "Calling setBypassed() on a SlotFX reference throws a 'function not found' error. The function appears in the API browser but is not implemented on the SlotFX scripting object.",
+      "sources": ["tid:5947"],
+      "verify": true,
+      "verify_hint": "grep setBypassed in hi_scripting/scripting/api/ScriptingApiObjects.cpp; check SlotFX scripting class"
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Bypass a SlotFX by holding a second reference as an Effect",
+      "summary": "Since setBypassed() is broken on SlotFX references, obtain a second reference to the same module using Synth.getEffect() and call setBypassed() on that. Both references can coexist and target the same physical module.",
+      "sources": ["tid:5947"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use Engine.addModuleStateToUserPreset() to persist SlotFX state across presets",
+      "summary": "Call Engine.addModuleStateToUserPreset(moduleId) in onInit for each SlotFX to ensure the loaded effect and its parameters are saved and recalled with user presets. Without this, preset loads will not restore which effect is in the slot.",
+      "sources": ["tid:13353", "tid:13661"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "setEffect() requires the effect type name, not the instance name",
+      "summary": "The argument to SlotFX.setEffect() must be the module type name as it appears in the slot dropdown list (e.g. \"SimpleReverb\", \"PhaseFX\"), not the instance name set in the module tree. Passing an instance name silently fails.",
+      "sources": ["tid:4691"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "getParameterProperties() returns undefined on SlotFX",
+      "summary": "Calling getParameterProperties() on a SlotFX reference returns undefined. Based on source inspection, this function only works with HardcodedMasterFX scriptnode effects, not with SlotFX itself.",
+      "sources": ["tid:13671"],
+      "verify": true,
+      "verify_hint": "grep getParameterProperties in hi_scripting/scripting/api/ScriptingApiObjects.cpp line ~3937; trace to HardcodedModuleBase.cpp line ~1245"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "HardcodedMasterFX with more than 2 channels cannot be loaded into an Effect Slot",
+      "summary": "Effect Slots only support 2-channel processing. A HardcodedMasterFX built on a scriptnode graph with more than 2 channels (e.g. a 4-channel sidechain compressor) cannot be loaded and will crash on recent HISE versions.",
+      "sources": ["tid:11005"],
+      "verify": true,
+      "verify_hint": "grep channel count check in SlotFX constrainer or HardcodedMasterFX loading path"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Filter FX type does not appear in the Effect Slot dropdown",
+      "summary": "The built-in Filter module is excluded from the Effect Slot type list and cannot be loaded via setEffect(). The community understanding is that filters must be first in the effect chain. Use a ScriptFX wrapping the desired filter behaviour as a workaround.",
+      "sources": ["tid:2536"],
+      "verify": true,
+      "verify_hint": "check SlotFX Constrainer allowType() or wildcard metadata string; look for filter exclusion logic"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Maintain a per-effect data record to drive generic modular UI",
+      "summary": "When building a dynamic effect rack with shared controls, store a data object per effect type that contains attribute indices, display names, min/max ranges, suffixes, and default values. Read this record on every slot change to reconfigure the shared UI rather than attempting to query these properties dynamically from the module.",
+      "sources": ["tid:12467"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Controls must be explicitly re-initialised after a slot swap",
+      "summary": "After calling setEffect() the newly loaded effect parameters are not automatically pushed to connected UI controls. A timing issue means the effect may not be fully loaded when the callback fires; re-read attribute values after a short delay or in a broadcaster callback triggered by the slot change.",
+      "sources": ["tid:12467"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Engine.addModuleStateToUserPreset() previously failed on modules with child elements",
+      "summary": "Earlier HISE versions threw an error when addModuleStateToUserPreset() was called on a module that had child modules (such as modulation slots). This was fixed: child modules are now left untouched while the parent state is still saved. Modulation matrix connections are handled separately by ScriptModulationMatrix.",
+      "sources": ["tid:13661"],
+      "verify": true,
+      "verify_hint": "grep addModuleStateToUserPreset in hi_scripting source; check child-element handling path"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use swap() with a slotRange and chainOrder offset to reorder effects within a fixed chain",
+      "summary": "If some slots at the start or end of the chain are fixed, pass a slotRange parameter (e.g. [3, 7]) and a chainOrder array whose indices are relative to the range start. Add an offset equal to the slotRange start index to the raw position values before passing them.",
+      "sources": ["tid:13661"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

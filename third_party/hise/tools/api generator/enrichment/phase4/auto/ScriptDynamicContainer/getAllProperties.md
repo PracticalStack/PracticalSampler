@@ -1,0 +1,1 @@
+Returns an array of all active property IDs for this component. ScriptDynamicContainer only exposes its reduced container-level property set, so preset, parameter, macro, and tooltip-related properties will not appear here.

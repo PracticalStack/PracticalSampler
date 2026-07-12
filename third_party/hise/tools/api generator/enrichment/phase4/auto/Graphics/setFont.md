@@ -1,0 +1,1 @@
+Sets the current font for subsequent text drawing operations and `getStringWidth` measurements. The `fontName` can be an embedded font (loaded via project settings with `Engine.loadFontAs()`), a system font, or `"Default"` for the global HISE font. The `fontSize` sets the height in pixels. To also control letter spacing, use `setFontWithSpacing` instead.

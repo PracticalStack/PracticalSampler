@@ -1,0 +1,78 @@
+{
+  "moduleId": "LegatoWithRetrigger",
+  "prettyName": "Legato with Retrigger",
+  "type": "MidiProcessor",
+  "subtype": "MidiProcessor",
+  "category": "note_processing",
+
+  "io": {
+    "midiIn": "MIDI in",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [],
+
+  "parameterGroups": [],
+
+  "compositeBlocks": [],
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "legato-event-logic",
+      "category": "signal_path",
+      "question": "What is the full processHiseEvent() logic? Specifically: when a new noteOn arrives while a note is already held, does it kill the old note (artificial noteOff) and start the new note, or does it just update pitch? What MIDI events are generated or suppressed?",
+      "context": "This is the core behavior of the module - the reference page needs to describe exactly what happens to overlapping notes."
+    },
+    {
+      "id": "retrigger-mechanism",
+      "category": "signal_path",
+      "question": "What does 'retrigger the previous note after a release' mean in implementation? When the current legato note is released, does the module re-send a noteOn for the previously held note? How deep is this stack (one note, multiple notes)?",
+      "context": "The retrigger behavior is the distinguishing feature vs a plain legato processor. Users need to know if it remembers one previous note or a full stack."
+    },
+    {
+      "id": "note-tracking-state",
+      "category": "signal_path",
+      "question": "What internal state does the module maintain? Is there a note stack/list tracking held notes? What data is stored per note (note number, velocity, channel, event ID)?",
+      "context": "Understanding the state model is essential for describing edge cases like rapid note changes and polyphonic input."
+    },
+    {
+      "id": "velocity-handling",
+      "category": "parameter_behavior",
+      "question": "When retriggering a previous note, what velocity is used - the original velocity of that note, or a fixed value? When performing legato (suppressing retrigger), is the new note's velocity preserved?",
+      "context": "Velocity behavior significantly affects expressiveness and users need to know what to expect."
+    },
+    {
+      "id": "channel-handling",
+      "category": "parameter_behavior",
+      "question": "Does the module operate on a specific MIDI channel or all channels? Does it preserve the original channel when retriggering?",
+      "context": "Channel behavior matters for multi-timbral setups."
+    },
+    {
+      "id": "event-id-management",
+      "category": "signal_path",
+      "question": "How does the module handle HISE artificial event IDs? Does it generate new event IDs for retriggered notes, or reuse the original IDs? Does it properly pair noteOn/noteOff events?",
+      "context": "Correct event ID management is critical in HISE's event system - mismatched IDs cause stuck notes or missed releases."
+    },
+    {
+      "id": "edge-case-all-released",
+      "category": "conditional_logic",
+      "question": "What happens when the last note in the stack is released? Does the module simply pass through the noteOff, or is there special handling?",
+      "context": "Users need to understand the full lifecycle from first note to silence."
+    },
+    {
+      "id": "description-accuracy",
+      "category": "description_accuracy",
+      "question": "The base description says 'useful for lead lines and expressive legato phrasing'. Is this accurate, or does the module have broader/narrower applicability? Is 'monophonic' enforced (only one sounding note at a time)?",
+      "context": "Verify the description matches actual behavior before carrying it to the reference page."
+    }
+  ],
+
+  "notes": "LegatoWithRetrigger has zero parameters, zero interfaces, and zero modulation chains - all behavior is implicit in processHiseEvent(). This makes it a pure event-transformation MIDI processor. The description suggests a note-stack architecture where releasing the current note retriggers the previous one (common in monosynth legato implementations). The module's entire value proposition is in the C++ event logic, so Step 3 exploration is critical. Compare with TransposerMidiProcessor (another parameterless MIDI processor) and any other legato-related modules."
+}

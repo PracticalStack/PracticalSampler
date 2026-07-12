@@ -1,0 +1,120 @@
+{
+  "targetId": "MidiPlayer",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [13345, 9646, 13184, 4732, 4699, 1903, 7311, 13170, 11082, 5595, 6354, 1425, 7724, 7411, 4575, 4228, 1961, 12489, 13471, 13704, 14080, 11082, 1286, 13949, 13081, 14164],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "NoteOff events from MidiPlayer are invisible to sibling MIDI script processors",
+      "summary": "A script processor placed in the same MIDI chain as a MidiPlayer (as a sibling) will not receive noteOff callbacks. The note-offs are pushed to the future-event buffer, which is not processed by sibling processors. Place script processors that need noteOff events inside a child container beneath the MidiPlayer.",
+      "sources": ["tid:1903"],
+      "verify": true,
+      "verify_hint": "grep addHiseEventToBuffer in MidiPlayer.cpp; check future-event buffer routing in preprocessBuffer()"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "MIDI files are silently absent from compiled plugins if pooled files are not exported before compiling",
+      "summary": "MIDI files must be exported via 'Export > Export Pooled Files To Binary Resource' before compiling. If skipped, the midiFilesSize in PresetData.h will be 28 bytes (empty pool) and no files will play in the compiled plugin.",
+      "sources": ["tid:9646"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "LoopEnabled button was broken - loop was always active regardless of toggle state",
+      "summary": "Christoph Hart confirmed a regression where the LoopEnabled toggle had no effect and the player would always loop. Additionally, disabling the loop caused the first beat to be missed on each iteration. Workaround: use the sequence callback with Math.ceil on NumBars to normalize the loop boundary.",
+      "sources": ["tid:7311"],
+      "verify": true,
+      "verify_hint": "check LoopEnabled handling in preprocessBuffer() MidiPlayer.cpp; check loopEnabled flag path for off-by-one at boundary"
+    },
+    {
+      "type": "API",
+      "title": "Sequence length defaults to last note-off position, not last bar boundary",
+      "summary": "When a MIDI file is loaded, its length is set to the timestamp of the last note-off event. If the file has no end-of-track marker or no notes reaching the final bar boundary, NumBars will be fractional. Round up with Math.ceil via setSequenceCallback to get clean loop boundaries.",
+      "sources": ["tid:7311", "tid:5595"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use setSequenceCallback to normalize sequence length to full bars on load",
+      "summary": "Call setSequenceCallback with a function that reads the TimeSignature, rounds NumBars up with Math.ceil, and writes it back via setTimeSignature. This ensures the loop boundary always falls on a bar line regardless of note content.",
+      "sources": ["tid:7311"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "MidiPlayer does not support tempo changes embedded in MIDI files",
+      "summary": "Tempo map events (ritardando, accelerando) in a MIDI file are ignored. The player is designed for loop-based sequencers that sync to an external DAW clock. Engine.setHostBpm() or PlaybackSpeed can be used for tempo adjustments in standalone mode.",
+      "sources": ["tid:1425", "tid:7411"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "MidiPlayer events are artificial; use Message.isArtificial() to separate from user MIDI input",
+      "summary": "All events injected by MidiPlayer are marked as artificial. In a script processor that receives both player output and live keyboard input, use Message.isArtificial() to distinguish them. Alternatively, assign the MidiPlayer to a different MIDI channel via the CurrentTrack parameter.",
+      "sources": ["tid:13471"],
+      "verify": true,
+      "verify_hint": "grep isArtificial in MidiPlayer.cpp preprocessBuffer(); check HiseEvent artificial flag assignment"
+    },
+    {
+      "type": "API",
+      "title": "The keyboard floating tile does not animate from MidiPlayer output",
+      "summary": "The built-in keyboard FloatingTile responds only to incoming MIDI events, not to the artificial events injected by MidiPlayer. To visualise playback on a keyboard, create a custom panel and use the MidiPlayer's event callbacks or getNoteRectangleList.",
+      "sources": ["tid:13704"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Calling Engine.getPlayHead() inside audio callbacks causes heap allocation crash",
+      "summary": "Engine.getPlayHead() allocates a new object each call. Calling it inside a timer or transport callback on the audio thread causes an 'Illegal operation in audio thread: HeapBlock allocation' error. Call it once in onInit and reuse the stored reference; its properties update automatically.",
+      "sources": ["tid:1286"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Pass an empty string to setFile() to clear all loaded sequences",
+      "summary": "There is no explicit clearAllSequences() scripting API call. Passing an empty string as the first argument to setFile() — MidiPlayer.setFile(\"\", true, true) — effectively clears all sequences.",
+      "sources": ["tid:4228"],
+      "verify": true,
+      "verify_hint": "check setFile() implementation in MidiPlayer scripting API; look for empty string handling"
+    },
+    {
+      "type": "API",
+      "title": "NoteRectangleList indices only align with EventList when filtered to NoteOn events only",
+      "summary": "getNoteRectangleList() returns one rectangle per note, following NoteOn order. If the EventList contains CC or other non-note events, the indices diverge. Filter the EventList to NoteOn events only before using EventId to index into the rectangle list.",
+      "sources": ["tid:7724"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Each sequence supports exactly one TimeSignature; multiple time signatures per sequence are not supported",
+      "summary": "A sequence holds a single TimeSignature object. Files with internal time signature changes will have those changes ignored. The workaround is to split content into multiple sequences and switch between them.",
+      "sources": ["tid:11082"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use Synth.getMidiPlayer() for full API; use asMidiPlayer() if you only have a MidiProcessor reference",
+      "summary": "To access transport methods (play, stop, setFile etc.), obtain a MidiPlayer reference via Synth.getMidiPlayer(). If you already hold a MidiProcessor reference (e.g. from getMidiProcessor()), call .asMidiPlayer() on it to get the full scripting interface.",
+      "sources": ["tid:13949"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "setFile() with {PROJECT_FOLDER} wildcard targets the MidiFiles subfolder in the project",
+      "summary": "When using {PROJECT_FOLDER} as a path prefix, it resolves to the project's MidiFiles directory. Use file.toString(File.FullPath) when loading externally browsed files via FileSystem.browse, not the File object directly.",
+      "sources": ["tid:13345", "tid:1961"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

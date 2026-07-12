@@ -1,0 +1,156 @@
+{
+  "moduleId": "MidiController",
+  "nodes": [
+    {
+      "id": "midi_input",
+      "label": "MIDI Event",
+      "type": "input",
+      "importance": 0.9,
+      "group": "event_handling",
+      "description": "Incoming HiseEvent (CC, aftertouch, or pitch wheel)"
+    },
+    {
+      "id": "mpe_filter",
+      "label": "MPE Channel Filter",
+      "type": "decision",
+      "importance": 0.3,
+      "group": "event_handling",
+      "description": "When MPE is enabled, only channel 1 events pass through"
+    },
+    {
+      "id": "event_match",
+      "label": "Controller Match",
+      "type": "decision",
+      "importance": 0.8,
+      "group": "event_handling",
+      "description": "Checks if event type and number match the configured controllerNumber (0-127 for CC, 128 for pitch wheel, 129 for aftertouch)"
+    },
+    {
+      "id": "normalize",
+      "label": "Normalize to 0-1",
+      "type": "process",
+      "importance": 0.9,
+      "group": "value_processing",
+      "description": "CC: value/127, pitch wheel: value/16383, channel pressure: value/127, poly aftertouch: max of per-note values/127"
+    },
+    {
+      "id": "constrain",
+      "label": "Constrain 0-1",
+      "type": "process",
+      "importance": 0.3,
+      "group": "value_processing",
+      "description": "CONSTRAIN_TO_0_1 clamps the normalized value"
+    },
+    {
+      "id": "table_lookup",
+      "label": "Table Lookup",
+      "type": "process",
+      "importance": 0.7,
+      "group": "value_processing",
+      "description": "512-point interpolated lookup table maps normalized input to shaped output (0-1 -> 0-1)"
+    },
+    {
+      "id": "invert",
+      "label": "Invert",
+      "type": "process",
+      "importance": 0.6,
+      "group": "value_processing",
+      "description": "Flips value: 1 - value"
+    },
+    {
+      "id": "target_value",
+      "label": "Target Value",
+      "type": "process",
+      "importance": 0.5,
+      "group": "smoothing",
+      "description": "Stores the processed value as the smoother's target"
+    },
+    {
+      "id": "smoother",
+      "label": "One-Pole Smoother",
+      "type": "process",
+      "importance": 0.8,
+      "group": "smoothing",
+      "description": "Per-sample one-pole IIR low-pass filter interpolating currentValue toward targetValue. Short-circuits to fill when converged."
+    },
+    {
+      "id": "output",
+      "label": "Modulation Output",
+      "type": "output",
+      "importance": 1.0,
+      "group": "smoothing",
+      "description": "Smoothed modulation value written to internalBuffer, applied by TimeVariantModulator::render()"
+    },
+    {
+      "id": "param_controller_number",
+      "label": "ControllerNumber",
+      "type": "parameter",
+      "importance": 0.8,
+      "group": null,
+      "description": "Selects which MIDI source to listen to (0-127: CC, 128: pitch wheel, 129: aftertouch)"
+    },
+    {
+      "id": "param_use_table",
+      "label": "UseTable",
+      "type": "parameter",
+      "importance": 0.6,
+      "group": null,
+      "description": "Enables/disables the lookup table stage"
+    },
+    {
+      "id": "param_inverted",
+      "label": "Inverted",
+      "type": "parameter",
+      "importance": 0.5,
+      "group": null,
+      "description": "Enables/disables signal inversion after table lookup"
+    },
+    {
+      "id": "param_smooth_time",
+      "label": "SmoothTime",
+      "type": "parameter",
+      "importance": 0.6,
+      "group": null,
+      "description": "Smoothing time in ms; 0 disables smoothing"
+    },
+    {
+      "id": "param_default_value",
+      "label": "DefaultValue",
+      "type": "parameter",
+      "importance": 0.4,
+      "group": null,
+      "description": "Initial value before first CC received (currently broken due to uint8 cast bug)"
+    },
+    {
+      "id": "learn_mode",
+      "label": "MIDI Learn",
+      "type": "decision",
+      "importance": 0.3,
+      "group": "event_handling",
+      "description": "When active, next CC/aftertouch/pitchwheel sets controllerNumber"
+    }
+  ],
+  "edges": [
+    { "from": "midi_input", "to": "mpe_filter", "type": "signal", "label": null },
+    { "from": "mpe_filter", "to": "learn_mode", "type": "signal", "label": "passed" },
+    { "from": "learn_mode", "to": "event_match", "type": "signal", "label": null },
+    { "from": "event_match", "to": "normalize", "type": "signal", "label": "matched" },
+    { "from": "normalize", "to": "constrain", "type": "signal", "label": null },
+    { "from": "constrain", "to": "table_lookup", "type": "conditional", "label": "UseTable on" },
+    { "from": "constrain", "to": "invert", "type": "conditional", "label": "UseTable off" },
+    { "from": "table_lookup", "to": "invert", "type": "signal", "label": null },
+    { "from": "invert", "to": "target_value", "type": "signal", "label": null },
+    { "from": "target_value", "to": "smoother", "type": "signal", "label": null },
+    { "from": "smoother", "to": "output", "type": "signal", "label": null },
+    { "from": "param_controller_number", "to": "event_match", "type": "control", "label": null },
+    { "from": "param_use_table", "to": "table_lookup", "type": "control", "label": "enables/disables" },
+    { "from": "param_inverted", "to": "invert", "type": "control", "label": "enables/disables" },
+    { "from": "param_smooth_time", "to": "smoother", "type": "control", "label": "sets filter coefficient" },
+    { "from": "param_default_value", "to": "midi_input", "type": "control", "label": "synthesizes initial CC event" }
+  ],
+  "groups": [
+    { "id": "event_handling", "label": "Event Handling" },
+    { "id": "value_processing", "label": "Value Processing" },
+    { "id": "smoothing", "label": "Smoothing & Output" }
+  ]
+}

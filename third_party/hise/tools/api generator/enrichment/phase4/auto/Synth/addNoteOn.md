@@ -1,0 +1,3 @@
+Adds an artificial note-on event to the MIDI buffer with explicit channel, velocity, and sample-accurate timestamp. Returns the event ID, which must be stored for later use with `noteOffByEventId` or `addVolumeFade`. This is the most flexible note generation method - use `playNote` when you do not need to specify the channel or timestamp.
+
+> [!Warning:Disable retrigger kill for unison voices] When generating multiple artificial voices per key (e.g. unison), call `Synth.setShouldKillRetriggeredNote(false)` in `onInit` first. Otherwise the synth kills the previous voice on the same pitch as soon as the next artificial note arrives.

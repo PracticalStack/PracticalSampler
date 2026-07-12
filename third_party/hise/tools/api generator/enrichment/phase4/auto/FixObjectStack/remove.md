@@ -1,0 +1,1 @@
+Finds and removes the first element matching the given object using the factory's compare function. Returns `true` if the element was found and removed.

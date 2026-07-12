@@ -1,0 +1,183 @@
+{
+  "moduleId": "EventDataModulator",
+  "nodes": [
+    {
+      "id": "note_on",
+      "label": "Note-On Event",
+      "type": "input",
+      "importance": 0.9,
+      "group": "input",
+      "description": "Incoming HiseEvent (noteOn) triggers voice start value calculation"
+    },
+    {
+      "id": "extract_event_id",
+      "label": "Extract Event ID",
+      "type": "process",
+      "importance": 0.7,
+      "group": "lookup",
+      "description": "Gets the 16-bit event ID from the HiseEvent via getEventId()"
+    },
+    {
+      "id": "storage_lookup",
+      "label": "Event Data Lookup",
+      "type": "process",
+      "importance": 1.0,
+      "group": "lookup",
+      "description": "Hash-table lookup in AdditionalEventStorage using eventId and dataSlot index. Returns (found, value) pair."
+    },
+    {
+      "id": "slot_found_check",
+      "label": "Slot Written?",
+      "type": "decision",
+      "importance": 0.8,
+      "group": "lookup",
+      "description": "Checks if the storage returned a valid value for this event ID (nv.first == true)"
+    },
+    {
+      "id": "clamp_value",
+      "label": "Clamp to [0,1]",
+      "type": "process",
+      "importance": 0.5,
+      "group": "output",
+      "description": "Clamps the stored value to [0.0, 1.0] via jlimit"
+    },
+    {
+      "id": "use_default",
+      "label": "Use DefaultValue",
+      "type": "process",
+      "importance": 0.7,
+      "group": "output",
+      "description": "Returns the DefaultValue parameter when the slot was not written for this event"
+    },
+    {
+      "id": "mod_output",
+      "label": "Voice Start Value",
+      "type": "output",
+      "importance": 0.9,
+      "group": "output",
+      "description": "Final modulation value stored as voiceValues[voiceIndex], constant for voice lifetime"
+    },
+    {
+      "id": "param_slot_index",
+      "label": "SlotIndex",
+      "type": "parameter",
+      "importance": 0.8,
+      "group": "parameters",
+      "description": "Selects which of the 16 event data slots (0-15) to read"
+    },
+    {
+      "id": "param_default_value",
+      "label": "DefaultValue",
+      "type": "parameter",
+      "importance": 0.7,
+      "group": "parameters",
+      "description": "Fallback value (0.0-1.0) when slot has not been written for this event"
+    },
+    {
+      "id": "ext_global_routing",
+      "label": "GlobalRoutingManager",
+      "type": "external",
+      "importance": 0.6,
+      "group": "external",
+      "description": "Provides the AdditionalEventStorage. Must exist or modulator logs an error and returns default."
+    },
+    {
+      "id": "ext_script_write",
+      "label": "Script setEventData()",
+      "type": "external",
+      "importance": 0.5,
+      "group": "external",
+      "description": "Write side: scripts call GlobalRoutingManager.setEventData(eventId, slot, value) to populate slots before note-on"
+    }
+  ],
+  "edges": [
+    {
+      "from": "note_on",
+      "to": "extract_event_id",
+      "type": "signal",
+      "label": "HiseEvent"
+    },
+    {
+      "from": "extract_event_id",
+      "to": "storage_lookup",
+      "type": "signal",
+      "label": "eventId"
+    },
+    {
+      "from": "param_slot_index",
+      "to": "storage_lookup",
+      "type": "control",
+      "label": "dataSlot"
+    },
+    {
+      "from": "ext_global_routing",
+      "to": "storage_lookup",
+      "type": "control",
+      "label": "additionalEventStorage"
+    },
+    {
+      "from": "ext_script_write",
+      "to": "ext_global_routing",
+      "type": "signal",
+      "label": "setValue()"
+    },
+    {
+      "from": "storage_lookup",
+      "to": "slot_found_check",
+      "type": "signal",
+      "label": "(found, value)"
+    },
+    {
+      "from": "slot_found_check",
+      "to": "clamp_value",
+      "type": "conditional",
+      "label": "found == true"
+    },
+    {
+      "from": "slot_found_check",
+      "to": "use_default",
+      "type": "conditional",
+      "label": "found == false"
+    },
+    {
+      "from": "param_default_value",
+      "to": "use_default",
+      "type": "control",
+      "label": null
+    },
+    {
+      "from": "clamp_value",
+      "to": "mod_output",
+      "type": "signal",
+      "label": null
+    },
+    {
+      "from": "use_default",
+      "to": "mod_output",
+      "type": "signal",
+      "label": null
+    }
+  ],
+  "groups": [
+    {
+      "id": "input",
+      "label": "Input"
+    },
+    {
+      "id": "lookup",
+      "label": "Event Data Lookup"
+    },
+    {
+      "id": "output",
+      "label": "Output"
+    },
+    {
+      "id": "parameters",
+      "label": "Parameters"
+    },
+    {
+      "id": "external",
+      "label": "External Dependencies"
+    }
+  ]
+}

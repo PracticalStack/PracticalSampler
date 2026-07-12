@@ -1,0 +1,618 @@
+{
+  "className": "Sampler",
+  "category": "namespace",
+  "description": "All scripting functions for sampler specific functionality.",
+  "methods": {
+    "clearSampleMap": {
+      "signature": "bool clearSampleMap()",
+      "returnType": "bool",
+      "description": "Clears the current samplemap.",
+      "parameters": []
+    },
+    "createListFromGUISelection": {
+      "signature": "var createListFromGUISelection()",
+      "returnType": "var",
+      "description": "Returns a list of the sounds selected in the samplemap.",
+      "parameters": []
+    },
+    "createListFromScriptSelection": {
+      "signature": "var createListFromScriptSelection()",
+      "returnType": "var",
+      "description": "Returns a list of the sounds selected by the selectSounds() method.",
+      "parameters": []
+    },
+    "createSelection": {
+      "signature": "var createSelection(String regex)",
+      "returnType": "var",
+      "description": "Returns an array with all samples that match this regex.",
+      "parameters": [
+        {
+          "name": "regex",
+          "type": "String"
+        }
+      ]
+    },
+    "createSelectionFromIndexes": {
+      "signature": "var createSelectionFromIndexes(var indexData)",
+      "returnType": "var",
+      "description": "Returns an array with all samples from the index data (can be either int or array of int, -1 selects all.).",
+      "parameters": [
+        {
+          "name": "indexData",
+          "type": "var"
+        }
+      ]
+    },
+    "createSelectionWithFilter": {
+      "signature": "var createSelectionWithFilter(var filterFunction)",
+      "returnType": "var",
+      "description": "Returns an array with all samples that match the filter function.",
+      "parameters": [
+        {
+          "name": "filterFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "enableRoundRobin": {
+      "signature": "void enableRoundRobin(bool shouldUseRoundRobin)",
+      "returnType": "void",
+      "description": "Enables / Disables the automatic round robin group start logic (works only on samplers).",
+      "parameters": [
+        {
+          "name": "shouldUseRoundRobin",
+          "type": "bool"
+        }
+      ]
+    },
+    "getActiveRRGroup": {
+      "signature": "int getActiveRRGroup()",
+      "returnType": "int",
+      "description": "Returns the currently (single) active RR group.",
+      "parameters": []
+    },
+    "getActiveRRGroupForEventId": {
+      "signature": "int getActiveRRGroupForEventId(int eventId)",
+      "returnType": "int",
+      "description": "Returns the RR group that is associated with the event ID.",
+      "parameters": [
+        {
+          "name": "eventId",
+          "type": "int"
+        }
+      ]
+    },
+    "getAttribute": {
+      "signature": "var getAttribute(int index)",
+      "returnType": "var",
+      "description": "Gets the attribute with the given index (use the constants for clearer code).",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "getAttributeId": {
+      "signature": "String getAttributeId(int index)",
+      "returnType": "String",
+      "description": "Returns the ID of the attribute with the given index.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "getAttributeIndex": {
+      "signature": "int getAttributeIndex(String id)",
+      "returnType": "int",
+      "description": "Returns the index of the attribute with the given ID.",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "String"
+        }
+      ]
+    },
+    "getAudioWaveformContentAsBase64": {
+      "signature": "String getAudioWaveformContentAsBase64(var presetObj)",
+      "returnType": "String",
+      "description": "Converts the user preset data of a audio waveform to a base 64 samplemap.",
+      "parameters": [
+        {
+          "name": "presetObj",
+          "type": "var"
+        }
+      ]
+    },
+    "getComplexGroupManager": {
+      "signature": "var getComplexGroupManager()",
+      "returnType": "var",
+      "description": "Returns an object that can be used to control the complex group management of this sampler.",
+      "parameters": []
+    },
+    "getCurrentSampleMapId": {
+      "signature": "String getCurrentSampleMapId()",
+      "returnType": "String",
+      "description": "Returns the currently loaded sample map.",
+      "parameters": []
+    },
+    "getMicPositionName": {
+      "signature": "String getMicPositionName(int channelIndex)",
+      "returnType": "String",
+      "description": "Returns the name of the channel with the given index (Multimic samples only.",
+      "parameters": [
+        {
+          "name": "channelIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "getNumActiveGroups": {
+      "signature": "int getNumActiveGroups()",
+      "returnType": "int",
+      "description": "Returns the number of currently active groups.",
+      "parameters": []
+    },
+    "getNumAttributes": {
+      "signature": "int getNumAttributes()",
+      "returnType": "int",
+      "description": "Returns the number of attributes.",
+      "parameters": []
+    },
+    "getNumMicPositions": {
+      "signature": "int getNumMicPositions()",
+      "returnType": "int",
+      "description": "Returns the number of mic positions.",
+      "parameters": []
+    },
+    "getNumSelectedSounds": {
+      "signature": "int getNumSelectedSounds()",
+      "returnType": "int",
+      "description": "Returns the amount of selected samples.",
+      "parameters": []
+    },
+    "getReleaseStartOptions": {
+      "signature": "var getReleaseStartOptions()",
+      "returnType": "var",
+      "description": "Returns the current release start options as JSON object.",
+      "parameters": []
+    },
+    "getRRGroupsForMessage": {
+      "signature": "int getRRGroupsForMessage(int noteNumber, int velocity)",
+      "returnType": "int",
+      "description": "Returns the amount of actual RR groups for the notenumber and velocity",
+      "parameters": [
+        {
+          "name": "noteNumber",
+          "type": "int"
+        },
+        {
+          "name": "velocity",
+          "type": "int"
+        }
+      ]
+    },
+    "getSampleMapAsBase64": {
+      "signature": "String getSampleMapAsBase64()",
+      "returnType": "String",
+      "description": "Returns a base64 compressed string containing the entire samplemap.",
+      "parameters": []
+    },
+    "getSampleMapList": {
+      "signature": "var getSampleMapList()",
+      "returnType": "var",
+      "description": "Returns an array with all available sample maps.",
+      "parameters": []
+    },
+    "getSoundProperty": {
+      "signature": "var getSoundProperty(int propertyIndex, int soundIndex)",
+      "returnType": "var",
+      "description": "Returns the property of the sound with the specified index.",
+      "parameters": [
+        {
+          "name": "propertyIndex",
+          "type": "int"
+        },
+        {
+          "name": "soundIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "getTimestretchOptions": {
+      "signature": "var getTimestretchOptions()",
+      "returnType": "var",
+      "description": "Returns the current timestretching options as JSON object.",
+      "parameters": []
+    },
+    "importSamples": {
+      "signature": "var importSamples(var fileNameList, bool skipExistingSamples)",
+      "returnType": "var",
+      "description": "Loads a few samples in the current samplemap and returns a list of references to these samples.",
+      "parameters": [
+        {
+          "name": "fileNameList",
+          "type": "var"
+        },
+        {
+          "name": "skipExistingSamples",
+          "type": "bool"
+        }
+      ]
+    },
+    "isMicPositionPurged": {
+      "signature": "bool isMicPositionPurged(int micIndex)",
+      "returnType": "bool",
+      "description": "Checks if the mic position is purged.",
+      "parameters": [
+        {
+          "name": "micIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "isNoteNumberMapped": {
+      "signature": "bool isNoteNumberMapped(int noteNumber)",
+      "returnType": "bool",
+      "description": "Checks whether the note number is mapped to any samples.",
+      "parameters": [
+        {
+          "name": "noteNumber",
+          "type": "int"
+        }
+      ]
+    },
+    "loadSampleForAnalysis": {
+      "signature": "var loadSampleForAnalysis(int indexInSelection)",
+      "returnType": "var",
+      "description": "Loads the content of the given sample into an array of VariantBuffers that can be used for analysis.",
+      "parameters": [
+        {
+          "name": "indexInSelection",
+          "type": "int"
+        }
+      ]
+    },
+    "loadSampleMap": {
+      "signature": "void loadSampleMap(String fileName)",
+      "returnType": "void",
+      "description": "Loads a new samplemap into this sampler.",
+      "parameters": [
+        {
+          "name": "fileName",
+          "type": "String"
+        }
+      ]
+    },
+    "loadSampleMapFromBase64": {
+      "signature": "void loadSampleMapFromBase64(String b64)",
+      "returnType": "void",
+      "description": "Loads a base64 compressed string with the samplemap.",
+      "parameters": [
+        {
+          "name": "b64",
+          "type": "String"
+        }
+      ]
+    },
+    "loadSampleMapFromJSON": {
+      "signature": "void loadSampleMapFromJSON(var jsonSampleMap)",
+      "returnType": "void",
+      "description": "Loads a samplemap from a list of JSON objects.",
+      "parameters": [
+        {
+          "name": "jsonSampleMap",
+          "type": "var"
+        }
+      ]
+    },
+    "loadSfzFile": {
+      "signature": "var loadSfzFile(var sfzFile)",
+      "returnType": "var",
+      "description": "Loads an SFZ file into the sampler.",
+      "parameters": [
+        {
+          "name": "sfzFile",
+          "type": "var"
+        }
+      ]
+    },
+    "parseSampleFile": {
+      "signature": "var parseSampleFile(var sampleFile)",
+      "returnType": "var",
+      "description": "Creates a JSON object from the sample file that can be used with loadSampleMapFromJSON.",
+      "parameters": [
+        {
+          "name": "sampleFile",
+          "type": "var"
+        }
+      ]
+    },
+    "purgeMicPosition": {
+      "signature": "void purgeMicPosition(String micName, bool shouldBePurged)",
+      "returnType": "void",
+      "description": "Purges all samples of the given mic (Multimic samples only).",
+      "parameters": [
+        {
+          "name": "micName",
+          "type": "String"
+        },
+        {
+          "name": "shouldBePurged",
+          "type": "bool"
+        }
+      ]
+    },
+    "purgeSampleSelection": {
+      "signature": "void purgeSampleSelection(var selection)",
+      "returnType": "void",
+      "description": "Purges the array of sampler sounds (and unpurges the rest).",
+      "parameters": [
+        {
+          "name": "selection",
+          "type": "var"
+        }
+      ]
+    },
+    "refreshInterface": {
+      "signature": "void refreshInterface()",
+      "returnType": "void",
+      "description": "Refreshes the interface. Call this after you changed the properties.",
+      "parameters": []
+    },
+    "refreshRRMap": {
+      "signature": "void refreshRRMap()",
+      "returnType": "void",
+      "description": "Recalculates the RR Map. Call this at compile time if you want to use 'getRRGroupForMessage()'.",
+      "parameters": []
+    },
+    "saveCurrentSampleMap": {
+      "signature": "bool saveCurrentSampleMap(String relativePathWithoutXml)",
+      "returnType": "bool",
+      "description": "Saves (and loads) the current samplemap to the given path (which should be the same string as the ID).",
+      "parameters": [
+        {
+          "name": "relativePathWithoutXml",
+          "type": "String"
+        }
+      ]
+    },
+    "selectSounds": {
+      "signature": "void selectSounds(String regex)",
+      "returnType": "void",
+      "description": "Selects samples using the regex string as wildcard and the selectMode (\"SELECT\", \"ADD\", \"SUBTRACT\")",
+      "parameters": [
+        {
+          "name": "regex",
+          "type": "String"
+        }
+      ]
+    },
+    "setActiveGroup": {
+      "signature": "void setActiveGroup(int activeGroupIndex)",
+      "returnType": "void",
+      "description": "Enables the group with the given index (one-based). Works only with samplers and `enableRoundRobin(false)`.",
+      "parameters": [
+        {
+          "name": "activeGroupIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "setActiveGroupForEventId": {
+      "signature": "void setActiveGroupForEventId(int eventId, int activeGroupIndex)",
+      "returnType": "void",
+      "description": "Enables the group with the given index (one-based) for the given event ID. Works only with samplers and `enableRoundRobin(false)`.",
+      "parameters": [
+        {
+          "name": "eventId",
+          "type": "int"
+        },
+        {
+          "name": "activeGroupIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "setAllowReleaseStart": {
+      "signature": "bool setAllowReleaseStart(int eventId, bool shouldBeAllowed)",
+      "returnType": "bool",
+      "description": "Enable / disables the release start feature for the given event.",
+      "parameters": [
+        {
+          "name": "eventId",
+          "type": "int"
+        },
+        {
+          "name": "shouldBeAllowed",
+          "type": "bool"
+        }
+      ]
+    },
+    "setAttribute": {
+      "signature": "void setAttribute(int index, var newValue)",
+      "returnType": "void",
+      "description": "Sets a attribute to the given value.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        },
+        {
+          "name": "newValue",
+          "type": "var"
+        }
+      ]
+    },
+    "setGUISelection": {
+      "signature": "void setGUISelection(var sampleList, bool addToSelection)",
+      "returnType": "void",
+      "description": "Sets the currently selected samples on the interface to the given list.",
+      "parameters": [
+        {
+          "name": "sampleList",
+          "type": "var"
+        },
+        {
+          "name": "addToSelection",
+          "type": "bool"
+        }
+      ]
+    },
+    "setMultiGroupIndex": {
+      "signature": "void setMultiGroupIndex(var groupIndex, bool enabled)",
+      "returnType": "void",
+      "description": "Enables the group with the given index (one-based). Allows multiple groups to be active.",
+      "parameters": [
+        {
+          "name": "groupIndex",
+          "type": "var"
+        },
+        {
+          "name": "enabled",
+          "type": "bool"
+        }
+      ]
+    },
+    "setMultiGroupIndexForEventId": {
+      "signature": "void setMultiGroupIndexForEventId(int eventId, var groupIndex, bool enabled)",
+      "returnType": "void",
+      "description": "Enables the group with the given index (one-based) for the given event id. Allows multiple groups to be active.",
+      "parameters": [
+        {
+          "name": "eventId",
+          "type": "int"
+        },
+        {
+          "name": "groupIndex",
+          "type": "var"
+        },
+        {
+          "name": "enabled",
+          "type": "bool"
+        }
+      ]
+    },
+    "setReleaseStartOptions": {
+      "signature": "void setReleaseStartOptions(var newOptions)",
+      "returnType": "void",
+      "description": "Sets the options for the release start behaviour.",
+      "parameters": [
+        {
+          "name": "newOptions",
+          "type": "var"
+        }
+      ]
+    },
+    "setRRGroupVolume": {
+      "signature": "void setRRGroupVolume(int groupIndex, int gainInDecibels)",
+      "returnType": "void",
+      "description": "Sets the volume of a particular group (use -1 for active group). Only works with disabled crossfade tables.",
+      "parameters": [
+        {
+          "name": "groupIndex",
+          "type": "int"
+        },
+        {
+          "name": "gainInDecibels",
+          "type": "int"
+        }
+      ]
+    },
+    "setSortByRRGroup": {
+      "signature": "void setSortByRRGroup(bool shouldSort)",
+      "returnType": "void",
+      "description": "Enables a presorting of the sounds into RR groups. This might improve the performance at voice start if you have a lot of samples (> 20.000) in many RR groups.",
+      "parameters": [
+        {
+          "name": "shouldSort",
+          "type": "bool"
+        }
+      ]
+    },
+    "setSoundProperty": {
+      "signature": "void setSoundProperty(int soundIndex, int propertyIndex, var newValue)",
+      "returnType": "void",
+      "description": "Sets the property for the index within the selection.",
+      "parameters": [
+        {
+          "name": "soundIndex",
+          "type": "int"
+        },
+        {
+          "name": "propertyIndex",
+          "type": "int"
+        },
+        {
+          "name": "newValue",
+          "type": "var"
+        }
+      ]
+    },
+    "setSoundPropertyForAllSamples": {
+      "signature": "void setSoundPropertyForAllSamples(int propertyIndex, var newValue)",
+      "returnType": "void",
+      "description": "Sets the property for all samples of the sampler.",
+      "parameters": [
+        {
+          "name": "propertyIndex",
+          "type": "int"
+        },
+        {
+          "name": "newValue",
+          "type": "var"
+        }
+      ]
+    },
+    "setSoundPropertyForSelection": {
+      "signature": "void setSoundPropertyForSelection(int propertyIndex, var newValue)",
+      "returnType": "void",
+      "description": "Sets the property of the sampler sound for the selection.",
+      "parameters": [
+        {
+          "name": "propertyIndex",
+          "type": "int"
+        },
+        {
+          "name": "newValue",
+          "type": "var"
+        }
+      ]
+    },
+    "setTimestretchOptions": {
+      "signature": "void setTimestretchOptions(var newOptions)",
+      "returnType": "void",
+      "description": "Sets the timestretching options from a JSON object.",
+      "parameters": [
+        {
+          "name": "newOptions",
+          "type": "var"
+        }
+      ]
+    },
+    "setTimestretchRatio": {
+      "signature": "void setTimestretchRatio(double newRatio)",
+      "returnType": "void",
+      "description": "Sets the timestretch ratio for the sampler depending on its timestretch mode.",
+      "parameters": [
+        {
+          "name": "newRatio",
+          "type": "double"
+        }
+      ]
+    },
+    "setUseStaticMatrix": {
+      "signature": "void setUseStaticMatrix(bool shouldUseStaticMatrix)",
+      "returnType": "void",
+      "description": "Disables dynamic resizing when a sample map is loaded.",
+      "parameters": [
+        {
+          "name": "shouldUseStaticMatrix",
+          "type": "bool"
+        }
+      ]
+    }
+  }
+}

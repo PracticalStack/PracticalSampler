@@ -1,0 +1,228 @@
+{
+  "moduleId": "PolyphonicFilter",
+  "prettyName": "Filter",
+  "type": "Effect",
+  "subtype": "VoiceEffect",
+  "category": "filter",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "voice",
+    "audioOut": "voice",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "per-voice",
+
+  "interfaces": [],
+
+  "parameterGroups": [
+    {
+      "label": "Filter Configuration",
+      "rationale": "Mode selects the filter type; Frequency, Q, and Gain are the filter coefficients that define its response curve. Gain only applies to shelf and peak filter types.",
+      "parameters": [
+        {
+          "id": "Mode",
+          "name": "Mode",
+          "range": { "min": 0.0, "max": 17.0, "step": 1.0 },
+          "default": 6.0,
+          "description": "Selects the filter type (low-pass, high-pass, shelf, peak, etc.)",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Frequency",
+          "name": "Frequency",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0, "middlePosition": 1500.0 },
+          "default": 20000.0,
+          "description": "The cutoff or center frequency of the filter in Hz",
+          "composite": {
+            "type": "modMultiply",
+            "chainName": "Frequency Modulation",
+            "chainIndex": 0,
+            "constrainer": "*",
+            "modulationMode": "gain"
+          },
+          "modChain": {
+            "name": "Frequency Modulation",
+            "chainIndex": 0,
+            "constrainer": "*",
+            "modulationMode": "gain"
+          }
+        },
+        {
+          "id": "Q",
+          "name": "Q",
+          "range": { "min": 0.3, "max": 8.0, "step": 0.0, "middlePosition": 1.0 },
+          "default": 1.0,
+          "description": "The resonance or bandwidth of the filter",
+          "composite": {
+            "type": "modMultiply",
+            "chainName": "Q Modulation",
+            "chainIndex": 3,
+            "constrainer": "*",
+            "modulationMode": "gain"
+          },
+          "modChain": {
+            "name": "Q Modulation",
+            "chainIndex": 3,
+            "constrainer": "*",
+            "modulationMode": "gain"
+          }
+        },
+        {
+          "id": "Gain",
+          "name": "Gain",
+          "range": { "min": -18.0, "max": 18.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "Filter gain in decibels for shelf and peak filter types",
+          "composite": {
+            "type": "modMultiply",
+            "chainName": "Gain Modulation",
+            "chainIndex": 1,
+            "constrainer": "*",
+            "modulationMode": "gain"
+          },
+          "modChain": {
+            "name": "Gain Modulation",
+            "chainIndex": 1,
+            "constrainer": "*",
+            "modulationMode": "gain"
+          }
+        }
+      ]
+    },
+    {
+      "label": "Bipolar Frequency Modulation",
+      "rationale": "BipolarIntensity controls the depth and polarity of a separate bipolar frequency modulation path. This chain uses offset mode rather than gain mode, allowing bidirectional frequency shifts centered around the base Frequency value.",
+      "parameters": [
+        {
+          "id": "BipolarIntensity",
+          "name": "Bipolar Intensity",
+          "range": { "min": -1.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "Intensity of the bipolar frequency modulation (-1 to 1)",
+          "composite": {
+            "type": "modMultiply",
+            "chainName": "Bipolar Freq Modulation",
+            "chainIndex": 2,
+            "constrainer": "*",
+            "modulationMode": "offset"
+          },
+          "modChain": {
+            "name": "Bipolar Freq Modulation",
+            "chainIndex": 2,
+            "constrainer": "*",
+            "modulationMode": "offset"
+          }
+        }
+      ]
+    },
+    {
+      "label": "Render Quality",
+      "rationale": "Quality controls the internal processing resolution - a performance/quality tradeoff independent of the filter's audio character.",
+      "parameters": [
+        {
+          "id": "Quality",
+          "name": "Quality",
+          "range": { "min": 0.0, "max": 4096.0, "step": 1.0 },
+          "default": 512.0,
+          "description": "Internal render quality as power-of-two buffer size for modulation processing",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [
+    {
+      "type": "modMultiply",
+      "param": "Frequency",
+      "details": {
+        "chainName": "Frequency Modulation",
+        "chainIndex": 0,
+        "constrainer": "*"
+      }
+    },
+    {
+      "type": "modMultiply",
+      "param": "Gain",
+      "details": {
+        "chainName": "Gain Modulation",
+        "chainIndex": 1,
+        "constrainer": "*"
+      }
+    },
+    {
+      "type": "modMultiply",
+      "param": "BipolarIntensity",
+      "details": {
+        "chainName": "Bipolar Freq Modulation",
+        "chainIndex": 2,
+        "constrainer": "*"
+      }
+    },
+    {
+      "type": "modMultiply",
+      "param": "Q",
+      "details": {
+        "chainName": "Q Modulation",
+        "chainIndex": 3,
+        "constrainer": "*"
+      }
+    }
+  ],
+
+  "standaloneModChains": [],
+
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-order",
+      "category": "signal_path",
+      "question": "What is the processing order in applyEffect() / renderVoice()? Is the filter applied in-place to the voice buffer? Is there any pre/post processing around the filter kernel (e.g. gain staging, saturation, DC offset removal)?",
+      "context": "Need the exact signal flow for the pseudo-code. VoiceEffect subtype means this runs per-voice, but the internal chain needs to be confirmed."
+    },
+    {
+      "id": "filter-type-mapping",
+      "category": "conditional_logic",
+      "question": "Mode parameter has 18 discrete values (0-17, default 6). What filter type does each value correspond to? Are these IIR biquad types, or does the module use different filter topologies for different modes?",
+      "context": "Users need to know what each Mode value does. The description only says 'low-pass, high-pass, shelf, peak, etc.' - the full list of 18 types is undocumented."
+    },
+    {
+      "id": "bipolar-frequency-interaction",
+      "category": "parameter_behavior",
+      "question": "How does the Bipolar Freq Modulation (offset mode, chainIndex 2) interact with the primary Frequency Modulation (gain mode, chainIndex 0)? Are they combined additively on the frequency? Does BipolarIntensity scale the offset, and if so, in what unit space (Hz, semitones, normalized)?",
+      "context": "The two-chain frequency modulation architecture is unusual and needs precise documentation. Users need to understand the difference between the standard frequency mod and the bipolar path."
+    },
+    {
+      "id": "quality-parameter-behavior",
+      "category": "parameter_behavior",
+      "question": "The Quality parameter (0-4096, default 512) is described as 'power-of-two buffer size for modulation processing'. Does this control how often filter coefficients are recalculated? What happens at Quality=0? Is the range actually restricted to power-of-two values, or can any integer be used?",
+      "context": "This parameter directly affects CPU cost and modulation smoothness. Users need to understand the tradeoff."
+    },
+    {
+      "id": "gain-parameter-conditional",
+      "category": "conditional_logic",
+      "question": "The Gain parameter description says it applies to 'shelf and peak filter types'. Is it truly ignored for other Mode values, or does it still affect the coefficients? Which specific Mode indices are shelf/peak types?",
+      "context": "Need to document which modes make the Gain parameter active vs inactive."
+    },
+    {
+      "id": "frequency-default-20k",
+      "category": "description_accuracy",
+      "question": "Frequency defaults to 20000 Hz (maximum). This effectively means the filter is fully open by default. Is this intentional as a 'bypass-like' default, or is there a separate bypass mechanism?",
+      "context": "Unusual default - worth confirming it's intentional rather than a metadata extraction artifact."
+    },
+    {
+      "id": "coefficient-calculation",
+      "category": "performance",
+      "question": "Is the filter implemented as a biquad (IIR) or does it use other topologies for certain modes? Are coefficients recalculated per-sample, per-block, or at the Quality-defined interval? What is the per-voice CPU cost relative to a simple gain?",
+      "context": "Per-voice filter is one of the most CPU-intensive common operations. The Quality parameter suggests configurable update rate, which is the key performance knob."
+    }
+  ],
+
+  "notes": "PolyphonicFilter is a VoiceEffect with an unusually rich modulation architecture: 4 mod chains covering all audio-relevant parameters, with the bipolar frequency modulation chain using offset mode (unique among the 4 chains). The two frequency modulation paths (standard gain-mode and bipolar offset-mode) suggest a dual-modulation design where the standard path scales the base frequency and the bipolar path adds a signed offset. The Quality parameter hints at a coefficient update rate optimization. Mode has 18 filter types (one of the highest mode counts in the module list). No interfaces are declared, which is notable - no TableProcessor despite being a filter. The constrainer on all mod chains is '*' (unrestricted), allowing any modulator type including envelopes and LFOs for per-voice modulation."
+}

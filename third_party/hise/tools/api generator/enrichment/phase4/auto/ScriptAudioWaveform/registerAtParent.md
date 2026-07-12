@@ -1,0 +1,1 @@
+Registers this component's internal audio data with the parent script processor at the given slot index, making it accessible from scriptnode or external code. Returns a ScriptAudioFile handle that references the same audio buffer as this waveform, which you can use to load, query, and manipulate the audio data programmatically.

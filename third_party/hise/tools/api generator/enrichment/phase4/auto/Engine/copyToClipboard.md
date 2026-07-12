@@ -1,0 +1,1 @@
+Copies the given text to the system clipboard.

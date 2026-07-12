@@ -1,0 +1,175 @@
+{
+  "className": "Server",
+  "category": "namespace",
+  "description": "",
+  "methods": {
+    "callWithGET": {
+      "signature": "void callWithGET(String subURL, var parameters, var callback)",
+      "returnType": "void",
+      "description": "Calls a sub URL and executes the callback when finished.",
+      "parameters": [
+        {
+          "name": "subURL",
+          "type": "String"
+        },
+        {
+          "name": "parameters",
+          "type": "var"
+        },
+        {
+          "name": "callback",
+          "type": "var"
+        }
+      ]
+    },
+    "callWithPOST": {
+      "signature": "void callWithPOST(String subURL, var parameters, var callback)",
+      "returnType": "void",
+      "description": "Calls a sub URL with POST arguments and executes the callback when finished.",
+      "parameters": [
+        {
+          "name": "subURL",
+          "type": "String"
+        },
+        {
+          "name": "parameters",
+          "type": "var"
+        },
+        {
+          "name": "callback",
+          "type": "var"
+        }
+      ]
+    },
+    "cleanFinishedDownloads": {
+      "signature": "void cleanFinishedDownloads()",
+      "returnType": "void",
+      "description": "Removes all finished downloads from the list.",
+      "parameters": []
+    },
+    "downloadFile": {
+      "signature": "var downloadFile(String subURL, var parameters, var targetFile, var callback)",
+      "returnType": "var",
+      "description": "Downloads a file to the given target and returns a Download object.",
+      "parameters": [
+        {
+          "name": "subURL",
+          "type": "String"
+        },
+        {
+          "name": "parameters",
+          "type": "var"
+        },
+        {
+          "name": "targetFile",
+          "type": "var"
+        },
+        {
+          "name": "callback",
+          "type": "var"
+        }
+      ]
+    },
+    "getPendingCalls": {
+      "signature": "var getPendingCalls()",
+      "returnType": "var",
+      "description": "Returns a list of all pending Calls.",
+      "parameters": []
+    },
+    "getPendingDownloads": {
+      "signature": "var getPendingDownloads()",
+      "returnType": "var",
+      "description": "Returns a list of all pending Downloads.",
+      "parameters": []
+    },
+    "isEmailAddress": {
+      "signature": "bool isEmailAddress(String email)",
+      "returnType": "bool",
+      "description": "Checks if given email address is valid - not fool proof.",
+      "parameters": [
+        {
+          "name": "email",
+          "type": "String"
+        }
+      ]
+    },
+    "isOnline": {
+      "signature": "bool isOnline()",
+      "returnType": "bool",
+      "description": "Returns true if the system is connected to the internet.",
+      "parameters": []
+    },
+    "resendLastCall": {
+      "signature": "bool resendLastCall()",
+      "returnType": "bool",
+      "description": "Resends the last call to the Server (eg. in case that there was no internet connection).",
+      "parameters": []
+    },
+    "setBaseURL": {
+      "signature": "void setBaseURL(String url)",
+      "returnType": "void",
+      "description": "Sets the base URL for all server queries.",
+      "parameters": [
+        {
+          "name": "url",
+          "type": "String"
+        }
+      ]
+    },
+    "setEnforceTrailingSlash": {
+      "signature": "void setEnforceTrailingSlash(bool shouldAddSlash)",
+      "returnType": "void",
+      "description": "Sets whether to append a trailing slash to each POST call (default is true).",
+      "parameters": [
+        {
+          "name": "shouldAddSlash",
+          "type": "bool"
+        }
+      ]
+    },
+    "setHttpHeader": {
+      "signature": "void setHttpHeader(String additionalHeader)",
+      "returnType": "void",
+      "description": "Adds the given String to the HTTP POST header.",
+      "parameters": [
+        {
+          "name": "additionalHeader",
+          "type": "String"
+        }
+      ]
+    },
+    "setNumAllowedDownloads": {
+      "signature": "void setNumAllowedDownloads(int maxNumberOfParallelDownloads)",
+      "returnType": "void",
+      "description": "Sets the maximal number of parallel downloads.",
+      "parameters": [
+        {
+          "name": "maxNumberOfParallelDownloads",
+          "type": "int"
+        }
+      ]
+    },
+    "setServerCallback": {
+      "signature": "void setServerCallback(var callback)",
+      "returnType": "void",
+      "description": "This function will be called whenever there is server activity.",
+      "parameters": [
+        {
+          "name": "callback",
+          "type": "var"
+        }
+      ]
+    },
+    "setTimeoutMessageString": {
+      "signature": "void setTimeoutMessageString(String timeoutMessage)",
+      "returnType": "void",
+      "description": "Sets a string that is parsed as timeout message when the server doesn't respond. Default is \"{}\" (empty JSON object).",
+      "parameters": [
+        {
+          "name": "timeoutMessage",
+          "type": "String"
+        }
+      ]
+    }
+  }
+}

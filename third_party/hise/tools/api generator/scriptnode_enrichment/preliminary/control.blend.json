@@ -1,0 +1,108 @@
+{
+  "factoryPath": "control.blend",
+  "factory": "control",
+  "nodeId": "blend",
+  "description": "Blends the two input values based on the Alpha parameter.",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Blend control",
+      "rationale": "Alpha controls the crossfade ratio between the two input values.",
+      "parameters": [
+        {
+          "id": "Alpha",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Input values",
+      "rationale": "The two values that are blended together based on Alpha.",
+      "parameters": [
+        {
+          "id": "Value1",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Value2",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/blend.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "blend-formula",
+      "category": "signal_path",
+      "question": "What is the exact blending formula? Is it a simple linear interpolation: output = Value1 * (1 - Alpha) + Value2 * Alpha, or something else?",
+      "context": "The formula determines how Alpha=0 and Alpha=1 map to the two inputs and whether intermediate values are linear."
+    },
+    {
+      "id": "blend-normalisation",
+      "category": "parameter_behaviour",
+      "question": "The base data does not list UseUnnormalisedModulation, yet the control-infrastructure doc lists blend as unnormalised. Which is correct? Does the multilogic::blend class return isNormalisedModulation() == false?",
+      "context": "Critical for understanding whether connected targets have range conversion applied or receive raw values."
+    },
+    {
+      "id": "blend-output-clamping",
+      "category": "parameter_behaviour",
+      "question": "Is the blended output clamped to 0..1, or can it exceed that range if Value1 and Value2 are at extremes?",
+      "context": "Determines whether blend can produce out-of-range values when used with unnormalised inputs."
+    }
+  ],
+
+  "notes": "blend is implemented via multi_parameter<NV, PT, multilogic::blend>. The control-infrastructure doc explicitly lists blend as unnormalised (no_mod_normalisation), but the base data cppProperties do NOT include UseUnnormalisedModulation. This discrepancy needs resolution during C++ exploration. The node conceptually interpolates between two input values, similar to a lerp/mix function."
+}

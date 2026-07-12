@@ -1,0 +1,1 @@
+Checks whether this reference still points to a valid component in the container's data tree. Returns `false` if the reference was invalidated by `ScriptDynamicContainer.setData()`, `removeFromParent()`, or container destruction. Once invalid, a reference cannot become valid again.

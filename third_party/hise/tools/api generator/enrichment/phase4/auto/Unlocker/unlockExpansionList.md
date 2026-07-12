@@ -1,0 +1,3 @@
+Backend-only method that scans expansion folders for metadata and collects encryption keys, passing them to `ExpansionHandler.setCredentials()` to unlock expansions. Use this during development to unlock expansions without a signed expansion list file. In frontend builds, use `loadExpansionList()` with a properly signed expansion key file instead.
+
+> [!Warning:Backend only - silent no-op in exports] Returns false silently in frontend builds with no error or warning. Code that relies on this method will appear to work in the HISE IDE but do nothing in exported plugins.

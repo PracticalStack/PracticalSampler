@@ -1,0 +1,1 @@
+Sorts an array in-place using a custom comparator function. The comparator receives two elements and must return a negative number if the first should come before the second, zero if equal, or a positive number if the first should come after. Returns `false` silently if either argument is invalid.

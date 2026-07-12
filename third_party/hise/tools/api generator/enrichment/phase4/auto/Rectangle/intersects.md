@@ -1,0 +1,1 @@
+Returns `true` if any part of another rectangle overlaps this one. Use `getIntersection()` when you need the actual overlapping area rather than just a boolean check.

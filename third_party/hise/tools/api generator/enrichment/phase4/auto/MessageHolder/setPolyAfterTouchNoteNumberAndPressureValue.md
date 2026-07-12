@@ -1,0 +1,1 @@
+Sets both the note number and pressure value for a polyphonic aftertouch event in a single call. To construct a complete polyphonic aftertouch event, call `setType(mh.Aftertouch)` first, then this method to specify which note receives the pressure.

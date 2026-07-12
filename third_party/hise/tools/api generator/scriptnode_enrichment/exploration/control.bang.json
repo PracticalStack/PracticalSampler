@@ -1,0 +1,14 @@
+{
+  "factoryPath": "control.bang",
+  "nodes": [
+    { "id": "value_param", "label": "Value", "type": "parameter", "importance": 1.0, "description": "The value to send when triggered (stored, raw/unscaled)" },
+    { "id": "bang_param", "label": "Bang", "type": "parameter", "importance": 1.0, "description": "Trigger input: fires when set above 0.5" },
+    { "id": "dirty_check", "label": "Dirty Check", "type": "decision", "importance": 0.8, "description": "Only sends output if bang set dirty flag to true" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Sends stored Value unchanged (unnormalised)" }
+  ],
+  "edges": [
+    { "from": "value_param", "to": "dirty_check", "type": "control", "label": "stored value" },
+    { "from": "bang_param", "to": "dirty_check", "type": "control", "label": "v > 0.5 sets dirty" },
+    { "from": "dirty_check", "to": "mod_out", "type": "signal", "label": "if dirty" }
+  ]
+}

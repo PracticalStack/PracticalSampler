@@ -1,0 +1,76 @@
+# Architecture Overview
+
+This note captures the intended Phase 0 boundary lines for Decent Rhapsody Studio so future work grows around stable seams instead of drifting into an accidental HISE fork.
+
+## Layer map
+
+### `app/`
+
+Product-owned JUCE shell code lives here.
+
+- `drs_app_shared` owns the reusable status-panel UI that can surface runtime information in both standalone and plugin shells.
+- `drs_standalone_shell` owns the standalone-facing root component and window content.
+- `drs_plugin_shell` owns the minimal plugin processor and editor shell.
+
+This layer may depend on public headers from `engine_adapter/`, but it should not include HISE headers directly.
+
+### `engine_adapter/`
+
+This is the only product-owned layer allowed to mediate between the shell and HISE-facing concerns.
+
+Current Phase 0 responsibilities:
+
+- compile exact metadata about the vendored HISE snapshot into generated headers
+- expose frontend-profile metadata through a lightweight linked bridge
+- resolve the product-owned HISE content root under `content/hise_project/`
+- present a stable `EngineFacade` surface to the shell
+
+Future HISE-backed runtime objects, preset loading orchestration, and processor-construction boundaries should be introduced here first.
+
+### `content/`
+
+This is product-owned authoring and runtime-facing data.
+
+- HISE project assets live under `content/hise_project/`
+- authored scripts, presets, sample maps, images, and XML backups belong here
+- this tree is the product-owned source of truth for early authoring assets, not the vendored HISE tree
+
+### `tests/`
+
+This layer validates the product-owned seams without becoming a second application surface.
+
+- `drs_phase0_smoke_tests` exercises `EngineFacade`
+- the smoke harness validates that the authored HISE content root is present and populated
+- the same executable instantiates the standalone and plugin shell components to catch immediate bootstrap failures
+
+### `third_party/`
+
+External source snapshots live here and must be treated as external even when vendored.
+
+- `third_party/juce/`
+- `third_party/hise/`
+
+Local product work should prefer wrappers, generated config, and explicit integration seams over ad hoc edits inside vendored code.
+
+## Dependency direction
+
+The intended dependency flow is:
+
+`app/` -> `engine_adapter/` -> vendored HISE metadata and content conventions
+
+`tests/` -> `app/` and `engine_adapter/`
+
+`content/` is data consumed by the adapter and, later, by runtime services. It should not depend on code layers.
+
+## Guardrails
+
+- Product-owned code outside `engine_adapter/` should not include HISE headers.
+- Product-owned authoring assets should not be stored under `third_party/hise/`.
+- Changes to vendored dependencies should be rare, explicit, and documented as external updates.
+- New runtime integration work should first expose a stable adapter API before spreading through shell code.
+
+## Current Phase 0 proof points
+
+- Windows bootstrap builds the standalone shell, VST3 shell, HISE frontend compile probe, and smoke harness.
+- The smoke harness runs through CTest and is wired into GitHub Actions.
+- The shell can already surface adapter-driven status information without a full HISE runtime handshake.

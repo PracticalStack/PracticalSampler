@@ -1,0 +1,3 @@
+Returns the current audio sample rate in Hz (e.g., 44100.0, 48000.0). This is the same rate used internally by all unit conversion methods.
+
+> [!Warning:Returns -1 during onInit in exported plugins] In exported (compiled) plugins, the audio engine is not yet initialized when `onInit` runs, so `Engine.getSampleRate()` returns -1. Defer any sample-rate-dependent logic to a timer callback or a control callback that runs after initialization.

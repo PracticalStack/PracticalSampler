@@ -1,0 +1,1 @@
+Sets the channel pressure (monophonic aftertouch) value on this event. Set the event type to `Aftertouch` first to construct a valid monophonic aftertouch event.

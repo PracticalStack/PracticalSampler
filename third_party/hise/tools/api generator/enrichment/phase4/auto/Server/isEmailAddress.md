@@ -1,0 +1,1 @@
+Performs a basic structural check on the given string to determine whether it looks like a valid email address. This is a client-side check with no server round-trip, making it suitable for real-time form validation (e.g. enabling a submit button only when the email field contains a plausible address). It is not foolproof - it checks format, not deliverability.

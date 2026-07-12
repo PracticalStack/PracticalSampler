@@ -1,0 +1,1 @@
+Converts a sample count to quarter beats using an explicit BPM value instead of the current host tempo. At 120 BPM and 44100 Hz, one quarter beat equals 22050 samples.

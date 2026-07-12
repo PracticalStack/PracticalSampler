@@ -1,0 +1,24 @@
+{
+  "factoryPath": "core.oscillator",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 0.5, "description": "Existing audio signal (oscillator adds to it)" },
+    { "id": "osc", "label": "Oscillator", "type": "process", "importance": 1.0, "description": "Generates waveform sample using tick function based on Mode" },
+    { "id": "mode", "label": "Mode", "type": "parameter", "importance": 1.0, "description": "Selects waveform: Sine, Saw, Triangle, Square, Noise" },
+    { "id": "freq", "label": "Frequency", "type": "parameter", "importance": 0.9, "description": "Base frequency in Hz (overridden by MIDI note-on)" },
+    { "id": "ratio", "label": "Freq Ratio", "type": "parameter", "importance": 0.7, "description": "Integer pitch multiplier" },
+    { "id": "gate", "label": "Gate", "type": "parameter", "importance": 0.7, "description": "On/off toggle; resets phase on rising edge" },
+    { "id": "phase", "label": "Phase", "type": "parameter", "importance": 0.5, "description": "Phase offset for waveform start position" },
+    { "id": "gain_p", "label": "Gain", "type": "parameter", "importance": 0.7, "description": "Output amplitude (0-1)" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Input + generated waveform (additive)" }
+  ],
+  "edges": [
+    { "from": "in", "to": "osc", "type": "signal", "label": null },
+    { "from": "mode", "to": "osc", "type": "control", "label": "waveform select" },
+    { "from": "freq", "to": "osc", "type": "control", "label": null },
+    { "from": "ratio", "to": "osc", "type": "control", "label": null },
+    { "from": "gate", "to": "osc", "type": "control", "label": "enable/disable" },
+    { "from": "phase", "to": "osc", "type": "control", "label": null },
+    { "from": "gain_p", "to": "osc", "type": "control", "label": null },
+    { "from": "osc", "to": "out", "type": "signal", "label": "s += v" }
+  ]
+}

@@ -1,0 +1,1 @@
+Returns `true` if both Sample objects point to the same underlying sound. This is an identity check, not a property comparison - useful for detecting overlap between two selections or skipping a specific sample in a loop.

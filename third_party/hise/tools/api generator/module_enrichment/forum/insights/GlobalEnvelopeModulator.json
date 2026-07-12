@@ -1,0 +1,64 @@
+{
+  "targetId": "GlobalEnvelopeModulator",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [13000, 9499, 13849, 8386, 9644, 14174, 14176, 13652],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Requires Uniform Voice Handler or voices will not sync correctly",
+      "summary": "Global envelopes rely on consistent event IDs to map envelope voices from the source container to the consumer. Without a Uniform Voice Handler in the signal chain, event IDs are inconsistent and the envelope assignment silently fails. The author notes this is documented but easy to miss.",
+      "sources": ["tid:9499"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Synth Group violates the one-voice-per-event requirement",
+      "summary": "The Uniform Voice Handler requires that each incoming event starts exactly one voice. A Synth Group breaks this constraint by starting multiple voices per event, causing the global envelope voice assignment to fail. Do not use Synth Group as the host container for global envelope consumers.",
+      "sources": ["tid:9499"],
+      "verify": true,
+      "verify_hint": "grep UniformVoiceHandler or uniform_voice in hi_core; check voice allocation logic in SynthGroup vs SynthChain"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Arpeggiator must be in the Master Chain to trigger global envelopes",
+      "summary": "An arpeggiator placed inside a synth (e.g., inside a Sine Generator's MIDI chain) produces notes that are never seen by the GlobalModulatorContainer. Only MIDI events that pass through the master chain are processed by the container and can trigger a new envelope voice.",
+      "sources": ["tid:13000", "tid:13652"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use Silent Synth with a voice manager node for Hardcoded Polyphonic FX",
+      "summary": "When hosting a Global Envelope Modulator inside a compiled Hardcoded Polyphonic FX network, a voice manager node must be added to the scriptnode network (or the Silent Synth placed inside a Synth Group) to give the network proper per-voice event tracking. Without it, the envelope does not activate.",
+      "sources": ["tid:8386"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Global envelope output is always unipolar (0 to 1); bipolar application is per-target",
+      "summary": "The GlobalEnvelopeModulator always produces values in the 0-1 range regardless of any bipolar-looking UI arrows. Bipolar modulation (e.g., symmetric pitch or panning) must be configured at the modulation target, not at the global envelope source.",
+      "sources": ["tid:9644"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "Inverted parameter has no effect",
+      "summary": "The Invert toggle exists in the UI but the inversion code is commented out in both the table and non-table paths of calculateBlock(). Setting Inverted=true does nothing to the output signal.",
+      "sources": ["tid:14174"],
+      "verify": true,
+      "verify_hint": "grep 'Inverted\\|invert' in GlobalModulators.cpp calculateBlock; confirm inversion code is commented out"
+    },
+    {
+      "type": "API",
+      "title": "Setting intensity to zero does not kill notes; note length is envelope-derived",
+      "summary": "Note length is determined by the envelope signal from the source, not by the consumer's intensity value. Temporarily setting intensity to zero will silence the modulation but the voice keeps running until the source envelope finishes.",
+      "sources": ["tid:14176"],
+      "verify": true,
+      "verify_hint": "check isPlaying() in GlobalModulators.cpp; confirm it delegates to container clear state, not intensity"
+    }
+  ]
+}

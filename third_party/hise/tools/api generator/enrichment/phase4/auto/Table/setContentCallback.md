@@ -1,0 +1,3 @@
+Registers a callback that fires whenever the table's content changes - when points are added, removed, modified, or when the table is reset or bulk-updated. The callback receives a single argument: the index of the changed point, or -1 for bulk changes (from `reset()` or `setTablePointsFromArray()`). Only one content callback can be active at a time; calling this again replaces the previous one. Pass `false` to clear the callback.
+
+> [!Warning:Point index is -1 for bulk operations] The point index argument is -1 for bulk operations. Check for -1 before using it as an array index into `getTablePointsAsArray()`.

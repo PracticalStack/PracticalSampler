@@ -1,0 +1,14 @@
+{
+  "factoryPath": "analyse.goniometer",
+  "nodes": [
+    {"id": "in", "label": "Stereo In (L/R)", "type": "input", "importance": 1.0, "description": "Stereo audio input (2 channels required)"},
+    {"id": "process", "label": "Goniometer Display", "type": "process", "importance": 1.0, "description": "Writes stereo pairs to ring buffer for X-Y (Lissajous) visualization"},
+    {"id": "rb", "label": "SimpleRingBuffer", "type": "external_data", "importance": 1.0, "description": "Display ring buffer (2 channels, 512-32768 samples)"},
+    {"id": "out", "label": "Audio Out (pass-through)", "type": "output", "importance": 1.0, "description": "Stereo input unchanged"}
+  ],
+  "edges": [
+    {"from": "in", "to": "process", "type": "signal", "label": null},
+    {"from": "process", "to": "rb", "type": "signal", "label": "ring buffer write (L/R channels)"},
+    {"from": "in", "to": "out", "type": "signal", "label": "pass-through"}
+  ]
+}

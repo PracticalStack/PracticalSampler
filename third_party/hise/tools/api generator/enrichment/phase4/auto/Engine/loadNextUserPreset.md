@@ -1,0 +1,1 @@
+Loads the next user preset in the preset list. When `stayInDirectory` is `true`, navigation stays within the current preset subfolder. When `false`, the full preset list is traversed.

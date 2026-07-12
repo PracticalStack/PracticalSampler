@@ -1,0 +1,1 @@
+Extends the compilation timeout during `onInit` to prevent HISE from aborting a long-running initialisation task. Can be called multiple times to add more time as needed. Has no practical effect in exported plugins where initialisation runs without a time limit.

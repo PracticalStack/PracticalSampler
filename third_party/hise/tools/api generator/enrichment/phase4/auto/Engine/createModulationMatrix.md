@@ -1,0 +1,1 @@
+Creates a modulation matrix for dynamic modulation routing. The `containerId` must be the processor ID of an existing Global Modulator Container in the module tree. The returned object manages connections between global modulator sources and target parameters, and integrates with the FloatingTile ModulationMatrix component for drag-and-drop UI.

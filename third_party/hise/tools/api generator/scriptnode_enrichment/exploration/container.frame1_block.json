@@ -1,0 +1,17 @@
+{
+  "factoryPath": "container.frame1_block",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio block (only channel 0 is processed)" },
+    { "id": "fix_ch", "label": "Fix to 1 channel", "type": "process", "importance": 0.7, "description": "wrap::fix<1> casts to ProcessData<1>, extra channels pass through" },
+    { "id": "frame_iter", "label": "Per-sample iteration", "type": "process", "importance": 1.0, "description": "FrameProcessor iterates sample-by-sample, loading/storing one float per channel" },
+    { "id": "serial", "label": "Serial child processFrame", "type": "process", "importance": 0.8, "description": "Children process span<float, 1> one sample at a time" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Channel 0 processed, other channels unmodified" }
+  ],
+  "edges": [
+    { "from": "in", "to": "fix_ch", "type": "signal", "label": null },
+    { "from": "fix_ch", "to": "frame_iter", "type": "signal", "label": "mono" },
+    { "from": "frame_iter", "to": "serial", "type": "signal", "label": "1 sample" },
+    { "from": "serial", "to": "frame_iter", "type": "feedback", "label": "next sample" },
+    { "from": "frame_iter", "to": "out", "type": "signal", "label": "all samples done" }
+  ]
+}

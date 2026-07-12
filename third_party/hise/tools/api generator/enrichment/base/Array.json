@@ -1,0 +1,330 @@
+{
+  "className": "Array",
+  "category": "namespace",
+  "description": "This is a dummy class that contains the array functions.",
+  "methods": {
+    "clear": {
+      "signature": "void clear()",
+      "returnType": "void",
+      "description": "Clears the array.",
+      "parameters": []
+    },
+    "clone": {
+      "signature": "var clone()",
+      "returnType": "var",
+      "description": "Creates a deep copy of the array.",
+      "parameters": []
+    },
+    "concat": {
+      "signature": "void concat(var argumentList)",
+      "returnType": "void",
+      "description": "Concatenates (joins) two or more arrays",
+      "parameters": [
+        {
+          "name": "argumentList",
+          "type": "var"
+        }
+      ]
+    },
+    "contains": {
+      "signature": "bool contains(var elementToLookFor)",
+      "returnType": "bool",
+      "description": "Searches for the element in the array.",
+      "parameters": [
+        {
+          "name": "elementToLookFor",
+          "type": "var"
+        }
+      ]
+    },
+    "every": {
+      "signature": "var every(var testFunction, var optionalThisObject)",
+      "returnType": "var",
+      "description": "Checks if all array elements pass a function test.",
+      "parameters": [
+        {
+          "name": "testFunction",
+          "type": "var"
+        },
+        {
+          "name": "optionalThisObject",
+          "type": "var"
+        }
+      ]
+    },
+    "filter": {
+      "signature": "var filter(var testFunction, var optionalThisObject)",
+      "returnType": "var",
+      "description": "Creates a new array filled with elements that pass the function test.",
+      "parameters": [
+        {
+          "name": "testFunction",
+          "type": "var"
+        },
+        {
+          "name": "optionalThisObject",
+          "type": "var"
+        }
+      ]
+    },
+    "find": {
+      "signature": "var find(var testFunction, var optionalThisObject)",
+      "returnType": "var",
+      "description": "Returns the value of the first element that passes the function test.",
+      "parameters": [
+        {
+          "name": "testFunction",
+          "type": "var"
+        },
+        {
+          "name": "optionalThisObject",
+          "type": "var"
+        }
+      ]
+    },
+    "findIndex": {
+      "signature": "var findIndex(var testFunction, var optionalThisObject)",
+      "returnType": "var",
+      "description": "Returns the index of the first element that passes the function test.",
+      "parameters": [
+        {
+          "name": "testFunction",
+          "type": "var"
+        },
+        {
+          "name": "optionalThisObject",
+          "type": "var"
+        }
+      ]
+    },
+    "forEach": {
+      "signature": "var forEach(var testFunction, var optionalThisObject)",
+      "returnType": "var",
+      "description": "Calls a function for each element.",
+      "parameters": [
+        {
+          "name": "testFunction",
+          "type": "var"
+        },
+        {
+          "name": "optionalThisObject",
+          "type": "var"
+        }
+      ]
+    },
+    "includes": {
+      "signature": "bool includes(var elementToLookFor)",
+      "returnType": "bool",
+      "description": "Checks if the array contains the given element (JS-compatible alias for contains).",
+      "parameters": [
+        {
+          "name": "elementToLookFor",
+          "type": "var"
+        }
+      ]
+    },
+    "indexOf": {
+      "signature": "int indexOf(var elementToLookFor, int startOffset, int typeStrictness)",
+      "returnType": "int",
+      "description": "Searches the array and returns the first index.",
+      "parameters": [
+        {
+          "name": "elementToLookFor",
+          "type": "var"
+        },
+        {
+          "name": "startOffset",
+          "type": "int"
+        },
+        {
+          "name": "typeStrictness",
+          "type": "int"
+        }
+      ]
+    },
+    "insert": {
+      "signature": "void insert(int firstIndex, var argumentList)",
+      "returnType": "void",
+      "description": "Inserts the given arguments at the firstIndex.",
+      "parameters": [
+        {
+          "name": "firstIndex",
+          "type": "int"
+        },
+        {
+          "name": "argumentList",
+          "type": "var"
+        }
+      ]
+    },
+    "isArray": {
+      "signature": "bool isArray(var variableToTest)",
+      "returnType": "bool",
+      "description": "Checks if the given variable is an array.",
+      "parameters": [
+        {
+          "name": "variableToTest",
+          "type": "var"
+        }
+      ]
+    },
+    "isEmpty": {
+      "signature": "bool isEmpty()",
+      "returnType": "bool",
+      "description": "Returns true if the array has no elements.",
+      "parameters": []
+    },
+    "join": {
+      "signature": "String join(var separatorString)",
+      "returnType": "String",
+      "description": "Joins the array into a string with the given separator.",
+      "parameters": [
+        {
+          "name": "separatorString",
+          "type": "var"
+        }
+      ]
+    },
+    "lastIndexOf": {
+      "signature": "int lastIndexOf(var elementToLookFor)",
+      "returnType": "int",
+      "description": "Returns the last index of the element in the array, searching from the end.",
+      "parameters": [
+        {
+          "name": "elementToLookFor",
+          "type": "var"
+        }
+      ]
+    },
+    "map": {
+      "signature": "var map(var testFunction, var optionalThisObject)",
+      "returnType": "var",
+      "description": "Creates a new array from calling a function for every array element.",
+      "parameters": [
+        {
+          "name": "testFunction",
+          "type": "var"
+        },
+        {
+          "name": "optionalThisObject",
+          "type": "var"
+        }
+      ]
+    },
+    "pop": {
+      "signature": "var pop()",
+      "returnType": "var",
+      "description": "Removes and returns the last element.",
+      "parameters": []
+    },
+    "push": {
+      "signature": "int push(var elementToInsert)",
+      "returnType": "int",
+      "description": "Adds the given element at the end and returns the size.",
+      "parameters": [
+        {
+          "name": "elementToInsert",
+          "type": "var"
+        }
+      ]
+    },
+    "pushIfNotAlreadyThere": {
+      "signature": "int pushIfNotAlreadyThere(var elementToInsert)",
+      "returnType": "int",
+      "description": "Adds the given element at the end and returns the size.",
+      "parameters": [
+        {
+          "name": "elementToInsert",
+          "type": "var"
+        }
+      ]
+    },
+    "remove": {
+      "signature": "var remove(var elementToRemove)",
+      "returnType": "var",
+      "description": "Removes all instances of the given element.",
+      "parameters": [
+        {
+          "name": "elementToRemove",
+          "type": "var"
+        }
+      ]
+    },
+    "removeElement": {
+      "signature": "var removeElement(int index)",
+      "returnType": "var",
+      "description": "Removes the element at the given position.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "reserve": {
+      "signature": "void reserve(int numElements)",
+      "returnType": "void",
+      "description": "Reserves the space needed for the given amount of elements.",
+      "parameters": [
+        {
+          "name": "numElements",
+          "type": "int"
+        }
+      ]
+    },
+    "reverse": {
+      "signature": "void reverse()",
+      "returnType": "void",
+      "description": "Reverses the order of the elements in the array.",
+      "parameters": []
+    },
+    "shift": {
+      "signature": "var shift()",
+      "returnType": "var",
+      "description": "Removes and returns the first element.",
+      "parameters": []
+    },
+    "slice": {
+      "signature": "var slice(int startIndex, int endIndex)",
+      "returnType": "var",
+      "description": "Returns a shallow copy of a portion of the array from start to end (end not included). Supports negative indices.",
+      "parameters": [
+        {
+          "name": "startIndex",
+          "type": "int"
+        },
+        {
+          "name": "endIndex",
+          "type": "int"
+        }
+      ]
+    },
+    "some": {
+      "signature": "var some(var testFunction, var optionalThisObject)",
+      "returnType": "var",
+      "description": "Checks if any array elements pass a function test.",
+      "parameters": [
+        {
+          "name": "testFunction",
+          "type": "var"
+        },
+        {
+          "name": "optionalThisObject",
+          "type": "var"
+        }
+      ]
+    },
+    "sort": {
+      "signature": "void sort()",
+      "returnType": "void",
+      "description": "Sorts the array.",
+      "parameters": []
+    },
+    "sortNatural": {
+      "signature": "void sortNatural()",
+      "returnType": "void",
+      "description": "Sorts array of numbers, objects, or strings with \"number in string\" priority. Can also sort a combination of all types",
+      "parameters": []
+    }
+  }
+}

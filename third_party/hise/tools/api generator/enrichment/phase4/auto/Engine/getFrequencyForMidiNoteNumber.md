@@ -1,0 +1,1 @@
+Converts a MIDI note number to its corresponding frequency in Hz using standard A440 equal temperament tuning. Note 69 returns 440.0 Hz.

@@ -1,0 +1,1 @@
+Enables or disables undo support for preset loading. When enabled, each preset load is wrapped in an undoable action, allowing `Engine.undo()` to restore the previous preset state. Consecutive loads are coalesced so that undoing skips intermediate states.

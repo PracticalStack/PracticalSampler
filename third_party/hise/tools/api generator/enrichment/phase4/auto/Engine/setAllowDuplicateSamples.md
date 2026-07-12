@@ -1,0 +1,1 @@
+Controls whether the sample pool deduplicates sample references. When `false`, multiple samplers referencing the same file share one memory copy. When `true`, each sampler loads its own independent copy. Call during `onInit`.

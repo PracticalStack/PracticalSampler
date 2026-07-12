@@ -1,0 +1,30 @@
+{
+  "factoryPath": "core.granulator",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 0.3, "description": "Existing signal (granulator adds to it)" },
+    { "id": "midi", "label": "MIDI Events", "type": "input", "importance": 0.8, "description": "Note-on/off for voice management" },
+    { "id": "grain_gen", "label": "Grain Scheduler", "type": "process", "importance": 0.9, "description": "Triggers new grains based on timing and density" },
+    { "id": "grains", "label": "Grain Pool (128)", "type": "process", "importance": 1.0, "description": "Active grains read from audio file with envelope and stereo spread" },
+    { "id": "position", "label": "Position", "type": "parameter", "importance": 1.0, "description": "Normalised read position in file (0-1)" },
+    { "id": "pitch", "label": "Pitch", "type": "parameter", "importance": 0.9, "description": "Playback speed ratio (0.5-2.0)" },
+    { "id": "grainsize", "label": "GrainSize", "type": "parameter", "importance": 0.9, "description": "Grain duration in ms" },
+    { "id": "density", "label": "Density", "type": "parameter", "importance": 0.8, "description": "Grain overlap amount (0-1)" },
+    { "id": "spread", "label": "Spread", "type": "parameter", "importance": 0.7, "description": "Stereo and position randomisation" },
+    { "id": "detune", "label": "Detune", "type": "parameter", "importance": 0.7, "description": "Random pitch variation per grain" },
+    { "id": "audiofile", "label": "AudioFile", "type": "external_data", "importance": 1.0, "description": "Source audio for grain content" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Summed grain output (stereo, additive)" }
+  ],
+  "edges": [
+    { "from": "in", "to": "out", "type": "signal", "label": "passthrough" },
+    { "from": "midi", "to": "grain_gen", "type": "signal", "label": "voice management" },
+    { "from": "grain_gen", "to": "grains", "type": "signal", "label": "start new grains" },
+    { "from": "audiofile", "to": "grains", "type": "signal", "label": "grain source" },
+    { "from": "position", "to": "grain_gen", "type": "control", "label": null },
+    { "from": "pitch", "to": "grains", "type": "control", "label": null },
+    { "from": "grainsize", "to": "grain_gen", "type": "control", "label": null },
+    { "from": "density", "to": "grain_gen", "type": "control", "label": null },
+    { "from": "spread", "to": "grains", "type": "control", "label": null },
+    { "from": "detune", "to": "grains", "type": "control", "label": null },
+    { "from": "grains", "to": "out", "type": "signal", "label": "sum += grains" }
+  ]
+}

@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="800" height="500">
+  <defs>
+    <!-- Arrow markers -->
+    <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0 0, 8 3, 0 6" fill="#90FFB1"/>
+    </marker>
+    <marker id="arrow-teal" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0 0, 8 3, 0 6" fill="#3F6E6E"/>
+    </marker>
+  </defs>
+  
+  <!-- Background removed for transparent rendering -->
+  
+  <!-- Phase zones -->
+  <rect x="30" y="40" width="740" height="260" fill="#4E8E35" fill-opacity="0.05" stroke="#4E8E35" stroke-opacity="0.2" rx="6"/>
+  <rect x="30" y="320" width="740" height="150" fill="#3F6E6E" fill-opacity="0.05" stroke="#3F6E6E" stroke-opacity="0.2" rx="6"/>
+  
+  <!-- Phase labels -->
+  <text x="50" y="60" font-family="Lato, sans-serif" font-size="12" font-weight="bold" fill="#4E8E35">onInit phase</text>
+  <text x="50" y="340" font-family="Lato, sans-serif" font-size="12" font-weight="bold" fill="#3F6E6E">runtime phase</text>
+  
+  <!-- Timeline spine -->
+  <line x1="70" y1="100" x2="70" y2="380" stroke="#90FFB1" stroke-width="2"/>
+  
+  <!-- Step 1: setTableMode -->
+  <circle cx="70" cy="115" r="14" fill="#0d1117" stroke="#90FFB1" stroke-width="2"/>
+  <text x="70" y="121" font-family="Lato, sans-serif" font-size="14" font-weight="bold" fill="#CCCCCC" text-anchor="middle">1</text>
+  <rect x="100" y="95" width="660" height="70" fill="#161b22" stroke="#90FFB1" stroke-width="1" rx="6"/>
+  <text x="115" y="115" font-family="Consolas, 'Courier New', monospace" font-size="13" fill="#90FFB1">setTableMode(metadata)</text>
+  <text x="115" y="135" font-family="Lato, sans-serif" font-size="12" fill="#CCCCCC">Activates table mode and configures behavior</text>
+  <rect x="115" y="145" width="460" height="15" fill="#161b22" stroke="#444444" stroke-width="1" rx="3"/>
+  <text x="120" y="156" font-family="Consolas, 'Courier New', monospace" font-size="10" fill="#808080">{ "RowHeight": 30, "HeaderHeight": 28, "Sortable": true }</text>
+  
+  <!-- Step 2: setTableColumns -->
+  <circle cx="70" cy="200" r="14" fill="#0d1117" stroke="#90FFB1" stroke-width="2"/>
+  <text x="70" y="206" font-family="Lato, sans-serif" font-size="14" font-weight="bold" fill="#CCCCCC" text-anchor="middle">2</text>
+  <rect x="100" y="180" width="660" height="55" fill="#161b22" stroke="#90FFB1" stroke-width="1" rx="6"/>
+  <text x="115" y="200" font-family="Consolas, 'Courier New', monospace" font-size="13" fill="#90FFB1">setTableColumns(columnArray)</text>
+  <text x="115" y="220" font-family="Lato, sans-serif" font-size="12" fill="#CCCCCC">Defines column structure and cell types (Text, Button, Slider, ComboBox, Image, Hidden)</text>
+  
+  <!-- Step 3: setTableCallback -->
+  <circle cx="70" cy="270" r="14" fill="#0d1117" stroke="#90FFB1" stroke-width="2"/>
+  <text x="70" y="276" font-family="Lato, sans-serif" font-size="14" font-weight="bold" fill="#CCCCCC" text-anchor="middle">3</text>
+  <rect x="100" y="250" width="660" height="55" fill="#161b22" stroke="#90FFB1" stroke-width="1" rx="6"/>
+  <text x="115" y="270" font-family="Consolas, 'Courier New', monospace" font-size="13" fill="#90FFB1">setTableCallback(inlineFunction)</text>
+  <text x="115" y="290" font-family="Lato, sans-serif" font-size="12" fill="#CCCCCC">Registers interaction handler (receives event object with Type, rowIndex, columnID, value)</text>
+  
+  <!-- Phase boundary -->
+  <line x1="30" y1="310" x2="770" y2="310" stroke="#808080" stroke-width="1" stroke-dasharray="6,4"/>
+  
+  <!-- Step 4: setTableRowData (runtime) -->
+  <circle cx="70" cy="380" r="14" fill="#0d1117" stroke="#3F6E6E" stroke-width="2"/>
+  <text x="70" y="386" font-family="Lato, sans-serif" font-size="14" font-weight="bold" fill="#CCCCCC" text-anchor="middle">4</text>
+  <rect x="100" y="360" width="660" height="55" fill="#161b22" stroke="#3F6E6E" stroke-width="1" rx="6"/>
+  <text x="115" y="380" font-family="Consolas, 'Courier New', monospace" font-size="13" fill="#3F6E6E">setTableRowData(rowArray)</text>
+  <text x="115" y="400" font-family="Lato, sans-serif" font-size="12" fill="#CCCCCC">Populates or refreshes row data - can be called at any time, repeatedly</text>
+  
+  <!-- Repeat arrow for step 4 -->
+  <path d="M 765 360 Q 780 380 765 400" fill="none" stroke="#3F6E6E" stroke-width="1.5" marker-end="url(#arrow-teal)"/>
+</svg>

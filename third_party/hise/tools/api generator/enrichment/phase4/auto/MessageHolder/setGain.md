@@ -1,0 +1,1 @@
+Sets the per-event gain in decibels, clamped to the range -100 to 36. A value of 0 means unity gain. This gain is applied as a per-voice factor during rendering, independent of velocity. Use this to attenuate or boost events before re-injection via `Synth.addMessageFromHolder()` without affecting velocity-based sample selection.

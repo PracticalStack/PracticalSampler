@@ -1,0 +1,37 @@
+{
+  "moduleId": "HarmonicFilter",
+  "nodes": [
+    { "id": "audio_in", "type": "input", "label": "Voice Audio In (L/R)", "importance": 1.0, "group": null, "description": "Per-voice stereo audio input" },
+    { "id": "voice_freq", "type": "external", "label": "Voice Frequency", "importance": 0.8, "group": "freq_calc", "description": "MIDI note frequency from HiseEvent (set once at voice start)" },
+    { "id": "semitone_param", "type": "parameter", "label": "SemitoneTranspose", "importance": 0.6, "group": "freq_calc", "description": "Shifts base frequency in semitones (-24 to +24)" },
+    { "id": "freq_calc", "type": "process", "label": "Harmonic Frequency Calculation", "importance": 0.9, "group": "freq_calc", "description": "Computes integer harmonic frequencies (f, 2f, 3f, ...) from transposed note frequency. Clamps bands above 0.4 * sampleRate." },
+    { "id": "numbands_param", "type": "parameter", "label": "NumFilterBands", "importance": 0.7, "group": "freq_calc", "description": "Number of active harmonic bands: 1, 2, 4, 8, or 16 (power-of-two mapping)" },
+    { "id": "crossfade_param", "type": "parameter", "label": "CrossfadeValue", "importance": 0.8, "group": "crossfade", "description": "Blend position between slider pack A and B (0.0-1.0)" },
+    { "id": "xfade_mod", "type": "modulation", "label": "X-Fade Modulation", "importance": 0.7, "group": "crossfade", "description": "Scales crossfade position per-block (ScaleOnly mode)" },
+    { "id": "sliderpack_a", "type": "external", "label": "Slider Pack A", "importance": 0.8, "group": "crossfade", "description": "Per-band gain values in dB (-24 to +24)" },
+    { "id": "sliderpack_b", "type": "external", "label": "Slider Pack B", "importance": 0.8, "group": "crossfade", "description": "Alternate per-band gain values in dB (-24 to +24)" },
+    { "id": "gain_interp", "type": "process", "label": "A/B Gain Interpolation", "importance": 0.9, "group": "crossfade", "description": "Linear interpolation of per-band dB gains from packs A and B using crossfade value" },
+    { "id": "q_param", "type": "parameter", "label": "QFactor", "importance": 0.7, "group": "filter_bank", "description": "Filter Q (4-48), uniform across all bands. Higher = narrower peaks." },
+    { "id": "filter_bank", "type": "process", "label": "Series Peak Filter Bank", "importance": 1.0, "group": "filter_bank", "description": "N SVF peak EQ filters in series, each tuned to successive harmonics. Per-sample processing." },
+    { "id": "audio_out", "type": "output", "label": "Voice Audio Out (L/R)", "importance": 1.0, "group": null, "description": "Filtered per-voice stereo output (no dry/wet mix)" }
+  ],
+  "edges": [
+    { "from": "voice_freq", "to": "freq_calc", "type": "control", "label": "note frequency" },
+    { "from": "semitone_param", "to": "freq_calc", "type": "control", "label": "transpose" },
+    { "from": "numbands_param", "to": "freq_calc", "type": "control", "label": "band count" },
+    { "from": "freq_calc", "to": "filter_bank", "type": "control", "label": "center frequencies" },
+    { "from": "crossfade_param", "to": "gain_interp", "type": "control", "label": null },
+    { "from": "xfade_mod", "to": "gain_interp", "type": "control", "label": "scales crossfade" },
+    { "from": "sliderpack_a", "to": "gain_interp", "type": "control", "label": "A gains" },
+    { "from": "sliderpack_b", "to": "gain_interp", "type": "control", "label": "B gains" },
+    { "from": "gain_interp", "to": "filter_bank", "type": "control", "label": "per-band dB gain" },
+    { "from": "q_param", "to": "filter_bank", "type": "control", "label": "resonance" },
+    { "from": "audio_in", "to": "filter_bank", "type": "signal", "label": null },
+    { "from": "filter_bank", "to": "audio_out", "type": "signal", "label": null }
+  ],
+  "groups": [
+    { "id": "freq_calc", "label": "Frequency Setup (voice start)" },
+    { "id": "crossfade", "label": "A/B Crossfade" },
+    { "id": "filter_bank", "label": "Peak Filter Processing" }
+  ]
+}

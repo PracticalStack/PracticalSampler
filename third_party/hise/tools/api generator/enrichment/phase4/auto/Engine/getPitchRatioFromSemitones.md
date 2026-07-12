@@ -1,0 +1,1 @@
+Converts a semitone offset to a pitch ratio using the formula `2^(semitones/12)`. A value of 0 returns 1.0, 12 returns 2.0 (one octave up), -12 returns 0.5 (one octave down). This is the inverse of `Engine.getSemitonesFromPitchRatio()`.

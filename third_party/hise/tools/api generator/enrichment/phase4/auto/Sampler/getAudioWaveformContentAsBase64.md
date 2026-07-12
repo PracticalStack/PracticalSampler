@@ -1,0 +1,1 @@
+Converts an AudioWaveform user preset object into a base64-encoded sample map. The preset object must contain a `data` property (file path), and optionally `rangeStart` and `rangeEnd` for sample boundaries. Use this to capture AudioWaveform state for preset persistence.

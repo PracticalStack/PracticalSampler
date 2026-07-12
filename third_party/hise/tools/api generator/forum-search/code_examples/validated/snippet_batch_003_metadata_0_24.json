@@ -1,0 +1,691 @@
+{
+  "0": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {
+        "type": "MidiPlayer",
+        "name": "MIDI Player1"
+      }
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Code already guards with isEmpty() + create(4,4,1). MidiPlayer in chain 0 (MIDI processors) under the master container."
+  },
+  "1": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptPanel",
+        "id": "Panel1"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Pure CSS LAF demo with setInlineStyleSheet and div:hover transition. Panel1 must exist for setLocalLookAndFeel to apply."
+  },
+  "2": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptSlider",
+        "id": "Knob1"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knob2"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knob3"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knob4"
+      },
+      {
+        "type": "ScriptPanel",
+        "id": "Panel1"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "CSS styling with --bgColour and --value CSS variables on sliders. Panel1 acts as a transparent overlay capturing mouse events. Knobs should be stacked vertically. Panel1 must cover same area as knobs."
+  },
+  "3": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptSlider",
+        "id": "Knob1"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knob2"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knob3"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knob4"
+      },
+      {
+        "type": "ScriptPanel",
+        "id": "Panel1"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Extends example 2 with CSS :hover pseudo-state management via setStyleSheetPseudoState and Shift+click modal text input via Content.showModalTextInput. Panel1 must be named 'Panel1' (used by parentComponent key in modal config)."
+  },
+  "4": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Engine.createGlobalScriptLookAndFeel registers a global LAF. Without a SliderPack component anywhere in the interface the drawSliderPackBackground callback never fires. Add one programmatically."
+  },
+  "5": {
+    "tier": 4,
+    "testable": false,
+    "skipReason": "Requires a ScriptFX module ('Script FX1') that contains a compiled scriptnode network with a peak node configured as External Display Buffer #0. Setting up the full scriptnode network (LFO -> peak -> global_cable) programmatically is not feasible for automated testing.",
+    "modules": [],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Demonstrates Synth.getDisplayBufferSource + ScriptRingBuffer.createPath for 2D signal plotting. The P1 panel is obtained via getComponent \u2014 needs a ScriptPanel named 'P1' \u2014 but the core blocker is the scriptnode network dependency."
+  },
+  "6": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {
+        "type": "SimpleGain",
+        "name": "Script FX1"
+      }
+    ],
+    "components": [
+      {
+        "type": "ScriptButton",
+        "id": "low"
+      },
+      {
+        "type": "ScriptButton",
+        "id": "mid"
+      },
+      {
+        "type": "ScriptButton",
+        "id": "high"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Demonstrates exclusive solo-button logic with an effect. The original uses a custom ScriptFX whose script defines .lows/.mids/.highs attributes \u2014 those are unavailable without the FX script. Using numeric indices 0/1/2 against SimpleGain is functionally sufficient to demonstrate the toggle pattern."
+  },
+  "7": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {
+        "type": "CurveEq",
+        "name": "EQ"
+      }
+    ],
+    "components": [
+      {
+        "type": "ScriptFloatingTile",
+        "id": "MainDragFiltFT"
+      },
+      {
+        "type": "ScriptPanel",
+        "id": "Panel0"
+      },
+      {
+        "type": "ScriptPanel",
+        "id": "Panel1"
+      },
+      {
+        "type": "ScriptPanel",
+        "id": "Panel2"
+      },
+      {
+        "type": "ScriptPanel",
+        "id": "Panel3"
+      },
+      {
+        "type": "ScriptPanel",
+        "id": "Panel4"
+      },
+      {
+        "type": "ScriptPanel",
+        "id": "Panel5"
+      },
+      {
+        "type": "ScriptPanel",
+        "id": "Panel6"
+      },
+      {
+        "type": "ScriptPanel",
+        "id": "Panel7"
+      },
+      {
+        "type": "ScriptComboBox",
+        "id": "Type0"
+      },
+      {
+        "type": "ScriptComboBox",
+        "id": "Type1"
+      },
+      {
+        "type": "ScriptComboBox",
+        "id": "Type2"
+      },
+      {
+        "type": "ScriptComboBox",
+        "id": "Type3"
+      },
+      {
+        "type": "ScriptComboBox",
+        "id": "Type4"
+      },
+      {
+        "type": "ScriptComboBox",
+        "id": "Type5"
+      },
+      {
+        "type": "ScriptComboBox",
+        "id": "Type6"
+      },
+      {
+        "type": "ScriptComboBox",
+        "id": "Type7"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Freq0"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Freq1"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Freq2"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Freq3"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Freq4"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Freq5"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Freq6"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Freq7"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Q0"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Q1"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Q2"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Q3"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Q4"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Q5"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Q6"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Q7"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Gain0"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Gain1"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Gain2"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Gain3"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Gain4"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Gain5"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Gain6"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Gain7"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Full 8-band parametric EQ UI with 5 custom LAF functions (drawFilterPath, drawFilterDragHandle, drawAnalyserPath, drawFilterGridLines, drawAnalyserGrid). MainDragFiltFT must be a FloatingTile configured as a FilterDisplay/DraggableFilterPanel type backed by the CurveEq. The control callbacks all call an empty collective_eqWatcher_Function, so none crash. 41 components total."
+  },
+  "8": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {
+        "type": "SineSynth",
+        "name": "Sine Wave Generator1"
+      },
+      {
+        "type": "LFO",
+        "name": "LFO1",
+        "parent": "Sine Wave Generator1",
+        "chain": 1
+      }
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Registers drawAnalyserBackground and drawAnalyserPath LAF functions on a programmatically created FloatingTile plotter. The LFO1 modulator provides the live data stream for the plotter. FloatingTile is created in code (Content.addFloatingTile) so it does not need a component entry."
+  },
+  "9": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptPanel",
+        "id": "Panel1"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Self-contained 4x4 clickable grid with hover highlighting, all drawn via setPaintRoutine and controlled via setMouseCallback. Panel1.data stores hover index, numCols, numRows."
+  },
+  "10": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptPanel",
+        "id": "Panel1"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knob1"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Content.createShader('shader') creates an empty shader object if 'shader.glsl' is not found in the project \u2014 the code compiles and runs but renders nothing visible. The uniform setUniformData call is still exercised. Shader file presence is optional for compilation testing."
+  },
+  "11": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {
+        "type": "SimpleGain",
+        "name": "Simple Gain1"
+      },
+      {
+        "type": "SimpleGain",
+        "name": "Simple Gain2"
+      }
+    ],
+    "components": [
+      {
+        "type": "ScriptButton",
+        "id": "linkBtn"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knob1"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knob2"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Demonstrates safe knob-linking via setAttribute on effects to avoid infinite callback loops. Two SimpleGain effects in the FX chain (chain 3)."
+  },
+  "12": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptPanel",
+        "id": "Panel1"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Uses Engine.getCpuUsage and Engine.doubleToString inside a panel timer callback to show real-time CPU% via drawAlignedText. Reads panel's own textColour and text properties. startTimer(200) is already in the code."
+  },
+  "13": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {
+        "type": "SineSynth",
+        "name": "Sine Wave Generator1"
+      },
+      {
+        "type": "Constant",
+        "name": "M1",
+        "parent": "Sine Wave Generator1",
+        "chain": 1
+      }
+    ],
+    "components": [
+      {
+        "type": "ScriptSliderPack",
+        "id": "SliderPack1"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Engine.getGlobalRoutingManager + getCable('Macro1') + connectToGlobalModulator('M1', true) wires the Macro1 cable to receive values from the global modulator named M1. The registered callback sets a SliderPack slider at index 4. A Constant modulator named M1 in the gain chain acts as the source."
+  },
+  "14": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {
+        "type": "SineSynth",
+        "name": "Sine Wave Generator1"
+      },
+      {
+        "type": "Constant",
+        "name": "Constant1",
+        "parent": "Sine Wave Generator1",
+        "chain": 1
+      },
+      {
+        "type": "Constant",
+        "name": "Constant2",
+        "parent": "Sine Wave Generator1",
+        "chain": 1
+      },
+      {
+        "type": "Constant",
+        "name": "Constant3",
+        "parent": "Sine Wave Generator1",
+        "chain": 1
+      },
+      {
+        "type": "Constant",
+        "name": "Constant4",
+        "parent": "Sine Wave Generator1",
+        "chain": 1
+      },
+      {
+        "type": "Constant",
+        "name": "Constant5",
+        "parent": "Sine Wave Generator1",
+        "chain": 1
+      },
+      {
+        "type": "Constant",
+        "name": "Constant6",
+        "parent": "Sine Wave Generator1",
+        "chain": 1
+      }
+    ],
+    "components": [
+      {
+        "type": "ScriptSlider",
+        "id": "Pitch_a"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Pitch_b"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Pitch_c"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Demonstrates dynamic knob-to-modulator wiring using index arrays. PITCH_INDEXES defines knob suffixes; PITCH_TARGET_INDEXES maps each knob to a list of Constant modulator indices. Moving Pitch_a sets intensity of Constant1; Pitch_b sets Constant2/3/4; Pitch_c sets Constant5/6."
+  },
+  "15": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptPanel",
+        "id": "Panel1"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Simple g.rotate demo using Math.toRadians(-90) around panel center to draw vertically oriented text."
+  },
+  "16": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptSlider",
+        "id": "Knob1",
+        "properties": {
+          "style": "Linear Horizontal"
+        }
+      }
+    ],
+    "verifyScript": null,
+    "notes": "drawLinearSlider LAF only fires when the slider style is a linear variant (not rotary). Knob1 must have its style changed to 'Linear Horizontal' (or 'Linear Vertical') to trigger the registered LAF function."
+  },
+  "17": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptSlider",
+        "id": "Knob1"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knob2"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knob3"
+      },
+      {
+        "type": "ScriptSlider",
+        "id": "Knob4"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Uses obj.valueAsText in drawRotarySlider to overlay the current formatted value as centred text. Knobs use default rotary style. Note: code references Colours.whitesmoke \u2014 verify HISE supports this colour constant (standard CSS colour name)."
+  },
+  "18": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptFloatingTile",
+        "id": "FloatingTile1",
+        "properties": {
+          "contentType": "MatrixPeakMeter"
+        }
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Registers drawMatrixPeakMeter LAF that fills an SVG icon path with opacity driven by obj.peaks[0]. The icon path data is hard-coded via Content.createPath + loadFromData. FloatingTile1 must be configured as a MatrixPeakMeter to supply the obj.peaks data."
+  },
+  "19": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {
+        "type": "MidiPlayer",
+        "name": "MIDI Player1"
+      },
+      {
+        "type": "MidiPlayer",
+        "name": "MIDI Player2"
+      }
+    ],
+    "components": [
+      {
+        "type": "ScriptPanel",
+        "id": "Panel1"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Uses Engine.createTransportHandler with setEnableGrid, setSyncToMasterClock, setSyncMode(InternalOnly), and setOnGridChange to toggle a panel text on each grid beat. Two MidiPlayers in the MIDI processor chain (chain 0)."
+  },
+  "20": {
+    "tier": 3,
+    "testable": true,
+    "skipReason": null,
+    "modules": [
+      {
+        "type": "SineSynth",
+        "name": "Sine Wave Generator1"
+      }
+    ],
+    "components": [],
+    "verifyScript": null,
+    "notes": "Content.createShader('bunny.glsl') creates an empty shader object if the file is missing \u2014 code compiles and runs but renders a blank panel. The getCurrentLevel + uniform smoothing logic is still exercised. Panel is created in code (Content.addPanel). SineWaveGenerator1 provides getCurrentLevel data."
+  },
+  "21": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptButton",
+        "id": "Button1"
+      },
+      {
+        "type": "ScriptButton",
+        "id": "Button2"
+      },
+      {
+        "type": "ScriptPanel",
+        "id": "Panel1"
+      },
+      {
+        "type": "ScriptPanel",
+        "id": "Panel2"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Custom tab LAF using Content.createPath with quadraticTo for rounded-corner tabs. Active tab draws a notch at the bottom; inactive tab is flat. Clicking toggles the paired panel visibility. Buttons should be set to toggle mode (radioGroup or individual toggle)."
+  },
+  "22": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptSlider",
+        "id": "Knob1",
+        "properties": {
+          "style": "Linear Horizontal"
+        }
+      },
+      {
+        "type": "ScriptComboBox",
+        "id": "ComboBox1",
+        "properties": {
+          "items": "Red\nBlue\nGreen"
+        }
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Uses Content.getAllComponents('Knob\\d') and Content.getAllComponents('ComboBox\\d') to build paired arrays. The LAF reads obj.id to find the index, then reads the paired ComboBox value to pick a fill color. Needs at least one Knob and one ComboBox with IDs matching the regex patterns. ComboBox must have 3 items (for states 0/1/2). Sliders should be in linear mode so drawLinearSlider fires."
+  },
+  "23": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptButton",
+        "id": "Button1"
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Engine.createBroadcaster with attachToComponentMouseEvents and addListener to log hover events. Uses Content.getAllComponents('Button\\d') so any button with an ID matching the pattern works. At least one Button needed."
+  },
+  "24": {
+    "tier": 2,
+    "testable": true,
+    "skipReason": null,
+    "modules": [],
+    "components": [
+      {
+        "type": "ScriptComboBox",
+        "id": "ComboBox1",
+        "properties": {
+          "items": "Animal 1\nAnimal 2\nAnimal 3\nAnimal 4\nAnimal 5\nAnimal 6\nAnimal 7\nAnimal 8\nAnimal 9\nAnimal 10"
+        }
+      }
+    ],
+    "verifyScript": null,
+    "notes": "Demonstrates JSON object as lookup table keyed by getItemText() result. ComboBox1 must have items 'Animal 1' through 'Animal 10' so getItemText() returns keys that match the animals object."
+  }
+}

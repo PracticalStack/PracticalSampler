@@ -1,0 +1,1 @@
+Returns the current system time as milliseconds since the Unix epoch (1 January 1970, 00:00:00 UTC). Use this for elapsed-time calculations or as input to `Date.millisecondsToISO8601()` when you need a formatted string later.

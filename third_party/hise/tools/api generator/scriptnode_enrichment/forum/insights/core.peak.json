@@ -1,0 +1,56 @@
+{
+  "targetId": "core.peak",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [11639, 7566, 7297, 7998, 8652, 11190],
+  "insights": [
+    {
+      "type": "PATTERN",
+      "title": "Create custom peak meter visuals by drawing paths directly from the DisplayBuffer",
+      "summary": "The recommended pattern for a custom peak meter UI is to use a `core.peak` node with its display buffer, then draw graphics directly from that buffer in a ScriptPanel LAF function. This avoids the timer-polling approach and provides smooth, accurate metering. Both ustk and orange (trusted) confirm this is the preferred method.",
+      "sources": ["tid:11639"],
+      "verify": true,
+      "verify_hint": "Verify DisplayBuffer path-drawing API and that core.peak exposes a display buffer for external reading."
+    },
+    {
+      "type": "API",
+      "title": "MatrixPeakMeter ChannelIndexes must be an array",
+      "summary": "When configuring a MatrixPeakMeter FloatingTile, the `ChannelIndexes` property must be a JSON array of zero-based integers, e.g. `[0, 1]` for stereo. A common mistake is passing a single integer or a one-based index which causes the meter to fail silently.",
+      "sources": ["tid:7998", "tid:7297"],
+      "verify": true,
+      "verify_hint": "Confirm ChannelIndexes JSON format requirement in the FloatingTile property editor and HISE source."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Peak meter floating tile shows same value for both channels in compiled FX plugin",
+      "summary": "A confirmed bug was reported where the MatrixPeakMeter displayed the same peak value for both L and R channels in a compiled effect plugin, even with panned audio. The workaround is to use the `ENABLE_ALL_PEAK_METERS=1` compile definition. The root cause was the track panner being post-effect.",
+      "sources": ["tid:8652"],
+      "verify": true,
+      "verify_hint": "Test compiled FX plugin with ENABLE_ALL_PEAK_METERS=1 and verify channel-independent peak readings."
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use core.peak as an envelope follower trigger for ADSR gates",
+      "summary": "To use an audio signal's amplitude as a trigger for a gate-driven ADSR, connect a `core.peak` node's output to the gate parameter. For better smoothing, prefer `envelope_follower` over `core.peak` since it has dedicated attack/release controls. A `cable_expr` node can be inserted to define a custom threshold formula before the gate.",
+      "sources": ["tid:7566"],
+      "verify": true,
+      "verify_hint": "Confirm core.peak outputs a normalised 0-1 value suitable for modulating a gate parameter."
+    },
+    {
+      "type": "BUG",
+      "title": "MatrixPeakMeter maxPeaks array always returns [0, 0]",
+      "summary": "A bug was identified where the `maxPeaks` array in the MatrixPeakMeter LAF callback always contains `[0, 0]` regardless of actual peak levels. David Healey identified this as a typo in the source and submitted a fix via PR.",
+      "sources": ["tid:11190"],
+      "verify": true,
+      "verify_hint": "Check if the maxPeaks typo fix has been merged and the array now correctly reports peak-hold values."
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Peak metering in compiled plugins requires the ENABLE_ALL_PEAK_METERS compile definition",
+      "summary": "Peak meters (including the MatrixPeakMeter FloatingTile and timer-based getCurrentLevel() approaches) do not work in compiled plugins by default. You must add `ENABLE_ALL_PEAK_METERS=1` to your extra definitions in the project settings. An additional `ENABLE_PEAK_METERS_FOR_GAIN_EFFECT=1` flag exists for gain-effect-specific metering.",
+      "sources": ["tid:8652", "tid:13418"],
+      "verify": true,
+      "verify_hint": "Confirm both compile definitions and their effect on peak meter availability in exported plugins."
+    }
+  ]
+}

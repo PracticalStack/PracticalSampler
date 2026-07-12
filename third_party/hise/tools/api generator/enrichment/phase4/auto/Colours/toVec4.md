@@ -1,0 +1,1 @@
+Converts a colour to a four-element float array `[r, g, b, a]` in the 0.0-1.0 range. The output format matches GLSL `vec4` uniforms, making this the bridge between HISE colour values and `ScriptShader.setUniformData()`. Unlike the `toHsl`/`fromHsl` pair, the `toVec4`/`fromVec4` roundtrip is lossless within float rounding precision.

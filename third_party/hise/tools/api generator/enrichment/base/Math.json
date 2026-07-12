@@ -1,0 +1,517 @@
+{
+  "className": "Math",
+  "category": "namespace",
+  "description": "The Math Object.",
+  "methods": {
+    "abs": {
+      "signature": "var abs(var value)",
+      "returnType": "var",
+      "description": "Returns the absolute (unsigned) value.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "acos": {
+      "signature": "var acos(var value)",
+      "returnType": "var",
+      "description": "Calculates the acosine value (radian based).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "acosh": {
+      "signature": "var acosh(var value)",
+      "returnType": "var",
+      "description": "Calculates the acosh value (radian based).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "asin": {
+      "signature": "var asin(var value)",
+      "returnType": "var",
+      "description": "Calculates the asine value (radian based).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "asinh": {
+      "signature": "var asinh(var value)",
+      "returnType": "var",
+      "description": "Calculates the asinh value (radian based).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "atan": {
+      "signature": "var atan(var value)",
+      "returnType": "var",
+      "description": "Calculates the atan value (radian based).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "atanh": {
+      "signature": "var atanh(var value)",
+      "returnType": "var",
+      "description": "Calculates the atanh value (radian based).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "ceil": {
+      "signature": "var ceil(var value)",
+      "returnType": "var",
+      "description": "Rounds up the value.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "clamp": {
+      "signature": "var clamp(var value, var lowerLimit, var upperLimit)",
+      "returnType": "var",
+      "description": "Limits the value to the given range (JS-compatible alias for Math.range).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        },
+        {
+          "name": "lowerLimit",
+          "type": "var"
+        },
+        {
+          "name": "upperLimit",
+          "type": "var"
+        }
+      ]
+    },
+    "cos": {
+      "signature": "var cos(var value)",
+      "returnType": "var",
+      "description": "Calculates the cosine value (radian based).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "cosh": {
+      "signature": "var cosh(var value)",
+      "returnType": "var",
+      "description": "Calculates the cosh value (radian based).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "exp": {
+      "signature": "var exp(var value)",
+      "returnType": "var",
+      "description": "Calculates the exp value.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "floor": {
+      "signature": "var floor(var value)",
+      "returnType": "var",
+      "description": "Rounds down the value.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "fmod": {
+      "signature": "var fmod(var value, var limit)",
+      "returnType": "var",
+      "description": "Returns the remainder when dividing value with limit.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        },
+        {
+          "name": "limit",
+          "type": "var"
+        }
+      ]
+    },
+    "from0To1": {
+      "signature": "var from0To1(var value, var rangeObj)",
+      "returnType": "var",
+      "description": "Converts a normalised value (between 0 and 1) to a range defined by the JSON data in rangeObj.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        },
+        {
+          "name": "rangeObj",
+          "type": "var"
+        }
+      ]
+    },
+    "isinf": {
+      "signature": "var isinf(var value)",
+      "returnType": "var",
+      "description": "Checks for infinity.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "isnan": {
+      "signature": "var isnan(var value)",
+      "returnType": "var",
+      "description": "Checks for NaN (invalid floating point value).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "log": {
+      "signature": "var log(var value)",
+      "returnType": "var",
+      "description": "Calculates the log value (with base E).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "log10": {
+      "signature": "var log10(var value)",
+      "returnType": "var",
+      "description": "Calculates the log value (with base 10).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "max": {
+      "signature": "var max(var first, var second)",
+      "returnType": "var",
+      "description": "Returns the bigger number.",
+      "parameters": [
+        {
+          "name": "first",
+          "type": "var"
+        },
+        {
+          "name": "second",
+          "type": "var"
+        }
+      ]
+    },
+    "min": {
+      "signature": "var min(var first, var second)",
+      "returnType": "var",
+      "description": "Returns the smaller number.",
+      "parameters": [
+        {
+          "name": "first",
+          "type": "var"
+        },
+        {
+          "name": "second",
+          "type": "var"
+        }
+      ]
+    },
+    "pow": {
+      "signature": "var pow(var base, var exp)",
+      "returnType": "var",
+      "description": "Calculates the power of base and exponent.",
+      "parameters": [
+        {
+          "name": "base",
+          "type": "var"
+        },
+        {
+          "name": "exp",
+          "type": "var"
+        }
+      ]
+    },
+    "randInt": {
+      "signature": "var randInt(var low, var high)",
+      "returnType": "var",
+      "description": "Returns a random integer between the low and the high values.",
+      "parameters": [
+        {
+          "name": "low",
+          "type": "var"
+        },
+        {
+          "name": "high",
+          "type": "var"
+        }
+      ]
+    },
+    "random": {
+      "signature": "var random()",
+      "returnType": "var",
+      "description": "Returns a random number between 0.0 and 1.0.",
+      "parameters": []
+    },
+    "range": {
+      "signature": "var range(var value, var lowerLimit, var upperLimit)",
+      "returnType": "var",
+      "description": "Limits the value to the given range.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        },
+        {
+          "name": "lowerLimit",
+          "type": "var"
+        },
+        {
+          "name": "upperLimit",
+          "type": "var"
+        }
+      ]
+    },
+    "round": {
+      "signature": "var round(var value)",
+      "returnType": "var",
+      "description": "Rounds the value to the next integer.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "sanitize": {
+      "signature": "var sanitize(var value)",
+      "returnType": "var",
+      "description": "Sets infinity & NaN floating point numbers to zero.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "sign": {
+      "signature": "var sign(var value)",
+      "returnType": "var",
+      "description": "Returns the sign of the value.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "sin": {
+      "signature": "var sin(var value)",
+      "returnType": "var",
+      "description": "Calculates the sine value (radian based).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "sinh": {
+      "signature": "var sinh(var value)",
+      "returnType": "var",
+      "description": "Calculates the sinh value (radian based).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "skew": {
+      "signature": "var skew(var start, var end, var midPoint)",
+      "returnType": "var",
+      "description": "Returns the skew factor for the given mid point.",
+      "parameters": [
+        {
+          "name": "start",
+          "type": "var"
+        },
+        {
+          "name": "end",
+          "type": "var"
+        },
+        {
+          "name": "midPoint",
+          "type": "var"
+        }
+      ]
+    },
+    "smoothstep": {
+      "signature": "var smoothstep(var input, var lower, var upper)",
+      "returnType": "var",
+      "description": "Calculates a smooth transition between the lower and the upper value.",
+      "parameters": [
+        {
+          "name": "input",
+          "type": "var"
+        },
+        {
+          "name": "lower",
+          "type": "var"
+        },
+        {
+          "name": "upper",
+          "type": "var"
+        }
+      ]
+    },
+    "sqr": {
+      "signature": "var sqr(var value)",
+      "returnType": "var",
+      "description": "Calculates the square (x*x) of the value.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "sqrt": {
+      "signature": "var sqrt(var value)",
+      "returnType": "var",
+      "description": "Calculates the square root of the value.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "tan": {
+      "signature": "var tan(var value)",
+      "returnType": "var",
+      "description": "Calculates the tan value (radian based).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "tanh": {
+      "signature": "var tanh(var value)",
+      "returnType": "var",
+      "description": "Calculates the tanh value (radian based).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "to0To1": {
+      "signature": "var to0To1(var value, var rangeObj)",
+      "returnType": "var",
+      "description": "Converts a value inside a range defined by the JSON data in range obj to a normalised value.",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        },
+        {
+          "name": "rangeObj",
+          "type": "var"
+        }
+      ]
+    },
+    "toDegrees": {
+      "signature": "var toDegrees(var value)",
+      "returnType": "var",
+      "description": "Converts radian (0...2*PI) to degree (0...360�).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "toRadians": {
+      "signature": "var toRadians(var value)",
+      "returnType": "var",
+      "description": "Converts degree (0...360�) to radian (0...2*PI).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "trunc": {
+      "signature": "var trunc(var value)",
+      "returnType": "var",
+      "description": "Truncates the value toward zero (removes the decimal part).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        }
+      ]
+    },
+    "wrap": {
+      "signature": "var wrap(var value, var limit)",
+      "returnType": "var",
+      "description": "Wraps the value around the limit (always positive).",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "var"
+        },
+        {
+          "name": "limit",
+          "type": "var"
+        }
+      ]
+    }
+  }
+}

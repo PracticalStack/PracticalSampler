@@ -1,0 +1,1 @@
+Returns whether the licence key file exists on disk at the expected location. The file path is determined by `getLicenseKeyFile()`. Use this to decide whether to show a registration dialogue or attempt to load an existing key.

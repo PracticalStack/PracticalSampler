@@ -1,0 +1,1 @@
+Registers this component with the user preset system. When registered, the entire subtree (data properties, children, and values) is automatically saved and restored with user presets via Base64 serialisation. Pass `false` to unregister.

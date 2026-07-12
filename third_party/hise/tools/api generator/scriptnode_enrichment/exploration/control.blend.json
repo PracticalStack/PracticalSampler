@@ -1,0 +1,16 @@
+{
+  "factoryPath": "control.blend",
+  "nodes": [
+    { "id": "alpha_param", "label": "Alpha", "type": "parameter", "importance": 1.0, "description": "Blend ratio: 0=Value1, 1=Value2" },
+    { "id": "value1_param", "label": "Value1", "type": "parameter", "importance": 1.0, "description": "First input value" },
+    { "id": "value2_param", "label": "Value2", "type": "parameter", "importance": 1.0, "description": "Second input value" },
+    { "id": "lerp", "label": "Linear Interpolation", "type": "process", "importance": 1.0, "description": "output = value1 + (value2 - value1) * alpha" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Blended value (unnormalised)" }
+  ],
+  "edges": [
+    { "from": "alpha_param", "to": "lerp", "type": "control", "label": "blend ratio" },
+    { "from": "value1_param", "to": "lerp", "type": "control", "label": "endpoint A" },
+    { "from": "value2_param", "to": "lerp", "type": "control", "label": "endpoint B" },
+    { "from": "lerp", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

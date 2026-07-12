@@ -1,0 +1,121 @@
+{
+  "factoryPath": "control.tempo_sync",
+  "factory": "control",
+  "nodeId": "tempo_sync",
+  "description": "Sends the tempo duration as modulation signal",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": true,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Tempo Selection",
+      "rationale": "Tempo and Multiplier together define the musical duration to output.",
+      "parameters": [
+        {
+          "id": "Tempo",
+          "range": { "min": 0.0, "max": 18.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "101.nT6K8ChgkK..TOfUgwVckMzatYWYxQWYxAP.BjFck01b.DfXEDyKwnPLuHCQTQCQ3fSL1PzLxPjMzPDU.D1XzklckAP.AH..QfJDuc8+N.oanG.LpO.30hWR6PnRHFr.MzFBGTJ",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Multiplier",
+          "range": { "min": 1.0, "max": 16.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Sync Toggle",
+      "rationale": "When disabled, uses a manual time value instead of tempo-synced duration.",
+      "parameters": [
+        {
+          "id": "Enabled",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Manual Time",
+      "rationale": "Used when Enabled=false (sync disabled) to set a manual time in milliseconds.",
+      "parameters": [
+        {
+          "id": "UnsyncedTime",
+          "range": { "min": 0.0, "max": 1000.0, "step": 0.1, "skew": 1.0 },
+          "default": 200.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": true,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/tempo_sync.md",
+    "tier": "BRIEF",
+    "lines": 19
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "output-value-units",
+      "category": "signal_path",
+      "question": "From tempo.md: output = TempoSyncer::getTempoInMilliSeconds(bpm, currentTempo) * multiplier when Enabled=true, or UnsyncedTime when Enabled=false. Confirm units are always milliseconds.",
+      "context": "Since output is unnormalised, the units are critical for users connecting to delay time parameters."
+    },
+    {
+      "id": "hise-event-usage",
+      "category": "signal_path",
+      "question": "tempo_sync has IsProcessingHiseEvent=true. What events does it respond to? From tempo.md it seems tempo changes come via TempoListener callbacks, not MIDI events. Why is IsProcessingHiseEvent set?",
+      "context": "Need to clarify whether MIDI events trigger any behaviour, or if IsProcessingHiseEvent is set for another reason."
+    },
+    {
+      "id": "update-frequency",
+      "category": "parameter_behaviour",
+      "question": "From tempo.md: the node only sends an update when the value actually changes (lastMs != currentTempoMilliseconds). Does it also send on voice start?",
+      "context": "Users need to know when the output updates to understand timing behaviour."
+    }
+  ],
+
+  "notes": "tempo_sync does NOT have IsControlNode in cppProperties. It uses wrap::mod pattern. It IS a TempoListener (inherits from clock_base). Has IsProcessingHiseEvent. Output is unnormalised (raw milliseconds). The Enabled parameter switches between tempo-synced and manual (UnsyncedTime) modes. Common use case: driving delay time parameters."
+}

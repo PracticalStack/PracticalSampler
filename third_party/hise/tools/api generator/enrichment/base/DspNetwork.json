@@ -1,0 +1,158 @@
+{
+  "className": "DspNetwork",
+  "category": "scriptnode",
+  "description": "A network of multiple DSP objects that are connected using a graph.",
+  "methods": {
+    "clear": {
+      "signature": "void clear(bool removeNodesFromSignalChain, bool removeUnusedNodes)",
+      "returnType": "void",
+      "description": "Removes all nodes.",
+      "parameters": [
+        {
+          "name": "removeNodesFromSignalChain",
+          "type": "bool"
+        },
+        {
+          "name": "removeUnusedNodes",
+          "type": "bool"
+        }
+      ]
+    },
+    "create": {
+      "signature": "var create(String path, String id)",
+      "returnType": "var",
+      "description": "Creates and returns a node with the given path (`factory.node`). If a node with the id already exists, it returns this node.",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "String"
+        },
+        {
+          "name": "id",
+          "type": "String"
+        }
+      ]
+    },
+    "createAndAdd": {
+      "signature": "var createAndAdd(String path, String id, var parent)",
+      "returnType": "var",
+      "description": "Creates a node, names it automatically and adds it at the end of the given parent.",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "String"
+        },
+        {
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "name": "parent",
+          "type": "var"
+        }
+      ]
+    },
+    "createFromJSON": {
+      "signature": "var createFromJSON(var jsonData, var parent)",
+      "returnType": "var",
+      "description": "Creates multiple nodes from the given JSON object.",
+      "parameters": [
+        {
+          "name": "jsonData",
+          "type": "var"
+        },
+        {
+          "name": "parent",
+          "type": "var"
+        }
+      ]
+    },
+    "createTest": {
+      "signature": "var createTest(var testData)",
+      "returnType": "var",
+      "description": "Creates a test object for this network.",
+      "parameters": [
+        {
+          "name": "testData",
+          "type": "var"
+        }
+      ]
+    },
+    "deleteIfUnused": {
+      "signature": "bool deleteIfUnused(String id)",
+      "returnType": "bool",
+      "description": "Deletes the node if it is not in a signal path.",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "String"
+        }
+      ]
+    },
+    "get": {
+      "signature": "var get(var id)",
+      "returnType": "var",
+      "description": "Returns a reference to the node with the given id.",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "var"
+        }
+      ]
+    },
+    "prepareToPlay": {
+      "signature": "void prepareToPlay(double sampleRate, double blockSize)",
+      "returnType": "void",
+      "description": "Initialise processing of all nodes.",
+      "parameters": [
+        {
+          "name": "sampleRate",
+          "type": "double"
+        },
+        {
+          "name": "blockSize",
+          "type": "double"
+        }
+      ]
+    },
+    "processBlock": {
+      "signature": "void processBlock(var data)",
+      "returnType": "void",
+      "description": "Process the given channel array with the node network.",
+      "parameters": [
+        {
+          "name": "data",
+          "type": "var"
+        }
+      ]
+    },
+    "setForwardControlsToParameters": {
+      "signature": "void setForwardControlsToParameters(bool shouldForward)",
+      "returnType": "void",
+      "description": "Defines whether the UI controls of this script control the parameters or regular script callbacks.",
+      "parameters": [
+        {
+          "name": "shouldForward",
+          "type": "bool"
+        }
+      ]
+    },
+    "setParameterDataFromJSON": {
+      "signature": "bool setParameterDataFromJSON(var jsonData)",
+      "returnType": "bool",
+      "description": "Sets the parameters of this node according to the JSON data.",
+      "parameters": [
+        {
+          "name": "jsonData",
+          "type": "var"
+        }
+      ]
+    },
+    "undo": {
+      "signature": "bool undo()",
+      "returnType": "bool",
+      "description": "Undo the last action.",
+      "parameters": []
+    }
+  }
+}

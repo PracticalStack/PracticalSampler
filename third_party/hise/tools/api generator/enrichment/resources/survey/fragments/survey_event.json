@@ -1,0 +1,170 @@
+{
+  "Broadcaster": {
+    "brief": "A flexible event router that attaches to component values, properties, module parameters, complex data, mouse events, and other sources to dispatch messages to registered listener callbacks.",
+    "domain": "event",
+    "role": "event",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": ["Broadcaster"],
+    "seeAlso": [
+      {
+        "class": "GlobalCable",
+        "distinction": "Broadcaster routes events within a single script (component values, module parameters, mouse events), while GlobalCable is a named value bus for cross-project or cross-script value routing with OSC integration."
+      },
+      {
+        "class": "Timer",
+        "distinction": "Broadcaster fires callbacks in response to state changes from attached sources, while Timer fires a callback at a fixed periodic interval regardless of external state."
+      },
+      {
+        "class": "TransportHandler",
+        "distinction": "Broadcaster can attach to arbitrary UI/module sources, while TransportHandler specifically reacts to host transport events (tempo, play/stop, beat, time signature)."
+      }
+    ],
+    "callbackDensity": 0.84,
+    "statefulness": 0.1,
+    "threadingExposure": 0.5
+  },
+  "ErrorHandler": {
+    "brief": "Intercepts system-level error events (missing samples, audio dropouts, license issues) and routes them to a scripting callback for custom error UI instead of the default overlay.",
+    "domain": "scripting",
+    "role": "service",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": [],
+    "seeAlso": [
+      {
+        "class": "Broadcaster",
+        "distinction": "ErrorHandler is specifically for system error events with predefined error levels, while Broadcaster is a general-purpose event dispatcher for arbitrary script-level sources."
+      }
+    ],
+    "callbackDensity": 0.13,
+    "statefulness": 0.5,
+    "threadingExposure": 0.1
+  },
+  "TransportHandler": {
+    "brief": "Registers callbacks for host transport events including tempo changes, play/stop state, time signature changes, beat positions, and a high-precision grid timer synced to the DAW timeline.",
+    "domain": "playback",
+    "role": "event",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": [],
+    "seeAlso": [
+      {
+        "class": "Timer",
+        "distinction": "TransportHandler fires callbacks in response to host transport events (tempo, play/stop, beat position), while Timer fires at a fixed millisecond interval independent of the DAW."
+      },
+      {
+        "class": "Broadcaster",
+        "distinction": "TransportHandler is dedicated to host transport state (tempo, playback, grid), while Broadcaster can attach to arbitrary component, module, or data sources."
+      }
+    ],
+    "callbackDensity": 0.3,
+    "statefulness": 0.65,
+    "threadingExposure": 0.7
+  },
+  "Timer": {
+    "brief": "A periodic timer that fires a callback on the message thread at a configurable millisecond interval, used for UI polling and delayed actions.",
+    "domain": "ui",
+    "role": "utility",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": [],
+    "seeAlso": [
+      {
+        "class": "TransportHandler",
+        "distinction": "Timer fires at a fixed millisecond interval for general-purpose polling, while TransportHandler fires callbacks synced to the host transport (tempo, beat, grid)."
+      },
+      {
+        "class": "BackgroundTask",
+        "distinction": "Timer fires periodically on the message thread for UI updates, while BackgroundTask runs a one-shot or long-running function on a background thread."
+      },
+      {
+        "class": "Broadcaster",
+        "distinction": "Timer fires at a fixed interval regardless of state changes, while Broadcaster fires when an attached source (component value, module parameter, etc.) changes."
+      }
+    ],
+    "callbackDensity": 0.17,
+    "statefulness": 0.33,
+    "threadingExposure": 0.1
+  },
+  "Threads": {
+    "brief": "Provides thread-awareness utilities for querying thread identity, lock state, and safely executing functions on the loading thread after suspending audio processing.",
+    "domain": "scripting",
+    "role": "utility",
+    "baseClass": "ApiClass",
+    "creates": [],
+    "references": [],
+    "seeAlso": [
+      {
+        "class": "BackgroundTask",
+        "distinction": "Threads provides query methods for thread state and a single killVoicesAndCall utility, while BackgroundTask is a concrete task handle for running code on a dedicated background thread with progress tracking."
+      }
+    ],
+    "callbackDensity": 0.2,
+    "statefulness": 0.8,
+    "threadingExposure": 0.9
+  },
+  "BackgroundTask": {
+    "brief": "A task handle for running long operations (downloads, processing, OS processes) on a background thread with progress reporting, abort signaling, and thread-safe property storage.",
+    "domain": "scripting",
+    "role": "handle",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": [],
+    "seeAlso": [
+      {
+        "class": "Timer",
+        "distinction": "BackgroundTask runs a one-shot or long-running function on a background thread, while Timer fires a periodic callback on the message thread for UI polling."
+      },
+      {
+        "class": "Threads",
+        "distinction": "BackgroundTask is a concrete task handle with progress tracking and abort control, while Threads is a utility namespace for querying thread identity and lock state."
+      }
+    ],
+    "callbackDensity": 0.27,
+    "statefulness": 0.6,
+    "threadingExposure": 0.8
+  },
+  "GlobalRoutingManager": {
+    "brief": "A singleton manager for the global cable routing system that creates and retrieves named GlobalCable instances and provides OSC send/receive integration for external controller communication.",
+    "domain": "routing",
+    "role": "factory",
+    "baseClass": "ConstScriptingObject",
+    "creates": ["GlobalCable"],
+    "references": [],
+    "seeAlso": [
+      {
+        "class": "GlobalCable",
+        "distinction": "GlobalRoutingManager is the factory that creates/retrieves GlobalCable instances and manages OSC connections, while GlobalCable is the individual named value bus you send and receive values through."
+      },
+      {
+        "class": "Broadcaster",
+        "distinction": "GlobalRoutingManager provides cross-project named value buses with OSC integration, while Broadcaster routes events between components and modules within a single script."
+      }
+    ],
+    "callbackDensity": 0.14,
+    "statefulness": 0.29,
+    "threadingExposure": 0.4
+  },
+  "GlobalCable": {
+    "brief": "A named value bus for routing normalised or ranged values between scripts, modules, macro controls, and external OSC sources, with support for synchronous (audio-thread-safe) and asynchronous callbacks.",
+    "domain": "routing",
+    "role": "handle",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": ["GlobalRoutingManager"],
+    "seeAlso": [
+      {
+        "class": "Broadcaster",
+        "distinction": "GlobalCable is a named value bus for cross-project routing with OSC and macro integration, while Broadcaster attaches to specific component/module sources for script-level event dispatch."
+      },
+      {
+        "class": "GlobalRoutingManager",
+        "distinction": "GlobalCable is the individual value bus you interact with, while GlobalRoutingManager is the factory that creates cables and manages OSC connections."
+      }
+    ],
+    "callbackDensity": 0.2,
+    "statefulness": 0.47,
+    "threadingExposure": 0.7
+  }
+}

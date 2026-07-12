@@ -1,0 +1,1 @@
+Returns a new Rectangle with the same position and width but a different height. The top-left corner stays fixed.

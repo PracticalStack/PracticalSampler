@@ -1,0 +1,1 @@
+Serializes all 128 slot values into a Base64-encoded string. The result is deterministic - the same slot values always produce the same string - making it suitable for storing MidiList snapshots in user presets, XML, or project data. Use `restoreFromBase64String()` to reload the data.

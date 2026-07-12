@@ -1,0 +1,1 @@
+Returns `true` if the callback returns a truthy value for at least one element, `false` if all elements fail. Stops at the first passing element. The callback receives up to three arguments: `element`, `index`, and `array`.

@@ -1,0 +1,12 @@
+{
+  "factoryPath": "routing.public_mod",
+  "nodes": [
+    { "id": "value", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Input value (0..1) to expose as public modulation" },
+    { "id": "write_mod", "label": "Write to ModValue", "type": "process", "importance": 1.0, "description": "Writes value to the shared ModValue pointer (via DllBoundaryTempoSyncer::publicModValue)" },
+    { "id": "mod_out", "label": "Public Mod Output", "type": "modulation_out", "importance": 1.0, "description": "Value accessible from the parent network" }
+  ],
+  "edges": [
+    { "from": "value", "to": "write_mod", "type": "control", "label": null },
+    { "from": "write_mod", "to": "mod_out", "type": "signal", "label": "setModValueIfChanged" }
+  ]
+}

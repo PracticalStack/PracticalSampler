@@ -1,0 +1,16 @@
+{
+  "factoryPath": "jdsp.jdelay_cubic",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal (per-voice)" },
+    { "id": "delay", "label": "Cubic Delay", "type": "process", "importance": 1.0, "description": "Per-channel delay line with Lagrange 3rd-order interpolation" },
+    { "id": "limit", "label": "Limit", "type": "parameter", "importance": 0.7, "description": "Maximum delay buffer size in ms (affects memory, not CPU)" },
+    { "id": "delay_time", "label": "DelayTime", "type": "parameter", "importance": 0.9, "description": "Actual delay time in ms (no smoothing)" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Delayed audio signal with flat frequency response" }
+  ],
+  "edges": [
+    { "from": "in", "to": "delay", "type": "signal", "label": null },
+    { "from": "limit", "to": "delay", "type": "control", "label": "buffer size" },
+    { "from": "delay_time", "to": "delay", "type": "control", "label": null },
+    { "from": "delay", "to": "out", "type": "signal", "label": null }
+  ]
+}

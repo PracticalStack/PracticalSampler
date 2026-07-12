@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="420" viewBox="0 0 780 420">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#CCCCCC"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#BB3434"/>
+    </marker>
+  </defs>
+
+  <!-- Entry marker -->
+  <circle cx="60" cy="80" r="5" fill="#90FFB1"/>
+  <path d="M65,80 L105,80" stroke="#90FFB1" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+  <!-- Waiting state -->
+  <rect x="110" y="55" width="140" height="50" rx="6" fill="#161b22" stroke="rgba(0,0,0,0.5)" stroke-width="1"/>
+  <text x="180" y="85" fill="#CCCCCC" font-family="Lato, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Waiting</text>
+
+  <!-- Downloading state -->
+  <rect x="320" y="55" width="160" height="50" rx="6" fill="#161b22" stroke="#90FFB1" stroke-width="2"/>
+  <text x="400" y="85" fill="#CCCCCC" font-family="Lato, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Downloading</text>
+
+  <!-- Paused state -->
+  <rect x="560" y="55" width="140" height="50" rx="6" fill="#161b22" stroke="rgba(0,0,0,0.5)" stroke-width="1"/>
+  <text x="630" y="85" fill="#CCCCCC" font-family="Lato, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Paused</text>
+
+  <!-- Completed state -->
+  <rect x="320" y="220" width="160" height="50" rx="6" fill="#161b22" stroke="#4E8E35" stroke-width="1"/>
+  <text x="400" y="250" fill="#CCCCCC" font-family="Lato, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Completed</text>
+
+  <!-- Aborted state -->
+  <rect x="320" y="330" width="160" height="50" rx="6" fill="#161b22" stroke="#BB3434" stroke-width="1"/>
+  <text x="400" y="360" fill="#CCCCCC" font-family="Lato, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Aborted</text>
+
+  <!-- Waiting -> Downloading -->
+  <path d="M250,80 L315,80" stroke="#CCCCCC" stroke-width="1" marker-end="url(#arrow)" fill="none"/>
+  <rect x="256" y="57" width="58" height="16" fill="#161b22" fill-opacity="0.85" rx="3"/>
+  <text x="285" y="69" fill="#808080" font-family="Consolas, 'Courier New', monospace" font-size="11" text-anchor="middle">WebThread</text>
+
+  <!-- Downloading -> Paused (stop) -->
+  <path d="M480,72 L555,72" stroke="#CCCCCC" stroke-width="1" marker-end="url(#arrow)" fill="none"/>
+  <rect x="493" y="57" width="48" height="16" fill="#161b22" fill-opacity="0.85" rx="3"/>
+  <text x="517" y="69" fill="#FFBA00" font-family="Consolas, 'Courier New', monospace" font-size="11" text-anchor="middle">stop()</text>
+
+  <!-- Paused -> Waiting (resume) -->
+  <path d="M560,100 L260,100 L260,92 L250,92" stroke="#CCCCCC" stroke-width="1" marker-end="url(#arrow)" fill="none"/>
+  <rect x="367" y="103" width="68" height="16" fill="#161b22" fill-opacity="0.85" rx="3"/>
+  <text x="401" y="115" fill="#90FFB1" font-family="Consolas, 'Courier New', monospace" font-size="11" text-anchor="middle">resume()</text>
+
+  <!-- Downloading -> Completed -->
+  <path d="M400,105 L400,215" stroke="#4E8E35" stroke-width="1" marker-end="url(#arrow)" fill="none"/>
+  <rect x="408" y="148" width="54" height="16" fill="#161b22" fill-opacity="0.85" rx="3"/>
+  <text x="435" y="160" fill="#808080" font-family="Consolas, 'Courier New', monospace" font-size="11" text-anchor="middle">finished</text>
+
+  <!-- Downloading -> Aborted (abort) -->
+  <path d="M370,105 L370,200 L370,325" stroke="#BB3434" stroke-width="1" marker-end="url(#arrow-red)" fill="none"/>
+  <rect x="330" y="193" width="48" height="16" fill="#161b22" fill-opacity="0.85" rx="3"/>
+  <text x="354" y="205" fill="#BB3434" font-family="Consolas, 'Courier New', monospace" font-size="11" text-anchor="middle">abort()</text>
+
+  <!-- Completed annotation -->
+  <text x="498" y="238" fill="#808080" font-family="Lato, sans-serif" font-size="11" text-anchor="start">check data.success</text>
+
+  <!-- Aborted annotation -->
+  <text x="498" y="350" fill="#808080" font-family="Lato, sans-serif" font-size="11" text-anchor="start">target file deleted</text>
+  <text x="498" y="365" fill="#808080" font-family="Lato, sans-serif" font-size="11" text-anchor="start">cannot resume</text>
+</svg>

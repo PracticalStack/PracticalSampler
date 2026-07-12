@@ -1,0 +1,1 @@
+Creates a MIDI list - a fixed-size array of 128 integer values (one per MIDI note number). MidiList is optimised for MIDI-related lookups such as key-to-velocity mappings, note filtering masks, or custom note-to-value tables. Values default to -1 (unused) and the list supports fast Base64 serialisation for user preset storage.

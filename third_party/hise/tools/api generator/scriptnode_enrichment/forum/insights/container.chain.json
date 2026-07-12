@@ -1,0 +1,64 @@
+{
+  "targetId": "container.chain",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [5825, 9268, 7678, 12946, 11223, 5236, 9276],
+  "insights": [
+    {
+      "type": "BUG",
+      "title": "Chain node rendered twice inside frame2block — fixed in 2022",
+      "body": "A critical bug caused a chain node to be rendered twice when used inside a frame2block context, leading to significant processing differences (e.g. oscillators running an octave higher). container.fixblock nodes were not affected. Nodes compiled to C++ also worked correctly, which may explain discrepancies between interpreted and compiled networks. Fixed in May 2022 — if you were relying on the old behaviour you may need to audit existing networks.",
+      "source": "tid:5825",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "API",
+      "title": "Processing order is always top-down; polyphonic FX runs before monophonic Master FX",
+      "body": "In a container the signal flows top-down as shown in the module tree. FX modules in a container are rendered after its child sound generators. Within the FX chain, polyphonic effects are always processed before monophonic (Master FX) effects, and this ordering is reflected in the Module Tree — adding a Filter after a Phaser causes it to jump to the top automatically.",
+      "source": "tid:9268",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "API",
+      "title": "Use container.sidechain or multi-channel setup for scriptnode compressor sidechain",
+      "body": "To build a sidechain compressor in scriptnode, set the master container to 4 channels, route the dry signal to channels 1+2 and the sidechain source to channels 3+4, then use a dynamics.compressor node with the sidechain mode set to 'Sidechain'. The node uses the second channel pair for gain reduction and applies it to the first pair. Requires the Script FX to enable all 4 channels.",
+      "source": "tid:7678",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "API",
+      "title": "container.branch bypasses non-selected child nodes — no need for soft bypass alongside it",
+      "body": "The container.branch node automatically hard-bypasses all child nodes at positions other than the currently selected Index parameter value. There is no need to wrap children in container.soft_bypass on top of branch. The branch node handles routing and bypass internally.",
+      "source": "tid:12946",
+      "author": "Christoph Hart [author], aaronventure [trusted]",
+      "confidence": "high"
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Use container.branch instead of chained soft bypass nodes to avoid audio bumps",
+      "body": "Chaining two container.soft_bypass nodes in series produces audible audio bumps. Using a container.branch node instead avoids the problem entirely — it is cleaner, bump-free, and scales easily when more than two branches are needed.",
+      "source": "tid:11223",
+      "author": "aaronventure [trusted]",
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Programmatically bypassing gain chain modulators can accidentally bypass the entire chain",
+      "body": "When iterating over modulators via scripting to bypass them, it is easy to accidentally bypass the ModulatorChain itself (which represents the entire gain chain). Check `if (modulator.getType() == \"ModulatorChain\")` and skip it to avoid the 'You need at least one envelope in the gain chain' error. The symptom is the envelope appearing enabled in the detail view but bypassed in the Module Tree sidebar.",
+      "source": "tid:9276",
+      "author": "David Healey [expert]",
+      "confidence": "high"
+    },
+    {
+      "type": "API",
+      "title": "To place a filter after all other FX, wrap the module in a container and add the filter to that container's FX chain",
+      "body": "HISE's polyphonic/monophonic ordering rules mean you cannot freely reorder all FX within a single chain. To guarantee a filter runs at the very end of the chain, place the upstream processing inside a container and add the filter to the container's own FX chain — the container's FX always run after all its children.",
+      "source": "tid:12803",
+      "author": "David Healey [expert]",
+      "confidence": "high"
+    }
+  ]
+}

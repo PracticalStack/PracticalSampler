@@ -1,0 +1,80 @@
+{
+  "targetId": "PolyphonicFilter",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [2797, 13240, 2749, 978, 404, 7996, 9615, 377, 9113],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Standard frequency modulation scales to the parameter value, it does not offset from it",
+      "summary": "The standard frequency modulator chain multiplies the base Frequency parameter value by the modulator output (0-1). This means modulation sweeps from ~20 Hz up to the knob value, not around it. To modulate around a center frequency, use the Bipolar Frequency Chain instead.",
+      "sources": ["tid:2749"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Bipolar frequency modulation does not modulate symmetrically around the set cutoff frequency",
+      "summary": "Despite the name, the bipolar chain adds a signed offset in normalized frequency space (0-1 mapped to 20-20000 Hz), then the standard frequency mod multiplies the result. The result is not symmetric in Hz or semitones around the base cutoff. Users expecting a classic +/- semitone vibrato from bipolar mod will be surprised.",
+      "sources": ["tid:2749"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use ArrayModulator (not SliderPack) for per-note filter frequency control",
+      "summary": "A SliderPack cannot be directly routed to control the PolyphonicFilter's frequency per note. The ArrayModulator is the correct module - it maps note number to an array of values, functioning like a SliderPack keyed to MIDI note number.",
+      "sources": ["tid:2797"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Recommended cutoff knob setup: use FilterFreq preset and set frequency parameter to 20kHz",
+      "summary": "When connecting a UI knob for cutoff control via a modulator chain, set the filter's Frequency parameter to 20 kHz, place a modulator in the frequency chain, and use the FilterFreq or FilterFreq Logarithmic range preset on the modulator. The connection wizard sets knob range and suffixes automatically.",
+      "sources": ["tid:13240"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Polyphonic Filter processes per-voice; Monophonic Filter processes the summed stereo output",
+      "summary": "The PolyphonicFilter runs its filter algorithm independently for each active voice (required for per-voice modulation such as velocity-to-cutoff). The MonophonicFilter processes the already-summed stereo output and is significantly cheaper for static or shared modulation. The monophonic filter is stereo-only; for multi-channel instruments requiring mono-path filtering, duplicate the filter.",
+      "sources": ["tid:404"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Adding a polyphonic modulator to any chain triggers per-voice processing and raises CPU cost",
+      "summary": "The filter automatically switches between a cheap mono path (summed buffer, 64-sample sub-blocks) and an expensive poly path (per-voice) based on whether any modulator chain contains a polyphonic modulator. Adding even a single polyphonic modulator (e.g., velocity) to any chain forces all voices to be processed independently.",
+      "sources": ["tid:404", "tid:2797"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Gain modulator behavior is non-obvious: at mod value 1.0 it produces 0 dB change, at 0.0 it applies full dB attenuation",
+      "summary": "The gain modulation formula is dB2gain(gain * (gainMod - 1.0)). At gainMod=1.0 the result is 0 dB (unity). At gainMod=0.0 it applies the full Gain parameter value as dB attenuation. This means a gain modulator going from 0 to 1 applies maximum cut at its minimum and no cut at its maximum - the inverse of what many users expect.",
+      "sources": ["tid:7996"],
+      "verify": true,
+      "verify_hint": "grep dB2gain in MultiChannelFilters.cpp; check RenderData::applyModValue gain branch"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use pma node in scriptnode for filter cutoff with envelope modulation",
+      "summary": "In scriptnode, the recommended pattern for a cutoff knob plus envelope modulation is: connect the cutoff control to math.add (offset), connect the envelope to math.mul (scale), feed the result into the filter's freq parameter via a peak node. The pma node consolidates this into a single node.",
+      "sources": ["tid:9615"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "Historical bug: filter held sampler voices indefinitely due to hasTail() returning true",
+      "summary": "An older HISE version had PolyphonicFilter::hasTail() returning true, which caused the filter to prevent sampler voices from being released. The fix was to return false. This was corrected in the codebase; users on very old HISE builds should update.",
+      "sources": ["tid:978"],
+      "verify": true,
+      "verify_hint": "grep hasTail in hi_modules/effects/fx/Filters.h; confirm it returns false"
+    }
+  ]
+}

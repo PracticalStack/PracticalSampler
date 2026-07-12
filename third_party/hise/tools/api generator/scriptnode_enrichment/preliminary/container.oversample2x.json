@@ -1,0 +1,83 @@
+{
+  "factoryPath": "container.oversample2x",
+  "factory": "container",
+  "nodeId": "oversample2x",
+  "description": "Processes the child nodes with a higher samplerate",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Oversampling Configuration",
+      "rationale": "Single parameter configuring the anti-aliasing filter. The oversampling factor is fixed at 2x and not exposed as a parameter.",
+      "parameters": [
+        {
+          "id": "FilterType",
+          "range": { "min": 0, "max": 1, "step": 1, "skew": 1.0 },
+          "default": 0,
+          "textConverter": "60.nT6K8CxLYF..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.OT.TuwVdvgVXyUlBFkjT.D1XzklckAP.AH..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "UI-only: controls whether the container is displayed vertically or horizontally in the scriptnode graph editor. No effect on signal processing."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": true,
+    "groupName": "oversampleNx",
+    "templateParameter": "oversampling factor",
+    "variantValue": "2"
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/container/oversample2x.md",
+    "tier": "STUB",
+    "lines": 6
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "variant-difference-2x",
+      "category": "signal_path",
+      "question": "oversample2x uses wrap::oversample<2, T> with the factor fixed at compile time. Is the processing logic identical to the dynamic container.oversample when set to factor 2, except that no Oversampling parameter is exposed and no runtime factor switching occurs?",
+      "context": "If identical, the doc can reference the base variant and note only the difference: fixed factor, no Oversampling parameter, potentially lower overhead from avoiding the runtime lock on factor changes."
+    }
+  ],
+
+  "notes": "Fixed 2x variant of the oversample group. References container.oversample as the base variant for full signal flow and infrastructure documentation. Only difference: OversampleFactor template parameter is 2 (not -1/dynamic), so no Oversampling parameter is exposed. Children see sampleRate*2 and blockSize*2. Same constraints apply: monophonic only (IllegalPolyphony), no frame processing (processFrame asserts false), block processing only."
+}

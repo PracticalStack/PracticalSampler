@@ -1,0 +1,100 @@
+{
+  "moduleId": "ChannelFilter",
+  "prettyName": "MIDI Channel Filter",
+  "type": "MidiProcessor",
+  "subtype": "MidiProcessor",
+  "category": "routing, note_processing",
+
+  "io": {
+    "midiIn": "MIDI_in",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [],
+
+  "parameterGroups": [
+    {
+      "label": "Single Channel Mode",
+      "rationale": "Controls which MIDI channel is passed through when MPE is disabled",
+      "parameters": [
+        {
+          "id": "channelNumber",
+          "name": "Channel Number",
+          "range": { "min": 1.0, "max": 16.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "MIDI channel to pass when MPE is disabled",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "MPE Channel Range",
+      "rationale": "Defines the start and end channels for MPE note filtering; only active in MPE mode",
+      "parameters": [
+        {
+          "id": "mpeStart",
+          "name": "MPE Start Channel",
+          "range": { "min": 2.0, "max": 16.0, "step": 1.0 },
+          "default": 2.0,
+          "description": "Start channel for the MPE note range",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "mpeEnd",
+          "name": "MPE End Channel",
+          "range": { "min": 2.0, "max": 16.0, "step": 1.0 },
+          "default": 16.0,
+          "description": "End channel for the MPE note range",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "event-filtering-logic",
+      "category": "signal_path",
+      "question": "How does processHiseEvent() filter MIDI events? Does it discard events on non-matching channels, or does it transform/remap them? What happens to events that pass the filter - are they forwarded unchanged?",
+      "context": "Core behavior: users need to know whether this blocks, passes, or remaps events."
+    },
+    {
+      "id": "mpe-mode-toggle",
+      "category": "conditional_logic",
+      "question": "How is MPE mode activated? Is there an implicit toggle based on the parent SynthChain's MPE state, or is it detected from the parameters? The description says channelNumber is used 'when MPE is disabled' but there is no explicit enable/disable parameter.",
+      "context": "Users need to know what determines which parameter set (channelNumber vs mpeStart/mpeEnd) is active."
+    },
+    {
+      "id": "event-type-scope",
+      "category": "parameter_behavior",
+      "question": "Does the filter apply to all MIDI event types (noteOn, noteOff, CC, pitchbend, aftertouch) or only note events? Are certain event types always passed through regardless of channel?",
+      "context": "Users with multi-channel setups need to know which event types are affected."
+    },
+    {
+      "id": "mpe-range-edge-cases",
+      "category": "parameter_behavior",
+      "question": "What happens when mpeStart > mpeEnd? Does channel 1 (the MPE master channel) receive special treatment in MPE mode?",
+      "context": "MPE spec reserves channel 1 as the manager channel. Users need to know if this is handled."
+    },
+    {
+      "id": "description-mpe-optional",
+      "category": "description_accuracy",
+      "question": "The description says 'optional MPE start and end channel ranges'. Verify that MPE filtering is truly optional and that non-MPE single-channel filtering is the default mode.",
+      "context": "Confirm the base description accurately reflects the conditional behavior."
+    }
+  ],
+
+  "notes": "ChannelFilter is a simple MIDI processor with no modulation chains, no interfaces, and no children. The key architectural question is how MPE mode is toggled - it likely reads from the parent chain's MPE enabled state rather than having its own toggle parameter. The two parameter groups reflect two mutually exclusive operating modes (single channel vs MPE range). The mpeStart default of 2 and mpeEnd default of 16 match the MPE spec (channels 2-16 for note data, channel 1 for manager)."
+}

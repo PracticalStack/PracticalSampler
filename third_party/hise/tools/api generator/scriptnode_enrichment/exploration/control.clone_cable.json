@@ -1,0 +1,20 @@
+{
+  "factoryPath": "control.clone_cable",
+  "nodes": [
+    { "id": "value", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Input value (0..1) fed to distribution function" },
+    { "id": "gamma", "label": "Gamma", "type": "parameter", "importance": 0.8, "description": "Shape modifier for the distribution curve" },
+    { "id": "numclones", "label": "NumClones", "type": "parameter", "importance": 0.7, "description": "Number of active clones to address" },
+    { "id": "midi_in", "label": "MIDI In", "type": "input", "importance": 0.6, "description": "Note-on frequency replaces Value for MIDI-reactive modes" },
+    { "id": "mode", "label": "Mode", "type": "decision", "importance": 0.9, "description": "Selects distribution algorithm (spread, scale, triangle, harmonics, nyquist, fixed, ducker, random, toggle)" },
+    { "id": "distribute", "label": "Distribute", "type": "process", "importance": 1.0, "description": "Calls LogicType::getValue(index, numClones, value, gamma) for each clone" },
+    { "id": "clone_out", "label": "Per-Clone Output", "type": "modulation_out", "importance": 1.0, "description": "Sends computed value to each clone's target parameter (normalised)" }
+  ],
+  "edges": [
+    { "from": "value", "to": "distribute", "type": "control", "label": null },
+    { "from": "gamma", "to": "distribute", "type": "control", "label": null },
+    { "from": "numclones", "to": "distribute", "type": "control", "label": "loop count" },
+    { "from": "midi_in", "to": "distribute", "type": "control", "label": "frequency (reactive modes)" },
+    { "from": "mode", "to": "distribute", "type": "conditional", "label": "selects algorithm" },
+    { "from": "distribute", "to": "clone_out", "type": "signal", "label": "per-clone values" }
+  ]
+}

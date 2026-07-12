@@ -1,0 +1,468 @@
+{
+  "Content": {
+    "brief": "Top-level factory for creating and managing all UI components on the script interface, including layout helpers and object factories for paths, shaders, and look-and-feel objects.",
+    "domain": "ui",
+    "role": "factory",
+    "baseClass": "ScriptingObject",
+    "creates": ["ScriptPanel", "ScriptButton", "ScriptSlider", "ScriptComboBox", "ScriptLabel", "ScriptTable", "ScriptSliderPack", "ScriptImage", "ScriptAudioWaveform", "ScriptFloatingTile", "ScriptWebView", "ScriptedViewport", "ScriptMultipageDialog", "ScriptDynamicContainer", "ScriptLookAndFeel", "Path", "ScriptShader", "MarkdownRenderer"],
+    "references": ["Colours", "Engine", "FileSystem"],
+    "seeAlso": [
+      {
+        "class": "ScriptPanel",
+        "distinction": "Content creates and manages components; ScriptPanel is a specific component you draw on with paint routines and mouse callbacks."
+      },
+      {
+        "class": "Engine",
+        "distinction": "Content manages the visual interface; Engine manages the audio engine, MIDI, and global state."
+      }
+    ],
+    "callbackDensity": 0.06,
+    "statefulness": 0.35,
+    "threadingExposure": 0.0
+  },
+  "ScriptPanel": {
+    "brief": "Scriptable panel component with custom paint routines, mouse/touch interaction, timer callbacks, animation support, drag-and-drop, popup display, and child panel hierarchy.",
+    "domain": "ui",
+    "role": "component",
+    "baseClass": "ScriptComponent",
+    "creates": [],
+    "references": ["Graphics", "Path", "ScriptLookAndFeel", "Colours", "Content"],
+    "seeAlso": [
+      {
+        "class": "ScriptImage",
+        "distinction": "Use ScriptPanel when you need custom drawing via paint routines; use ScriptImage for simple static image display."
+      },
+      {
+        "class": "ScriptFloatingTile",
+        "distinction": "Use ScriptPanel for fully custom-drawn content; use ScriptFloatingTile to embed pre-built HISE widgets like keyboards or waveform displays."
+      },
+      {
+        "class": "ScriptButton",
+        "distinction": "Use ScriptPanel for arbitrary interactive regions with custom drawing; use ScriptButton for standard toggle/momentary button behavior."
+      }
+    ],
+    "callbackDensity": 0.18,
+    "statefulness": 0.4,
+    "threadingExposure": 0.02
+  },
+  "ScriptButton": {
+    "brief": "Toggle or momentary button component with filmstrip/image support, radio group assignment, and popup data attachment.",
+    "domain": "ui",
+    "role": "component",
+    "baseClass": "ScriptComponent",
+    "creates": [],
+    "references": ["ScriptLookAndFeel", "Content"],
+    "seeAlso": [
+      {
+        "class": "ScriptSlider",
+        "distinction": "Use ScriptButton for on/off or momentary states; use ScriptSlider for continuous or stepped numeric value input."
+      },
+      {
+        "class": "ScriptPanel",
+        "distinction": "Use ScriptButton for standard toggle behavior with built-in filmstrip support; use ScriptPanel for fully custom interactive areas."
+      },
+      {
+        "class": "ScriptComboBox",
+        "distinction": "Use ScriptButton for binary or radio-group selection; use ScriptComboBox for selecting from a list of named items."
+      }
+    ],
+    "callbackDensity": 0.05,
+    "statefulness": 0.55,
+    "threadingExposure": 0.0
+  },
+  "ScriptSlider": {
+    "brief": "Numeric value slider/knob component with configurable range, step size, mid-point skew, multiple display styles (Knob/Horizontal/Vertical), filmstrip support, and modifier key customization.",
+    "domain": "ui",
+    "role": "component",
+    "baseClass": "ScriptComponent",
+    "creates": [],
+    "references": ["ScriptLookAndFeel", "Content"],
+    "seeAlso": [
+      {
+        "class": "ScriptButton",
+        "distinction": "Use ScriptSlider for continuous or stepped numeric values; use ScriptButton for on/off toggling."
+      },
+      {
+        "class": "ScriptComboBox",
+        "distinction": "Use ScriptSlider for numeric ranges with visual feedback; use ScriptComboBox for selecting from discrete named items."
+      },
+      {
+        "class": "ScriptSliderPack",
+        "distinction": "Use ScriptSlider for a single value control; use ScriptSliderPack for editing an array of values simultaneously."
+      }
+    ],
+    "callbackDensity": 0.07,
+    "statefulness": 0.55,
+    "threadingExposure": 0.0
+  },
+  "ScriptComboBox": {
+    "brief": "Drop-down list component for selecting from a set of named items, with dynamic item addition and text retrieval.",
+    "domain": "ui",
+    "role": "component",
+    "baseClass": "ScriptComponent",
+    "creates": [],
+    "references": ["ScriptLookAndFeel", "Content"],
+    "seeAlso": [
+      {
+        "class": "ScriptSlider",
+        "distinction": "Use ScriptComboBox for choosing from named text items; use ScriptSlider for numeric value input with a continuous range."
+      },
+      {
+        "class": "ScriptButton",
+        "distinction": "Use ScriptComboBox for multi-option selection from a list; use ScriptButton for binary on/off toggling or radio groups."
+      },
+      {
+        "class": "ScriptedViewport",
+        "distinction": "Use ScriptComboBox for simple drop-down selection; use ScriptedViewport in table mode for displaying and interacting with tabular data."
+      }
+    ],
+    "callbackDensity": 0.05,
+    "statefulness": 0.5,
+    "threadingExposure": 0.0
+  },
+  "ScriptLabel": {
+    "brief": "Text display and input component for showing labels, editable text fields, and text overlays on the interface.",
+    "domain": "ui",
+    "role": "component",
+    "baseClass": "ScriptComponent",
+    "creates": [],
+    "references": ["ScriptLookAndFeel", "Content"],
+    "seeAlso": [
+      {
+        "class": "ScriptPanel",
+        "distinction": "Use ScriptLabel for standard text display or text input; use ScriptPanel with drawText in the paint routine for fully custom-rendered text."
+      },
+      {
+        "class": "ScriptComboBox",
+        "distinction": "Use ScriptLabel for displaying or editing free-form text; use ScriptComboBox for selecting from a predefined item list."
+      }
+    ],
+    "callbackDensity": 0.05,
+    "statefulness": 0.5,
+    "threadingExposure": 0.0
+  },
+  "ScriptTable": {
+    "brief": "Curve editor component backed by a Table data object, used for shaping envelopes, velocity curves, and modulation transfer functions.",
+    "domain": "ui",
+    "role": "component",
+    "baseClass": "ComplexDataScriptComponent",
+    "creates": [],
+    "references": ["ScriptLookAndFeel", "Content"],
+    "seeAlso": [
+      {
+        "class": "ScriptSliderPack",
+        "distinction": "Use ScriptTable for smooth curve editing with draggable control points; use ScriptSliderPack for editing discrete step values in an array."
+      },
+      {
+        "class": "ScriptAudioWaveform",
+        "distinction": "Use ScriptTable for parameter curve editing; use ScriptAudioWaveform for displaying and interacting with audio sample data."
+      }
+    ],
+    "callbackDensity": 0.05,
+    "statefulness": 0.5,
+    "threadingExposure": 0.05
+  },
+  "ScriptSliderPack": {
+    "brief": "Multi-slider array component for editing a pack of discrete values, commonly used for step sequencers, arpeggiator patterns, and parameter arrays.",
+    "domain": "ui",
+    "role": "component",
+    "baseClass": "ComplexDataScriptComponent",
+    "creates": [],
+    "references": ["ScriptLookAndFeel", "Content"],
+    "seeAlso": [
+      {
+        "class": "ScriptSlider",
+        "distinction": "Use ScriptSliderPack for editing multiple values at once in an array; use ScriptSlider for a single value control."
+      },
+      {
+        "class": "ScriptTable",
+        "distinction": "Use ScriptSliderPack for discrete stepped values; use ScriptTable for smooth interpolated curves."
+      }
+    ],
+    "callbackDensity": 0.05,
+    "statefulness": 0.5,
+    "threadingExposure": 0.05
+  },
+  "ScriptImage": {
+    "brief": "Static image display component for showing PNG/filmstrip images with offset and alpha control, without custom paint routines.",
+    "domain": "ui",
+    "role": "component",
+    "baseClass": "ScriptComponent",
+    "creates": [],
+    "references": ["Content"],
+    "seeAlso": [
+      {
+        "class": "ScriptPanel",
+        "distinction": "Use ScriptImage for simple image display; use ScriptPanel when you need custom drawing, mouse interaction, or animation."
+      }
+    ],
+    "callbackDensity": 0.05,
+    "statefulness": 0.5,
+    "threadingExposure": 0.0
+  },
+  "ScriptAudioWaveform": {
+    "brief": "Audio waveform display component for visualizing and interacting with audio samples, connected to AudioSampleProcessors or ScriptAudioFile objects.",
+    "domain": "ui",
+    "role": "component",
+    "baseClass": "ComplexDataScriptComponent",
+    "creates": [],
+    "references": ["ScriptLookAndFeel", "Content", "AudioFile"],
+    "seeAlso": [
+      {
+        "class": "ScriptTable",
+        "distinction": "Use ScriptAudioWaveform for audio sample visualization; use ScriptTable for envelope/curve editing."
+      },
+      {
+        "class": "ScriptPanel",
+        "distinction": "Use ScriptAudioWaveform for built-in audio waveform rendering; use ScriptPanel for custom-drawn waveform visualizations with full control."
+      }
+    ],
+    "callbackDensity": 0.05,
+    "statefulness": 0.5,
+    "threadingExposure": 0.05
+  },
+  "ScriptFloatingTile": {
+    "brief": "Wrapper component that embeds pre-built HISE floating tile widgets (keyboard, preset browser, waveform display, etc.) into the script interface.",
+    "domain": "ui",
+    "role": "component",
+    "baseClass": "ScriptComponent",
+    "creates": [],
+    "references": ["Content"],
+    "seeAlso": [
+      {
+        "class": "ScriptPanel",
+        "distinction": "Use ScriptFloatingTile to embed built-in HISE widgets; use ScriptPanel for fully custom-drawn components."
+      },
+      {
+        "class": "ScriptAudioWaveform",
+        "distinction": "Use ScriptFloatingTile for embedding complex built-in tiles like the preset browser; use ScriptAudioWaveform specifically for audio waveform display."
+      }
+    ],
+    "callbackDensity": 0.05,
+    "statefulness": 0.5,
+    "threadingExposure": 0.0
+  },
+  "ScriptWebView": {
+    "brief": "Embedded web browser component for rendering HTML/CSS/JS content within the plugin interface, with bidirectional HiseScript-to-JavaScript communication.",
+    "domain": "ui",
+    "role": "component",
+    "baseClass": "ScriptComponent",
+    "creates": [],
+    "references": ["Content"],
+    "seeAlso": [
+      {
+        "class": "ScriptPanel",
+        "distinction": "Use ScriptWebView for HTML/CSS-based UI rendering; use ScriptPanel for native HISE graphics drawing."
+      },
+      {
+        "class": "ScriptFloatingTile",
+        "distinction": "Use ScriptWebView for custom web content; use ScriptFloatingTile for embedding built-in HISE widgets."
+      }
+    ],
+    "callbackDensity": 0.05,
+    "statefulness": 0.45,
+    "threadingExposure": 0.0
+  },
+  "ScriptedViewport": {
+    "brief": "Scrollable viewport component that doubles as a sortable data table with configurable columns, row data, and selection callbacks.",
+    "domain": "ui",
+    "role": "component",
+    "baseClass": "ScriptComponent",
+    "creates": [],
+    "references": ["ScriptLookAndFeel", "Content"],
+    "seeAlso": [
+      {
+        "class": "ScriptComboBox",
+        "distinction": "Use ScriptedViewport for displaying scrollable lists or multi-column tables; use ScriptComboBox for simple drop-down selection."
+      },
+      {
+        "class": "ScriptPanel",
+        "distinction": "Use ScriptedViewport for built-in scrollable list/table behavior; use ScriptPanel for custom scrollable content with manual drawing."
+      }
+    ],
+    "callbackDensity": 0.1,
+    "statefulness": 0.45,
+    "threadingExposure": 0.0
+  },
+  "ScriptMultipageDialog": {
+    "brief": "Multi-page wizard/dialog component for building guided workflows with pages, navigation, modal overlays, and state management.",
+    "domain": "ui",
+    "role": "component",
+    "baseClass": "ScriptComponent",
+    "creates": [],
+    "references": ["ScriptLookAndFeel", "Content"],
+    "seeAlso": [
+      {
+        "class": "ScriptPanel",
+        "distinction": "Use ScriptMultipageDialog for structured multi-step wizard flows; use ScriptPanel for freeform custom UI layouts."
+      },
+      {
+        "class": "ScriptFloatingTile",
+        "distinction": "Use ScriptMultipageDialog for step-by-step user workflows; use ScriptFloatingTile for embedding single built-in HISE widgets."
+      }
+    ],
+    "callbackDensity": 0.1,
+    "statefulness": 0.35,
+    "threadingExposure": 0.0
+  },
+  "ScriptDynamicContainer": {
+    "brief": "Container component that dynamically creates and manages child components from a data model, supporting template-based layout and value callbacks.",
+    "domain": "ui",
+    "role": "container",
+    "baseClass": "ScriptComponent",
+    "creates": [],
+    "references": ["ScriptLookAndFeel", "Content"],
+    "seeAlso": [
+      {
+        "class": "ScriptPanel",
+        "distinction": "Use ScriptDynamicContainer for data-driven dynamic child creation; use ScriptPanel for static custom-drawn content with manual child management."
+      },
+      {
+        "class": "ScriptedViewport",
+        "distinction": "Use ScriptDynamicContainer for dynamic component lists from data models; use ScriptedViewport for scrollable table/list display."
+      }
+    ],
+    "callbackDensity": 0.07,
+    "statefulness": 0.45,
+    "threadingExposure": 0.0
+  },
+  "ScriptLookAndFeel": {
+    "brief": "Customizable look-and-feel object for overriding the rendering of standard UI components (buttons, sliders, comboboxes, etc.) using registered paint functions, CSS stylesheets, or image strips.",
+    "domain": "ui",
+    "role": "service",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": ["Graphics", "Path", "Colours", "Content"],
+    "seeAlso": [
+      {
+        "class": "ScriptPanel",
+        "distinction": "Use ScriptLookAndFeel to customize how standard components render; use ScriptPanel for fully custom-drawn components with their own paint routines."
+      },
+      {
+        "class": "Graphics",
+        "distinction": "ScriptLookAndFeel defines which paint functions are called for components; Graphics is the drawing context passed into those paint functions."
+      }
+    ],
+    "callbackDensity": 0.15,
+    "statefulness": 0.15,
+    "threadingExposure": 0.0
+  },
+  "Graphics": {
+    "brief": "2D drawing context passed to paint routines for rendering shapes, text, images, paths, gradients, layers, blur effects, and shaders onto panels and look-and-feel functions.",
+    "domain": "ui",
+    "role": "utility",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": ["Path", "ScriptShader", "MarkdownRenderer", "Colours", "ScriptPanel"],
+    "seeAlso": [
+      {
+        "class": "Path",
+        "distinction": "Graphics is the drawing context that renders shapes; Path defines reusable vector shape geometry that Graphics draws or fills."
+      },
+      {
+        "class": "ScriptLookAndFeel",
+        "distinction": "Graphics provides drawing methods; ScriptLookAndFeel determines when and where those drawing methods are called for component rendering."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.15,
+    "threadingExposure": 0.0
+  },
+  "Path": {
+    "brief": "Vector path object for defining reusable 2D shapes (arcs, bezier curves, polygons, stars, etc.) that can be drawn or filled by the Graphics context.",
+    "domain": "ui",
+    "role": "utility",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": ["Graphics", "Rectangle"],
+    "seeAlso": [
+      {
+        "class": "Rectangle",
+        "distinction": "Use Path for complex vector shapes with curves and multiple sub-paths; use Rectangle for simple axis-aligned rectangular geometry."
+      },
+      {
+        "class": "Graphics",
+        "distinction": "Path defines shape geometry; Graphics renders those shapes onto a surface."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.1,
+    "threadingExposure": 0.0
+  },
+  "Rectangle": {
+    "brief": "Mutable rectangle utility for layout calculations with slicing (removeFromTop/Left/Bottom/Right), resizing, containment checks, and union/intersection operations.",
+    "domain": "ui",
+    "role": "utility",
+    "baseClass": "RectangleDynamicObject",
+    "creates": [],
+    "references": ["Path"],
+    "seeAlso": [
+      {
+        "class": "Path",
+        "distinction": "Use Rectangle for axis-aligned rectangular bounds and layout slicing; use Path for arbitrary vector shapes."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.25,
+    "threadingExposure": 0.0
+  },
+  "ScriptShader": {
+    "brief": "OpenGL fragment shader wrapper for GPU-accelerated visual effects, supporting uniform variables, preprocessor definitions, blend modes, and cached output buffers.",
+    "domain": "ui",
+    "role": "utility",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": ["Graphics", "Content"],
+    "seeAlso": [
+      {
+        "class": "Graphics",
+        "distinction": "Use ScriptShader for GPU-accelerated pixel processing; use Graphics for CPU-based 2D drawing operations."
+      },
+      {
+        "class": "ScriptPanel",
+        "distinction": "ScriptShader provides the shader code; ScriptPanel hosts the paint routine that applies the shader via Graphics.applyShader()."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.3,
+    "threadingExposure": 0.0
+  },
+  "MarkdownRenderer": {
+    "brief": "Markdown text renderer that parses markdown syntax into styled text with headings, lists, and inline images, drawn via Graphics.drawMarkdownText().",
+    "domain": "ui",
+    "role": "utility",
+    "baseClass": "ConstScriptingObject",
+    "creates": [],
+    "references": ["Graphics", "Path", "Colours", "Content"],
+    "seeAlso": [
+      {
+        "class": "Graphics",
+        "distinction": "MarkdownRenderer parses and lays out markdown text; Graphics.drawMarkdownText() renders the result onto a surface."
+      },
+      {
+        "class": "ScriptLabel",
+        "distinction": "Use MarkdownRenderer for rich formatted text with headings and images; use ScriptLabel for simple plain-text display or input."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.6,
+    "threadingExposure": 0.0
+  },
+  "Colours": {
+    "brief": "Static utility namespace for colour manipulation -- converting between ARGB/HSL/vec4 formats, mixing colours, and adjusting alpha/brightness/saturation of colour values.",
+    "domain": "ui",
+    "role": "utility",
+    "baseClass": "ApiClass",
+    "creates": [],
+    "references": [],
+    "seeAlso": [
+      {
+        "class": "Graphics",
+        "distinction": "Colours provides colour constants and manipulation functions; Graphics uses those colour values for drawing operations via setColour()."
+      }
+    ],
+    "callbackDensity": 0.0,
+    "statefulness": 0.0,
+    "threadingExposure": 0.0
+  }
+}

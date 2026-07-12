@@ -1,0 +1,16 @@
+{
+  "factoryPath": "control.branch_cable",
+  "nodes": [
+    { "id": "index_param", "label": "Index", "type": "parameter", "importance": 1.0, "description": "Selects which output slot receives the value (0-7, integer)" },
+    { "id": "value_param", "label": "Value", "type": "parameter", "importance": 1.0, "description": "The value to route to the selected output" },
+    { "id": "bounds_check", "label": "Bounds Check", "type": "decision", "importance": 0.7, "description": "Checks index is within valid range (0 to NumParameters-1)" },
+    { "id": "route", "label": "Route to Output", "type": "process", "importance": 1.0, "description": "Sends value to selected output via callWithRuntimeIndex()" },
+    { "id": "mod_out", "label": "Modulation Outputs", "type": "modulation_out", "importance": 1.0, "description": "Multiple output slots (normalised), only one receives value at a time" }
+  ],
+  "edges": [
+    { "from": "index_param", "to": "bounds_check", "type": "control", "label": "integer index" },
+    { "from": "value_param", "to": "route", "type": "control", "label": null },
+    { "from": "bounds_check", "to": "route", "type": "conditional", "label": "if in range" },
+    { "from": "route", "to": "mod_out", "type": "signal", "label": "to slot[index]" }
+  ]
+}

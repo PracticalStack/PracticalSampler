@@ -1,0 +1,1 @@
+Returns a `Table` data object for the specified table index. The `Table` object shares the same underlying data but provides a richer API including curve evaluation with `Table.getTableValueNormalised()`, display callbacks, and point editing methods that do not require a `tableIndex` parameter. Changes made through either interface are reflected in both.

@@ -1,0 +1,1 @@
+Returns `true` if offline audio rendering is in progress. Use this to branch behaviour between real-time playback and export - for example, skipping UI updates or enabling higher-quality processing during offline rendering.

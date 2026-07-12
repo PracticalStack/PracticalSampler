@@ -1,0 +1,87 @@
+{
+  "factoryPath": "container.frame1_block",
+  "factory": "container",
+  "nodeId": "frame1_block",
+  "description": "Per sample processing for 1 audio channels",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "UI-only: controls whether the container is displayed vertically or horizontally in the scriptnode graph. No effect on audio processing."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": true,
+    "groupName": "frameN_block",
+    "templateParameter": "channel count",
+    "variantValue": "1"
+  },
+
+  "existingDoc": {
+    "path": "phase3/container/frame1_block.md",
+    "tier": "GOOD",
+    "lines": 24
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "frame-processing-mechanism",
+      "category": "signal_path",
+      "question": "frame1_block uses wrap::frame<1, T> which is fix<1, frame_x<T>>. How does the interleaving work with only 1 channel? Is the child's processFrame() called with a span<float, 1>, and does the child see blockSize=1 in its PrepareSpecs?",
+      "context": "Users need to understand that children inside frame1_block receive one sample at a time on one channel. This determines which child nodes are compatible."
+    },
+    {
+      "id": "extra-channel-handling",
+      "category": "signal_path",
+      "question": "If the parent network has 2 channels but frame1_block fixes to 1 channel, what happens to the second channel? The infrastructure doc mentions SingleSampleBlock handles channel mismatch with a leftover buffer. How does this leftover mechanism work?",
+      "context": "Critical for stereo networks. Users placing frame1_block in a stereo context need to know whether the second channel is discarded, passed through unprocessed, or buffered."
+    },
+    {
+      "id": "bypass-frame-revert",
+      "category": "signal_path",
+      "question": "When frame1_block is bypassed, does it revert to block processing (passing through to children with original block size)? The containers infrastructure doc mentions SingleSampleBlock overrides setBypassed() to re-prepare.",
+      "context": "Bypass behaviour for frame containers differs from block containers. Need to confirm the mechanism."
+    },
+    {
+      "id": "cpu-overhead-magnitude",
+      "category": "performance",
+      "question": "The existing doc warns of 'significant CPU overhead'. What is the nature of this overhead -- is it purely from per-sample function call overhead, or does the interleave/deinterleave add measurable cost? How does it compare to fix8_block?",
+      "context": "The existing doc recommends fix8_block as a compromise. Quantifying the overhead ratio helps users make informed decisions."
+    }
+  ],
+
+  "notes": "Base variant of the frameN_block group. Uses wrap::frame<1, T> = wrap::fix<1, wrap::frame_x<T>>. This is the mono per-sample processing container. The existing phase3 doc is excellent -- 24 lines explaining the buffer abstraction, when per-sample processing is needed, CPU overhead warning, and the fix8_block compromise recommendation. Key distinction from framex_block: frame1_block fixes channel count to 1 at compile time, while framex_block uses dynamic channel count."
+}

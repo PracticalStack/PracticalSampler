@@ -1,0 +1,61 @@
+{
+  "moduleId": "RouteFX",
+  "prettyName": "Routing Matrix",
+  "type": "Effect",
+  "subtype": "MasterEffect",
+  "category": "routing",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "stereo",
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "RoutingMatrix",
+      "signalFlowRole": "Primary function - the routing matrix IS the module's signal path. Unlike other modules where RoutingMatrix is skipped, here it defines the entire behaviour."
+    }
+  ],
+
+  "parameterGroups": [],
+
+  "compositeBlocks": [],
+
+  "standaloneModChains": [],
+
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "signal-path",
+      "category": "signal_path",
+      "question": "How does the routing matrix process audio? Does it use the standard applyEffect() path or override renderWholeBuffer()? Does it copy, add, or move channels?",
+      "context": "Need to understand the actual signal flow for the pseudo-code - this module has no parameters so the routing matrix IS the signal path."
+    },
+    {
+      "id": "channel-operations",
+      "category": "signal_path",
+      "question": "What channel operations does the routing matrix support? Can it duplicate channels (send), remap channels, or both? Is it additive or replacing?",
+      "context": "Users need to understand whether this duplicates or moves signal between channels."
+    },
+    {
+      "id": "bypass-behaviour",
+      "category": "conditional_logic",
+      "question": "The setSoftBypass override is empty - what happens when this module is bypassed? Does the routing simply stop?",
+      "context": "Bypass behaviour matters for live use where routing may be toggled."
+    },
+    {
+      "id": "multichannel",
+      "category": "parameter_behavior",
+      "question": "How many channels does the routing matrix support? Is it limited to stereo or does it support multichannel configurations?",
+      "context": "Users building multichannel setups need to know the channel count limits."
+    }
+  ],
+
+  "notes": "RouteFX is unique among effects - it has zero parameters and zero modulation chains. The entire module is just a routing matrix wrapper. The RoutingMatrix interface, normally skipped for other modules, is the primary and only function here. The module overrides setSoftBypass with an empty body, suggesting bypass is not supported or has no effect. applyEffect() appears to be empty - the actual routing likely happens in renderWholeBuffer()."
+}

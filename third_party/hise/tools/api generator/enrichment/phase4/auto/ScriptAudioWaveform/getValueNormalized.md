@@ -1,0 +1,1 @@
+Returns the current value in a normalised 0.0 to 1.0 range.

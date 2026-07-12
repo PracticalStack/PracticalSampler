@@ -1,0 +1,226 @@
+{
+  "moduleId": "Convolution",
+  "prettyName": "Convolution Reverb",
+  "type": "Effect",
+  "subtype": "MasterEffect",
+  "category": "reverb",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "stereo",
+    "audioOut": "stereo",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "RoutingMatrix",
+      "signalFlowRole": "skip - inferred from type/subtype"
+    },
+    {
+      "name": "AudioSampleProcessor",
+      "signalFlowRole": "Audio sample resource - loads the impulse response file used by the convolution engine"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Mix Levels",
+      "rationale": "DryGain and WetGain together control the output blend of unprocessed and convolved signals",
+      "parameters": [
+        {
+          "id": "DryGain",
+          "name": "Dry Gain",
+          "range": { "min": -100.0, "max": 0.0, "step": 0.1 },
+          "default": -100.0,
+          "description": "Dry output level in decibels for the unprocessed signal",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "WetGain",
+          "name": "Wet Gain",
+          "range": { "min": -100.0, "max": 0.0, "step": 0.1 },
+          "default": 0.0,
+          "description": "Wet output level in decibels for the convolved signal",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Impulse Response Shaping",
+      "rationale": "Damping and HiCut modify the loaded impulse response before convolution, not the wet output in real time",
+      "parameters": [
+        {
+          "id": "Damping",
+          "name": "Damping",
+          "range": { "min": -100.0, "max": 0.0, "step": 0.1 },
+          "default": 0.0,
+          "description": "Damping amount in decibels applied to the impulse response fade-out",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "HiCut",
+          "name": "HiCut",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0 },
+          "default": 20000.0,
+          "description": "Low-pass cutoff frequency applied to the impulse response",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Timing",
+      "rationale": "Predelay adds a time gap before the convolved signal, applied in real time via delay lines",
+      "parameters": [
+        {
+          "id": "Predelay",
+          "name": "Predelay",
+          "range": { "min": 0.0, "max": 200.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "Delay time in milliseconds before the reverb tail begins",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Engine Configuration",
+      "rationale": "Controls that affect the convolution engine behaviour rather than the sound character",
+      "parameters": [
+        {
+          "id": "ProcessInput",
+          "name": "Process Input",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Enables processing of the input signal; disabling fades out and resets the engine",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "UseBackgroundThread",
+          "name": "Use Background Thread",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Renders the impulse tail on a background thread to reduce audio thread load",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "FFTType",
+          "name": "FFT Type",
+          "range": { "min": 0.0, "max": 4.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Selects the FFT implementation used for convolution",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Latency",
+          "name": "Latency",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "Convolution latency in samples, which must be a power of two",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Deprecated",
+      "rationale": "ImpulseLength is explicitly marked as deprecated in the metadata description",
+      "parameters": [
+        {
+          "id": "ImpulseLength",
+          "name": "Impulse Length",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 1.0,
+          "description": "Deprecated impulse length control, use the sample area of the impulse display instead",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-order",
+      "category": "signal_path",
+      "question": "What is the complete processing order in applyEffect/processBase? How are dry and wet signals combined at the output?",
+      "context": "Need to document the full signal chain from input to output, including any fixed gain compensation."
+    },
+    {
+      "id": "ir-loading-pipeline",
+      "category": "signal_path",
+      "question": "How is the impulse response prepared before convolution? What processing stages (resampling, damping, HiCut) are applied and in what order?",
+      "context": "Damping and HiCut likely modify the IR offline rather than filtering the wet signal in real time. This distinction matters for the reference page."
+    },
+    {
+      "id": "ir-crossfade",
+      "category": "signal_path",
+      "question": "How does the module handle impulse response changes at runtime? Is there a crossfade between old and new convolver engines?",
+      "context": "Changing IRs during playback is a common use case. Need to document the transition behaviour."
+    },
+    {
+      "id": "dry-wet-mixing",
+      "category": "parameter_behavior",
+      "question": "How are DryGain and WetGain applied? Is there any fixed gain compensation? Why does DryGain default to -100 dB (silent)?",
+      "context": "The unusual defaults (dry silent, wet unity) suggest this is designed as a 100% wet effect by default."
+    },
+    {
+      "id": "latency-parameter-usage",
+      "category": "parameter_behavior",
+      "question": "How does the Latency parameter affect the convolution engine? Does it control the head block size? The range 0-1 seems inconsistent with 'samples, power of two'.",
+      "context": "Need to clarify what Latency actually controls and whether it functions as documented."
+    },
+    {
+      "id": "impulselength-vestigial",
+      "category": "description_accuracy",
+      "question": "Is the ImpulseLength parameter truly non-functional? Does getAttribute return a hardcoded value?",
+      "context": "The description says 'deprecated'. Need to verify it has no effect on processing."
+    },
+    {
+      "id": "processinput-toggle",
+      "category": "conditional_logic",
+      "question": "What happens when ProcessInput is toggled? Is there a crossfade/ramp? What is the ramp time?",
+      "context": "Need to document whether toggling causes clicks or smooth transitions."
+    },
+    {
+      "id": "background-thread-behaviour",
+      "category": "conditional_logic",
+      "question": "How does UseBackgroundThread change the convolution processing? What are the tradeoffs?",
+      "context": "Users need to know when to enable background processing."
+    },
+    {
+      "id": "ffttype-options",
+      "category": "parameter_behavior",
+      "question": "What are the available FFTType options (0-4)? What does 'BestAvailable' resolve to on each platform?",
+      "context": "Users need to understand the FFT implementation choices and platform availability."
+    },
+    {
+      "id": "interface-audiosampleprocessor",
+      "category": "interface_usage",
+      "question": "How does the AudioSampleProcessor interface provide the impulse response to the convolution engine? What triggers a reload?",
+      "context": "The IR loading mechanism is central to this module's usage."
+    },
+    {
+      "id": "convolution-performance",
+      "category": "performance",
+      "question": "What is the CPU cost profile? How does the two-stage (head/tail) convolution architecture work? What determines head and tail block sizes?",
+      "context": "Convolution is inherently CPU-heavy. Need to document the performance characteristics and scaling factors."
+    }
+  ],
+
+  "notes": "Convolution has no modulation chains (getNumChildProcessors returns 0). The default DryGain of -100 dB and WetGain of 0 dB means the module outputs 100% wet by default - unusual for a reverb. The AudioSampleProcessor interface loads the impulse response file. The base class ConvolutionEffectBase in hi_dsp_library contains the actual DSP, shared with the scriptnode fx.convolution node. Damping and HiCut appear to modify the IR offline (during reload) rather than filtering the wet output in real time. The TwoStageFFTConvolver uses a head/tail partitioned convolution architecture."
+}

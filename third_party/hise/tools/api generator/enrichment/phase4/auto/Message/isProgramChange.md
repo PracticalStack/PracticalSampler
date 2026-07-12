@@ -1,0 +1,1 @@
+Returns whether the current event is a MIDI program change message. Program change events route through `onController`, so use this method to detect them before calling `Message.getProgramChangeNumber()`.

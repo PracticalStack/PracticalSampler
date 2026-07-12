@@ -1,0 +1,104 @@
+{
+  "targetId": "PitchWheel",
+  "domain": "modules",
+  "generatedAt": "2026-04-08",
+  "topicIds": [11256, 445, 1665, 2304, 1922, 12365, 13837, 8406, 6288, 13991, 1578, 4150, 12608],
+  "insights": [
+    {
+      "type": "API",
+      "title": "Pitch bend is exposed as CC128 in the onController callback",
+      "summary": "Hardware pitch wheel messages arrive in the scripting onController callback with a controller number of 128. The named constant Message.PITCH_BEND_CC (value 128) can be used for clarity instead of the magic number.",
+      "sources": ["tid:11256", "tid:12365", "tid:445"],
+      "verify": true,
+      "verify_hint": "grep CC128 or PITCH_BEND_CC in hi_scripting/scripting/ScriptingApi.cpp; check Message.getControllerNumber() for pitch bend"
+    },
+    {
+      "type": "API",
+      "title": "Pitch bend value is 14-bit (0-16383), not 7-bit",
+      "summary": "Unlike standard CCs (0-127), pitch bend messages carry 14-bit values in the range 0-16383, with 8192 as the center/rest position. When scaling to a 0-1 range for UI display, divide by 127.0 twice (i.e., divide by 16129) or directly by 16383.",
+      "sources": ["tid:11256", "tid:445"],
+      "verify": true,
+      "verify_hint": "grep pitch bend range in ScriptingApi.cpp; check sendController and addController for 14-bit handling"
+    },
+    {
+      "type": "BUG",
+      "title": "PitchWheel modulator display bar shows ~40-50% at init instead of zero",
+      "summary": "Immediately after inserting a PitchWheel Modulator, the modulation bar in the editor is not at zero but at approximately 40-50%. This was reported and confirmed by multiple trusted users and was still present as of late 2020.",
+      "sources": ["tid:2304"],
+      "verify": true,
+      "verify_hint": "grep PitchWheelModulator or PitchWheelModulatorEditor in hi_scripting; check initial modulation value at construction"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "UI pitch wheel panel defaults to 0 (bottom) on compile, not center (8192)",
+      "summary": "A ScriptPanel used as a pitch wheel visual display will reset to value 0 on compile/interface rebuild, appearing fully down. The fix is to explicitly call pnlPitch.setValue(8192) after the panel is created in onInit.",
+      "sources": ["tid:445"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "PitchWheel Modulator only responds to hardware pitch wheel, not CC",
+      "summary": "The PitchWheel Modulator listens exclusively to MIDI pitch bend messages. It cannot be driven by a CC or script. To change pitch programmatically, use a CC Modulator or Constant Modulator instead.",
+      "sources": ["tid:8406"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Intensity parameter accepts -1 to +1 range (maps to ±12 semitones at full range)",
+      "summary": "When controlling the PitchWheel Modulator's intensity via setAttribute() or a slider, the value range is -1.0 to +1.0, where ±1 corresponds to ±12 semitones of pitch range. A UI knob labeled ±12 must divide by 12 before passing to setAttribute.",
+      "sources": ["tid:1922", "tid:1665"],
+      "verify": true,
+      "verify_hint": "grep PitchWheelModulator.*intensity or setAttribute in hi_scripting/scripting/modules; check normalised range"
+    },
+    {
+      "type": "BUG",
+      "title": "Pitch modulation amount appears doubled when using PitchWheel Modulator vs. Constant Modulator",
+      "summary": "David Healey observed that with a PitchWheel Modulator, the actual pitch change was double that of an equivalent Constant Modulator or CC Modulator set to the same value. This may be version-dependent and could interact with how the sampler's pitch chain accumulates modulation.",
+      "sources": ["tid:1665"],
+      "verify": true,
+      "verify_hint": "compare pitch semitone output in PitchWheelModulator vs ConstantModulator; check pitch chain accumulation in hi_sampler or SynthesiserVoice"
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Use table to invert pitch wheel direction instead of Inverted parameter",
+      "summary": "To invert the pitch wheel modulation direction, enabling the UseTable parameter and flipping the table endpoints (swap high and low points) achieves the same result as the Inverted toggle and provides finer control over the pitch curve.",
+      "sources": ["tid:1665"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Using MIDI learn for pitch/mod wheel UI sliders pollutes user presets",
+      "summary": "Connecting UI pitch wheel sliders via MIDI learn causes the slider positions to be saved in user presets, which is usually undesirable. Christoph Hart recommends handling CC128 in the onController callback manually instead.",
+      "sources": ["tid:13837"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Calling setControllerValue() fails if callbacks are deferred",
+      "summary": "If Synth.deferCallbacks(true) is active, calling Message.setControllerValue() inside onController triggers an error ('Call of setControllerValue() outside of onController'). The callback runs on the UI timer thread rather than the MIDI thread, making the call technically invalid.",
+      "sources": ["tid:1922"],
+      "verify": true,
+      "verify_hint": "grep setControllerValue in ScriptingApi.cpp; check callback thread enforcement"
+    },
+    {
+      "type": "API",
+      "title": "PitchWheel Modulator can be added to any generator's Pitch chain, not just samplers",
+      "summary": "The PitchWheel Modulator is a general TimeVariantModulator and can be placed in the Pitch chain of any synthesiser or generator that exposes a Pitch modulator chain, including the Sine Wave Generator.",
+      "sources": ["tid:13991"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "sendController() and addController() require non-negative values for pitch bend",
+      "summary": "Prior to a PR by David Healey, Synth.sendController() and Synth.addController() did not accept negative values for CC128 (pitch bend), even though pitch bend below center requires values below 8192. The fix enforces the range 0-16383.",
+      "sources": ["tid:11256"],
+      "verify": true,
+      "verify_hint": "grep sendController.*128 or addController in ScriptingApi.cpp; check pitch bend value clamping"
+    }
+  ]
+}

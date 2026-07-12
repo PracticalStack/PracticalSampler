@@ -1,0 +1,126 @@
+{
+  "factoryPath": "container.oversample",
+  "factory": "container",
+  "nodeId": "oversample",
+  "description": "Processes the child nodes with a higher samplerate",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Oversampling Configuration",
+      "rationale": "Both parameters configure the oversampling engine: the factor selects how much to oversample, and the filter type selects the anti-aliasing filter used during up/downsampling.",
+      "parameters": [
+        {
+          "id": "Oversampling",
+          "range": { "min": 0, "max": 4, "step": 1, "skew": 1.0 },
+          "default": 1,
+          "textConverter": "64.nT6K8CxM4F..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.STfSu4VYJHCdJPCdJfCdJDiM3APXiQWZ1UF.ADf...",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "FilterType",
+          "range": { "min": 0, "max": 1, "step": 1, "skew": 1.0 },
+          "default": 0,
+          "textConverter": "60.nT6K8CxLYF..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.OT.TuwVdvgVXyUlBFkjT.D1XzklckAP.AH..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "UI-only: controls whether the container is displayed vertically or horizontally in the scriptnode graph editor. No effect on signal processing."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": "oversampleNx",
+    "templateParameter": "oversampling factor",
+    "variantValue": "dynamic (-1)"
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/container/oversample.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "child-dispatch-serial",
+      "category": "signal_path",
+      "question": "The oversample container wraps DynamicSerialProcessor. Does it process children serially (like chain) within the oversampled context? Confirm the wrapper composition: wrap::oversample<-1, DynamicSerialProcessor>.",
+      "context": "Needed to describe the signal flow: input -> upsample -> serial child chain at higher rate -> downsample -> output."
+    },
+    {
+      "id": "oversampling-parameter-encoding",
+      "category": "parameter_behaviour",
+      "question": "The Oversampling parameter has range 0-4 with step 1. From infrastructure we know this is an exponent (0=1x, 1=2x, 2=4x, 3=8x, 4=16x). The TextToValueConverter is present. Confirm the exact mapping and whether value 0 (1x) means no oversampling (passthrough) or still processes through the JUCE oversampler with factor 1.",
+      "context": "Users need to know if setting Oversampling=0 (1x) adds any latency or CPU overhead vs not using the container at all."
+    },
+    {
+      "id": "filter-type-names",
+      "category": "parameter_behaviour",
+      "question": "FilterType has range 0-1. From infrastructure: 0=PolyphaseIIR (lower latency), 1=FIR Equiripple (steeper rolloff). Confirm the exact display names from the TextToValueConverter and verify there are exactly 2 options.",
+      "context": "Reference page needs accurate filter type names and practical guidance on when to choose each."
+    },
+    {
+      "id": "latency-reporting",
+      "category": "performance",
+      "question": "Does the oversample container report latency to the host? JUCE dsp::Oversampling has getLatencyInSamples(). Is this propagated to the DspNetwork's latency reporting?",
+      "context": "Users need to know if oversampling introduces latency and whether it is automatically compensated."
+    },
+    {
+      "id": "bypass-reprepare",
+      "category": "signal_path",
+      "question": "From containers.md: OversampleNode overrides setBypassed() to re-prepare with original specs when bypass changes. Confirm: when bypassed, do children revert to the original sampleRate and blockSize?",
+      "context": "Important for documentation: bypassing the oversample container changes the processing context for all children."
+    },
+    {
+      "id": "dynamic-factor-change-behavior",
+      "category": "parameter_behaviour",
+      "question": "When the Oversampling parameter changes at runtime, the wrapper uses SimpleReadWriteLock and calls prepare() again. Does this cause an audible gap (silence during re-preparation) or is it seamless? Is the JUCE oversampler rebuilt or just reconfigured?",
+      "context": "Users need to know if changing the oversampling factor at runtime is safe during playback or should only be done during initialization."
+    },
+    {
+      "id": "max-channel-count",
+      "category": "signal_path",
+      "question": "The oversample wrapper in process() uses NUM_MAX_CHANNELS (16). Is there a practical channel limit for the oversample container?",
+      "context": "Documentation should note any channel count restrictions."
+    }
+  ],
+
+  "notes": "This is the BASE VARIANT of the oversample group. It is the dynamic version (OversampleFactor template parameter = -1 / registered as 0 in the factory), exposing both Oversampling and FilterType parameters. The fixed variants (oversample2x-16x) have the factor baked at compile time and only expose FilterType. The isPolyphonic=false classification comes from wrap::oversample which explicitly throws Error::IllegalPolyphony -- this is a hard constraint, not just a default. processFrame() asserts false, so this container only supports block-based processing."
+}

@@ -1,0 +1,1 @@
+Returns the peak absolute magnitude for a selected range. For tail detection, scan in fixed windows and track the last window above your silence threshold rather than checking only one full-buffer call.

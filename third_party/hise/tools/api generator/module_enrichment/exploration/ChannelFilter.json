@@ -1,0 +1,108 @@
+{
+  "moduleId": "ChannelFilter",
+  "nodes": [
+    {
+      "id": "midi_in",
+      "type": "input",
+      "label": "MIDI Event In",
+      "importance": 1.0,
+      "description": "Incoming MIDI event (noteOn, noteOff, CC, pitchbend, aftertouch)"
+    },
+    {
+      "id": "mpe_mode_check",
+      "type": "decision",
+      "label": "MPE Enabled?",
+      "importance": 0.9,
+      "group": "filter_logic",
+      "description": "Branches on the global MPE enabled state (mpeEnabled boolean, set by MPEData::Listener callback)"
+    },
+    {
+      "id": "single_channel_match",
+      "type": "process",
+      "label": "Channel == channelNumber?",
+      "importance": 0.9,
+      "group": "single_channel",
+      "description": "Compares event channel to the selected channel number. Mismatches are ignored."
+    },
+    {
+      "id": "mpe_range_match",
+      "type": "process",
+      "label": "Channel in mpeRange?",
+      "importance": 0.9,
+      "group": "mpe_range",
+      "description": "Checks the mpeRange bitmask for the event channel. Channels outside the range are ignored. Channel 1 is always allowed (after parameter change)."
+    },
+    {
+      "id": "ignore_event",
+      "type": "output",
+      "label": "Ignore Event",
+      "importance": 0.8,
+      "description": "Event is marked with ignoreEvent(true) and will not be processed downstream"
+    },
+    {
+      "id": "pass_event",
+      "type": "output",
+      "label": "Pass Event",
+      "importance": 1.0,
+      "description": "Event passes through unchanged (no remapping or transformation)"
+    },
+    {
+      "id": "channel_number_param",
+      "type": "parameter",
+      "label": "Channel Number",
+      "importance": 0.8,
+      "group": "single_channel",
+      "description": "MIDI channel to pass (1-16), active when MPE is disabled"
+    },
+    {
+      "id": "mpe_start_param",
+      "type": "parameter",
+      "label": "MPE Start Channel",
+      "importance": 0.7,
+      "group": "mpe_range",
+      "description": "Start of the MPE channel range (2-16), active when MPE is enabled"
+    },
+    {
+      "id": "mpe_end_param",
+      "type": "parameter",
+      "label": "MPE End Channel",
+      "importance": 0.7,
+      "group": "mpe_range",
+      "description": "End of the MPE channel range (2-16), active when MPE is enabled"
+    },
+    {
+      "id": "mpe_state",
+      "type": "external",
+      "label": "Global MPE State",
+      "importance": 0.8,
+      "description": "System-wide MPE enabled flag from MidiControllerAutomationHandler::MPEData"
+    }
+  ],
+  "edges": [
+    { "from": "midi_in", "to": "mpe_mode_check", "type": "signal" },
+    { "from": "mpe_state", "to": "mpe_mode_check", "type": "control", "label": "mpeEnabled" },
+    { "from": "mpe_mode_check", "to": "single_channel_match", "type": "conditional", "label": "MPE off" },
+    { "from": "mpe_mode_check", "to": "mpe_range_match", "type": "conditional", "label": "MPE on" },
+    { "from": "channel_number_param", "to": "single_channel_match", "type": "control" },
+    { "from": "mpe_start_param", "to": "mpe_range_match", "type": "control" },
+    { "from": "mpe_end_param", "to": "mpe_range_match", "type": "control" },
+    { "from": "single_channel_match", "to": "pass_event", "type": "conditional", "label": "match" },
+    { "from": "single_channel_match", "to": "ignore_event", "type": "conditional", "label": "no match" },
+    { "from": "mpe_range_match", "to": "pass_event", "type": "conditional", "label": "in range" },
+    { "from": "mpe_range_match", "to": "ignore_event", "type": "conditional", "label": "out of range" }
+  ],
+  "groups": [
+    {
+      "id": "filter_logic",
+      "label": "Mode Selection"
+    },
+    {
+      "id": "single_channel",
+      "label": "Single Channel Mode"
+    },
+    {
+      "id": "mpe_range",
+      "label": "MPE Range Mode"
+    }
+  ]
+}

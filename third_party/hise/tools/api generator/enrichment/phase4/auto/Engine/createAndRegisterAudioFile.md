@@ -1,0 +1,1 @@
+Creates a ScriptAudioFile and registers it at the given slot index in the ExternalData system. Other modules (scriptnode nodes, other script processors) can access this audio file through the same slot index. The returned object provides methods for loading audio files, accessing buffer data, and controlling playback ranges.

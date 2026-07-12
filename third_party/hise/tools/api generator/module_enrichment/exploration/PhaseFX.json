@@ -1,0 +1,38 @@
+{
+  "moduleId": "PhaseFX",
+  "nodes": [
+    { "id": "audio_in", "type": "input", "label": "Audio In (L/R)", "importance": 1.0 },
+    { "id": "phase_mod", "type": "modulation", "label": "Phase Modulation", "importance": 0.9, "description": "Sweep position between Frequency1 and Frequency2 (0-1)" },
+    { "id": "freq1_param", "type": "parameter", "label": "Frequency1", "importance": 0.8, "group": "sweep" },
+    { "id": "freq2_param", "type": "parameter", "label": "Frequency2", "importance": 0.8, "group": "sweep" },
+    { "id": "delay_calc", "type": "process", "label": "Delay Coefficient", "importance": 0.5, "description": "Interpolates between Freq1 and Freq2 normalised delays" },
+    { "id": "allpass_cascade", "type": "process", "label": "6x Allpass Cascade", "importance": 1.0, "description": "6 first-order allpass filters in series, all sharing the same delay coefficient", "group": "allpass" },
+    { "id": "feedback_param", "type": "parameter", "label": "Feedback", "importance": 0.8, "group": "allpass" },
+    { "id": "feedback_path", "type": "process", "label": "Feedback", "importance": 0.7, "description": "Previous output fed back to cascade input, scaled by 0.99 * Feedback", "group": "allpass" },
+    { "id": "sum", "type": "process", "label": "Sum", "importance": 0.7, "description": "input + allpass output (creates notch/peak pattern)" },
+    { "id": "mix_param", "type": "parameter", "label": "Mix", "importance": 0.7, "group": "mix" },
+    { "id": "mix", "type": "process", "label": "Dry/Wet Mix", "importance": 0.8, "description": "Linear crossfade: input * (1-Mix) + Mix * phaserOutput", "group": "mix" },
+    { "id": "audio_out", "type": "output", "label": "Audio Out (L/R)", "importance": 1.0 }
+  ],
+  "edges": [
+    { "from": "audio_in", "to": "allpass_cascade", "type": "signal" },
+    { "from": "phase_mod", "to": "delay_calc", "type": "control" },
+    { "from": "freq1_param", "to": "delay_calc", "type": "control" },
+    { "from": "freq2_param", "to": "delay_calc", "type": "control" },
+    { "from": "delay_calc", "to": "allpass_cascade", "type": "control" },
+    { "from": "feedback_param", "to": "feedback_path", "type": "control" },
+    { "from": "allpass_cascade", "to": "feedback_path", "type": "signal" },
+    { "from": "feedback_path", "to": "allpass_cascade", "type": "feedback" },
+    { "from": "allpass_cascade", "to": "sum", "type": "signal" },
+    { "from": "audio_in", "to": "sum", "type": "signal" },
+    { "from": "sum", "to": "mix", "type": "signal" },
+    { "from": "audio_in", "to": "mix", "type": "signal" },
+    { "from": "mix_param", "to": "mix", "type": "control" },
+    { "from": "mix", "to": "audio_out", "type": "signal" }
+  ],
+  "groups": [
+    { "id": "sweep", "label": "Sweep Range" },
+    { "id": "allpass", "label": "Allpass Filter Chain" },
+    { "id": "mix", "label": "Output Mix" }
+  ]
+}

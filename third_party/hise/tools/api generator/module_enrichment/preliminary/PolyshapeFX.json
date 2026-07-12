@@ -1,0 +1,159 @@
+{
+  "moduleId": "PolyshapeFX",
+  "prettyName": "Polyshape FX",
+  "type": "Effect",
+  "subtype": "VoiceEffect",
+  "category": "dynamics",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": "voice",
+    "audioOut": "voice",
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "per-voice",
+
+  "interfaces": [
+    {
+      "name": "TableProcessor",
+      "signalFlowRole": "Lookup table step in signal path - used by table-based shaping modes (e.g. Curve)"
+    },
+    {
+      "name": "DisplayBufferSource",
+      "signalFlowRole": "skip - UI communication point, not in signal path"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Input Stage",
+      "rationale": "Controls applied to the signal before the shaping function: drive gain and DC bias",
+      "parameters": [
+        {
+          "id": "Drive",
+          "name": "Drive",
+          "range": { "min": 0.0, "max": 60.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "The distortion drive amount in decibels",
+          "composite": {
+            "type": "modMultiply",
+            "chainName": "Drive Modulation",
+            "chainIndex": 0,
+            "constrainer": "*"
+          },
+          "modChain": {
+            "name": "Drive Modulation",
+            "chainIndex": 0,
+            "constrainer": "*",
+            "modulationMode": "gain",
+            "description": "Audio-rate modulation of the drive amount"
+          }
+        },
+        {
+          "id": "Bias",
+          "name": "Bias",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "Adds a DC offset before the shaping function for asymmetric distortion",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Shaping",
+      "rationale": "Core shaping parameters: mode selection and oversampling quality toggle",
+      "parameters": [
+        {
+          "id": "Mode",
+          "name": "Mode",
+          "range": { "min": 0.0, "max": 33.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Selects the waveshaping function (populated dynamically from available shapers)",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Oversampling",
+          "name": "Oversampling",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Enables 4x oversampling to reduce aliasing from the shaping function",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [
+    {
+      "type": "modMultiply",
+      "param": "Drive",
+      "details": {
+        "chainName": "Drive Modulation",
+        "chainIndex": 0,
+        "constrainer": "*"
+      }
+    }
+  ],
+
+  "standaloneModChains": [],
+
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "signal-path-order",
+      "category": "signal_path",
+      "question": "What is the processing order in applyEffect() / renderVoice()? Specifically: where do drive gain, bias, shaping function, and oversampling sit relative to each other? Is there DC removal after the shaper?",
+      "context": "Need to author accurate pseudo-code showing the full per-voice signal chain from input to output."
+    },
+    {
+      "id": "shared-code-with-shapefx",
+      "category": "signal_path",
+      "question": "Does PolyshapeFX share the same shaping engine as ShapeFX (e.g. a common ShapeFXBase class or shared shaper functions)? Or is it a separate implementation?",
+      "context": "Understanding code sharing determines whether ShapeFX exploration findings can be reused and whether the signal path topology is similar."
+    },
+    {
+      "id": "drive-application",
+      "category": "parameter_behavior",
+      "question": "How is Drive (0-60 dB) applied? Is it converted to a linear gain multiplier applied before the shaper? Does the modulation chain multiply the Drive value before conversion, or modulate the linear gain?",
+      "context": "Drive is the only modulatable parameter - users need to understand how modulation interacts with the dB-scaled drive."
+    },
+    {
+      "id": "bias-application",
+      "category": "parameter_behavior",
+      "question": "How is Bias (0-1) applied? Is the DC offset added to the signal before the shaper? Is it removed after shaping?",
+      "context": "Users need to know whether bias-induced DC offset persists in the output or is removed post-shaping."
+    },
+    {
+      "id": "mode-values",
+      "category": "conditional_logic",
+      "question": "What shaping functions are available for each Mode value (0-33)? Which modes use the TableProcessor lookup table? Are these the same modes as ShapeFX?",
+      "context": "Users need to know what each mode does. The table-based modes are the TableProcessor interface usage."
+    },
+    {
+      "id": "table-lookup-position",
+      "category": "interface_usage",
+      "question": "Where does the TableProcessor lookup occur in the signal path? Is it the shaping function itself for table-based modes (e.g. Curve)?",
+      "context": "Required since TableProcessor is listed as an interface - need to understand its role in the shaping pipeline."
+    },
+    {
+      "id": "oversampling-implementation",
+      "category": "performance",
+      "question": "Is oversampling a simple on/off 4x toggle (as the parameter suggests)? Does it introduce latency? What is the CPU cost impact per voice?",
+      "context": "As a per-voice effect, oversampling cost scales with polyphony - users need to understand the performance/quality trade-off."
+    },
+    {
+      "id": "dry-wet-mix",
+      "category": "signal_path",
+      "question": "Is there a dry/wet mix in PolyshapeFX? ShapeFX has a Mix parameter but PolyshapeFX does not - is the output always 100% wet?",
+      "context": "Absence of Mix parameter suggests always-wet output, but need to confirm there is no hardcoded mix behavior."
+    }
+  ],
+
+  "notes": "PolyshapeFX is the per-voice (polyphonic) counterpart to ShapeFX (monophonic MasterEffect). It has a much simpler parameter set - only 4 parameters vs ShapeFX's 12. Notable differences from ShapeFX: no pre-shaper filters (HighPass/LowPass/BypassFilters), no separate Gain parameter (only Drive), single Bias instead of per-channel BiasLeft/BiasRight, binary oversampling toggle instead of variable factor, no Mix/Autogain/Reduce/LimitInput. The Drive parameter has a modulation chain (constrainer '*' = any modulator type) making it dynamically controllable per-voice. The Drive modulation mode is 'gain' which is the standard multiply pattern. The Oversampling parameter is typed as Button with items ['Off', 'On'], confirming it is a simple toggle. The Mode parameter range (0-33) matches ShapeFX exactly, suggesting shared shaping functions."
+}

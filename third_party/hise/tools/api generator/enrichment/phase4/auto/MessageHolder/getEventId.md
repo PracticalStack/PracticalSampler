@@ -1,0 +1,1 @@
+Returns the event ID stored on this event. When captured via `Message.store()`, this reflects the ID assigned during MIDI processing. For holders created with `Engine.createMessageHolder()`, the ID is 0. When re-injected via `Synth.addMessageFromHolder()`, the system assigns a fresh event ID to NoteOn events - the ID stored on the holder itself does not update.

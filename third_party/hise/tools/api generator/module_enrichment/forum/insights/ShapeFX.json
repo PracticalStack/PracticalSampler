@@ -1,0 +1,88 @@
+{
+  "targetId": "ShapeFX",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [1763, 5978, 5099, 12599, 9590, 9685, 4921, 6309],
+  "insights": [
+    {
+      "type": "API",
+      "title": "Curve mode is attribute value 32, not a sequential index",
+      "summary": "The Mode parameter (attribute index 4) uses value 32 for Curve mode and 33 for AsymmetricalCurve. The values are not sequential from 1-N; there is a large gap between the mathematical modes (1-12) and the table modes (32-33). Scripts must use the numeric value directly.",
+      "sources": ["tid:1763"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use getTablePointsAsArray() and exportAsBase64() to save and restore user-drawn curves",
+      "summary": "When using Curve (mode 32) or AsymmetricalCurve (mode 33), the user-drawn transfer function can be serialised with exportAsBase64() and restored later, or inspected as a point array via getTablePointsAsArray(). This enables preset saving of custom waveshaper curves.",
+      "sources": ["tid:5099"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Saturate mode equation is publicly documented in UtilityClasses",
+      "summary": "The Saturate shaper (mode 6) uses the formula: output = ((1 + k) * input) / (1 + k * abs(input)), where k = (2 * amount) / (1 - amount). This comes from the Saturator class in hi_core/hi_core/UtilityClasses. The amount is derived from the Gain parameter.",
+      "sources": ["tid:5978"],
+      "verify": true,
+      "verify_hint": "grep class Saturator in hi_core/hi_core/UtilityClasses.h or UtilityClasses.cpp"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Drive parameter has no audio effect in ShapeFX (vestigial)",
+      "summary": "The Drive parameter is stored and serialised by ShapeFX but is never read during audio processing. Only the Gain parameter controls the input level. Drive is functional in the polyphonic variant PolyshapeFX but not in the MasterEffect version ShapeFX.",
+      "sources": ["tid:5978"],
+      "verify": true,
+      "verify_hint": "grep 'case Drive' in ShapeFX.cpp setInternalAttribute; confirm drive variable is not used in applyEffect()"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "BypassFilters also disables DC offset removal after the shaper",
+      "summary": "Enabling BypassFilters bypasses not only the pre-shaper HP/LP filters but also the post-shaper 30 Hz DC removal filter. If BypassFilters is on and a DC bias is added via the Bias parameter, the DC offset will be present in the output signal.",
+      "sources": [],
+      "verify": true,
+      "verify_hint": "check applyEffect() in ShapeFX.cpp - DC remover gated by !bypassFilters alongside the pre-shaper filters"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Implementing a custom LUT waveshaper in Scriptnode requires C++ or SNEX",
+      "summary": "There is no built-in scriptnode equivalent for ShapeFX's Curve mode. To implement a table-driven waveshaper in scriptnode, use the snex.shaper node with a span<float, N> lookup array and linear interpolation in SNEX, or write a full C++ node.",
+      "sources": ["tid:12599", "tid:6309"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Autogain compensation is static, calculated at configuration time",
+      "summary": "The autogain value is computed once whenever Mode or Gain changes by probing 128 input values through the shaper. It is not a dynamic loudness measurement. Switching modes mid-playback will trigger a recalculation with 40ms smoothing to avoid clicks.",
+      "sources": [],
+      "verify": true,
+      "verify_hint": "see updateGain() in ShapeFX.cpp - 128-point probe, autogainer.processBlock with 40ms smoothing"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Oversampling introduces latency that must be compensated externally",
+      "summary": "When oversampling is enabled (2x or 4x), the half-band polyphase IIR filters introduce latency. HISE compensates the dry signal path internally via delay lines, but the overall plugin latency reported to the host increases. There is no linear-phase oversampling option in ShapeFX.",
+      "sources": [],
+      "verify": true,
+      "verify_hint": "see updateOversampling() in ShapeFX.cpp - getLatencyInSamples(), lDelay/rDelay configuration; filterHalfBandPolyphaseIIR type"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use snex.shaper node as a scriptnode alternative to ShapeFX with custom parameters",
+      "summary": "The snex.shaper scriptnode node provides a getSample() callback for per-sample waveshaping, a shape display, and support for multiple custom parameters via setParameter<P>. It is the recommended approach when custom waveshaping logic is needed in a scriptnode graph.",
+      "sources": ["tid:4921"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Waveform display shows transfer function, not audio waveform",
+      "summary": "The waveform display in the ShapeFX editor visualises the current transfer function curve (the shaping function's input-to-output mapping). It is not a scope or audio waveform viewer. The display recalculates when Mode, Gain, or table data changes.",
+      "sources": [],
+      "verify": true,
+      "verify_hint": "grep WaveformComponent::Broadcaster in ShapeFX.cpp or ShapeFXEditor"
+    }
+  ]
+}

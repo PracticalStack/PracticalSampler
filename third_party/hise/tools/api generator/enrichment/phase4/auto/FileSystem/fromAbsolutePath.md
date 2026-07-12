@@ -1,0 +1,3 @@
+Creates a `File` object from an absolute filesystem path string. The path must be absolute (e.g. `C:/Users/MyFile.txt` on Windows or `/Users/name/file.txt` on macOS). The method does not verify that the file exists on disk - it only validates the path format. Use `File.isFile()` or `File.isDirectory()` on the returned object to check existence. This is particularly useful for converting path strings from `ScriptPanel.setFileDropCallback()` into `File` objects, or for reconstructing files from stored path strings.
+
+> [!Warning:Relative paths return undefined] Returns `undefined` silently when given a relative path or non-path string. Check with `isDefined()` if the path source is untrusted.

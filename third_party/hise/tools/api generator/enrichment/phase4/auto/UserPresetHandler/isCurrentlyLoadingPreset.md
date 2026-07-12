@@ -1,0 +1,1 @@
+Returns true if called from the same thread that is currently performing a preset load. This thread-aware check avoids false positives when queried from a different thread while a load is in progress elsewhere. Use it inside automation callbacks or module state restoration to distinguish preset-driven changes from user-driven changes.

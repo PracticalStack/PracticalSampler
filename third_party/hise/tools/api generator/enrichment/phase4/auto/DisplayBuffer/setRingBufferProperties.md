@@ -1,0 +1,3 @@
+Configures the ring buffer by passing a JSON object of property key-value pairs. The available properties depend on the buffer source type - each DSP node registers its own set of configurable properties. When configuring multiple buffers of the same type, define the properties object once and pass it to each buffer for consistency.
+
+> [!Warning:Property names are silently ignored if misspelled] There is no error message for unrecognised keys. Use the exact capitalisation: `"BufferLength"`, `"WindowType"`, `"DecibelRange"`, `"UsePeakDecay"`, `"UseDecibelScale"`, `"YGamma"`, `"Decay"`, `"UseLogarithmicFreqAxis"`.

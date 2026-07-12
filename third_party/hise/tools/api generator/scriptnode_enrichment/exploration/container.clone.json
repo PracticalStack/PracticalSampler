@@ -1,0 +1,18 @@
+{
+  "factoryPath": "container.clone",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal" },
+    { "id": "numclones", "label": "NumClones", "type": "parameter", "importance": 1.0, "description": "Number of active clones (1 to total)" },
+    { "id": "splitsignal", "label": "SplitSignal", "type": "parameter", "importance": 1.0, "description": "Processing mode: Serial/Parallel/Copy" },
+    { "id": "mode", "label": "Mode select", "type": "decision", "importance": 0.9, "description": "Routes audio differently based on SplitSignal value" },
+    { "id": "clones", "label": "Clone processing", "type": "process", "importance": 1.0, "description": "N identical child chains process audio according to selected mode" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Combined output from all active clones" }
+  ],
+  "edges": [
+    { "from": "in", "to": "mode", "type": "signal", "label": null },
+    { "from": "splitsignal", "to": "mode", "type": "control", "label": null },
+    { "from": "numclones", "to": "clones", "type": "control", "label": null },
+    { "from": "mode", "to": "clones", "type": "signal", "label": "Serial/Parallel/Copy routing" },
+    { "from": "clones", "to": "out", "type": "signal", "label": null }
+  ]
+}

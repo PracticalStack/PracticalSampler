@@ -1,0 +1,56 @@
+{
+  "targetId": "fx.bitcrush",
+  "domain": "scriptnode",
+  "generatedAt": "2026-03-31",
+  "topicIds": [5928, 11336, 3544, 6280, 6904, 12711],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "DC mode produces a persistent non-zero output even on silence",
+      "summary": "In DC mode (mode 0), the ceil-rounding algorithm introduces a DC offset of -0.5 * stepSize. At any BitDepth below 16 this offset is audible and the signal meters will show activity even with no input signal. The offset magnitude increases as BitDepth decreases.",
+      "sources": ["tid:5928"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Bipolar mode is the recommended choice when modulating BitDepth",
+      "summary": "DC mode creates a DC offset that varies with BitDepth; modulating BitDepth in DC mode therefore injects a time-varying DC component into the signal. Bipolar mode rounds toward zero for both polarities and produces no DC offset, making it the correct choice for any use case involving BitDepth modulation.",
+      "sources": ["tid:5928", "tid:6280"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "DC offset from DC mode cannot be removed with a clip node",
+      "summary": "Clipping the output to [-1, 1] does not eliminate DC offset because DC offset is a 0 Hz signal component, not an amplitude excess. The correct remedy is a high-pass filter placed after the node; even a single-pole HPF at ~20 Hz is sufficient to remove it.",
+      "sources": ["tid:5928"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Bipolar mode was added after the initial release; existing networks may warn on load",
+      "summary": "The original fx.bitcrush had only DC mode. Bipolar mode was added in response to DC offset complaints. Loading a network saved before this change will produce a parameter structure warning, which is harmless and can be dismissed.",
+      "sources": ["tid:5928"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Wrap with mu-law compression and expansion for vintage DAC character",
+      "summary": "Applying mu-law compression before the node and mu-law expansion after distributes quantisation steps logarithmically: more steps are allocated to quiet signals and fewer to loud ones. This improves SNR at low bit depths and more accurately models vintage hardware DACs (drum machines, 8-bit samplers) compared to linear bit reduction alone.",
+      "sources": ["tid:11336"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use frame processing to eliminate aliasing artifacts from high-rate parameter modulation",
+      "summary": "When modulating BitDepth at audio or near-audio rates using a scriptnode modulator, block-based processing can introduce aliasing-like artifacts. Inserting a dynamic_blocksize node and switching to frame processing (block size 1) resolves this at the cost of higher CPU. The dynamic_blocksize node can be exposed as a parameter to allow block size to vary based on modulation depth.",
+      "sources": ["tid:12711"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

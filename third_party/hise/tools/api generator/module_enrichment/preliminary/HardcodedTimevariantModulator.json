@@ -1,0 +1,66 @@
+{
+  "moduleId": "HardcodedTimevariantModulator",
+  "prettyName": "Hardcoded Time Variant Modulator",
+  "type": "Modulator",
+  "subtype": "TimeVariantModulator",
+  "category": "custom",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": true,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    { "name": "SlotFX", "signalFlowRole": "hot-swappable network slot (selects which compiled network to load)" },
+    { "name": "TableProcessor", "signalFlowRole": "complex data exposed from compiled network" },
+    { "name": "SliderPackProcessor", "signalFlowRole": "complex data exposed from compiled network" },
+    { "name": "AudioSampleProcessor", "signalFlowRole": "complex data exposed from compiled network" },
+    { "name": "DisplayBufferSource", "signalFlowRole": "skip - UI communication only" }
+  ],
+
+  "parameterGroups": [],
+
+  "standaloneModChains": [],
+  "disabledModChains": [],
+  "compositeBlocks": [],
+
+  "gaps": [
+    {
+      "id": "network-loading",
+      "category": "signal_path",
+      "question": "How does the time-variant modulator load and run a compiled network to produce a monophonic modulation signal?",
+      "context": "The network must produce a continuous modulation signal."
+    },
+    {
+      "id": "parameter-exposure",
+      "category": "parameter_behavior",
+      "question": "How are compiled network parameters exposed? Are there any fixed parameters?",
+      "context": "This module has no fixed parameters - all come from the network."
+    },
+    {
+      "id": "control-rate",
+      "category": "performance",
+      "question": "Does the modulator run at control rate (downsampled)?",
+      "context": "Time-variant modulators typically run at control rate."
+    },
+    {
+      "id": "midi-handling",
+      "category": "signal_path",
+      "question": "Does the module forward MIDI events to the compiled network?",
+      "context": "Time-variant modulators normally do not receive MIDI, but the compiled network might need events."
+    },
+    {
+      "id": "complex-data-exposure",
+      "category": "interface_usage",
+      "question": "How are Tables, SliderPacks, and AudioFiles from the compiled network exposed?",
+      "context": "Complex data access for custom modulation shapes."
+    }
+  ],
+
+  "notes": "This module has no fixed parameters. All parameters come from the loaded compiled network. Runs monophonically with single-channel output at control rate."
+}

@@ -1,0 +1,94 @@
+{
+  "factoryPath": "core.global_mod",
+  "nodes": [
+    {
+      "id": "in",
+      "label": "GlobalModulatorContainer Signal",
+      "type": "input",
+      "importance": 1.0,
+      "description": "Downsampled modulation signal from a modulator in the GlobalModulatorContainer, received via runtime_target connection"
+    },
+    {
+      "id": "index",
+      "label": "Index",
+      "type": "parameter",
+      "importance": 1.0,
+      "description": "Selects which modulator slot (0-16) to read from the GlobalModulatorContainer"
+    },
+    {
+      "id": "upsample",
+      "label": "Rate Matching",
+      "type": "process",
+      "importance": 0.6,
+      "description": "Linear interpolation to upsample control-rate signal to audio rate (when needed)"
+    },
+    {
+      "id": "apply_mod",
+      "label": "Apply Modulation",
+      "type": "process",
+      "importance": 1.0,
+      "description": "Applies the selected mode formula (Gain/Unipolar/Bipolar) with Value and Intensity to the raw modulation signal"
+    },
+    {
+      "id": "value",
+      "label": "Value",
+      "type": "parameter",
+      "importance": 0.8,
+      "description": "Base value for the modulation formula (center point or ceiling)"
+    },
+    {
+      "id": "mode",
+      "label": "Mode",
+      "type": "parameter",
+      "importance": 0.9,
+      "description": "Selects modulation formula: Gain, Unipolar, or Bipolar"
+    },
+    {
+      "id": "intensity",
+      "label": "Intensity",
+      "type": "parameter",
+      "importance": 0.9,
+      "description": "Modulation depth (-1 to 1); negative values invert modulation"
+    },
+    {
+      "id": "process_signal",
+      "label": "ProcessSignal",
+      "type": "parameter",
+      "importance": 0.7,
+      "description": "When enabled, writes modulation signal to audio channel 0"
+    },
+    {
+      "id": "mod_out",
+      "label": "Modulation Output",
+      "type": "modulation_out",
+      "importance": 1.0,
+      "description": "Normalised modulation value (0-1) sent to connected parameter targets"
+    },
+    {
+      "id": "audio_out",
+      "label": "Audio Out",
+      "type": "output",
+      "importance": 0.5,
+      "description": "Audio channel 0 output (only active when ProcessSignal is enabled)"
+    },
+    {
+      "id": "display",
+      "label": "Display Buffer",
+      "type": "external_data",
+      "importance": 0.3,
+      "description": "Ring buffer for ModPlotter visualisation (downsampled by factor 32)"
+    }
+  ],
+  "edges": [
+    { "from": "in", "to": "upsample", "type": "signal", "label": null },
+    { "from": "index", "to": "in", "type": "control", "label": "slot selection" },
+    { "from": "upsample", "to": "apply_mod", "type": "signal", "label": null },
+    { "from": "value", "to": "apply_mod", "type": "control", "label": null },
+    { "from": "mode", "to": "apply_mod", "type": "control", "label": null },
+    { "from": "intensity", "to": "apply_mod", "type": "control", "label": null },
+    { "from": "apply_mod", "to": "mod_out", "type": "signal", "label": null },
+    { "from": "apply_mod", "to": "audio_out", "type": "conditional", "label": "ProcessSignal enabled" },
+    { "from": "process_signal", "to": "audio_out", "type": "control", "label": null },
+    { "from": "apply_mod", "to": "display", "type": "signal", "label": "downsampled" }
+  ]
+}

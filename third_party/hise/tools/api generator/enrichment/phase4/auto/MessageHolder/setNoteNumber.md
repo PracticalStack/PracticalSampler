@@ -1,0 +1,3 @@
+Sets the MIDI note number for this event, clamped to 0-127. When changing note numbers for pitch-shifting purposes, prefer `setTransposeAmount()` instead - it preserves the original note number so NoteOn and NoteOff events continue to match automatically.
+
+> [!Warning:Breaks automatic note-off matching] Changing the note number directly breaks automatic NoteOn/NoteOff matching. If you modify a NoteOn's note number, you must ensure the corresponding NoteOff uses the same modified number.

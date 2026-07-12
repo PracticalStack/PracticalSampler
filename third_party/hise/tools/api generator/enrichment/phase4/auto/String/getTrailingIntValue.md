@@ -1,0 +1,1 @@
+Extracts and returns the integer at the end of the string. Returns 0 if the string does not end with digits. This is the standard way to extract numeric suffixes from component IDs (e.g. `"Knob12"` returns `12`), enabling a single callback to handle numbered controls by using the trailing value as an array index.

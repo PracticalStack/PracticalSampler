@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<Preset Version="0.1.0">
+  <Content Processor="Interface">
+    <Control type="ScriptComboBox" id="SampleMapSelector" value="2.0"/>
+    <Control type="ScriptComboBox" id="FactoryPresetSelector" value="2.0"/>
+    <Control type="ScriptSlider" id="ToneKnob" value="0.78"/>
+    <Control type="ScriptSlider" id="MotionKnob" value="0.62"/>
+    <Control type="ScriptSlider" id="SpaceKnob" value="0.34"/>
+  </Content>
+  <MidiAutomation/>
+  <MPEData Enabled="0"/>
+</Preset>

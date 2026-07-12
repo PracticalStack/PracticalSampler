@@ -1,0 +1,3 @@
+Reads and decrypts a file that was written with `writeEncryptedObject`, then parses the result as JSON. The key must match the one used for writing. This uses BlowFish symmetric encryption (not RSA) with a maximum effective key length of 72 bytes. One practical use case is storing offline licence or activation data that should not be trivially readable from disk.
+
+> [!Warning:Returns undefined on decryption failure] Silently returns `undefined` on decryption or parse failure (wrong key, corrupted file). Unlike `loadAsObject`, no script error is reported. Always check the result with `isDefined()`.

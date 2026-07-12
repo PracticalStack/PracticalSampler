@@ -1,0 +1,1 @@
+Returns the number of free bytes on the volume containing the specified folder. The `folder` parameter accepts either a `SpecialLocations` constant or a `File` object. Pair with `FileSystem.descriptionOfSizeInBytes()` to display the result in a user-friendly format.

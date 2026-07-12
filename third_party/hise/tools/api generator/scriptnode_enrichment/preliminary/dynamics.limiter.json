@@ -1,0 +1,135 @@
+{
+  "factoryPath": "dynamics.limiter",
+  "factory": "dynamics",
+  "nodeId": "limiter",
+  "description": "A limiter with the ducking amount as modulation signal",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Dynamics detection",
+      "rationale": "Threshhold sets the ceiling level. Attack and Release control how quickly the limiter responds to transients and recovers.",
+      "parameters": [
+        {
+          "id": "Threshhold",
+          "range": { "min": -100.0, "max": 0.0, "step": 0.0, "skew": 5.42 },
+          "default": 0.0,
+          "textConverter": "Decibel",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Attack",
+          "range": { "min": 0.0, "max": 250.0, "step": 0.0, "skew": 1.0 },
+          "default": 50.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Release",
+          "range": { "min": 0.0, "max": 250.0, "step": 0.0, "skew": 1.0 },
+          "default": 50.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Limiting amount",
+      "rationale": "Ratio determines the limiting severity. A true limiter uses very high ratios (approaching infinity:1).",
+      "parameters": [
+        {
+          "id": "Ratio",
+          "range": { "min": 1.0, "max": 32.0, "step": 0.0, "skew": 0.30 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Sidechain routing",
+      "rationale": "Sidechain selects the detection source. The encoded converter indicates 3 discrete options.",
+      "parameters": [
+        {
+          "id": "Sidechain",
+          "range": { "min": 0.0, "max": 2.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "encoded_converter_3_options",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0,
+    "displayBuffers": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/dynamics/limiter.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "limiter-vs-comp-algorithm",
+      "category": "signal_path",
+      "question": "How does the limiter differ from dynamics.comp in the C++ implementation? A limiter typically has a very fast attack and high/infinite ratio. Does this node enforce a minimum attack time, use lookahead, or simply apply a higher effective ratio than comp? Or is the only difference the UI labelling?",
+      "context": "Core to understanding what makes this a 'limiter' vs a 'compressor'. They share identical parameter ranges, so the algorithm difference must be in the gain calculation or internal behaviour."
+    },
+    {
+      "id": "ducking-modulation-output",
+      "category": "description_accuracy",
+      "question": "The description says 'ducking amount as modulation signal' but ModulationTargets is empty in the base data. Does this node actually produce a modulation output? If so, what value does it output?",
+      "context": "Same discrepancy as dynamics.comp and dynamics.gate. Need to verify whether modulation output exists."
+    },
+    {
+      "id": "sidechain-modes",
+      "category": "parameter_behaviour",
+      "question": "The Sidechain parameter has 3 options (encoded converter, range 0-2). What are the 3 sidechain modes? Are they identical to dynamics.comp's sidechain options?",
+      "context": "Users need to know how to configure sidechain detection for the limiter."
+    },
+    {
+      "id": "display-buffer-content",
+      "category": "signal_path",
+      "question": "The node has 1 DisplayBuffer. What does it display -- the gain reduction meter, the input/output waveform, or the limiting envelope?",
+      "context": "Determines what visual feedback users see in the scriptnode UI."
+    }
+  ],
+
+  "notes": "Shares identical parameters with dynamics.comp and dynamics.gate. A limiter is typically a compressor with very high ratio and fast attack. Given that the Ratio parameter goes up to 32 and Attack range is 0-250ms (same as comp), the difference between limiter and comp may be in the internal gain computation rather than parameter constraints. The 'ducking amount as modulation signal' description has the same ModulationTargets discrepancy as comp and gate. This node may share a base class with comp and gate, differing only in the gain reduction formula."
+}

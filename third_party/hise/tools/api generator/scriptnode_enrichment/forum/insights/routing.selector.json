@@ -1,0 +1,16 @@
+{
+  "targetId": "routing.selector",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "No substantive forum discussion found for routing.selector",
+      "body": "The 25 posts retrieved for the 'routing.selector' search target did not contain any discussions specifically about the scriptnode routing.selector node. All matched topics were about unrelated selectors (MIDI CC selector, sample map selector, FX slot selector, sustain CC selector). No bugs, patterns, or usage insights could be extracted for this node from the available forum cache.",
+      "source": "forum_cache/scriptnode_routing.selector.json",
+      "author": "analysis",
+      "confidence": "high"
+    }
+  ]
+}

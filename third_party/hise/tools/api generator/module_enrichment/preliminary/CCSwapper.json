@@ -1,0 +1,79 @@
+{
+  "moduleId": "CCSwapper",
+  "prettyName": "CC Swapper",
+  "type": "MidiProcessor",
+  "subtype": "MidiProcessor",
+  "category": "routing",
+
+  "io": {
+    "midiIn": "MIDI in",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [],
+
+  "parameterGroups": [
+    {
+      "label": "CC Mapping",
+      "rationale": "Both parameters define the pair of CC numbers to swap - they are symmetric and only meaningful together",
+      "parameters": [
+        {
+          "id": "FirstCC",
+          "name": "First CC",
+          "range": { "min": 0.0, "max": 127.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "First controller number that gets swapped",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "SecondCC",
+          "name": "Second CC",
+          "range": { "min": 0.0, "max": 127.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "Second controller number that gets swapped",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "swap-logic",
+      "category": "signal_path",
+      "question": "How does processHiseEvent() implement the swap? Does it check incoming CC number against both FirstCC and SecondCC and replace the matching one with the other, or is there a different mechanism?",
+      "context": "Need to describe the exact transformation for the reference page pseudo-code."
+    },
+    {
+      "id": "non-cc-passthrough",
+      "category": "signal_path",
+      "question": "Are non-CC MIDI events (noteOn, noteOff, pitch bend, aftertouch) passed through unchanged?",
+      "context": "Users need to know whether this module affects any MIDI data beyond CC messages."
+    },
+    {
+      "id": "same-value-behavior",
+      "category": "conditional_logic",
+      "question": "What happens when FirstCC and SecondCC are set to the same value? Is it a no-op, or does it cause unexpected behavior? What about the default state where both are 0?",
+      "context": "Both parameters default to 0 - users need to know if this edge case is handled gracefully."
+    },
+    {
+      "id": "cc-value-preservation",
+      "category": "parameter_behavior",
+      "question": "Does the swap preserve the CC value (velocity/amount) unchanged, or is the value modified in any way during the swap?",
+      "context": "Users remapping controllers need to know that only the CC number changes, not the value."
+    }
+  ],
+
+  "notes": "CCSwapper is one of the simplest MIDI processors - a pure CC number remapper with no modulation, no audio, and no interfaces. Both parameters default to 0, which means CC #0 (Bank Select MSB) would be swapped with itself at default settings - effectively a no-op until configured. The symmetric nature of the swap means order of FirstCC/SecondCC does not matter."
+}

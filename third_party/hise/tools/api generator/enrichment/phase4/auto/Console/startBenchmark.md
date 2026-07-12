@@ -1,0 +1,1 @@
+Starts a high-resolution benchmark timer. Call `stopBenchmark()` to end the measurement and print the elapsed time in milliseconds. Only one benchmark can be active at a time - calling `startBenchmark()` again overwrites the previous start time.

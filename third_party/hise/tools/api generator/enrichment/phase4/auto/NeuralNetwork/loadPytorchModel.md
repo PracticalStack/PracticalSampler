@@ -1,0 +1,3 @@
+Loads a complete PyTorch model with both layer topology and trained weights in a single call. The JSON object must have two keys: `"layers"` containing the text output of Python's `print(model)`, and `"weights"` containing the trained parameters from PyTorch's `state_dict()`. This is the recommended default workflow for PyTorch models - use the two-step `build` + `loadWeights` path only when topology and weights are managed separately.
+
+> [!Warning:Layers string must match print(model) output exactly] The `"layers"` value must be the exact string output of Python's `print(model)`, including newlines and indentation. The parser relies on this format to identify layer types and dimensions.

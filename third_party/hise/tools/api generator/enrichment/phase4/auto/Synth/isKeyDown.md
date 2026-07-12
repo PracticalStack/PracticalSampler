@@ -1,0 +1,1 @@
+Checks whether the specified MIDI note number is currently held down. Only real (non-artificial) note events are tracked - script-generated notes via `playNote` or `addNoteOn` do not register as pressed keys. Use `playNoteFromUI` if you need artificial notes to update keyboard state.

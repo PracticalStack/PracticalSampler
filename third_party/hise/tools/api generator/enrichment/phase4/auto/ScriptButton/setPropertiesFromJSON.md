@@ -1,0 +1,1 @@
+Sets multiple component properties at once from a JSON object. Each key must be a valid property ID for this component type. This is a convenience alternative to calling `set()` repeatedly.

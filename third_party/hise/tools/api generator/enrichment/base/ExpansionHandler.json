@@ -1,0 +1,189 @@
+{
+  "className": "ExpansionHandler",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "encodeWithCredentials": {
+      "signature": "bool encodeWithCredentials(var hxiFile)",
+      "returnType": "bool",
+      "description": "Encrypts the given hxi file.",
+      "parameters": [
+        {
+          "name": "hxiFile",
+          "type": "var"
+        }
+      ]
+    },
+    "getCurrentExpansion": {
+      "signature": "var getCurrentExpansion()",
+      "returnType": "var",
+      "description": "Returns the currently active expansion (if there is one).",
+      "parameters": []
+    },
+    "getExpansion": {
+      "signature": "var getExpansion(var name)",
+      "returnType": "var",
+      "description": "Returns the expansion with the given name",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "var"
+        }
+      ]
+    },
+    "getExpansionForInstallPackage": {
+      "signature": "var getExpansionForInstallPackage(var packageFile)",
+      "returnType": "var",
+      "description": "Checks if the expansion is already installed and returns a reference to the expansion if it exists.",
+      "parameters": [
+        {
+          "name": "packageFile",
+          "type": "var"
+        }
+      ]
+    },
+    "getExpansionList": {
+      "signature": "var getExpansionList()",
+      "returnType": "var",
+      "description": "Returns a list of all available expansions.",
+      "parameters": []
+    },
+    "getMetaDataFromPackage": {
+      "signature": "var getMetaDataFromPackage(var packageFile)",
+      "returnType": "var",
+      "description": "Returns a meta data object from the .hr file",
+      "parameters": [
+        {
+          "name": "packageFile",
+          "type": "var"
+        }
+      ]
+    },
+    "getUninitialisedExpansions": {
+      "signature": "var getUninitialisedExpansions()",
+      "returnType": "var",
+      "description": "Returns a list of all expansions that aren't loaded properly yet.",
+      "parameters": []
+    },
+    "installExpansionFromPackage": {
+      "signature": "bool installExpansionFromPackage(var packageFile, var sampleDirectory)",
+      "returnType": "bool",
+      "description": "Decompresses the samples and installs the .hxi / .hxp file.",
+      "parameters": [
+        {
+          "name": "packageFile",
+          "type": "var"
+        },
+        {
+          "name": "sampleDirectory",
+          "type": "var"
+        }
+      ]
+    },
+    "refreshExpansions": {
+      "signature": "bool refreshExpansions()",
+      "returnType": "bool",
+      "description": "Call this to refresh the expansion list.",
+      "parameters": []
+    },
+    "setAllowedExpansionTypes": {
+      "signature": "void setAllowedExpansionTypes(var typeList)",
+      "returnType": "void",
+      "description": "Sets a list of allowed expansion types that can be loaded.",
+      "parameters": [
+        {
+          "name": "typeList",
+          "type": "var"
+        }
+      ]
+    },
+    "setCredentials": {
+      "signature": "void setCredentials(var newCredentials)",
+      "returnType": "void",
+      "description": "Set a credentials object that can be embedded into each expansion.",
+      "parameters": [
+        {
+          "name": "newCredentials",
+          "type": "var"
+        }
+      ]
+    },
+    "setCurrentExpansion": {
+      "signature": "bool setCurrentExpansion(var expansionName)",
+      "returnType": "bool",
+      "description": "Sets the current expansion as active expansion.",
+      "parameters": [
+        {
+          "name": "expansionName",
+          "type": "var"
+        }
+      ]
+    },
+    "setEncryptionKey": {
+      "signature": "void setEncryptionKey(String newKey)",
+      "returnType": "void",
+      "description": "Set a encryption key that will be used to encrypt the content (deprecated).",
+      "parameters": [
+        {
+          "name": "newKey",
+          "type": "String"
+        }
+      ]
+    },
+    "setErrorFunction": {
+      "signature": "void setErrorFunction(var newErrorFunction)",
+      "returnType": "void",
+      "description": "Sets a error function that will be executed.",
+      "parameters": [
+        {
+          "name": "newErrorFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "setErrorMessage": {
+      "signature": "void setErrorMessage(String errorMessage)",
+      "returnType": "void",
+      "description": "Calls the error function specified with setErrorFunction.",
+      "parameters": [
+        {
+          "name": "errorMessage",
+          "type": "String"
+        }
+      ]
+    },
+    "setExpansionCallback": {
+      "signature": "void setExpansionCallback(var expansionLoadedCallback)",
+      "returnType": "void",
+      "description": "Set a function that will be called whenever a expansion is being loaded.",
+      "parameters": [
+        {
+          "name": "expansionLoadedCallback",
+          "type": "var"
+        }
+      ]
+    },
+    "setInstallCallback": {
+      "signature": "void setInstallCallback(var installationCallback)",
+      "returnType": "void",
+      "description": "Set a function that will be called during installation of a new expansion.",
+      "parameters": [
+        {
+          "name": "installationCallback",
+          "type": "var"
+        }
+      ]
+    },
+    "setInstallFullDynamics": {
+      "signature": "void setInstallFullDynamics(bool shouldInstallFullDynamics)",
+      "returnType": "void",
+      "description": "Sets whether the installExpansionFromPackage function should install full dynamics.",
+      "parameters": [
+        {
+          "name": "shouldInstallFullDynamics",
+          "type": "bool"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,1 @@
+Returns the UI component associated with the given modulation target ID. For MatrixModulator targets, returns the component connected to the modulator's Value parameter. For parameter targets, returns the ScriptSlider with a matching `matrixTargetId` property. Returns `undefined` if no matching component is found.

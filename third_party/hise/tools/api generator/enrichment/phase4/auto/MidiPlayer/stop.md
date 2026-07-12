@@ -1,0 +1,1 @@
+Stops playback or recording. Pass 0 for an immediate stop, or a sample-accurate timestamp for precisely timed stopping within the current audio buffer. Returns true if the player was stopped, or false if it is synced to the master clock (in which case transport is controlled externally). If the player was recording, the recorded events are automatically flushed to the sequence.

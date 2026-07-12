@@ -1,0 +1,1 @@
+Returns an array of references to all child components whose `parentComponent` property is set to this component. This returns regular ScriptComponent children only, not dynamic children created via `setData()`. Use ContainerChild references for dynamic children.

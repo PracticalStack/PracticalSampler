@@ -1,0 +1,275 @@
+[
+  {
+    "title": "Batch Sampler Property Scaling",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "Sampler.createSelection(\".*\") with get/set on Sampler.LoopStart, LoopEnd, and SampleEnd to batch-modify sample properties. Multiplies all sample indices by a factor for samplerate conversion and calls Sampler.refreshInterface() to update the UI.",
+    "code": "/** Select all samples in the current samplemap\n \".*\" is Regex and means everything.\n*/\nconst var allSamples = Sampler.createSelection(\".*\");\n\n/** You'll get an array of all samples, which you can iterate */\nfor(s in allSamples)\n{\n /** Just multiply all sample properties with 2 */\n s.set(Sampler.LoopStart, parseInt(s.get(Sampler.LoopStart)) * 2);\n s.set(Sampler.LoopEnd, parseInt(s.get(Sampler.LoopEnd)) * 2);\n s.set(Sampler.SampleEnd, parseInt(s.get(Sampler.SampleEnd)) * 2);\n}\n\n/** This needs to be called after a sample manipulation op\n in order to refresh the UI. */\nSampler.refreshInterface();",
+    "url": "https://forum.hise.audio/topic/3545",
+    "featured": false
+  },
+  {
+    "title": "Save Parametric EQ State in User Presets",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert"
+    ],
+    "description": "Synth.getIdList and Engine.addModuleStateToUserPreset to automatically persist all Parametriq EQ module states with user presets. Iterates all EQ IDs and registers them for serialization.",
+    "code": "// Save EQs with presets\nconst eqIds = Synth.getIdList(\"Parametriq EQ\");\n\nfor (id in eqIds)\n Engine.addModuleStateToUserPreset(id);",
+    "url": "https://forum.hise.audio/topic/3510",
+    "featured": false
+  },
+  {
+    "title": "AppData User Preset File Listing",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert"
+    ],
+    "description": "FileSystem.getFolder(FileSystem.AppData) with getChildFile and FileSystem.findFiles to list user preset files from the app data directory. Iterates results and prints full paths using File.toString.",
+    "code": "const var appDataFolder = FileSystem.getFolder(FileSystem.AppData);\nconst var presetsFolder = appDataFolder.getChildFile(\"User Presets\");\n\nconst var fileList = FileSystem.findFiles(presetsFolder, \"*.mix\", true);\n\nfor (f in fileList)\n{\n Console.print(f.toString(\"FullPath\"));\n}",
+    "url": "https://forum.hise.audio/topic/3408",
+    "featured": false
+  },
+  {
+    "title": "SVG Path from Numeric Data Array",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Content.createPath with loadFromData to render an SVG icon from a numeric array in a Panel paint routine. Converts exported path data into a drawable path and fills it with g.fillPath at a specified size.",
+    "code": "const var Panel = Content.addPanel(\"Panel\", 0, 0);\n\nconst var p = Content.createPath();\n\n// pass an array with numbers to load SVG images\np.loadFromData([110,109,0,245,207,67,128,217,36,67,108,0,236,189,67,128,89,69,67,108,0,\n 245,207,67,128,217,101,67,108,192,212,207,67,128,53,81,67,98,217,93,211,\n 67,51,180,80,67,123,228,219,67,2,123,91,67,128,144,224,67,0,149,101,67,\n 98,39,209,224,67,29,247,89,67,79,60,223,67,36,224,61,67,0,245,207,67,0,\n 12,54,67,108,0,245,207,67,128,217,36,67,99,109,128,33,193,67,0,168,88,\n 67,108,0,66,193,67,0,76,109,67,98,231,184,189,67,77,205,109,67,69,50,\n 181,67,126,6,99,67,64,134,176,67,128,236,88,67,98,154,69,176,67,99,138,\n 100,67,49,218,177,67,174,80,128,67,128,33,193,67,192,58,132,67,108,128,\n 33,193,67,0,212,140,67,108,192,42,211,67,0,40,121,67,108,128,33,193,67,\n 0,168,88,67,99,101,0,0]);\n\nPanel.setPaintRoutine(function(g)\n{\n g.setColour(Colours.white);\n g.fillPath(p, [0, 0, 50, 50]);\n});",
+    "url": "https://forum.hise.audio/topic/2204",
+    "featured": false
+  },
+  {
+    "title": "Value Popup Styling Configuration",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Content.setValuePopupData to customize the tooltip popup appearance including font, border, margin, background color, and text color. Documents all available styling properties for the knob/slider value popup overlay.",
+    "code": "// set the popup styling\nContent.setValuePopupData({\n \"fontName\":\"Netto\",\n \"fontSize\": 14,\n \"borderSize\": 1,\n \"borderRadius\": 1,\n \"margin\":4,\n \"bgColour\": 0xFF636363,\n \"itemColour\": 0xFF000000,\n \"itemColour2\": 0xFF000000,\n \"textColour\": 0xFF636363 \n});",
+    "url": "https://forum.hise.audio/topic/1300",
+    "featured": false
+  },
+  {
+    "title": "Convolution Reverb IR Button Switcher",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Synth.getAudioSampleProcessor with setFile to load different convolution impulse response files from buttons. Switches between IR samples stored in the project AudioFiles folder.",
+    "code": "const var convolution = Synth.getAudioSampleProcessor(\"Convolution Reverb\");\n\nconst var irFiles = [\n\t\"{PROJECT_FOLDER}classic-fl1a.wav\",\n\t\"{PROJECT_FOLDER}LargeHall_IR.wav\"\n];\n\nconst var irButtons = [\n\tContent.getComponent(\"Button1\"),\n\tContent.getComponent(\"Button2\")\n];\n\nfor (b in irButtons)\n\tb.setControlCallback(onIrButtonControl);\n\ninline function onIrButtonControl(component, value)\n{\n\tif (value)\n\t{\n\t\tlocal index = irButtons.indexOf(component);\n\t\tconvolution.setFile(irFiles[index]);\n\t}\n}",
+    "url": "https://forum.hise.audio/topic/951",
+    "featured": true
+  },
+  {
+    "title": "Disable DSP Network Parameter Forwarding",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "Engine.createDspNetwork with setForwardControlsToParameters(false) to prevent the DSP network from intercepting UI control callbacks. Allows script-level control callbacks to handle parameter routing instead.",
+    "code": "const var dsp = Engine.createDspNetwork(\"dsp\");\n\ndsp.setForwardControlsToParameters(false);",
+    "url": "https://forum.hise.audio/topic/2659",
+    "featured": false
+  },
+  {
+    "title": "Timer-Driven Modulator Level Display",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Synth.getEffect with getModulatorChain(0) and getCurrentLevel to read the current gain modulation value on a timer. Updates a knob position every 30ms to visualize the real-time modulator output.",
+    "code": "const var SimpleGain1 = Synth.getEffect(\"SimpleGain1\");\nconst var SimpleGain1GainMod = SimpleGain1.getModulatorChain(0);\n\nconst var Knob1 = Content.getComponent(\"Knob1\");\n\nconst var t = Engine.createTimerObject();\n\nt.setTimerCallback(function()\n{\n var v = SimpleGain1GainMod.getCurrentLevel();\n Knob1.setValue(v);\n});\nt.startTimer(30);",
+    "url": "https://forum.hise.audio/topic/2503",
+    "featured": false
+  },
+  {
+    "title": "Bulk Disable SaveInPreset for All Components",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "Content.getComponentList(\"\") to iterate all UI components and set saveInPreset to false. Uses empty regex string to match all components for bulk property changes.",
+    "code": "// Empty string will return all components\nfor(c in Content.getComponentList(\"\"))\n c.set(\"saveInPreset\", false);",
+    "url": "https://forum.hise.audio/topic/1859",
+    "featured": false
+  },
+  {
+    "title": "Collect All Script Processors by ID List",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert"
+    ],
+    "description": "Synth.getIdList(\"Script Processor\") with Synth.getMidiProcessor to dynamically build an array of all script processor references. Useful when the number of processors is unknown at design time.",
+    "code": "const var processorIds = Synth.getIdList(\"Script Processor\");\n const var scriptProcessors = [];\n for (id in processorIds)\n scriptProcessors.push(Synth.getMidiProcessor(id));",
+    "url": "https://forum.hise.audio/topic/1859",
+    "featured": false
+  },
+  {
+    "title": "Rotating Image with Timer Animation",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Panel.loadImage with g.rotate in setPaintRoutine and a timer callback to animate continuous image rotation. Button starts/stops the timer and a knob controls rotation speed via Math.toRadians.",
+    "code": "Content.makeFrontInterface(600, 500);\n\nconst var Panel1 = Content.getComponent(\"Panel1\");\nconst var Button1 = Content.getComponent(\"Button1\");\n\nreg angle = 0;\nreg speed = 5;\n\nPanel1.loadImage(\"{PROJECT_FOLDER}logo_bw.png\", \"test\");\n\nPanel1.setPaintRoutine(function(g)\n{\n\tg.rotate(Math.toRadians(angle), [this.get(\"width\") / 2, this.get(\"height\") / 2]);\n\tg.drawImage(\"test\", [0, 0, this.get(\"width\"), this.get(\"height\")], 0, 0);\n});\n\nPanel1.setTimerCallback(function()\n{\n\tangle = (angle + speed) % 360;\n\tthis.repaint();\n});\n\ninline function onButton1Control(component, value)\n{\n\tif (value)\n\t\tPanel1.startTimer(40);\n\telse\n\t\tPanel1.stopTimer();\n}\n\nButton1.setControlCallback(onButton1Control);",
+    "url": "https://forum.hise.audio/topic/1110",
+    "featured": false
+  },
+  {
+    "title": "Filmstrip Animation with Timer",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Panel.loadImage with g.drawImage y-offset to animate a filmstrip sprite sheet using a timer callback. Cycles through frames by incrementing an index modulo total frames and repainting each tick.",
+    "code": "const var Panel1 = Content.getComponent(\"Panel1\");\nconst var Button1 = Content.getComponent(\"Button1\");\n\nreg index = 0;\nreg total_frames = 24;\nreg frame_height = 64;\n\nPanel1.loadImage(\"{PROJECT_FOLDER}on_off_64_64_24.png\", \"dot\");\n\nPanel1.setPaintRoutine(function(g)\n{\n\tg.drawImage(\"dot\", [0, 0, this.get(\"width\"), this.get(\"height\")], 0, index * frame_height);\n});\n\nPanel1.setTimerCallback(function()\n{\n\tindex = (index + 1) % total_frames;\n\tthis.repaint();\n});\n\ninline function onButton1Control(component, value)\n{\n\tif (value)\n\t\tPanel1.startTimer(100);\n\telse\n\t\tPanel1.stopTimer();\n}\n\nButton1.setControlCallback(onButton1Control);",
+    "url": "https://forum.hise.audio/topic/1110",
+    "featured": false
+  },
+  {
+    "title": "MIDI Player Random Octave Transpose",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "MidiPlayer.getEventList with setTransposeAmount and flushMessageList to randomly transpose MIDI notes by octave on button press. Iterates the event list, checks isNoteOn, and applies a random 50% chance of -12 semitone shift.",
+    "code": "const var MIDIPlay = Synth.getMidiPlayer(\"MIDI Player1\");\n\ninline function onButtonranControl(component, value)\n{\n\tlocal list = MIDIPlay.getEventList();\n\n\tfor (note in list)\n\t{\n\t\tif (note.isNoteOn())\n\t\t\tnote.setTransposeAmount(Math.random() > 0.5 ? 0 : -12);\n\t}\n\n\tMIDIPlay.flushMessageList(list);\n}\n\nContent.getComponent(\"Buttonran\").setControlCallback(onButtonranControl);",
+    "url": "https://forum.hise.audio/topic/2008",
+    "featured": false
+  },
+  {
+    "title": "MIDI Player Post-Load Random Transpose",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "MidiPlayer.setPostLoadingCallback with getEventList, setTransposeAmount, and flushEventList to automatically randomize note pitches whenever a new MIDI sequence is loaded. Applies random transposition within a ±5 semitone range.",
+    "code": "const var player = Synth.getMidiPlayer(\"MIDI Player1\");\n\nplayer.setPostLoadingCallback(function()\n{\n\tlocal list = this.getEventList();\n\n\tfor (note in list)\n\t{\n\t\tif (note.isNoteOn())\n\t\t\tnote.setTransposeAmount(Math.randInt(-5, 5));\n\t}\n\n\tthis.flushEventList(list);\n});",
+    "url": "https://forum.hise.audio/topic/1899",
+    "featured": false
+  },
+  {
+    "title": "Fine and Coarse Tune Knobs",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert"
+    ],
+    "description": "Content.addKnob with Message.setFineDetune and Message.setCoarseDetune in onNoteOn/onNoteOff for per-note pitch adjustment. Creates fine (±100 cents) and coarse (±12 semitone) tuning controls.",
+    "code": "const var knbFine = Content.addKnob(\"knbFine\", 0, 0);\nknbFine.set(\"text\", \"Fine Tune\");\nknbFine.setRange(-100, 100, 1);\n\nconst var knbCoarse = Content.addKnob(\"knbCoarse\", 150, 0);\nknbCoarse.set(\"text\", \"Coarse Tune\");\nknbCoarse.setRange(-12, 12, 1);\n\nfunction onNoteOn()\n{\n\tMessage.setFineDetune(knbFine.getValue());\n\tMessage.setCoarseDetune(knbCoarse.getValue());\n}\n\nfunction onNoteOff()\n{\n\tMessage.setFineDetune(knbFine.getValue());\n\tMessage.setCoarseDetune(knbCoarse.getValue());\n}",
+    "url": "https://forum.hise.audio/topic/1122",
+    "featured": false
+  },
+  {
+    "title": "Multi-Output Routing Matrix Switch",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert"
+    ],
+    "description": "Synth.getChildSynth with getRoutingMatrix and addConnection to switch audio output channels via a combo box. Routes stereo pairs to different output buses and falls back to channels 1-2 on error.",
+    "code": "const var MasterChain = Synth.getChildSynth(\"master\");\nconst var matrix = MasterChain.getRoutingMatrix();\n\nconst var cmbOutput = [\n\tContent.getComponent(\"cmbOutput0\"),\n\tContent.getComponent(\"cmbOutput1\")\n];\n\nfor (c in cmbOutput)\n\tc.setControlCallback(changeOutput);\n\ninline function changeOutput(component, value)\n{\n\tlocal success = true;\n\tlocal idx = cmbOutput.indexOf(component);\n\n\tif (value == 1)\n\t{\n\t\tmatrix.addConnection(0 + (idx * 2), 0);\n\t\tmatrix.addConnection(1 + (idx * 2), 1);\n\t}\n\telse if (value == 2)\n\t{\n\t\tmatrix.addConnection(0 + (idx * 2), 2);\n\t\tsuccess = matrix.addConnection(1 + (idx * 2), 3);\n\t}\n\telse if (value == 3)\n\t{\n\t\tmatrix.addConnection(0 + (idx * 2), 4);\n\t\tsuccess = matrix.addConnection(1 + (idx * 2), 5);\n\t}\n\n\tif (!success)\n\t{\n\t\tmatrix.addConnection(0 + (idx * 2), 0);\n\t\tmatrix.addConnection(1 + (idx * 2), 1);\n\t}\n}",
+    "url": "https://forum.hise.audio/topic/1845",
+    "featured": false
+  },
+  {
+    "title": "MIDI Player Trigger on Key Press",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "MidiPlayer.play with Message.getTimestamp in onNoteOn to start MIDI playback when a specific key is pressed. Ignores the trigger note to prevent it from sounding.",
+    "code": "const var MIDIPlayer1 = Synth.getMidiPlayer(\"MIDI Player1\");\n\nfunction onNoteOn()\n{\n\tif (Message.getNoteNumber() == 84)\n\t{\n\t\tMIDIPlayer1.play(Message.getTimestamp());\n\t\tMessage.ignoreEvent(true);\n\t}\n}",
+    "url": "https://forum.hise.audio/topic/1870",
+    "featured": false
+  },
+  {
+    "title": "Button-Triggered MIDI Note with MidiList",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert"
+    ],
+    "description": "Engine.createMidiList with Synth.playNote and Synth.noteOffByEventId to play a MIDI note from a UI button. Tracks active event IDs in a MidiList and turns off the previous note before playing a new one.",
+    "code": "const var ids = Engine.createMidiList();\n\ninline function onButton1Control(component, value)\n{\n local noteNumber = 60;\n \n if (value)\n {\n //Turn off old note\n if (ids.getValue(noteNumber) != -1)\n Synth.noteOffByEventId(ids.getValue(noteNumber));\n \n //Play new note\n ids.setValue(noteNumber, Synth.playNote(noteNumber, 60));\n }\t \n};\n\nContent.getComponent(\"Button1\").setControlCallback(onButton1Control);",
+    "url": "https://forum.hise.audio/topic/1685",
+    "featured": false
+  },
+  {
+    "title": "AHDSR-Timed Note Off Delay",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "trusted"
+    ],
+    "description": "Synth.addNoteOn with Synth.noteOffDelayedByEventId using AHDSR envelope getAttribute to calculate note duration. Sums attack, hold, and decay times and converts to samples via Engine.getSamplesForMilliSeconds.",
+    "code": "const var Synth1AHDSREnvelope = Synth.getModulator(\"AHDSR Envelope1\");\n\ninline function playTimedNote(ch, noteNb, noteVel)\n{\n\tlocal time = Synth1AHDSREnvelope.getAttribute(2) + Synth1AHDSREnvelope.getAttribute(4) + Synth1AHDSREnvelope.getAttribute(5);\n\tlocal samples = Engine.getSamplesForMilliSeconds(time);\n\tlocal noteID = Synth.addNoteOn(ch, noteNb, noteVel, 0);\n\tSynth.noteOffDelayedByEventId(noteID, samples);\n}",
+    "url": "https://forum.hise.audio/topic/1685",
+    "featured": false
+  },
+  {
+    "title": "CC-Controlled Note Gate Filter",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "expert"
+    ],
+    "description": "MIDI processor using Message.getControllerNumber and getControllerValue in onController to store CC64 (sustain pedal) state, then Message.ignoreEvent in onNoteOn to filter notes when the CC value exceeds a threshold.",
+    "code": "reg ccValue = 0;\n\nfunction onNoteOn()\n{\n\tif (ccValue > 50)\n\t\tMessage.ignoreEvent(true);\n}\n\nfunction onNoteOff()\n{\n}\n\nfunction onController()\n{\n\tif (Message.getControllerNumber() == 64)\n\t\tccValue = Message.getControllerValue();\n}",
+    "url": "https://forum.hise.audio/topic/1473",
+    "featured": false
+  },
+  {
+    "title": "Clickable Link Panel with Paint Routine",
+    "category": "Forum",
+    "tags": [
+      "forum",
+      "General Questions",
+      "author"
+    ],
+    "description": "Panel with setPaintRoutine and setMouseCallback to create a clickable text link that opens a website on double-click via Engine.openWebsite. Configures allowCallbacks and draws centered text with custom color.",
+    "code": "const var LinkPanel = Content.getComponent(\"LinkPanel\");\n\nLinkPanel.set(\"width\", 100);\nLinkPanel.set(\"height\", 20);\nLinkPanel.set(\"allowCallbacks\", \"Clicks only\");\n\nLinkPanel.setPaintRoutine(function(g)\n{\n\tg.setColour(Colours.cornflowerblue);\n\tg.drawAlignedText(\"website.com\", [0, 0, this.getWidth(), this.getHeight()], \"centred\");\n});\n\nLinkPanel.setMouseCallback(function(event)\n{\n\tif (event.doubleClick)\n\t\tEngine.openWebsite(\"https://website.com\");\n});",
+    "url": "https://forum.hise.audio/topic/697",
+    "featured": false
+  }
+]

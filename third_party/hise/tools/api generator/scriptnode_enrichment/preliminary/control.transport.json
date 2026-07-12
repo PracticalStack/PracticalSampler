@@ -1,0 +1,68 @@
+{
+  "factoryPath": "control.transport",
+  "factory": "control",
+  "nodeId": "transport",
+  "description": "Sends a modulation signal when the transport state changes",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/transport.md",
+    "tier": "BRIEF",
+    "lines": 14
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "output-values",
+      "category": "signal_path",
+      "question": "From tempo.md: transport outputs 0/1 reflecting the play state. Confirm: 1.0 when playing, 0.0 when stopped? Or is it inverted?",
+      "context": "Simple binary output but the polarity needs confirmation."
+    },
+    {
+      "id": "no-iscontrolnode",
+      "category": "signal_path",
+      "question": "transport does not have IsControlNode. It has OutsideSignalPath but not IsControlNode. Does it use wrap::mod or clock_base's parameter output mechanism? How does the modulation output actually reach targets?",
+      "context": "Without IsControlNode, the output mechanism differs from typical control nodes."
+    }
+  ],
+
+  "notes": "transport is the simplest tempo-aware node. No parameters, no properties. Has OutsideSignalPath but NOT IsControlNode. IsPolyphonic is true. Inherits from clock_base per tempo.md. Outputs a binary 0/1 signal based on DAW transport play/stop state."
+}

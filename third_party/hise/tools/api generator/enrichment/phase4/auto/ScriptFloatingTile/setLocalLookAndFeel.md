@@ -1,0 +1,1 @@
+Attaches a `ScriptLookAndFeel` object to this component and all its children. Pass `undefined` to clear it. If the LAF uses CSS, `setStyleSheetClass({})` is called automatically to initialise the class selector.

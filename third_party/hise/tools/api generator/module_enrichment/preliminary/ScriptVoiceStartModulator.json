@@ -1,0 +1,81 @@
+{
+  "moduleId": "ScriptVoiceStartModulator",
+  "prettyName": "Script Voice Start Modulator",
+  "type": "Modulator",
+  "subtype": "VoiceStartModulator",
+  "category": "custom",
+
+  "io": {
+    "midiIn": "noteOn",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": true,
+    "fxChain": null
+  },
+
+  "voiceContext": "per-voice",
+
+  "interfaces": [
+    {
+      "name": "TableProcessor",
+      "signalFlowRole": "Lookup table accessible from script via Content.getTable()"
+    },
+    {
+      "name": "SliderPackProcessor",
+      "signalFlowRole": "Slider pack data accessible from script via Content.getSliderPack()"
+    },
+    {
+      "name": "AudioSampleProcessor",
+      "signalFlowRole": "Audio file resource accessible from script via Content.getAudioFile()"
+    }
+  ],
+
+  "parameterGroups": [],
+
+  "standaloneModChains": [],
+
+  "disabledModChains": [],
+
+  "compositeBlocks": [],
+
+  "gaps": [
+    {
+      "id": "callback-list",
+      "category": "signal_path",
+      "question": "What are all the callbacks available in the ScriptVoiceStartModulator? What are their exact signatures?",
+      "context": "The reference page must document every callback comprehensively."
+    },
+    {
+      "id": "return-value-semantics",
+      "category": "signal_path",
+      "question": "What should the onVoiceStart callback return? How is the return value used as a modulation value?",
+      "context": "Users must know the expected return value range and semantics."
+    },
+    {
+      "id": "voice-stop-callback",
+      "category": "signal_path",
+      "question": "What does the onVoiceStop callback do? When is it called? What is the voiceIndex parameter?",
+      "context": "Users need to understand the voice lifecycle callbacks."
+    },
+    {
+      "id": "api-objects-available",
+      "category": "signal_path",
+      "question": "What API objects are registered and available inside callbacks?",
+      "context": "Users need to know what scripting API objects are accessible."
+    },
+    {
+      "id": "on-control-parameters",
+      "category": "parameter_behavior",
+      "question": "What parameters does the onControl callback receive?",
+      "context": "onControl is the UI interaction callback."
+    },
+    {
+      "id": "dynamic-parameters",
+      "category": "parameter_behavior",
+      "question": "The module has metadataType 'dynamic' and no static parameters. How are parameters defined?",
+      "context": "Parameters are created by the user script via Content API."
+    }
+  ],
+
+  "notes": "ScriptVoiceStartModulator is a VoiceStartModulator subtype that computes its modulation value via HiseScript. It has 5 callbacks: onInit, onVoiceStart, onVoiceStop, onController, onControl. The onVoiceStart callback receives a voiceIndex parameter and must return a float value (0.0-1.0) that becomes the per-voice modulation value. Unlike ScriptProcessor, it has no onNoteOn/onNoteOff/onTimer callbacks - instead it has onVoiceStart and onVoiceStop which are voice-lifecycle-aware."
+}

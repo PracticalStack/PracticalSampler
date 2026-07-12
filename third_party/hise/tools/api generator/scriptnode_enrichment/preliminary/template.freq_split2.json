@@ -1,0 +1,100 @@
+{
+  "factoryPath": "template.freq_split2",
+  "factory": "template",
+  "nodeId": "freq_split2",
+  "description": "Processes each node independently and sums up the output.",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Crossover Frequencies",
+      "rationale": "Each Band parameter sets a crossover frequency point. Band 1 is the single crossover between low and high bands. Each crossover frequency is routed to the Frequency parameter of paired Linkwitz-Riley filters in adjacent bands (one LP, one HP), ensuring phase-coherent summation.",
+      "parameters": [
+        {
+          "id": "Band 1",
+          "range": { "min": 20.0, "max": 20000.0, "step": 0.0, "skew": 0.2299045584686382 },
+          "default": 187.9941165776182,
+          "textConverter": null,
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": true,
+    "groupName": "freq_splitN",
+    "templateParameter": "number of frequency bands (2-5)",
+    "variantValue": "2"
+  },
+
+  "existingDoc": {
+    "path": "phase3/template/freq_split2.md",
+    "tier": "BRIEF",
+    "lines": 13
+  },
+
+  "availableImages": ["lr4_3.png", "split.png"],
+
+  "gaps": [
+    {
+      "id": "internal-topology",
+      "category": "signal_path",
+      "question": "The root container is container.split with N bands as children. Each band is a container.chain containing a jdsp.jlinkwitzriley filter and a math.mul dummy. What are the Type parameter values for the LR filters in band1 (LP=0) vs band2 (HP=2)? Are these Linkwitz-Riley 4th order (LR4) filters as suggested by the lr4_3.png image name?",
+      "context": "Understanding the filter order and type assignment is essential for documenting the crossover slope steepness and phase behaviour."
+    },
+    {
+      "id": "crossover-parameter-routing",
+      "category": "parameter_behaviour",
+      "question": "Band 1 connects to lr1_1.Frequency and lr2_1.Frequency. In a 2-band split, lr1_1 is in band1 (LP filter) and lr2_1 is in band2 (HP filter). Confirm that each crossover parameter feeds the same frequency to the LP filter of the lower band and the HP filter of the upper band.",
+      "context": "Correct documentation of parameter routing is critical for users who want to understand how crossover points are shared between adjacent bands."
+    },
+    {
+      "id": "dummy-mul-purpose",
+      "category": "signal_path",
+      "question": "Each band contains a math.mul node (dummy) with Value=1.0. Is this a placeholder for user processing, or does it serve a functional purpose (e.g., gain compensation)?",
+      "context": "Users need to know whether to replace the dummy nodes with their own processing chains."
+    },
+    {
+      "id": "description-accuracy",
+      "category": "description_accuracy",
+      "question": "The base description says 'Processes each node independently and sums up the output' which is the generic container.split description. A more accurate description would reference frequency-band splitting with Linkwitz-Riley crossovers.",
+      "context": "The generic split description does not convey the template's specific purpose as a frequency crossover network."
+    },
+    {
+      "id": "phase-coherence",
+      "category": "signal_path",
+      "question": "Linkwitz-Riley crossovers are designed so that the sum of LP and HP outputs is unity at the crossover frequency. Does this template achieve flat magnitude response when bands are summed, or is there a gain offset at crossover points?",
+      "context": "Phase coherence and flat summing are the primary advantages of LR crossovers. Users need to know if this guarantee holds."
+    }
+  ],
+
+  "notes": "Base variant of the freq_splitN group. Root is container.split. Each band child is container.chain with [jdsp.jlinkwitzriley, math.mul]. Band 1 parameter connects to lr1_1 and lr2_1 (filters in band1 and band2 respectively). The skew factor 0.2299 is typical for logarithmic frequency mapping. The math.mul dummies (Value=1.0) appear to be placeholders where users insert their per-band processing. The description is inherited from container.split and does not describe the template's actual purpose. Available image lr4_3.png appears to show a 3-band variant, suggesting LR4 (4th-order Linkwitz-Riley) topology."
+}

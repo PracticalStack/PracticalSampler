@@ -1,0 +1,1 @@
+Removes all images previously loaded via `loadImage()`, releasing their pooled references. After calling this, `isImageLoaded()` returns false for all previously loaded aliases and paint functions can no longer reference the unloaded images.

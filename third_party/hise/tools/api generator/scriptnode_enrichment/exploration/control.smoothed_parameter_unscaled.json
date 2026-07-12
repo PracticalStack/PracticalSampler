@@ -1,0 +1,16 @@
+{
+  "factoryPath": "control.smoothed_parameter_unscaled",
+  "nodes": [
+    { "id": "value_in", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Raw target value for the smoother (unscaled)" },
+    { "id": "smoothing_time", "label": "SmoothingTime", "type": "parameter", "importance": 0.8, "description": "Smoothing duration in milliseconds" },
+    { "id": "enabled", "label": "Enabled", "type": "parameter", "importance": 0.6, "description": "Toggle smoothing on/off" },
+    { "id": "smoother", "label": "Smoother", "type": "process", "importance": 1.0, "description": "Advances smoother per sample/block (same modes as smoothed_parameter)" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Smoothed unnormalised value via wrap::mod" }
+  ],
+  "edges": [
+    { "from": "value_in", "to": "smoother", "type": "control", "label": "set target" },
+    { "from": "smoothing_time", "to": "smoother", "type": "control", "label": "ramp time" },
+    { "from": "enabled", "to": "smoother", "type": "control", "label": "bypass" },
+    { "from": "smoother", "to": "mod_out", "type": "signal", "label": "advance() per sample" }
+  ]
+}

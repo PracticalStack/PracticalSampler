@@ -1,0 +1,1 @@
+Returns a `ScriptMidiProcessor` handle to the MIDI processor with the given name within the parent synth's subtree. You cannot get a reference to the script processor that owns this `Synth` object - passing your own processor's ID produces an error.

@@ -1,0 +1,139 @@
+{
+  "version": "1.0.0",
+  "description": "Test cases for verifying correct tool selection by LLMs",
+  "testCases": [
+    {
+      "id": "ts-001",
+      "category": "exact-api-method",
+      "input": "How do I add a note on event in HISE?",
+      "expectedTool": "search_hise",
+      "expectedQuery": "note on",
+      "notes": "Should search first since user doesn't know exact method name"
+    },
+    {
+      "id": "ts-002",
+      "category": "exact-api-method",
+      "input": "What does Synth.addNoteOn do?",
+      "expectedTool": "query_scripting_api",
+      "expectedArg": "Synth.addNoteOn",
+      "notes": "User knows exact method name"
+    },
+    {
+      "id": "ts-003",
+      "category": "exact-api-method",
+      "input": "Tell me about Math.round()",
+      "expectedTool": "query_scripting_api",
+      "expectedArg": "Math.round",
+      "notes": "Should handle parentheses in input"
+    },
+    {
+      "id": "ts-004",
+      "category": "ui-property",
+      "input": "What is the filmstripImage property?",
+      "expectedTool": "query_ui_property",
+      "expectedArg": "ScriptButton.filmstripImage",
+      "notes": "UI property, not a method"
+    },
+    {
+      "id": "ts-005",
+      "category": "ui-property",
+      "input": "How do I set the text property of a label?",
+      "expectedTool": "query_ui_property",
+      "expectedArg": "ScriptLabel.text",
+      "notes": "Property access, not method call"
+    },
+    {
+      "id": "ts-006",
+      "category": "module-parameter",
+      "input": "What are the parameters for SimpleEnvelope?",
+      "expectedTool": "search_hise",
+      "expectedQuery": "SimpleEnvelope.*",
+      "notes": "Should search to list all parameters"
+    },
+    {
+      "id": "ts-007",
+      "category": "module-parameter",
+      "input": "What is the Attack parameter range for SimpleEnvelope?",
+      "expectedTool": "query_module_parameter",
+      "expectedArg": "SimpleEnvelope.Attack",
+      "notes": "Specific parameter query"
+    },
+    {
+      "id": "ts-008",
+      "category": "discovery",
+      "input": "What MIDI-related functions are available?",
+      "expectedTool": "search_hise",
+      "expectedQuery": "midi",
+      "notes": "Discovery/exploration query"
+    },
+    {
+      "id": "ts-009",
+      "category": "discovery",
+      "input": "Show me all Synth methods",
+      "expectedTool": "search_hise",
+      "expectedQuery": "Synth.*",
+      "notes": "Namespace listing"
+    },
+    {
+      "id": "ts-010",
+      "category": "snippets",
+      "input": "Show me example code for a basic synth",
+      "expectedTool": "list_snippets",
+      "notes": "Looking for code examples"
+    },
+    {
+      "id": "ts-011",
+      "category": "negative-api-vs-property",
+      "input": "How do I use setValue on a knob?",
+      "expectedTool": "query_scripting_api",
+      "expectedArg": "Knob.setValue",
+      "shouldNotBe": "query_ui_property",
+      "notes": "setValue is a METHOD, not a property"
+    },
+    {
+      "id": "ts-012",
+      "category": "negative-property-vs-api",
+      "input": "What is the bgColour property?",
+      "expectedTool": "search_hise",
+      "expectedQuery": "bgColour",
+      "shouldNotBe": "query_scripting_api",
+      "notes": "bgColour is a PROPERTY, not a method"
+    },
+    {
+      "id": "ts-013",
+      "category": "negative-param-vs-api",
+      "input": "What is the Gain parameter?",
+      "expectedTool": "search_hise",
+      "expectedQuery": "Gain",
+      "shouldNotBe": "query_scripting_api",
+      "notes": "Gain is a module PARAMETER, not a method"
+    },
+    {
+      "id": "ts-014",
+      "category": "ambiguous",
+      "input": "How do I change the color of a button?",
+      "expectedTool": "search_hise",
+      "expectedQuery": "button color",
+      "notes": "Ambiguous - should search to find relevant properties"
+    },
+    {
+      "id": "ts-015",
+      "category": "exact-with-parentheses",
+      "input": "Synth.addNoteOn()",
+      "expectedTool": "query_scripting_api",
+      "expectedArg": "Synth.addNoteOn",
+      "notes": "Direct method name with parentheses should work"
+    }
+  ],
+  "categories": {
+    "exact-api-method": "User knows exact API method name",
+    "ui-property": "UI component property queries",
+    "module-parameter": "DSP module parameter queries",
+    "discovery": "Exploration/discovery queries",
+    "snippets": "Code example queries",
+    "negative-api-vs-property": "Should NOT use API tool for properties",
+    "negative-property-vs-api": "Should NOT use property tool for methods",
+    "negative-param-vs-api": "Should NOT use API tool for parameters",
+    "ambiguous": "Unclear queries that need search"
+  }
+}

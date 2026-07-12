@@ -1,0 +1,1 @@
+Returns an `AudioFile` object for the module's audio data slot. AudioSampleProcessor modules have exactly one slot, so always pass 0. The returned object provides access to sample buffers, content change callbacks, and can be used as a `Broadcaster.attachToComplexData` target or file drop target.

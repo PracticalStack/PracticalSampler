@@ -1,0 +1,109 @@
+{
+  "factoryPath": "control.smoothed_parameter_unscaled",
+  "factory": "control",
+  "nodeId": "smoothed_parameter_unscaled",
+  "description": "Smoothes an incoming modulation signal",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input",
+      "rationale": "The raw value to be smoothed before sending to the output without range scaling.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": true
+        }
+      ]
+    },
+    {
+      "label": "Smoothing Configuration",
+      "rationale": "Controls the smoothing behaviour -- time constant and enable toggle.",
+      "parameters": [
+        {
+          "id": "SmoothingTime",
+          "range": { "min": 0.1, "max": 1000.0, "step": 0.1, "skew": 1.0 },
+          "default": 100.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Enabled",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "Mode",
+      "defaultValue": "Linear Ramp",
+      "type": "enum",
+      "note": "Selects the smoothing algorithm. Same mode namespace as smoothed_parameter ('smoothers')."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": true,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/smoothed_parameter_unscaled.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "unscaled-difference",
+      "category": "signal_path",
+      "question": "Is the only difference from smoothed_parameter that this variant uses no_mod_normalisation (unnormalised output + unscaled Value input)? Is the smoothing algorithm identical?",
+      "context": "If identical except for normalisation, the doc can reference smoothed_parameter and note only the scaling difference."
+    },
+    {
+      "id": "smoothing-modes",
+      "category": "conditional_logic",
+      "question": "Does smoothed_parameter_unscaled share the same Mode options as smoothed_parameter?",
+      "context": "Confirm mode parity between the two variants."
+    }
+  ],
+
+  "notes": "Disambiguation pair with smoothed_parameter. Like smoothed_parameter, does NOT have OutsideSignalPath or IsControlNode -- sits in the signal path using wrap::mod pattern. The difference is UseUnnormalisedModulation with Value as unscaled input. Has TemplateArgumentIsPolyphonic and HasModeTemplateArgument."
+}

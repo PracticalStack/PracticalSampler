@@ -1,0 +1,88 @@
+{
+  "moduleId": "GlobalEnvelopeModulator",
+  "nodes": [
+    {
+      "id": "connection",
+      "type": "external",
+      "label": "Source Envelope (in Container)",
+      "importance": 1,
+      "detail": "Pre-computed envelope buffer from GlobalModulatorContainer, indexed by event ID % NUM_POLYPHONIC_VOICES"
+    },
+    {
+      "id": "buffer_copy",
+      "type": "process",
+      "label": "Buffer Copy / Table Lookup",
+      "importance": 1,
+      "detail": "Non-table: FloatVectorOperations::copy(). Table: per-sample getInterpolatedValue(). Inversion code commented out (vestigial)."
+    },
+    {
+      "id": "use_table_param",
+      "type": "parameter",
+      "label": "UseTable",
+      "importance": 2
+    },
+    {
+      "id": "inverted_param",
+      "type": "parameter",
+      "label": "Inverted (vestigial)",
+      "importance": 0,
+      "detail": "Defined but inversion code is commented out in both paths."
+    },
+    {
+      "id": "monophonic_param",
+      "type": "parameter",
+      "label": "Monophonic",
+      "importance": 2,
+      "detail": "Affects voice management framework, not envelope shape."
+    },
+    {
+      "id": "retrigger_param",
+      "type": "parameter",
+      "label": "Retrigger",
+      "importance": 2,
+      "detail": "Affects voice management framework, not envelope shape."
+    },
+    {
+      "id": "is_playing",
+      "type": "process",
+      "label": "isPlaying Check",
+      "importance": 2,
+      "detail": "Delegates to container's envelope clear state check for this event."
+    },
+    {
+      "id": "mod_output",
+      "type": "output",
+      "label": "Modulation Output",
+      "importance": 1
+    },
+    {
+      "id": "disconnected",
+      "type": "decision",
+      "label": "Connected?",
+      "importance": 1,
+      "detail": "Disconnected: fills buffer with getInitialValue() (1.0 gain / 0.0 pitch)."
+    }
+  ],
+  "edges": [
+    { "from": "disconnected", "to": "connection", "type": "conditional", "label": "connected" },
+    { "from": "disconnected", "to": "mod_output", "type": "conditional", "label": "disconnected (initial value)" },
+    { "from": "connection", "to": "buffer_copy" },
+    { "from": "use_table_param", "to": "buffer_copy", "type": "control" },
+    { "from": "buffer_copy", "to": "mod_output" },
+    { "from": "buffer_copy", "to": "is_playing" },
+    { "from": "monophonic_param", "to": "buffer_copy", "type": "control" },
+    { "from": "retrigger_param", "to": "buffer_copy", "type": "control" }
+  ],
+  "groups": [
+    {
+      "id": "value_processing",
+      "label": "Value Processing",
+      "nodes": ["buffer_copy", "use_table_param", "inverted_param"]
+    },
+    {
+      "id": "voice_management",
+      "label": "Voice Management",
+      "nodes": ["monophonic_param", "retrigger_param", "is_playing"]
+    }
+  ]
+}

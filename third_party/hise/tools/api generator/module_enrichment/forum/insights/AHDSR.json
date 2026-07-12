@@ -1,0 +1,112 @@
+{
+  "targetId": "AHDSR",
+  "domain": "modules",
+  "generatedAt": "2026-04-08",
+  "topicIds": [5492, 10567, 7336, 10818, 7183, 14434, 13481, 3582, 9615, 4351, 4626, 197, 1546, 6359, 7892, 11244, 11664, 11318, 11319, 89, 200, 1241, 1790, 2392, 8306, 8757, 377, 8677, 10072, 9608, 14311, 13735, 14119, 8112, 5662, 8270],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Monophonic mode disables voice killing",
+      "summary": "Switching an AHDSR to Monophonic mode causes it to lose its ability to kill voices. HISE normally detects when an envelope is not in the signal chain and throws an error, but this case slips through silently. Workaround: add a second envelope left in poly mode to handle voice killing.",
+      "sources": ["tid:9608"],
+      "verify": true,
+      "verify_hint": "grep voice kill / monophonic in AhdsrEnvelope or ModulatorChain source"
+    },
+    {
+      "type": "API",
+      "title": "Envelope is mandatory for voice killing; removing it causes ringing notes",
+      "summary": "HISE requires at least one envelope per sound generator because the envelope is responsible for killing the voice when it reaches zero. Without an envelope, sound generators that have no natural end point will produce ringing notes that never stop.",
+      "sources": ["tid:7336"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "AHDSR graph display disabled in compiled plugins without ENABLE_ALL_PEAK_METERS",
+      "summary": "The animated ball/path display of the AHDSR envelope is deactivated in compiled plugins by default to avoid audio thread overhead. Adding ENABLE_ALL_PEAK_METERS=1 to Extra Definitions re-enables it. As of a later commit, Christoph removed this requirement specifically for the AHDSR graph, so current builds may display it unconditionally.",
+      "sources": ["tid:1546"],
+      "verify": true,
+      "verify_hint": "grep ENABLE_ALL_PEAK_METERS in AhdsrEnvelope or Modulator display code"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Release curve cannot be shaped in AHDSR; use Table Envelope instead",
+      "summary": "The AHDSR module has AttackCurve and DecayCurve parameters but no equivalent curve control for Release. To shape the release curve, use the Table Envelope, which provides separate attack and release tables.",
+      "sources": ["tid:8306"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "Attack level modulation uses 0-100% table range rather than dB",
+      "summary": "Adding a modulator to the AHDSR Attack Level parameter applies a 0-100% multiplier rather than a dB offset. Additionally, if the attack level is set below the sustain level, the envelope can stall and never progress past the attack stage.",
+      "sources": ["tid:3582"],
+      "verify": true,
+      "verify_hint": "grep AttackLevel in AhdsrEnvelope; check how modulation chain is applied to attack level vs sustain level comparison"
+    },
+    {
+      "type": "BUG",
+      "title": "Global AHDSR modulation causes faulty retriggering and dead notes",
+      "summary": "Using an AHDSR as a global modulator (inside a Global Modulator Container) causes retriggering issues and dead notes in polyphonic setups. Christoph confirmed active work on a new modulation matrix to fix these issues.",
+      "sources": ["tid:10567"],
+      "verify": true,
+      "verify_hint": "search GlobalModulatorContainer + envelope handling; check for polyphony voice assignment bugs"
+    },
+    {
+      "type": "BUG",
+      "title": "Filter envelopes stop triggering on replayed notes above certain release lengths",
+      "summary": "When a gain AHDSR has a long enough release, filter envelopes stop being triggered when the same note is replayed in quick succession. The filter envelope plotter shows normal triggering but the signal does not reach the filter. Christoph confirmed this as a regression affecting same-note repeats in polyphonic mode.",
+      "sources": ["tid:14434"],
+      "verify": true,
+      "verify_hint": "search voice reset / note retrigger in envelope and filter modulation chain; check same-note polyphonic handling"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "AHDSR is slightly more CPU-intensive than SimpleEnvelope",
+      "summary": "Christoph confirmed the AHDSR uses slightly more CPU than the SimpleEnvelope due to its additional parameters and computation. For instruments that do not need Hold or curve shaping, using SimpleEnvelope is a minor but valid optimization.",
+      "sources": ["tid:197"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use an AHDSR controller script to drive multiple envelopes from one set of UI knobs",
+      "summary": "When one set of UI controls must drive identical AHDSR parameters across multiple sound generators, use a secondary AHDSR controller MidiProcessor script (publicly available from David Healey) rather than scripting setAttribute calls manually. Connect UI knobs to the controller using processor/property IDs.",
+      "sources": ["tid:5662", "tid:14119", "tid:8270"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "LAF drawAhdsrBackground / drawAhdsrPath / drawAhdsrBall control AHDSR display",
+      "summary": "The AHDSR display graphic (background, envelope path, and moving ball indicator) can each be overridden or suppressed via Look and Feel functions. Global LAF must be used; local LAF does not work for these callbacks.",
+      "sources": ["tid:8677"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "The exclamation mark icon means the envelope acts as a voice killer",
+      "summary": "An envelope with an exclamation mark icon in the module tree is configured to act as the voice killer - it will stop voices when it sends a voice reset message. The icon resembles a panic button symbol, which can alarm new users.",
+      "sources": ["tid:11244"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Filter envelope can be placed directly in the sampler's frequency modulation chain",
+      "summary": "It is not necessary to wrap a sampler in a Synthesizer Group to use filter envelopes. Adding a filter directly to the sampler and placing an AHDSR in the filter's frequency modulation chain works correctly.",
+      "sources": ["tid:1790"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Monophonic mode shares one envelope across all voices but voices still play polyphonically",
+      "summary": "In Monophonic mode the envelope is shared (one envelope instance for all voices), and notes still play polyphonically. This is not the same as building a mono synth - for true monophonic playback a different approach using the Monophonic Glide Synth pattern is needed.",
+      "sources": ["tid:9608"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

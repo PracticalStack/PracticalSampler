@@ -1,0 +1,1 @@
+Writes expansion key data to the expansion list file, stored as a sibling of the main licence key file. Requires `HISE_USE_UNLOCKER_FOR_EXPANSIONS` to be enabled. The `keyData` string must start with `"Expansion List"` or the method silently returns false. On a successful write, automatically calls `loadExpansionList()` to decrypt and apply the expansion credentials.

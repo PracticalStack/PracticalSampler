@@ -1,0 +1,1 @@
+Removes all automation callbacks that were previously attached via `attachAutomationCallback`. This deregisters every callback from the dispatch system in one call, rather than removing them individually.

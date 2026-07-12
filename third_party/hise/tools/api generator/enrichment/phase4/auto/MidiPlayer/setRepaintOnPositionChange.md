@@ -1,0 +1,1 @@
+Enables or disables automatic repainting of the connected panel during playback. When enabled, the panel set via `connectToPanel()` receives repaint calls at roughly 50ms intervals as the playback position advances. When disabled, the panel is only repainted when the sequence data itself changes.

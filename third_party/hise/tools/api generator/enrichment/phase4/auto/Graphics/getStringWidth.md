@@ -1,0 +1,1 @@
+Returns the pixel width of the given text string when rendered with the current font. Call `setFont` or `setFontWithSpacing` first to ensure the measurement matches the actual rendered output. This is the only Graphics method that returns a value rather than drawing something.

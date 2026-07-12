@@ -1,0 +1,1 @@
+Adds a regular polygon centred at the given point with the specified number of sides. Each vertex sits at `radius` distance from the centre. The `angle` parameter rotates the polygon in radians (0.0 places the first vertex pointing right). For a triangle with explicit vertex control, use `addTriangle` instead.

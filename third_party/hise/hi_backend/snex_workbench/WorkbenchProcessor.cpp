@@ -1,0 +1,1643 @@
+/*  ===========================================================================
+*
+*   This file is part of HISE.
+*   Copyright 2016 Christoph Hart
+*
+*   HISE is free software: you can redistribute it and/or modify
+*   it under the terms of the GNU General Public License as published by
+*   the Free Software Foundation, either version 3 of the License, or
+*   (at your option any later version.
+*
+*   HISE is distributed in the hope that it will be useful,
+*   but WITHOUT ANY WARRANTY; without even the implied warranty of
+*   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*   GNU General Public License for more details.
+*
+*   You should have received a copy of the GNU General Public License
+*   along with HISE.  If not, see <http://www.gnu.org/licenses/>.
+*
+*   Commercial licences for using HISE in an closed source project are
+*   available on request. Please visit the project's website to get more
+*   information about commercial licencing:
+*
+*   http://www.hartinstruments.net/hise/
+*
+*   HISE is based on the JUCE library,
+*   which also must be licenced for commercial applications:
+*
+*   http://www.juce.com
+*
+*   ===========================================================================
+*/
+
+
+
+namespace hise {
+using namespace juce;
+
+
+
+struct IncludeSorter
+{
+	static int compareElements(const File& f1, const File& f2)
+	{
+		using namespace scriptnode;
+		using namespace snex::cppgen;
+
+		auto xml1 = XmlDocument::parse(f1);
+		auto xml2 = XmlDocument::parse(f2);
+
+		if (xml1 != nullptr && xml2 != nullptr)
+		{
+			ValueTree v1 = ValueTree::fromXml(*xml1);
+			ValueTree v2 = ValueTree::fromXml(*xml2);
+
+			auto id1 = "project." + v1.getProperty(PropertyIds::ID).toString();
+			auto id2 = "project." + v2.getProperty(PropertyIds::ID).toString();
+
+			auto f1 = [id1](ValueTree& v)
+			{
+				if (v.getProperty(PropertyIds::FactoryPath).toString() == id1)
+					return true;
+
+				return false;
+			};
+
+			auto f2 = [id2](ValueTree& v)
+			{
+				if (v.getProperty(PropertyIds::FactoryPath).toString() == id2)
+					return true;
+
+				return false;
+			};
+
+			auto firstIsReferencedInSecond = valuetree::Helpers::forEach(v1, f2, valuetree::Helpers::IterationType::ChildrenFirst);
+
+			auto secondIsReferencedInFirst = valuetree::Helpers::forEach(v1, f2, valuetree::Helpers::IterationType::ChildrenFirst);
+
+			String e;
+			e << "Cyclic reference: ";
+			e << id1 << " && " << id2;
+
+			if (firstIsReferencedInSecond)
+			{
+				if (secondIsReferencedInFirst)
+					throw String(e);
+
+				return -1;
+			}
+
+			if (secondIsReferencedInFirst)
+			{
+				if (firstIsReferencedInSecond)
+					throw String(e);
+
+				return 1;
+			}
+		}
+
+		return 0;
+	};
+};
+
+DspNetworkCompileExporter::DspNetworkCompileExporter(Component* e, BackendProcessor* bp, bool skipCompilation_) :
+	DialogWindowWithBackgroundThread("Compile DSP networks"),
+	ControlledObject(bp),
+	CompileExporter(bp->getMainSynthChain()),
+	editor(e),
+	skipCompilation(skipCompilation_) 
+{
+	addComboBox("build", { "Debug", "CI", "Release" }, "Build Configuration");
+
+#if !JUCE_DEBUG
+    getComboBoxComponent("build")->setText("Release", dontSendNotification);
+#endif
+
+	configurationName = getComboBoxComponent("build")->getText();
+
+	if(!skipCompilation)
+	{
+		if (getNetwork() == nullptr)
+		{
+			raw::Builder builder(bp);
+			MainController::ScopedBadBabysitter sb(bp);
+
+			auto jmp = builder.create<JavascriptMasterEffect>(bp->getMainSynthChain(), raw::IDs::Chains::FX);
+			jmp->getOrCreate("internal_dsp");
+		}
+	}
+
+	if (auto n = getNetwork())
+		n->createAllNodesOnce();
+	
+	auto customProperties = bp->dllManager->getSubFolder(getMainController(), BackendDllManager::FolderSubType::ThirdParty).getChildFile("node_properties.json");
+
+	if (customProperties.existsAsFile())
+	{
+		auto obj = JSON::parse(customProperties);
+		
+		if (auto o = obj.getDynamicObject())
+		{
+			for (auto& nv : o->getProperties())
+			{
+				if (auto ar = nv.value.getArray())
+				{
+					for (const auto& prop : *ar)
+					{
+						cppgen::CustomNodeProperties::addNodeIdManually(nv.name, prop.toString());
+					}
+				}
+			}
+		}
+	}
+
+	addBasicComponents(true);
+
+	String s;
+	s << "Nodes to compile:\n";
+
+	for (auto f : bp->dllManager->getThirdPartyFiles(bp, false))
+	{
+		String t = f.getFileNameWithoutExtension();
+		cppFilesToCompile.add(t);
+		s << " - " << t << + " [external C++]\n";
+	}
+
+	for (auto f : bp->dllManager->getNetworkFiles(bp, false))
+	{
+		String t = f.getFileNameWithoutExtension();
+		nodesToCompile.add(t);
+		s << " - " << t << "\n";
+	}
+
+	s = s.upToLastOccurrenceOf(", ", false, false);
+
+	addTextBlock(s);
+
+	showStatusMessage("Press OK to compile the nodes into a DLL");
+}
+
+void DspNetworkCompileExporter::writeDebugFileAndShowSolution()
+{
+    auto& settings = dynamic_cast<GlobalSettingManager*>(getMainController())->getSettingsObject();
+    auto hisePath = settings.getSetting(HiseSettings::Compiler::HisePath).toString();
+    auto solutionFolder = BackendDllManager::getSubFolder(getMainController(), BackendDllManager::FolderSubType::Binaries).getChildFile("Builds");
+    auto projectName = settings.getSetting(HiseSettings::Project::Name).toString();
+    auto debugExecutable = File(hisePath).getChildFile("projects/standalone/Builds/");
+    
+	auto currentExecutable = File::getSpecialLocation(File::currentExecutableFile);
+
+#if JUCE_WINDOWS
+    auto isUsingVs2026 = HelperClasses::isUsingVisualStudio2026(settings);
+    auto vsString = isUsingVs2026 ? "VisualStudio2026" : "VisualStudio2022";
+    auto vsVersion = isUsingVs2026 ? "18.0" : "17.0";
+	auto folder = currentExecutable.getFullPathName().contains(" with Faust") ? "Debug with Faust" : "Minimal Build";
+
+	debugExecutable = debugExecutable.getChildFile(vsString).getChildFile("x64").getChildFile(folder).getChildFile("App").getChildFile("HISE Debug.exe");
+
+	// If this hits, then you have a mismatch between VS2022 and VS2026...
+	jassertEqual(debugExecutable, currentExecutable);
+	
+    solutionFolder = solutionFolder.getChildFile(vsString);
+    auto solutionFile = solutionFolder.getChildFile(projectName).withFileExtension("sln");
+    
+	ScopedPointer<XmlElement> xml = new XmlElement("Project");
+	xml->setAttribute("ToolsVersion", vsVersion);
+	xml->setAttribute("xmlns", "http://schemas.microsoft.com/developer/msbuild/2003");
+	auto pg = new XmlElement("PropertyGroup");
+	pg->setAttribute("Condition", "'$(Configuration)|$(Platform)'=='Debug|x64'");
+	xml->addChildElement(pg);
+
+	auto ldc = new XmlElement("LocalDebuggerCommand");
+
+	jassert(debugExecutable.existsAsFile());
+
+	ldc->addTextElement(debugExecutable.getFullPathName()) ;
+	
+	pg->addChildElement(ldc);
+	auto df = new XmlElement("DebuggerFlavor");
+	df->addTextElement("WindowsLocalDebugger");
+	pg->addChildElement(df);
+
+	auto userFile = solutionFile.getSiblingFile(projectName + "_DynamicLibrary.vcxproj.user");
+
+	auto fileContent = xml->createDocument("");
+
+	userFile.replaceWithText(fileContent);
+    
+	auto hasThirdPartyFiles = includedThirdPartyFiles.isEmpty();
+
+    if (hasThirdPartyFiles && managerToUse == nullptr && PresetHandler::showYesNoWindow("Quit HISE", "Do you want to quit HISE and show VS solution for debugging the DLL?  \n> Double click on the solution file, then run the VS debugger and it will open HISE with the ability to set VS breakpoints in your C++ nodes"))
+    {
+        solutionFile.revealToUser();
+        JUCEApplication::quit();
+    }
+    
+#elif JUCE_MAC
+    debugExecutable = debugExecutable.getChildFile("MacOSX/build/Debug/HISE Debug.app");
+    
+    jassert(debugExecutable.isDirectory());
+    solutionFolder = solutionFolder.getChildFile("MacOSX");
+    auto solutionFile = solutionFolder.getChildFile(projectName).withFileExtension("xcodeproj");
+    
+    if (managerToUse == nullptr && PresetHandler::showYesNoWindow("Show XCode Project", "Do you want to show the Xcode Project file?  \n> Double click on the file to open XCode, then choose `Debug->Attach to Process->HISE Debug` in order to run your C++ node in the Xcode Debugger"))
+    {
+        solutionFile.revealToUser();
+    }
+#endif
+}
+
+MainController* DspNetworkCompileExporter::Context::getMainController() const
+{
+	return bp;
+}
+
+juce::File DspNetworkCompileExporter::Context::getFolder(BackendDllManager::FolderSubType t) const
+{
+	return BackendDllManager::getSubFolder(bp, t);
+}
+
+void DspNetworkCompileExporter::Context::logMessage(const String& m) const
+{
+	if (managerToUse != nullptr)
+	{
+		managerToUse->logMessage("> " + m + "\n");
+		return;
+	}
+
+	if (logCallback)
+		logCallback(m);
+	else
+		Logger::writeToLog(m);
+}
+
+void DspNetworkCompileExporter::Context::setProgress(double p) const
+{
+	if (managerToUse != nullptr)
+		managerToUse->setProgress(p);
+
+	if (progressCallback)
+		progressCallback(p);
+}
+
+DspNetworkCompileExporter::CppFileLocationType DspNetworkCompileExporter::getLocationType(const Context& ctx, const File& f)
+{
+	if (f.getParentDirectory().getFileNameWithoutExtension() == "src")
+		return ThirdPartySourceFile;
+
+	if (f.getFileNameWithoutExtension() == "embedded_audiodata")
+		return EmbeddedDataFile;
+
+	for (auto& incF : ctx.includedFiles)
+	{
+		if (incF.getFileNameWithoutExtension() == f.getFileNameWithoutExtension())
+			return CompiledNetworkFile;
+	}
+
+	for(auto& neuralF: ctx.includedNeuralModelFiles)
+	{
+		if(neuralF.getFileNameWithoutExtension() == f.getFileNameWithoutExtension())
+			return CompiledNeuralModelFile;
+	}
+
+	for (auto& itf : ctx.includedThirdPartyFiles)
+	{
+		if (itf.getFileNameWithoutExtension() == f.getFileNameWithoutExtension())
+			return ThirdPartyFile;
+	}
+
+	return UnknownFileType;
+}
+
+scriptnode::DspNetwork* DspNetworkCompileExporter::getNetwork(const Context& ctx)
+{
+	Processor::Iterator<JavascriptProcessor> iter(ctx.getMainController()->getMainSynthChain());
+
+	while (auto jsp = iter.getNextProcessor())
+	{
+		if (auto n = jsp->getActiveOrDebuggedNetwork())
+			return n;
+	}
+
+	return nullptr;
+}
+
+scriptnode::DspNetwork* DspNetworkCompileExporter::getNetwork()
+{
+	Context ctx;
+	ctx.bp = dynamic_cast<BackendProcessor*>(getMainController());
+	return getNetwork(ctx);
+}
+
+
+
+void DspNetworkCompileExporter::run()
+{
+	ok = setupHisePath();
+
+	if(ok != CompileExporter::ErrorCodes::OK)
+	{
+		errorMessage << "Can't find HISE path";
+		return;
+	}
+
+	Context ctx;
+	ctx.bp = dynamic_cast<BackendProcessor*>(getMainController());
+	ctx.exporter = this;
+	ctx.managerToUse = managerToUse;
+	ctx.skipCompilation = skipCompilation;
+	ctx.logCallback = [this](const String& m) { showStatusMessage(m); };
+
+	if(managerToUse != nullptr && !skipCompilation)
+		managerToUse->setProgress(0.25);
+
+	runStatic(ctx);
+
+	nodesToCompile = std::move(ctx.nodesToCompile);
+	cppFilesToCompile = std::move(ctx.cppFilesToCompile);
+	includedFiles = std::move(ctx.includedFiles);
+	includedThirdPartyFiles = std::move(ctx.includedThirdPartyFiles);
+	ok = ctx.ok;
+	errorMessage = ctx.errorMessage;
+
+	if (ok != ErrorCodes::OK)
+		return;
+
+	silentMode = true;
+
+#if JUCE_WINDOWS
+	BuildOption o = CompileExporter::VSTiWindowsx64;
+#elif JUCE_MAC
+	BuildOption o = CompileExporter::VSTmacOS;
+#else
+	BuildOption o = CompileExporter::VSTLinux;
+#endif
+
+	logMessage("Compiling dll plugin");
+
+	if(MessageManager::getInstance()->isThisTheMessageThread())
+		configurationName = getComboBoxComponent("build")->getText();
+
+	if(!skipCompilation)
+	{
+		if(managerToUse != nullptr)
+			managerToUse->setProgress(0.5);
+
+#if JUCE_LINUX
+		ok = ErrorCodes::OK;
+#else
+		ok = compileSolution(o, CompileExporter::TargetTypes::numTargetTypes, managerToUse);
+#endif
+
+		if(managerToUse != nullptr)
+			managerToUse->setProgress(1.0);
+	}
+}
+
+void DspNetworkCompileExporter::runStatic(Context& ctx)
+{
+	auto n = getNetwork(ctx);
+	auto neuralNetworkFiles = BackendDllManager::getNeuralNetworkFiles(ctx.getMainController());
+
+	if (n == nullptr && neuralNetworkFiles.isEmpty() && !ctx.skipCompilation)
+	{
+		ctx.ok = (ErrorCodes)(int)DspNetworkErrorCodes::NoNetwork;
+		ctx.errorMessage << "You need at least one active network for the export process.  \n";
+		ctx.errorMessage << "> This is used to create all nodes once to setup the codegen properties";
+		return;
+	}
+
+	if (!cppgen::CustomNodeProperties::isInitialised() && !(n == nullptr && !neuralNetworkFiles.isEmpty()))
+	{
+		ctx.ok = ErrorCodes::CompileError;
+		ctx.errorMessage << "the node properties are not initialised. Load a DspNetwork at least once";
+		return;
+	}
+
+	getSourceDirectory(ctx, false).deleteRecursively();
+	getSourceDirectory(ctx, false).createDirectory();
+	getSourceDirectory(ctx, true).deleteRecursively();
+	getSourceDirectory(ctx, true).createDirectory();
+
+	ctx.logMessage("Create files");
+
+	auto buildFolder = ctx.getFolder(BackendDllManager::FolderSubType::Binaries);
+
+	auto networkRoot = ctx.getFolder(BackendDllManager::FolderSubType::Networks);
+	auto unsortedList = BackendDllManager::getNetworkFiles(ctx.getMainController(), false);
+
+	auto unsortedListU = BackendDllManager::getNetworkFiles(ctx.getMainController(), true);
+
+	if(!neuralNetworkFiles.isEmpty())
+		ctx.logMessage("Found " + String(neuralNetworkFiles.size()) + " compiled neural network file(s)");
+
+	for (auto s : unsortedList)
+		unsortedListU.removeAllInstancesOf(s);
+
+	ctx.logMessage("Sorting include dependencies");
+
+	Array<File> list, ulist;
+
+	for (auto& nf : unsortedList)
+	{
+		if (nf.getFileName().startsWith("autosave"))
+			continue;
+
+		for (auto& sf : getIncludedNetworkFiles(nf))
+		{
+			if (!BackendDllManager::allowCompilation(sf))
+			{
+				ctx.ok = ErrorCodes::CompileError;
+				ctx.errorMessage << "Error at compiling `" << nf.getFileNameWithoutExtension() << "`:\n> `" << sf.getFileNameWithoutExtension() << "` can't be included because it's not flagged for compilation\n";
+
+				ctx.errorMessage << "Enable the `AllowCompilation` flag for " << sf.getFileNameWithoutExtension() << " or remove the node from " << nf.getFileNameWithoutExtension();
+
+				return;
+			}
+
+
+			list.addIfNotAlreadyThere(sf);
+		}
+	}
+
+	for (auto& nf : unsortedListU)
+	{
+		if (nf.getFileName().startsWith("autosave"))
+			continue;
+
+		for (auto& sf : getIncludedNetworkFiles(nf))
+		{
+			ulist.addIfNotAlreadyThere(sf);
+		}
+	}
+
+	jassert(list.size() == unsortedList.size());
+
+	auto sourceDir = ctx.getFolder(BackendDllManager::FolderSubType::ProjucerSourceFolder);
+
+#if HISE_INCLUDE_RT_NEURAL
+	for(auto neuralFile: neuralNetworkFiles)
+	{
+		String code;
+		auto r = NeuralNetwork::createCompiledModelHeader(neuralFile, code);
+
+		if(r.failed())
+		{
+			ctx.ok = ErrorCodes::CompileError;
+			ctx.errorMessage = r.getErrorMessage();
+			return;
+		}
+
+		auto target = sourceDir.getChildFile(neuralFile.getFileNameWithoutExtension() + "_neural").withFileExtension("h");
+
+		if(!target.replaceWithText(code))
+		{
+			ctx.ok = ErrorCodes::CompileError;
+			ctx.errorMessage = "Could not write generated neural model header: " + target.getFullPathName();
+			return;
+		}
+
+		ctx.includedNeuralModelFiles.add(target);
+	}
+#endif
+
+	using namespace snex::cppgen;
+
+	ValueTreeBuilder::SampleList externalSamples;
+
+	// set with all files to generate for all networks
+	std::set<String> faustClassIds;
+
+	for (auto e : list)
+	{
+		if (auto xml = XmlDocument::parse(e))
+		{
+			auto p = ValueTree::fromXml(*xml);
+			auto v = p.getChild(0);
+
+			auto id = v[scriptnode::PropertyIds::ID].toString();
+
+			auto cr = ValueTreeBuilder::cleanValueTreeIds(v);
+
+            if(!cr.wasOk())
+            {
+                ctx.errorMessage = "";
+                ctx.errorMessage << id << ": " << cr.getErrorMessage();
+                ctx.ok = ErrorCodes::ProjectXmlInvalid;
+                return;
+            }
+
+			if (id.compareIgnoreCase(e.getFileNameWithoutExtension()) != 0)
+			{
+				ctx.errorMessage << "Error at exporting `" << e.getFileName() << "`: Name mismatch between DSP network file and Root container.  \n>";
+				ctx.errorMessage << "You need to either rename the file to `" << id;
+				ctx.errorMessage << ".xml` or edit the XML data and set the root node's ID to `" << e.getFileNameWithoutExtension() << "`.";
+				ctx.ok = ErrorCodes::ProjectXmlInvalid;
+				return;
+			}
+
+			if(cppgen::StringHelpers::makeValidCppName(id).compareIgnoreCase(id) != 0)
+			{
+				ctx.errorMessage << "Illegal ID: `" << id << "`  \n> The network ID must be a valid C++ identifier";
+				ctx.ok = ErrorCodes::ProjectXmlInvalid;
+				return;
+			}
+
+            ctx.logMessage("Creating C++ file for Network " + id);
+
+			scriptnode::routing::LocalCableHelpers::replaceAllLocalCables(v);
+
+			ValueTreeBuilder b(v, ValueTreeBuilder::Format::CppDynamicLibrary);
+
+			b.setCodeProvider(new BackendDllManager::FileCodeProvider(ctx.getMainController()));
+			b.addAudioFileProvider(new PooledAudioFileDataProvider(ctx.getMainController()));
+
+			auto f = sourceDir.getChildFile(id).withFileExtension(".h");
+
+			auto r = b.createCppCode();
+
+			faustClassIds.insert(r.faustClassIds->begin(), r.faustClassIds->end());
+
+			externalSamples.addArray(b.getExternalSampleList());
+
+
+			if (r.r.wasOk())
+				f.replaceWithText(r.code);
+			else
+            {
+                ctx.ok = ErrorCodes::ProjectXmlInvalid;
+
+				ctx.errorMessage = "";
+				ctx.errorMessage << f.getFileNameWithoutExtension() << ": " << r.r.getErrorMessage();
+
+
+                return;
+            };
+
+			ctx.includedFiles.add(f);
+		}
+	}
+
+#if HISE_INCLUDE_FAUST_JIT
+	DBG("sourceDir: " + sourceDir.getFullPathName());
+
+
+
+	auto codeDestDir = ctx.getFolder(BackendDllManager::FolderSubType::ThirdParty).getChildFile("src_");
+	auto codeDestDirPath = codeDestDir.getFullPathName().toStdString();
+
+	auto realCodeDestDir = ctx.getFolder(BackendDllManager::FolderSubType::ThirdParty).getChildFile("src");
+
+	if (!codeDestDir.isDirectory())
+		codeDestDir.createDirectory();
+
+	if(!realCodeDestDir.isDirectory())
+		realCodeDestDir.createDirectory();
+
+	DBG("codeDestDirPath: " + codeDestDirPath);
+
+	auto boilerplateDestDirPath = codeDestDir.getParentDirectory().getFullPathName().toStdString();
+	DBG("boilerplateDestDirPath: " + boilerplateDestDirPath);
+	// we either need to hard code this path and keep it consistent with faust_jit_node or hi_backend will have to depend on hi_faust_jit
+	auto codeLibDir = ctx.getFolder(BackendDllManager::FolderSubType::CodeLibrary).getChildFile("faust");
+	auto codeLibDirPath = codeLibDir.getFullPathName().toStdString();
+	DBG("codeLibDirPath: " + codeLibDirPath);
+
+	auto faustFileList = codeLibDir.findChildFiles(File::findFiles, false, "*.dsp");
+
+	for(auto f: faustFileList)
+	{
+		auto fp = f.getFileNameWithoutExtension();
+
+		if(faustClassIds.find(fp) == faustClassIds.end())
+		{
+			faustClassIds.insert(fp);
+		}
+	}
+
+
+	// create all necessary files before thirdPartyFiles
+	for (const auto& classId : faustClassIds)
+	{
+		auto _classId = classId.toStdString();
+		DBG("Found Faust classId: " + classId);
+		auto faustSourcePath = codeLibDir.getChildFile(classId + ".dsp").getFullPathName().toStdString();
+
+		auto boilerplate_path = scriptnode::faust::faust_jit_helpers::genStaticInstanceBoilerplate(boilerplateDestDirPath, _classId);
+		if (boilerplate_path.size() > 0)
+			DBG("Wrote boilerplate file to " + boilerplate_path);
+		else
+			DBG("Writing generated boilerplate failed.");
+
+		std::vector<std::string> faustLibraryPaths = {codeLibDirPath};
+		// lookup FaustPath from settings
+		auto& settings = dynamic_cast<GlobalSettingManager*>(ctx.getMainController())->getSettingsObject();
+
+        auto faustPath = settings.getFaustPath();
+
+		if (faustPath.isDirectory()) {
+			auto globalFaustLibraryPath = faustPath.getChildFile("share").getChildFile("faust");
+
+			if (globalFaustLibraryPath.isDirectory()) {
+				faustLibraryPaths.push_back(globalFaustLibraryPath.getFullPathName().toStdString());
+			}
+		}
+
+
+		auto code_path = scriptnode::faust::faust_jit_helpers::genStaticInstanceCode(_classId, faustSourcePath, faustLibraryPaths, codeDestDirPath);
+
+		auto copyOk = codeDestDir.getChildFile(code_path).copyFileTo(realCodeDestDir.getChildFile(code_path));
+
+		if (code_path.size() > 0 && copyOk)
+		{
+			DBG("Wrote code file to " + code_path);
+		}
+		else
+		{
+			DBG("Writing generated code failed.");
+		}
+	}
+
+#endif // HISE_INCLUDE_FAUST_JIT
+
+	auto thirdPartyFiles = BackendDllManager::getThirdPartyFiles(ctx.getMainController(), false);
+
+	if (!thirdPartyFiles.isEmpty())
+	{
+		ctx.logMessage("Copying third party files");
+
+		for (auto tpf : thirdPartyFiles)
+		{
+			ctx.includedThirdPartyFiles.insert(0, tpf);
+		}
+	}
+
+	if (!externalSamples.isEmpty())
+	{
+        ctx.logMessage("Writing embedded audio data file");
+
+		auto eadFile = getSourceDirectory(ctx, true).getChildFile("embedded_audiodata.h");
+		eadFile.deleteFile();
+
+		FileOutputStream fos(eadFile);
+
+		fos << "// Embedded audiodata" << "\n";
+
+        fos << "#pragma once\n\n";
+
+		fos << "namespace audiodata {\n";
+
+		for (const auto& es : externalSamples)
+		{
+			auto& bf = es.data->buffer;
+
+			for (int i = 0; i < bf.getNumChannels(); i++)
+			{
+				fos << "static const uint32 " << es.className << i << "[] = { \n";
+				cppgen::IntegerArray<uint32, float>::writeToStream(fos, reinterpret_cast<uint32*>(bf.getWritePointer(i)), bf.getNumSamples());
+				fos << "};\n";
+			}
+		}
+
+		fos << "}\n";
+		fos.flush();
+
+		eadFile.copyFileTo(getSourceDirectory(ctx, false).getChildFile("embedded_audiodata.h"));
+	}
+
+	for (auto u : unsortedListU)
+	{
+		if (auto xml = XmlDocument::parse(u))
+		{
+			auto v = ValueTree::fromXml(*xml);
+
+			zstd::ZDefaultCompressor comp;
+			MemoryBlock mb;
+
+			comp.compress(v, mb);
+
+			auto id = v[scriptnode::PropertyIds::ID].toString() + "_networkdata";
+			auto f = sourceDir.getChildFile(id).withFileExtension(".h");
+
+			Base c(snex::cppgen::Base::OutputType::AddTabs);
+
+			Namespace n(c, "project", false);
+
+			DefinitionBase b(c, "scriptnode::dll::InterpretedNetworkData");
+
+			Array<DefinitionBase*> baseClasses;
+			baseClasses.add(&b);
+
+			Struct s(c, id, baseClasses, {});
+
+			c << "String getId() const override";
+			{
+				StatementBlock sb(c);
+				String def;
+				def << "return \"" << v[scriptnode::PropertyIds::ID].toString() << "\";";
+				c << def;
+			}
+
+			c << "bool isModNode() const override";
+			{
+				StatementBlock sb(c);
+				String def;
+				def << "return ";
+				auto hasMod = cppgen::ValueTreeIterator::hasChildNodeWithProperty(v, PropertyIds::IsPublicMod);
+				def << (hasMod ? "true" : "false") << ";";
+				c << def;
+			}
+
+			c << "String getNetworkData() const override";
+			{
+				StatementBlock sb(c);
+				String def;
+				def << "return \"" << mb.toBase64Encoding() << "\";";
+				c << def;
+			}
+
+			s.flushIfNot();
+			n.flushIfNot();
+
+			f.replaceWithText(c.toString());
+
+			ctx.includedFiles.add(f);
+		}
+	}
+
+	createProjucerFile(ctx);
+
+	for (auto l : getSourceDirectory(ctx, true).findChildFiles(File::findFiles, true, "*.h"))
+	{
+		auto target = getSourceDirectory(ctx, false).getChildFile(l.getFileName());
+
+		if (isInterpretedDataFile(target))
+			l.moveFileTo(target);
+		else
+			l.copyFileTo(target);
+	}
+
+	createIncludeFile(ctx, getSourceDirectory(ctx, true));
+	createIncludeFile(ctx, getSourceDirectory(ctx, false));
+
+
+	try
+	{
+		createMainCppFile(ctx, false);
+	}
+	catch(Result& r)
+	{
+		ctx.ok = ErrorCodes::CompileError;
+		ctx.errorMessage << r.getErrorMessage();
+		return;
+	}
+
+
+	for (int i = 0; i < ctx.includedFiles.size(); i++)
+	{
+		if (isInterpretedDataFile(ctx.includedFiles[i]))
+			ctx.includedFiles.remove(i--);
+	}
+
+	createMainCppFile(ctx, true);
+
+	ctx.ok = ErrorCodes::OK;
+}
+
+void DspNetworkCompileExporter::threadFinished()
+{
+#if JUCE_LINUX
+	ok = compileSolution(CompileExporter::VSTLinux, CompileExporter::TargetTypes::numTargetTypes, managerToUse);
+#endif
+
+	if (ok == ErrorCodes::OK)
+	{
+		if (isUsingCIMode()) {
+			return;
+		}
+
+#if JUCE_DEBUG
+		writeDebugFileAndShowSolution();
+#endif
+
+		globalCommandLineExport = false;
+
+		
+#if JUCE_LINUX
+		if(managerToUse == nullptr)
+			PresetHandler::showMessageWindow("Project creation OK", "Please run the makefile, then press OK to reload the dynamic library");
+#else
+		if(managerToUse == nullptr)
+			PresetHandler::showMessageWindow("Compilation OK", "Press OK to reload the DLL and refresh all compiled effect instances.");
+
+		auto dllManager = getDllManager();
+
+		auto f = [dllManager](Processor*)
+		{
+			dllManager->loadDll(true);
+			return SafeFunctionCall::OK;
+		};
+
+		getMainController()->getKillStateHandler().killVoicesAndCall(getMainController()->getMainSynthChain(), f,
+			MainController::KillStateHandler::TargetThread::SampleLoadingThread);
+#endif
+		
+	}
+	else
+	{
+		if(managerToUse == nullptr)
+			PresetHandler::showMessageWindow("Compilation Error", errorMessage, PresetHandler::IconType::Error);
+	}
+}
+
+juce::File DspNetworkCompileExporter::getBuildFolder() const
+{
+	return getFolder(BackendDllManager::FolderSubType::Binaries);
+}
+
+
+
+juce::Array<juce::File> DspNetworkCompileExporter::getIncludedNetworkFiles(const File& networkFile)
+{
+	using namespace scriptnode;
+	using namespace snex::cppgen;
+
+	Array<File> list;
+
+	if (auto xml = XmlDocument::parse(networkFile))
+	{
+		ValueTree v = ValueTree::fromXml(*xml);
+
+		auto f2 = [&list, networkFile](ValueTree& v)
+		{
+			auto p = v.getProperty(PropertyIds::FactoryPath).toString();
+
+			if (p.startsWith("project."))
+			{
+				auto pId = p.fromFirstOccurrenceOf("project.", false, false);
+				list.add(networkFile.getSiblingFile(pId).withFileExtension("xml"));
+			}
+
+			return false;
+		};
+	}
+
+	list.add(networkFile);
+
+	return list;
+}
+
+hise::BackendDllManager* DspNetworkCompileExporter::getDllManager(const Context& ctx)
+{
+	return ctx.bp->dllManager.get();
+}
+
+hise::BackendDllManager* DspNetworkCompileExporter::getDllManager()
+{
+	Context ctx;
+	ctx.bp = dynamic_cast<BackendProcessor*>(getMainController());
+	return getDllManager(ctx);
+}
+
+bool DspNetworkCompileExporter::isInterpretedDataFile(const File& f)
+{
+	return f.getFileNameWithoutExtension().endsWith("_networkdata");
+}
+
+void DspNetworkCompileExporter::createIncludeFile(Context& ctx, const File& sourceDir)
+{
+	File includeFile = sourceDir.getChildFile("includes.h");
+
+	cppgen::Base i(cppgen::Base::OutputType::AddTabs);
+
+	i.setHeader([]() { return "/* Autogenerated include file. */"; });
+
+	i << "#if (defined (_WIN32) || defined (_WIN64))";
+	i << "#pragma warning( push )";
+	i << "#pragma warning( disable : 4189 4373)";  // unused variables, wrong override (from faust classes)
+	i << "#else";
+    i << "#pragma clang diagnostic push";
+    i << "#pragma clang diagnostic ignored \"-Wunused-variable\"";
+	i << "#endif";
+
+    i.addEmptyLine();
+
+
+    auto fileList = sourceDir.findChildFiles(File::findFiles, false, "*.h");
+
+	auto thirdPartyFiles = ctx.getFolder(BackendDllManager::FolderSubType::ThirdParty).findChildFiles(File::findFiles, false, "*.h");
+
+	fileList.addArray(thirdPartyFiles);
+
+	for (auto& f : fileList)
+	{
+		if (getLocationType(ctx, f) == EmbeddedDataFile)
+		{
+			i.addComment("Include embedded audio data", cppgen::Base::CommentType::FillTo80Light);
+			cppgen::Include m(i, sourceDir, f);
+			break;
+		}
+	}
+
+	bool somethingFound = false;
+
+	for (auto& f : fileList)
+	{
+		if (getLocationType(ctx, f) == ThirdPartyFile)
+		{
+			if (!somethingFound)
+			{
+				i.addComment("Include third party header files", cppgen::Base::CommentType::FillTo80Light);
+				somethingFound = true;
+			}
+
+			cppgen::Base dummyInclude(cppgen::Base::OutputType::NoProcessing);
+			{
+				dummyInclude.addComment("This just references the real file", cppgen::Base::CommentType::RawWithNewLine);
+				cppgen::Include m(dummyInclude, sourceDir, f);
+			}
+
+			auto fInDir = sourceDir.getChildFile(f.getFileName());
+			fInDir.replaceWithText(dummyInclude.toString());
+			cppgen::Include m2(i, sourceDir, fInDir);
+		}
+	}
+
+	if (somethingFound)
+		i.addEmptyLine();
+
+	somethingFound = false;
+
+	for(auto& f: fileList)
+	{
+		if(getLocationType(ctx, f) == CompiledNeuralModelFile)
+		{
+			if(!somethingFound)
+			{
+				i.addComment("Include compiled neural model files", cppgen::Base::CommentType::FillTo80Light);
+				somethingFound = true;
+			}
+
+			cppgen::Include m(i, sourceDir, f);
+		}
+	}
+
+	if(somethingFound)
+		i.addEmptyLine();
+
+	somethingFound = false;
+
+	for (auto& f : fileList)
+	{
+		if (getLocationType(ctx, f) == CompiledNetworkFile)
+		{
+			if (!somethingFound)
+			{
+				i.addComment("Include compiled network files", cppgen::Base::CommentType::FillTo80Light);
+				somethingFound = true;
+			}
+
+			cppgen::Include m(i, sourceDir, f);
+		}
+	}
+
+    i.addEmptyLine();
+
+	i << "#if (defined (_WIN32) || defined (_WIN64))";
+	i << "#pragma warning( pop )";
+	i << "#else";
+    i << "#pragma clang diagnostic pop";
+	i << "#endif";
+
+	includeFile.replaceWithText(i.toString());
+}
+
+void DspNetworkCompileExporter::createProjucerFile(Context& ctx)
+{
+	String templateProject = String(projectDllTemplate_jucer);
+
+	ProjectTemplateHelpers::handleCompilerWarnings(templateProject);
+
+	auto& dataObject = dynamic_cast<GlobalSettingManager*>(ctx.getMainController())->getSettingsObject();
+
+	ProjectTemplateHelpers::handleVisualStudioVersion(dataObject, templateProject);
+
+	const File jucePath = ctx.exporter->hisePath.getChildFile("JUCE/modules");
+
+	auto projectName = GET_HISE_SETTING(ctx.getMainController()->getMainSynthChain(), HiseSettings::Project::Name).toString();
+
+    auto dllprefix = cppgen::StringHelpers::makeValidCppName(projectName);
+
+	auto dllFolder = ctx.getFolder(BackendDllManager::FolderSubType::DllLocation);
+	auto dbgFile = dllFolder.getChildFile(dllprefix + "_debug").withFileExtension(".dll");
+	auto rlsFile = dllFolder.getChildFile(dllprefix).withFileExtension(".dll");
+	auto ciFile = dllFolder.getChildFile(dllprefix + "_ci").withFileExtension(".dll");
+
+	auto dbgName = dbgFile.getNonexistentSibling(false).getFileNameWithoutExtension().removeCharacters(" ");
+	auto rlsName = rlsFile.getNonexistentSibling(false).getFileNameWithoutExtension().removeCharacters(" ");
+	auto ciName =  ciFile.getNonexistentSibling(false).getFileNameWithoutExtension().removeCharacters(" ");
+
+	const auto& data = dynamic_cast<GlobalSettingManager*>(ctx.exporter->chainToExport->getMainController())->getSettingsObject();
+
+#if JUCE_WINDOWS
+	if (!ctx.exporter->useIpp)
+		ctx.exporter->useIpp = data.getSetting(HiseSettings::Compiler::UseIPP);
+
+	REPLACE_WILDCARD_WITH_STRING("%IPP_1A%", ctx.exporter->useIpp ? "Static_Library" : String());
+#else
+	REPLACE_WILDCARD_WITH_STRING("%IPP_1A%", "");
+#endif
+
+	REPLACE_WILDCARD_WITH_STRING("%DEBUG_DLL_NAME%", dbgName);
+	REPLACE_WILDCARD_WITH_STRING("%RELEASE_DLL_NAME%", rlsName);
+	REPLACE_WILDCARD_WITH_STRING("%CI_DLL_NAME%", ciName);
+	REPLACE_WILDCARD_WITH_STRING("%NAME%", projectName);
+	REPLACE_WILDCARD_WITH_STRING("%HISE_PATH%", ctx.exporter->hisePath.getFullPathName());
+	REPLACE_WILDCARD_WITH_STRING("%JUCE_PATH%", jucePath.getFullPathName());
+
+	String s = GET_HISE_SETTING(ctx.getMainController()->getMainSynthChain(), HiseSettings::Project::ExtraDefinitionsNetworkDll).toString();
+
+	REPLACE_WILDCARD_WITH_STRING("%EXTRA_DEFINES_LINUX%", s);
+	REPLACE_WILDCARD_WITH_STRING("%EXTRA_DEFINES_WIN%", s);
+	REPLACE_WILDCARD_WITH_STRING("%EXTRA_DEFINES_OSX%", s);
+
+	auto includeFaust = BackendDllManager::shouldIncludeFaust(ctx.getMainController());
+	REPLACE_WILDCARD_WITH_STRING("%HISE_INCLUDE_FAUST%", includeFaust ? "enabled" : "disabled");
+
+
+	ProjectTemplateHelpers::handleAdditionalStaticLibs(ctx.exporter, templateProject, "");
+
+    String headerPath;
+
+    if (includeFaust)
+    {
+        auto faustPath = dynamic_cast<GlobalSettingManager*>(ctx.getMainController())->getSettingsObject().getFaustPath();
+        headerPath = faustPath.getChildFile("include").getFullPathName();
+    }
+
+    if(BackendDllManager::hasRNBOFiles(ctx.getMainController()))
+    {
+        auto folder = BackendDllManager::getRNBOSourceFolder(ctx.getMainController());
+
+        headerPath << ";" << folder.getFullPathName();
+        headerPath << ";" << folder.getChildFile("common").getFullPathName();
+    }
+
+    REPLACE_WILDCARD_WITH_STRING("%FAUST_HEADER_PATH%", headerPath);
+
+
+
+	auto targetFile = ctx.getFolder(BackendDllManager::FolderSubType::Binaries).getChildFile("AutogeneratedProject.jucer");
+
+	targetFile.replaceWithText(templateProject);
+}
+
+juce::File DspNetworkCompileExporter::getSourceDirectory(const Context& ctx, bool isDllMainFile)
+{
+	if (isDllMainFile)
+		return ctx.getFolder(BackendDllManager::FolderSubType::ProjucerSourceFolder);
+	else
+		return GET_PROJECT_HANDLER(ctx.getMainController()->getMainSynthChain()).getSubDirectory(FileHandlerBase::AdditionalSourceCode).getChildFile("nodes");
+}
+
+void DspNetworkCompileExporter::createMainCppFile(Context& ctx, bool isDllMainFile)
+{
+	File f;
+	File sourceDirectory = getSourceDirectory(ctx, isDllMainFile);
+
+	if (isDllMainFile)
+		f = sourceDirectory.getChildFile("Main.cpp");
+	else
+		f = sourceDirectory.getChildFile("factory.cpp");
+
+	using namespace cppgen;
+
+	Base b(Base::OutputType::AddTabs);
+
+	b.setHeader([]() { return "/** Autogenerated Main.cpp. */"; });
+
+	b.addEmptyLine();
+
+    b.addComment("Include only the DSP files ", snex::cppgen::Base::CommentType::FillTo80);
+	Include(b, "AppConfig.h");
+	Include(b, "hi_dsp_library/hi_dsp_library.h");
+    Include(b, "hi_faust/hi_faust.h");
+    
+	Include(b, sourceDirectory, sourceDirectory.getChildFile("includes.h"));
+
+    b.addComment("Now we can add the rest of the codebase", snex::cppgen::Base::CommentType::FillTo80);
+    Include(b, "JuceHeader.h");
+    
+    b.addEmptyLine();
+
+	b << "#if !JUCE_WINDOWS";
+    b << "#pragma clang diagnostic push";
+    b << "#pragma clang diagnostic ignored \"-Wreturn-type-c-linkage\"";
+	b << "#endif";
+    
+	b.addEmptyLine();
+
+	{
+		b.addComment("Project Factory", snex::cppgen::Base::CommentType::FillTo80);
+
+		Namespace n(b, "project", false);
+
+		DefinitionBase bc(b, "scriptnode::dll::StaticLibraryHostFactory");
+
+		Struct s(b, "Factory", { &bc }, {});
+
+		b << "Factory()";
+
+		{
+			cppgen::StatementBlock bk(b);
+
+			b << "TempoSyncer::initTempoData();";
+
+			b.addComment("Node registrations", snex::cppgen::Base::CommentType::FillTo80Light);
+
+			for (int i = 0; i < ctx.includedThirdPartyFiles.size(); i++)
+			{
+				String def;
+
+				String nid;
+
+				auto tid = ctx.includedThirdPartyFiles[i].getFileNameWithoutExtension();
+
+				nid << "project::" << tid;
+
+				auto illegalPoly = true;
+
+				if(CustomNodeProperties::nodeHasProperty(tid, PropertyIds::AllowPolyphonic))
+					illegalPoly = false;
+				else
+				{
+					for(auto nf: ctx.includedFiles)
+					{
+						auto networkFile = ctx.getFolder(BackendDllManager::FolderSubType::Networks).getChildFile(nf.getFileNameWithoutExtension()).withFileExtension("xml");
+
+						if(auto xml = XmlDocument::parse(networkFile))
+						{
+							auto d = xml->createDocument("");
+							auto vt = ValueTree::fromXml(*xml);
+
+							auto path = ctx.includedThirdPartyFiles[i].getFileNameWithoutExtension();
+							auto fp = "project." + path;
+
+							auto found = valuetree::Helpers::forEach(vt, [path, fp](const ValueTree& c)
+							{
+								if(c[PropertyIds::FactoryPath].toString() == fp)
+									return true;
+
+								if(c.getType() == scriptnode::PropertyIds::Property)
+								{
+									if(c[PropertyIds::ID].toString() == "ClassId")
+									{
+										return c[scriptnode::PropertyIds::Value].toString() == path;
+									}
+								}
+                                
+                                return false;
+							});
+
+							if(found)
+							{
+								auto networkIsPolyphonic = (bool)vt[scriptnode::PropertyIds::AllowPolyphonic];
+
+								auto thisIllegal = !networkIsPolyphonic;
+
+								auto isCppNode = CustomNodeProperties::nodeHasProperty(tid, PropertyIds::IsPolyphonic);
+
+
+
+								if(networkIsPolyphonic && isCppNode)
+								{
+									// Otherwise this branch wouldn't get executed...
+									jassert(!CustomNodeProperties::nodeHasProperty(tid, PropertyIds::AllowPolyphonic));
+									throw Result::fail("The C++ node `" + nid + "` requires the `AllowPolyphonic` flag in node_properties.json because it is used in the polyphonic network `" + networkFile.getFileName() + "`");
+								}
+
+								// allow it being used in several places and set the flag to false
+								// as soon as one of them is allowing polyphonic compilation
+								illegalPoly &= thisIllegal;
+							}
+						}
+					}
+				}
+
+				if(illegalPoly)
+				{
+					def << "registerPolyNode<" << nid << "<1>, scriptnode::wrap::illegal_poly<" << nid << "<1>>>();";
+				}
+				else
+				{
+					def << "registerPolyNode<" << nid << "<1>, " << nid << "<NUM_POLYPHONIC_VOICES>>();";
+				}
+
+				
+				b << def;
+			}
+
+			for (int i = 0; i < ctx.includedFiles.size(); i++)
+			{
+				auto networkFile = ctx.getFolder(BackendDllManager::FolderSubType::Networks).getChildFile(ctx.includedFiles[i].getFileNameWithoutExtension()).withFileExtension("xml");
+
+				auto isPolyNode = ctx.includedFiles[i].loadFileAsString().contains("polyphonic template declaration");
+				auto illegalPoly = isPolyNode && !BackendDllManager::allowPolyphonic(networkFile);
+
+				String classId = "project::" + ctx.includedFiles[i].getFileNameWithoutExtension();
+
+				String def;
+
+				String methodPrefix = "register";
+
+				if (isInterpretedDataFile(ctx.includedFiles[i]))
+					methodPrefix << "Data";
+
+				if (!isPolyNode)
+					def << methodPrefix << "Node<" << classId << ">();";
+				else
+				{
+					def << methodPrefix << "PolyNode<" << classId << "<1>, ";
+					
+					if (illegalPoly)
+						def << "wrap::illegal_poly<" << classId << "<1>>>();";
+					else
+						def << classId << "<NUM_POLYPHONIC_VOICES>>();";
+				}
+					
+
+				b << def;
+			}
+		}
+
+		s.flushIfNot();
+
+		b.addEmptyLine();
+		b << "#if HISE_INCLUDE_RT_NEURAL";
+		{
+			DefinitionBase nbc(b, "hise::NeuralNetwork::Factory");
+			Struct ns(b, "NeuralFactory", { &nbc }, {});
+
+			b << "NeuralFactory()";
+
+			{
+				cppgen::StatementBlock bk(b);
+
+				for(auto neuralFile: ctx.includedNeuralModelFiles)
+				{
+					auto id = neuralFile.getFileNameWithoutExtension();
+
+					if(id.endsWith("_neural"))
+						id = id.dropLastCharacters(7);
+
+					b << "project::registerCompiledNeuralNetworks_" + id + "(this);";
+				}
+			}
+
+			b << "void* cloneModel(void* model) const";
+
+			{
+				cppgen::StatementBlock bk(b);
+				b << "if(auto m = static_cast<hise::NeuralNetwork::ModelBase*>(model))";
+
+				{
+					cppgen::StatementBlock ifBlock(b);
+					b << "return m->clone();";
+				}
+
+				b << "return nullptr;";
+			}
+
+			b << "void destroyModel(void* model) const";
+
+			{
+				cppgen::StatementBlock bk(b);
+				b << "delete static_cast<hise::NeuralNetwork::ModelBase*>(model);";
+			}
+
+			b << "void resetModel(void* model) const";
+
+			{
+				cppgen::StatementBlock bk(b);
+				b << "if(auto m = static_cast<hise::NeuralNetwork::ModelBase*>(model))";
+
+				{
+					cppgen::StatementBlock ifBlock(b);
+					b << "m->reset();";
+				}
+			}
+
+			b << "void processModel(void* model, const float* input, float* output) const";
+
+			{
+				cppgen::StatementBlock bk(b);
+				b << "if(auto m = static_cast<hise::NeuralNetwork::ModelBase*>(model))";
+
+				{
+					cppgen::StatementBlock ifBlock(b);
+					b << "m->process(input, output);";
+				}
+			}
+		}
+
+		b << "#endif";
+	}
+
+	if (isDllMainFile)
+	{
+		b << "project::Factory f;";
+		b << "#if HISE_INCLUDE_RT_NEURAL";
+		b << "project::NeuralFactory nf;";
+		b << "#endif";
+
+		b.addEmptyLine();
+
+		b.addComment("Exported DLL functions", snex::cppgen::Base::CommentType::FillTo80);
+
+		{
+			b << "DLL_EXPORT int getNumNodes()";
+			StatementBlock bk(b);
+			b << "return f.getNumNodes();";
+		}
+
+		b.addEmptyLine();
+
+		{
+			b << "DLL_EXPORT size_t getNodeId(int index, char* t)";
+			StatementBlock bk(b);
+			b << "return HelperFunctions::writeString(t, f.getId(index).getCharPointer());";
+		}
+
+		b.addEmptyLine();
+
+		{
+			b << "DLL_EXPORT bool isThirdPartyNode(int index)";
+			StatementBlock bk(b);
+			String def;
+			def << "return index < " << String(ctx.includedThirdPartyFiles.size()) << ";";
+			b << def;
+		}
+
+		b.addEmptyLine();
+
+		{
+			b << "DLL_EXPORT int getNumDataObjects(int nodeIndex, int dataTypeAsInt)";
+			StatementBlock bk(b);
+			b << "return f.getNumDataObjects(nodeIndex, dataTypeAsInt);";
+		}
+
+		b.addEmptyLine();
+
+		{
+			b << "DLL_EXPORT void deInitOpaqueNode(scriptnode::OpaqueNode* n)";
+			StatementBlock bk(b);
+			b << "n->callDestructor();";
+		}
+
+		b.addEmptyLine();
+
+		{
+			b << "DLL_EXPORT void initOpaqueNode(scriptnode::OpaqueNode* n, int index, bool polyIfPossible)";
+			StatementBlock bk(b);
+			b << "f.initOpaqueNode(n, index, polyIfPossible);";
+		}
+
+		{
+			b << "DLL_EXPORT int getHash(int index)";
+			StatementBlock bk(b);
+
+			if (ctx.includedFiles.size() == 0)
+			{
+				b << "return 0;";
+			}
+			else
+			{
+				String def1;
+				def1 << "static const int thirdPartyOffset = " << String(ctx.includedThirdPartyFiles.size()) << ";";
+				b << def1;
+
+				String def;
+
+				def << "static const int hashIndexes[" << ctx.includedFiles.size() << "] =";
+				b << def;
+
+				{
+					StatementBlock l(b, true);
+
+					for (int i = 0; i < ctx.includedFiles.size(); i++)
+					{
+						if (isInterpretedDataFile(ctx.includedFiles[i]))
+							break;
+
+						String l;
+
+						auto hash = getDllManager(ctx)->getHashForNetworkFile(ctx.getMainController(), ctx.includedFiles[i].getFileNameWithoutExtension());
+
+						if (hash == 0)
+						{
+							jassertfalse;
+						}
+
+						l << hash;
+
+						if ((i != ctx.includedFiles.size() - 1) && !isInterpretedDataFile(ctx.includedFiles[i+1]))
+							l << ", ";
+
+						b << l;
+					}
+				}
+
+				b << "return (index >= thirdPartyOffset) ? hashIndexes[index - thirdPartyOffset] : 0;";
+			}
+		}
+		{
+			b << "DLL_EXPORT int getWrapperType(int index)";
+			StatementBlock bk(b);
+			b << "return f.getWrapperType(index);";
+		}
+
+		{
+			b << "DLL_EXPORT ErrorC getError()";
+			StatementBlock bk(b);
+			b << "return f.getError();";
+		}
+
+		{
+			b << "DLL_EXPORT void clearError()";
+			StatementBlock bk(b);
+			b << "f.clearError();";
+		}
+
+		{
+			b << "DLL_EXPORT int getNumNeuralModels()";
+			StatementBlock bk(b);
+			b << "#if HISE_INCLUDE_RT_NEURAL";
+			b << "return nf.getNumModels();";
+			b << "#else";
+			b << "return 0;";
+			b << "#endif";
+		}
+
+		auto addNeuralStringGetter = [&b](const String& methodName, const String& factoryMethodName)
+		{
+			b.addEmptyLine();
+			b << "DLL_EXPORT size_t " + methodName + "(int index, char* t)";
+			StatementBlock bk(b);
+			b << "#if HISE_INCLUDE_RT_NEURAL";
+			b << "return HelperFunctions::writeString(t, nf." + factoryMethodName + "(index).getCharPointer());";
+			b << "#else";
+			b << "ignoreUnused(index);";
+			b << "#endif";
+			b << "return HelperFunctions::writeString(t, \"\");";
+		};
+
+		addNeuralStringGetter("getNeuralModelId", "getModelId");
+		addNeuralStringGetter("getNeuralModelQualityId", "getModelQualityId");
+		addNeuralStringGetter("getNeuralModelMetadata", "getModelMetadata");
+
+		auto addNeuralIntGetter = [&b](const String& methodName, const String& factoryMethodName)
+		{
+			b.addEmptyLine();
+			b << "DLL_EXPORT int " + methodName + "(int index)";
+			StatementBlock bk(b);
+			b << "#if HISE_INCLUDE_RT_NEURAL";
+			b << "return nf." + factoryMethodName + "(index);";
+			b << "#else";
+			b << "ignoreUnused(index);";
+			b << "#endif";
+			b << "return 0;";
+		};
+
+		addNeuralIntGetter("getNeuralModelNumInputs", "getModelNumInputs");
+		addNeuralIntGetter("getNeuralModelNumOutputs", "getModelNumOutputs");
+
+		b.addEmptyLine();
+
+		{
+			b << "DLL_EXPORT void* createNeuralModel(int index)";
+			StatementBlock bk(b);
+			b << "#if HISE_INCLUDE_RT_NEURAL";
+			b << "return nf.createByIndex(index);";
+			b << "#else";
+			b << "ignoreUnused(index);";
+			b << "#endif";
+			b << "return nullptr;";
+		}
+
+		b.addEmptyLine();
+
+		{
+			b << "DLL_EXPORT void* cloneNeuralModel(void* model)";
+			StatementBlock bk(b);
+			b << "#if HISE_INCLUDE_RT_NEURAL";
+			b << "return nf.cloneModel(model);";
+			b << "#else";
+			b << "ignoreUnused(model);";
+			b << "#endif";
+			b << "return nullptr;";
+		}
+
+		b.addEmptyLine();
+
+		{
+			b << "DLL_EXPORT void destroyNeuralModel(void* model)";
+			StatementBlock bk(b);
+			b << "#if HISE_INCLUDE_RT_NEURAL";
+			b << "nf.destroyModel(model);";
+			b << "#else";
+			b << "ignoreUnused(model);";
+			b << "#endif";
+		}
+
+		b.addEmptyLine();
+
+		{
+			b << "DLL_EXPORT void resetNeuralModel(void* model)";
+			StatementBlock bk(b);
+			b << "#if HISE_INCLUDE_RT_NEURAL";
+			b << "nf.resetModel(model);";
+			b << "#else";
+			b << "ignoreUnused(model);";
+			b << "#endif";
+		}
+
+		b.addEmptyLine();
+
+		{
+			b << "DLL_EXPORT void processNeuralModel(void* model, const float* input, float* output)";
+			StatementBlock bk(b);
+			b << "#if HISE_INCLUDE_RT_NEURAL";
+			b << "nf.processModel(model, input, output);";
+			b << "#else";
+			b << "ignoreUnused(model, input, output);";
+			b << "#endif";
+		}
+
+		{
+			b << "DLL_EXPORT int getDllVersionCounter()";
+			StatementBlock bk(b);
+			b << "return scriptnode::dll::ProjectDll::DllUpdateCounter;";
+		}
+	}
+	else
+	{
+		b << "scriptnode::dll::FactoryBase* scriptnode::DspNetwork::createStaticFactory()";
+		{
+			StatementBlock sb(b);
+			b << "return new project::Factory();";
+		}
+
+		b.addEmptyLine();
+
+		b << "#if HISE_INCLUDE_RT_NEURAL";
+		b << "void scriptnode::DspNetwork::registerStaticNeuralNetworks(hise::NeuralNetwork::Factory* f)";
+		{
+			StatementBlock sb(b);
+
+			for(auto neuralFile: ctx.includedNeuralModelFiles)
+			{
+				auto id = neuralFile.getFileNameWithoutExtension();
+
+				if(id.endsWith("_neural"))
+					id = id.dropLastCharacters(7);
+
+				b << "project::registerCompiledNeuralNetworks_" + id + "(f);";
+			}
+		}
+		b << "#endif";
+	}
+
+    b.addEmptyLine();
+	b << "#if !JUCE_WINDOWS";
+    b << "#pragma clang diagnostic pop";
+	b << "#endif";
+    b.addEmptyLine();
+    
+	f.replaceWithText(b.toString());
+    
+    auto rnboSibling = f.getSiblingFile("RNBO.cpp");
+    
+    if(BackendDllManager::hasRNBOFiles(ctx.getMainController()))
+    {
+        Base r(Base::OutputType::AddTabs);
+
+        r.setHeader([]() { return "/** Autogenerated RNBO.cpp. file */"; });
+
+        b.addEmptyLine();
+
+        auto rroot = BackendDllManager::getRNBOSourceFolder(ctx.getMainController());
+        
+        r << "#define RNBO_NO_PATCHERFACTORY 1";
+        r << "#define RNBO_USE_FLOAT32 1";
+        
+        Include(r, sourceDirectory, rroot.getChildFile("RNBO.cpp"));
+        
+        rnboSibling.replaceWithText(r.toString());
+    }
+    else
+    {
+        rnboSibling.replaceWithText("");
+    }
+}
+
+}

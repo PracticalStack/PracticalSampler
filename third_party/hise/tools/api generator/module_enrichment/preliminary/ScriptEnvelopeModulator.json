@@ -1,0 +1,97 @@
+{
+  "moduleId": "ScriptEnvelopeModulator",
+  "prettyName": "Script Envelope Modulator",
+  "type": "Modulator",
+  "subtype": "EnvelopeModulator",
+  "category": "custom",
+
+  "io": {
+    "midiIn": "noteOn+noteOff",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": true,
+    "fxChain": null
+  },
+
+  "voiceContext": "per-voice",
+
+  "interfaces": [
+    { "name": "SlotFX", "signalFlowRole": "network_host - loads and hot-swaps scriptnode DSP networks" },
+    { "name": "TableProcessor", "signalFlowRole": "complex_data - exposes Table objects from the loaded network" },
+    { "name": "SliderPackProcessor", "signalFlowRole": "complex_data - exposes SliderPack objects from the loaded network" },
+    { "name": "AudioSampleProcessor", "signalFlowRole": "complex_data - exposes AudioFile objects from the loaded network" },
+    { "name": "DisplayBufferSource", "signalFlowRole": "skip - UI communication only" }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Voice Mode",
+      "rationale": "Controls whether the envelope runs per-voice or monophonically, and retriggering behaviour",
+      "parameters": [
+        {
+          "id": "Monophonic",
+          "name": "Monophonic",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": "dynamic",
+          "description": "Enables monophonic mode where only one voice is rendered",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "Retrigger",
+          "name": "Retrigger",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Restarts the envelope when a new note is triggered in monophonic mode",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "standaloneModChains": [],
+  "disabledModChains": [],
+  "compositeBlocks": [],
+
+  "gaps": [
+    {
+      "id": "network-loading-mechanism",
+      "category": "signal_path",
+      "question": "How does the envelope modulator load a scriptnode network? Is it set in onInit?",
+      "context": "Users need to know how to load an envelope network."
+    },
+    {
+      "id": "voice-lifecycle",
+      "category": "signal_path",
+      "question": "How do startVoice/stopVoice/reset map to the scriptnode network's voice handling? How does voice killing work?",
+      "context": "Voice lifecycle is critical for envelope modulators."
+    },
+    {
+      "id": "control-rate-processing",
+      "category": "signal_path",
+      "question": "Does the envelope modulator process at control rate (downsampled) rather than audio rate? What is the control rate?",
+      "context": "Understanding the processing rate affects how users design their networks."
+    },
+    {
+      "id": "parameter-exposure",
+      "category": "parameter_behavior",
+      "question": "How are network parameters exposed alongside the fixed Monophonic/Retrigger parameters?",
+      "context": "Users need to understand parameter indexing."
+    },
+    {
+      "id": "complex-data-routing",
+      "category": "interface_usage",
+      "question": "How are Tables, SliderPacks, and AudioFiles from the loaded network exposed?",
+      "context": "Complex data routing for envelope networks."
+    },
+    {
+      "id": "voice-killer-interaction",
+      "category": "signal_path",
+      "question": "Does ScriptEnvelopeModulator act as its own voice killer? How does it signal that a voice should be killed?",
+      "context": "Voice killing is the primary role of envelopes in HISE."
+    }
+  ],
+
+  "notes": "ScriptEnvelopeModulator is the per-voice envelope variant. It inherits Monophonic/Retrigger from EnvelopeModulator. The C++ class is JavascriptEnvelopeModulator. The Hardcoded equivalent is HardcodedEnvelopeModulator. It sets itself as the voice killer in the constructor."
+}

@@ -1,0 +1,22 @@
+{
+  "factoryPath": "core.phasor_fm",
+  "nodes": [
+    { "id": "in", "label": "Audio In (FM source)", "type": "input", "importance": 1.0, "description": "Input signal used as FM modulator on channel 0" },
+    { "id": "fm_mod", "label": "Phase Modulation", "type": "process", "importance": 1.0, "description": "Input scales phase increment: delta *= input" },
+    { "id": "ramp", "label": "Phase Ramp", "type": "process", "importance": 1.0, "description": "Generates 0..1 ramp with FM-modulated phase" },
+    { "id": "gate", "label": "Gate", "type": "parameter", "importance": 0.7, "description": "Enables output" },
+    { "id": "freq", "label": "Frequency", "type": "parameter", "importance": 0.9, "description": "Base ramp frequency" },
+    { "id": "ratio", "label": "Freq Ratio", "type": "parameter", "importance": 0.7, "description": "Frequency multiplier" },
+    { "id": "phase", "label": "Phase", "type": "parameter", "importance": 0.5, "description": "Phase offset" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Channel 0 = FM-modulated ramp (replaces input)" }
+  ],
+  "edges": [
+    { "from": "in", "to": "fm_mod", "type": "signal", "label": "modulator" },
+    { "from": "fm_mod", "to": "ramp", "type": "signal", "label": "modulated delta" },
+    { "from": "gate", "to": "ramp", "type": "control", "label": null },
+    { "from": "freq", "to": "ramp", "type": "control", "label": null },
+    { "from": "ratio", "to": "ramp", "type": "control", "label": null },
+    { "from": "phase", "to": "ramp", "type": "control", "label": null },
+    { "from": "ramp", "to": "out", "type": "signal", "label": "replaces ch0" }
+  ]
+}

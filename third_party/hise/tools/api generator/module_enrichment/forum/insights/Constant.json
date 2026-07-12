@@ -1,0 +1,56 @@
+{
+  "targetId": "Constant",
+  "domain": "modules",
+  "generatedAt": "2026-04-08",
+  "topicIds": [47, 1217, 2960],
+  "insights": [
+    {
+      "type": "API",
+      "title": "No getIntensity() method exists on the Constant modulator",
+      "summary": "There is no API call to read back the current intensity value of a Constant modulator. If you need to track the value in script, store it in a separate variable when you call setIntensity().",
+      "sources": ["tid:47"],
+      "verify": true,
+      "verify_hint": "grep getIntensity in hi_scripting/scripting/scriptnode or Modulator scripting wrappers"
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use two Constant modulators instead of computing relative offsets",
+      "summary": "When one source (e.g., a knob) and another source (e.g., a key switch) both need to set pitch or gain independently, stack two Constant modulators rather than trying to compute a delta from a single one. Voice-start modulators have virtually no CPU cost so the overhead is negligible.",
+      "sources": ["tid:47"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Constant modulator is the correct tool for real-time per-voice gain control",
+      "summary": "When you need to change volume while voices are already playing (e.g., a gain knob that must affect sustained notes), the Constant VoiceStartModulator combined with setIntensity() is the recommended approach. Simple gain on the synth group works only if notes are retriggered.",
+      "sources": ["tid:2960"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "For smooth real-time gain control, wrap Constant in a scriptnode time-variant modulator",
+      "summary": "A plain Constant modulator produces zipper noise when its intensity is changed during playback. Christoph Hart's recommended pattern is to use a scriptnode-powered Script Time Variant Modulator with a smoothing node; adjust the smoothing time and parameter range (e.g., logarithmic) to taste.",
+      "sources": ["tid:2960", "tid:1217"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "No native time-variant Constant modulator; use Script Time Variant Modulator instead",
+      "summary": "There is no built-in time-variant equivalent of the Constant modulator. The intended substitute is a Script Time Variant Modulator built with scriptnode. Christoph Hart provided two reference HiseSnippets: one with smooth interpolation and one bare (\"ugly beast\") version without.",
+      "sources": ["tid:1217"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Synth group placement is marginally more CPU-efficient than per-sampler placement",
+      "summary": "Placing a Constant modulator at the synth group level is slightly more efficient than one per sampler because voices are handled together. In practice the difference is negligible and the real bottleneck is usually elsewhere.",
+      "sources": ["tid:2960"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

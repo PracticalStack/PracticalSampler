@@ -1,0 +1,141 @@
+{
+  "factoryPath": "control.minmax",
+  "factory": "control",
+  "nodeId": "minmax",
+  "description": "Scales the input value to a modifyable range",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Input Signal",
+      "rationale": "Value is the primary 0..1 normalised input to be remapped.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Output Range",
+      "rationale": "Minimum and Maximum define the output range that the 0..1 input is mapped to. Together with Skew and Step they form a complete NormalisableRange definition.",
+      "parameters": [
+        {
+          "id": "Minimum",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Maximum",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Skew",
+          "range": { "min": 0.1, "max": 10.0, "step": 0.0, "skew": 0.2890648245811462 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Step",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Polarity",
+      "rationale": "Polarity is a boolean toggle that controls whether the input range is inverted before mapping. Separated because it is a mode switch, not a continuous parameter.",
+      "parameters": [
+        {
+          "id": "Polarity",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "62.nT6K8CRMoF..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.QTfSuIWagwlBI4lckIGckQF.gMFcoYWY.DP.B..",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": true,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/minmax.md",
+    "tier": "BRIEF",
+    "lines": 13
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "minmax-mapping-formula",
+      "category": "signal_path",
+      "question": "In multilogic::minmax::getValue(), what is the exact mapping formula? Does it construct a NormalisableRange from Minimum/Maximum/Skew/Step and use convertFrom0to1(), or is it a custom formula?",
+      "context": "Need the precise mapping to document how the 0..1 input becomes an unnormalised output value."
+    },
+    {
+      "id": "minmax-polarity-behaviour",
+      "category": "parameter_behaviour",
+      "question": "What does the Polarity parameter do exactly? Does it invert the input (1-value) before range mapping, or does it invert the output after mapping, or does it swap Minimum and Maximum?",
+      "context": "The Polarity toggle has a text converter suggesting named options. Need to know the exact effect for documentation."
+    },
+    {
+      "id": "minmax-step-quantisation",
+      "category": "parameter_behaviour",
+      "question": "How does the Step parameter interact with the range mapping? Is it applied as the interval field of NormalisableRange (quantising the output), or does it serve a different purpose?",
+      "context": "Step with default 0.0 suggests it is optional quantisation. Need to confirm the snapping behaviour."
+    },
+    {
+      "id": "minmax-unnormalised-input-note",
+      "category": "signal_path",
+      "question": "The cppProperties show UseUnnormalisedModulation: true (not an array of parameter names). The control-infrastructure doc says minmax uses no_mod_normalisation with empty unscaled input list. Confirm: Value input IS scaled (0..1) but the output is unnormalised?",
+      "context": "This asymmetry (normalised input, unnormalised output) is the defining characteristic of minmax and must be documented clearly."
+    }
+  ],
+
+  "notes": "minmax is the primary range-mapping control node. It takes a normalised 0..1 input and outputs an unnormalised value in a user-defined range. The UseUnnormalisedModulation flag is set globally (true, not per-parameter), but the control-infrastructure doc clarifies that the no_mod_normalisation constructor receives an empty unscaled parameter list -- meaning the VALUE input is still range-scaled (normalised), while the OUTPUT is unnormalised. This makes minmax the standard bridge from normalised to unnormalised domains. Has 6 parameters -- the most of any node in this batch."
+}

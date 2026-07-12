@@ -1,0 +1,57 @@
+{
+  "moduleId": "ChannelFilter",
+  "notes": "Implemented as a HardcodedScriptProcessor (C++ class with scripting-style callbacks). The MPE mode is driven by the global MPEData listener, not a user-facing parameter toggle. When MPE is enabled, messages are tested against a BigInteger bitmask built from mpeStart/mpeEnd channel range (master channel 1 is always allowed). When MPE is disabled, messages are tested against the single channelNumber value. All three MIDI event types (note-on, note-off, controller) use identical filtering logic. Non-matching messages are silently ignored via Message.ignoreEvent(true) - they are not destroyed, just flagged to be skipped by downstream processors.",
+  "nodes": [
+    {
+      "id": "midi_in",
+      "label": "MIDI Input",
+      "type": "midi_event",
+      "detail": "Note-on, note-off, and CC messages",
+      "scope": "monophonic",
+      "importance": 1.0
+    },
+    {
+      "id": "mpe_check",
+      "label": "MPE Mode",
+      "type": "decision",
+      "detail": "Global MPE state from MidiControllerAutomationHandler",
+      "scope": "monophonic",
+      "importance": 0.6,
+      "condition": {
+        "parameter": "MPE mode (global)",
+        "whenTrue": "Filter by MPE channel range",
+        "whenFalse": "Filter by single channel number"
+      }
+    },
+    {
+      "id": "channel_check",
+      "label": "Channel Match",
+      "type": "decision",
+      "scope": "monophonic",
+      "importance": 1.0,
+      "parameters": ["channelNumber", "mpeStart", "mpeEnd"]
+    },
+    {
+      "id": "pass",
+      "label": "Pass",
+      "type": "io",
+      "detail": "Message continues to downstream processors",
+      "scope": "monophonic",
+      "importance": 1.0
+    },
+    {
+      "id": "drop",
+      "label": "Ignore",
+      "type": "io",
+      "detail": "Message flagged via ignoreEvent, not destroyed",
+      "scope": "monophonic",
+      "importance": 0.6
+    }
+  ],
+  "edges": [
+    { "from": "midi_in", "to": "mpe_check", "type": "signal" },
+    { "from": "mpe_check", "to": "channel_check", "type": "signal" },
+    { "from": "channel_check", "to": "pass", "type": "signal", "label": "Match" },
+    { "from": "channel_check", "to": "drop", "type": "signal", "label": "No match" }
+  ]
+}

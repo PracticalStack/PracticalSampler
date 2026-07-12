@@ -1,0 +1,3 @@
+Returns a new array populated with the results of calling the callback on every element. The original array is not modified. The callback receives up to three arguments: `element`, `index`, and `array`.
+
+> [!Warning:Undefined elements are silently skipped] Elements that are `undefined` are not passed to the callback and produce no output element. An array `[1, undefined, 3]` produces a 2-element result, not 3.

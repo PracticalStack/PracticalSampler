@@ -1,0 +1,104 @@
+{
+  "targetId": "WaveSynth",
+  "domain": "modules",
+  "generatedAt": "2026-04-08",
+  "topicIds": [13665, 11561, 8046, 13734, 13720, 1934, 12679, 10637, 9514, 10696, 11523, 5931, 10793, 11455, 9277, 13426, 953],
+  "insights": [
+    {
+      "type": "API",
+      "title": "WaveSynth has no built-in start-phase control; oscillators always reset to phase 0 on note-on",
+      "summary": "The Waveform Generator provides no StartPhase parameter. On every note-on both oscillators always start at phase 0. A community PR added StartPhase1/StartPhase2 attributes but it is not merged in the main build. For random or free-running phase, use a scriptnode patch instead.",
+      "sources": ["tid:13720"],
+      "verify": true,
+      "verify_hint": "grep StartPhase in hi_scripting/scripting/modules/generators/WaveformGenerator or WaveSynth; check if PR was merged"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "PolyBLEP falls back to sine when oscillator frequency reaches sampleRate/4",
+      "summary": "The WaveSynth PolyBLEP algorithm silently reverts to a sine wave when the oscillator frequency exceeds sampleRate/4 to prevent aliasing. This means high-pitched notes on non-sine waveforms may unexpectedly sound like sines.",
+      "sources": ["tid:9514"],
+      "verify": true,
+      "verify_hint": "grep sampleRate/4 or PolyBlep in hi_scripting/scripting/modules/generators; check fallback condition"
+    },
+    {
+      "type": "API",
+      "title": "Pulse width (PWM) modulation is not natively supported; requires wavetable or custom C++ oscillator",
+      "summary": "The WaveSynth does not implement pulse width modulation. The only practical in-HISE approaches are: (1) pre-render PWM sweep cycles and load as a wavetable, or (2) write a custom SNEX or C++ node. A file-player-based workaround using single-cycle waveforms exists but introduces aliasing when pitching.",
+      "sources": ["tid:13665"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "File player used as an oscillator has no antialiasing; pitching up creates harsh harmonics",
+      "summary": "When using a single-cycle waveform loaded in a file player to simulate oscillator behaviour, pitching up causes severe aliasing because the file player applies no band-limiting. This was highlighted in the context of PWM emulation as a known limitation.",
+      "sources": ["tid:13665"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "Oscillator uptime counter can overflow/explode after extended playback",
+      "summary": "A bug was reported where an oscillator running continuously for several minutes causes the internal uptime counter to overflow, producing noise or silence. Christoph confirmed the issue but noted it was an unusual scenario that nobody else had reported. It was also reproduced inside a modChain node.",
+      "sources": ["tid:10696"],
+      "verify": true,
+      "verify_hint": "grep uptime in hi_scripting/scripting/modules/generators/WaveformGenerator; check for integer overflow in phase accumulation"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Scriptnode oscillator in a no_midi container is required for fixed LFO-style frequency",
+      "summary": "When a scriptnode oscillator is used for sub-audio modulation (LFO-style), it will retune itself to the last received MIDI note frequency unless wrapped in a no_midi container. Without the no_midi container, playing a key will alter the modulation rate.",
+      "sources": ["tid:13426"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "Wrapping a scriptnode oscillator in soft bypass inside a clone container causes a crash",
+      "summary": "Placing a scriptnode oscillator node inside a soft bypass wrapper within a clone container results in a crash. This was reproduced by both David Healey and the reporter.",
+      "sources": ["tid:9277"],
+      "verify": true,
+      "verify_hint": "grep soft bypass or SoftBypassNode in scriptnode; check interaction with clone containers and oscillator state"
+    },
+    {
+      "type": "API",
+      "title": "Osc2PitchChain supports audio-rate FM synthesis; hard sync resets osc2 per osc1 cycle",
+      "summary": "The separate Osc2PitchChain allows audio-rate modulation of osc2 pitch, enabling classic FM-style synthesis where osc1 is the modulator. Hard sync is implemented at the PolyBLEP level: when osc1 completes a cycle, osc2 phase is reset, which is the canonical hard sync definition. Neither feature is accessible via scripting alone.",
+      "sources": ["tid:953"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Amplitude-modulating an oscillator at audio rate requires a frame context node in scriptnode",
+      "summary": "When amplitude-modulating an oscillator quickly (at or near audio rate), results are unpredictable unless the processing is wrapped in a frame context node. The frame context forces sample-accurate processing instead of block processing, resolving timing artifacts.",
+      "sources": ["tid:11455"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use scriptnode to rebuild the Waveform Generator with random/free-running phase",
+      "summary": "Christoph Hart confirmed that scriptnode was specifically designed to handle oscillator customization (like random phase) that would otherwise require frankensteining HISE modules. A scriptnode patch with multiple oscillator nodes in a split chain can replicate the WaveSynth feature set minus hard sync.",
+      "sources": ["tid:13720"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Detune in scriptnode: combine converter node with freq_ratio parameter and semitone offset",
+      "summary": "To add detune to a scriptnode oscillator, connect a converter node to the freq_ratio parameter. Semitone and cent detune can be combined by summing their respective converter outputs before connecting to freq_ratio.",
+      "sources": ["tid:13734"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "WaveSynth Mix crossfade is linear, not equal-power; Pan uses equal-power BalanceCalculator",
+      "summary": "The Mix parameter fades between osc1 and osc2 using a linear crossfade (osc1 *= 1-mix, osc2 *= mix), which produces a level dip at center. The Pan parameters for each oscillator use HISE's equal-power BalanceCalculator with sqrt(2) * cos/sin law.",
+      "sources": [],
+      "verify": true,
+      "verify_hint": "Confirmed from phase1 C++ analysis; grep BalanceCalculator in hi_scripting/scripting/modules/generators/WaveformGenerator"
+    }
+  ]
+}

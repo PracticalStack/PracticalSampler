@@ -1,0 +1,32 @@
+{
+  "targetId": "container.modchain",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [4978],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Avoid overusing send/receive nodes inside a mod chain — prefer the normal signal flow",
+      "body": "Using many send/receive nodes inside a modchain for summing or routing creates unnecessary complexity. The author recommends using the normal top-down signal flow as much as possible and only resorting to send/receive when genuinely needed (e.g. feedback loops). To sum multiple modulation sources into a single output, use a split node inside the mod chain with a peak node placed after it.",
+      "source": "tid:4978",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Deleting modulating nodes can leave orphan connections on the target node",
+      "body": "When a node that is modulating another node is deleted, the connection can persist on the target node and prevent it from working normally. If a modulated parameter behaves unexpectedly after removing nodes from the graph, manually inspect and remove any remaining connections on the target.",
+      "source": "tid:4978",
+      "author": "ustk [trusted]",
+      "confidence": "high"
+    },
+    {
+      "type": "API",
+      "title": "Range editor requires values to be defined on both source AND target for connections to work",
+      "body": "Since the new_layout / later develop versions, connections between modchain nodes require the parameter ranges (min/max) to be defined on both the source node and the target node. Editing only the source was sufficient in older builds but no longer works. Use SHIFT-click on the min/max fields in the range editor to set values. You can set min greater than max to invert the curve.",
+      "source": "tid:4978",
+      "author": "Matt_SF [trusted]",
+      "confidence": "high"
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+Controls whether a trailing slash is automatically appended to POST request URLs. Enabled by default. Some server configurations return 301 redirects when a trailing slash is missing, so the default prevents that common issue. Disable this if your server requires URLs without a trailing slash.

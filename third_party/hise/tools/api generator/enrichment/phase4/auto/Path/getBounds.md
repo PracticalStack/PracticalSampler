@@ -1,0 +1,1 @@
+Returns the bounding rectangle of the path as `[x, y, width, height]`. The `scaleFactor` is applied as a uniform transform before computing bounds - pass `1.0` for the path's actual coordinates. This is useful for determining how much space a path occupies or for positioning related elements relative to the path geometry.

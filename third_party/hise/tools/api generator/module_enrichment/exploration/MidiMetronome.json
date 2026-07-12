@@ -1,0 +1,103 @@
+{
+  "moduleId": "MidiMetronome",
+  "nodes": [
+    {
+      "id": "audio_in",
+      "type": "input",
+      "label": "Audio In (L/R)",
+      "importance": 1.0
+    },
+    {
+      "id": "enabled_check",
+      "type": "decision",
+      "label": "Enabled?",
+      "importance": 0.8,
+      "description": "Checks if the metronome is enabled and a MidiPlayer is connected"
+    },
+    {
+      "id": "beat_detect",
+      "type": "process",
+      "label": "Beat Detection",
+      "importance": 0.8,
+      "description": "Reads the MidiPlayer playback position and detects new beats"
+    },
+    {
+      "id": "downbeat_check",
+      "type": "decision",
+      "label": "Downbeat?",
+      "importance": 0.7,
+      "description": "Checks if the current beat is a downbeat (beat % nominator == 0)"
+    },
+    {
+      "id": "click_synth",
+      "type": "process",
+      "label": "Click Synthesis",
+      "importance": 1.0,
+      "description": "Generates a click sound from sine + noise with exponential decay"
+    },
+    {
+      "id": "additive_mix",
+      "type": "process",
+      "label": "Additive Mix",
+      "importance": 0.9,
+      "description": "Adds the click signal to both audio channels"
+    },
+    {
+      "id": "enabled_param",
+      "type": "parameter",
+      "label": "Enabled",
+      "importance": 0.8
+    },
+    {
+      "id": "volume_param",
+      "type": "parameter",
+      "label": "Volume",
+      "importance": 0.9
+    },
+    {
+      "id": "noise_param",
+      "type": "parameter",
+      "label": "NoiseAmount",
+      "importance": 0.8
+    },
+    {
+      "id": "midi_player",
+      "type": "external",
+      "label": "MIDI Player",
+      "importance": 0.9,
+      "description": "Connected MidiPlayer providing playback position and time signature"
+    },
+    {
+      "id": "audio_out",
+      "type": "output",
+      "label": "Audio Out",
+      "importance": 1.0
+    }
+  ],
+  "edges": [
+    { "from": "audio_in", "to": "enabled_check", "type": "signal" },
+    { "from": "enabled_param", "to": "enabled_check", "type": "control" },
+    { "from": "enabled_check", "to": "audio_out", "type": "conditional", "label": "disabled (passthrough)" },
+    { "from": "enabled_check", "to": "beat_detect", "type": "conditional", "label": "enabled" },
+    { "from": "midi_player", "to": "beat_detect", "type": "control", "label": "position + time sig" },
+    { "from": "beat_detect", "to": "downbeat_check", "type": "signal" },
+    { "from": "downbeat_check", "to": "click_synth", "type": "conditional", "label": "sets pitch accent" },
+    { "from": "volume_param", "to": "click_synth", "type": "control" },
+    { "from": "noise_param", "to": "click_synth", "type": "control" },
+    { "from": "click_synth", "to": "additive_mix", "type": "signal" },
+    { "from": "audio_in", "to": "additive_mix", "type": "signal" },
+    { "from": "additive_mix", "to": "audio_out", "type": "signal" }
+  ],
+  "groups": [
+    {
+      "id": "timing",
+      "label": "Beat Tracking",
+      "nodes": ["beat_detect", "downbeat_check", "midi_player"]
+    },
+    {
+      "id": "synthesis",
+      "label": "Click Generation",
+      "nodes": ["click_synth", "additive_mix", "volume_param", "noise_param"]
+    }
+  ]
+}

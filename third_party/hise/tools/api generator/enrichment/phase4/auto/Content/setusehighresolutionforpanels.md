@@ -1,0 +1,1 @@
+Enables double-resolution rendering for ScriptPanel paint routines, producing sharper graphics on HiDPI/Retina displays. Call this immediately after `Content.makeFrontInterface()` if any ScriptPanel in the project uses a custom paint routine. Without it, panels render at 1x resolution and appear blurry on high-DPI screens.

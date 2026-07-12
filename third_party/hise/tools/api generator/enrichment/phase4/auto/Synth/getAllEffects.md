@@ -1,0 +1,1 @@
+Returns an array of `ScriptEffect` handles for all effects in the parent synth's subtree whose IDs match the given wildcard pattern. The pattern supports `*` as a glob wildcard (e.g. `"Delay*"` matches "Delay1", "DelayFX"). Use `".*"` to match all effects.

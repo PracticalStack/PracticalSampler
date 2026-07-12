@@ -1,0 +1,1 @@
+Connects the neural network to global routing cables for automatic input and output. When a value arrives on the input cable, it triggers inference via `process`, and the first output value is sent to the output cable. Pass an empty string for either parameter to skip that connection.

@@ -1,0 +1,14 @@
+{
+  "factoryPath": "fx.phase_delay",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Input audio signal (up to 2 channels)" },
+    { "id": "allpass", "label": "Allpass Filter", "type": "process", "importance": 1.0, "description": "First-order allpass: preserves amplitude, shifts phase from 0 to -180 degrees" },
+    { "id": "frequency", "label": "Frequency", "type": "parameter", "importance": 1.0, "description": "Corner frequency where phase shift = -90 degrees (20-20000 Hz)" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Phase-shifted signal (same amplitude, altered phase)" }
+  ],
+  "edges": [
+    { "from": "in", "to": "allpass", "type": "signal", "label": null },
+    { "from": "frequency", "to": "allpass", "type": "control", "label": null },
+    { "from": "allpass", "to": "out", "type": "signal", "label": null }
+  ]
+}

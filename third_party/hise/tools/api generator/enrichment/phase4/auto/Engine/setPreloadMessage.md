@@ -1,0 +1,1 @@
+Sets the status message displayed during sample loading. Use this to provide custom progress messages during long-running operations that use the preload overlay.

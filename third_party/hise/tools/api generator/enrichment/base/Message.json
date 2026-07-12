@@ -1,0 +1,319 @@
+{
+  "className": "Message",
+  "category": "namespace",
+  "description": "All scripting methods related to the midi message that triggered the callback.\nEvery method must be called on the message like this:\nmessage.delayEvent(200);",
+  "methods": {
+    "delayEvent": {
+      "signature": "void delayEvent(int samplesToDelay)",
+      "returnType": "void",
+      "description": "Delays the event by the sampleAmount.",
+      "parameters": [
+        {
+          "name": "samplesToDelay",
+          "type": "int"
+        }
+      ]
+    },
+    "getChannel": {
+      "signature": "int getChannel()",
+      "returnType": "int",
+      "description": "Returns the MIDI Channel from 1 to 16.",
+      "parameters": []
+    },
+    "getCoarseDetune": {
+      "signature": "int getCoarseDetune()",
+      "returnType": "int",
+      "description": "Returns the coarse detune amount in semitones.",
+      "parameters": []
+    },
+    "getControllerNumber": {
+      "signature": "var getControllerNumber()",
+      "returnType": "var",
+      "description": "returns the controller number or 'undefined', if the message is neither controller nor pitch wheel nor aftertouch.\nYou can also check for pitch wheel values and aftertouch messages. Pitchwheel has number 128, Aftertouch has number 129.",
+      "parameters": []
+    },
+    "getControllerValue": {
+      "signature": "var getControllerValue()",
+      "returnType": "var",
+      "description": "Returns the value of the controller.",
+      "parameters": []
+    },
+    "getEventId": {
+      "signature": "int getEventId()",
+      "returnType": "int",
+      "description": "Returns the event id of the current message.",
+      "parameters": []
+    },
+    "getFineDetune": {
+      "signature": "int getFineDetune()",
+      "returnType": "int",
+      "description": "Returns the fine detune amount int cents.",
+      "parameters": []
+    },
+    "getGain": {
+      "signature": "int getGain()",
+      "returnType": "int",
+      "description": "Returns the volume of the note.",
+      "parameters": []
+    },
+    "getMonophonicAftertouchPressure": {
+      "signature": "int getMonophonicAftertouchPressure()",
+      "returnType": "int",
+      "description": "Returns the aftertouch value of the monophonic aftertouch message.",
+      "parameters": []
+    },
+    "getNoteNumber": {
+      "signature": "int getNoteNumber()",
+      "returnType": "int",
+      "description": "Return the note number. This can be called only on midi event callbacks.",
+      "parameters": []
+    },
+    "getPolyAfterTouchNoteNumber": {
+      "signature": "int getPolyAfterTouchNoteNumber()",
+      "returnType": "int",
+      "description": "Returns the polyphonic aftertouch note number.",
+      "parameters": []
+    },
+    "getPolyAfterTouchPressureValue": {
+      "signature": "int getPolyAfterTouchPressureValue()",
+      "returnType": "int",
+      "description": "Checks if the message is a POLYPHONIC aftertouch message (Use isChannelPressure() for monophonic aftertouch).",
+      "parameters": []
+    },
+    "getProgramChangeNumber": {
+      "signature": "int getProgramChangeNumber()",
+      "returnType": "int",
+      "description": "Returns the program change number or -1 if it isn't a program change message.",
+      "parameters": []
+    },
+    "getTimestamp": {
+      "signature": "int getTimestamp()",
+      "returnType": "int",
+      "description": "Returns the timestamp of the message.",
+      "parameters": []
+    },
+    "getTransposeAmount": {
+      "signature": "int getTransposeAmount()",
+      "returnType": "int",
+      "description": "Gets the tranpose value.",
+      "parameters": []
+    },
+    "getVelocity": {
+      "signature": "int getVelocity()",
+      "returnType": "int",
+      "description": "Returns the Velocity.",
+      "parameters": []
+    },
+    "ignoreEvent": {
+      "signature": "void ignoreEvent(bool shouldBeIgnored)",
+      "returnType": "void",
+      "description": "Ignores the event.",
+      "parameters": [
+        {
+          "name": "shouldBeIgnored",
+          "type": "bool"
+        }
+      ]
+    },
+    "isArtificial": {
+      "signature": "bool isArtificial()",
+      "returnType": "bool",
+      "description": "Checks if the event was created by a script earlier.",
+      "parameters": []
+    },
+    "isMonophonicAfterTouch": {
+      "signature": "bool isMonophonicAfterTouch()",
+      "returnType": "bool",
+      "description": "Checks if the message is a MONOPHONIC aftertouch message.",
+      "parameters": []
+    },
+    "isPolyAftertouch": {
+      "signature": "bool isPolyAftertouch()",
+      "returnType": "bool",
+      "description": "Checks if the message is a POLYPHONIC aftertouch message (Use isChannelPressure() for monophonic aftertouch).",
+      "parameters": []
+    },
+    "isProgramChange": {
+      "signature": "bool isProgramChange()",
+      "returnType": "bool",
+      "description": "Checks if the message is a program change message.",
+      "parameters": []
+    },
+    "makeArtificial": {
+      "signature": "int makeArtificial()",
+      "returnType": "int",
+      "description": "Creates a artificial copy of this event and returns the new event ID. If the event is already artificial it will return the event ID.",
+      "parameters": []
+    },
+    "makeArtificialOrLocal": {
+      "signature": "int makeArtificialOrLocal()",
+      "returnType": "int",
+      "description": "Creates a artificial copy of this event and returns the new event ID. If the event is artificial it will make a new one with a new ID.",
+      "parameters": []
+    },
+    "sendToMidiOut": {
+      "signature": "void sendToMidiOut()",
+      "returnType": "void",
+      "description": "This will forward the message to the MIDI out of the plugin.",
+      "parameters": []
+    },
+    "setAllNotesOffCallback": {
+      "signature": "void setAllNotesOffCallback(var onAllNotesOffCallback)",
+      "returnType": "void",
+      "description": "Sets a callback that will be performed when an all notes off message is received.",
+      "parameters": [
+        {
+          "name": "onAllNotesOffCallback",
+          "type": "var"
+        }
+      ]
+    },
+    "setChannel": {
+      "signature": "void setChannel(int newChannel)",
+      "returnType": "void",
+      "description": "Changes the MIDI channel from 1 to 16.",
+      "parameters": [
+        {
+          "name": "newChannel",
+          "type": "int"
+        }
+      ]
+    },
+    "setCoarseDetune": {
+      "signature": "void setCoarseDetune(int semiToneDetune)",
+      "returnType": "void",
+      "description": "Sets the coarse detune amount in semitones.",
+      "parameters": [
+        {
+          "name": "semiToneDetune",
+          "type": "int"
+        }
+      ]
+    },
+    "setControllerNumber": {
+      "signature": "void setControllerNumber(int newControllerNumber)",
+      "returnType": "void",
+      "description": "Changes the ControllerNumber.",
+      "parameters": [
+        {
+          "name": "newControllerNumber",
+          "type": "int"
+        }
+      ]
+    },
+    "setControllerValue": {
+      "signature": "void setControllerValue(int newControllerValue)",
+      "returnType": "void",
+      "description": "Changes the controller value (range 0 - 127).",
+      "parameters": [
+        {
+          "name": "newControllerValue",
+          "type": "int"
+        }
+      ]
+    },
+    "setFineDetune": {
+      "signature": "void setFineDetune(int cents)",
+      "returnType": "void",
+      "description": "Sets the fine detune amount in cents.",
+      "parameters": [
+        {
+          "name": "cents",
+          "type": "int"
+        }
+      ]
+    },
+    "setGain": {
+      "signature": "void setGain(int gainInDecibels)",
+      "returnType": "void",
+      "description": "Sets the volume of the note (-100 = silence).",
+      "parameters": [
+        {
+          "name": "gainInDecibels",
+          "type": "int"
+        }
+      ]
+    },
+    "setMonophonicAfterTouchPressure": {
+      "signature": "void setMonophonicAfterTouchPressure(int pressure)",
+      "returnType": "void",
+      "description": "Sets the pressure value of the monophonic aftertouch message",
+      "parameters": [
+        {
+          "name": "pressure",
+          "type": "int"
+        }
+      ]
+    },
+    "setNoteNumber": {
+      "signature": "void setNoteNumber(int newNoteNumber)",
+      "returnType": "void",
+      "description": "Changes the note number.",
+      "parameters": [
+        {
+          "name": "newNoteNumber",
+          "type": "int"
+        }
+      ]
+    },
+    "setPolyAfterTouchNoteNumberAndPressureValue": {
+      "signature": "void setPolyAfterTouchNoteNumberAndPressureValue(int noteNumber, int aftertouchAmount)",
+      "returnType": "void",
+      "description": "Copied from MidiMessage.",
+      "parameters": [
+        {
+          "name": "noteNumber",
+          "type": "int"
+        },
+        {
+          "name": "aftertouchAmount",
+          "type": "int"
+        }
+      ]
+    },
+    "setStartOffset": {
+      "signature": "void setStartOffset(int newStartOffset)",
+      "returnType": "void",
+      "description": "Sets the start offset for the given message.",
+      "parameters": [
+        {
+          "name": "newStartOffset",
+          "type": "int"
+        }
+      ]
+    },
+    "setTransposeAmount": {
+      "signature": "void setTransposeAmount(int tranposeValue)",
+      "returnType": "void",
+      "description": "Transposes the note on.",
+      "parameters": [
+        {
+          "name": "tranposeValue",
+          "type": "int"
+        }
+      ]
+    },
+    "setVelocity": {
+      "signature": "void setVelocity(int newVelocity)",
+      "returnType": "void",
+      "description": "Changes the velocity (range 1 - 127).",
+      "parameters": [
+        {
+          "name": "newVelocity",
+          "type": "int"
+        }
+      ]
+    },
+    "store": {
+      "signature": "void store(var messageEventHolder)",
+      "returnType": "void",
+      "description": "Stores a copy of the current event into the given holder object.",
+      "parameters": [
+        {
+          "name": "messageEventHolder",
+          "type": "var"
+        }
+      ]
+    }
+  }
+}

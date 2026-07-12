@@ -1,0 +1,1 @@
+Sets the fine detune amount in cents (-128 to 127) for this event. This per-event pitch modifier works together with `setCoarseDetune()` and is applied during voice rendering.

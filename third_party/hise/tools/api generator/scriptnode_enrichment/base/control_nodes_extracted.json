@@ -1,0 +1,2646 @@
+{
+  "control.bang": {
+    "ID": "bang",
+    "FactoryPath": "control.bang",
+    "Bypassed": false,
+    "Name": "bang",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 1.0,
+          "SkewFactor": 1.0,
+          "ID": "Bang",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "send the value when the bang input changes",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsPolyphonic": true,
+      "UseUnnormalisedModulation": [
+        "Value"
+      ],
+      "IsControlNode": true
+    }
+  },
+  "control.bipolar": {
+    "ID": "bipolar",
+    "FactoryPath": "control.bipolar",
+    "Bypassed": false,
+    "Name": "bipolar",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": -1.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Scale",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.5,
+          "MaxValue": 2.0,
+          "StepSize": 0.0,
+          "SkewFactor": 0.6309297680854797,
+          "ID": "Gamma",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 1.0,
+          "DefaultValue": 1.0
+        }
+      ]
+    },
+    "description": "Creates a bipolar mod signal from a 0...1 range",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsPolyphonic": true,
+      "IsControlNode": true
+    }
+  },
+  "control.blend": {
+    "ID": "blend",
+    "FactoryPath": "control.blend",
+    "Bypassed": false,
+    "Name": "blend",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Alpha",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value1",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value2",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Blends the two input values based on the Alpha parameter.",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsPolyphonic": true,
+      "IsControlNode": true
+    }
+  },
+  "control.branch_cable": {
+    "ID": "branch_cable",
+    "FactoryPath": "control.branch_cable",
+    "Bypassed": false,
+    "Name": "branch_cable",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {
+      "ChildId": "Property",
+      "Children": [
+        {
+          "ID": "NumParameters",
+          "Value": 0
+        }
+      ]
+    },
+    "SwitchTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 7.0,
+          "StepSize": 1.0,
+          "SkewFactor": 1.0,
+          "ID": "Index",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Send the incoming value to a single output",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsPolyphonic": true,
+      "IsControlNode": true
+    }
+  },
+  "control.cable_expr": {
+    "ID": "cable_expr",
+    "FactoryPath": "control.cable_expr",
+    "Bypassed": false,
+    "Name": "cable_expr",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {
+      "ChildId": "Property",
+      "Children": [
+        {
+          "ID": "Code",
+          "Value": "input"
+        },
+        {
+          "ID": "Debug",
+          "Value": false
+        }
+      ]
+    },
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "evaluates an expression for the control value",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "UseUnnormalisedModulation": [
+        "Value"
+      ],
+      "IsControlNode": true
+    }
+  },
+  "control.cable_pack": {
+    "ID": "cable_pack",
+    "FactoryPath": "control.cable_pack",
+    "Bypassed": false,
+    "Name": "cable_pack",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "ComplexData": {
+      "ChildId": "SliderPacks",
+      "Children": [
+        {
+          "ChildId": "SliderPack",
+          "Children": [
+            {
+              "Index": -1,
+              "EmbeddedData": -1
+            }
+          ]
+        }
+      ]
+    },
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Uses a slider pack to modify a modulation signal",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsControlNode": true
+    }
+  },
+  "control.cable_table": {
+    "ID": "cable_table",
+    "FactoryPath": "control.cable_table",
+    "Bypassed": false,
+    "Name": "cable_table",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "ComplexData": {
+      "ChildId": "Tables",
+      "Children": [
+        {
+          "ChildId": "Table",
+          "Children": [
+            {
+              "Index": -1,
+              "EmbeddedData": -1
+            }
+          ]
+        }
+      ]
+    },
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Modify a modulation signal using a lookup table",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsControlNode": true
+    }
+  },
+  "control.change": {
+    "ID": "change",
+    "FactoryPath": "control.change",
+    "Bypassed": false,
+    "Name": "change",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Filters out repetitions of the same value",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsPolyphonic": true,
+      "UseUnnormalisedModulation": [
+        "Value"
+      ],
+      "IsControlNode": true
+    }
+  },
+  "control.clone_cable": {
+    "ID": "clone_cable",
+    "FactoryPath": "control.clone_cable",
+    "Bypassed": false,
+    "Name": "clone_cable",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {
+      "ChildId": "Property",
+      "Children": [
+        {
+          "ID": "Mode",
+          "Value": "Spread"
+        }
+      ]
+    },
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 1.0,
+          "MaxValue": 16.0,
+          "StepSize": 1.0,
+          "SkewFactor": 1.0,
+          "ID": "NumClones",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 1.0,
+          "DefaultValue": 1.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Gamma",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Send different values to cloned nodes",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsProcessingHiseEvent": true,
+      "IsControlNode": true,
+      "HasModeTemplateArgument": true,
+      "IsCloneCableNode": true
+    }
+  },
+  "control.clone_forward": {
+    "ID": "clone_forward",
+    "FactoryPath": "control.clone_forward",
+    "Bypassed": false,
+    "Name": "clone_forward",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 1.0,
+          "MaxValue": 16.0,
+          "StepSize": 1.0,
+          "SkewFactor": 1.0,
+          "ID": "NumClones",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 1.0,
+          "DefaultValue": 1.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "forwards the unscaled input parameter to all clones",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "UseUnnormalisedModulation": [
+        "Value"
+      ],
+      "IsControlNode": true,
+      "IsCloneCableNode": true
+    }
+  },
+  "control.clone_pack": {
+    "ID": "clone_pack",
+    "FactoryPath": "control.clone_pack",
+    "Bypassed": false,
+    "Name": "clone_pack",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "ComplexData": {
+      "ChildId": "SliderPacks",
+      "Children": [
+        {
+          "ChildId": "SliderPack",
+          "Children": [
+            {
+              "Index": -1,
+              "EmbeddedData": -1
+            }
+          ]
+        }
+      ]
+    },
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 1.0,
+          "MaxValue": 16.0,
+          "StepSize": 1.0,
+          "SkewFactor": 1.0,
+          "ID": "NumClones",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 1.0,
+          "DefaultValue": 1.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 1.0,
+          "DefaultValue": 1.0
+        }
+      ]
+    },
+    "description": "control cloned parameters with a slider pack",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsControlNode": true,
+      "IsCloneCableNode": true
+    }
+  },
+  "control.compare": {
+    "ID": "compare",
+    "FactoryPath": "control.compare",
+    "Bypassed": false,
+    "Name": "compare",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Left",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Right",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 7.0,
+          "StepSize": 1.0,
+          "SkewFactor": 1.0,
+          "ID": "Comparator",
+          "TextToValueConverter": "75.nT6K8ChPQH..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.dTPQQofSEEkBGQkBLQkBGQUQJvDUEoPSI4jBMEDV.D1XzklckAP.AH..",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "compares the input signals and outputs either 1.0 or 0.0",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsPolyphonic": true,
+      "IsControlNode": true
+    }
+  },
+  "control.converter": {
+    "ID": "converter",
+    "FactoryPath": "control.converter",
+    "Bypassed": false,
+    "Name": "converter",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {
+      "ChildId": "Property",
+      "Children": [
+        {
+          "ID": "Mode",
+          "Value": "Ms2Freq"
+        }
+      ]
+    },
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "converts a control value",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "UseUnnormalisedModulation": [
+        "Value"
+      ],
+      "IsControlNode": true,
+      "HasModeTemplateArgument": true
+    }
+  },
+  "control.delay_cable": {
+    "ID": "delay_cable",
+    "FactoryPath": "control.delay_cable",
+    "Bypassed": false,
+    "Name": "delay_cable",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 44100.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "DelayTimeSamples",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Delays the message by a given amount",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsPolyphonic": true,
+      "UseUnnormalisedModulation": [
+        "Value"
+      ],
+      "IsControlNode": true
+    }
+  },
+  "control.file_analyser": {
+    "ID": "file_analyser",
+    "FactoryPath": "control.file_analyser",
+    "Bypassed": false,
+    "Name": "file_analyser",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {
+      "ChildId": "Property",
+      "Children": [
+        {
+          "ID": "Mode",
+          "Value": "Peak"
+        }
+      ]
+    },
+    "ModulationTargets": {},
+    "ComplexData": {
+      "ChildId": "AudioFiles",
+      "Children": [
+        {
+          "ChildId": "AudioFile",
+          "Children": [
+            {
+              "Index": -1,
+              "EmbeddedData": -1
+            }
+          ]
+        }
+      ]
+    },
+    "Parameters": {},
+    "description": "Extracts file information (pitch, length, etc) and sends it as modulation signal on file load",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "UseUnnormalisedModulation": true,
+      "IsControlNode": true,
+      "HasModeTemplateArgument": true
+    }
+  },
+  "control.input_toggle": {
+    "ID": "input_toggle",
+    "FactoryPath": "control.input_toggle",
+    "Bypassed": false,
+    "Name": "input_toggle",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 1.0,
+          "SkewFactor": 1.0,
+          "ID": "Input",
+          "TextToValueConverter": "62.nT6K8CRMoF..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.QTPRtAWczARLJjjavUGcfHC.gMFcoYWY.DP.B..",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value1",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value2",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Switch between two input values as modulation signal",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsPolyphonic": true,
+      "UseUnnormalisedModulation": [
+        "Value1",
+        "Value2"
+      ],
+      "IsControlNode": true
+    }
+  },
+  "control.intensity": {
+    "ID": "intensity",
+    "FactoryPath": "control.intensity",
+    "Bypassed": false,
+    "Name": "intensity",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Intensity",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 1.0,
+          "DefaultValue": 1.0
+        }
+      ]
+    },
+    "description": "applies the HISE modulation intensity to the value",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsPolyphonic": true,
+      "IsControlNode": true
+    }
+  },
+  "control.locked_mod": {
+    "ID": "locked_mod",
+    "FactoryPath": "control.locked_mod",
+    "Bypassed": false,
+    "Name": "locked_mod",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Adds a scaled modulation dragger to its immediate locked node container parent",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsControlNode": true
+    }
+  },
+  "control.locked_mod_unscaled": {
+    "ID": "locked_mod_unscaled",
+    "FactoryPath": "control.locked_mod_unscaled",
+    "Bypassed": false,
+    "Name": "locked_mod_unscaled",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Adds a unscaled modulation dragger to its immediate locked node container parent",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "UseUnnormalisedModulation": [
+        "Value"
+      ],
+      "IsControlNode": true
+    }
+  },
+  "control.logic_op": {
+    "ID": "logic_op",
+    "FactoryPath": "control.logic_op",
+    "Bypassed": false,
+    "Name": "logic_op",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Left",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Right",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 2.0,
+          "StepSize": 1.0,
+          "SkewFactor": 1.0,
+          "ID": "Operator",
+          "TextToValueConverter": "57.nT6K8CBLAF..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.LTPPNQjBOIkBX8jT.D1XzklckAP.AH..",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Combines the (binary) input signals using a logic operator",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsPolyphonic": true,
+      "IsControlNode": true
+    }
+  },
+  "control.midi_cc": {
+    "ID": "midi_cc",
+    "FactoryPath": "control.midi_cc",
+    "Bypassed": false,
+    "Name": "midi_cc",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 131.0,
+          "StepSize": 1.0,
+          "SkewFactor": 1.0,
+          "ID": "CCNumber",
+          "TextToValueConverter": "278.nT6K8C1bBTFB.H+yv.BPqw8FixZjgrMURhqMYtCLwgX8Rg1TRYx8jL7DbXlsEbjffb7Mz7Vrb7PKuyiP5Wn4dIRLKhZO2+TPfDimOAlEulCRqLyLyLQDQDQDwdoXEMQE2c2c2cu6t6t6t6khWcsVqdo3mlkGTThjpTJEyLyLyLu6t6t6tppppppZuT7pIpj8RwqlOsFHn2wvCDjTPu+FQNMEIEuJBFK4zbumFCAya4cCjb9mwAFsBRJHXr..vfjCnF+qIA4v8O22vSi8QNKJBjGpAQ95Hnne..aEDPADXbc.T0ik7nVfcxQlIXwkXJ0Lg7qnN8yXfHUHnyk3h30dSMyneVB9HUD8JIofpK.IHcHfgIFfDe.",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 1.0,
+          "DefaultValue": 1.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 1.0,
+          "SkewFactor": 1.0,
+          "ID": "EnableMPE",
+          "TextToValueConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvStovSlYF.gMFcoYWY.DP.B..",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "DefaultValue",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "sends a MIDI cc value",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsControlNode": true
+    }
+  },
+  "control.minmax": {
+    "ID": "minmax",
+    "FactoryPath": "control.minmax",
+    "Bypassed": false,
+    "Name": "minmax",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Minimum",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Maximum",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 1.0,
+          "DefaultValue": 1.0
+        },
+        {
+          "MinValue": 0.1000000014901161,
+          "MaxValue": 10.0,
+          "StepSize": 0.0,
+          "SkewFactor": 0.2890648245811462,
+          "ID": "Skew",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 1.0,
+          "DefaultValue": 1.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Step",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 1.0,
+          "SkewFactor": 1.0,
+          "ID": "Polarity",
+          "TextToValueConverter": "62.nT6K8CRMoF..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.QTfSuIWagwlBI4lckIGckQF.gMFcoYWY.DP.B..",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Scales the input value to a modifyable range",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsPolyphonic": true,
+      "UseUnnormalisedModulation": true,
+      "IsControlNode": true
+    }
+  },
+  "control.normaliser": {
+    "ID": "normaliser",
+    "FactoryPath": "control.normaliser",
+    "Bypassed": false,
+    "Name": "normaliser",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "normalises the input value",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsControlNode": true
+    }
+  },
+  "control.pack2_writer": {
+    "ID": "pack2_writer",
+    "FactoryPath": "control.pack2_writer",
+    "Bypassed": false,
+    "Name": "pack2_writer",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "ComplexData": {
+      "ChildId": "SliderPacks",
+      "Children": [
+        {
+          "ChildId": "SliderPack",
+          "Children": [
+            {
+              "Index": -1,
+              "EmbeddedData": -1
+            }
+          ]
+        }
+      ]
+    },
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value1",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value2",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Writes the values from the parameter sliders into a slider pack",
+    "cppProperties": {
+      "OutsideSignalPath": true
+    }
+  },
+  "control.pack3_writer": {
+    "ID": "pack3_writer",
+    "FactoryPath": "control.pack3_writer",
+    "Bypassed": false,
+    "Name": "pack3_writer",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "ComplexData": {
+      "ChildId": "SliderPacks",
+      "Children": [
+        {
+          "ChildId": "SliderPack",
+          "Children": [
+            {
+              "Index": -1,
+              "EmbeddedData": -1
+            }
+          ]
+        }
+      ]
+    },
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value1",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value2",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value3",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Writes the values from the parameter sliders into a slider pack",
+    "cppProperties": {
+      "OutsideSignalPath": true
+    }
+  },
+  "control.pack4_writer": {
+    "ID": "pack4_writer",
+    "FactoryPath": "control.pack4_writer",
+    "Bypassed": false,
+    "Name": "pack4_writer",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "ComplexData": {
+      "ChildId": "SliderPacks",
+      "Children": [
+        {
+          "ChildId": "SliderPack",
+          "Children": [
+            {
+              "Index": -1,
+              "EmbeddedData": -1
+            }
+          ]
+        }
+      ]
+    },
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value1",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value2",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value3",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value4",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Writes the values from the parameter sliders into a slider pack",
+    "cppProperties": {
+      "OutsideSignalPath": true
+    }
+  },
+  "control.pack5_writer": {
+    "ID": "pack5_writer",
+    "FactoryPath": "control.pack5_writer",
+    "Bypassed": false,
+    "Name": "pack5_writer",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "ComplexData": {
+      "ChildId": "SliderPacks",
+      "Children": [
+        {
+          "ChildId": "SliderPack",
+          "Children": [
+            {
+              "Index": -1,
+              "EmbeddedData": -1
+            }
+          ]
+        }
+      ]
+    },
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value1",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value2",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value3",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value4",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value5",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Writes the values from the parameter sliders into a slider pack",
+    "cppProperties": {
+      "OutsideSignalPath": true
+    }
+  },
+  "control.pack6_writer": {
+    "ID": "pack6_writer",
+    "FactoryPath": "control.pack6_writer",
+    "Bypassed": false,
+    "Name": "pack6_writer",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "ComplexData": {
+      "ChildId": "SliderPacks",
+      "Children": [
+        {
+          "ChildId": "SliderPack",
+          "Children": [
+            {
+              "Index": -1,
+              "EmbeddedData": -1
+            }
+          ]
+        }
+      ]
+    },
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value1",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value2",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value3",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value4",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value5",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value6",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Writes the values from the parameter sliders into a slider pack",
+    "cppProperties": {
+      "OutsideSignalPath": true
+    }
+  },
+  "control.pack7_writer": {
+    "ID": "pack7_writer",
+    "FactoryPath": "control.pack7_writer",
+    "Bypassed": false,
+    "Name": "pack7_writer",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "ComplexData": {
+      "ChildId": "SliderPacks",
+      "Children": [
+        {
+          "ChildId": "SliderPack",
+          "Children": [
+            {
+              "Index": -1,
+              "EmbeddedData": -1
+            }
+          ]
+        }
+      ]
+    },
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value1",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value2",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value3",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value4",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value5",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value6",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value7",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Writes the values from the parameter sliders into a slider pack",
+    "cppProperties": {
+      "OutsideSignalPath": true
+    }
+  },
+  "control.pack8_writer": {
+    "ID": "pack8_writer",
+    "FactoryPath": "control.pack8_writer",
+    "Bypassed": false,
+    "Name": "pack8_writer",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "ComplexData": {
+      "ChildId": "SliderPacks",
+      "Children": [
+        {
+          "ChildId": "SliderPack",
+          "Children": [
+            {
+              "Index": -1,
+              "EmbeddedData": -1
+            }
+          ]
+        }
+      ]
+    },
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value1",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value2",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value3",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value4",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value5",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value6",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value7",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value8",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Writes the values from the parameter sliders into a slider pack",
+    "cppProperties": {
+      "OutsideSignalPath": true
+    }
+  },
+  "control.pack_resizer": {
+    "ID": "pack_resizer",
+    "FactoryPath": "control.pack_resizer",
+    "Bypassed": false,
+    "Name": "pack_resizer",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "ComplexData": {
+      "ChildId": "SliderPacks",
+      "Children": [
+        {
+          "ChildId": "SliderPack",
+          "Children": [
+            {
+              "Index": -1,
+              "EmbeddedData": "4....f+."
+            }
+          ]
+        }
+      ]
+    },
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 128.0,
+          "StepSize": 1.0,
+          "SkewFactor": 1.0,
+          "ID": "NumSliders",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Dynamically resizes a slider pack",
+    "cppProperties": {
+      "OutsideSignalPath": true
+    }
+  },
+  "control.pma": {
+    "ID": "pma",
+    "FactoryPath": "control.pma",
+    "Bypassed": false,
+    "Name": "pma",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": -1.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Multiply",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 1.0,
+          "DefaultValue": 1.0
+        },
+        {
+          "MinValue": -1.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Add",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Scales and offsets a modulation signal",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsPolyphonic": true,
+      "IsControlNode": true
+    }
+  },
+  "control.pma_unscaled": {
+    "ID": "pma_unscaled",
+    "FactoryPath": "control.pma_unscaled",
+    "Bypassed": false,
+    "Name": "pma_unscaled",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": -1.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Multiply",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 1.0,
+          "DefaultValue": 1.0
+        },
+        {
+          "MinValue": -1.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Add",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "multiplies and adds an offset to an unscaled modulation signal",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsPolyphonic": true,
+      "UseUnnormalisedModulation": [
+        "Value",
+        "Add"
+      ],
+      "IsControlNode": true
+    }
+  },
+  "control.ppq": {
+    "ID": "ppq",
+    "FactoryPath": "control.ppq",
+    "Bypassed": false,
+    "Name": "ppq",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 18.0,
+          "StepSize": 1.0,
+          "SkewFactor": 1.0,
+          "ID": "Tempo",
+          "TextToValueConverter": "101.nT6K8ChgkK..TOfUgwVckMzatYWYxQWYxAP.BjFck01b.DfXEDyKwnPLuHCQTQCQ3fSL1PzLxPjMzPDU.D1XzklckAP.AH..QfJDuc8+N.oanG.LpO.30hWR6PnRHFr.MzFBGTJ",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 5.0,
+          "DefaultValue": 5.0
+        },
+        {
+          "MinValue": 1.0,
+          "MaxValue": 16.0,
+          "StepSize": 1.0,
+          "SkewFactor": 1.0,
+          "ID": "Multiplier",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 1.0,
+          "DefaultValue": 1.0
+        }
+      ]
+    },
+    "description": "Sends a modulation signal with the playback position in quarters when the clock starts.",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsPolyphonic": true
+    }
+  },
+  "control.random": {
+    "ID": "random",
+    "FactoryPath": "control.random",
+    "Bypassed": false,
+    "Name": "random",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "creates a random value",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsControlNode": true
+    }
+  },
+  "control.resetter": {
+    "ID": "resetter",
+    "FactoryPath": "control.resetter",
+    "Bypassed": false,
+    "Name": "resetter",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Sends an inverted impulse (0,1) to reset gate-like parameters",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsControlNode": true
+    }
+  },
+  "control.sliderbank": {
+    "ID": "sliderbank",
+    "FactoryPath": "control.sliderbank",
+    "Bypassed": false,
+    "Name": "sliderbank",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {
+      "ChildId": "Property",
+      "Children": [
+        {
+          "ID": "NumParameters",
+          "Value": 0
+        }
+      ]
+    },
+    "SwitchTargets": {},
+    "ComplexData": {
+      "ChildId": "SliderPacks",
+      "Children": [
+        {
+          "ChildId": "SliderPack",
+          "Children": [
+            {
+              "Index": -1,
+              "EmbeddedData": -1
+            }
+          ]
+        }
+      ]
+    },
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Scale a value with a slider pack and send it to multiple targets",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsControlNode": true
+    }
+  },
+  "control.tempo_sync": {
+    "ID": "tempo_sync",
+    "FactoryPath": "control.tempo_sync",
+    "Bypassed": false,
+    "Name": "tempo_sync",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 18.0,
+          "StepSize": 1.0,
+          "SkewFactor": 1.0,
+          "ID": "Tempo",
+          "TextToValueConverter": "101.nT6K8ChgkK..TOfUgwVckMzatYWYxQWYxAP.BjFck01b.DfXEDyKwnPLuHCQTQCQ3fSL1PzLxPjMzPDU.D1XzklckAP.AH..QfJDuc8+N.oanG.LpO.30hWR6PnRHFr.MzFBGTJ",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 1.0,
+          "MaxValue": 16.0,
+          "StepSize": 1.0,
+          "SkewFactor": 1.0,
+          "ID": "Multiplier",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 1.0,
+          "DefaultValue": 1.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 1.0,
+          "SkewFactor": 1.0,
+          "ID": "Enabled",
+          "TextToValueConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1000.0,
+          "StepSize": 0.1000000014901161,
+          "SkewFactor": 1.0,
+          "ID": "UnsyncedTime",
+          "TextToValueConverter": "Time",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 200.0,
+          "DefaultValue": 200.0
+        }
+      ]
+    },
+    "description": "Sends the tempo duration as modulation signal",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsPolyphonic": true,
+      "IsProcessingHiseEvent": true,
+      "UseUnnormalisedModulation": true
+    }
+  },
+  "control.transport": {
+    "ID": "transport",
+    "FactoryPath": "control.transport",
+    "Bypassed": false,
+    "Name": "transport",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {},
+    "description": "Sends a modulation signal when the transport state changes",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsPolyphonic": true
+    }
+  },
+  "control.unscaler": {
+    "ID": "unscaler",
+    "FactoryPath": "control.unscaler",
+    "Bypassed": false,
+    "Name": "unscaler",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "forwards the raw parameter value",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "UseUnnormalisedModulation": [
+        "Value"
+      ],
+      "IsControlNode": true
+    }
+  },
+  "control.voice_bang": {
+    "ID": "voice_bang",
+    "FactoryPath": "control.voice_bang",
+    "Bypassed": false,
+    "Name": "voice_bang",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {},
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "sends out the current value when a voice is started (note-on is received)",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsControlNode": true
+    }
+  },
+  "control.xfader": {
+    "ID": "xfader",
+    "FactoryPath": "control.xfader",
+    "Bypassed": false,
+    "Name": "xfader",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {
+      "ChildId": "Property",
+      "Children": [
+        {
+          "ID": "NumParameters",
+          "Value": 2
+        },
+        {
+          "ID": "Mode",
+          "Value": "Linear"
+        }
+      ]
+    },
+    "SwitchTargets": {
+      "ChildId": "SwitchTarget",
+      "Children": [
+        {
+          "Connections": {},
+          "ChildId": "Connections",
+          "Children": []
+        },
+        {
+          "Connections": {},
+          "ChildId": "Connections",
+          "Children": []
+        }
+      ]
+    },
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "Apply a crossfade to multiple outputs",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsControlNode": true,
+      "HasModeTemplateArgument": true
+    }
+  },
+  "control.xy": {
+    "ID": "xy",
+    "FactoryPath": "control.xy",
+    "Bypassed": false,
+    "Name": "xy",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {
+      "ChildId": "Property",
+      "Children": [
+        {
+          "ID": "NumParameters",
+          "Value": 2
+        }
+      ]
+    },
+    "SwitchTargets": {
+      "ChildId": "SwitchTarget",
+      "Children": [
+        {
+          "ID": "X",
+          "Connections": {},
+          "ChildId": "Connections",
+          "Children": []
+        },
+        {
+          "ID": "Y",
+          "Connections": {},
+          "ChildId": "Connections",
+          "Children": []
+        }
+      ]
+    },
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "X",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": -1.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Y",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        }
+      ]
+    },
+    "description": "A XY-Controller for two parameters",
+    "cppProperties": {
+      "OutsideSignalPath": true,
+      "IsControlNode": true
+    }
+  },
+  "control.midi": {
+    "ID": "midi",
+    "FactoryPath": "control.midi",
+    "Bypassed": false,
+    "Name": "midi",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {
+      "ChildId": "Property",
+      "Children": [
+        {
+          "ID": "Mode",
+          "Value": "Gate"
+        }
+      ]
+    },
+    "ModulationTargets": {},
+    "Parameters": {},
+    "description": "Create a modulation signal from MIDI input",
+    "cppProperties": {
+      "IsProcessingHiseEvent": true,
+      "TemplateArgumentIsPolyphonic": true,
+      "HasModeTemplateArgument": true
+    }
+  },
+  "control.smoothed_parameter": {
+    "ID": "smoothed_parameter",
+    "FactoryPath": "control.smoothed_parameter",
+    "Bypassed": false,
+    "Name": "smoothed_parameter",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {
+      "ChildId": "Property",
+      "Children": [
+        {
+          "ID": "Mode",
+          "Value": "Linear Ramp"
+        }
+      ]
+    },
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.1000000014901161,
+          "MaxValue": 1000.0,
+          "StepSize": 0.1000000014901161,
+          "SkewFactor": 1.0,
+          "ID": "SmoothingTime",
+          "TextToValueConverter": "Time",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 100.0,
+          "DefaultValue": 100.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 1.0,
+          "SkewFactor": 1.0,
+          "ID": "Enabled",
+          "TextToValueConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 1.0,
+          "DefaultValue": 1.0
+        }
+      ]
+    },
+    "description": "Smoothes an incoming modulation signal",
+    "cppProperties": {
+      "IsPolyphonic": true,
+      "TemplateArgumentIsPolyphonic": true,
+      "HasModeTemplateArgument": true
+    }
+  },
+  "control.smoothed_parameter_unscaled": {
+    "ID": "smoothed_parameter_unscaled",
+    "FactoryPath": "control.smoothed_parameter_unscaled",
+    "Bypassed": false,
+    "Name": "smoothed_parameter_unscaled",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {
+      "ChildId": "Property",
+      "Children": [
+        {
+          "ID": "Mode",
+          "Value": "Linear Ramp"
+        }
+      ]
+    },
+    "ModulationTargets": {},
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 0.0,
+          "SkewFactor": 1.0,
+          "ID": "Value",
+          "TextToValueConverter": "Undefined",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 0.0,
+          "DefaultValue": 0.0
+        },
+        {
+          "MinValue": 0.1000000014901161,
+          "MaxValue": 1000.0,
+          "StepSize": 0.1000000014901161,
+          "SkewFactor": 1.0,
+          "ID": "SmoothingTime",
+          "TextToValueConverter": "Time",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 100.0,
+          "DefaultValue": 100.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 1.0,
+          "SkewFactor": 1.0,
+          "ID": "Enabled",
+          "TextToValueConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 1.0,
+          "DefaultValue": 1.0
+        }
+      ]
+    },
+    "description": "Smoothes an incoming modulation signal",
+    "cppProperties": {
+      "IsPolyphonic": true,
+      "TemplateArgumentIsPolyphonic": true,
+      "UseUnnormalisedModulation": [
+        "Value"
+      ],
+      "HasModeTemplateArgument": true
+    }
+  },
+  "control.timer": {
+    "ID": "timer",
+    "FactoryPath": "control.timer",
+    "Bypassed": false,
+    "Name": "timer",
+    "NodeColour": 0,
+    "Comment": "",
+    "Properties": {
+      "ChildId": "Property",
+      "Children": [
+        {
+          "ID": "ClassId",
+          "Value": ""
+        },
+        {
+          "ID": "Mode",
+          "Value": "Ping"
+        }
+      ]
+    },
+    "ModulationTargets": {},
+    "ComplexData": {
+      "Tables": {},
+      "SliderPacks": {},
+      "AudioFiles": {},
+      "Filters": {},
+      "DisplayBuffers": {}
+    },
+    "Parameters": {
+      "ChildId": "Parameter",
+      "Children": [
+        {
+          "MinValue": 0.0,
+          "MaxValue": 1.0,
+          "StepSize": 1.0,
+          "SkewFactor": 1.0,
+          "ID": "Active",
+          "TextToValueConverter": "53.nT6K8CBKgE..VEFa0U1Pu4lckIGckIG.AHPZzUVayAP.HTvSlYlBO4F.gMFcoYWY.DP.B..",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 1.0,
+          "DefaultValue": 1.0
+        },
+        {
+          "MinValue": 0.0,
+          "MaxValue": 2000.0,
+          "StepSize": 0.1000000014901161,
+          "SkewFactor": 1.0,
+          "ID": "Interval",
+          "TextToValueConverter": "Time",
+          "Page": "",
+          "SubGroup": "",
+          "Value": 500.0,
+          "DefaultValue": 500.0
+        }
+      ]
+    },
+    "description": "Create a periodic modulation signal if active",
+    "cppProperties": {
+      "IsPolyphonic": true,
+      "TemplateArgumentIsPolyphonic": true,
+      "HasModeTemplateArgument": true,
+      "IsOptionalSnexNode": true
+    }
+  }
+}

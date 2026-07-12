@@ -1,0 +1,94 @@
+{
+  "factoryPath": "envelope.voice_manager",
+  "factory": "envelope",
+  "nodeId": "voice_manager",
+  "description": "Sends a voice reset message when `Value < 0.5`",
+
+  "classification": {
+    "signalPathRole": "utility",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Voice Control",
+      "rationale": "Single parameter that determines whether the voice should be killed.",
+      "parameters": [
+        {
+          "id": "Kill Voice",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/envelope/voice_manager.md",
+    "tier": "BRIEF",
+    "lines": 15
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "kill-voice-mechanism",
+      "category": "signal_path",
+      "question": "How does voice_manager kill a voice when Kill Voice < 0.5? Does it call VoiceResetter, send a reset through the PolyHandler, or use another mechanism?",
+      "context": "Understanding the kill mechanism determines whether there is an immediate cut or a graceful shutdown."
+    },
+    {
+      "id": "value-threshold-logic",
+      "category": "parameter_behaviour",
+      "question": "The description says 'when Value < 0.5' but the parameter is named 'Kill Voice'. Is the threshold exactly 0.5? Does 0.5 itself trigger a kill or not? The default is 1.0 (no kill).",
+      "context": "Users connecting modulation to this parameter need to know the exact threshold."
+    },
+    {
+      "id": "outside-signal-path-role",
+      "category": "signal_path",
+      "question": "voice_manager is OutsideSignalPath but not IsControlNode. It has no modulation output. What is its actual role -- is it purely a modulation target that receives a value and uses it to kill voices?",
+      "context": "This is an unusual classification: outside signal path, not a control node, not polyphonic. Need to understand the intended usage pattern."
+    },
+    {
+      "id": "monophonic-voice-kill",
+      "category": "signal_path",
+      "question": "voice_manager is NOT polyphonic (no IsPolyphonic flag). How does a monophonic node kill polyphonic voices? Does it access the PolyHandler from PrepareSpecs even though it has no per-voice state?",
+      "context": "The monophonic-yet-voice-managing nature is architecturally unusual and needs explanation."
+    }
+  ],
+
+  "notes": "voice_manager is architecturally unusual: it is in the envelope factory but is OutsideSignalPath (not in audio chain), NOT polyphonic, and NOT a control node. It has no modulation output. Its sole purpose appears to be receiving a modulation value and using it to kill voices when the value drops below 0.5. This makes it a modulation target (receiver) rather than a source. The parameter name 'Kill Voice' (with space) is unusual -- most node parameters use camelCase or single words. The description references 'Value' but the parameter is named 'Kill Voice'."
+}

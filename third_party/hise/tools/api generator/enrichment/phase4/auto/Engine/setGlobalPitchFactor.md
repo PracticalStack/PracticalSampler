@@ -1,0 +1,1 @@
+Sets the global pitch offset in semitones, affecting all voices in the instrument. The value is clamped to -12.0 to +12.0 (one octave in each direction).

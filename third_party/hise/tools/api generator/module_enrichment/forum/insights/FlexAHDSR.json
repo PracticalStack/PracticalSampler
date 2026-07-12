@@ -1,0 +1,88 @@
+{
+  "targetId": "FlexAHDSR",
+  "domain": "modules",
+  "generatedAt": "2026-04-08",
+  "topicIds": [13133, 14211, 12641, 13481, 8685],
+  "insights": [
+    {
+      "type": "API",
+      "title": "UseOneDimensionDrag floating tile property controls drag axis constraint",
+      "summary": "The FlexAHDSR floating tile has a `UseOneDimensionDrag` property (default: true) that constrains dragging to one axis at a time. Setting it to false allows simultaneous horizontal and vertical dragging to change both length and level in one gesture.",
+      "sources": ["tid:13133"],
+      "verify": true,
+      "verify_hint": "grep UseOneDimensionDrag in FlexAHDSR floating tile source or FloatingTile property handling"
+    },
+    {
+      "type": "API",
+      "title": "obj.active in LAF callbacks reflects currently playing voice, not hover state",
+      "summary": "In LAF callbacks such as `drawFlexAhdsrSegment`, `obj.active` is true only when the segment is currently being played by the last active voice. It is not triggered by mouse hover or any UI interaction.",
+      "sources": ["tid:13133"],
+      "verify": true,
+      "verify_hint": "grep drawFlexAhdsrSegment or obj.active in FlexAHDSR floating tile rendering code"
+    },
+    {
+      "type": "API",
+      "title": "Six LAF functions control all visual aspects of the FlexAHDSR display",
+      "summary": "The full set of LAF callbacks for FlexAHDSR is: `drawFlexAhdsrBackground`, `drawFlexAhdsrFullPath`, `drawFlexAhdsrCurvePoint`, `drawFlexAhdsrSegment`, `drawFlexAhdsrPosition`, and `drawFlexAhdsrText`. Each receives an `obj` with context-specific properties including `path`, `pathArea`, `curvePoint`, `pointOnPath`, `area`, `active`, and `text`.",
+      "sources": ["tid:13133"],
+      "verify": true,
+      "verify_hint": "grep drawFlexAhdsrBackground in HISE source to confirm full list and obj properties"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "FlexAHDSR state is not saved to user presets by default",
+      "summary": "The envelope shape and parameter state are not included in user presets unless `Engine.addModuleStateToUserPreset(\"MyFlex\")` is called explicitly. Without this call, preset loads will not restore the envelope configuration.",
+      "sources": ["tid:13133"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "BUG",
+      "title": "FlexAHDSR has limited or no modulation slots for parameters",
+      "summary": "The FlexAHDSR envelope has fewer modulation slots than expected - notably Decay time cannot be directly modulated. The author acknowledged this and planned to add modulation slots in a future update.",
+      "sources": ["tid:14211"],
+      "verify": true,
+      "verify_hint": "Check FlexAHDSR modulation chain definitions in C++ source; compare modulation slot count with AHDSR"
+    },
+    {
+      "type": "WORKAROUND",
+      "title": "Use GlobalModulatorContainer for velocity-to-envelope-time modulation",
+      "summary": "Since FlexAHDSR lacks direct velocity modulation slots for time parameters, the recommended workaround is to create a velocity modulator in the GlobalModulatorContainer and assign it via a `matrixTargetId` on the UI control that drives the envelope parameter.",
+      "sources": ["tid:14211"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "PATTERN",
+      "title": "Use a dedicated MIDI processor script for realtime envelope parameter control",
+      "summary": "When scripting velocity-to-parameter mappings for the FlexAHDSR, place the logic in a separate MIDI processor script rather than the Interface script. The Interface script should be deferred; realtime parameter changes from note events require a non-deferred processor.",
+      "sources": ["tid:14211"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Retrigger attribute (index 1) affects release behaviour when Mode changes",
+      "summary": "The Retrigger attribute (default 1.0) interacts with the Mode parameter to control how the release stage is triggered. Adjusting Retrigger can alter release behaviour when switching between Trigger, Note, and Loop modes.",
+      "sources": ["tid:13481"],
+      "verify": true,
+      "verify_hint": "grep Retrigger in FlexAHDSR or AhdsrEnvelope source; check Mode enum handling"
+    },
+    {
+      "type": "API",
+      "title": "Trigger mode use case is distinct from Note and Loop modes but underdocumented",
+      "summary": "Users consistently asked what the Trigger mode is for, distinguishing it from Note mode. The mode controls whether the envelope restarts or responds differently to note events, but this distinction is not obvious from the UI label alone.",
+      "sources": ["tid:13133"],
+      "verify": true,
+      "verify_hint": "grep Mode enum or TriggerMode in FlexAHDSR source to clarify Trigger vs Note behaviour"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Hold stage has no direct drag handle in the FlexAHDSR UI",
+      "summary": "Unlike Attack, Decay, and Release, the Hold stage does not have a dedicated drag handle visible in the envelope display. Users must drag within the Hold segment area to adjust it, which is not discoverable from the visual design alone.",
+      "sources": ["tid:13133"],
+      "verify": false,
+      "verify_hint": null
+    }
+  ]
+}

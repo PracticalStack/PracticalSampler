@@ -1,0 +1,1 @@
+Decompresses a Base64-encoded, zstd-compressed string back into a JSON object. This is the inverse of `Engine.compressJSON()`. Reports a script error if the input is corrupted or was not produced by `compressJSON`.

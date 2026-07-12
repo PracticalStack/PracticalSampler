@@ -1,0 +1,1 @@
+Returns the string with all characters converted to lowercase. The standard approach for case-insensitive comparison is to call `toLowerCase()` on both strings before using `String.contains()` or comparing with `==`.

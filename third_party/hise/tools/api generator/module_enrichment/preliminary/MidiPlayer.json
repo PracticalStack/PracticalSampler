@@ -1,0 +1,177 @@
+{
+  "moduleId": "MidiPlayer",
+  "prettyName": "MIDI Player",
+  "type": "MidiProcessor",
+  "subtype": "MidiProcessor",
+  "category": "sequencing, generator",
+
+  "io": {
+    "midiIn": "MIDI in",
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": false,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    {
+      "name": "MidiPlayer",
+      "signalFlowRole": "skip - single-consumer, redundant with module identity"
+    }
+  ],
+
+  "parameterGroups": [
+    {
+      "label": "Playback Position",
+      "rationale": "CurrentPosition tracks the playback head within the MIDI file and is the primary runtime state indicator",
+      "parameters": [
+        {
+          "id": "CurrentPosition",
+          "name": "Current Position",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "The current playback position within the MIDI file, normalized 0-1 (non-persistent)",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Sequence & Track Selection",
+      "rationale": "CurrentSequence and CurrentTrack together determine which MIDI data is active for playback",
+      "parameters": [
+        {
+          "id": "CurrentSequence",
+          "name": "Current Sequence",
+          "range": { "min": 0.0, "max": 16.0, "step": 1.0 },
+          "default": 0.0,
+          "description": "The 1-based index of the currently active MIDI sequence",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "CurrentTrack",
+          "name": "Current Track",
+          "range": { "min": 0.0, "max": 16.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "The 1-based index of the currently active track within the sequence",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Loop Region",
+      "rationale": "LoopEnabled, LoopStart, and LoopEnd together define the loop behavior - the toggle gates the region, and the two positions define its bounds",
+      "parameters": [
+        {
+          "id": "LoopEnabled",
+          "name": "Loop Enabled",
+          "range": { "min": 0.0, "max": 1.0, "step": 1.0 },
+          "default": 1.0,
+          "description": "Toggles between looped and one-shot playback",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "LoopStart",
+          "name": "Loop Start",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 0.0,
+          "description": "The normalized start position of the loop region (0-1)",
+          "composite": null,
+          "modChain": null
+        },
+        {
+          "id": "LoopEnd",
+          "name": "Loop End",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0 },
+          "default": 1.0,
+          "description": "The normalized end position of the loop region (0-1)",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    },
+    {
+      "label": "Playback Speed",
+      "rationale": "PlaybackSpeed is the sole parameter controlling the rate of MIDI event playback",
+      "parameters": [
+        {
+          "id": "PlaybackSpeed",
+          "name": "Playback Speed",
+          "range": { "min": 0.01, "max": 16.0, "step": 0.01 },
+          "default": 1.0,
+          "description": "Playback speed multiplier where 1.0 is normal speed",
+          "composite": null,
+          "modChain": null
+        }
+      ]
+    }
+  ],
+
+  "compositeBlocks": [],
+  "standaloneModChains": [],
+  "disabledModChains": [],
+
+  "gaps": [
+    {
+      "id": "midi-event-generation",
+      "category": "signal_path",
+      "question": "How does processHiseEvent() / prepareToPlay() work? Does the MidiPlayer inject noteOn/noteOff events into the MIDI buffer based on the current position, or does it transform incoming events?",
+      "context": "Need to understand whether MidiPlayer is a MIDI generator (creates events from file data) or a MIDI transformer. The 'sequencing' + 'generator' categories suggest it generates events."
+    },
+    {
+      "id": "transport-control",
+      "category": "signal_path",
+      "question": "How is playback started and stopped? Is there a play/stop/record API, or does it respond to incoming MIDI (e.g., noteOn triggers playback)? How does it sync to host transport?",
+      "context": "Users need to know how to control playback. No transport parameters are exposed - this must be handled via scripting API or internal logic."
+    },
+    {
+      "id": "position-parameter-behavior",
+      "category": "parameter_behavior",
+      "question": "Is CurrentPosition read-only (output-only for UI display) or can it be set externally to seek the playback position? The description says 'non-persistent' - does this mean it is not saved with presets?",
+      "context": "Users need to know if they can use CurrentPosition for seeking or if it is only a readout."
+    },
+    {
+      "id": "sequence-index-base",
+      "category": "description_accuracy",
+      "question": "CurrentSequence description says '1-based index' but min=0.0 and default=0.0. Is the index actually 0-based, or does 0 mean 'no sequence selected'?",
+      "context": "The mismatch between '1-based' description and 0-based range/default could confuse users."
+    },
+    {
+      "id": "track-selection-effect",
+      "category": "parameter_behavior",
+      "question": "What does CurrentTrack actually control? Does it filter which MIDI track from a multi-track file is played, or does it select a track for editing in the piano roll overlay?",
+      "context": "The description mentions 'multi-track support' but it's unclear whether track selection affects playback output or just the UI."
+    },
+    {
+      "id": "loop-region-interaction",
+      "category": "conditional_logic",
+      "question": "When LoopEnabled is off, does the player still respect LoopStart/LoopEnd as a playback region, or does it play the entire sequence once? What happens when playback reaches the end in one-shot mode?",
+      "context": "Users need to know how loop toggle interacts with the region boundaries."
+    },
+    {
+      "id": "speed-tempo-relationship",
+      "category": "parameter_behavior",
+      "question": "Does PlaybackSpeed interact with host BPM? Is MIDI file playback tempo-synced to the host by default, with PlaybackSpeed as a multiplier on top of that? Or is PlaybackSpeed absolute?",
+      "context": "Critical for users to understand how playback timing relates to the DAW tempo."
+    },
+    {
+      "id": "midi-file-loading",
+      "category": "signal_path",
+      "question": "How are MIDI files loaded? Via scripting API, drag-and-drop, or a file browser? Are they embedded in the preset or referenced externally?",
+      "context": "Users need to know the workflow for getting MIDI data into the player."
+    },
+    {
+      "id": "overlay-integration",
+      "category": "interface_usage",
+      "question": "The module description mentions 'piano roll and step sequencer overlays'. How do these UI overlays interact with the MidiPlayer? Can the user edit the MIDI sequence in real-time?",
+      "context": "The overlay system is a key feature but not represented in the parameters."
+    }
+  ],
+
+  "notes": "MidiPlayer is a MIDI processor in the 'sequencing' + 'generator' categories, meaning it likely generates MIDI events from loaded MIDI file data rather than transforming incoming MIDI. No modulation chains are present. The module has no transport parameters (play/stop) exposed - these are likely controlled via the MidiPlayer scripting API interface (which is skipped in this preliminary as single-consumer/redundant). The CurrentSequence parameter has a suspicious mismatch between its '1-based' description and its 0-based min/default values. PlaybackSpeed's wide range (0.01-16x) with fine step (0.01) suggests precise speed control, possibly independent of host tempo."
+}

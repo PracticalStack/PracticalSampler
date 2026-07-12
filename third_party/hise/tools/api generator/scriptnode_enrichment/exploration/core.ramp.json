@@ -1,0 +1,20 @@
+{
+  "factoryPath": "core.ramp",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 0.5, "description": "Existing signal (ramp adds to it)" },
+    { "id": "ramp", "label": "Ramp Generator", "type": "process", "importance": 1.0, "description": "Generates 0..1 ramp with configurable period and loop start" },
+    { "id": "period", "label": "PeriodTime", "type": "parameter", "importance": 1.0, "description": "Ramp cycle duration in ms" },
+    { "id": "loop", "label": "LoopStart", "type": "parameter", "importance": 0.7, "description": "Phase value where ramp wraps back to" },
+    { "id": "gate", "label": "Gate", "type": "parameter", "importance": 0.8, "description": "Enable/disable; rising edge resets phase" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 0.8, "description": "Input + ramp value (additive)" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Current ramp value (0..1 normalized)" }
+  ],
+  "edges": [
+    { "from": "in", "to": "ramp", "type": "signal", "label": null },
+    { "from": "period", "to": "ramp", "type": "control", "label": null },
+    { "from": "loop", "to": "ramp", "type": "control", "label": null },
+    { "from": "gate", "to": "ramp", "type": "control", "label": null },
+    { "from": "ramp", "to": "out", "type": "signal", "label": "s += ramp" },
+    { "from": "ramp", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

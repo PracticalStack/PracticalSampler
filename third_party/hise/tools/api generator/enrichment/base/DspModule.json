@@ -1,0 +1,164 @@
+{
+  "className": "DspModule",
+  "category": "object",
+  "description": "This objects is a wrapper around the actual DSP module that is loaded from a plugin.\nIt contains the glue code for accessing it per Javascript and is reference counted to manage the lifetime of the external module.",
+  "methods": {
+    "getConstant": {
+      "signature": "var getConstant(int index)",
+      "returnType": "var",
+      "description": "Returns the constant at the given index.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "getConstantId": {
+      "signature": "var getConstantId(int index)",
+      "returnType": "var",
+      "description": "Returns the name of the constant.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "getInfo": {
+      "signature": "var getInfo()",
+      "returnType": "var",
+      "description": "Returns an informative String.",
+      "parameters": []
+    },
+    "getNumConstants": {
+      "signature": "var getNumConstants()",
+      "returnType": "var",
+      "description": "Returns the number of constants.",
+      "parameters": []
+    },
+    "getNumParameters": {
+      "signature": "var getNumParameters()",
+      "returnType": "var",
+      "description": "Returns the number of parameters.",
+      "parameters": []
+    },
+    "getParameter": {
+      "signature": "var getParameter(int index)",
+      "returnType": "var",
+      "description": "Returns the parameter with the given index.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "getStringParameter": {
+      "signature": "String getStringParameter(int index)",
+      "returnType": "String",
+      "description": "Gets the string value.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ]
+    },
+    "isBypassed": {
+      "signature": "bool isBypassed()",
+      "returnType": "bool",
+      "description": "Checks if the processing is enabled.",
+      "parameters": []
+    },
+    "operator >>": {
+      "signature": "void operator >>(var data)",
+      "returnType": "void",
+      "description": "Applies the module on the data.",
+      "parameters": [
+        {
+          "name": "data",
+          "type": "var"
+        }
+      ]
+    },
+    "operator<<": {
+      "signature": "void operator<<(var data)",
+      "returnType": "void",
+      "description": "Applies the module on the data.",
+      "parameters": [
+        {
+          "name": "data",
+          "type": "var"
+        }
+      ]
+    },
+    "prepareToPlay": {
+      "signature": "void prepareToPlay(double sampleRate, int samplesPerBlock)",
+      "returnType": "void",
+      "description": "Calls the setup method of the external module.",
+      "parameters": [
+        {
+          "name": "sampleRate",
+          "type": "double"
+        },
+        {
+          "name": "samplesPerBlock",
+          "type": "int"
+        }
+      ]
+    },
+    "processBlock": {
+      "signature": "void processBlock(var data)",
+      "returnType": "void",
+      "description": "Calls the processMethod of the external module.",
+      "parameters": [
+        {
+          "name": "data",
+          "type": "var"
+        }
+      ]
+    },
+    "setBypassed": {
+      "signature": "void setBypassed(bool shouldBeBypassed)",
+      "returnType": "void",
+      "description": "Enables / Disables the processing.",
+      "parameters": [
+        {
+          "name": "shouldBeBypassed",
+          "type": "bool"
+        }
+      ]
+    },
+    "setParameter": {
+      "signature": "void setParameter(int index, float newValue)",
+      "returnType": "void",
+      "description": "Sets the float parameter with the given index.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        },
+        {
+          "name": "newValue",
+          "type": "float"
+        }
+      ]
+    },
+    "setStringParameter": {
+      "signature": "void setStringParameter(int index, String value)",
+      "returnType": "void",
+      "description": "Sets a String value.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "int"
+        },
+        {
+          "name": "value",
+          "type": "String"
+        }
+      ]
+    }
+  }
+}

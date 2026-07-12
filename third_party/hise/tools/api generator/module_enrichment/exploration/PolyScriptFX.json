@@ -1,0 +1,26 @@
+{
+  "moduleId": "PolyScriptFX",
+  "nodes": [
+    { "id": "voice_in", "label": "Voice Audio In", "type": "input", "importance": 0.9, "group": "io", "description": "Per-voice audio input from the parent synth" },
+    { "id": "voice_start", "label": "Start Voice", "type": "process", "importance": 0.8, "group": "voice", "description": "Initialises the network's voice state" },
+    { "id": "pre_suspend", "label": "Pre-Suspension Check", "type": "decision", "importance": 0.5, "group": "voice", "description": "Skips processing if the voice is silent" },
+    { "id": "network_process", "label": "Network Process", "type": "process", "importance": 1.0, "group": "voice", "description": "Processes audio through the network for this voice" },
+    { "id": "mod_chains", "label": "Extra Modulation Chains", "type": "modulation", "importance": 0.7, "group": "modulation", "description": "Optional modulation chains that modulate network parameters" },
+    { "id": "post_suspend", "label": "Post-Suspension Check", "type": "decision", "importance": 0.4, "group": "voice", "description": "Updates tailing status after processing" },
+    { "id": "voice_out", "label": "Voice Audio Out", "type": "output", "importance": 0.9, "group": "io", "description": "Processed per-voice audio output" }
+  ],
+  "edges": [
+    { "from": "voice_in", "to": "pre_suspend", "type": "signal", "label": null },
+    { "from": "pre_suspend", "to": "network_process", "type": "conditional", "label": "voice active" },
+    { "from": "pre_suspend", "to": "voice_out", "type": "conditional", "label": "voice silent" },
+    { "from": "mod_chains", "to": "network_process", "type": "control", "label": "parameter modulation" },
+    { "from": "network_process", "to": "post_suspend", "type": "signal", "label": null },
+    { "from": "post_suspend", "to": "voice_out", "type": "signal", "label": null },
+    { "from": "voice_start", "to": "network_process", "type": "signal", "label": "on note-on" }
+  ],
+  "groups": [
+    { "id": "io", "label": "I/O" },
+    { "id": "voice", "label": "Per-Voice Processing" },
+    { "id": "modulation", "label": "Modulation" }
+  ]
+}

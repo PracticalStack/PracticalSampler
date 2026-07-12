@@ -1,0 +1,72 @@
+{
+  "moduleId": "ScriptTimeVariantModulator",
+  "prettyName": "Script Time Variant Modulator",
+  "type": "Modulator",
+  "subtype": "TimeVariantModulator",
+  "category": "custom",
+
+  "io": {
+    "midiIn": null,
+    "audioIn": null,
+    "audioOut": null,
+    "modulationOut": true,
+    "fxChain": null
+  },
+
+  "voiceContext": "monophonic",
+
+  "interfaces": [
+    { "name": "SlotFX", "signalFlowRole": "network_host - loads and hot-swaps scriptnode DSP networks" },
+    { "name": "TableProcessor", "signalFlowRole": "complex_data - exposes Table objects from the loaded network" },
+    { "name": "SliderPackProcessor", "signalFlowRole": "complex_data - exposes SliderPack objects from the loaded network" },
+    { "name": "AudioSampleProcessor", "signalFlowRole": "complex_data - exposes AudioFile objects from the loaded network" },
+    { "name": "DisplayBufferSource", "signalFlowRole": "skip - UI communication only" }
+  ],
+
+  "parameterGroups": [],
+
+  "standaloneModChains": [],
+  "disabledModChains": [],
+  "compositeBlocks": [],
+
+  "gaps": [
+    {
+      "id": "network-loading-mechanism",
+      "category": "signal_path",
+      "question": "How does the time variant modulator load a scriptnode network?",
+      "context": "Users need to know how to load a modulation network."
+    },
+    {
+      "id": "dual-mode-operation",
+      "category": "signal_path",
+      "question": "Does ScriptTimeVariantModulator support both scriptnode network and HISEScript callback modes? It has prepareToPlay and processBlock callbacks.",
+      "context": "Understanding the dual-mode nature is critical."
+    },
+    {
+      "id": "output-clipping",
+      "category": "signal_path",
+      "question": "Is the modulation output clipped to 0-1? The calculateBlock code shows FloatVectorOperations::clip.",
+      "context": "Users need to know the valid output range for their networks."
+    },
+    {
+      "id": "parameter-exposure",
+      "category": "parameter_behavior",
+      "question": "How are network parameters exposed? Are there any fixed parameters?",
+      "context": "Users need to understand available parameters."
+    },
+    {
+      "id": "complex-data-routing",
+      "category": "interface_usage",
+      "question": "How are Tables, SliderPacks, and AudioFiles from the loaded network exposed?",
+      "context": "Complex data routing for modulator networks."
+    },
+    {
+      "id": "midi-event-handling",
+      "category": "signal_path",
+      "question": "How does the time variant modulator handle MIDI events? It has onNoteOn/onNoteOff/onController callbacks in HISEScript mode.",
+      "context": "MIDI responsiveness matters for modulator design."
+    }
+  ],
+
+  "notes": "ScriptTimeVariantModulator is the monophonic continuous modulator variant. No fixed parameters. Supports both scriptnode and HISEScript callback modes. The C++ class is JavascriptTimeVariantModulator. The Hardcoded equivalent is HardcodedTimeVariantModulator. Output is clipped to 0-1."
+}

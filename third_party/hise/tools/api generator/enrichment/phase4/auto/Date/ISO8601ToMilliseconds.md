@@ -1,0 +1,1 @@
+Parses an ISO-8601 formatted date string and returns the corresponding time as milliseconds since the Unix epoch. The string may include or omit divider characters. This is the inverse of `Date.millisecondsToISO8601()`.

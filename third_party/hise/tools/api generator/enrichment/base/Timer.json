@@ -1,0 +1,53 @@
+{
+  "className": "Timer",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "getMilliSecondsSinceCounterReset": {
+      "signature": "var getMilliSecondsSinceCounterReset()",
+      "returnType": "var",
+      "description": "Returns the duration from the last counter reset.",
+      "parameters": []
+    },
+    "isTimerRunning": {
+      "signature": "bool isTimerRunning()",
+      "returnType": "bool",
+      "description": "Checks if the timer is active.",
+      "parameters": []
+    },
+    "resetCounter": {
+      "signature": "void resetCounter()",
+      "returnType": "void",
+      "description": "Resets the internal counter.",
+      "parameters": []
+    },
+    "setTimerCallback": {
+      "signature": "void setTimerCallback(var callbackFunction)",
+      "returnType": "void",
+      "description": "Sets the function that will be called periodically.",
+      "parameters": [
+        {
+          "name": "callbackFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "startTimer": {
+      "signature": "void startTimer(int intervalInMilliSeconds)",
+      "returnType": "void",
+      "description": "Starts the timer.",
+      "parameters": [
+        {
+          "name": "intervalInMilliSeconds",
+          "type": "int"
+        }
+      ]
+    },
+    "stopTimer": {
+      "signature": "void stopTimer()",
+      "returnType": "void",
+      "description": "Stops the timer.",
+      "parameters": []
+    }
+  }
+}

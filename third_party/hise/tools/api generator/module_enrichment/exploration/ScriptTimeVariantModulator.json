@@ -1,0 +1,24 @@
+{
+  "moduleId": "ScriptTimeVariantModulator",
+  "nodes": [
+    { "id": "tick", "label": "Processing Tick", "type": "input", "importance": 0.7, "group": "io", "description": "Called continuously at audio rate" },
+    { "id": "network_check", "label": "Network Loaded?", "type": "decision", "importance": 0.8, "group": "dispatch", "description": "Checks whether a scriptnode network is active" },
+    { "id": "network_process", "label": "Network Process", "type": "process", "importance": 1.0, "group": "processing", "description": "Processes modulation signal through the network (1 channel)" },
+    { "id": "clip", "label": "Clip to 0-1", "type": "process", "importance": 0.8, "group": "processing", "description": "Clamps the network output to the valid modulation range" },
+    { "id": "script_process", "label": "Script processBlock", "type": "process", "importance": 0.6, "group": "processing", "description": "Fallback: processes through HISEScript processBlock callback" },
+    { "id": "mod_out", "label": "Modulation Out (0-1)", "type": "output", "importance": 0.9, "group": "io", "description": "Continuous monophonic modulation signal" }
+  ],
+  "edges": [
+    { "from": "tick", "to": "network_check", "type": "signal", "label": null },
+    { "from": "network_check", "to": "network_process", "type": "conditional", "label": "network active" },
+    { "from": "network_check", "to": "script_process", "type": "conditional", "label": "no network" },
+    { "from": "network_process", "to": "clip", "type": "signal", "label": null },
+    { "from": "clip", "to": "mod_out", "type": "signal", "label": null },
+    { "from": "script_process", "to": "mod_out", "type": "signal", "label": null }
+  ],
+  "groups": [
+    { "id": "io", "label": "I/O" },
+    { "id": "dispatch", "label": "Mode Selection" },
+    { "id": "processing", "label": "Processing" }
+  ]
+}

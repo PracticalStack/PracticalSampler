@@ -1,0 +1,1 @@
+Triggers the control callback (if registered via `setControlCallback()`) and sends a visual refresh message to the component. Call this after `setValue()` to fire the callback. Unlike `ScriptComponent.changed()`, this works during `onInit` because it uses synchronous listeners internally.

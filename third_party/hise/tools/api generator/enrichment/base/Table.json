@@ -1,0 +1,118 @@
+{
+  "className": "Table",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "addTablePoint": {
+      "signature": "void addTablePoint(float x, float y)",
+      "returnType": "void",
+      "description": "Adds a new table point (x and y are normalized coordinates).",
+      "parameters": [
+        {
+          "name": "x",
+          "type": "float"
+        },
+        {
+          "name": "y",
+          "type": "float"
+        }
+      ]
+    },
+    "getCurrentlyDisplayedIndex": {
+      "signature": "float getCurrentlyDisplayedIndex()",
+      "returnType": "float",
+      "description": "Returns the current ruler position (from 0 to 1).",
+      "parameters": []
+    },
+    "getTablePointsAsArray": {
+      "signature": "var getTablePointsAsArray()",
+      "returnType": "var",
+      "description": "Returns an array containing all table points ([[x0, y0, curve0], ...]).",
+      "parameters": []
+    },
+    "getTableValueNormalised": {
+      "signature": "float getTableValueNormalised(double normalisedInput)",
+      "returnType": "float",
+      "description": "Returns the value of the table at the given input (0.0 ... 1.0).",
+      "parameters": [
+        {
+          "name": "normalisedInput",
+          "type": "double"
+        }
+      ]
+    },
+    "linkTo": {
+      "signature": "void linkTo(var otherTable)",
+      "returnType": "void",
+      "description": "Makes this table refer to the given table.",
+      "parameters": [
+        {
+          "name": "otherTable",
+          "type": "var"
+        }
+      ]
+    },
+    "reset": {
+      "signature": "void reset()",
+      "returnType": "void",
+      "description": "Resets the table with the given index to a 0..1 line.",
+      "parameters": []
+    },
+    "setContentCallback": {
+      "signature": "void setContentCallback(var contentFunction)",
+      "returnType": "void",
+      "description": "Sets a callback that is being executed when a point is added / removed / changed.",
+      "parameters": [
+        {
+          "name": "contentFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "setDisplayCallback": {
+      "signature": "void setDisplayCallback(var displayFunction)",
+      "returnType": "void",
+      "description": "Sets a callback that is being executed when the ruler position changes.",
+      "parameters": [
+        {
+          "name": "displayFunction",
+          "type": "var"
+        }
+      ]
+    },
+    "setTablePoint": {
+      "signature": "void setTablePoint(int pointIndex, float x, float y, float curve)",
+      "returnType": "void",
+      "description": "Sets the point with the given index to the values.",
+      "parameters": [
+        {
+          "name": "pointIndex",
+          "type": "int"
+        },
+        {
+          "name": "x",
+          "type": "float"
+        },
+        {
+          "name": "y",
+          "type": "float"
+        },
+        {
+          "name": "curve",
+          "type": "float"
+        }
+      ]
+    },
+    "setTablePointsFromArray": {
+      "signature": "void setTablePointsFromArray(var pointList)",
+      "returnType": "void",
+      "description": "Sets the table points from a multidimensional array ([x0, y0, curve0], ...]).",
+      "parameters": [
+        {
+          "name": "pointList",
+          "type": "var"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,1 @@
+Checks whether this component matches the given argument. Accepts either a string (compared against the component's `id`) or a ContainerChild reference (compared by identity). Returns `false` if the argument is neither type.

@@ -1,0 +1,1 @@
+Loads a MIDI file from the pool by its reference string. Use `getMidiFileList()` to get valid reference strings. The `clearExistingSequences` parameter controls whether previously loaded sequences are removed first, and `selectNewSequence` controls whether the newly loaded sequence becomes active. Returns true if the file reference is valid.

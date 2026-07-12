@@ -1,0 +1,95 @@
+{
+  "factoryPath": "control.ppq",
+  "factory": "control",
+  "nodeId": "ppq",
+  "description": "Sends a modulation signal with the playback position in quarters when the clock starts.",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": true,
+    "isControlNode": false,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "per-voice"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Timing Configuration",
+      "rationale": "Tempo and multiplier together define the loop length in musical time over which the PPQ position wraps.",
+      "parameters": [
+        {
+          "id": "Tempo",
+          "range": { "min": 0.0, "max": 18.0, "step": 1.0, "skew": 1.0 },
+          "default": 5.0,
+          "textConverter": "101.nT6K8ChgkK..TOfUgwVckMzatYWYxQWYxAP.BjFck01b.DfXEDyKwnPLuHCQTQCQ3fSL1PzLxPjMzPDU.D1XzklckAP.AH..QfJDuc8+N.oanG.LpO.30hWR6PnRHFr.MzFBGTJ",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Multiplier",
+          "range": { "min": 1.0, "max": 16.0, "step": 1.0, "skew": 1.0 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/ppq.md",
+    "tier": "GOOD",
+    "lines": 27
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "output-formula",
+      "category": "signal_path",
+      "question": "From tempo.md: output = fmod(ppqPos, loopLengthQuarters) / loopLengthQuarters where loopLengthQuarters = tempoFactor * multiplier. Confirm this is correct and that the output is always 0..1.",
+      "context": "The normalised wrapping behaviour is the core functionality to document."
+    },
+    {
+      "id": "update-timing",
+      "category": "signal_path",
+      "question": "From tempo.md: ppq only updates on transport start and resync events, NOT continuously. Confirm: does this mean the output is only set once when playback starts and does not track during playback?",
+      "context": "This is counterintuitive -- users might expect continuous PPQ tracking. Critical to document clearly."
+    },
+    {
+      "id": "tempo-default-value",
+      "category": "parameter_behaviour",
+      "question": "Default Tempo is 5, which maps to index 5 in the TempoSyncer enum (QuarterDuet = 1/4D). Confirm this mapping.",
+      "context": "Need to document the default tempo value correctly."
+    }
+  ],
+
+  "notes": "ppq is a TempoListener-based control node that inherits from clock_base. It does NOT have IsControlNode in cppProperties, which means it likely uses wrap::mod pattern. IsPolyphonic is true. The Tempo parameter uses a TempoSync text converter with all tempo value names. From tempo.md: loopLengthQuarters = tempoFactor * multiplier, output = fmod(ppqPos, loopLengthQuarters) / loopLengthQuarters."
+}

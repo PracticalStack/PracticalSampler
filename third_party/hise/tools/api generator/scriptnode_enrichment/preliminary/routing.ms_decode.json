@@ -1,0 +1,68 @@
+{
+  "factoryPath": "routing.ms_decode",
+  "factory": "routing",
+  "nodeId": "ms_decode",
+  "description": "A MS decoder (`M-S -> L-R`)",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/routing/ms_decode.md",
+    "tier": "STUB",
+    "lines": 7
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "decoding-formula",
+      "category": "signal_path",
+      "question": "What exact formula is used for the MS decoding? Standard decoding is L = M+S, R = M-S (or with 0.5 scaling). Does the decode formula match the encode formula so the pair is gain-neutral?",
+      "context": "Must be consistent with ms_encode. If encode uses 0.5 scaling, decode should not, and vice versa."
+    },
+    {
+      "id": "channel-count-requirement",
+      "category": "signal_path",
+      "question": "Does this node require exactly 2 channels? What happens with non-stereo signals?",
+      "context": "Same consideration as ms_encode -- MS decoding only applies to stereo."
+    }
+  ],
+
+  "notes": "routing.ms_decode is the companion to routing.ms_encode. No parameters, no properties. Converts Mid/Side back to Left/Right. Should always be used after ms_encode (with processing in between). The encode/decode pair must be gain-neutral -- the decoding formula must be the algebraic inverse of the encoding formula."
+}

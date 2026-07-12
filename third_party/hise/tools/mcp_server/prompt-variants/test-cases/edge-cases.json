@@ -1,0 +1,100 @@
+{
+  "version": "1.0.0",
+  "description": "Edge cases and tricky inputs for testing robustness",
+  "testCases": [
+    {
+      "id": "ec-001",
+      "category": "typos",
+      "input": "Synth.addNotOn",
+      "expectedBehavior": "Should suggest Synth.addNoteOn",
+      "notes": "Common typo - missing 'e'"
+    },
+    {
+      "id": "ec-002",
+      "category": "typos",
+      "input": "ScriptButon.filmstripImage",
+      "expectedBehavior": "Should suggest ScriptButton.filmstripImage",
+      "notes": "Typo in component name"
+    },
+    {
+      "id": "ec-003",
+      "category": "non-existent",
+      "input": "Synth.nonExistentMethod",
+      "expectedBehavior": "Should return not found with suggestions",
+      "notes": "Valid namespace, invalid method"
+    },
+    {
+      "id": "ec-004",
+      "category": "non-existent",
+      "input": "FakeNamespace.fakeMethod",
+      "expectedBehavior": "Should return not found with suggestions or empty",
+      "notes": "Completely invalid query"
+    },
+    {
+      "id": "ec-005",
+      "category": "format-variations",
+      "input": "synth.addnoteon",
+      "expectedBehavior": "Should find Synth.addNoteOn",
+      "notes": "All lowercase should work"
+    },
+    {
+      "id": "ec-006",
+      "category": "format-variations",
+      "input": "SYNTH.ADDNOTEON",
+      "expectedBehavior": "Should find Synth.addNoteOn",
+      "notes": "All uppercase should work"
+    },
+    {
+      "id": "ec-007",
+      "category": "ambiguous-domain",
+      "input": "setValue",
+      "expectedBehavior": "Should search across all domains and find multiple matches",
+      "notes": "setValue exists in multiple namespaces"
+    },
+    {
+      "id": "ec-008",
+      "category": "ambiguous-domain",
+      "input": "Gain",
+      "expectedBehavior": "Should find module parameters with Gain",
+      "notes": "Gain is a common parameter name"
+    },
+    {
+      "id": "ec-009",
+      "category": "partial-match",
+      "input": "addNote",
+      "expectedBehavior": "Should find addNoteOn, addNoteOff, etc.",
+      "notes": "Partial method name"
+    },
+    {
+      "id": "ec-010",
+      "category": "empty-result",
+      "input": "xyzabc123",
+      "expectedBehavior": "Should return no results gracefully",
+      "notes": "Gibberish input"
+    },
+    {
+      "id": "ec-011",
+      "category": "special-characters",
+      "input": "Synth.addNoteOn(1, 60, 127, 0)",
+      "expectedBehavior": "Should strip arguments and find method",
+      "notes": "Full method call with arguments"
+    },
+    {
+      "id": "ec-012",
+      "category": "snippet-search",
+      "input": "basic synth example",
+      "expectedBehavior": "Should find BasicSynth snippet",
+      "notes": "Natural language snippet search"
+    }
+  ],
+  "categories": {
+    "typos": "Input with typographical errors",
+    "non-existent": "Queries for items that don't exist",
+    "format-variations": "Different casing and formatting",
+    "ambiguous-domain": "Queries that could match multiple domains",
+    "partial-match": "Incomplete or partial queries",
+    "empty-result": "Queries that should return no results",
+    "special-characters": "Input with special characters or syntax",
+    "snippet-search": "Code example discovery queries"
+  }
+}

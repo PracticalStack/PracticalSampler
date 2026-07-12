@@ -1,0 +1,24 @@
+{
+  "targetId": "container.multi",
+  "domain": "scriptnode",
+  "generatedAt": "2026-04-10",
+  "topicIds": [3604, 7457],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Most 'multi' forum hits relate to HISE sampler multi-mic, not the scriptnode container.multi node",
+      "body": "Searching for 'container.multi' on the forum returns predominantly threads about the HISE sampler's multi-mic channel system. There is very little dedicated discussion of the scriptnode container.multi node specifically. The one directly relevant thread (tid:3604) reports a bug with filters inside a multi container that was open at the time of posting.",
+      "source": "tid:3604",
+      "author": "Lindon [trusted]",
+      "confidence": "medium"
+    },
+    {
+      "type": "API",
+      "title": "Multi-output FX plugins require HISE_NUM_FX_PLUGIN_CHANNELS preprocessor define",
+      "body": "To expose more than one stereo pair from an FX plugin (needed when using the master container with multiple channels, e.g. for sidechain or multi-output routing), set the `HISE_NUM_FX_PLUGIN_CHANNELS` preprocessor in ExtraDefinitions. Without this, the plugin only exports 2 channels regardless of the master container's routing matrix. This also enables sidechain inputs in supporting DAWs. You can use 'hidden' extra channel pairs for internal processing by setting the routing matrix higher than HISE_NUM_FX_PLUGIN_CHANNELS.",
+      "source": "tid:7457",
+      "author": "Christoph Hart [author]",
+      "confidence": "high"
+    }
+  ]
+}

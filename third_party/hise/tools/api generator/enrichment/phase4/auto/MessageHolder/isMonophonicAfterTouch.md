@@ -1,0 +1,3 @@
+Returns true if this event has the Aftertouch type. To distinguish between channel pressure and polyphonic aftertouch, check the note number: monophonic aftertouch typically has note number 0, while polyphonic aftertouch has a non-zero note number.
+
+> [!Warning:Cannot distinguish mono from poly] This method and `isPolyAftertouch()` return the same result for all events - they both check for the Aftertouch type and cannot distinguish mono from poly aftertouch on their own.

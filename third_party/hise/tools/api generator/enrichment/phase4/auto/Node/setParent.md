@@ -1,0 +1,1 @@
+Moves this node into a target container at the specified index position. Pass -1 as the index to append at the end. Passing an empty or null parent detaches the node from the graph. Existing parameter connections are preserved during the move. The [DspNetwork]($API.DspNetwork$) object itself can be passed as the parent - it automatically resolves to the network's root container.

@@ -1,0 +1,3 @@
+Returns the target file as a `File` object, regardless of the current download state. The returned file path is the one originally passed to `Server.downloadFile()`.
+
+> [!Warning:Check finished and success first] The file may not exist yet (download not started), may be partially written (download in progress), or may have been deleted (after `abort()`). Check `data.finished` and `data.success` before using the file.

@@ -1,0 +1,1 @@
+Sets the MIDI note number of the current note-on or note-off event. The value is clamped to 0-127. The change affects all downstream processors. For pitch changes that should not alter which sample is triggered, use `Message.setTransposeAmount()` with `Message.setCoarseDetune()` instead.

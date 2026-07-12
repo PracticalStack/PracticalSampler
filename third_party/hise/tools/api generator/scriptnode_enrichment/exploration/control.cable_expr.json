@@ -1,0 +1,12 @@
+{
+  "factoryPath": "control.cable_expr",
+  "nodes": [
+    { "id": "value_param", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Input value passed as 'input' to the expression (unscaled)" },
+    { "id": "expr", "label": "SNEX Expression", "type": "process", "importance": 1.0, "description": "Evaluates user-defined expression: double op(double input)" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Expression result (unnormalised)" }
+  ],
+  "edges": [
+    { "from": "value_param", "to": "expr", "type": "control", "label": "as 'input'" },
+    { "from": "expr", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

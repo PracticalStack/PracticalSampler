@@ -1,0 +1,16 @@
+{
+  "factoryPath": "control.pma_unscaled",
+  "nodes": [
+    { "id": "value_in", "label": "Value", "type": "parameter", "importance": 1.0, "description": "Primary input (unscaled, raw values)" },
+    { "id": "multiply", "label": "Multiply", "type": "parameter", "importance": 1.0, "description": "Scale factor (-1..1, range-scaled input)" },
+    { "id": "add", "label": "Add", "type": "parameter", "importance": 1.0, "description": "DC offset (unscaled, raw values)" },
+    { "id": "pma_op", "label": "Value * Multiply + Add", "type": "process", "importance": 1.0, "description": "Computes value * mulValue + addValue, no clamping" },
+    { "id": "mod_out", "label": "Modulation Out", "type": "modulation_out", "importance": 1.0, "description": "Unnormalised output -- raw value passed to targets without range conversion" }
+  ],
+  "edges": [
+    { "from": "value_in", "to": "pma_op", "type": "signal", "label": null },
+    { "from": "multiply", "to": "pma_op", "type": "control", "label": null },
+    { "from": "add", "to": "pma_op", "type": "control", "label": null },
+    { "from": "pma_op", "to": "mod_out", "type": "signal", "label": null }
+  ]
+}

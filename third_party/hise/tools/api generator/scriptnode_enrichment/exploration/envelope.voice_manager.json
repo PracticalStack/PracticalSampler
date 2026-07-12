@@ -1,0 +1,12 @@
+{
+  "factoryPath": "envelope.voice_manager",
+  "nodes": [
+    { "id": "kill_voice", "label": "Kill Voice", "type": "parameter", "importance": 1.0, "description": "When value < 0.5, kills the currently-rendering voice" },
+    { "id": "threshold_check", "label": "Threshold Check", "type": "process", "importance": 1.0, "description": "Checks v < 0.5 and voiceIndex != -1" },
+    { "id": "voice_reset", "label": "Voice Reset", "type": "process", "importance": 0.9, "description": "Sends sendVoiceResetMessage(false) via PolyHandler" }
+  ],
+  "edges": [
+    { "from": "kill_voice", "to": "threshold_check", "type": "control", "label": null },
+    { "from": "threshold_check", "to": "voice_reset", "type": "conditional", "label": "if v < 0.5 and voice active" }
+  ]
+}

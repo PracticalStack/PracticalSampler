@@ -1,0 +1,81 @@
+{
+  "factoryPath": "container.offline",
+  "factory": "container",
+  "nodeId": "offline",
+  "description": "",
+
+  "classification": {
+    "signalPathRole": "container",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [],
+
+  "properties": [
+    {
+      "id": "IsVertical",
+      "defaultValue": true,
+      "type": "boolean",
+      "note": "UI-only layout hint. Does not affect processing."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "phase3/container/offline.md",
+    "tier": "STUB",
+    "lines": 6
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "offline-processing-model",
+      "category": "signal_path",
+      "question": "The wrap::offline wrapper makes process(), processFrame(), and handleHiseEvent() all no-ops. Only prepare(), reset(), and initialise() are forwarded. What is the intended use case? How do children inside an offline container actually process audio if the process callback is empty?",
+      "context": "The offline container has no description and a STUB doc. Its purpose and processing model are completely unknown from the base data."
+    },
+    {
+      "id": "offline-rendering-mechanism",
+      "category": "signal_path",
+      "question": "The infrastructure doc mentions offline is 'for nodes that render to external data objects (not realtime)'. How is this rendering triggered? Is there a separate API or trigger mechanism that causes the offline chain to process audio outside the normal callback?",
+      "context": "Without understanding the trigger mechanism, the offline container cannot be documented meaningfully."
+    },
+    {
+      "id": "missing-description",
+      "category": "description_accuracy",
+      "question": "The base data has an empty description string. What should the description be? Something like 'Processes child nodes offline (non-realtime) for rendering to external data.'?",
+      "context": "The empty description is the most severe documentation gap of any container node."
+    }
+  ],
+
+  "notes": "Offline is the least documented container node: empty description in base data, STUB phase3 doc (6 lines, no content). The wrap::offline wrapper is unusual -- it blocks all processing callbacks while forwarding lifecycle callbacks. This suggests a non-realtime rendering use case where audio is processed through a different mechanism than the standard process() callback. The OfflineChainNode class in NodeContainerTypes.h needs careful C++ exploration to understand its actual purpose."
+}

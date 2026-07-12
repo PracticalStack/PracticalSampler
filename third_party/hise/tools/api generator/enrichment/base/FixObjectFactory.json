@@ -1,0 +1,52 @@
+{
+  "className": "FixObjectFactory",
+  "category": "object",
+  "description": "",
+  "methods": {
+    "create": {
+      "signature": "var create()",
+      "returnType": "var",
+      "description": "Creates a single object from the prototype layout.",
+      "parameters": []
+    },
+    "createArray": {
+      "signature": "var createArray(int numElements)",
+      "returnType": "var",
+      "description": "Creates a fixed size array with the given number of elements.",
+      "parameters": [
+        {
+          "name": "numElements",
+          "type": "int"
+        }
+      ]
+    },
+    "createStack": {
+      "signature": "var createStack(int numElements)",
+      "returnType": "var",
+      "description": "Creates an unordered stack.",
+      "parameters": [
+        {
+          "name": "numElements",
+          "type": "int"
+        }
+      ]
+    },
+    "getTypeHash": {
+      "signature": "int getTypeHash()",
+      "returnType": "int",
+      "description": "Returns the hash code for the memory layout which factors in member IDs, order and type.",
+      "parameters": []
+    },
+    "setCompareFunction": {
+      "signature": "void setCompareFunction(var newCompareFunction)",
+      "returnType": "void",
+      "description": "Registers a function that will be used for comparison. If you pass in a string it will only compare the given property.",
+      "parameters": [
+        {
+          "name": "newCompareFunction",
+          "type": "var"
+        }
+      ]
+    }
+  }
+}

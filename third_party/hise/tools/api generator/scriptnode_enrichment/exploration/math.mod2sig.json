@@ -1,0 +1,12 @@
+{
+  "factoryPath": "math.mod2sig",
+  "nodes": [
+    { "id": "in", "label": "Audio In", "type": "input", "importance": 1.0, "description": "Unipolar modulation signal [0, 1]" },
+    { "id": "mod2sig", "label": "Mod to Signal", "type": "process", "importance": 1.0, "description": "output = input * 2.0 - 1.0" },
+    { "id": "out", "label": "Audio Out", "type": "output", "importance": 1.0, "description": "Bipolar audio signal [-1, 1]" }
+  ],
+  "edges": [
+    { "from": "in", "to": "mod2sig", "type": "signal", "label": null },
+    { "from": "mod2sig", "to": "out", "type": "signal", "label": null }
+  ]
+}

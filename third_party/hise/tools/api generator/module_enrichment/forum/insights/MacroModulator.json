@@ -1,0 +1,56 @@
+{
+  "targetId": "MacroModulator",
+  "domain": "modules",
+  "generatedAt": "2026-04-09",
+  "topicIds": [13838, 12911, 13389, 5086, 8407, 4333, 2949, 13348, 8405],
+  "insights": [
+    {
+      "type": "GOTCHA",
+      "title": "Macro modulation is not sample-accurate and is designed for slow movements only",
+      "summary": "Christoph Hart explicitly confirmed that macro modulation is not sample-accurate and never will be. It was designed as a quick way to add slow movement to controls (e.g., slow pad filter sweeps, randomized jitter), not as a precision modulation system. For fast or exact modulation, use HISE's built-in modulators instead.",
+      "sources": ["tid:4333"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "API",
+      "title": "Macro modulation works by moving the knob value, not injecting into the modulation chain",
+      "summary": "The macro modulation system operates at lower resolution than the modulation chain. It effectively moves the target parameter's knob value very fast - this means the parameter's own built-in smoothing is what you hear, not a dedicated modulation signal. Use proper HISE modulators for high-accuracy modulation.",
+      "sources": ["tid:13348"],
+      "verify": false,
+      "verify_hint": null
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Macro Modulator placed in a Container does not receive note-on events",
+      "summary": "Containers have no voice logic and no MIDI processing, so a Macro Modulator (or any envelope/matrix modulator) placed inside a Container will not restart on note-on. The modulator runs but never resets its phase. Use the modulator inside a sound generator instead.",
+      "sources": ["tid:13389"],
+      "verify": true,
+      "verify_hint": "grep 'handleHiseEvent' in MacroControlModulator.cpp; check container voice logic in ModulatorSynthChain"
+    },
+    {
+      "type": "BUG",
+      "title": "Macro control modulator index is off by one in the UI",
+      "summary": "David Healey reported that the macro control modulator index shown in the UI is off by one relative to the actual macro slot it controls. Reported in 2023; verify whether this has been fixed in current builds.",
+      "sources": ["tid:8407"],
+      "verify": true,
+      "verify_hint": "grep 'MacroIndex' or 'macroIndex' in MacroControlModulator.cpp; check combo box population in MacroControlModulatorEditorBody"
+    },
+    {
+      "type": "API",
+      "title": "Macro system uses a 0-127 range internally; non-standard knob ranges require normalization",
+      "summary": "David Healey noted that the macro control system operates on a 0-127 range internally, which causes mismatch when controlling knobs with custom ranges. Normalized values (0-1) would make more sense but are not what the system uses.",
+      "sources": ["tid:8407"],
+      "verify": true,
+      "verify_hint": "grep 'macroControllerMoved' in MacroControlModulator.cpp; check clamping and range handling"
+    },
+    {
+      "type": "GOTCHA",
+      "title": "Macro control values saved in presets behave inconsistently",
+      "summary": "User reports that macro control values do save into presets but the behavior is described as 'wonky'. Treat preset round-tripping of macro modulator state as potentially unreliable until verified.",
+      "sources": ["tid:2949"],
+      "verify": true,
+      "verify_hint": "grep 'restoreFromValueTree' or 'exportAsValueTree' in MacroControlModulator.cpp; check MacroIndex and MacroValue serialization"
+    }
+  ]
+}

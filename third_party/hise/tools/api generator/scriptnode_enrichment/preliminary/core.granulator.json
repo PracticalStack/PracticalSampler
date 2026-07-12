@@ -1,0 +1,159 @@
+{
+  "factoryPath": "core.granulator",
+  "factory": "core",
+  "nodeId": "granulator",
+  "description": "A granular synthesiser",
+
+  "classification": {
+    "signalPathRole": "audio_processor",
+    "isPolyphonic": false,
+    "isControlNode": false,
+    "outsideSignalPath": false,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Playback Position",
+      "rationale": "Position controls where in the audio file grains are sourced from",
+      "parameters": [
+        {
+          "id": "Position",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Grain Properties",
+      "rationale": "GrainSize and Pitch control the fundamental character of each grain",
+      "parameters": [
+        {
+          "id": "GrainSize",
+          "range": { "min": 20.0, "max": 800.0, "step": 0.0, "skew": 1.0 },
+          "default": 80.0,
+          "textConverter": "Time",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Pitch",
+          "range": { "min": 0.5, "max": 2.0, "step": 0.0, "skew": 0.631 },
+          "default": 1.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    },
+    {
+      "label": "Grain Distribution",
+      "rationale": "Density, Spread, and Detune control how grains overlap and vary, affecting texture and stereo image",
+      "parameters": [
+        {
+          "id": "Density",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Spread",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        },
+        {
+          "id": "Detune",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 1
+  },
+
+  "modulationOutput": {
+    "hasOutput": false,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": false,
+    "count": 0
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/core/granulator.md",
+    "tier": "GOOD",
+    "lines": 28
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "grain-generation",
+      "category": "signal_path",
+      "question": "How does the granulator generate and overlap grains? What windowing function is used? How many simultaneous grains can be active? Does it replace or mix with the input signal?",
+      "context": "Core signal path question -- the grain generation algorithm defines the node's behaviour."
+    },
+    {
+      "id": "position-mapping",
+      "category": "parameter_behaviour",
+      "question": "Position is normalised 0-1. Does 0 map to the start of the audio file and 1 to the end? Is position static or does it advance automatically?",
+      "context": "Users need to know if they must modulate Position for scanning playback or if it auto-advances."
+    },
+    {
+      "id": "density-semantics",
+      "category": "parameter_behaviour",
+      "question": "What does Density 0-1 control? Is it the number of overlapping grains, the grain trigger rate, or the overlap ratio?",
+      "context": "Density is a common granular parameter but its exact implementation varies across engines."
+    },
+    {
+      "id": "spread-semantics",
+      "category": "parameter_behaviour",
+      "question": "Does Spread control stereo panning randomisation of grains, or position randomisation around the Position parameter?",
+      "context": "The name is ambiguous -- could be spatial spread or temporal/positional spread."
+    },
+    {
+      "id": "detune-semantics",
+      "category": "parameter_behaviour",
+      "question": "Detune is normalised 0-1. What pitch range does it map to? Is it random per-grain pitch variation?",
+      "context": "Users need to know the actual detune range to control the granular texture."
+    },
+    {
+      "id": "pitch-as-ratio",
+      "category": "parameter_behaviour",
+      "question": "Pitch range 0.5-2.0 suggests a ratio (0.5 = octave down, 2.0 = octave up). Is this the grain playback speed ratio? Does it affect all grains uniformly?",
+      "context": "Confirms the pitch parameter is a speed ratio rather than semitones."
+    },
+    {
+      "id": "no-polyphony-no-midi",
+      "category": "description_accuracy",
+      "question": "The granulator has no IsPolyphonic or IsProcessingHiseEvent flags. Is it purely a continuous texture generator that must be triggered externally (e.g., via a Gate from another node)?",
+      "context": "Important for users to understand that this is not a note-triggered instrument by itself."
+    }
+  ],
+
+  "notes": "Unlike file_player and stretch_player, granulator is monophonic and does not process MIDI events. This means it operates as a continuous granular texture generator rather than a note-triggered instrument. The Pitch parameter uses the same range and skew as stretch_player's Pitch (ratio-based rather than semitone-based). GrainSize uses a Time text converter, confirming values are in milliseconds (20-800ms). The existing phase3 doc is GOOD tier (28 lines), which may provide additional context."
+}

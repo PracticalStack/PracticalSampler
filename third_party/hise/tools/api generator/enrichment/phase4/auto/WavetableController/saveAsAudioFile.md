@@ -1,0 +1,1 @@
+Saves the current wavetable as a 48 kHz, 24-bit WAV file. The output includes loop point metadata so the file can be reimported with correct cycle boundaries. Accepts both ScriptFile objects and string paths.

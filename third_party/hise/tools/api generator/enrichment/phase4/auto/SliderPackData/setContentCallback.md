@@ -1,0 +1,1 @@
+Registers a callback that fires when slider values change. The callback receives a single integer argument: the index of the changed slider, or -1 for bulk operations (e.g. `setAllValues()`, `fromBase64()`). For watching changes across many SliderPackData objects, consider `Broadcaster.attachToComplexData("SliderPack.Content", ...)` instead of registering individual callbacks.

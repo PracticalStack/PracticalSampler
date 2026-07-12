@@ -1,0 +1,1 @@
+Returns an integer hash derived from the factory's member names and data types. Two factories with identical layout descriptions (same property names, types, and order) produce the same hash. Useful for verifying type compatibility between factories or containers at runtime.

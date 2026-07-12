@@ -1,0 +1,107 @@
+{
+  "factoryPath": "control.xfader",
+  "factory": "control",
+  "nodeId": "xfader",
+  "description": "Apply a crossfade to multiple outputs",
+
+  "classification": {
+    "signalPathRole": "control_source",
+    "isPolyphonic": false,
+    "isControlNode": true,
+    "outsideSignalPath": true,
+    "isProcessingHiseEvent": false,
+    "voiceContext": "monophonic"
+  },
+
+  "parameterGroups": [
+    {
+      "label": "Crossfade position",
+      "rationale": "Value controls the crossfade position, distributing gain coefficients across the outputs.",
+      "parameters": [
+        {
+          "id": "Value",
+          "range": { "min": 0.0, "max": 1.0, "step": 0.0, "skew": 1.0 },
+          "default": 0.0,
+          "textConverter": "Undefined",
+          "unnormalisedModulation": false
+        }
+      ]
+    }
+  ],
+
+  "properties": [
+    {
+      "id": "NumParameters",
+      "defaultValue": 2,
+      "type": "integer",
+      "note": "Number of output parameter slots. Determines how many fade outputs are distributed across the crossfade range."
+    },
+    {
+      "id": "Mode",
+      "defaultValue": "Linear",
+      "type": "enum",
+      "note": "Selects the crossfade curve type. Maps to a C++ template argument via the 'faders' namespace (HasModeTemplateArgument is set). Likely options include Linear, Equal Power, etc."
+    }
+  ],
+
+  "complexData": {
+    "tables": 0,
+    "sliderPacks": 0,
+    "audioFiles": 0
+  },
+
+  "modulationOutput": {
+    "hasOutput": true,
+    "isUnnormalised": false,
+    "namedOutputs": []
+  },
+
+  "switchTargets": {
+    "hasSwitchTargets": true,
+    "count": 2
+  },
+
+  "variantGroup": {
+    "isVariant": false,
+    "groupName": null,
+    "templateParameter": null,
+    "variantValue": null
+  },
+
+  "existingDoc": {
+    "path": "scriptnode_enrichment/phase3/control/xfader.md",
+    "tier": "STUB",
+    "lines": 6
+  },
+
+  "availableImages": [],
+
+  "gaps": [
+    {
+      "id": "xfader-mode-variants",
+      "category": "conditional_logic",
+      "question": "What fade curve modes are available in the 'faders' namespace? The default is 'Linear'. What are the other options (e.g. EqualPower, ConstantPower, Switch)?",
+      "context": "Each mode produces different gain curves, critical for understanding how the crossfade behaves musically."
+    },
+    {
+      "id": "xfader-distribution-formula",
+      "category": "signal_path",
+      "question": "How does the Value parameter distribute fade coefficients across N outputs? For Linear mode with 2 outputs: is output[0] = 1-Value and output[1] = Value? For N>2, how is the range partitioned?",
+      "context": "Users need to understand the exact relationship between the Value knob position and each output's gain."
+    },
+    {
+      "id": "xfader-output-range",
+      "category": "parameter_behaviour",
+      "question": "Do the individual output values stay in 0..1 range? For equal power mode, the sum of squares equals 1, so individual outputs are 0..1. Confirm this for all modes.",
+      "context": "Determines whether xfader outputs can be used directly as normalised modulation sources."
+    },
+    {
+      "id": "xfader-numparameters-range",
+      "category": "parameter_behaviour",
+      "question": "What is the valid range for NumParameters? Default is 2, max appears to be determined by dynamic_list limits (32). Is there a practical maximum?",
+      "context": "Users need to know how many outputs they can create."
+    }
+  ],
+
+  "notes": "xfader is a multi-output node (Pattern 4) that distributes fade coefficients across multiple outputs based on a single Value input. It uses HasModeTemplateArgument with the 'faders' namespace for compile-time mode selection. The SwitchTargets has 2 children matching the default NumParameters of 2. This node is commonly used for crossfading between parallel signal chains in a split container."
+}

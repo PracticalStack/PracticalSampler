@@ -1,0 +1,1 @@
+Makes this Table handle refer to the same underlying data as another Table object. After linking, both handles share the same control points and lookup table - modifications through either handle affect both. Callbacks registered on this handle remain active and fire based on the linked data's events.

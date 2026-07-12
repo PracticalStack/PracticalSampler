@@ -1,0 +1,239 @@
+{
+  "moduleId": "ShapeFX",
+  "nodes": [
+    {
+      "id": "audio_in",
+      "type": "input",
+      "label": "Audio In (L/R)",
+      "importance": 1.0
+    },
+    {
+      "id": "dry_copy",
+      "type": "process",
+      "label": "Dry Copy",
+      "importance": 0.5,
+      "description": "Copies unprocessed input to dry buffer, applies (1 - Mix) gain"
+    },
+    {
+      "id": "pre_filters",
+      "type": "process",
+      "label": "Pre-Shaper Filters",
+      "importance": 0.8,
+      "group": "filtering",
+      "description": "High-pass then low-pass filtering on the wet signal"
+    },
+    {
+      "id": "highpass_param",
+      "type": "parameter",
+      "label": "HighPass",
+      "importance": 0.7,
+      "group": "filtering"
+    },
+    {
+      "id": "lowpass_param",
+      "type": "parameter",
+      "label": "LowPass",
+      "importance": 0.7,
+      "group": "filtering"
+    },
+    {
+      "id": "bypass_filters_param",
+      "type": "parameter",
+      "label": "BypassFilters",
+      "importance": 0.7,
+      "group": "filtering"
+    },
+    {
+      "id": "input_gain",
+      "type": "process",
+      "label": "Input Gain",
+      "importance": 0.9,
+      "group": "input_stage",
+      "description": "Smoothed gain in dB applied before shaping"
+    },
+    {
+      "id": "gain_param",
+      "type": "parameter",
+      "label": "Gain",
+      "importance": 0.9,
+      "group": "input_stage"
+    },
+    {
+      "id": "bias_add",
+      "type": "process",
+      "label": "DC Bias",
+      "importance": 0.7,
+      "group": "input_stage",
+      "description": "Adds DC offset to each channel independently"
+    },
+    {
+      "id": "bias_left_param",
+      "type": "parameter",
+      "label": "BiasLeft",
+      "importance": 0.6,
+      "group": "input_stage"
+    },
+    {
+      "id": "bias_right_param",
+      "type": "parameter",
+      "label": "BiasRight",
+      "importance": 0.6,
+      "group": "input_stage"
+    },
+    {
+      "id": "soft_limiter",
+      "type": "process",
+      "label": "Soft Limiter",
+      "importance": 0.6,
+      "group": "input_stage",
+      "description": "Per-sample soft limiting at -0.5 dB threshold"
+    },
+    {
+      "id": "limit_input_param",
+      "type": "parameter",
+      "label": "LimitInput",
+      "importance": 0.6,
+      "group": "input_stage"
+    },
+    {
+      "id": "oversampling_up",
+      "type": "process",
+      "label": "Oversample Up",
+      "importance": 0.5,
+      "group": "shaping",
+      "description": "Upsamples the signal for reduced aliasing"
+    },
+    {
+      "id": "shaper",
+      "type": "process",
+      "label": "Waveshaper",
+      "importance": 1.0,
+      "group": "shaping",
+      "description": "Per-sample nonlinear shaping function selected by Mode"
+    },
+    {
+      "id": "mode_param",
+      "type": "parameter",
+      "label": "Mode",
+      "importance": 1.0,
+      "group": "shaping"
+    },
+    {
+      "id": "bitcrush",
+      "type": "process",
+      "label": "Bitcrusher",
+      "importance": 0.7,
+      "group": "shaping",
+      "description": "Per-sample bit reduction for lo-fi distortion"
+    },
+    {
+      "id": "reduce_param",
+      "type": "parameter",
+      "label": "Reduce",
+      "importance": 0.7,
+      "group": "shaping"
+    },
+    {
+      "id": "oversampling_down",
+      "type": "process",
+      "label": "Oversample Down",
+      "importance": 0.5,
+      "group": "shaping",
+      "description": "Downsamples the signal back to original rate"
+    },
+    {
+      "id": "oversampling_param",
+      "type": "parameter",
+      "label": "Oversampling",
+      "importance": 0.7,
+      "group": "shaping"
+    },
+    {
+      "id": "dc_removal",
+      "type": "process",
+      "label": "DC Removal",
+      "importance": 0.5,
+      "group": "output_stage",
+      "description": "30 Hz high-pass to remove DC offset from bias and shaping"
+    },
+    {
+      "id": "autogain_stage",
+      "type": "process",
+      "label": "Autogain",
+      "importance": 0.7,
+      "group": "output_stage",
+      "description": "Static gain compensation based on the shaping curve"
+    },
+    {
+      "id": "autogain_param",
+      "type": "parameter",
+      "label": "Autogain",
+      "importance": 0.7,
+      "group": "output_stage"
+    },
+    {
+      "id": "mix_stage",
+      "type": "process",
+      "label": "Dry/Wet Mix",
+      "importance": 0.8,
+      "group": "output_stage",
+      "description": "Smoothed crossfade between dry and wet signals"
+    },
+    {
+      "id": "mix_param",
+      "type": "parameter",
+      "label": "Mix",
+      "importance": 0.8,
+      "group": "output_stage"
+    },
+    {
+      "id": "drive_param",
+      "type": "parameter",
+      "label": "Drive",
+      "importance": 0.2,
+      "description": "Vestigial - stored but not used in audio processing"
+    },
+    {
+      "id": "audio_out",
+      "type": "output",
+      "label": "Audio Out (L/R)",
+      "importance": 1.0
+    }
+  ],
+  "edges": [
+    { "from": "audio_in", "to": "dry_copy", "type": "signal" },
+    { "from": "audio_in", "to": "pre_filters", "type": "signal" },
+    { "from": "highpass_param", "to": "pre_filters", "type": "control" },
+    { "from": "lowpass_param", "to": "pre_filters", "type": "control" },
+    { "from": "bypass_filters_param", "to": "pre_filters", "type": "conditional", "label": "skip if On" },
+    { "from": "pre_filters", "to": "input_gain", "type": "signal" },
+    { "from": "gain_param", "to": "input_gain", "type": "control" },
+    { "from": "input_gain", "to": "bias_add", "type": "signal" },
+    { "from": "bias_left_param", "to": "bias_add", "type": "control" },
+    { "from": "bias_right_param", "to": "bias_add", "type": "control" },
+    { "from": "bias_add", "to": "soft_limiter", "type": "signal" },
+    { "from": "limit_input_param", "to": "soft_limiter", "type": "conditional", "label": "skip if Off" },
+    { "from": "soft_limiter", "to": "oversampling_up", "type": "signal" },
+    { "from": "oversampling_param", "to": "oversampling_up", "type": "conditional", "label": "skip if 1x" },
+    { "from": "oversampling_up", "to": "shaper", "type": "signal" },
+    { "from": "mode_param", "to": "shaper", "type": "control" },
+    { "from": "shaper", "to": "bitcrush", "type": "signal" },
+    { "from": "reduce_param", "to": "bitcrush", "type": "conditional", "label": "skip if 0" },
+    { "from": "bitcrush", "to": "oversampling_down", "type": "signal" },
+    { "from": "oversampling_param", "to": "oversampling_down", "type": "conditional", "label": "skip if 1x" },
+    { "from": "oversampling_down", "to": "dc_removal", "type": "signal" },
+    { "from": "bypass_filters_param", "to": "dc_removal", "type": "conditional", "label": "skip if On" },
+    { "from": "dc_removal", "to": "autogain_stage", "type": "signal" },
+    { "from": "autogain_param", "to": "autogain_stage", "type": "conditional", "label": "skip if Off" },
+    { "from": "autogain_stage", "to": "mix_stage", "type": "signal" },
+    { "from": "mix_param", "to": "mix_stage", "type": "control" },
+    { "from": "dry_copy", "to": "mix_stage", "type": "signal", "label": "dry path" },
+    { "from": "mix_stage", "to": "audio_out", "type": "signal" }
+  ],
+  "groups": [
+    { "id": "filtering", "label": "Pre-Shaper Filtering" },
+    { "id": "input_stage", "label": "Input Stage" },
+    { "id": "shaping", "label": "Shaping" },
+    { "id": "output_stage", "label": "Output Stage" }
+  ]
+}

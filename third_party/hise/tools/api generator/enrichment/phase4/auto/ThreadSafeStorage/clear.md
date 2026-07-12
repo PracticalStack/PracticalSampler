@@ -1,0 +1,1 @@
+Resets the storage to an empty (undefined) state. Subsequent calls to `load()` or `tryLoad()` return undefined or the fallback value respectively until new data is stored.
