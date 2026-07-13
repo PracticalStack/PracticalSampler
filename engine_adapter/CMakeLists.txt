@@ -130,6 +130,7 @@ add_library(drs_engine_adapter STATIC
     src/EngineFacade.cpp
     src/HiseProjectContent.cpp
     src/Phase1Baseline.cpp
+    src/ProjectDocument.cpp
     src/RuntimeCompiler.cpp
     src/RuntimeLoadProfile.cpp
     src/RuntimeLoader.cpp
@@ -137,6 +138,7 @@ add_library(drs_engine_adapter STATIC
     src/RuntimeStreamingService.cpp
     src/RuntimeStream.cpp
     src/RuntimeVoice.cpp
+    include/drs/engine/ProjectDocument.h
     include/drs/engine/RuntimePresetState.h
     include/drs/engine/RuntimeLoadProfile.h
 )
@@ -178,6 +180,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     src/HiseFrontendPluginProbe.cpp
     src/HiseProjectContent.cpp
     src/Phase1Baseline.cpp
+    src/ProjectDocument.cpp
     src/RuntimeCompiler.cpp
     src/RuntimeLoader.cpp
     src/RuntimePresetState.cpp
@@ -189,6 +192,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     include/drs/engine/Phase1Baseline.h
     include/drs/engine/HiseFrontendBridge.h
     include/drs/engine/HiseProjectContent.h
+    include/drs/engine/ProjectDocument.h
     include/drs/engine/RuntimeCompiler.h
     include/drs/engine/RuntimeLoadProfile.h
     include/drs/engine/RuntimeLoader.h

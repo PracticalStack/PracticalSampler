@@ -131,7 +131,7 @@ int main()
         require(hasPresentDirectory(contentSnapshot, "XmlPresetBackups", 2),
                 "Expected authored HISE XML backup assets under XmlPresetBackups/.");
 
-        drs::standalone::MainComponent mainComponent;
+        drs::standalone::MainComponent mainComponent(false);
         require(mainComponent.getWidth() == 860, "Standalone shell width changed unexpectedly.");
         require(mainComponent.getHeight() == 760, "Standalone shell height changed unexpectedly.");
         require(mainComponent.getNumChildComponents() == 1, "Standalone shell should expose exactly one root performance panel.");
@@ -141,6 +141,17 @@ int main()
                 "Standalone shell should expose the Sprint 5 keyboard surface.");
         require(standaloneRoot->findChildWithID("performanceDiagnosticsToggle") != nullptr,
                 "Standalone shell should expose a diagnostics entry point.");
+        require(!mainComponent.isAudioOutputEnabled(),
+                "Headless standalone smoke validation should keep the real audio device disabled.");
+        mainComponent.getProcessor().prepareToPlay(44100.0, 512);
+        juce::AudioBuffer<float> standaloneSurfaceBuffer(2, 512);
+        standaloneSurfaceBuffer.clear();
+        juce::MidiBuffer standaloneEmptyMidiBuffer;
+        mainComponent.getProcessor().queuePerformanceSurfaceNoteOn(57, 0.8f);
+        mainComponent.getProcessor().processBlock(standaloneSurfaceBuffer, standaloneEmptyMidiBuffer);
+        require(standaloneSurfaceBuffer.getMagnitude(0, standaloneSurfaceBuffer.getNumSamples()) > 0.0001f,
+                "Standalone performance surface should render audible output through the shared processor path.");
+        mainComponent.getProcessor().queuePerformanceSurfaceNoteOff(57);
 
         drs::plugin::Processor processor;
         require(processor.acceptsMidi(), "Plugin shell must remain configured as a MIDI-driven synth.");

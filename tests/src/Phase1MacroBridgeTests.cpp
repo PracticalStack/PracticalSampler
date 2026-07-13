@@ -52,7 +52,7 @@ int main()
     {
         juce::ScopedJuceInitialiser_GUI gui;
 
-        drs::standalone::MainComponent standalone;
+        drs::standalone::MainComponent standalone(false);
         require(standalone.setMacroValue("tone", 0.88), "Standalone shell should expose the tone macro.");
         require(standalone.setMacroValue("motion", 0.73), "Standalone shell should expose the motion macro.");
         requireNear(findMacroValue(standalone.getEngineFacade(), "tone"), 0.88, 0.0001,
@@ -83,7 +83,7 @@ int main()
                 "High tone macro should drive an accent-range preview velocity.");
 
         const auto standaloneState = standalone.exportStateJson();
-        drs::standalone::MainComponent restoredStandalone;
+        drs::standalone::MainComponent restoredStandalone(false);
         require(restoredStandalone.restoreStateJson(standaloneState).restored,
                 "Standalone shell should restore its exported macro state.");
         requireNear(findMacroValue(restoredStandalone.getEngineFacade(), "tone"), 0.88, 0.0001,

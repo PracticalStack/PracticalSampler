@@ -2,11 +2,31 @@
 
 namespace drs::standalone
 {
-MainComponent::MainComponent()
-    : performancePanel(engineFacade)
+MainComponent::MainComponent(bool enableAudioOutput)
+    : performancePanel(processor.getEngineFacade(),
+                       [this](const std::string& macroId, double value)
+                       {
+                           processor.setMacroValueFromShell(macroId, value);
+                       },
+                       [this](int midiNoteNumber, float velocity)
+                       {
+                           processor.queuePerformanceSurfaceNoteOn(midiNoteNumber, velocity);
+                       },
+                       [this](int midiNoteNumber)
+                       {
+                           processor.queuePerformanceSurfaceNoteOff(midiNoteNumber);
+                       })
 {
     addAndMakeVisible(performancePanel);
     setSize(860, 760);
+
+    if (enableAudioOutput)
+        initializeAudioOutput();
+}
+
+MainComponent::~MainComponent()
+{
+    shutdownAudioOutput();
 }
 
 void MainComponent::resized()
@@ -16,16 +36,53 @@ void MainComponent::resized()
 
 std::string MainComponent::exportStateJson() const
 {
-    return engineFacade.exportPresetStateJson();
+    juce::MemoryBlock stateBlock;
+    const_cast<drs::plugin::Processor&>(processor).getStateInformation(stateBlock);
+    return std::string(static_cast<const char*>(stateBlock.getData()), stateBlock.getSize());
 }
 
 drs::engine::EnginePresetStateRestoreResult MainComponent::restoreStateJson(const std::string& stateJson)
 {
-    return engineFacade.restorePresetStateJson(stateJson);
+    const auto validationResult = processor.getEngineFacade().restorePresetStateJson(stateJson);
+    if (!validationResult.restored)
+        return validationResult;
+
+    processor.setStateInformation(stateJson.data(), static_cast<int>(stateJson.size()));
+    return validationResult;
 }
 
 bool MainComponent::setMacroValue(const std::string& macroId, double value)
 {
-    return engineFacade.setMacroValue(macroId, value);
+    const auto parameterId = "macro." + juce::String::fromUTF8(macroId.c_str());
+    if (processor.getParameterState().getParameter(parameterId) == nullptr)
+        return false;
+
+    processor.setMacroValueFromShell(macroId, value);
+    return true;
+}
+
+void MainComponent::initializeAudioOutput()
+{
+    audioProcessorPlayer.setProcessor(&processor);
+
+    const auto setupError = audioDeviceManager.initialise(0, 2, nullptr, true);
+    if (setupError.isNotEmpty())
+    {
+        audioDeviceError = setupError;
+        audioProcessorPlayer.setProcessor(nullptr);
+        return;
+    }
+
+    audioDeviceManager.addAudioCallback(&audioProcessorPlayer);
+    audioOutputEnabled = true;
+}
+
+void MainComponent::shutdownAudioOutput()
+{
+    if (audioOutputEnabled)
+        audioDeviceManager.removeAudioCallback(&audioProcessorPlayer);
+
+    audioProcessorPlayer.setProcessor(nullptr);
+    audioOutputEnabled = false;
 }
 } // namespace drs::standalone

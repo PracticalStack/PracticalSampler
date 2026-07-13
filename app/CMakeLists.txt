@@ -54,6 +54,7 @@ target_include_directories(drs_standalone_shell
 target_link_libraries(drs_standalone_shell
     PUBLIC
         drs_app_shared
+        drs_plugin_shell
 )
 
 target_compile_features(drs_standalone_shell PUBLIC cxx_std_17)

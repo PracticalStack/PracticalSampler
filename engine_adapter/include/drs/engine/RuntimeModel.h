@@ -13,6 +13,89 @@ struct RuntimeProjectSampleSource
     std::string role;
 };
 
+struct RuntimeProjectZoneDefinition
+{
+    std::string id;
+    std::string sampleSourceId;
+    std::string displayName;
+    std::string groupId;
+    std::string articulationId;
+    int rootKey = 60;
+    int keyLow = 0;
+    int keyHigh = 127;
+    int velocityLow = 1;
+    int velocityHigh = 127;
+    double gainDb = 0.0;
+    double pan = 0.0;
+    std::uint64_t sampleStartFrame = 0;
+    bool loopEnabled = false;
+    std::uint64_t loopStartFrame = 0;
+    std::uint64_t loopEndFrame = 0;
+};
+
+struct RuntimeProjectMacroTargetDefinition
+{
+    std::string parameterId;
+    std::string parameterPath;
+    std::string role;
+};
+
+struct RuntimeProjectMacroDefinition
+{
+    std::string id;
+    std::string name;
+    double defaultValue = 0.0;
+    double minValue = 0.0;
+    double maxValue = 1.0;
+    std::vector<RuntimeProjectMacroTargetDefinition> targets;
+};
+
+struct RuntimeProjectFxSlotDefinition
+{
+    std::string id;
+    std::string displayName;
+    std::string effectType;
+    bool bypassed = false;
+};
+
+struct RuntimeProjectRoutingBusDefinition
+{
+    std::string id;
+    std::string displayName;
+    std::string inputSourceId;
+    std::vector<std::string> fxSlotIds;
+};
+
+struct RuntimeProjectTriggerSlotDefinition
+{
+    std::string id;
+    std::string displayName;
+    std::string triggerEvent;
+    std::string targetArticulationId;
+};
+
+struct RuntimeProjectPerformanceBankDefinition
+{
+    std::string id;
+    std::string displayName;
+    std::vector<RuntimeProjectTriggerSlotDefinition> triggerSlots;
+    std::vector<std::string> notes;
+};
+
+struct RuntimeProjectAuthoringState
+{
+    std::string schemaName;
+    int schemaVersion = 0;
+    std::string selectedZoneId;
+    std::string selectedPerformanceBankId;
+    std::vector<RuntimeProjectZoneDefinition> zones;
+    std::vector<RuntimeProjectMacroDefinition> macros;
+    std::vector<RuntimeProjectFxSlotDefinition> fxSlots;
+    std::vector<RuntimeProjectRoutingBusDefinition> routingBuses;
+    std::vector<RuntimeProjectPerformanceBankDefinition> performanceBanks;
+    std::vector<std::string> notes;
+};
+
 struct RuntimeProjectModel
 {
     std::string schemaName;
@@ -22,6 +105,7 @@ struct RuntimeProjectModel
     std::string contentRootPath;
     std::string defaultInstrumentManifestPath;
     std::vector<RuntimeProjectSampleSource> sampleSources;
+    RuntimeProjectAuthoringState authoring;
     std::vector<std::string> notes;
 };
 
@@ -184,6 +268,22 @@ struct RuntimeProjectLoadResult
     bool manifestFound = false;
     bool loaded = false;
     std::string manifestPath;
+    std::string state;
+    std::vector<std::string> issues;
+    RuntimeProjectModel project;
+};
+
+struct RuntimeProjectValidationResult
+{
+    bool valid = false;
+    std::string state;
+    std::vector<std::string> issues;
+};
+
+struct RuntimeProjectMigrationResult
+{
+    bool valid = false;
+    bool migrated = false;
     std::string state;
     std::vector<std::string> issues;
     RuntimeProjectModel project;

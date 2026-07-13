@@ -118,6 +118,31 @@ add_test(
     COMMAND drs_phase1_state_recall_tests
 )
 
+juce_add_console_app(drs_phase2_authoring_foundation_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Authoring Foundation Tests"
+)
+
+target_sources(drs_phase2_authoring_foundation_tests
+    PRIVATE
+        src/Phase2AuthoringFoundationTests.cpp
+)
+
+target_link_libraries(drs_phase2_authoring_foundation_tests
+    PRIVATE
+        drs_engine_adapter
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase2_authoring_foundation_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase2.authoring_foundation
+    COMMAND drs_phase2_authoring_foundation_tests
+)
+
 juce_add_console_app(drs_phase1_diagnostics_tests
     PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Diagnostics Tests"
 )
