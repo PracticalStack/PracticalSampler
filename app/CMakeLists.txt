@@ -1,4 +1,7 @@
 set(DRS_APP_SHARED_SOURCES
+    src/shared/AuthoringPanel.cpp
+    src/shared/AuthoringPanel.h
+    src/shared/AuthoringPreviewModel.h
     src/shared/PerformancePanel.cpp
     src/shared/PerformancePanel.h
     src/shared/StatusPanel.cpp

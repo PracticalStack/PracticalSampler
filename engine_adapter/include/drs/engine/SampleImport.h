@@ -1,5 +1,7 @@
 #pragma once
 
+#include "drs/engine/RuntimeModel.h"
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -50,7 +52,122 @@ struct SampleImportResult
     ImportedSampleData sample;
 };
 
+enum class SampleFilenameTokenKind
+{
+    unknown,
+    text,
+    rootNote,
+    velocity,
+    roundRobin,
+    articulation
+};
+
+enum class AuthoringImportFindingSeverity
+{
+    info,
+    warning,
+    error
+};
+
+enum class AuthoringImportItemState
+{
+    pending,
+    parsing,
+    inferred,
+    warning,
+    failed,
+    canceled,
+    accepted
+};
+
+struct SampleFilenameToken
+{
+    SampleFilenameTokenKind kind = SampleFilenameTokenKind::unknown;
+    std::string text;
+    std::string normalizedText;
+    std::string canonicalValue;
+    int numericValue = 0;
+};
+
+struct AuthoringImportFinding
+{
+    AuthoringImportFindingSeverity severity = AuthoringImportFindingSeverity::info;
+    std::string code;
+    std::string summary;
+    std::string detail;
+    bool requiresConfirmation = false;
+    std::vector<std::string> relatedTokens;
+};
+
+struct AuthoringImportZoneSuggestion
+{
+    bool suggested = false;
+    std::string sourceSampleId;
+    RuntimeProjectZoneDefinition zone;
+    std::string rootKeySource;
+    std::string velocitySource;
+    int roundRobinIndex = 0;
+};
+
+struct AuthoringImportQueueItem
+{
+    std::string id;
+    std::string sourcePath;
+    AuthoringImportItemState state = AuthoringImportItemState::pending;
+    SampleImportResult importResult;
+    std::vector<SampleFilenameToken> filenameTokens;
+    std::vector<AuthoringImportFinding> findings;
+    AuthoringImportZoneSuggestion suggestedZone;
+};
+
+struct AuthoringImportQueueMetrics
+{
+    std::size_t totalItemCount = 0;
+    std::size_t pendingCount = 0;
+    std::size_t processedCount = 0;
+    std::size_t warningItemCount = 0;
+    std::size_t failedItemCount = 0;
+    std::size_t canceledItemCount = 0;
+    std::size_t acceptedItemCount = 0;
+    std::uint64_t lastProcessDurationMicros = 0;
+    std::uint64_t averageProcessDurationMicros = 0;
+    std::uint64_t maxProcessDurationMicros = 0;
+    std::string lastProcessedItemId;
+    std::string state;
+};
+
+struct AuthoringImportQueue
+{
+    std::string contentRootPath;
+    std::vector<AuthoringImportQueueItem> items;
+    AuthoringImportQueueMetrics metrics;
+};
+
+struct AuthoringImportProcessResult
+{
+    bool processed = false;
+    bool queueDrained = false;
+    std::string itemId;
+    std::string state;
+    std::uint64_t durationMicros = 0;
+    std::vector<std::string> issues;
+};
+
+struct ParsedSampleFilenameHeuristics
+{
+    std::vector<SampleFilenameToken> tokens;
+    std::vector<AuthoringImportFinding> findings;
+    AuthoringImportZoneSuggestion suggestedZone;
+};
+
 SampleImportPolicyReport evaluatePhase1SamplePolicy(const ImportedSampleMetadata& metadata,
                                                     const std::string& contentRootPath = {});
 SampleImportResult importSampleFile(const std::string& samplePath);
+ParsedSampleFilenameHeuristics parseSampleFilenameHeuristics(const std::string& samplePath,
+                                                             const ImportedSampleMetadata* metadata = nullptr);
+AuthoringImportQueue createAuthoringImportQueue(const std::vector<std::string>& samplePaths,
+                                                const std::string& contentRootPath);
+AuthoringImportProcessResult processNextAuthoringImportQueueItem(AuthoringImportQueue& queue);
+bool cancelAuthoringImportQueueItem(AuthoringImportQueue& queue, const std::string& itemId);
+bool acceptAuthoringImportQueueItem(AuthoringImportQueue& queue, const std::string& itemId);
 } // namespace drs::engine

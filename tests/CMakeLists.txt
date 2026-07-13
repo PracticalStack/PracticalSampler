@@ -143,6 +143,89 @@ add_test(
     COMMAND drs_phase2_authoring_foundation_tests
 )
 
+juce_add_console_app(drs_phase2_authoring_import_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Authoring Import Tests"
+)
+
+target_sources(drs_phase2_authoring_import_tests
+    PRIVATE
+        src/Phase2AuthoringImportTests.cpp
+        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
+)
+
+target_link_libraries(drs_phase2_authoring_import_tests
+    PRIVATE
+        drs_engine_adapter
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase2_authoring_import_tests PRIVATE cxx_std_17)
+
+target_include_directories(drs_phase2_authoring_import_tests
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/third_party/juce/modules
+)
+
+add_test(
+    NAME drs.phase2.authoring_import
+    COMMAND drs_phase2_authoring_import_tests
+)
+
+juce_add_console_app(drs_phase2_mapping_workspace_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Mapping Workspace Tests"
+)
+
+target_sources(drs_phase2_mapping_workspace_tests
+    PRIVATE
+        src/Phase2MappingWorkspaceTests.cpp
+)
+
+target_link_libraries(drs_phase2_mapping_workspace_tests
+    PRIVATE
+        drs_engine_adapter
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase2_mapping_workspace_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase2.mapping_workspace
+    COMMAND drs_phase2_mapping_workspace_tests
+)
+
+juce_add_console_app(drs_phase2_waveform_preview_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Waveform Preview Tests"
+)
+
+target_sources(drs_phase2_waveform_preview_tests
+    PRIVATE
+        src/Phase2WaveformPreviewTests.cpp
+)
+
+target_link_libraries(drs_phase2_waveform_preview_tests
+    PRIVATE
+        drs_plugin_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase2_waveform_preview_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase2.waveform_preview
+    COMMAND drs_phase2_waveform_preview_tests
+)
+
 juce_add_console_app(drs_phase1_diagnostics_tests
     PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Diagnostics Tests"
 )
@@ -638,6 +721,22 @@ set_target_properties(drs_phase1_preset_state_tests PROPERTIES
 )
 
 set_target_properties(drs_phase1_state_recall_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_phase2_authoring_foundation_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_phase2_authoring_import_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_phase2_mapping_workspace_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_phase2_waveform_preview_tests PROPERTIES
     FOLDER "Tests"
 )
 

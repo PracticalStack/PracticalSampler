@@ -62,6 +62,20 @@ juce::File getBuiltPluginBundle()
         .getChildFile("VST3")
         .getChildFile("Decent Rhapsody Studio.vst3");
 }
+
+juce::Component* findDescendantById(juce::Component& root, const juce::String& componentId)
+{
+    if (root.getComponentID() == componentId)
+        return &root;
+
+    for (int index = 0; index < root.getNumChildComponents(); ++index)
+    {
+        if (auto* match = findDescendantById(*root.getChildComponent(index), componentId))
+            return match;
+    }
+
+    return nullptr;
+}
 } // namespace
 
 int main()
@@ -134,13 +148,20 @@ int main()
         drs::standalone::MainComponent mainComponent(false);
         require(mainComponent.getWidth() == 860, "Standalone shell width changed unexpectedly.");
         require(mainComponent.getHeight() == 760, "Standalone shell height changed unexpectedly.");
-        require(mainComponent.getNumChildComponents() == 1, "Standalone shell should expose exactly one root performance panel.");
+        require(mainComponent.getNumChildComponents() == 1, "Standalone shell should expose exactly one root workspace container.");
         auto* standaloneRoot = mainComponent.getChildComponent(0);
-        require(standaloneRoot != nullptr, "Standalone shell root performance panel was missing.");
-        require(standaloneRoot->findChildWithID("performanceKeyboard") != nullptr,
+        require(standaloneRoot != nullptr, "Standalone shell root workspace container was missing.");
+        require(findDescendantById(mainComponent, "workspaceTabs") != nullptr,
+                "Standalone shell should expose the workspace tab container.");
+        require(findDescendantById(mainComponent, "performanceKeyboard") != nullptr,
                 "Standalone shell should expose the Sprint 5 keyboard surface.");
-        require(standaloneRoot->findChildWithID("performanceDiagnosticsToggle") != nullptr,
+        require(findDescendantById(mainComponent, "performanceDiagnosticsToggle") != nullptr,
                 "Standalone shell should expose a diagnostics entry point.");
+        auto* standaloneTabs = dynamic_cast<juce::TabbedComponent*>(findDescendantById(mainComponent, "workspaceTabs"));
+        require(standaloneTabs != nullptr, "Standalone shell workspace tab container should be a tabbed component.");
+        standaloneTabs->setCurrentTabIndex(1);
+        require(findDescendantById(mainComponent, "authoringZoneSelector") != nullptr,
+                "Standalone shell should expose the Sprint 3 mapping workspace zone selector.");
         require(!mainComponent.isAudioOutputEnabled(),
                 "Headless standalone smoke validation should keep the real audio device disabled.");
         mainComponent.getProcessor().prepareToPlay(44100.0, 512);
@@ -160,13 +181,20 @@ int main()
         require(editor != nullptr, "Plugin editor creation failed.");
         require(editor->getWidth() == 820, "Plugin editor width changed unexpectedly.");
         require(editor->getHeight() == 700, "Plugin editor height changed unexpectedly.");
-        require(editor->getNumChildComponents() == 1, "Plugin editor should expose exactly one root performance panel.");
+        require(editor->getNumChildComponents() == 1, "Plugin editor should expose exactly one root workspace container.");
         auto* pluginRoot = editor->getChildComponent(0);
-        require(pluginRoot != nullptr, "Plugin editor root performance panel was missing.");
-        require(pluginRoot->findChildWithID("performanceKeyboard") != nullptr,
+        require(pluginRoot != nullptr, "Plugin editor root workspace container was missing.");
+        require(findDescendantById(*editor, "workspaceTabs") != nullptr,
+                "Plugin editor should expose the workspace tab container.");
+        require(findDescendantById(*editor, "performanceKeyboard") != nullptr,
                 "Plugin editor should expose the Sprint 5 keyboard surface.");
-        require(pluginRoot->findChildWithID("performanceDiagnosticsToggle") != nullptr,
+        require(findDescendantById(*editor, "performanceDiagnosticsToggle") != nullptr,
                 "Plugin editor should expose a diagnostics entry point.");
+        auto* pluginTabs = dynamic_cast<juce::TabbedComponent*>(findDescendantById(*editor, "workspaceTabs"));
+        require(pluginTabs != nullptr, "Plugin editor workspace tab container should be a tabbed component.");
+        pluginTabs->setCurrentTabIndex(1);
+        require(findDescendantById(*editor, "authoringZoneSelector") != nullptr,
+                "Plugin editor should expose the Sprint 3 mapping workspace zone selector.");
 
         processor.prepareToPlay(44100.0, 512);
         juce::AudioBuffer<float> pluginBuffer(2, 512);

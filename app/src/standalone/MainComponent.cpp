@@ -15,9 +15,29 @@ MainComponent::MainComponent(bool enableAudioOutput)
                        [this](int midiNoteNumber)
                        {
                            processor.queuePerformanceSurfaceNoteOff(midiNoteNumber);
-                       })
+                       }),
+      authoringPanel(processor.getAuthoringSession(),
+                     [this]()
+                     {
+                         return processor.getAuthoringWaveformPreview();
+                     },
+                     [this]()
+                     {
+                         return processor.getAuthoringImportResponsivenessSnapshot();
+                     },
+                     [this](int midiNoteNumber, float velocity)
+                     {
+                         processor.queuePerformanceSurfaceNoteOn(midiNoteNumber, velocity);
+                     },
+                     [this](int midiNoteNumber)
+                     {
+                         processor.queuePerformanceSurfaceNoteOff(midiNoteNumber);
+                     })
 {
-    addAndMakeVisible(performancePanel);
+    workspaceTabs.setComponentID("workspaceTabs");
+    workspaceTabs.addTab("Perform", juce::Colour::fromRGB(28, 126, 214), &performancePanel, false);
+    workspaceTabs.addTab("Map", juce::Colour::fromRGB(181, 96, 21), &authoringPanel, false);
+    addAndMakeVisible(workspaceTabs);
     setSize(860, 760);
 
     if (enableAudioOutput)
@@ -31,7 +51,7 @@ MainComponent::~MainComponent()
 
 void MainComponent::resized()
 {
-    performancePanel.setBounds(getLocalBounds());
+    workspaceTabs.setBounds(getLocalBounds());
 }
 
 std::string MainComponent::exportStateJson() const

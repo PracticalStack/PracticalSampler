@@ -1,6 +1,7 @@
 #pragma once
 
 #include "plugin/PluginProcessor.h"
+#include "shared/AuthoringPanel.h"
 #include "shared/PerformancePanel.h"
 
 #include <juce_audio_utils/juce_audio_utils.h>
@@ -32,7 +33,9 @@ private:
     void shutdownAudioOutput();
 
     drs::plugin::Processor processor;
+    juce::TabbedComponent workspaceTabs { juce::TabbedButtonBar::TabsAtTop };
     drs::app::PerformancePanel performancePanel;
+    drs::app::AuthoringPanel authoringPanel;
     juce::AudioDeviceManager audioDeviceManager;
     juce::AudioProcessorPlayer audioProcessorPlayer;
     bool audioOutputEnabled = false;

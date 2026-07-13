@@ -1,5 +1,6 @@
 #pragma once
 
+#include "shared/AuthoringPanel.h"
 #include "plugin/PluginProcessor.h"
 #include "shared/PerformancePanel.h"
 
@@ -16,6 +17,8 @@ public:
 
 private:
     Processor& processor;
+    juce::TabbedComponent workspaceTabs { juce::TabbedButtonBar::TabsAtTop };
     drs::app::PerformancePanel performancePanel;
+    drs::app::AuthoringPanel authoringPanel;
 };
 } // namespace drs::plugin

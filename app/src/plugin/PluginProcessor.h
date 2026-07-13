@@ -1,8 +1,10 @@
 #pragma once
 
+#include "drs/engine/AuthoringSession.h"
 #include "drs/engine/EngineFacade.h"
 #include "drs/engine/RuntimeStream.h"
 #include "drs/engine/SampleImport.h"
+#include "shared/AuthoringPreviewModel.h"
 
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -44,8 +46,12 @@ public:
 
     drs::engine::EngineFacade& getEngineFacade() { return engineFacade; }
     const drs::engine::EngineFacade& getEngineFacade() const { return engineFacade; }
+    drs::engine::AuthoringSession& getAuthoringSession() { return authoringSession; }
+    const drs::engine::AuthoringSession& getAuthoringSession() const { return authoringSession; }
     juce::AudioProcessorValueTreeState& getParameterState() { return parameterState; }
     const juce::AudioProcessorValueTreeState& getParameterState() const { return parameterState; }
+    drs::app::AuthoringWaveformPreview getAuthoringWaveformPreview();
+    drs::app::AuthoringImportResponsivenessSnapshot getAuthoringImportResponsivenessSnapshot() const;
     void setMacroValueFromShell(const std::string& macroId, double value);
     void queuePerformanceSurfaceNoteOn(int midiNoteNumber, float velocity);
     void queuePerformanceSurfaceNoteOff(int midiNoteNumber);
@@ -84,14 +90,22 @@ private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     void syncEngineFromParameters();
     void syncParametersFromEngine();
+    drs::app::AuthoringWaveformPreview buildAuthoringWaveformPreview(const drs::engine::ImportedSampleData& sample,
+                                                                     bool loopEnabled,
+                                                                     std::uint64_t loopStartFrame,
+                                                                     std::uint64_t loopEndFrame) const;
+    void initializeAuthoringImportMetrics();
 
+    drs::engine::AuthoringSession authoringSession;
     drs::engine::EngineFacade engineFacade;
     drs::engine::RuntimeManifestLoadResult referenceManifest;
     drs::engine::RuntimeStreamLoadResult referenceStream;
     std::unordered_map<std::string, LoadedReferenceSample> loadedSamples;
+    std::unordered_map<std::string, drs::app::AuthoringWaveformPreview> authoringWaveformPreviewCache;
     std::vector<ActiveRenderVoice> activeVoices;
     juce::MidiMessageCollector performanceSurfaceMidiCollector;
     juce::AudioProcessorValueTreeState parameterState;
+    drs::app::AuthoringImportResponsivenessSnapshot authoringImportResponsivenessSnapshot;
     double currentSampleRate = 44100.0;
     std::uint64_t nextRenderVoiceId = 1;
     bool isSynchronizingParameterState = false;

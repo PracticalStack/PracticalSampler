@@ -1,6 +1,7 @@
 #include "plugin/PluginProcessor.h"
 #include "plugin/PluginEditor.h"
 
+#include "drs/engine/RuntimeLoader.h"
 #include "drs/engine/RuntimeVoice.h"
 
 #include <algorithm>
@@ -71,16 +72,47 @@ fs::path resolveSamplePath(const std::string& streamContainerPath, const std::st
 
     return (containerPath.parent_path() / candidate).lexically_normal();
 }
+
+drs::engine::RuntimeProjectModel buildInitialAuthoringProject()
+{
+    const auto phase2Project = drs::engine::loadPhase2ReferenceProjectManifest();
+    if (phase2Project.loaded)
+        return phase2Project.project;
+
+    const auto phase1Project = drs::engine::loadPhase1ReferenceProjectManifest();
+    const auto migratedProject = drs::engine::migrateRuntimeProjectToPhase2Authoring(phase1Project.project);
+    if (migratedProject.valid)
+        return migratedProject.project;
+
+    return {};
+}
+
+std::optional<drs::engine::RuntimeProjectSampleSource> findProjectSampleSource(const drs::engine::RuntimeProjectModel& project,
+                                                                               const std::string& sampleSourceId)
+{
+    const auto iterator = std::find_if(project.sampleSources.begin(),
+                                       project.sampleSources.end(),
+                                       [&](const drs::engine::RuntimeProjectSampleSource& sampleSource)
+                                       {
+                                           return sampleSource.id == sampleSourceId;
+                                       });
+    if (iterator == project.sampleSources.end())
+        return std::nullopt;
+
+    return *iterator;
+}
 } // namespace
 
 Processor::Processor()
     : juce::AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)),
+      authoringSession(buildInitialAuthoringProject()),
       parameterState(*this, nullptr, "macroParameters", buildParameterLayout(engineFacade))
 {
     performanceSurfaceMidiCollector.reset(currentSampleRate);
     referenceManifest = engineFacade.loadPhase1ReferenceInstrument();
     referenceStream = engineFacade.loadPhase1ReferenceStream();
     initializeReferencePlaybackAssets();
+    initializeAuthoringImportMetrics();
 
     for (const auto& macro : engineFacade.getMacroDescriptors())
         parameterState.addParameterListener(buildMacroParameterId(macro.id), this);
@@ -188,6 +220,47 @@ void Processor::setMacroValueFromShell(const std::string& macroId, double value)
     }
 }
 
+drs::app::AuthoringWaveformPreview Processor::getAuthoringWaveformPreview()
+{
+    const auto selectedZone = authoringSession.getSelectedZone();
+    if (!selectedZone.has_value())
+        return { false, "No zone selected" };
+
+    const auto projectSampleSource = findProjectSampleSource(authoringSession.getProject(), selectedZone->sampleSourceId);
+    if (!projectSampleSource.has_value())
+        return { false, "Selected zone sample source is missing from the project." };
+
+    if (const auto iterator = authoringWaveformPreviewCache.find(projectSampleSource->id);
+        iterator != authoringWaveformPreviewCache.end())
+    {
+        auto preview = iterator->second;
+        preview.loopEnabled = selectedZone->loopEnabled;
+        preview.loopStartFrame = selectedZone->loopStartFrame;
+        preview.loopEndFrame = selectedZone->loopEndFrame;
+        return preview;
+    }
+
+    const auto importResult = drs::engine::importSampleFile(projectSampleSource->path);
+    if (!importResult.imported)
+    {
+        drs::app::AuthoringWaveformPreview preview;
+        preview.state = importResult.state.empty() ? "Waveform preview unavailable" : importResult.state;
+        return preview;
+    }
+
+    auto preview = buildAuthoringWaveformPreview(importResult.sample,
+                                                 selectedZone->loopEnabled,
+                                                 selectedZone->loopStartFrame,
+                                                 selectedZone->loopEndFrame);
+    authoringWaveformPreviewCache.emplace(projectSampleSource->id, preview);
+    return preview;
+}
+
+drs::app::AuthoringImportResponsivenessSnapshot Processor::getAuthoringImportResponsivenessSnapshot() const
+{
+    return authoringImportResponsivenessSnapshot;
+}
+
 void Processor::queuePerformanceSurfaceNoteOn(int midiNoteNumber, float velocity)
 {
     auto message = juce::MidiMessage::noteOn(1,
@@ -261,6 +334,82 @@ void Processor::syncParametersFromEngine()
             parameter->setValueNotifyingHost(parameter->convertTo0to1(static_cast<float>(macro.currentValue)));
         }
     }
+}
+
+drs::app::AuthoringWaveformPreview Processor::buildAuthoringWaveformPreview(const drs::engine::ImportedSampleData& sample,
+                                                                            bool loopEnabled,
+                                                                            std::uint64_t loopStartFrame,
+                                                                            std::uint64_t loopEndFrame) const
+{
+    drs::app::AuthoringWaveformPreview preview;
+    preview.available = true;
+    preview.state = "Waveform preview ready";
+    preview.sourcePath = sample.metadata.sourcePath;
+    preview.formatName = sample.metadata.formatName;
+    preview.durationSeconds = sample.metadata.durationSeconds;
+    preview.sampleRate = sample.metadata.sampleRate;
+    preview.frameCount = sample.metadata.frameCount;
+    preview.channelCount = sample.metadata.channelCount;
+    preview.loopEnabled = loopEnabled;
+    preview.loopStartFrame = loopStartFrame;
+    preview.loopEndFrame = loopEndFrame;
+
+    if (sample.normalizedChannels.empty() || sample.normalizedChannels.front().empty())
+        return preview;
+
+    const auto& monoView = sample.normalizedChannels.front();
+    constexpr std::size_t pointCount = 192;
+    const auto bucketSize = std::max<std::size_t>(1, monoView.size() / pointCount);
+
+    preview.points.reserve(pointCount);
+    for (std::size_t index = 0; index < monoView.size(); index += bucketSize)
+    {
+        const auto bucketEnd = std::min(monoView.size(), index + bucketSize);
+        auto minValue = monoView[index];
+        auto maxValue = monoView[index];
+
+        for (std::size_t sampleIndex = index + 1; sampleIndex < bucketEnd; ++sampleIndex)
+        {
+            minValue = std::min(minValue, monoView[sampleIndex]);
+            maxValue = std::max(maxValue, monoView[sampleIndex]);
+        }
+
+        preview.points.push_back({ minValue, maxValue });
+    }
+
+    return preview;
+}
+
+void Processor::initializeAuthoringImportMetrics()
+{
+    const auto& project = authoringSession.getProject();
+    std::vector<std::string> samplePaths;
+    samplePaths.reserve(project.sampleSources.size());
+
+    for (const auto& sampleSource : project.sampleSources)
+        samplePaths.push_back(sampleSource.path);
+
+    auto queue = drs::engine::createAuthoringImportQueue(samplePaths, project.contentRootPath);
+    while (true)
+    {
+        const auto processResult = drs::engine::processNextAuthoringImportQueueItem(queue);
+        if (!processResult.processed)
+            break;
+    }
+
+    authoringImportResponsivenessSnapshot.available = true;
+    authoringImportResponsivenessSnapshot.state = queue.metrics.state;
+    authoringImportResponsivenessSnapshot.totalItemCount = queue.metrics.totalItemCount;
+    authoringImportResponsivenessSnapshot.pendingCount = queue.metrics.pendingCount;
+    authoringImportResponsivenessSnapshot.processedCount = queue.metrics.processedCount;
+    authoringImportResponsivenessSnapshot.warningItemCount = queue.metrics.warningItemCount;
+    authoringImportResponsivenessSnapshot.failedItemCount = queue.metrics.failedItemCount;
+    authoringImportResponsivenessSnapshot.canceledItemCount = queue.metrics.canceledItemCount;
+    authoringImportResponsivenessSnapshot.acceptedItemCount = queue.metrics.acceptedItemCount;
+    authoringImportResponsivenessSnapshot.lastProcessDurationMicros = queue.metrics.lastProcessDurationMicros;
+    authoringImportResponsivenessSnapshot.averageProcessDurationMicros = queue.metrics.averageProcessDurationMicros;
+    authoringImportResponsivenessSnapshot.maxProcessDurationMicros = queue.metrics.maxProcessDurationMicros;
+    authoringImportResponsivenessSnapshot.lastProcessedItemId = queue.metrics.lastProcessedItemId;
 }
 
 void Processor::initializeReferencePlaybackAssets()

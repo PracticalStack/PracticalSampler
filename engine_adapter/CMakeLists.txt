@@ -127,6 +127,7 @@ target_include_directories(drs_hise_frontend_bridge
 target_compile_features(drs_hise_frontend_bridge PUBLIC cxx_std_17)
 
 add_library(drs_engine_adapter STATIC
+    src/AuthoringSession.cpp
     src/EngineFacade.cpp
     src/HiseProjectContent.cpp
     src/Phase1Baseline.cpp
@@ -138,6 +139,7 @@ add_library(drs_engine_adapter STATIC
     src/RuntimeStreamingService.cpp
     src/RuntimeStream.cpp
     src/RuntimeVoice.cpp
+    include/drs/engine/AuthoringSession.h
     include/drs/engine/ProjectDocument.h
     include/drs/engine/RuntimePresetState.h
     include/drs/engine/RuntimeLoadProfile.h
@@ -175,6 +177,7 @@ set_target_properties(drs_hise_frontend_plugin_probe PROPERTIES
 )
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
+    src/AuthoringSession.cpp
     src/EngineFacade.cpp
     src/HiseFrontendBridge.cpp
     src/HiseFrontendPluginProbe.cpp
@@ -188,6 +191,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     src/RuntimeStream.cpp
     src/RuntimeVoice.cpp
     src/SampleImport.cpp
+    include/drs/engine/AuthoringSession.h
     include/drs/engine/EngineFacade.h
     include/drs/engine/Phase1Baseline.h
     include/drs/engine/HiseFrontendBridge.h
