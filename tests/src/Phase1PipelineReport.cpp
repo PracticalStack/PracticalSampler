@@ -1,3 +1,4 @@
+#include "drs/engine/EngineFacade.h"
 #include "drs/engine/RuntimeCompiler.h"
 #include "drs/engine/RuntimeLoadProfile.h"
 #include "drs/engine/RuntimeLoader.h"
@@ -5,14 +6,20 @@
 #include "drs/engine/RuntimeStreamingService.h"
 #include "drs/engine/RuntimeVoice.h"
 #include "drs/engine/SampleImport.h"
+#include "plugin/PluginProcessor.h"
+#include "standalone/MainComponent.h"
+
+#include <juce_audio_processors_headless/juce_audio_processors_headless.h>
 
 #include <json/json.hpp>
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -52,6 +59,46 @@ bool containsText(const std::vector<std::string>& messages, const std::string& n
                        {
                            return message.find(needle) != std::string::npos;
                        });
+}
+
+bool nearlyEqual(double actual, double expected, double tolerance = 0.0001)
+{
+    return std::abs(actual - expected) <= tolerance;
+}
+
+std::optional<double> findMacroValue(const drs::engine::EngineFacade& engineFacade, const std::string& macroId)
+{
+    for (const auto& macro : engineFacade.getMacroDescriptors())
+    {
+        if (macro.id == macroId)
+            return macro.currentValue;
+    }
+
+    return std::nullopt;
+}
+
+bool sessionMatchesLeadPerformance(const drs::engine::RuntimeSessionStateSnapshot& sessionState)
+{
+    if (sessionState.loadProfileId != "performance" || sessionState.selectedArticulationId != "lead")
+        return false;
+
+    const auto toneIterator = std::find_if(sessionState.macroValues.begin(),
+                                           sessionState.macroValues.end(),
+                                           [](const drs::engine::RuntimePresetMacroValue& macroValue)
+                                           {
+                                               return macroValue.id == "tone";
+                                           });
+    const auto motionIterator = std::find_if(sessionState.macroValues.begin(),
+                                             sessionState.macroValues.end(),
+                                             [](const drs::engine::RuntimePresetMacroValue& macroValue)
+                                             {
+                                                 return macroValue.id == "motion";
+                                             });
+
+    return toneIterator != sessionState.macroValues.end()
+        && motionIterator != sessionState.macroValues.end()
+        && nearlyEqual(toneIterator->value, 0.62)
+        && nearlyEqual(motionIterator->value, 0.78);
 }
 
 drs::engine::RuntimeStreamingServiceOptions makeStreamingOptions(
@@ -285,6 +332,8 @@ int main(int argc, char* argv[])
 
     try
     {
+        juce::ScopedJuceInitialiser_GUI gui;
+
         const auto referenceProject = drs::engine::loadPhase1ReferenceProjectManifest();
         const auto referenceInstrument = drs::engine::loadPhase1ReferenceInstrumentManifest();
 
@@ -701,6 +750,7 @@ int main(int argc, char* argv[])
         bool runtimeCountersAllocated = false;
         bool runtimeCountersWaited = false;
         bool runtimeCountersRecovered = false;
+        bool runtimeCountersPassed = false;
         std::string runtimeCountersErrorMessage;
 
         if (performanceProfile.has_value() && ecoProfile.has_value())
@@ -809,7 +859,7 @@ int main(int argc, char* argv[])
             runtimeCountersSection["residentPageCount"] = runtimeCounterMetrics.residentPageCount;
             runtimeCountersSection["errorMessage"] = runtimeCountersErrorMessage;
 
-            const bool runtimeCountersPassed = runtimeCountersAllocated
+            runtimeCountersPassed = runtimeCountersAllocated
                 && runtimeCountersWaited
                 && runtimeCountersRecovered
                 && runtimeCounterMetrics.pageMissCount >= 3
@@ -968,16 +1018,192 @@ int main(int argc, char* argv[])
             && malformedGeneratedRejected;
         report["corruptionChecks"] = std::move(corruptionSection);
 
-        const bool overallPassed = loaderPassed
+        const auto presetRoot = fs::path(drs::engine::getPhase1RuntimeRootPath()) / "preset-state";
+        const auto leadPresetPath = presetRoot / "reference" / "lead-performance-state.drpreset.json";
+        const auto negativePresetPath = presetRoot / "negative" / "transient-diagnostics-leak.drpreset.json";
+        const auto leadPresetJson = readTextFile(leadPresetPath);
+        const auto negativePresetJson = readTextFile(negativePresetPath);
+
+        ordered_json stateRecallSection;
+        bool standaloneFixtureRestored = false;
+        bool standaloneExportMatchesFixture = false;
+        bool standaloneReloadMatchesFixture = false;
+        bool pluginFixtureRestored = false;
+        bool pluginExportMatchesFixture = false;
+        bool pluginReloadMatchesFixture = false;
+        bool pluginParameterSurfaceMatchesMacros = false;
+        bool macroStateComparePassed = false;
+        bool invalidRestorePreservedLastGoodState = false;
+
+        drs::standalone::MainComponent standaloneSource;
+        const auto standaloneRestore = standaloneSource.restoreStateJson(leadPresetJson);
+        standaloneFixtureRestored = standaloneRestore.restored;
+
+        const auto standaloneExportedState = standaloneSource.exportStateJson();
+        standaloneExportMatchesFixture = standaloneExportedState == leadPresetJson;
+
+        drs::standalone::MainComponent standaloneReloaded;
+        standaloneReloadMatchesFixture = standaloneReloaded.restoreStateJson(standaloneExportedState).restored
+            && sessionMatchesLeadPerformance(standaloneReloaded.getEngineFacade().getCurrentSessionState());
+
+        drs::plugin::Processor sourceProcessor;
+        sourceProcessor.setStateInformation(leadPresetJson.data(), static_cast<int>(leadPresetJson.size()));
+        pluginFixtureRestored = sessionMatchesLeadPerformance(sourceProcessor.getEngineFacade().getCurrentSessionState());
+
+        juce::MemoryBlock pluginState;
+        sourceProcessor.getStateInformation(pluginState);
+        const auto pluginStateJson = std::string(static_cast<const char*>(pluginState.getData()), pluginState.getSize());
+        pluginExportMatchesFixture = pluginStateJson == leadPresetJson;
+
+        drs::plugin::Processor restoredProcessor;
+        restoredProcessor.setStateInformation(pluginState.getData(), static_cast<int>(pluginState.getSize()));
+        pluginReloadMatchesFixture = sessionMatchesLeadPerformance(restoredProcessor.getEngineFacade().getCurrentSessionState());
+
+        const auto restoredToneValue = findMacroValue(restoredProcessor.getEngineFacade(), "tone");
+        const auto restoredMotionValue = findMacroValue(restoredProcessor.getEngineFacade(), "motion");
+        auto* restoredToneParameter = dynamic_cast<juce::RangedAudioParameter*>(
+            restoredProcessor.getParameterState().getParameter("macro.tone"));
+        auto* restoredMotionParameter = dynamic_cast<juce::RangedAudioParameter*>(
+            restoredProcessor.getParameterState().getParameter("macro.motion"));
+
+        pluginParameterSurfaceMatchesMacros = restoredToneParameter != nullptr
+            && restoredMotionParameter != nullptr
+            && restoredProcessor.getParameterState().getRawParameterValue("macro.tone") != nullptr
+            && restoredProcessor.getParameterState().getRawParameterValue("macro.motion") != nullptr
+            && nearlyEqual(static_cast<double>(restoredProcessor.getParameterState().getRawParameterValue("macro.tone")->load()),
+                           0.62)
+            && nearlyEqual(static_cast<double>(restoredProcessor.getParameterState().getRawParameterValue("macro.motion")->load()),
+                           0.78);
+        macroStateComparePassed = restoredToneValue.has_value()
+            && restoredMotionValue.has_value()
+            && nearlyEqual(*restoredToneValue, 0.62)
+            && nearlyEqual(*restoredMotionValue, 0.78)
+            && pluginParameterSurfaceMatchesMacros;
+
+        const auto previousPluginState = restoredProcessor.getEngineFacade().exportPresetStateJson();
+        restoredProcessor.setStateInformation(negativePresetJson.data(), static_cast<int>(negativePresetJson.size()));
+        invalidRestorePreservedLastGoodState = restoredProcessor.getEngineFacade().exportPresetStateJson() == previousPluginState
+            && !restoredProcessor.getEngineFacade().getCurrentSessionState().transientMetrics.lastFailure.empty();
+
+        stateRecallSection["standaloneFixtureRestored"] = standaloneFixtureRestored;
+        stateRecallSection["standaloneExportMatchesFixture"] = standaloneExportMatchesFixture;
+        stateRecallSection["standaloneReloadMatchesFixture"] = standaloneReloadMatchesFixture;
+        stateRecallSection["pluginFixtureRestored"] = pluginFixtureRestored;
+        stateRecallSection["pluginExportMatchesFixture"] = pluginExportMatchesFixture;
+        stateRecallSection["pluginReloadMatchesFixture"] = pluginReloadMatchesFixture;
+        stateRecallSection["pluginParameterSurfaceMatchesMacros"] = pluginParameterSurfaceMatchesMacros;
+        stateRecallSection["macroStateComparePassed"] = macroStateComparePassed;
+        stateRecallSection["invalidRestorePreservedLastGoodState"] = invalidRestorePreservedLastGoodState;
+        const bool stateRecallPassed = standaloneFixtureRestored
+            && standaloneExportMatchesFixture
+            && standaloneReloadMatchesFixture
+            && pluginFixtureRestored
+            && pluginExportMatchesFixture
+            && pluginReloadMatchesFixture
+            && macroStateComparePassed
+            && invalidRestorePreservedLastGoodState;
+        stateRecallSection["passed"] = stateRecallPassed;
+        report["stateRecall"] = std::move(stateRecallSection);
+
+        ordered_json errorHandlingSection;
+        drs::engine::EngineFacade errorFacade;
+        const auto restoreLeadResult = errorFacade.restorePresetStateJson(leadPresetJson);
+        const bool baselineSessionLoaded = restoreLeadResult.restored
+            && sessionMatchesLeadPerformance(errorFacade.getCurrentSessionState());
+
+        const auto missingPackProbe = errorFacade.probeContentFailure(
+            drs::engine::EngineContentFailureCategory::missingContent);
+        const bool missingPackHandledGracefully = missingPackProbe.attempted
+            && missingPackProbe.failedGracefully
+            && containsText(missingPackProbe.issues, "Zone sample does not exist")
+            && sessionMatchesLeadPerformance(errorFacade.getCurrentSessionState());
+
+        const auto checksumProbe = errorFacade.probeContentFailure(
+            drs::engine::EngineContentFailureCategory::badChecksum);
+        const bool checksumHandledGracefully = checksumProbe.attempted
+            && checksumProbe.failedGracefully
+            && containsText(checksumProbe.issues, "checksum mismatch")
+            && sessionMatchesLeadPerformance(errorFacade.getCurrentSessionState());
+
+        const auto schemaProbe = errorFacade.probeContentFailure(
+            drs::engine::EngineContentFailureCategory::schemaMismatch);
+        const bool schemaHandledGracefully = schemaProbe.attempted
+            && schemaProbe.failedGracefully
+            && containsText(schemaProbe.issues, "schemaName")
+            && sessionMatchesLeadPerformance(errorFacade.getCurrentSessionState());
+
+        const auto partialProbe = errorFacade.probeContentFailure(
+            drs::engine::EngineContentFailureCategory::partialCompiledArtifact);
+        const bool partialArtifactHandledGracefully = partialProbe.attempted
+            && partialProbe.failedGracefully
+            && containsText(partialProbe.issues, "Compiled stream asset must exist")
+            && sessionMatchesLeadPerformance(errorFacade.getCurrentSessionState());
+
+        const auto diagnosticsAfterProbe = errorFacade.getDiagnosticsSnapshot();
+        const bool diagnosticsSurfacedFailure = diagnosticsAfterProbe.lastContentProbeCategory == "partial-compiled-artifact"
+            && diagnosticsAfterProbe.lastContentProbeFailedGracefully
+            && !diagnosticsAfterProbe.failureState.empty();
+
+        errorFacade.clearContentFailureProbe();
+        const auto diagnosticsAfterClear = errorFacade.getDiagnosticsSnapshot();
+        const bool clearedVisibleFailure = diagnosticsAfterClear.lastContentProbeCategory.empty()
+            && diagnosticsAfterClear.failureState.empty();
+
+        errorHandlingSection["baselineSessionLoaded"] = baselineSessionLoaded;
+        errorHandlingSection["missingPackHandledGracefully"] = missingPackHandledGracefully;
+        errorHandlingSection["checksumHandledGracefully"] = checksumHandledGracefully;
+        errorHandlingSection["schemaHandledGracefully"] = schemaHandledGracefully;
+        errorHandlingSection["partialArtifactHandledGracefully"] = partialArtifactHandledGracefully;
+        errorHandlingSection["diagnosticsSurfacedFailure"] = diagnosticsSurfacedFailure;
+        errorHandlingSection["clearedVisibleFailure"] = clearedVisibleFailure;
+        const bool errorHandlingPassed = baselineSessionLoaded
+            && missingPackHandledGracefully
+            && checksumHandledGracefully
+            && schemaHandledGracefully
+            && partialArtifactHandledGracefully
+            && diagnosticsSurfacedFailure
+            && clearedVisibleFailure
+            && report["corruptionChecks"].at("passed").get<bool>();
+        errorHandlingSection["passed"] = errorHandlingPassed;
+        report["errorHandling"] = std::move(errorHandlingSection);
+
+        const bool loadValidationPassed = loaderPassed
             && streamReaderPassed
-            && schedulerPassed
+            && importerPassed
+            && compilePassed;
+        const bool playValidationPassed = schedulerPassed
             && voicePassed
             && noteRoutingPassed
             && loadProfilePassed
-            && report["runtimeCounters"].at("passed").get<bool>()
-            && importerPassed
-            && compilePassed
-            && report["corruptionChecks"].at("passed").get<bool>();
+            && runtimeCountersPassed;
+
+        ordered_json nightlyValidationSection;
+        nightlyValidationSection["load"] = {
+            { "passed", loadValidationPassed },
+            { "sources", ordered_json::array({ "loader", "streamReader", "importer", "compilePath" }) }
+        };
+        nightlyValidationSection["play"] = {
+            { "passed", playValidationPassed },
+            { "sources", ordered_json::array({ "streamScheduler", "voiceRuntime", "noteRouting", "loadProfile", "runtimeCounters" }) }
+        };
+        nightlyValidationSection["stateRecall"] = {
+            { "passed", stateRecallPassed },
+            { "sources", ordered_json::array({ "stateRecall" }) }
+        };
+        nightlyValidationSection["errorHandling"] = {
+            { "passed", errorHandlingPassed },
+            { "sources", ordered_json::array({ "errorHandling", "corruptionChecks" }) }
+        };
+        nightlyValidationSection["passed"] = loadValidationPassed
+            && playValidationPassed
+            && stateRecallPassed
+            && errorHandlingPassed;
+        report["nightlyValidation"] = std::move(nightlyValidationSection);
+
+        const bool overallPassed = loadValidationPassed
+            && playValidationPassed
+            && stateRecallPassed
+            && errorHandlingPassed;
         report["passed"] = overallPassed;
         writeTextFile(outputPath, report.dump(2) + "\n");
         std::cout << report.dump(2) << std::endl;

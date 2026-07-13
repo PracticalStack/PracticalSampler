@@ -103,6 +103,26 @@ int main()
         require(containsIssue(malformedJsonResult, "JSON parse failed"),
                 "Malformed-json corrupt fixture must report a parse failure issue.");
 
+        const auto schemaMismatchManifest = getPhase1RuntimeRoot()
+            / "negative-corpus"
+            / "schema-mismatch"
+            / "schema-mismatch.drinst";
+        const auto schemaMismatchResult = drs::engine::loadRuntimeInstrumentManifest(schemaMismatchManifest.generic_string());
+
+        require(!schemaMismatchResult.loaded, "Schema-mismatch negative fixture should fail validation.");
+        require(containsIssue(schemaMismatchResult, "schemaName"),
+                "Schema-mismatch negative fixture must report the schema issue.");
+
+        const auto partialArtifactManifest = getPhase1RuntimeRoot()
+            / "negative-corpus"
+            / "partial-compiled-artifact"
+            / "partial-compiled-artifact.drinst";
+        const auto partialArtifactResult = drs::engine::loadRuntimeInstrumentManifest(partialArtifactManifest.generic_string());
+
+        require(!partialArtifactResult.loaded, "Partial-artifact negative fixture should fail validation.");
+        require(containsIssue(partialArtifactResult, "Compiled stream asset must exist"),
+                "Partial-artifact negative fixture must report the missing compiled stream asset.");
+
         const auto corpusIndexPath = fs::path(drs::engine::getPhase1ReferenceCorpusIndexPath());
         require(fs::exists(corpusIndexPath), "Reference corpus index must exist.");
 
@@ -113,6 +133,10 @@ int main()
                 "Reference corpus index must list the missing-sample negative fixture.");
         require(corpusIndexText.find("\"corrupt-malformed-json\"") != std::string::npos,
                 "Reference corpus index must list the malformed-json corrupt fixture.");
+        require(corpusIndexText.find("\"negative-schema-mismatch\"") != std::string::npos,
+                "Reference corpus index must list the schema-mismatch negative fixture.");
+        require(corpusIndexText.find("\"negative-partial-compiled-artifact\"") != std::string::npos,
+                "Reference corpus index must list the partial-artifact negative fixture.");
 
         const auto baselinePath = fs::path(drs::engine::getPhase1ReferenceBaselinePath());
         require(fs::exists(baselinePath), "Checked-in Phase 1 baseline snapshot must exist.");

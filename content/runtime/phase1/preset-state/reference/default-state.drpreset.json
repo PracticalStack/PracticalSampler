@@ -1,0 +1,24 @@
+{
+  "schemaName": "drs.presetState",
+  "schemaVersion": 1,
+  "presetId": "drs.phase1.tiny-open-instrument.default",
+  "targetInstrumentId": "drs.phase1.tiny-open-instrument",
+  "targetInstrumentSchemaName": "drs.instrument",
+  "targetInstrumentSchemaVersion": 1,
+  "loadProfileId": "balanced",
+  "selectedArticulationId": "sustain",
+  "macroValues": [
+    {
+      "id": "tone",
+      "value": 0.35
+    },
+    {
+      "id": "motion",
+      "value": 0.15
+    }
+  ],
+  "notes": [
+    "Sprint 4 default preset-state fixture for the Phase 1 reference instrument.",
+    "Only user-facing runtime choices belong here; content manifests, stream graphs, and diagnostics stay outside the payload."
+  ]
+}

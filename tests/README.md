@@ -9,9 +9,14 @@ Current baseline:
 - `drs_phase0_smoke_tests` exercises the product-owned engine facade and content resolver.
 - The same executable instantiates the standalone shell component and plugin editor shell without launching the full app.
 - `drs_phase1_runtime_contract_tests` validates the product-owned `.drinst` fixture contract plus negative fixtures.
+- `drs_phase1_preset_state_tests` validates the Sprint 4 preset-state contract, golden recall fixtures, and rejection of leaked transient diagnostics.
+- `drs_phase1_state_recall_tests` exercises standalone and plugin save/reload round-trips plus rejection of invalid restore payloads.
+- `drs_phase1_diagnostics_tests` validates the Sprint 4 diagnostics snapshot, load-profile budget exposure, purge counters, and visible failure-state reporting.
+- `drs_phase1_failure_handling_tests` validates graceful reporting for missing content, bad checksums, schema mismatch, and partially compiled artifacts while preserving the last known-good session state.
+- `drs_phase1_macro_bridge_tests` validates standalone macro edits, plugin host-facing macro parameters, and macro persistence across save/reload.
 - `drs_phase1_sample_import_tests` generates paired WAV and FLAC fixtures, imports them through the product-owned decoder seam, and checks normalized metadata plus failure reporting.
 - `drs_phase1_compile_path_tests` imports the real reference WAV sources, compiles deterministic runtime artifacts in a temp directory, confirms the Sprint 1 loader can open the generated manifests, and rejects unsupported compile-policy inputs loudly.
-- `drs_phase1_pipeline_report` writes a single JSON report for the reference corpus covering loader, stream-reader, streaming-service, voice-runtime, note-routing, load-profile, runtime-counters, importer, compile-determinism, golden-file-parity, and corruption-check status.
+- `drs_phase1_pipeline_report` writes a single JSON report for the reference corpus covering loader, stream-reader, streaming-service, voice-runtime, note-routing, load-profile, runtime-counters, importer, compile-determinism, golden-file-parity, state-recall, macro-state compare, and error-handling status, plus a nightly summary block for load, play, state recall, and error handling.
 - `drs_phase1_stream_reader_tests` loads the checked-in `.drstrm` artifact, verifies prefetch and page lookup math, and fails cleanly on checksum or offset corruption.
 - `drs_phase1_streaming_service_tests` exercises the background page-read scheduler, cache hits, in-flight request coalescing, lease release, and cache-budget eviction behavior.
 - `drs_phase1_voice_runtime_tests` exercises voice allocation, macro snapshots, wait-at-page-boundary behavior, polyphony cleanup, and stale-lease prevention.

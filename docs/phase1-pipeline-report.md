@@ -18,6 +18,10 @@ The report currently covers:
 - importer status for each reference sample source
 - compile-path status for deterministic generation, golden-file parity, and temp-directory reload
 - corruption checks for known negative fixtures plus generated-artifact tampering
+- state-recall status for standalone export/reload, plugin host-state export/reload, and invalid restore preservation
+- macro-state compare status for runtime macro values versus host-facing `macro.*` plugin parameters
+- error-handling status for missing-pack/content, checksum, schema, and partial-artifact probes
+- a nightly validation summary block with separate pass/fail signals for `load`, `play`, `stateRecall`, and `errorHandling`
 
 ## Output
 
@@ -27,9 +31,12 @@ When run through CTest, the executable writes:
 
 in the active test build directory.
 
-The JSON structure is intentionally simple and reviewable in CI logs. It includes a top-level `passed` flag plus per-section pass states so the team can see whether a regression came from:
+The JSON structure is intentionally simple and reviewable in CI logs. It includes a top-level `passed` flag, per-section pass states, and a `nightlyValidation` summary so the team can see whether a regression came from:
 
 - loader behavior
+- playback/runtime behavior
+- state recall or macro bridging
+- error handling
 - importer policy
 - compile determinism
 - corruption handling
@@ -45,3 +52,9 @@ With the load-profile slice in place, the same report now also answers whether t
 With the note-routing slice in place, it also records which zones the reference instrument selected for low/high default and lead triggers so routing regressions are visible before a larger playback corpus lands.
 
 With the runtime-counter slice in place, the same report now also captures one benchmark-style observability pass so the team can see whether misses, head usage, read latency, voice count, and purge activity are all moving in the expected direction.
+
+With the Sprint 4 regression-automation slice in place, the same report now also answers whether:
+
+- save and reload still work through the real standalone and plugin shell seams
+- the host-facing macro surface still matches the restored runtime macro state
+- missing-pack/content and other planned failure paths still fail gracefully without discarding the last known-good session

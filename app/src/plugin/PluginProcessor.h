@@ -6,10 +6,12 @@
 
 namespace drs::plugin
 {
-class Processor final : public juce::AudioProcessor
+class Processor final : public juce::AudioProcessor,
+                        private juce::AudioProcessorValueTreeState::Listener
 {
 public:
     Processor();
+    ~Processor() override;
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
@@ -35,8 +37,21 @@ public:
     void setStateInformation(const void*, int) override;
 
     drs::engine::EngineFacade& getEngineFacade() { return engineFacade; }
+    const drs::engine::EngineFacade& getEngineFacade() const { return engineFacade; }
+    juce::AudioProcessorValueTreeState& getParameterState() { return parameterState; }
+    const juce::AudioProcessorValueTreeState& getParameterState() const { return parameterState; }
+    void setMacroValueFromShell(const std::string& macroId, double value);
 
 private:
+    static juce::String buildMacroParameterId(const std::string& macroId);
+    static juce::AudioProcessorValueTreeState::ParameterLayout buildParameterLayout(
+        const drs::engine::EngineFacade& engineFacade);
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
+    void syncEngineFromParameters();
+    void syncParametersFromEngine();
+
     drs::engine::EngineFacade engineFacade;
+    juce::AudioProcessorValueTreeState parameterState;
+    bool isSynchronizingParameterState = false;
 };
 } // namespace drs::plugin

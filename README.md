@@ -101,3 +101,20 @@ Sprint 2 import-pipeline work has now started in the same seam:
 - `tests/src/Phase1StreamingServiceTests.cpp`
 - `tests/src/Phase1StreamReaderTests.cpp`
 - `tests/src/Phase1VoiceRuntimeTests.cpp`
+
+Sprint 4 state-recall work has now started in the same seam:
+
+- `engine_adapter/include/drs/engine/RuntimePresetState.h`
+- `engine_adapter/src/RuntimePresetState.cpp`
+- `content/runtime/phase1/preset-state/`
+- `docs/phase1-diagnostics.md`
+- `docs/phase1-failure-handling.md`
+- `docs/phase1-macro-bridge.md`
+- `docs/phase1-preset-state.md`
+- `docs/phase1-regression-automation.md`
+- `docs/phase1-state-recall.md`
+- `tests/src/Phase1DiagnosticsTests.cpp`
+- `tests/src/Phase1FailureHandlingTests.cpp`
+- `tests/src/Phase1MacroBridgeTests.cpp`
+- `tests/src/Phase1PresetStateTests.cpp`
+- `tests/src/Phase1StateRecallTests.cpp`

@@ -71,6 +71,28 @@
       "notes": [
         "Contract test fixture for parse-failure handling on malformed JSON manifests."
       ]
+    },
+    {
+      "id": "negative-schema-mismatch",
+      "tier": "negative",
+      "status": "ready",
+      "projectPath": "../../reference-corpus/tiny-open-instrument/tiny-open-instrument.drsproj",
+      "instrumentManifestPath": "../negative-corpus/schema-mismatch/schema-mismatch.drinst",
+      "streamAssetPath": "../../reference-corpus/tiny-open-instrument/tiny-open-instrument.drstrm",
+      "notes": [
+        "Contract test fixture for unsupported manifest schema handling."
+      ]
+    },
+    {
+      "id": "negative-partial-compiled-artifact",
+      "tier": "negative",
+      "status": "ready",
+      "projectPath": "../../reference-corpus/tiny-open-instrument/tiny-open-instrument.drsproj",
+      "instrumentManifestPath": "../negative-corpus/partial-compiled-artifact/partial-compiled-artifact.drinst",
+      "streamAssetPath": "../negative-corpus/partial-compiled-artifact/partial-compiled-artifact.drstrm",
+      "notes": [
+        "Contract test fixture for missing compiled stream artifacts after a partial emit."
+      ]
     }
   ]
 }

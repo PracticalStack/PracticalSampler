@@ -64,10 +64,17 @@ int main()
 
         require(!statusSnapshot.mode.empty(), "Engine snapshot mode must not be empty.");
         require(!statusSnapshot.integrationState.empty(), "Engine snapshot integration state must not be empty.");
+        require(statusSnapshot.diagnostics.available, "Engine snapshot diagnostics must be available.");
+        require(statusSnapshot.diagnostics.pageMissCount >= 3,
+                "Engine snapshot diagnostics should expose streamed page misses.");
+        require(statusSnapshot.diagnostics.dormantPurgeCount >= 1,
+                "Engine snapshot diagnostics should expose dormant purge activity.");
         require(statusSnapshot.detail.find("Repo HISE content root:") != std::string::npos,
                 "Engine snapshot detail must describe the product-owned HISE content seam.");
         require(statusSnapshot.detail.find("Phase 1 runtime bootstrap:") != std::string::npos,
                 "Engine snapshot detail must describe the Phase 1 runtime bootstrap seam.");
+        require(statusSnapshot.detail.find("Runtime diagnostics:") != std::string::npos,
+                "Engine snapshot detail must describe the runtime diagnostics surface.");
         require(!statusSnapshot.nextSteps.empty(), "Engine snapshot must expose at least one Phase 0 next step.");
 
         const auto runtimeManifest = engineFacade.loadPhase1ReferenceInstrument();

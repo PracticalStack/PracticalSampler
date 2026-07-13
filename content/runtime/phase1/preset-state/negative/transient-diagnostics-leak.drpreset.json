@@ -1,0 +1,30 @@
+{
+  "schemaName": "drs.presetState",
+  "schemaVersion": 1,
+  "presetId": "drs.phase1.tiny-open-instrument.invalid-diagnostics-leak",
+  "targetInstrumentId": "drs.phase1.tiny-open-instrument",
+  "targetInstrumentSchemaName": "drs.instrument",
+  "targetInstrumentSchemaVersion": 1,
+  "loadProfileId": "performance",
+  "selectedArticulationId": "lead",
+  "macroValues": [
+    {
+      "id": "tone",
+      "value": 0.62
+    },
+    {
+      "id": "motion",
+      "value": 0.78
+    }
+  ],
+  "compiledStreamAssetPath": "tiny-open-instrument.drstrm",
+  "streamingMetrics": {
+    "pageMissCount": 4,
+    "cachedPageCount": 2
+  },
+  "lastFailure": "Page miss recovered",
+  "notes": [
+    "Negative fixture that intentionally leaks project-content and transient-runtime fields.",
+    "The parser must reject these fields so CI catches silent scope creep in the preset payload."
+  ]
+}

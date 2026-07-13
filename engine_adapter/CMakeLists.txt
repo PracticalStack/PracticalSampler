@@ -133,9 +133,11 @@ add_library(drs_engine_adapter STATIC
     src/RuntimeCompiler.cpp
     src/RuntimeLoadProfile.cpp
     src/RuntimeLoader.cpp
+    src/RuntimePresetState.cpp
     src/RuntimeStreamingService.cpp
     src/RuntimeStream.cpp
     src/RuntimeVoice.cpp
+    include/drs/engine/RuntimePresetState.h
     include/drs/engine/RuntimeLoadProfile.h
 )
 
@@ -178,6 +180,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     src/Phase1Baseline.cpp
     src/RuntimeCompiler.cpp
     src/RuntimeLoader.cpp
+    src/RuntimePresetState.cpp
     src/RuntimeStreamingService.cpp
     src/RuntimeStream.cpp
     src/RuntimeVoice.cpp
@@ -189,6 +192,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     include/drs/engine/RuntimeCompiler.h
     include/drs/engine/RuntimeLoadProfile.h
     include/drs/engine/RuntimeLoader.h
+    include/drs/engine/RuntimePresetState.h
     include/drs/engine/RuntimeModel.h
     include/drs/engine/RuntimeStreamingService.h
     include/drs/engine/RuntimeStream.h

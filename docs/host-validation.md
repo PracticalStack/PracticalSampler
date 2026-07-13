@@ -56,3 +56,15 @@ The Phase 0 smoke test now does all of the following:
 - verifies the plugin description resolves as `Decent Rhapsody Studio`
 
 If Reaper still does not discover the plugin after installation or scan-path correction, the next useful artifact is Reaper's scan result for this bundle.
+
+## Sprint 4 diagnostics spot-check
+
+Once the plugin or standalone shell opens, the Status panel should now also expose a developer diagnostics block.
+
+The minimum Sprint 4 spot-check is:
+
+- verify the panel shows a load profile, cache budget, and non-zero page-miss count
+- verify `Load Lead Fixture` switches the panel to the performance profile
+- verify `Inject Invalid State` surfaces a visible failure state without silently overwriting the prior valid session
+- verify `Probe Missing`, `Probe Checksum`, `Probe Schema`, and `Probe Partial` each surface a visible content failure while preserving the prior valid session
+- verify moving the macro sliders changes the visible macro values and, in a host, appears as `macro.*` automation parameters

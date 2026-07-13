@@ -14,6 +14,12 @@ public:
 
     void resized() override;
 
+    std::string exportStateJson() const;
+    drs::engine::EnginePresetStateRestoreResult restoreStateJson(const std::string& stateJson);
+    bool setMacroValue(const std::string& macroId, double value);
+    drs::engine::EngineFacade& getEngineFacade() { return engineFacade; }
+    const drs::engine::EngineFacade& getEngineFacade() const { return engineFacade; }
+
 private:
     drs::engine::EngineFacade engineFacade;
     drs::app::StatusPanel statusPanel;

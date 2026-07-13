@@ -61,6 +61,140 @@ add_test(
     COMMAND drs_phase1_runtime_contract_tests
 )
 
+juce_add_console_app(drs_phase1_preset_state_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Preset State Tests"
+)
+
+target_sources(drs_phase1_preset_state_tests
+    PRIVATE
+        src/Phase1PresetStateTests.cpp
+)
+
+target_link_libraries(drs_phase1_preset_state_tests
+    PRIVATE
+        drs_engine_adapter
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase1_preset_state_tests PRIVATE cxx_std_17)
+
+target_include_directories(drs_phase1_preset_state_tests
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
+)
+
+add_test(
+    NAME drs.phase1.preset_state
+    COMMAND drs_phase1_preset_state_tests
+)
+
+juce_add_console_app(drs_phase1_state_recall_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 State Recall Tests"
+)
+
+target_sources(drs_phase1_state_recall_tests
+    PRIVATE
+        src/Phase1StateRecallTests.cpp
+)
+
+target_link_libraries(drs_phase1_state_recall_tests
+    PRIVATE
+        drs_plugin_shell
+        drs_standalone_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase1_state_recall_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase1.state_recall
+    COMMAND drs_phase1_state_recall_tests
+)
+
+juce_add_console_app(drs_phase1_diagnostics_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Diagnostics Tests"
+)
+
+target_sources(drs_phase1_diagnostics_tests
+    PRIVATE
+        src/Phase1DiagnosticsTests.cpp
+)
+
+target_link_libraries(drs_phase1_diagnostics_tests
+    PRIVATE
+        drs_engine_adapter
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase1_diagnostics_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase1.diagnostics
+    COMMAND drs_phase1_diagnostics_tests
+)
+
+juce_add_console_app(drs_phase1_failure_handling_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Failure Handling Tests"
+)
+
+target_sources(drs_phase1_failure_handling_tests
+    PRIVATE
+        src/Phase1FailureHandlingTests.cpp
+)
+
+target_link_libraries(drs_phase1_failure_handling_tests
+    PRIVATE
+        drs_engine_adapter
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase1_failure_handling_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase1.failure_handling
+    COMMAND drs_phase1_failure_handling_tests
+)
+
+juce_add_console_app(drs_phase1_macro_bridge_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Macro Bridge Tests"
+)
+
+target_sources(drs_phase1_macro_bridge_tests
+    PRIVATE
+        src/Phase1MacroBridgeTests.cpp
+)
+
+target_link_libraries(drs_phase1_macro_bridge_tests
+    PRIVATE
+        drs_plugin_shell
+        drs_standalone_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase1_macro_bridge_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase1.macro_bridge
+    COMMAND drs_phase1_macro_bridge_tests
+)
+
 juce_add_console_app(drs_phase1_runtime_baseline_report
     PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Runtime Baseline Report"
 )
@@ -164,7 +298,10 @@ target_sources(drs_phase1_pipeline_report
 target_link_libraries(drs_phase1_pipeline_report
     PRIVATE
         drs_engine_adapter
+        drs_plugin_shell
+        drs_standalone_shell
         juce::juce_audio_formats
+        juce::juce_audio_processors_headless
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
@@ -433,6 +570,26 @@ set_target_properties(drs_phase0_smoke_tests PROPERTIES
 )
 
 set_target_properties(drs_phase1_runtime_contract_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_phase1_preset_state_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_phase1_state_recall_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_phase1_diagnostics_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_phase1_failure_handling_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_phase1_macro_bridge_tests PROPERTIES
     FOLDER "Tests"
 )
 
