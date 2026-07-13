@@ -45,11 +45,28 @@ public:
 
     std::vector<AuthoringZoneSummary> getZoneSummaries() const;
     std::optional<RuntimeProjectZoneDefinition> getSelectedZone() const;
+    std::optional<RuntimeProjectPerformanceBankDefinition> getSelectedPerformanceBank() const;
     AuthoringZonePreviewRequest buildSelectedZonePreviewRequest() const;
 
     RuntimeProjectDocumentActionResult selectZone(const std::string& zoneId);
+    RuntimeProjectDocumentActionResult selectPerformanceBank(const std::string& performanceBankId);
     RuntimeProjectDocumentActionResult updateSelectedZone(const RuntimeProjectZoneDefinition& zone,
                                                           const std::string& label);
+    RuntimeProjectDocumentActionResult updateMacro(std::size_t macroIndex,
+                                                   const RuntimeProjectMacroDefinition& macro,
+                                                   const std::string& label);
+    RuntimeProjectDocumentActionResult moveMacro(std::size_t macroIndex,
+                                                 int direction,
+                                                 const std::string& label);
+    RuntimeProjectDocumentActionResult updateFxSlot(std::size_t fxSlotIndex,
+                                                    const RuntimeProjectFxSlotDefinition& fxSlot,
+                                                    const std::string& label);
+    RuntimeProjectDocumentActionResult updateRoutingBus(std::size_t routingBusIndex,
+                                                        const RuntimeProjectRoutingBusDefinition& routingBus,
+                                                        const std::string& label);
+    RuntimeProjectDocumentActionResult updatePerformanceBank(std::size_t performanceBankIndex,
+                                                             const RuntimeProjectPerformanceBankDefinition& performanceBank,
+                                                             const std::string& label);
     RuntimeProjectDocumentActionResult undo();
     RuntimeProjectDocumentActionResult redo();
     void markSaved();

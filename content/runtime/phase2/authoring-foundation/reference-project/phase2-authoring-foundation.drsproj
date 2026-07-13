@@ -149,7 +149,9 @@
             "id": "slot-1",
             "displayName": "Phrase Trigger",
             "triggerEvent": "phrase-trigger",
-            "targetArticulationId": "lead"
+            "targetArticulationId": "lead",
+            "phraseAssetId": "writer-bank-c-major",
+            "chordMode": "follow-root"
           },
           {
             "id": "slot-2",
@@ -158,9 +160,47 @@
             "targetArticulationId": "sustain"
           }
         ],
+        "phraseAssets": [
+          {
+            "id": "writer-bank-c-major",
+            "displayName": "Writer Bank C Major",
+            "sourcePath": "generated://phase2/reference/writer-bank-c-major.mid",
+            "ticksPerQuarter": 960,
+            "lengthBeats": 2.0,
+            "chordHint": "C major",
+            "normalizationState": "Reference phrase asset placeholder for Sprint 6",
+            "issues": [],
+            "notes": [
+              {
+                "midiNote": 60,
+                "velocity": 96,
+                "startBeat": 0.0,
+                "durationBeats": 0.5
+              },
+              {
+                "midiNote": 64,
+                "velocity": 96,
+                "startBeat": 0.5,
+                "durationBeats": 0.5
+              },
+              {
+                "midiNote": 67,
+                "velocity": 96,
+                "startBeat": 1.0,
+                "durationBeats": 0.5
+              },
+              {
+                "midiNote": 72,
+                "velocity": 100,
+                "startBeat": 1.5,
+                "durationBeats": 0.5
+              }
+            ]
+          }
+        ],
         "notes": [
-          "Placeholder performance bank for Sprint 1 persistence coverage.",
-          "Phase 2 Sprint 6 will replace this placeholder with real phrase import and trigger-slot editing."
+          "Performance bank upgraded in Sprint 6 with a real phrase asset and explicit trigger-slot wiring.",
+          "Phrase-trigger slots now persist phrase imports, chord-follow rules, and trigger-slot editing state."
         ]
       }
     ],

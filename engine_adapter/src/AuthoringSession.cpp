@@ -6,6 +6,17 @@ namespace drs::engine
 {
 namespace
 {
+RuntimeProjectDocumentActionResult makeRejectedResult(const RuntimeProjectDocumentState& documentState,
+                                                      const std::string& state,
+                                                      const std::string& issue)
+{
+    RuntimeProjectDocumentActionResult result;
+    result.state = state;
+    result.issues.push_back(issue);
+    result.documentState = documentState;
+    return result;
+}
+
 std::vector<AuthoringZoneSummary> buildZoneSummaries(const RuntimeProjectModel& project)
 {
     std::vector<AuthoringZoneSummary> summaries;
@@ -46,6 +57,20 @@ std::optional<std::size_t> findSelectedZoneIndex(const RuntimeProjectModel& proj
 
     return static_cast<std::size_t>(std::distance(project.authoring.zones.begin(), iterator));
 }
+
+std::optional<std::size_t> findSelectedPerformanceBankIndex(const RuntimeProjectModel& project)
+{
+    const auto iterator = std::find_if(project.authoring.performanceBanks.begin(),
+                                       project.authoring.performanceBanks.end(),
+                                       [&](const RuntimeProjectPerformanceBankDefinition& performanceBank)
+                                       {
+                                           return performanceBank.id == project.authoring.selectedPerformanceBankId;
+                                       });
+    if (iterator == project.authoring.performanceBanks.end())
+        return std::nullopt;
+
+    return static_cast<std::size_t>(std::distance(project.authoring.performanceBanks.begin(), iterator));
+}
 } // namespace
 
 AuthoringSession::AuthoringSession(RuntimeProjectModel project)
@@ -77,6 +102,15 @@ std::optional<RuntimeProjectZoneDefinition> AuthoringSession::getSelectedZone() 
     return getProject().authoring.zones[*selectedZoneIndex];
 }
 
+std::optional<RuntimeProjectPerformanceBankDefinition> AuthoringSession::getSelectedPerformanceBank() const
+{
+    const auto selectedPerformanceBankIndex = findSelectedPerformanceBankIndex(getProject());
+    if (!selectedPerformanceBankIndex.has_value())
+        return std::nullopt;
+
+    return getProject().authoring.performanceBanks[*selectedPerformanceBankIndex];
+}
+
 AuthoringZonePreviewRequest AuthoringSession::buildSelectedZonePreviewRequest() const
 {
     AuthoringZonePreviewRequest request;
@@ -106,16 +140,32 @@ RuntimeProjectDocumentActionResult AuthoringSession::selectZone(const std::strin
                                            return zone.id == zoneId;
                                        });
     if (iterator == project.authoring.zones.end())
-    {
-        RuntimeProjectDocumentActionResult result;
-        result.state = "Zone selection rejected";
-        result.issues.push_back("Zone '" + zoneId + "' does not exist in the current authoring project.");
-        result.documentState = getDocumentState();
-        return result;
-    }
+        return makeRejectedResult(getDocumentState(),
+                                  "Zone selection rejected",
+                                  "Zone '" + zoneId + "' does not exist in the current authoring project.");
 
     project.authoring.selectedZoneId = zoneId;
     return documentController.commitSnapshot(project, "Select zone", {"authoring.selectedZoneId"});
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::selectPerformanceBank(const std::string& performanceBankId)
+{
+    auto project = getProject();
+    const auto iterator = std::find_if(project.authoring.performanceBanks.begin(),
+                                       project.authoring.performanceBanks.end(),
+                                       [&](const RuntimeProjectPerformanceBankDefinition& performanceBank)
+                                       {
+                                           return performanceBank.id == performanceBankId;
+                                       });
+    if (iterator == project.authoring.performanceBanks.end())
+        return makeRejectedResult(getDocumentState(),
+                                  "Performance-bank selection rejected",
+                                  "Performance bank '" + performanceBankId + "' does not exist in the current authoring project.");
+
+    project.authoring.selectedPerformanceBankId = performanceBankId;
+    return documentController.commitSnapshot(project,
+                                             "Select performance bank",
+                                             {"authoring.selectedPerformanceBankId"});
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::updateSelectedZone(const RuntimeProjectZoneDefinition& zone,
@@ -123,13 +173,9 @@ RuntimeProjectDocumentActionResult AuthoringSession::updateSelectedZone(const Ru
 {
     const auto selectedZoneIndex = findSelectedZoneIndex(getProject());
     if (!selectedZoneIndex.has_value())
-    {
-        RuntimeProjectDocumentActionResult result;
-        result.state = "Zone edit rejected";
-        result.issues.push_back("No zone is currently selected for editing.");
-        result.documentState = getDocumentState();
-        return result;
-    }
+        return makeRejectedResult(getDocumentState(),
+                                  "Zone edit rejected",
+                                  "No zone is currently selected for editing.");
 
     auto project = getProject();
     project.authoring.zones[*selectedZoneIndex] = zone;
@@ -140,6 +186,110 @@ RuntimeProjectDocumentActionResult AuthoringSession::updateSelectedZone(const Ru
                                              {
                                                  "authoring.zones[" + std::to_string(*selectedZoneIndex) + "]",
                                                  "authoring.selectedZoneId"
+                                             });
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::updateMacro(std::size_t macroIndex,
+                                                                 const RuntimeProjectMacroDefinition& macro,
+                                                                 const std::string& label)
+{
+    if (macroIndex >= getProject().authoring.macros.size())
+        return makeRejectedResult(getDocumentState(),
+                                  "Macro edit rejected",
+                                  "Macro index " + std::to_string(macroIndex) + " is out of range.");
+
+    auto project = getProject();
+    project.authoring.macros[macroIndex] = macro;
+    return documentController.commitSnapshot(project,
+                                             label,
+                                             {"authoring.macros[" + std::to_string(macroIndex) + "]"});
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::moveMacro(std::size_t macroIndex,
+                                                               int direction,
+                                                               const std::string& label)
+{
+    if (macroIndex >= getProject().authoring.macros.size())
+        return makeRejectedResult(getDocumentState(),
+                                  "Macro reorder rejected",
+                                  "Macro index " + std::to_string(macroIndex) + " is out of range.");
+
+    if (direction != -1 && direction != 1)
+        return makeRejectedResult(getDocumentState(),
+                                  "Macro reorder rejected",
+                                  "Macro reordering only supports directions of -1 or 1.");
+
+    const auto targetIndexSigned = static_cast<int>(macroIndex) + direction;
+    if (targetIndexSigned < 0
+        || targetIndexSigned >= static_cast<int>(getProject().authoring.macros.size()))
+    {
+        return makeRejectedResult(getDocumentState(),
+                                  "Macro reorder rejected",
+                                  "Macro cannot move beyond the current authoring surface bounds.");
+    }
+
+    auto project = getProject();
+    const auto targetIndex = static_cast<std::size_t>(targetIndexSigned);
+    std::swap(project.authoring.macros[macroIndex], project.authoring.macros[targetIndex]);
+
+    return documentController.commitSnapshot(project,
+                                             label,
+                                             {
+                                                 "authoring.macros[" + std::to_string(macroIndex) + "]",
+                                                 "authoring.macros[" + std::to_string(targetIndex) + "]"
+                                             });
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::updateFxSlot(std::size_t fxSlotIndex,
+                                                                  const RuntimeProjectFxSlotDefinition& fxSlot,
+                                                                  const std::string& label)
+{
+    if (fxSlotIndex >= getProject().authoring.fxSlots.size())
+        return makeRejectedResult(getDocumentState(),
+                                  "FX slot edit rejected",
+                                  "FX slot index " + std::to_string(fxSlotIndex) + " is out of range.");
+
+    auto project = getProject();
+    project.authoring.fxSlots[fxSlotIndex] = fxSlot;
+    return documentController.commitSnapshot(project,
+                                             label,
+                                             {"authoring.fxSlots[" + std::to_string(fxSlotIndex) + "]"});
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::updateRoutingBus(std::size_t routingBusIndex,
+                                                                      const RuntimeProjectRoutingBusDefinition& routingBus,
+                                                                      const std::string& label)
+{
+    if (routingBusIndex >= getProject().authoring.routingBuses.size())
+        return makeRejectedResult(getDocumentState(),
+                                  "Routing edit rejected",
+                                  "Routing bus index " + std::to_string(routingBusIndex) + " is out of range.");
+
+    auto project = getProject();
+    project.authoring.routingBuses[routingBusIndex] = routingBus;
+    return documentController.commitSnapshot(project,
+                                             label,
+                                             {"authoring.routingBuses[" + std::to_string(routingBusIndex) + "]"});
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::updatePerformanceBank(
+    std::size_t performanceBankIndex,
+    const RuntimeProjectPerformanceBankDefinition& performanceBank,
+    const std::string& label)
+{
+    if (performanceBankIndex >= getProject().authoring.performanceBanks.size())
+        return makeRejectedResult(getDocumentState(),
+                                  "Performance-bank edit rejected",
+                                  "Performance bank index " + std::to_string(performanceBankIndex) + " is out of range.");
+
+    auto project = getProject();
+    project.authoring.performanceBanks[performanceBankIndex] = performanceBank;
+    project.authoring.selectedPerformanceBankId = performanceBank.id;
+    return documentController.commitSnapshot(project,
+                                             label,
+                                             {
+                                                 "authoring.performanceBanks[" + std::to_string(performanceBankIndex) + "]",
+                                                 "authoring.selectedPerformanceBankId"
                                              });
 }
 

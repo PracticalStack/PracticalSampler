@@ -367,7 +367,50 @@ ordered_json serializeTriggerSlots(const std::vector<RuntimeProjectTriggerSlotDe
         slotObject["displayName"] = slot.displayName;
         slotObject["triggerEvent"] = slot.triggerEvent;
         slotObject["targetArticulationId"] = slot.targetArticulationId;
+        if (!slot.phraseAssetId.empty())
+            slotObject["phraseAssetId"] = slot.phraseAssetId;
+        if (!slot.chordMode.empty())
+            slotObject["chordMode"] = slot.chordMode;
         array.push_back(std::move(slotObject));
+    }
+
+    return array;
+}
+
+ordered_json serializePhraseNotes(const std::vector<RuntimeProjectPhraseNoteDefinition>& notes)
+{
+    ordered_json array = ordered_json::array();
+
+    for (const auto& note : notes)
+    {
+        ordered_json noteObject;
+        noteObject["midiNote"] = note.midiNote;
+        noteObject["velocity"] = note.velocity;
+        noteObject["startBeat"] = note.startBeat;
+        noteObject["durationBeats"] = note.durationBeats;
+        array.push_back(std::move(noteObject));
+    }
+
+    return array;
+}
+
+ordered_json serializePhraseAssets(const std::vector<RuntimeProjectPhraseAssetDefinition>& phraseAssets)
+{
+    ordered_json array = ordered_json::array();
+
+    for (const auto& phraseAsset : phraseAssets)
+    {
+        ordered_json phraseObject;
+        phraseObject["id"] = phraseAsset.id;
+        phraseObject["displayName"] = phraseAsset.displayName;
+        phraseObject["sourcePath"] = phraseAsset.sourcePath;
+        phraseObject["ticksPerQuarter"] = phraseAsset.ticksPerQuarter;
+        phraseObject["lengthBeats"] = phraseAsset.lengthBeats;
+        phraseObject["chordHint"] = phraseAsset.chordHint;
+        phraseObject["normalizationState"] = phraseAsset.normalizationState;
+        phraseObject["issues"] = serializeStringArray(phraseAsset.issues);
+        phraseObject["notes"] = serializePhraseNotes(phraseAsset.notes);
+        array.push_back(std::move(phraseObject));
     }
 
     return array;
@@ -383,6 +426,7 @@ ordered_json serializePerformanceBanks(const std::vector<RuntimeProjectPerforman
         bankObject["id"] = bank.id;
         bankObject["displayName"] = bank.displayName;
         bankObject["triggerSlots"] = serializeTriggerSlots(bank.triggerSlots);
+        bankObject["phraseAssets"] = serializePhraseAssets(bank.phraseAssets);
         bankObject["notes"] = serializeStringArray(bank.notes);
         array.push_back(std::move(bankObject));
     }
@@ -769,8 +813,78 @@ RuntimeProjectLoadResult loadRuntimeProjectManifest(const std::string& manifestP
                                 slot.triggerEvent = *triggerEvent;
                             if (const auto targetArticulationId = readRequired<RuntimeProjectLoadResult, std::string>(slotObject, result, "targetArticulationId", slotContext.c_str()))
                                 slot.targetArticulationId = *targetArticulationId;
+                            if (const auto phraseAssetId = readOptional<RuntimeProjectLoadResult, std::string>(slotObject, result, "phraseAssetId", slotContext.c_str()))
+                                slot.phraseAssetId = *phraseAssetId;
+                            if (const auto chordMode = readOptional<RuntimeProjectLoadResult, std::string>(slotObject, result, "chordMode", slotContext.c_str()))
+                                slot.chordMode = *chordMode;
 
                             bank.triggerSlots.push_back(std::move(slot));
+                        }
+                    }
+
+                    const auto phraseAssetsIterator = bankObject.find("phraseAssets");
+                    if (phraseAssetsIterator != bankObject.end())
+                    {
+                        if (!isObjectArray(*phraseAssetsIterator))
+                        {
+                            addIssue(result, context + " field 'phraseAssets' must be an array of objects.");
+                        }
+                        else
+                        {
+                            bank.phraseAssets.reserve(phraseAssetsIterator->size());
+
+                            for (std::size_t phraseIndex = 0; phraseIndex < phraseAssetsIterator->size(); ++phraseIndex)
+                            {
+                                const auto& phraseObject = phraseAssetsIterator->at(phraseIndex);
+                                const auto phraseContext = context + ".PhraseAsset[" + std::to_string(phraseIndex) + "]";
+                                RuntimeProjectPhraseAssetDefinition phraseAsset;
+
+                                if (const auto id = readRequired<RuntimeProjectLoadResult, std::string>(phraseObject, result, "id", phraseContext.c_str()))
+                                    phraseAsset.id = *id;
+                                if (const auto displayName = readRequired<RuntimeProjectLoadResult, std::string>(phraseObject, result, "displayName", phraseContext.c_str()))
+                                    phraseAsset.displayName = *displayName;
+                                if (const auto sourcePath = readRequired<RuntimeProjectLoadResult, std::string>(phraseObject, result, "sourcePath", phraseContext.c_str()))
+                                    phraseAsset.sourcePath = *sourcePath;
+                                if (const auto ticksPerQuarter = readRequired<RuntimeProjectLoadResult, int>(phraseObject, result, "ticksPerQuarter", phraseContext.c_str()))
+                                    phraseAsset.ticksPerQuarter = *ticksPerQuarter;
+                                if (const auto lengthBeats = readRequired<RuntimeProjectLoadResult, double>(phraseObject, result, "lengthBeats", phraseContext.c_str()))
+                                    phraseAsset.lengthBeats = *lengthBeats;
+                                if (const auto chordHint = readRequired<RuntimeProjectLoadResult, std::string>(phraseObject, result, "chordHint", phraseContext.c_str()))
+                                    phraseAsset.chordHint = *chordHint;
+                                if (const auto normalizationState = readRequired<RuntimeProjectLoadResult, std::string>(phraseObject, result, "normalizationState", phraseContext.c_str()))
+                                    phraseAsset.normalizationState = *normalizationState;
+                                phraseAsset.issues = readRequiredStringArray(phraseObject, result, "issues", phraseContext.c_str());
+
+                                const auto notesIterator = phraseObject.find("notes");
+                                if (notesIterator == phraseObject.end() || !isObjectArray(*notesIterator))
+                                {
+                                    addIssue(result, phraseContext + " field 'notes' must be an array of objects.");
+                                }
+                                else
+                                {
+                                    phraseAsset.notes.reserve(notesIterator->size());
+
+                                    for (std::size_t noteIndex = 0; noteIndex < notesIterator->size(); ++noteIndex)
+                                    {
+                                        const auto& noteObject = notesIterator->at(noteIndex);
+                                        const auto noteContext = phraseContext + ".Note[" + std::to_string(noteIndex) + "]";
+                                        RuntimeProjectPhraseNoteDefinition phraseNote;
+
+                                        if (const auto midiNote = readRequired<RuntimeProjectLoadResult, int>(noteObject, result, "midiNote", noteContext.c_str()))
+                                            phraseNote.midiNote = *midiNote;
+                                        if (const auto velocity = readRequired<RuntimeProjectLoadResult, int>(noteObject, result, "velocity", noteContext.c_str()))
+                                            phraseNote.velocity = *velocity;
+                                        if (const auto startBeat = readRequired<RuntimeProjectLoadResult, double>(noteObject, result, "startBeat", noteContext.c_str()))
+                                            phraseNote.startBeat = *startBeat;
+                                        if (const auto durationBeats = readRequired<RuntimeProjectLoadResult, double>(noteObject, result, "durationBeats", noteContext.c_str()))
+                                            phraseNote.durationBeats = *durationBeats;
+
+                                        phraseAsset.notes.push_back(std::move(phraseNote));
+                                    }
+                                }
+
+                                bank.phraseAssets.push_back(std::move(phraseAsset));
+                            }
                         }
                     }
 
@@ -954,6 +1068,42 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
             if (bank.displayName.empty())
                 addIssue(result, "Project performance bank '" + bank.id + "' must have a displayName.");
 
+            std::unordered_set<std::string> phraseAssetIds;
+            for (const auto& phraseAsset : bank.phraseAssets)
+            {
+                if (phraseAsset.id.empty())
+                    addIssue(result, "Project performance bank '" + bank.id + "' contains a phrase asset without id.");
+                else if (!phraseAssetIds.insert(phraseAsset.id).second)
+                    addIssue(result, "Project performance bank '" + bank.id + "' contains duplicate phrase asset id '" + phraseAsset.id + "'.");
+
+                if (phraseAsset.displayName.empty())
+                    addIssue(result, "Project phrase asset '" + phraseAsset.id + "' must have a displayName.");
+
+                if (phraseAsset.sourcePath.empty())
+                    addIssue(result, "Project phrase asset '" + phraseAsset.id + "' must record its sourcePath.");
+
+                if (phraseAsset.ticksPerQuarter <= 0)
+                    addIssue(result, "Project phrase asset '" + phraseAsset.id + "' must have a positive ticksPerQuarter.");
+
+                if (phraseAsset.lengthBeats < 0.0)
+                    addIssue(result, "Project phrase asset '" + phraseAsset.id + "' cannot have a negative lengthBeats.");
+
+                for (const auto& phraseNote : phraseAsset.notes)
+                {
+                    if (phraseNote.midiNote < 0 || phraseNote.midiNote > 127)
+                        addIssue(result, "Project phrase asset '" + phraseAsset.id + "' contains a midiNote outside 0-127.");
+
+                    if (phraseNote.velocity < 1 || phraseNote.velocity > 127)
+                        addIssue(result, "Project phrase asset '" + phraseAsset.id + "' contains a velocity outside 1-127.");
+
+                    if (phraseNote.startBeat < 0.0)
+                        addIssue(result, "Project phrase asset '" + phraseAsset.id + "' contains a negative startBeat.");
+
+                    if (phraseNote.durationBeats <= 0.0)
+                        addIssue(result, "Project phrase asset '" + phraseAsset.id + "' contains a non-positive durationBeats.");
+                }
+            }
+
             std::unordered_set<std::string> triggerSlotIds;
             for (const auto& triggerSlot : bank.triggerSlots)
             {
@@ -970,6 +1120,12 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
                 if (triggerSlot.targetArticulationId.empty())
                     addIssue(result, "Project trigger slot '" + triggerSlot.id + "' must have a targetArticulationId.");
+
+                if (triggerSlot.triggerEvent == "phrase-trigger" && triggerSlot.phraseAssetId.empty())
+                    addIssue(result, "Project trigger slot '" + triggerSlot.id + "' must reference a phraseAssetId when triggerEvent is 'phrase-trigger'.");
+
+                if (!triggerSlot.phraseAssetId.empty() && !phraseAssetIds.count(triggerSlot.phraseAssetId))
+                    addIssue(result, "Project trigger slot '" + triggerSlot.id + "' references unknown phraseAssetId '" + triggerSlot.phraseAssetId + "'.");
             }
         }
 

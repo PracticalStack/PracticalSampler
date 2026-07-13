@@ -25,6 +25,7 @@ MainComponent::MainComponent(bool enableAudioOutput)
                      {
                          return processor.getAuthoringImportResponsivenessSnapshot();
                      },
+                     drs::app::AuthoringPanel::LayoutMode::expanded,
                      [this](int midiNoteNumber, float velocity)
                      {
                          processor.queuePerformanceSurfaceNoteOn(midiNoteNumber, velocity);

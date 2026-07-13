@@ -72,6 +72,29 @@ struct RuntimeProjectTriggerSlotDefinition
     std::string displayName;
     std::string triggerEvent;
     std::string targetArticulationId;
+    std::string phraseAssetId;
+    std::string chordMode;
+};
+
+struct RuntimeProjectPhraseNoteDefinition
+{
+    int midiNote = 60;
+    int velocity = 96;
+    double startBeat = 0.0;
+    double durationBeats = 1.0;
+};
+
+struct RuntimeProjectPhraseAssetDefinition
+{
+    std::string id;
+    std::string displayName;
+    std::string sourcePath;
+    int ticksPerQuarter = 960;
+    double lengthBeats = 0.0;
+    std::string chordHint;
+    std::string normalizationState;
+    std::vector<std::string> issues;
+    std::vector<RuntimeProjectPhraseNoteDefinition> notes;
 };
 
 struct RuntimeProjectPerformanceBankDefinition
@@ -79,6 +102,7 @@ struct RuntimeProjectPerformanceBankDefinition
     std::string id;
     std::string displayName;
     std::vector<RuntimeProjectTriggerSlotDefinition> triggerSlots;
+    std::vector<RuntimeProjectPhraseAssetDefinition> phraseAssets;
     std::vector<std::string> notes;
 };
 

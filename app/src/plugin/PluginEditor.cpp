@@ -27,6 +27,7 @@ Editor::Editor(Processor& owner)
                      {
                          return owner.getAuthoringImportResponsivenessSnapshot();
                      },
+                     drs::app::AuthoringPanel::LayoutMode::compact,
                      [&owner](int midiNoteNumber, float velocity)
                      {
                          owner.queuePerformanceSurfaceNoteOn(midiNoteNumber, velocity);
