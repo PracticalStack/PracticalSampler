@@ -36,6 +36,48 @@ struct EngineMacroDescriptor
     double maxValue = 1.0;
     double defaultValue = 0.0;
     double currentValue = 0.0;
+    std::string ownershipKey;
+    std::string soundIntent;
+    std::string currentEffect;
+};
+
+struct EngineArticulationDescriptor
+{
+    std::string id;
+    std::string name;
+    bool isDefault = false;
+    bool selected = false;
+};
+
+struct EnginePreviewPlaybackSnapshot
+{
+    bool ready = false;
+    bool attempted = false;
+    bool succeeded = false;
+    int midiNote = 0;
+    int velocity = 0;
+    int effectiveMidiNote = 0;
+    int effectiveVelocity = 0;
+    std::string articulationId;
+    std::string zoneId;
+    bool waitedForPage = false;
+    bool acquiredPageLease = false;
+    bool voiceFinished = false;
+    std::string state;
+    std::string errorMessage;
+    std::string appliedMacroSummary;
+};
+
+struct EnginePerformanceSnapshot
+{
+    bool loaded = false;
+    std::string instrumentDisplayName;
+    std::string presetId;
+    std::string loadProfileId;
+    std::string selectedArticulationId;
+    std::string selectedArticulationName;
+    std::string loadIndicator;
+    EnginePreviewPlaybackSnapshot previewPlayback;
 };
 
 struct EngineDiagnosticsSnapshot
@@ -116,8 +158,12 @@ public:
     RuntimeManifestLoadResult loadPhase1ReferenceInstrument() const;
     RuntimeStreamLoadResult loadPhase1ReferenceStream() const;
     EngineDiagnosticsSnapshot getDiagnosticsSnapshot() const { return diagnosticsSnapshot; }
+    EnginePerformanceSnapshot getPerformanceSnapshot() const;
+    std::vector<EngineArticulationDescriptor> getArticulationDescriptors() const;
     std::vector<EngineMacroDescriptor> getMacroDescriptors() const;
+    bool setSelectedArticulation(const std::string& articulationId);
     bool setMacroValue(const std::string& macroId, double value);
+    EnginePreviewPlaybackSnapshot auditionPreviewNote(int midiNote, int velocity);
     std::string exportPresetStateJson() const;
     EnginePresetStateRestoreResult restorePresetStateJson(const std::string& presetStateJson);
     EnginePresetStateRestoreResult restorePresetStateFile(const std::string& presetStatePath);
@@ -134,6 +180,8 @@ private:
     RuntimeStreamLoadResult referenceStream;
     RuntimeSessionStateSnapshot currentSessionState;
     EngineDiagnosticsSnapshot diagnosticsSnapshot;
+    EnginePreviewPlaybackSnapshot previewPlaybackSnapshot;
     EngineContentFailureProbeResult lastContentFailureProbe;
+    std::uint64_t nextPreviewVoiceId = 4000;
 };
 } // namespace drs::engine

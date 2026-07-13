@@ -76,7 +76,7 @@ cmake --preset vs2022-debug
 Build:
 
 ```powershell
-cmake --build --preset build-debug --target drs_hise_frontend_plugin_probe DecentRhapsodyStudioApp DecentRhapsodyStudioPlugin_VST3 drs_phase0_smoke_tests
+cmake --build --preset build-debug --target drs_hise_frontend_plugin_probe DecentRhapsodyStudioApp DecentRhapsodyStudioPlugin drs_phase0_smoke_tests
 ```
 
 Run tests:

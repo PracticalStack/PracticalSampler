@@ -3,15 +3,15 @@
 namespace drs::standalone
 {
 MainComponent::MainComponent()
-    : statusPanel(engineFacade)
+    : performancePanel(engineFacade)
 {
-    addAndMakeVisible(statusPanel);
-    setSize(820, 520);
+    addAndMakeVisible(performancePanel);
+    setSize(860, 760);
 }
 
 void MainComponent::resized()
 {
-    statusPanel.setBounds(getLocalBounds());
+    performancePanel.setBounds(getLocalBounds());
 }
 
 std::string MainComponent::exportStateJson() const

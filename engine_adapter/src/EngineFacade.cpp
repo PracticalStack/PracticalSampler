@@ -57,10 +57,69 @@ std::string buildMacroSummary(const RuntimeSessionStateSnapshot& sessionState)
     return stream.str();
 }
 
+std::optional<double> findMacroValue(const RuntimeSessionStateSnapshot& sessionState, const std::string& macroId)
+{
+    const auto iterator = std::find_if(sessionState.macroValues.begin(),
+                                       sessionState.macroValues.end(),
+                                       [&](const RuntimePresetMacroValue& macroValue)
+                                       {
+                                           return macroValue.id == macroId;
+                                       });
+    if (iterator == sessionState.macroValues.end())
+        return std::nullopt;
+
+    return iterator->value;
+}
+
 double normalizeMacroValue(double value)
 {
     constexpr auto precisionScale = 1000000.0;
     return std::round(value * precisionScale) / precisionScale;
+}
+
+int clampMidiValue(int value)
+{
+    return std::clamp(value, 0, 127);
+}
+
+int computeTonePreviewVelocity(const RuntimeSessionStateSnapshot& sessionState, int fallbackVelocity)
+{
+    const auto toneValue = findMacroValue(sessionState, "tone").value_or(0.35);
+    const auto effectiveVelocity = static_cast<int>(std::lround(32.0 + toneValue * 95.0));
+    return std::clamp(effectiveVelocity, 1, 127);
+}
+
+int computeMotionPreviewNote(const RuntimeSessionStateSnapshot& sessionState, int playedNote)
+{
+    const auto motionValue = findMacroValue(sessionState, "motion").value_or(0.15);
+    const auto semitoneOffset = static_cast<int>(std::lround((motionValue - 0.5) * 24.0));
+    return clampMidiValue(playedNote + semitoneOffset);
+}
+
+std::string buildToneCurrentEffect(const RuntimeSessionStateSnapshot& sessionState)
+{
+    const auto toneValue = findMacroValue(sessionState, "tone").value_or(0.35);
+    if (toneValue >= 0.75)
+        return "Accent attack";
+    if (toneValue >= 0.4)
+        return "Balanced attack";
+    return "Soft attack";
+}
+
+std::string buildMotionCurrentEffect(const RuntimeSessionStateSnapshot& sessionState)
+{
+    const auto motionValue = findMacroValue(sessionState, "motion").value_or(0.15);
+    const auto semitoneOffset = static_cast<int>(std::lround((motionValue - 0.5) * 24.0));
+    if (semitoneOffset == 0)
+        return "Centered pitch";
+
+    const auto direction = semitoneOffset > 0 ? "+" : "";
+    return direction + std::to_string(semitoneOffset) + " st";
+}
+
+std::string buildAppliedMacroSummary(const RuntimeSessionStateSnapshot& sessionState)
+{
+    return "Tone: " + buildToneCurrentEffect(sessionState) + " | Motion: " + buildMotionCurrentEffect(sessionState);
 }
 
 void syncSessionSelectionsIntoDiagnostics(const RuntimeSessionStateSnapshot& sessionState,
@@ -69,6 +128,46 @@ void syncSessionSelectionsIntoDiagnostics(const RuntimeSessionStateSnapshot& ses
     diagnosticsSnapshot.presetId = sessionState.presetId;
     diagnosticsSnapshot.loadProfileId = sessionState.loadProfileId;
     diagnosticsSnapshot.selectedArticulationId = sessionState.selectedArticulationId;
+}
+
+const RuntimeArticulationDefinition* findArticulationDefinition(const RuntimeInstrumentModel& instrument,
+                                                                const std::string& articulationId)
+{
+    const auto iterator = std::find_if(instrument.articulations.begin(),
+                                       instrument.articulations.end(),
+                                       [&](const RuntimeArticulationDefinition& articulation)
+                                       {
+                                           return articulation.id == articulationId;
+                                       });
+    return iterator != instrument.articulations.end() ? &(*iterator) : nullptr;
+}
+
+std::string resolveArticulationName(const RuntimeManifestLoadResult& manifest,
+                                    const RuntimeSessionStateSnapshot& sessionState)
+{
+    if (!manifest.loaded)
+        return {};
+
+    if (const auto* articulation = findArticulationDefinition(manifest.instrument, sessionState.selectedArticulationId))
+        return articulation->name;
+
+    return {};
+}
+
+std::string buildLoadIndicator(const RuntimeManifestLoadResult& manifest,
+                               const RuntimeStreamLoadResult& stream,
+                               const RuntimeSessionStateSnapshot& sessionState)
+{
+    if (!manifest.loaded)
+        return "Manifest unavailable";
+
+    if (!stream.loaded)
+        return "Stream unavailable";
+
+    if (!sessionState.transientMetrics.lastFailure.empty())
+        return "Attention required";
+
+    return "Reference instrument ready";
 }
 
 template <typename TPredicate>
@@ -190,6 +289,8 @@ EngineFacade::EngineFacade()
         currentSessionState = buildDefaultRuntimeSessionState(referenceManifest);
         currentSessionState.transientMetrics.integrationState = "Default preset state loaded";
         referenceStream = loadPhase1ReferenceStreamContainer();
+        previewPlaybackSnapshot.ready = referenceStream.loaded;
+        previewPlaybackSnapshot.state = referenceStream.loaded ? "Ready to audition" : referenceStream.state;
     }
     else
     {
@@ -510,6 +611,45 @@ RuntimeStreamLoadResult EngineFacade::loadPhase1ReferenceStream() const
     return referenceStream;
 }
 
+EnginePerformanceSnapshot EngineFacade::getPerformanceSnapshot() const
+{
+    EnginePerformanceSnapshot snapshot;
+    snapshot.loaded = referenceManifest.loaded && referenceStream.loaded;
+    snapshot.instrumentDisplayName = referenceManifest.loaded ? referenceManifest.instrument.displayName : "Reference instrument unavailable";
+    snapshot.presetId = currentSessionState.presetId;
+    snapshot.loadProfileId = currentSessionState.loadProfileId;
+    snapshot.selectedArticulationId = currentSessionState.selectedArticulationId;
+    snapshot.selectedArticulationName = resolveArticulationName(referenceManifest, currentSessionState);
+    snapshot.loadIndicator = buildLoadIndicator(referenceManifest, referenceStream, currentSessionState);
+    snapshot.previewPlayback = previewPlaybackSnapshot;
+    snapshot.previewPlayback.ready = snapshot.loaded;
+    snapshot.previewPlayback.appliedMacroSummary = buildAppliedMacroSummary(currentSessionState);
+    if (snapshot.previewPlayback.state.empty())
+        snapshot.previewPlayback.state = snapshot.loaded ? "Ready to audition" : snapshot.loadIndicator;
+    return snapshot;
+}
+
+std::vector<EngineArticulationDescriptor> EngineFacade::getArticulationDescriptors() const
+{
+    std::vector<EngineArticulationDescriptor> descriptors;
+
+    if (!referenceManifest.loaded)
+        return descriptors;
+
+    descriptors.reserve(referenceManifest.instrument.articulations.size());
+    for (const auto& articulation : referenceManifest.instrument.articulations)
+    {
+        descriptors.push_back({
+            articulation.id,
+            articulation.name,
+            articulation.isDefault,
+            articulation.id == currentSessionState.selectedArticulationId
+        });
+    }
+
+    return descriptors;
+}
+
 std::vector<EngineMacroDescriptor> EngineFacade::getMacroDescriptors() const
 {
     std::vector<EngineMacroDescriptor> descriptors;
@@ -537,11 +677,34 @@ std::vector<EngineMacroDescriptor> EngineFacade::getMacroDescriptors() const
             macro.minValue,
             macro.maxValue,
             macro.defaultValue,
-            currentValue
+            currentValue,
+            macro.id == "tone" ? "preview.triggerVelocity" : "preview.noteTravel",
+            macro.id == "tone"
+                ? "Biases the reference preview from softer attacks into accent territory."
+                : "Offsets the previewed note pitch to add movement across the reference range.",
+            macro.id == "tone" ? buildToneCurrentEffect(currentSessionState) : buildMotionCurrentEffect(currentSessionState)
         });
     }
 
     return descriptors;
+}
+
+bool EngineFacade::setSelectedArticulation(const std::string& articulationId)
+{
+    if (!referenceManifest.loaded)
+        return false;
+
+    if (findArticulationDefinition(referenceManifest.instrument, articulationId) == nullptr)
+        return false;
+
+    currentSessionState.selectedArticulationId = articulationId;
+    currentSessionState.transientMetrics.integrationState = "Performance surface articulation updated";
+    previewPlaybackSnapshot = {};
+    previewPlaybackSnapshot.ready = referenceManifest.loaded && referenceStream.loaded;
+    previewPlaybackSnapshot.articulationId = articulationId;
+    previewPlaybackSnapshot.state = previewPlaybackSnapshot.ready ? "Ready to audition" : buildLoadIndicator(referenceManifest, referenceStream, currentSessionState);
+    syncSessionSelectionsIntoDiagnostics(currentSessionState, diagnosticsSnapshot);
+    return true;
 }
 
 bool EngineFacade::setMacroValue(const std::string& macroId, double value)
@@ -577,6 +740,110 @@ bool EngineFacade::setMacroValue(const std::string& macroId, double value)
 
     syncSessionSelectionsIntoDiagnostics(currentSessionState, diagnosticsSnapshot);
     return true;
+}
+
+EnginePreviewPlaybackSnapshot EngineFacade::auditionPreviewNote(int midiNote, int velocity)
+{
+    previewPlaybackSnapshot = {};
+    previewPlaybackSnapshot.midiNote = midiNote;
+    previewPlaybackSnapshot.velocity = velocity;
+    previewPlaybackSnapshot.effectiveMidiNote = midiNote;
+    previewPlaybackSnapshot.effectiveVelocity = velocity;
+    previewPlaybackSnapshot.articulationId = currentSessionState.selectedArticulationId;
+    previewPlaybackSnapshot.appliedMacroSummary = buildAppliedMacroSummary(currentSessionState);
+
+    if (!referenceManifest.loaded)
+    {
+        previewPlaybackSnapshot.state = "Preview unavailable";
+        previewPlaybackSnapshot.errorMessage = referenceManifest.state;
+        return previewPlaybackSnapshot;
+    }
+
+    if (!referenceStream.loaded)
+    {
+        previewPlaybackSnapshot.state = "Preview unavailable";
+        previewPlaybackSnapshot.errorMessage = referenceStream.state;
+        return previewPlaybackSnapshot;
+    }
+
+    const auto loadProfile = findPhase1RuntimeLoadProfile(currentSessionState.loadProfileId);
+    if (!loadProfile.has_value())
+    {
+        previewPlaybackSnapshot.state = "Preview unavailable";
+        previewPlaybackSnapshot.errorMessage = "Unknown load profile '" + currentSessionState.loadProfileId + "'.";
+        return previewPlaybackSnapshot;
+    }
+
+    previewPlaybackSnapshot.ready = true;
+    previewPlaybackSnapshot.attempted = true;
+
+    const auto effectiveMidiNote = computeMotionPreviewNote(currentSessionState, midiNote);
+    const auto effectiveVelocity = computeTonePreviewVelocity(currentSessionState, velocity);
+    previewPlaybackSnapshot.effectiveMidiNote = effectiveMidiNote;
+    previewPlaybackSnapshot.effectiveVelocity = effectiveVelocity;
+
+    RuntimeStreamingService service(
+        referenceStream.container,
+        buildRuntimeStreamingServiceOptions(*loadProfile, 2500));
+    RuntimeVoice previewVoice;
+    std::string errorMessage;
+
+    const auto allocated = previewVoice.allocate(referenceManifest.instrument,
+                                                 referenceStream.container,
+                                                 {
+                                                     nextPreviewVoiceId++,
+                                                     "",
+                                                     effectiveMidiNote,
+                                                     effectiveVelocity,
+                                                     toVoiceMacroValues(currentSessionState),
+                                                     currentSessionState.selectedArticulationId
+                                                 },
+                                                 errorMessage);
+    if (!allocated)
+    {
+        previewPlaybackSnapshot.state = "Preview allocation failed";
+        previewPlaybackSnapshot.errorMessage = errorMessage;
+        return previewPlaybackSnapshot;
+    }
+
+    previewVoice.advanceFrames(4096, service);
+    const auto boundaryAdvance = previewVoice.advanceFrames(64, service);
+    previewPlaybackSnapshot.waitedForPage = boundaryAdvance.waitingForPage;
+
+    if (previewPlaybackSnapshot.waitedForPage)
+    {
+        const auto pageReady = waitUntil(
+            [&]
+            {
+                const auto snapshot = previewVoice.getSnapshot();
+                return !snapshot.sampleId.empty()
+                    && service.isPageReady({ snapshot.sampleId, 0 });
+            },
+            std::chrono::milliseconds(500));
+
+        if (pageReady)
+        {
+            const auto resumedAdvance = previewVoice.advanceFrames(64, service);
+            previewPlaybackSnapshot.acquiredPageLease = resumedAdvance.acquiredPageLease;
+        }
+    }
+
+    previewPlaybackSnapshot.zoneId = previewVoice.getSnapshot().zoneId;
+    previewVoice.beginRelease();
+    previewPlaybackSnapshot.voiceFinished = waitUntil(
+        [&]
+        {
+            const auto advance = previewVoice.advanceFrames(8192, service);
+            return advance.voiceFinished
+                || previewVoice.getSnapshot().state == RuntimeVoiceLifecycleState::finished;
+        },
+        std::chrono::milliseconds(1500));
+    previewPlaybackSnapshot.succeeded = previewPlaybackSnapshot.voiceFinished;
+    previewPlaybackSnapshot.state = previewPlaybackSnapshot.succeeded
+        ? "Preview played"
+        : "Preview did not finish cleanly";
+
+    return previewPlaybackSnapshot;
 }
 
 std::string EngineFacade::exportPresetStateJson() const
@@ -628,6 +895,10 @@ EnginePresetStateRestoreResult EngineFacade::restorePresetStateJson(const std::s
     currentSessionState.notes = parsedState.preset.notes;
     currentSessionState.transientMetrics.integrationState = "Preset state restored";
     currentSessionState.transientMetrics.lastFailure.clear();
+    previewPlaybackSnapshot = {};
+    previewPlaybackSnapshot.ready = referenceManifest.loaded && referenceStream.loaded;
+    previewPlaybackSnapshot.articulationId = currentSessionState.selectedArticulationId;
+    previewPlaybackSnapshot.state = previewPlaybackSnapshot.ready ? "Ready to audition" : buildLoadIndicator(referenceManifest, referenceStream, currentSessionState);
     refreshDiagnosticsSnapshot();
 
     restoreResult.restored = true;
@@ -696,6 +967,10 @@ void EngineFacade::resetSessionStateToDefault()
     currentSessionState = buildDefaultRuntimeSessionState(referenceManifest);
     currentSessionState.transientMetrics.integrationState = "Default preset state loaded";
     currentSessionState.transientMetrics.lastFailure.clear();
+    previewPlaybackSnapshot = {};
+    previewPlaybackSnapshot.ready = referenceManifest.loaded && referenceStream.loaded;
+    previewPlaybackSnapshot.articulationId = currentSessionState.selectedArticulationId;
+    previewPlaybackSnapshot.state = previewPlaybackSnapshot.ready ? "Ready to audition" : buildLoadIndicator(referenceManifest, referenceStream, currentSessionState);
     lastContentFailureProbe = {};
     refreshDiagnosticsSnapshot();
 }

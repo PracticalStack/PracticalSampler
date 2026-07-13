@@ -1,5 +1,6 @@
 #include "drs/engine/Phase1Baseline.h"
 #include "drs/engine/RuntimeLoader.h"
+#include "drs/engine/RuntimeStream.h"
 
 #include <json/json.hpp>
 
@@ -7,19 +8,24 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 
 namespace
 {
 namespace fs = std::filesystem;
 using json = nlohmann::json;
+using ordered_json = nlohmann::ordered_json;
 
 struct Options
 {
     bool verify = true;
     bool writeReferenceFixtures = false;
+    bool writeReferencePackage = false;
     bool writeBaseline = false;
     std::string capturedOnIsoDate;
 };
@@ -42,6 +48,46 @@ void writeTextFile(const fs::path& path, const std::string& text)
     require(output.good(), "Could not open file for writing: " + path.generic_string());
     output << text;
     require(output.good(), "Could not finish writing file: " + path.generic_string());
+}
+
+std::string computeFnv1aChecksumHex(const fs::path& path)
+{
+    constexpr std::uint64_t offsetBasis = 14695981039346656037ull;
+    constexpr std::uint64_t prime = 1099511628211ull;
+
+    std::ifstream input(path, std::ios::binary);
+    require(input.good(), "Could not open file for checksum: " + path.generic_string());
+
+    std::uint64_t hash = offsetBasis;
+    char buffer[4096];
+
+    while (input.read(buffer, sizeof(buffer)) || input.gcount() > 0)
+    {
+        for (std::streamsize index = 0; index < input.gcount(); ++index)
+        {
+            hash ^= static_cast<unsigned char>(buffer[index]);
+            hash *= prime;
+        }
+    }
+
+    std::ostringstream stream;
+    stream << std::hex << std::setfill('0') << std::setw(16) << hash;
+    return stream.str();
+}
+
+std::string toPackageRelativePath(const fs::path& packageDirectory, const std::string& rawPath)
+{
+    const fs::path path(rawPath);
+    const auto normalizedPath = path.lexically_normal();
+
+    if (!normalizedPath.is_absolute())
+        return normalizedPath.generic_string();
+
+    const auto relativePath = normalizedPath.lexically_relative(packageDirectory);
+    if (!relativePath.empty())
+        return relativePath.generic_string();
+
+    return normalizedPath.generic_string();
 }
 
 std::string getCurrentIsoDate()
@@ -80,10 +126,16 @@ Options parseOptions(int argc, char* argv[])
             options.verify = false;
             options.writeBaseline = true;
         }
+        else if (argument == "--write-reference-package")
+        {
+            options.verify = false;
+            options.writeReferencePackage = true;
+        }
         else if (argument == "--write-all")
         {
             options.verify = false;
             options.writeReferenceFixtures = true;
+            options.writeReferencePackage = true;
             options.writeBaseline = true;
         }
         else if (argument == "--captured-on")
@@ -100,6 +152,93 @@ Options parseOptions(int argc, char* argv[])
     return options;
 }
 
+std::string buildReferencePackageManifest(const drs::engine::RuntimeProjectLoadResult& referenceProject,
+                                          const drs::engine::RuntimeManifestLoadResult& referenceInstrument,
+                                          const drs::engine::RuntimeStreamLoadResult& referenceStream)
+{
+    const auto packageDirectory = fs::path(drs::engine::getPhase1ReferencePackageManifestPath()).parent_path();
+    std::unordered_map<std::string, const drs::engine::RuntimeStreamSampleDefinition*> streamSamplesById;
+    for (const auto& sample : referenceStream.container.samples)
+        streamSamplesById.emplace(sample.sampleId, &sample);
+
+    ordered_json packageManifest;
+    packageManifest["schemaName"] = "drs.referencePackage";
+    packageManifest["schemaVersion"] = 1;
+    packageManifest["packageId"] = "drs.phase1.tiny-open-instrument.package";
+    packageManifest["displayName"] = "DRS Tiny Open Instrument Package";
+    packageManifest["instrumentId"] = referenceInstrument.instrument.instrumentId;
+
+    ordered_json generatedFrom;
+    generatedFrom["referenceCorpusIndexPath"] = "../index.json";
+    generatedFrom["projectManifestPath"] = fs::path(referenceProject.manifestPath).filename().generic_string();
+    generatedFrom["instrumentManifestPath"] = fs::path(referenceInstrument.manifestPath).filename().generic_string();
+    generatedFrom["streamAssetPath"] = fs::path(referenceStream.containerPath).filename().generic_string();
+    generatedFrom["contentRootPath"] = toPackageRelativePath(packageDirectory, referenceProject.project.contentRootPath);
+    packageManifest["generatedFrom"] = std::move(generatedFrom);
+
+    ordered_json packageFiles = ordered_json::array();
+    const auto appendPackageFile = [&packageFiles](const char* role, const fs::path& path)
+    {
+        ordered_json fileObject;
+        fileObject["role"] = role;
+        fileObject["path"] = path.filename().generic_string();
+        fileObject["sizeBytes"] = fs::file_size(path);
+        fileObject["checksumHex"] = computeFnv1aChecksumHex(path);
+        packageFiles.push_back(std::move(fileObject));
+    };
+
+    appendPackageFile("projectManifest", referenceProject.manifestPath);
+    appendPackageFile("instrumentManifest", referenceInstrument.manifestPath);
+    appendPackageFile("streamContainer", referenceStream.containerPath);
+    packageManifest["packageFiles"] = std::move(packageFiles);
+
+    ordered_json sourceSamples = ordered_json::array();
+    for (const auto& sampleSource : referenceProject.project.sampleSources)
+    {
+        const auto iterator = streamSamplesById.find(sampleSource.id);
+        require(iterator != streamSamplesById.end(),
+                "Reference package manifest generation could not find compiled stream metadata for source sample '" + sampleSource.id + "'.");
+
+        const auto* streamSample = iterator->second;
+        ordered_json sampleObject;
+        sampleObject["id"] = sampleSource.id;
+        sampleObject["role"] = sampleSource.role;
+        sampleObject["sourcePath"] = toPackageRelativePath(packageDirectory, sampleSource.path);
+        sampleObject["sourceChecksumHex"] = streamSample->sourceChecksumHex;
+        sampleObject["sampleRate"] = streamSample->sampleRate;
+        sampleObject["frameCount"] = streamSample->frameCount;
+        sampleObject["channelCount"] = streamSample->channelCount;
+        sampleObject["payloadOffsetBytes"] = streamSample->payloadOffsetBytes;
+        sampleObject["payloadSizeBytes"] = streamSample->payloadSizeBytes;
+        sampleObject["prefetchBytes"] = streamSample->prefetchBytes;
+        sourceSamples.push_back(std::move(sampleObject));
+    }
+
+    packageManifest["sourceSamples"] = std::move(sourceSamples);
+
+    ordered_json compiledRuntime;
+    compiledRuntime["defaultLoadProfile"] = referenceInstrument.instrument.defaultLoadProfile;
+    compiledRuntime["macroCount"] = referenceInstrument.metrics.macroCount;
+    compiledRuntime["articulationCount"] = referenceInstrument.metrics.articulationCount;
+    compiledRuntime["groupCount"] = referenceInstrument.metrics.groupCount;
+    compiledRuntime["zoneCount"] = referenceInstrument.metrics.zoneCount;
+    compiledRuntime["referencedSampleCount"] = referenceInstrument.metrics.referencedSampleCount;
+    compiledRuntime["totalPrefetchBytes"] = referenceInstrument.metrics.totalPrefetchBytes;
+    compiledRuntime["streamPageSizeBytes"] = referenceStream.container.pageSizeBytes;
+    compiledRuntime["streamSampleCount"] = referenceStream.metrics.sampleCount;
+    compiledRuntime["streamPageCount"] = referenceStream.metrics.pageCount;
+    compiledRuntime["totalPayloadBytes"] = referenceStream.container.totalPayloadBytes;
+    packageManifest["compiledRuntime"] = std::move(compiledRuntime);
+
+    ordered_json validation = ordered_json::array();
+    validation.push_back("Build and run drs_phase1_runtime_fixture_tool --verify to confirm the checked-in manifests and package metadata still match the canonical runtime serializers.");
+    validation.push_back("Run tools/package-phase1-reference-instrument.ps1 -Mode Verify to exercise the contributor-facing wrapper around that same package check.");
+    validation.push_back("Open the standalone shell, load the default or lead demo from the Phase 1 performance surface, and confirm playback without hidden debug commands.");
+    packageManifest["validation"] = std::move(validation);
+
+    return packageManifest.dump(2) + "\n";
+}
+
 void verifyReferenceFixtures(const drs::engine::RuntimeProjectLoadResult& referenceProject,
                              const drs::engine::RuntimeManifestLoadResult& referenceInstrument)
 {
@@ -114,6 +253,20 @@ void verifyReferenceFixtures(const drs::engine::RuntimeProjectLoadResult& refere
                                                                                       referenceManifestPath.generic_string());
     require(serializedInstrument == readTextFile(referenceManifestPath),
             "Reference instrument fixture is out of sync with the canonical serializer.");
+}
+
+void verifyReferencePackageManifest(const drs::engine::RuntimeProjectLoadResult& referenceProject,
+                                    const drs::engine::RuntimeManifestLoadResult& referenceInstrument,
+                                    const drs::engine::RuntimeStreamLoadResult& referenceStream)
+{
+    const auto packageManifestPath = fs::path(drs::engine::getPhase1ReferencePackageManifestPath());
+    require(fs::exists(packageManifestPath), "Reference package manifest must exist.");
+
+    const auto serializedPackageManifest = buildReferencePackageManifest(referenceProject,
+                                                                        referenceInstrument,
+                                                                        referenceStream);
+    require(serializedPackageManifest == readTextFile(packageManifestPath),
+            "Reference package manifest is out of sync with the canonical fixture package description.");
 }
 
 void verifyCheckedInBaseline(const drs::engine::RuntimeManifestLoadResult& coldResult)
@@ -183,6 +336,17 @@ void rewriteReferenceFixtures(const drs::engine::RuntimeProjectLoadResult& refer
     writeTextFile(referenceManifestPath, serializedInstrument);
 }
 
+void rewriteReferencePackageManifest(const drs::engine::RuntimeProjectLoadResult& referenceProject,
+                                     const drs::engine::RuntimeManifestLoadResult& referenceInstrument,
+                                     const drs::engine::RuntimeStreamLoadResult& referenceStream)
+{
+    const auto packageManifestPath = fs::path(drs::engine::getPhase1ReferencePackageManifestPath());
+    const auto packageManifestText = buildReferencePackageManifest(referenceProject,
+                                                                  referenceInstrument,
+                                                                  referenceStream);
+    writeTextFile(packageManifestPath, packageManifestText);
+}
+
 void rewriteBaselineSnapshot(const drs::engine::RuntimeManifestLoadResult& coldResult,
                              const drs::engine::RuntimeManifestLoadResult& warmResult,
                              const std::string& capturedOnIsoDate)
@@ -210,9 +374,13 @@ int main(int argc, char* argv[])
         const auto warmResult = drs::engine::loadPhase1ReferenceInstrumentManifest();
         require(warmResult.loaded, "Reference instrument warm-load must succeed before fixture maintenance can run.");
 
+        const auto referenceStream = drs::engine::loadPhase1ReferenceStreamContainer();
+        require(referenceStream.loaded, "Reference stream container must load cleanly before fixture maintenance can run.");
+
         if (options.verify)
         {
             verifyReferenceFixtures(referenceProject, coldResult);
+            verifyReferencePackageManifest(referenceProject, coldResult, referenceStream);
             verifyCheckedInBaseline(coldResult);
             std::cout << "Phase 1 runtime fixture tool verify passed." << std::endl;
             return 0;
@@ -220,6 +388,9 @@ int main(int argc, char* argv[])
 
         if (options.writeReferenceFixtures)
             rewriteReferenceFixtures(referenceProject, coldResult);
+
+        if (options.writeReferencePackage)
+            rewriteReferencePackageManifest(referenceProject, coldResult, referenceStream);
 
         if (options.writeBaseline)
         {

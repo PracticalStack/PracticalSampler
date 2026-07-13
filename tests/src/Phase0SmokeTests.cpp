@@ -44,10 +44,21 @@ juce::File getBuiltPluginBundle()
     const auto testsDirectory = artefactsDirectory.getParentDirectory();
     const auto buildDirectory = testsDirectory.getParentDirectory();
 
-    return buildDirectory
-        .getChildFile("app")
+    const auto appDirectory = buildDirectory.getChildFile("app");
+    const auto configurationName = configurationDirectory.getFileName();
+
+    const auto primaryBundle = appDirectory
+        .getChildFile("drs_plugin_bundle_artefacts")
+        .getChildFile(configurationName)
+        .getChildFile("VST3")
+        .getChildFile("Decent Rhapsody Studio.vst3");
+
+    if (primaryBundle.exists())
+        return primaryBundle;
+
+    return appDirectory
         .getChildFile("DecentRhapsodyStudioPlugin_artefacts")
-        .getChildFile(configurationDirectory.getFileName())
+        .getChildFile(configurationName)
         .getChildFile("VST3")
         .getChildFile("Decent Rhapsody Studio.vst3");
 }
@@ -76,6 +87,19 @@ int main()
         require(statusSnapshot.detail.find("Runtime diagnostics:") != std::string::npos,
                 "Engine snapshot detail must describe the runtime diagnostics surface.");
         require(!statusSnapshot.nextSteps.empty(), "Engine snapshot must expose at least one Phase 0 next step.");
+        require(engineFacade.getArticulationDescriptors().size() == 2,
+                "Engine facade should expose both reference articulations to the Sprint 5 performance surface.");
+        require(engineFacade.setSelectedArticulation("lead"),
+                "Engine facade should allow the Sprint 5 performance surface to select the lead articulation.");
+        require(engineFacade.setMacroValue("tone", 0.9),
+                "Engine facade should allow the Sprint 5 performance surface to bias the tone macro before preview.");
+        require(engineFacade.setMacroValue("motion", 0.5),
+                "Engine facade should allow the Sprint 5 performance surface to center the motion macro before preview.");
+        const auto previewSnapshot = engineFacade.auditionPreviewNote(69, 120);
+        require(previewSnapshot.succeeded,
+                "Engine facade preview playback should succeed for the lead articulation trigger.");
+        require(previewSnapshot.zoneId == "lead-a4-accent",
+                "Preview playback should resolve the lead accent zone for the Sprint 5 keyboard surface.");
 
         const auto runtimeManifest = engineFacade.loadPhase1ReferenceInstrument();
         require(runtimeManifest.manifestFound, "Phase 1 reference manifest must exist.");
@@ -108,18 +132,48 @@ int main()
                 "Expected authored HISE XML backup assets under XmlPresetBackups/.");
 
         drs::standalone::MainComponent mainComponent;
-        require(mainComponent.getWidth() == 820, "Standalone shell width changed unexpectedly.");
-        require(mainComponent.getHeight() == 520, "Standalone shell height changed unexpectedly.");
-        require(mainComponent.getNumChildComponents() == 1, "Standalone shell should expose exactly one root status panel.");
+        require(mainComponent.getWidth() == 860, "Standalone shell width changed unexpectedly.");
+        require(mainComponent.getHeight() == 760, "Standalone shell height changed unexpectedly.");
+        require(mainComponent.getNumChildComponents() == 1, "Standalone shell should expose exactly one root performance panel.");
+        auto* standaloneRoot = mainComponent.getChildComponent(0);
+        require(standaloneRoot != nullptr, "Standalone shell root performance panel was missing.");
+        require(standaloneRoot->findChildWithID("performanceKeyboard") != nullptr,
+                "Standalone shell should expose the Sprint 5 keyboard surface.");
+        require(standaloneRoot->findChildWithID("performanceDiagnosticsToggle") != nullptr,
+                "Standalone shell should expose a diagnostics entry point.");
 
         drs::plugin::Processor processor;
         require(processor.acceptsMidi(), "Plugin shell must remain configured as a MIDI-driven synth.");
 
         std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
         require(editor != nullptr, "Plugin editor creation failed.");
-        require(editor->getWidth() == 720, "Plugin editor width changed unexpectedly.");
-        require(editor->getHeight() == 420, "Plugin editor height changed unexpectedly.");
-        require(editor->getNumChildComponents() == 1, "Plugin editor should expose exactly one root status panel.");
+        require(editor->getWidth() == 820, "Plugin editor width changed unexpectedly.");
+        require(editor->getHeight() == 700, "Plugin editor height changed unexpectedly.");
+        require(editor->getNumChildComponents() == 1, "Plugin editor should expose exactly one root performance panel.");
+        auto* pluginRoot = editor->getChildComponent(0);
+        require(pluginRoot != nullptr, "Plugin editor root performance panel was missing.");
+        require(pluginRoot->findChildWithID("performanceKeyboard") != nullptr,
+                "Plugin editor should expose the Sprint 5 keyboard surface.");
+        require(pluginRoot->findChildWithID("performanceDiagnosticsToggle") != nullptr,
+                "Plugin editor should expose a diagnostics entry point.");
+
+        processor.prepareToPlay(44100.0, 512);
+        juce::AudioBuffer<float> pluginBuffer(2, 512);
+        pluginBuffer.clear();
+        juce::MidiBuffer midiBuffer;
+        midiBuffer.addEvent(juce::MidiMessage::noteOn(1, 57, static_cast<juce::uint8>(100)), 0);
+        processor.processBlock(pluginBuffer, midiBuffer);
+        require(pluginBuffer.getMagnitude(0, pluginBuffer.getNumSamples()) > 0.0001f,
+                "Plugin processor should produce audible output for the reference sustain trigger.");
+
+        juce::AudioBuffer<float> performanceSurfaceBuffer(2, 512);
+        performanceSurfaceBuffer.clear();
+        juce::MidiBuffer emptyMidiBuffer;
+        processor.queuePerformanceSurfaceNoteOn(57, 0.8f);
+        processor.processBlock(performanceSurfaceBuffer, emptyMidiBuffer);
+        require(performanceSurfaceBuffer.getMagnitude(0, performanceSurfaceBuffer.getNumSamples()) > 0.0001f,
+                "Plugin performance surface keyboard should produce audible output without host MIDI input.");
+        processor.queuePerformanceSurfaceNoteOff(57);
 
         juce::AudioPluginFormatManager formatManager;
         juce::addHeadlessDefaultFormatsToManager(formatManager);

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "drs/engine/EngineFacade.h"
-#include "shared/StatusPanel.h"
+#include "shared/PerformancePanel.h"
 
 #include <juce_gui_extra/juce_gui_extra.h>
 
@@ -22,6 +22,6 @@ public:
 
 private:
     drs::engine::EngineFacade engineFacade;
-    drs::app::StatusPanel statusPanel;
+    drs::app::PerformancePanel performancePanel;
 };
 } // namespace drs::standalone

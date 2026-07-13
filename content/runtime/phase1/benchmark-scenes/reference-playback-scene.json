@@ -1,0 +1,95 @@
+{
+  "schemaName": "drs.benchmarkScene",
+  "schemaVersion": 1,
+  "sceneId": "drs.phase1.reference-playback-scene",
+  "displayName": "DRS Phase 1 Reference Playback Scene",
+  "referenceInstrumentManifestPath": "../reference-corpus/tiny-open-instrument/tiny-open-instrument.drinst",
+  "referencePresetStatePath": "../preset-state/reference/lead-performance-state.drpreset.json",
+  "ordinaryPlayback": {
+    "articulationId": "sustain",
+    "midiNote": 57,
+    "velocity": 72,
+    "expectedZoneId": "pad-a3"
+  },
+  "moderatePolyphony": {
+    "loadProfileId": "performance",
+    "warmupFrames": 4096,
+    "boundaryFrames": 64,
+    "resumeFrames": 64,
+    "releaseFrames": 8192,
+    "expectedPeakActiveVoiceCount": 3,
+    "expectedReadyPages": [
+      {
+        "sampleId": "sine-a3",
+        "pageIndex": 0
+      },
+      {
+        "sampleId": "triangle-a4",
+        "pageIndex": 0
+      }
+    ],
+    "voices": [
+      {
+        "voiceId": 901,
+        "midiNote": 57,
+        "velocity": 110,
+        "articulationId": "sustain"
+      },
+      {
+        "voiceId": 902,
+        "midiNote": 69,
+        "velocity": 118,
+        "articulationId": "lead"
+      },
+      {
+        "voiceId": 903,
+        "midiNote": 69,
+        "velocity": 105,
+        "articulationId": "lead"
+      }
+    ]
+  },
+  "presetReload": {
+    "expectedLoadProfileId": "performance",
+    "expectedArticulationId": "lead",
+    "expectedMacros": [
+      {
+        "id": "tone",
+        "value": 0.62
+      },
+      {
+        "id": "motion",
+        "value": 0.78
+      }
+    ]
+  },
+  "loadProfileSwitch": {
+    "initialProfileId": "performance",
+    "downgradedProfileId": "eco",
+    "warmupFrames": 4096,
+    "boundaryFrames": 64,
+    "resumeFrames": 64,
+    "releaseFrames": 8192,
+    "expectedActiveLeaseCountBeforeSwitch": 1,
+    "voice": {
+      "voiceId": 951,
+      "midiNote": 57,
+      "velocity": 110,
+      "articulationId": "sustain"
+    },
+    "additionalPageReads": [
+      {
+        "sampleId": "sine-a3",
+        "pageIndex": 1
+      },
+      {
+        "sampleId": "sine-a3",
+        "pageIndex": 2
+      },
+      {
+        "sampleId": "triangle-a4",
+        "pageIndex": 0
+      }
+    ]
+  }
+}

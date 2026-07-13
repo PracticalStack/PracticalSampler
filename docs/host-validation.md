@@ -36,13 +36,13 @@ powershell -ExecutionPolicy Bypass -File .\tools\install-vst3-windows.ps1
 If you do not want to copy into `C:\Program Files\Common Files\VST3\`, add this directory to Reaper's VST scan paths:
 
 ```text
-<repo>\build\vs2022-debug\app\DecentRhapsodyStudioPlugin_artefacts\Debug\VST3
+<repo>\build\vs2022-debug\app\drs_plugin_bundle_artefacts\Debug\VST3
 ```
 
 or for release builds:
 
 ```text
-<repo>\build\vs2022-release\app\DecentRhapsodyStudioPlugin_artefacts\Release\VST3
+<repo>\build\vs2022-release\app\drs_plugin_bundle_artefacts\Release\VST3
 ```
 
 Again, the path should be the folder that contains the `.vst3` bundle, not the folder inside the bundle.
@@ -68,3 +68,17 @@ The minimum Sprint 4 spot-check is:
 - verify `Inject Invalid State` surfaces a visible failure state without silently overwriting the prior valid session
 - verify `Probe Missing`, `Probe Checksum`, `Probe Schema`, and `Probe Partial` each surface a visible content failure while preserving the prior valid session
 - verify moving the macro sliders changes the visible macro values and, in a host, appears as `macro.*` automation parameters
+
+## Sprint 5 performance-surface spot-check
+
+Once the shell opens, the first screen should now be the compact performance surface instead of the full diagnostics view.
+
+The minimum Sprint 5 spot-check is:
+
+- verify the load badge reports the reference instrument as ready
+- verify `Load Default` and `Load Lead Demo` update the visible patch status line
+- verify the articulation buttons switch the selected articulation shown on the surface
+- verify playing the on-screen keyboard updates the preview status with the note and routed zone
+- verify the macro strip shows both the raw value and the current effect text
+- verify higher `tone` values push preview playback toward accent behavior while `motion` changes the effective previewed note
+- verify `Show Diagnostics` reveals the deeper Sprint 4 diagnostics panel without leaving the performance surface

@@ -1,4 +1,6 @@
 set(DRS_APP_SHARED_SOURCES
+    src/shared/PerformancePanel.cpp
+    src/shared/PerformancePanel.h
     src/shared/StatusPanel.cpp
     src/shared/StatusPanel.h
 )
@@ -9,6 +11,7 @@ set(DRS_STANDALONE_SOURCES
 )
 
 set(DRS_PLUGIN_SOURCES
+    ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
     src/plugin/PluginEditor.cpp
     src/plugin/PluginEditor.h
     src/plugin/PluginProcessor.cpp
@@ -27,6 +30,7 @@ target_include_directories(drs_app_shared
 target_link_libraries(drs_app_shared
     PUBLIC
         drs_engine_adapter
+        juce::juce_audio_utils
         juce::juce_gui_extra
 )
 
@@ -66,6 +70,7 @@ target_include_directories(drs_plugin_shell
 target_link_libraries(drs_plugin_shell
     PUBLIC
         drs_app_shared
+        juce::juce_audio_formats
         juce::juce_audio_utils
 )
 
@@ -104,7 +109,7 @@ target_link_libraries(DecentRhapsodyStudioApp
         juce::juce_recommended_warning_flags
 )
 
-juce_add_plugin(DecentRhapsodyStudioPlugin
+juce_add_plugin(drs_plugin_bundle
     COMPANY_NAME "Decent Rhapsody"
     BUNDLE_ID "com.decentrhapsody.studio.plugin"
     IS_SYNTH TRUE
@@ -121,7 +126,7 @@ juce_add_plugin(DecentRhapsodyStudioPlugin
     NEEDS_CURL FALSE
 )
 
-target_link_libraries(DecentRhapsodyStudioPlugin
+target_link_libraries(drs_plugin_bundle
     PRIVATE
         drs_plugin_shell
     PUBLIC
@@ -130,15 +135,44 @@ target_link_libraries(DecentRhapsodyStudioPlugin
         juce::juce_recommended_warning_flags
 )
 
+get_target_property(DRS_PLUGIN_VST3_ARTEFACT drs_plugin_bundle_VST3 JUCE_PLUGIN_ARTEFACT_FILE)
+set(DRS_PLUGIN_LEGACY_VST3_DIR
+    "${CMAKE_CURRENT_BINARY_DIR}/DecentRhapsodyStudioPlugin_artefacts/$<CONFIG>/VST3/Decent Rhapsody Studio.vst3")
+
+add_custom_command(TARGET drs_plugin_bundle_VST3 POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        "${CMAKE_CURRENT_BINARY_DIR}/DecentRhapsodyStudioPlugin_artefacts/$<CONFIG>/VST3"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${DRS_PLUGIN_VST3_ARTEFACT}"
+        "${DRS_PLUGIN_LEGACY_VST3_DIR}"
+    COMMENT "Syncing VST3 bundle into legacy DecentRhapsodyStudioPlugin_artefacts path"
+)
+
+add_custom_target(DecentRhapsodyStudioPlugin
+    DEPENDS drs_plugin_bundle_VST3
+)
+
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     ${DRS_APP_SHARED_SOURCES}
     ${DRS_STANDALONE_SOURCES}
-    ${DRS_PLUGIN_SOURCES}
     src/standalone/Main.cpp
+)
+
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
+    src/plugin/PluginEditor.cpp
+    src/plugin/PluginEditor.h
+    src/plugin/PluginProcessor.cpp
+    src/plugin/PluginProcessor.h
+)
+
+source_group("External Sources" FILES
+    ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
 )
 
 set_target_properties(drs_app_shared PROPERTIES FOLDER "Product")
 set_target_properties(drs_standalone_shell PROPERTIES FOLDER "Product")
 set_target_properties(drs_plugin_shell PROPERTIES FOLDER "Product")
 set_target_properties(DecentRhapsodyStudioApp PROPERTIES FOLDER "Product")
+set_target_properties(drs_plugin_bundle PROPERTIES FOLDER "Product")
+set_target_properties(drs_plugin_bundle_VST3 PROPERTIES FOLDER "Product")
 set_target_properties(DecentRhapsodyStudioPlugin PROPERTIES FOLDER "Product")

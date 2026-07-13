@@ -1,7 +1,7 @@
 #pragma once
 
 #include "plugin/PluginProcessor.h"
-#include "shared/StatusPanel.h"
+#include "shared/PerformancePanel.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
@@ -16,6 +16,6 @@ public:
 
 private:
     Processor& processor;
-    drs::app::StatusPanel statusPanel;
+    drs::app::PerformancePanel performancePanel;
 };
 } // namespace drs::plugin

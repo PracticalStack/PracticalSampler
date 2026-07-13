@@ -8,9 +8,11 @@ namespace drs::engine
 {
 std::string getPhase1RuntimeRootPath();
 std::string getPhase1ReferenceCorpusIndexPath();
+std::string getPhase1ReferenceBenchmarkScenePath();
 std::string getPhase1ReferenceBaselinePath();
 std::string getPhase1ReferenceProjectManifestPath();
 std::string getPhase1ReferenceInstrumentManifestPath();
+std::string getPhase1ReferencePackageManifestPath();
 
 RuntimeProjectLoadResult loadRuntimeProjectManifest(const std::string& manifestPath);
 RuntimeProjectLoadResult loadPhase1ReferenceProjectManifest();

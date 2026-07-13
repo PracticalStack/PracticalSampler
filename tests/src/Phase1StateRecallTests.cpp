@@ -27,6 +27,18 @@ std::string readTextFile(const fs::path& path)
     return std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
 }
 
+drs::engine::EngineMacroDescriptor findMacroDescriptor(const drs::engine::EngineFacade& engineFacade,
+                                                       const std::string& macroId)
+{
+    for (const auto& macro : engineFacade.getMacroDescriptors())
+    {
+        if (macro.id == macroId)
+            return macro;
+    }
+
+    throw std::runtime_error("Macro descriptor '" + macroId + "' was not found.");
+}
+
 void requireSessionMatchesLeadPerformance(const drs::engine::RuntimeSessionStateSnapshot& sessionState,
                                           const std::string& context)
 {
@@ -75,6 +87,10 @@ int main()
         require(standaloneReload.restored, "Standalone shell must restore its exported state.");
         requireSessionMatchesLeadPerformance(standaloneReloaded.getEngineFacade().getCurrentSessionState(),
                                             "Standalone shell");
+        require(findMacroDescriptor(standaloneReloaded.getEngineFacade(), "tone").currentEffect == "Balanced attack",
+                "Standalone shell tone macro effect did not restore with the lead fixture.");
+        require(findMacroDescriptor(standaloneReloaded.getEngineFacade(), "motion").currentEffect == "+7 st",
+                "Standalone shell motion macro effect did not restore with the lead fixture.");
 
         const auto standaloneRejected = standaloneReloaded.restoreStateJson(negativePresetJson);
         require(!standaloneRejected.restored, "Standalone shell must reject the transient-diagnostics leak fixture.");
@@ -97,6 +113,10 @@ int main()
         restoredProcessor.setStateInformation(processorState.getData(), static_cast<int>(processorState.getSize()));
         requireSessionMatchesLeadPerformance(restoredProcessor.getEngineFacade().getCurrentSessionState(),
                                             "Plugin processor");
+        require(findMacroDescriptor(restoredProcessor.getEngineFacade(), "tone").currentEffect == "Balanced attack",
+                "Plugin tone macro effect did not restore with the lead fixture.");
+        require(findMacroDescriptor(restoredProcessor.getEngineFacade(), "motion").currentEffect == "+7 st",
+                "Plugin motion macro effect did not restore with the lead fixture.");
         require(restoredProcessor.getEngineFacade().getCurrentSessionState().transientMetrics.lastFailure.empty(),
                 "Plugin processor must not retain a restore failure after a valid round-trip.");
 

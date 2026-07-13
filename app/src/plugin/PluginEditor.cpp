@@ -5,18 +5,26 @@ namespace drs::plugin
 Editor::Editor(Processor& owner)
     : juce::AudioProcessorEditor(owner),
       processor(owner),
-      statusPanel(owner.getEngineFacade(),
-                  [&owner](const std::string& macroId, double value)
-                  {
-                      owner.setMacroValueFromShell(macroId, value);
-                  })
+      performancePanel(owner.getEngineFacade(),
+                       [&owner](const std::string& macroId, double value)
+                       {
+                           owner.setMacroValueFromShell(macroId, value);
+                       },
+                       [&owner](int midiNoteNumber, float velocity)
+                       {
+                           owner.queuePerformanceSurfaceNoteOn(midiNoteNumber, velocity);
+                       },
+                       [&owner](int midiNoteNumber)
+                       {
+                           owner.queuePerformanceSurfaceNoteOff(midiNoteNumber);
+                       })
 {
-    addAndMakeVisible(statusPanel);
-    setSize(720, 420);
+    addAndMakeVisible(performancePanel);
+    setSize(820, 700);
 }
 
 void Editor::resized()
 {
-    statusPanel.setBounds(getLocalBounds());
+    performancePanel.setBounds(getLocalBounds());
 }
 } // namespace drs::plugin

@@ -188,6 +188,11 @@ std::string getPhase1ReferenceCorpusIndexPath()
     return generated::workspacePhase1ReferenceCorpusIndex;
 }
 
+std::string getPhase1ReferenceBenchmarkScenePath()
+{
+    return generated::workspacePhase1ReferenceBenchmarkScene;
+}
+
 std::string getPhase1ReferenceBaselinePath()
 {
     return generated::workspacePhase1ReferenceBaseline;
@@ -201,6 +206,11 @@ std::string getPhase1ReferenceProjectManifestPath()
 std::string getPhase1ReferenceInstrumentManifestPath()
 {
     return generated::workspacePhase1ReferenceManifest;
+}
+
+std::string getPhase1ReferencePackageManifestPath()
+{
+    return generated::workspacePhase1ReferencePackageManifest;
 }
 
 RuntimeProjectLoadResult loadRuntimeProjectManifest(const std::string& manifestPath)

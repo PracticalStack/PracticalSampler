@@ -24,6 +24,13 @@ This fixture reuses the existing open HISE sample assets as its source audio whi
 
 Sprint 2 now also checks in a compiler-emitted prototype `.drstrm` descriptor for this fixture so the reference corpus captures deterministic payload offsets and page-table placeholders instead of only a placeholder container stub.
 
+Sprint 5 now also checks in a package manifest for this fixture so contributors can review one product-owned artifact that names:
+
+- the source sample inputs
+- the checked-in runtime manifests
+- the compiled stream descriptor
+- the expected runtime shape needed for repeatable validation
+
 ### 2. Medium internal streaming case
 
 Status: planned
@@ -95,6 +102,31 @@ These become active once the paging runtime exists:
 - the tiny open instrument must remain small enough for fast smoke validation
 - later larger fixtures must not replace the tiny fixture; they complement it
 
+## Contributor package flow
+
+The tiny open instrument is now also packaged as a checked-in package description at:
+
+- `content/runtime/phase1/reference-corpus/tiny-open-instrument/package-manifest.json`
+
+That file is intentionally generated from the canonical runtime loaders and stream metadata instead of being hand-maintained. The contributor-facing entry point is:
+
+- `powershell -ExecutionPolicy Bypass -File .\tools\package-phase1-reference-instrument.ps1 -Mode Verify`
+
+That wrapper:
+
+- configures the Windows presets if needed
+- builds `drs_phase1_runtime_fixture_tool`
+- runs the same verification path that CI uses for the checked-in manifests and package metadata
+
+If the reference package changes intentionally, refresh the checked-in package manifest with:
+
+- `powershell -ExecutionPolicy Bypass -File .\tools\package-phase1-reference-instrument.ps1 -Mode Refresh`
+
+Refreshes should be followed by a targeted validation pass:
+
+- `ctest --preset test-debug -R "drs.phase1.fixture_tool_verify|drs.phase1.runtime_contract|drs.phase1.macro_bridge|drs.phase0.smoke" --output-on-failure`
+- open the standalone app and confirm `Load Default` and `Load Lead Demo` both produce the expected playable state from the Sprint 5 performance surface
+
 ## Sprint 1 outcome
 
 The repo now has:
@@ -105,3 +137,4 @@ The repo now has:
 - a corrupt malformed-JSON fixture for parse-failure validation
 - a clear placeholder for the medium and stress cases
 - a stable metric vocabulary that later validation work can build on
+- a generated package manifest that ties the public reference source content to the checked-in runtime artifact set

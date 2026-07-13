@@ -109,7 +109,10 @@ Sprint 4 state-recall work has now started in the same seam:
 - `content/runtime/phase1/preset-state/`
 - `docs/phase1-diagnostics.md`
 - `docs/phase1-failure-handling.md`
+- `docs/phase1-macro-map.md`
 - `docs/phase1-macro-bridge.md`
+- `docs/phase1-performance-surface.md`
+- `docs/phase1-reference-corpus.md`
 - `docs/phase1-preset-state.md`
 - `docs/phase1-regression-automation.md`
 - `docs/phase1-state-recall.md`
@@ -118,3 +121,12 @@ Sprint 4 state-recall work has now started in the same seam:
 - `tests/src/Phase1MacroBridgeTests.cpp`
 - `tests/src/Phase1PresetStateTests.cpp`
 - `tests/src/Phase1StateRecallTests.cpp`
+
+Sprint 5 packaging work has now started for the reference instrument milestone artifact:
+
+- `content/runtime/phase1/reference-corpus/tiny-open-instrument/package-manifest.json`
+- `content/runtime/phase1/benchmark-scenes/reference-playback-scene.json`
+- `tools/package-phase1-reference-instrument.ps1`
+- `tools/run-phase1-benchmark-scene.ps1`
+- `docs/phase1-benchmark-scene.md`
+- `docs/phase1-reference-corpus.md`

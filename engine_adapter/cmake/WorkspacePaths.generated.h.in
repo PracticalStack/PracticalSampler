@@ -6,10 +6,12 @@ inline constexpr char workspaceRepoRoot[] = "@CMAKE_SOURCE_DIR@";
 inline constexpr char workspaceHiseProjectRoot[] = "@CMAKE_SOURCE_DIR@/content/hise_project";
 inline constexpr char workspacePhase1RuntimeRoot[] = "@CMAKE_SOURCE_DIR@/content/runtime/phase1";
 inline constexpr char workspacePhase1ReferenceCorpusIndex[] = "@CMAKE_SOURCE_DIR@/content/runtime/phase1/reference-corpus/index.json";
+inline constexpr char workspacePhase1ReferenceBenchmarkScene[] = "@CMAKE_SOURCE_DIR@/content/runtime/phase1/benchmark-scenes/reference-playback-scene.json";
 inline constexpr char workspacePhase1ReferenceBaseline[] = "@CMAKE_SOURCE_DIR@/content/runtime/phase1/baselines/tiny-open-instrument-baseline.json";
 inline constexpr char workspacePhase1ReferenceProject[] = "@CMAKE_SOURCE_DIR@/content/runtime/phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drsproj";
 inline constexpr char workspacePhase1ReferenceManifest[] = "@CMAKE_SOURCE_DIR@/content/runtime/phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drinst";
 inline constexpr char workspacePhase1ReferenceStream[] = "@CMAKE_SOURCE_DIR@/content/runtime/phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drstrm";
+inline constexpr char workspacePhase1ReferencePackageManifest[] = "@CMAKE_SOURCE_DIR@/content/runtime/phase1/reference-corpus/tiny-open-instrument/package-manifest.json";
 inline constexpr char runtimeCompanyName[] = "Decent Rhapsody";
 inline constexpr char runtimeProductName[] = "Decent Rhapsody Studio";
 } // namespace drs::engine::generated
