@@ -80,8 +80,8 @@ int main()
         require(runtimeManifest.instrument.groups.size() == 2, "Expected exactly two runtime groups in the reference manifest.");
         require(runtimeManifest.instrument.articulations.size() == 2,
                 "Expected exactly two articulations in the reference manifest.");
-        require(runtimeManifest.instrument.zones.size() == 2, "Expected exactly two runtime zones in the reference manifest.");
-        require(runtimeManifest.metrics.totalPrefetchBytes == 32768,
+        require(runtimeManifest.instrument.zones.size() == 4, "Expected exactly four runtime zones in the reference manifest.");
+        require(runtimeManifest.metrics.totalPrefetchBytes == 65536,
                 "Reference manifest prefetch budget changed unexpectedly.");
         require(runtimeManifest.metrics.usesStreaming,
                 "Reference manifest must point at a stream-container asset to keep the seam explicit.");

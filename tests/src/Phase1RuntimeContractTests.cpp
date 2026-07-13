@@ -65,7 +65,7 @@ int main()
         require(referenceResult.metrics.sourceProjectResolved, "Reference source project must resolve successfully.");
         require(referenceResult.metrics.compiledStreamAssetResolved, "Reference stream asset must resolve successfully.");
         require(referenceResult.metrics.macroCount == 2, "Reference macro count changed unexpectedly.");
-        require(referenceResult.metrics.zoneCount == 2, "Reference zone count changed unexpectedly.");
+        require(referenceResult.metrics.zoneCount == 4, "Reference zone count changed unexpectedly.");
 
         const auto referenceManifestPath = fs::path(drs::engine::getPhase1ReferenceInstrumentManifestPath());
         const auto serializedManifest = drs::engine::serializeRuntimeInstrumentManifest(referenceResult.instrument,

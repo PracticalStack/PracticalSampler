@@ -2,6 +2,7 @@
 #include "drs/engine/HiseFrontendBridge.h"
 #include "drs/engine/HiseProjectContent.h"
 #include "drs/engine/RuntimeLoader.h"
+#include "drs/engine/RuntimeStream.h"
 #include "drs/engine/HiseVendorInfo.generated.h"
 
 #include <sstream>
@@ -47,6 +48,9 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
     const auto linkedFrontend = getLinkedHiseFrontendSnapshot();
     const auto contentSnapshot = getHiseProjectContentSnapshot();
     const auto runtimeManifest = loadPhase1ReferenceInstrument();
+    const auto runtimeStream = runtimeManifest.loaded
+        ? loadPhase1ReferenceStream()
+        : RuntimeStreamLoadResult {};
 
     detail << "HISE root: " << hiseVendorRoot << "\n";
     detail << "Pinned HISE commit: " << hiseCurrentGitHash << "\n";
@@ -154,6 +158,15 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
                << ", load micros=" << runtimeManifest.metrics.loadDurationMicros
                << ", source project resolved=" << (runtimeManifest.metrics.sourceProjectResolved ? "yes" : "no")
                << ", stream asset resolved=" << (runtimeManifest.metrics.compiledStreamAssetResolved ? "yes" : "no") << "\n";
+        detail << "Stream reader state: " << runtimeStream.state << "\n";
+
+        if (runtimeStream.loaded)
+        {
+            detail << "Stream container: " << runtimeStream.container.containerId
+                   << ", samples=" << runtimeStream.metrics.sampleCount
+                   << ", pages=" << runtimeStream.metrics.pageCount
+                   << ", checksum validations=" << runtimeStream.metrics.checksumValidatedCount << "\n";
+        }
     }
 
     if (!runtimeManifest.issues.empty())
@@ -161,6 +174,14 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
         detail << "Runtime manifest issues:\n";
 
         for (const auto& issue : runtimeManifest.issues)
+            detail << "- " << issue << "\n";
+    }
+
+    if (runtimeManifest.loaded && !runtimeStream.issues.empty())
+    {
+        detail << "Runtime stream issues:\n";
+
+        for (const auto& issue : runtimeStream.issues)
             detail << "- " << issue << "\n";
     }
 
@@ -216,5 +237,10 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
 RuntimeManifestLoadResult EngineFacade::loadPhase1ReferenceInstrument() const
 {
     return loadPhase1ReferenceInstrumentManifest();
+}
+
+RuntimeStreamLoadResult EngineFacade::loadPhase1ReferenceStream() const
+{
+    return loadPhase1ReferenceStreamContainer();
 }
 } // namespace drs::engine

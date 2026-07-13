@@ -41,5 +41,6 @@ public:
     std::vector<HiseFrontendExportProfile> getFrontendExportProfiles() const;
     EngineStatusSnapshot getStatusSnapshot() const;
     RuntimeManifestLoadResult loadPhase1ReferenceInstrument() const;
+    RuntimeStreamLoadResult loadPhase1ReferenceStream() const;
 };
 } // namespace drs::engine

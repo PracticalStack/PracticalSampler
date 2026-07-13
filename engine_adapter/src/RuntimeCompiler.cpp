@@ -154,7 +154,8 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
     for (const auto& group : plan.groups)
         groupIds.emplace(group.id, true);
 
-    std::uint64_t nextOffsetBytes = 0;
+    std::unordered_map<std::string, std::uint64_t> maxPrefetchBySourceId;
+    maxPrefetchBySourceId.reserve(plan.sampleSources.size());
 
     for (const auto& zonePlan : plan.zones)
     {
@@ -176,8 +177,70 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
 
         if (zonePlan.velocityLow > zonePlan.velocityHigh)
             addIssue(result, "Zone '" + zonePlan.id + "' has velocityLow greater than velocityHigh.");
+        maxPrefetchBySourceId[zonePlan.sourceId] = std::max(maxPrefetchBySourceId[zonePlan.sourceId],
+                                                            zonePlan.prefetchBytes);
+    }
 
-        const auto& source = sourceIterator->second;
+    if (!result.issues.empty())
+    {
+        result.state = "Compile plan invalid";
+        return result;
+    }
+
+    std::unordered_map<std::string, std::uint64_t> streamOffsetBySourceId;
+    streamOffsetBySourceId.reserve(maxPrefetchBySourceId.size());
+
+    std::uint64_t nextOffsetBytes = 0;
+    for (const auto& sampleSource : plan.sampleSources)
+    {
+        const auto prefetchIterator = maxPrefetchBySourceId.find(sampleSource.id);
+        if (prefetchIterator == maxPrefetchBySourceId.end())
+            continue;
+
+        const auto payloadSizeBytes = sampleSource.metadata.frameCount
+            * static_cast<std::uint64_t>(sampleSource.metadata.channelCount)
+            * sizeof(float);
+        const auto clampedPrefetchBytes = std::min(prefetchIterator->second, payloadSizeBytes);
+
+        CompiledStreamSampleDefinition streamSample;
+        streamSample.sampleId = sampleSource.id;
+        streamSample.sourcePath = sampleSource.sourcePath;
+        streamSample.sourceChecksumHex = sampleSource.metadata.sourceChecksumHex;
+        streamSample.formatName = sampleSource.metadata.formatName;
+        streamSample.role = sampleSource.role;
+        streamSample.sampleRate = sampleSource.metadata.sampleRate;
+        streamSample.frameCount = sampleSource.metadata.frameCount;
+        streamSample.channelCount = sampleSource.metadata.channelCount;
+        streamSample.payloadOffsetBytes = nextOffsetBytes;
+        streamSample.payloadSizeBytes = payloadSizeBytes;
+        streamSample.prefetchBytes = clampedPrefetchBytes;
+        streamSample.rootMidiNotePresent = sampleSource.metadata.rootMidiNotePresent;
+        streamSample.rootMidiNote = sampleSource.metadata.rootMidiNote;
+        streamSample.loopRangePresent = sampleSource.metadata.loopRangePresent;
+        streamSample.loopStartFrame = sampleSource.metadata.loopStartFrame;
+        streamSample.loopEndFrame = sampleSource.metadata.loopEndFrame;
+
+        auto streamedOffsetBytes = clampedPrefetchBytes;
+        std::uint32_t pageIndex = 0;
+        while (streamedOffsetBytes < payloadSizeBytes)
+        {
+            CompiledStreamPageDefinition page;
+            page.pageIndex = pageIndex++;
+            page.offsetBytes = nextOffsetBytes + streamedOffsetBytes;
+            page.sizeBytes = std::min(plan.pageSizeBytes, payloadSizeBytes - streamedOffsetBytes);
+            streamSample.pages.push_back(std::move(page));
+            streamedOffsetBytes += plan.pageSizeBytes;
+        }
+
+        streamOffsetBySourceId[sampleSource.id] = nextOffsetBytes;
+        result.totalPayloadBytes += payloadSizeBytes;
+        result.streamSamples.push_back(std::move(streamSample));
+        nextOffsetBytes += alignUp(payloadSizeBytes, plan.pageSizeBytes);
+    }
+
+    for (const auto& zonePlan : plan.zones)
+    {
+        const auto& source = sourceById.at(zonePlan.sourceId);
         const auto payloadSizeBytes = source.metadata.frameCount
             * static_cast<std::uint64_t>(source.metadata.channelCount)
             * sizeof(float);
@@ -194,49 +257,9 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         zone.keyHigh = zonePlan.keyHigh;
         zone.velocityLow = zonePlan.velocityLow;
         zone.velocityHigh = zonePlan.velocityHigh;
-        zone.streamOffsetBytes = nextOffsetBytes;
+        zone.streamOffsetBytes = streamOffsetBySourceId.at(zonePlan.sourceId);
         zone.prefetchBytes = clampedPrefetchBytes;
         result.instrument.zones.push_back(std::move(zone));
-
-        CompiledStreamSampleDefinition streamSample;
-        streamSample.sampleId = source.id;
-        streamSample.sourcePath = source.sourcePath;
-        streamSample.sourceChecksumHex = source.metadata.sourceChecksumHex;
-        streamSample.formatName = source.metadata.formatName;
-        streamSample.role = source.role;
-        streamSample.sampleRate = source.metadata.sampleRate;
-        streamSample.frameCount = source.metadata.frameCount;
-        streamSample.channelCount = source.metadata.channelCount;
-        streamSample.payloadOffsetBytes = nextOffsetBytes;
-        streamSample.payloadSizeBytes = payloadSizeBytes;
-        streamSample.prefetchBytes = clampedPrefetchBytes;
-        streamSample.rootMidiNotePresent = source.metadata.rootMidiNotePresent;
-        streamSample.rootMidiNote = source.metadata.rootMidiNote;
-        streamSample.loopRangePresent = source.metadata.loopRangePresent;
-        streamSample.loopStartFrame = source.metadata.loopStartFrame;
-        streamSample.loopEndFrame = source.metadata.loopEndFrame;
-
-        auto streamedOffsetBytes = clampedPrefetchBytes;
-        std::uint32_t pageIndex = 0;
-        while (streamedOffsetBytes < payloadSizeBytes)
-        {
-            CompiledStreamPageDefinition page;
-            page.pageIndex = pageIndex++;
-            page.offsetBytes = nextOffsetBytes + streamedOffsetBytes;
-            page.sizeBytes = std::min(plan.pageSizeBytes, payloadSizeBytes - streamedOffsetBytes);
-            streamSample.pages.push_back(std::move(page));
-            streamedOffsetBytes += plan.pageSizeBytes;
-        }
-
-        result.totalPayloadBytes += payloadSizeBytes;
-        result.streamSamples.push_back(std::move(streamSample));
-        nextOffsetBytes += alignUp(payloadSizeBytes, plan.pageSizeBytes);
-    }
-
-    if (!result.issues.empty())
-    {
-        result.state = "Compile plan invalid";
-        return result;
     }
 
     result.compiled = true;

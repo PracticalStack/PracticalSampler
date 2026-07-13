@@ -9,6 +9,7 @@ inline constexpr char workspacePhase1ReferenceCorpusIndex[] = "@CMAKE_SOURCE_DIR
 inline constexpr char workspacePhase1ReferenceBaseline[] = "@CMAKE_SOURCE_DIR@/content/runtime/phase1/baselines/tiny-open-instrument-baseline.json";
 inline constexpr char workspacePhase1ReferenceProject[] = "@CMAKE_SOURCE_DIR@/content/runtime/phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drsproj";
 inline constexpr char workspacePhase1ReferenceManifest[] = "@CMAKE_SOURCE_DIR@/content/runtime/phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drinst";
+inline constexpr char workspacePhase1ReferenceStream[] = "@CMAKE_SOURCE_DIR@/content/runtime/phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drstrm";
 inline constexpr char runtimeCompanyName[] = "Decent Rhapsody";
 inline constexpr char runtimeProductName[] = "Decent Rhapsody Studio";
 } // namespace drs::engine::generated

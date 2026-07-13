@@ -90,8 +90,10 @@ The adapter-side runtime model now has explicit product-owned structs for:
 - groups
 - zones
 - instrument manifest
+- stream-container samples and pages
 - load metrics
 - manifest load results
+- stream-container load and read-resolution results
 
 That model is intentionally defined in `engine_adapter/include/drs/engine/RuntimeModel.h` so the shell can consume runtime status without reaching into HISE types.
 
@@ -119,6 +121,53 @@ The Sprint 1 loader does not yet:
 - allocate voices
 - page stream data
 - compile source assets into runtime artifacts
+
+Sprint 3 now adds the first product-owned `.drstrm` reader, which must:
+
+- parse the compiled stream descriptor
+- validate source checksums plus payload and page-table layout
+- resolve sample-relative offsets into either prefetch-head or page-table spans
+
+Sprint 3 now also adds the first product-owned background streaming service, which must:
+
+- accept page-read requests without blocking the requester thread
+- resolve queued reads on a worker thread
+- expose resident-page, pending-request, and lease-lifetime state explicitly
+- expose the active load-profile id plus configured cache budget explicitly
+
+Sprint 3 now also adds the first product-owned voice state object, which must:
+
+- bind a concrete zone, group, articulation, and macro snapshot at allocation time
+- advance explicit stream cursors through head data and streamed pages
+- wait, resume, release, and finish without stale lease leakage
+
+Sprint 3 now also adds the first product-owned note-routing path, which must:
+
+- resolve the default articulation when a trigger omits one
+- route note and velocity pairs to the expected zone for the reference instrument
+- fail loudly when no articulation or zone mapping exists for a trigger
+- hand the resolved zone directly to the existing voice and streaming path
+
+Sprint 3 now also adds the first product-owned load-profile policy, which must:
+
+- resolve named `eco`, `balanced`, and `performance` profiles by stable product-owned ids
+- clamp per-voice prefetch to the selected profile budget
+- let the shared streaming service downgrade cache budgets without invalidating active leases
+- allow dormant resident pages to be purged explicitly after active playback releases them
+
+Sprint 3 now also adds the first product-owned runtime counters, which must:
+
+- count page misses when voices stall at streamed boundaries
+- record prefetch-head usage before streamed-page waits begin
+- expose read latency statistics from queued background page reads
+- surface active and peak voice counts through the streaming runtime
+- record purge activity during both automatic eviction and explicit dormant cleanup
+
+The reader still does not:
+
+- schedule asynchronous I/O
+- own cache lifetime
+- execute playback voices
 
 ## Why this matters
 

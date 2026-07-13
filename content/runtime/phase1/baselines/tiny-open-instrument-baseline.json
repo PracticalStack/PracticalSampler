@@ -5,20 +5,20 @@
   "referenceManifestPath": "content/runtime/phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drinst",
   "timingUnits": "microseconds",
   "staticExpectations": {
-    "manifestBytes": 2139,
+    "manifestBytes": 2987,
     "sourceProjectResolved": true,
     "compiledStreamAssetResolved": true,
     "macroCount": 2,
     "articulationCount": 2,
     "groupCount": 2,
-    "zoneCount": 2,
-    "referencedSampleCount": 2,
-    "totalPrefetchBytes": 32768
+    "zoneCount": 4,
+    "referencedSampleCount": 4,
+    "totalPrefetchBytes": 65536
   },
   "latestObserved": {
     "capturedOn": "2026-07-12",
-    "coldLoadMicros": 857,
-    "warmLoadMicros": 767
+    "coldLoadMicros": 2031,
+    "warmLoadMicros": 1944
   },
   "driftPolicy": {
     "allowedPositiveDriftMicros": 5000,

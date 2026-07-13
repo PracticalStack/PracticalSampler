@@ -87,7 +87,7 @@ drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path& output
     };
     plan.instrumentValidationNotes = {
         "Uses the existing open HISE sample assets as stand-in sample sources for Sprint 1.",
-        "Exercises two articulations, two groups, and explicit prefetch metadata.",
+        "Exercises two articulations, two groups, velocity-layer routing, and explicit prefetch metadata.",
         "Acts as the canonical loader fixture until the import compiler lands in Sprint 2."
     };
 
@@ -154,9 +154,22 @@ drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path& output
     padZone.keyLow = 36;
     padZone.keyHigh = 76;
     padZone.velocityLow = 1;
-    padZone.velocityHigh = 127;
+    padZone.velocityHigh = 95;
     padZone.prefetchBytes = 16384;
     plan.zones.push_back(std::move(padZone));
+
+    drs::engine::RuntimeCompileZoneDefinition padAccentZone;
+    padAccentZone.id = "pad-a3-accent";
+    padAccentZone.sourceId = "sine-a3";
+    padAccentZone.groupId = "pad-core";
+    padAccentZone.articulationId = "sustain";
+    padAccentZone.rootKey = 57;
+    padAccentZone.keyLow = 36;
+    padAccentZone.keyHigh = 76;
+    padAccentZone.velocityLow = 96;
+    padAccentZone.velocityHigh = 127;
+    padAccentZone.prefetchBytes = 16384;
+    plan.zones.push_back(std::move(padAccentZone));
 
     drs::engine::RuntimeCompileZoneDefinition leadZone;
     leadZone.id = "lead-a4";
@@ -167,9 +180,22 @@ drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path& output
     leadZone.keyLow = 60;
     leadZone.keyHigh = 96;
     leadZone.velocityLow = 1;
-    leadZone.velocityHigh = 127;
+    leadZone.velocityHigh = 95;
     leadZone.prefetchBytes = 16384;
     plan.zones.push_back(std::move(leadZone));
+
+    drs::engine::RuntimeCompileZoneDefinition leadAccentZone;
+    leadAccentZone.id = "lead-a4-accent";
+    leadAccentZone.sourceId = "triangle-a4";
+    leadAccentZone.groupId = "lead-core";
+    leadAccentZone.articulationId = "lead";
+    leadAccentZone.rootKey = 69;
+    leadAccentZone.keyLow = 60;
+    leadAccentZone.keyHigh = 96;
+    leadAccentZone.velocityLow = 96;
+    leadAccentZone.velocityHigh = 127;
+    leadAccentZone.prefetchBytes = 16384;
+    plan.zones.push_back(std::move(leadAccentZone));
 
     return plan;
 }
@@ -238,8 +264,8 @@ int main()
         require(generatedInstrumentLoad.loaded, "Loader must open the compiler-generated instrument manifest.");
         require(generatedInstrumentLoad.metrics.macroCount == 2, "Compiler-generated manifest macro count changed unexpectedly.");
         require(generatedInstrumentLoad.metrics.groupCount == 2, "Compiler-generated manifest group count changed unexpectedly.");
-        require(generatedInstrumentLoad.metrics.zoneCount == 2, "Compiler-generated manifest zone count changed unexpectedly.");
-        require(generatedInstrumentLoad.metrics.totalPrefetchBytes == 32768,
+        require(generatedInstrumentLoad.metrics.zoneCount == 4, "Compiler-generated manifest zone count changed unexpectedly.");
+        require(generatedInstrumentLoad.metrics.totalPrefetchBytes == 65536,
                 "Compiler-generated manifest total prefetch bytes changed unexpectedly.");
 
         const auto streamJson = json::parse(generatedStreamJson);

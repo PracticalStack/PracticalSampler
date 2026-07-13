@@ -11,7 +11,13 @@ Current baseline:
 - `drs_phase1_runtime_contract_tests` validates the product-owned `.drinst` fixture contract plus negative fixtures.
 - `drs_phase1_sample_import_tests` generates paired WAV and FLAC fixtures, imports them through the product-owned decoder seam, and checks normalized metadata plus failure reporting.
 - `drs_phase1_compile_path_tests` imports the real reference WAV sources, compiles deterministic runtime artifacts in a temp directory, confirms the Sprint 1 loader can open the generated manifests, and rejects unsupported compile-policy inputs loudly.
-- `drs_phase1_pipeline_report` writes a single JSON report for the reference corpus covering loader status, importer status, compile determinism, golden-file parity, and corruption checks.
+- `drs_phase1_pipeline_report` writes a single JSON report for the reference corpus covering loader, stream-reader, streaming-service, voice-runtime, note-routing, load-profile, runtime-counters, importer, compile-determinism, golden-file-parity, and corruption-check status.
+- `drs_phase1_stream_reader_tests` loads the checked-in `.drstrm` artifact, verifies prefetch and page lookup math, and fails cleanly on checksum or offset corruption.
+- `drs_phase1_streaming_service_tests` exercises the background page-read scheduler, cache hits, in-flight request coalescing, lease release, and cache-budget eviction behavior.
+- `drs_phase1_voice_runtime_tests` exercises voice allocation, macro snapshots, wait-at-page-boundary behavior, polyphony cleanup, and stale-lease prevention.
+- `drs_phase1_note_routing_tests` exercises default-articulation selection, explicit `lead` routing, velocity-layer selection, routed playback hand-off, and loud failures for unmapped triggers.
+- `drs_phase1_load_profile_tests` exercises named `eco`/`balanced`/`performance` budgets, per-voice prefetch clamping, live profile downgrade behavior, dormant-page purge, and unknown-profile rejection.
+- `drs_phase1_runtime_counters_tests` exercises page misses, head usage, read latency, active voice counts, and purge activity during stress playback and idle recovery.
 - `drs_phase1_runtime_baseline_report` prints the first cold-vs-warm manifest-load baseline report for the reference instrument and writes `phase1-runtime-baseline.json` in the test build directory when run through CTest.
 - `drs_phase1_runtime_baseline_guard` compares the generated baseline artifact against the checked-in snapshot and fails CI when static fields drift or timing moves beyond the reviewed tolerance window.
 - `drs_phase1_runtime_fixture_tool` can verify or intentionally rewrite the checked-in Sprint 1 reference fixtures and baseline snapshot.

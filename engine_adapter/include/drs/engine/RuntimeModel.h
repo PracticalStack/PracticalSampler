@@ -80,6 +80,46 @@ struct RuntimeInstrumentModel
     std::vector<std::string> validationNotes;
 };
 
+struct RuntimeStreamPageDefinition
+{
+    std::uint32_t pageIndex = 0;
+    std::uint64_t offsetBytes = 0;
+    std::uint64_t sizeBytes = 0;
+};
+
+struct RuntimeStreamSampleDefinition
+{
+    std::string sampleId;
+    std::string sourcePath;
+    std::string sourceChecksumHex;
+    std::string formatName;
+    std::string role;
+    double sampleRate = 0.0;
+    std::uint64_t frameCount = 0;
+    std::uint32_t channelCount = 0;
+    std::uint64_t payloadOffsetBytes = 0;
+    std::uint64_t payloadSizeBytes = 0;
+    std::uint64_t prefetchBytes = 0;
+    bool rootMidiNotePresent = false;
+    int rootMidiNote = 60;
+    bool loopRangePresent = false;
+    std::uint64_t loopStartFrame = 0;
+    std::uint64_t loopEndFrame = 0;
+    std::vector<RuntimeStreamPageDefinition> pages;
+};
+
+struct RuntimeStreamContainerModel
+{
+    std::string schemaName;
+    int schemaVersion = 0;
+    std::string containerId;
+    std::uint64_t pageSizeBytes = 0;
+    std::string payloadEncoding;
+    std::uint64_t totalPayloadBytes = 0;
+    std::vector<RuntimeStreamSampleDefinition> samples;
+    std::vector<std::string> notes;
+};
+
 struct RuntimeLoadMetrics
 {
     std::size_t macroCount = 0;
@@ -95,6 +135,15 @@ struct RuntimeLoadMetrics
     bool compiledStreamAssetResolved = false;
 };
 
+struct RuntimeStreamLoadMetrics
+{
+    std::size_t sampleCount = 0;
+    std::size_t pageCount = 0;
+    std::size_t checksumValidatedCount = 0;
+    bool payloadLayoutValidated = false;
+    bool pageTableValidated = false;
+};
+
 struct RuntimeManifestLoadResult
 {
     bool manifestFound = false;
@@ -104,6 +153,30 @@ struct RuntimeManifestLoadResult
     std::vector<std::string> issues;
     RuntimeInstrumentModel instrument;
     RuntimeLoadMetrics metrics;
+};
+
+struct RuntimeStreamLoadResult
+{
+    bool containerFound = false;
+    bool loaded = false;
+    std::string containerPath;
+    std::string state;
+    std::vector<std::string> issues;
+    RuntimeStreamContainerModel container;
+    RuntimeStreamLoadMetrics metrics;
+};
+
+struct RuntimeStreamReadResult
+{
+    bool resolved = false;
+    bool inPrefetchHead = false;
+    bool inPageTable = false;
+    std::string state;
+    std::string sampleId;
+    std::uint64_t payloadRelativeOffsetBytes = 0;
+    std::uint64_t absoluteOffsetBytes = 0;
+    std::uint64_t readableBytes = 0;
+    std::uint32_t pageIndex = 0;
 };
 
 struct RuntimeProjectLoadResult

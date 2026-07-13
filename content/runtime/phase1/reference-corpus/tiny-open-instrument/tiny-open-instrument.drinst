@@ -61,6 +61,20 @@
       "keyLow": 36,
       "keyHigh": 76,
       "velocityLow": 1,
+      "velocityHigh": 95,
+      "streamOffsetBytes": 0,
+      "prefetchBytes": 16384
+    },
+    {
+      "id": "pad-a3-accent",
+      "groupId": "pad-core",
+      "articulationId": "sustain",
+      "samplePath": "../../../../hise_project/Samples/DRS_Sine_A3.wav",
+      "streamAssetPath": "tiny-open-instrument.drstrm",
+      "rootKey": 57,
+      "keyLow": 36,
+      "keyHigh": 76,
+      "velocityLow": 96,
       "velocityHigh": 127,
       "streamOffsetBytes": 0,
       "prefetchBytes": 16384
@@ -75,6 +89,20 @@
       "keyLow": 60,
       "keyHigh": 96,
       "velocityLow": 1,
+      "velocityHigh": 95,
+      "streamOffsetBytes": 393216,
+      "prefetchBytes": 16384
+    },
+    {
+      "id": "lead-a4-accent",
+      "groupId": "lead-core",
+      "articulationId": "lead",
+      "samplePath": "../../../../hise_project/Samples/DRS_TriangleLead_A4.wav",
+      "streamAssetPath": "tiny-open-instrument.drstrm",
+      "rootKey": 69,
+      "keyLow": 60,
+      "keyHigh": 96,
+      "velocityLow": 96,
       "velocityHigh": 127,
       "streamOffsetBytes": 393216,
       "prefetchBytes": 16384
@@ -82,7 +110,7 @@
   ],
   "validationNotes": [
     "Uses the existing open HISE sample assets as stand-in sample sources for Sprint 1.",
-    "Exercises two articulations, two groups, and explicit prefetch metadata.",
+    "Exercises two articulations, two groups, velocity-layer routing, and explicit prefetch metadata.",
     "Acts as the canonical loader fixture until the import compiler lands in Sprint 2."
   ]
 }
