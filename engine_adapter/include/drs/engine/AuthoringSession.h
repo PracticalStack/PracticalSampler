@@ -42,6 +42,7 @@ public:
 
     const RuntimeProjectModel& getProject() const;
     const RuntimeProjectDocumentState& getDocumentState() const;
+    void replaceProject(RuntimeProjectModel project);
 
     std::vector<AuthoringZoneSummary> getZoneSummaries() const;
     std::optional<RuntimeProjectZoneDefinition> getSelectedZone() const;
@@ -52,6 +53,9 @@ public:
     RuntimeProjectDocumentActionResult selectPerformanceBank(const std::string& performanceBankId);
     RuntimeProjectDocumentActionResult updateSelectedZone(const RuntimeProjectZoneDefinition& zone,
                                                           const std::string& label);
+    RuntimeProjectDocumentActionResult appendImportedContent(std::vector<RuntimeProjectSampleSource> sampleSources,
+                                                            std::vector<RuntimeProjectZoneDefinition> zones,
+                                                            const std::string& label);
     RuntimeProjectDocumentActionResult updateMacro(std::size_t macroIndex,
                                                    const RuntimeProjectMacroDefinition& macro,
                                                    const std::string& label);

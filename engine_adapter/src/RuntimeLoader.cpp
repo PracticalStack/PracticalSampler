@@ -938,7 +938,7 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
     if (project.defaultInstrumentManifestPath.empty())
         addIssue(result, "Project defaultInstrumentManifestPath must not be empty.");
 
-    if (project.sampleSources.empty())
+    if (project.schemaVersion == 1 && project.sampleSources.empty())
         addIssue(result, "Project must declare at least one sample source.");
 
     {

@@ -2,6 +2,8 @@
 
 #include <juce_audio_processors_headless/juce_audio_processors_headless.h>
 
+#include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -12,6 +14,20 @@ void require(bool condition, const std::string& message)
 {
     if (!condition)
         throw std::runtime_error(message);
+}
+
+bool hasVisibleWaveform(const drs::app::AuthoringWaveformPreview& preview)
+{
+    constexpr auto amplitudeEpsilon = 1.0e-4f;
+
+    return std::any_of(preview.points.begin(),
+                       preview.points.end(),
+                       [&](const drs::app::AuthoringWaveformPreviewPoint& point)
+                       {
+                           return std::abs(point.minValue) > amplitudeEpsilon
+                               || std::abs(point.maxValue) > amplitudeEpsilon
+                               || std::abs(point.maxValue - point.minValue) > amplitudeEpsilon;
+                       });
 }
 } // namespace
 
@@ -41,6 +57,8 @@ int main()
         require(defaultPreview.channelCount == 2, "Phase 2 default waveform fixture channel count changed unexpectedly.");
         require(defaultPreview.frameCount == 44100, "Phase 2 default waveform fixture frame count changed unexpectedly.");
         require(!defaultPreview.points.empty(), "Phase 2 default waveform fixture should include preview points.");
+        require(hasVisibleWaveform(defaultPreview),
+                "Phase 2 default waveform fixture should render visible waveform amplitude data.");
         require(!defaultPreview.loopEnabled, "Lead waveform preview should begin with looping disabled.");
         require(defaultPreview.loopStartFrame == 0 && defaultPreview.loopEndFrame == 0,
                 "Lead waveform preview loop markers changed unexpectedly.");
@@ -54,6 +72,8 @@ int main()
         require(loopPreview.channelCount == 1, "Looping Phase 2 waveform channel count changed unexpectedly.");
         require(loopPreview.frameCount == 88200, "Looping Phase 2 waveform frame count changed unexpectedly.");
         require(!loopPreview.points.empty(), "Looping Phase 2 waveform preview should include preview points.");
+        require(hasVisibleWaveform(loopPreview),
+                "Looping Phase 2 waveform preview should render visible waveform amplitude data.");
         require(loopPreview.loopEnabled, "Looping Phase 2 zone should report loop-enabled preview metadata.");
         require(loopPreview.loopStartFrame == 512, "Looping Phase 2 zone loop start changed unexpectedly.");
         require(loopPreview.loopEndFrame == 22016, "Looping Phase 2 zone loop end changed unexpectedly.");

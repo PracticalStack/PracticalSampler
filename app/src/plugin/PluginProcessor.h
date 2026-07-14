@@ -52,6 +52,7 @@ public:
     const juce::AudioProcessorValueTreeState& getParameterState() const { return parameterState; }
     drs::app::AuthoringWaveformPreview getAuthoringWaveformPreview();
     drs::app::AuthoringImportResponsivenessSnapshot getAuthoringImportResponsivenessSnapshot() const;
+    void replaceAuthoringProject(drs::engine::RuntimeProjectModel project);
     void setMacroValueFromShell(const std::string& macroId, double value);
     void queuePerformanceSurfaceNoteOn(int midiNoteNumber, float velocity);
     void queuePerformanceSurfaceNoteOff(int midiNoteNumber);

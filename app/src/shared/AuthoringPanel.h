@@ -34,6 +34,7 @@ public:
 
     void paint(juce::Graphics& g) override;
     void resized() override;
+    void reloadFromSession();
 
 private:
     class ZoneMapComponent final : public juce::Component

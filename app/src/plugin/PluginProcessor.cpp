@@ -101,6 +101,30 @@ std::optional<drs::engine::RuntimeProjectSampleSource> findProjectSampleSource(c
 
     return *iterator;
 }
+
+const std::vector<float>* selectWaveformPreviewChannel(const drs::engine::ImportedSampleData& sample)
+{
+    const std::vector<float>* previewChannel = nullptr;
+    auto previewChannelPeak = 0.0f;
+
+    for (const auto& channel : sample.normalizedChannels)
+    {
+        if (channel.empty())
+            continue;
+
+        auto channelPeak = 0.0f;
+        for (const auto value : channel)
+            channelPeak = std::max(channelPeak, std::abs(value));
+
+        if (previewChannel == nullptr || channelPeak > previewChannelPeak)
+        {
+            previewChannel = &channel;
+            previewChannelPeak = channelPeak;
+        }
+    }
+
+    return previewChannel;
+}
 } // namespace
 
 Processor::Processor()
@@ -261,6 +285,14 @@ drs::app::AuthoringImportResponsivenessSnapshot Processor::getAuthoringImportRes
     return authoringImportResponsivenessSnapshot;
 }
 
+void Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project)
+{
+    authoringSession.replaceProject(std::move(project));
+    authoringWaveformPreviewCache.clear();
+    activeVoices.clear();
+    initializeAuthoringImportMetrics();
+}
+
 void Processor::queuePerformanceSurfaceNoteOn(int midiNoteNumber, float velocity)
 {
     auto message = juce::MidiMessage::noteOn(1,
@@ -354,10 +386,11 @@ drs::app::AuthoringWaveformPreview Processor::buildAuthoringWaveformPreview(cons
     preview.loopStartFrame = loopStartFrame;
     preview.loopEndFrame = loopEndFrame;
 
-    if (sample.normalizedChannels.empty() || sample.normalizedChannels.front().empty())
+    const auto* previewChannel = selectWaveformPreviewChannel(sample);
+    if (previewChannel == nullptr)
         return preview;
 
-    const auto& monoView = sample.normalizedChannels.front();
+    const auto& monoView = *previewChannel;
     constexpr std::size_t pointCount = 192;
     const auto bucketSize = std::max<std::size_t>(1, monoView.size() / pointCount);
 

@@ -1,3 +1,4 @@
+#include "drs/engine/AuthoringSession.h"
 #include "drs/engine/ProjectDocument.h"
 #include "drs/engine/RuntimeLoader.h"
 
@@ -60,6 +61,51 @@ int main()
                 "Phase 2 authoring fixture routing-bus count changed unexpectedly.");
         require(phase2Project.project.authoring.performanceBanks.size() == 1,
                 "Phase 2 authoring fixture performance-bank count changed unexpectedly.");
+
+        drs::engine::RuntimeProjectModel blankProject;
+        blankProject.schemaName = "drs.project";
+        blankProject.schemaVersion = 2;
+        blankProject.projectId = "phase2.blank-project";
+        blankProject.displayName = "Blank Project";
+        blankProject.contentRootPath = phase2Project.project.contentRootPath;
+        blankProject.defaultInstrumentManifestPath = phase2Project.project.defaultInstrumentManifestPath;
+        blankProject.authoring.schemaName = "drs.authoring";
+        blankProject.authoring.schemaVersion = 1;
+        blankProject.notes.push_back("Blank project validation fixture.");
+
+        const auto blankValidation = drs::engine::validateRuntimeProjectModel(blankProject);
+        require(blankValidation.valid, "Blank Phase 2 authoring project should validate without sample sources.");
+
+        drs::engine::AuthoringSession blankSession(blankProject);
+        drs::engine::RuntimeProjectSampleSource importedSampleSource;
+        importedSampleSource.id = "imported-sine-a3";
+        importedSampleSource.path = phase2Project.project.sampleSources[0].path;
+        importedSampleSource.role = "imported-sustain";
+
+        drs::engine::RuntimeProjectZoneDefinition importedZone;
+        importedZone.id = "imported-pad-a3";
+        importedZone.sampleSourceId = importedSampleSource.id;
+        importedZone.displayName = "Imported Pad A3";
+        importedZone.groupId = "imported-group";
+        importedZone.articulationId = "sustain";
+        importedZone.rootKey = 60;
+        importedZone.keyLow = 60;
+        importedZone.keyHigh = 60;
+        importedZone.velocityLow = 1;
+        importedZone.velocityHigh = 127;
+
+        const auto appendResult = blankSession.appendImportedContent({ importedSampleSource },
+                                                                    { importedZone },
+                                                                    "Import draft sample");
+        require(appendResult.applied, "Blank Phase 2 authoring project should accept imported draft content.");
+        require(blankSession.getProject().sampleSources.size() == 1,
+                "Imported draft content should append a sample source.");
+        require(blankSession.getProject().authoring.zones.size() == 1,
+                "Imported draft content should append an authoring zone.");
+        require(blankSession.getProject().authoring.selectedZoneId == "imported-pad-a3",
+                "Imported draft content should select the first imported zone.");
+        require(blankSession.getDocumentState().dirty,
+                "Imported draft content should mark the authoring project dirty.");
 
         const auto serializedPhase2Project = drs::engine::serializeRuntimeProjectManifest(phase2Project.project,
                                                                                            phase2ProjectPath.generic_string());
@@ -132,6 +178,16 @@ int main()
                 "Saved Phase 2 authoring project must preserve the edited FX bypass state.");
         require(roundTripLoad.project.authoring.selectedZoneId == "pad-a3-high",
                 "Saved Phase 2 authoring project must preserve the edited selected zone.");
+
+        const auto blankProjectPath = tempDirectory / "blank-project-roundtrip.drsproj";
+        writeTextFile(blankProjectPath,
+                      drs::engine::serializeRuntimeProjectManifest(blankProject, blankProjectPath.generic_string()));
+        const auto blankRoundTrip = drs::engine::loadRuntimeProjectManifest(blankProjectPath.generic_string());
+        require(blankRoundTrip.loaded, "Blank Phase 2 authoring project should survive save/load round-tripping.");
+        require(blankRoundTrip.project.sampleSources.empty(),
+                "Blank Phase 2 authoring project should preserve an empty sample-source list.");
+        require(blankRoundTrip.project.authoring.zones.empty(),
+                "Blank Phase 2 authoring project should preserve an empty authoring-zone list.");
 
         auto invalidEdit = controller.getProject();
         invalidEdit.authoring.zones[0].sampleSourceId = "missing-source";

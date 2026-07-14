@@ -880,6 +880,11 @@ void AuthoringPanel::resized()
     }
 }
 
+void AuthoringPanel::reloadFromSession()
+{
+    refreshFromSession();
+}
+
 void AuthoringPanel::rebuildZoneSelector()
 {
     const auto zones = authoringSession.getZoneSummaries();
