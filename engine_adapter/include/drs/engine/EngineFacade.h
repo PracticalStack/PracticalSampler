@@ -178,6 +178,7 @@ private:
 
     RuntimeManifestLoadResult referenceManifest;
     RuntimeStreamLoadResult referenceStream;
+    bool referenceInstrumentActive = false;
     RuntimeSessionStateSnapshot currentSessionState;
     EngineDiagnosticsSnapshot diagnosticsSnapshot;
     EnginePreviewPlaybackSnapshot previewPlaybackSnapshot;

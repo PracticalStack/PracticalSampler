@@ -160,9 +160,19 @@ struct ParsedSampleFilenameHeuristics
     AuthoringImportZoneSuggestion suggestedZone;
 };
 
+struct SampleRootKeyInferenceResult
+{
+    bool resolved = false;
+    int rootKey = 60;
+    std::string source = "manual";
+    std::vector<AuthoringImportFinding> findings;
+};
+
 SampleImportPolicyReport evaluatePhase1SamplePolicy(const ImportedSampleMetadata& metadata,
                                                     const std::string& contentRootPath = {});
 SampleImportResult importSampleFile(const std::string& samplePath);
+SampleRootKeyInferenceResult inferSampleRootKey(const std::string& samplePath,
+                                                const ImportedSampleMetadata* metadata = nullptr);
 ParsedSampleFilenameHeuristics parseSampleFilenameHeuristics(const std::string& samplePath,
                                                              const ImportedSampleMetadata* metadata = nullptr);
 AuthoringImportQueue createAuthoringImportQueue(const std::vector<std::string>& samplePaths,

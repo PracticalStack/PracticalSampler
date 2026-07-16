@@ -1,5 +1,10 @@
 #pragma once
 
+#include "shared/authoring/AuthoringSummaryStrip.h"
+#include "shared/authoring/AuthoringViewModels.h"
+#include "shared/authoring/ZoneMappingEditor.h"
+#include "shared/authoring/ZoneMapCanvas.h"
+#include "shared/authoring/WaveformDetailView.h"
 #include "shared/AuthoringPreviewModel.h"
 #include "shared/PerformanceBankImport.h"
 #include "drs/engine/AuthoringSession.h"
@@ -24,39 +29,21 @@ public:
     using NotePreviewEndedCallback = std::function<void(int)>;
     using WaveformPreviewProvider = std::function<AuthoringWaveformPreview()>;
     using ImportResponsivenessProvider = std::function<AuthoringImportResponsivenessSnapshot()>;
+    using RestoreRootKeyCallback = std::function<void()>;
 
     explicit AuthoringPanel(drs::engine::AuthoringSession& authoringSession,
                             WaveformPreviewProvider waveformPreviewProvider = {},
                             ImportResponsivenessProvider importResponsivenessProvider = {},
                             LayoutMode layoutMode = LayoutMode::compact,
                             NotePreviewStartedCallback onNotePreviewStarted = {},
-                            NotePreviewEndedCallback onNotePreviewEnded = {});
+                            NotePreviewEndedCallback onNotePreviewEnded = {},
+                            RestoreRootKeyCallback onRestoreRootKeyRequested = {});
 
     void paint(juce::Graphics& g) override;
     void resized() override;
     void reloadFromSession();
 
 private:
-    class ZoneMapComponent final : public juce::Component
-    {
-    public:
-        void setZoneSummaries(std::vector<drs::engine::AuthoringZoneSummary> summaries);
-        void paint(juce::Graphics& g) override;
-
-    private:
-        std::vector<drs::engine::AuthoringZoneSummary> zoneSummaries;
-    };
-
-    class WaveformPreviewComponent final : public juce::Component
-    {
-    public:
-        void setPreview(AuthoringWaveformPreview preview);
-        void paint(juce::Graphics& g) override;
-
-    private:
-        AuthoringWaveformPreview preview;
-    };
-
     void rebuildZoneSelector();
     void rebuildMacroSelector();
     void rebuildFxSelector();
@@ -65,13 +52,19 @@ private:
     void rebuildTriggerSlotSelector();
     void refreshInspectorVisibility();
     void refreshFromSession();
-    void applySelectedZoneEdit(const juce::String& label);
+    void applySelectedZoneEdit(const authoring::ZoneFieldValuesViewModel& values, const juce::String& label);
     void applySelectedMacroEdit(const juce::String& label);
     void moveSelectedMacro(int direction);
     void applySelectedFxSlotEdit(const juce::String& label);
     void applySelectedRoutingBusEdit(const juce::String& label);
     void applySelectedTriggerSlotEdit(const juce::String& label);
     void importPhraseForSelectedBank();
+    void previewSelectedZone();
+    void undoLastEdit();
+    void redoLastEdit();
+    void markSavedCheckpoint();
+    authoring::SelectionSummaryViewModel buildSelectionSummaryViewModel() const;
+    authoring::ZoneFieldValuesViewModel buildZoneFieldValuesViewModel() const;
 
     drs::engine::AuthoringSession& authoringSession;
     WaveformPreviewProvider waveformPreviewProvider;
@@ -79,17 +72,18 @@ private:
     LayoutMode layoutMode = LayoutMode::compact;
     NotePreviewStartedCallback onNotePreviewStarted;
     NotePreviewEndedCallback onNotePreviewEnded;
+    RestoreRootKeyCallback onRestoreRootKeyRequested;
     bool isRefreshing = false;
     int selectedMacroIndex = 0;
     int selectedFxSlotIndex = 0;
     int selectedRoutingBusIndex = 0;
     int selectedPerformanceBankIndex = 0;
     int selectedTriggerSlotIndex = 0;
+    authoring::DrawerState drawerState;
+    authoring::SelectionSummaryViewModel selectionSummaryViewModel;
+    authoring::ZoneFieldValuesViewModel zoneFieldValuesViewModel;
 
-    juce::Label titleLabel;
-    juce::Label statusLabel;
-    juce::Label sourceLabel;
-    juce::Label articulationLabel;
+    authoring::AuthoringSummaryStrip summaryStrip;
     juce::Label waveformLabel;
     juce::Label waveformInfoLabel;
     juce::Label loopInfoLabel;
@@ -98,24 +92,9 @@ private:
     juce::ComboBox inspectorModeSelector;
     juce::Label zoneLabel;
     juce::ComboBox zoneSelector;
-    ZoneMapComponent zoneMap;
-    WaveformPreviewComponent waveformPreview;
-
-    juce::Slider rootKeySlider;
-    juce::Slider keyLowSlider;
-    juce::Slider keyHighSlider;
-    juce::Slider velocityLowSlider;
-    juce::Slider velocityHighSlider;
-    juce::Slider gainSlider;
-    juce::Slider panSlider;
-
-    juce::Label rootKeyLabel;
-    juce::Label keyLowLabel;
-    juce::Label keyHighLabel;
-    juce::Label velocityLowLabel;
-    juce::Label velocityHighLabel;
-    juce::Label gainLabel;
-    juce::Label panLabel;
+    authoring::ZoneMapCanvas zoneMap;
+    authoring::ZoneMappingEditor zoneMappingEditor;
+    authoring::WaveformDetailView waveformPreview;
 
     juce::Label macroSectionLabel;
     juce::ComboBox macroSelector;
@@ -167,10 +146,5 @@ private:
     juce::Label performanceSummaryLabel;
     juce::Label phraseSummaryLabel;
 
-    juce::ToggleButton loopEnabledToggle;
-    juce::TextButton previewButton;
-    juce::TextButton undoButton;
-    juce::TextButton redoButton;
-    juce::TextButton saveCheckpointButton;
 };
 } // namespace drs::app

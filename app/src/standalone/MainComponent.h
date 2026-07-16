@@ -8,6 +8,7 @@
 #include <juce_gui_extra/juce_gui_extra.h>
 
 #include <functional>
+#include <optional>
 
 namespace drs::standalone
 {
@@ -58,6 +59,7 @@ private:
     void saveProjectAs(std::function<void(bool)> completion = {});
     void importWavFiles();
     void showPreferencesDialog();
+    void restoreSelectedZoneRootKey();
     bool saveProjectToFile(const juce::File& file);
     bool loadProjectFromFile(const juce::File& file);
     void confirmSafeToDiscardChanges(const juce::String& nextAction, std::function<void(bool)> completion);
@@ -72,11 +74,19 @@ private:
                                            const std::vector<std::string>& details) const;
     juce::File getLibraryLocation() const;
     void setLibraryLocation(const juce::File& folder);
+    juce::File getProjectDirectory() const;
+    void setProjectDirectory(const juce::File& folder);
+    juce::File getRecentProjectDirectory() const;
+    void setRecentProjectDirectory(const juce::File& folder);
     juce::File buildChooserBaseDirectory() const;
     juce::File buildDefaultSaveTarget() const;
     void launchOpenProjectChooser(std::function<void(juce::File)> completion);
     void launchSaveProjectChooser(std::function<void(juce::File)> completion);
     void launchImportWavChooser(std::function<void(std::vector<juce::File>)> completion);
+    void promptForRootKeySelection(const juce::String& title,
+                                   const juce::String& message,
+                                   int initialRootKey,
+                                   std::function<void(std::optional<int>)> completion) const;
 
     drs::plugin::Processor processor;
     juce::MenuBarComponent menuBar { this };

@@ -135,6 +135,21 @@ int main()
         require(directHeuristics.suggestedZone.roundRobinIndex == 2,
                 "Direct filename heuristics round-robin parsing changed unexpectedly.");
 
+        const auto ambiguousRootInference = drs::engine::inferSampleRootKey(ambiguousPath.generic_string());
+        require(!ambiguousRootInference.resolved, "Ambiguous root-key inference should require manual confirmation.");
+        require(ambiguousRootInference.source == "manual",
+                "Ambiguous root-key inference source changed unexpectedly.");
+
+        const auto conflictImport = drs::engine::importSampleFile(conflictPath.generic_string());
+        require(conflictImport.imported, "Conflict fixture should still decode for root-key inference.");
+        const auto conflictRootInference = drs::engine::inferSampleRootKey(conflictPath.generic_string(),
+                                                                           &conflictImport.sample.metadata);
+        require(conflictRootInference.resolved, "Conflicting root-key sources should still resolve a primary candidate.");
+        require(conflictRootInference.rootKey == 69,
+                "Filename root-key inference should remain primary when metadata conflicts.");
+        require(conflictRootInference.source == "filename",
+                "Conflicting root-key inference should continue to identify the winning source.");
+
         auto queue = drs::engine::createAuthoringImportQueue(
             {
                 cleanPath.generic_string(),

@@ -75,16 +75,15 @@ fs::path resolveSamplePath(const std::string& streamContainerPath, const std::st
 
 drs::engine::RuntimeProjectModel buildInitialAuthoringProject()
 {
-    const auto phase2Project = drs::engine::loadPhase2ReferenceProjectManifest();
-    if (phase2Project.loaded)
-        return phase2Project.project;
-
-    const auto phase1Project = drs::engine::loadPhase1ReferenceProjectManifest();
-    const auto migratedProject = drs::engine::migrateRuntimeProjectToPhase2Authoring(phase1Project.project);
-    if (migratedProject.valid)
-        return migratedProject.project;
-
-    return {};
+    drs::engine::RuntimeProjectModel project;
+    project.schemaName = "drs.project";
+    project.schemaVersion = 2;
+    project.displayName = "No Project Loaded";
+    project.authoring.schemaName = "drs.authoring";
+    project.authoring.schemaVersion = 1;
+    project.authoring.notes = { "Open a project or create a new one to begin authoring." };
+    project.notes = { "This session starts without loading the checked-in reference project." };
+    return project;
 }
 
 std::optional<drs::engine::RuntimeProjectSampleSource> findProjectSampleSource(const drs::engine::RuntimeProjectModel& project,
@@ -133,9 +132,6 @@ Processor::Processor()
       parameterState(*this, nullptr, "macroParameters", buildParameterLayout(engineFacade))
 {
     performanceSurfaceMidiCollector.reset(currentSampleRate);
-    referenceManifest = engineFacade.loadPhase1ReferenceInstrument();
-    referenceStream = engineFacade.loadPhase1ReferenceStream();
-    initializeReferencePlaybackAssets();
     initializeAuthoringImportMetrics();
 
     for (const auto& macro : engineFacade.getMacroDescriptors())
@@ -155,9 +151,6 @@ void Processor::prepareToPlay(double sampleRate, int)
     currentSampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;
     performanceSurfaceMidiCollector.reset(currentSampleRate);
     activeVoices.clear();
-
-    if (loadedSamples.empty())
-        initializeReferencePlaybackAssets();
 }
 
 void Processor::releaseResources()
@@ -178,12 +171,12 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
     for (auto channel = 0; channel < buffer.getNumChannels(); ++channel)
         buffer.clear(channel, 0, buffer.getNumSamples());
 
-    if (!referenceManifest.loaded || !referenceStream.loaded || loadedSamples.empty())
-        return;
-
     juce::MidiBuffer combinedMidiMessages;
     combinedMidiMessages.addEvents(midiMessages, 0, buffer.getNumSamples(), 0);
     performanceSurfaceMidiCollector.removeNextBlockOfMessages(combinedMidiMessages, buffer.getNumSamples());
+
+    if (combinedMidiMessages.isEmpty() && activeVoices.empty())
+        return;
 
     int renderedSamples = 0;
 
@@ -288,6 +281,7 @@ drs::app::AuthoringImportResponsivenessSnapshot Processor::getAuthoringImportRes
 void Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project)
 {
     authoringSession.replaceProject(std::move(project));
+    authoringLoadedSamples.clear();
     authoringWaveformPreviewCache.clear();
     activeVoices.clear();
     initializeAuthoringImportMetrics();
@@ -445,6 +439,21 @@ void Processor::initializeAuthoringImportMetrics()
     authoringImportResponsivenessSnapshot.lastProcessedItemId = queue.metrics.lastProcessedItemId;
 }
 
+bool Processor::ensureReferencePlaybackAssetsLoaded()
+{
+    if (referenceManifest.loaded && referenceStream.loaded && !loadedSamples.empty())
+        return true;
+
+    if (!referenceManifest.loaded)
+        referenceManifest = engineFacade.loadPhase1ReferenceInstrument();
+
+    if (!referenceStream.loaded)
+        referenceStream = engineFacade.loadPhase1ReferenceStream();
+
+    initializeReferencePlaybackAssets();
+    return referenceManifest.loaded && referenceStream.loaded && !loadedSamples.empty();
+}
+
 void Processor::initializeReferencePlaybackAssets()
 {
     loadedSamples.clear();
@@ -463,8 +472,65 @@ void Processor::initializeReferencePlaybackAssets()
     }
 }
 
+bool Processor::startAuthoringVoiceForMidiMessage(const juce::MidiMessage& message)
+{
+    const auto selectedZone = authoringSession.getSelectedZone();
+    if (!selectedZone.has_value())
+        return false;
+
+    const auto projectSampleSource = findProjectSampleSource(authoringSession.getProject(), selectedZone->sampleSourceId);
+    if (!projectSampleSource.has_value())
+        return false;
+
+    auto sampleIterator = authoringLoadedSamples.find(projectSampleSource->id);
+    if (sampleIterator == authoringLoadedSamples.end())
+    {
+        const auto importResult = drs::engine::importSampleFile(projectSampleSource->path);
+        if (!importResult.imported)
+            return false;
+
+        sampleIterator = authoringLoadedSamples.emplace(projectSampleSource->id,
+                                                        LoadedReferenceSample { importResult.sample }).first;
+    }
+
+    const auto& sample = sampleIterator->second.sample;
+    if (sample.normalizedChannels.empty() || sample.metadata.sampleRate <= 0.0)
+        return false;
+
+    ActiveRenderVoice voice;
+    voice.renderVoiceId = nextRenderVoiceId++;
+    voice.sourceMidiNote = message.getNoteNumber();
+    voice.effectiveMidiNote = message.getNoteNumber();
+    voice.effectiveVelocity = std::clamp(static_cast<int>(std::round(message.getFloatVelocity() * 127.0f)), 1, 127);
+    voice.rootKey = selectedZone->rootKey;
+    voice.zoneId = selectedZone->id;
+    voice.sampleId = projectSampleSource->id;
+    voice.loadedSample = &sampleIterator->second;
+    voice.incrementFrames = std::pow(2.0, (voice.effectiveMidiNote - selectedZone->rootKey) / 12.0)
+        * (sample.metadata.sampleRate / std::max(currentSampleRate, 1.0));
+    voice.baseGain = 0.25f * (static_cast<float>(voice.effectiveVelocity) / 127.0f)
+        * static_cast<float>(std::pow(10.0, selectedZone->gainDb / 20.0));
+
+    activeVoices.push_back(std::move(voice));
+
+    constexpr std::size_t maxActiveVoices = 24;
+    if (activeVoices.size() > maxActiveVoices)
+    {
+        activeVoices.erase(activeVoices.begin(),
+                           activeVoices.begin() + static_cast<std::ptrdiff_t>(activeVoices.size() - maxActiveVoices));
+    }
+
+    return true;
+}
+
 void Processor::startVoiceForMidiMessage(const juce::MidiMessage& message)
 {
+    if (startAuthoringVoiceForMidiMessage(message))
+        return;
+
+    if (!ensureReferencePlaybackAssetsLoaded())
+        return;
+
     const auto sessionState = engineFacade.getCurrentSessionState();
     const auto effectiveMidiNote = computeMotionRenderNote(sessionState, message.getNoteNumber());
     const auto effectiveVelocity = computeToneRenderVelocity(sessionState);

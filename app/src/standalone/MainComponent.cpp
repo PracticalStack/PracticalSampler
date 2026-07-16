@@ -2,9 +2,12 @@
 
 #include "drs/engine/SampleImport.h"
 #include "drs/engine/RuntimeLoader.h"
+#include "shared/authoring/AuthoringWorkspaceLayout.h"
 
+#include <algorithm>
 #include <cctype>
 #include <filesystem>
+#include <memory>
 #include <unordered_set>
 
 namespace drs::standalone
@@ -17,6 +20,25 @@ constexpr int saveButtonResult = 1;
 constexpr int discardButtonResult = 2;
 constexpr int cancelButtonResult = 0;
 constexpr auto libraryLocationPropertyKey = "libraryLocation";
+constexpr auto projectDirectoryPropertyKey = "projectDirectory";
+constexpr auto recentProjectDirectoryPropertyKey = "recentProjectDirectory";
+
+juce::String formatMidiNoteLabel(int midiNote)
+{
+    return juce::String(midiNote) + " - " + juce::MidiMessage::getMidiNoteName(midiNote, true, true, 4);
+}
+
+const drs::engine::RuntimeProjectSampleSource* findSampleSource(const drs::engine::RuntimeProjectModel& project,
+                                                                const std::string& sampleSourceId)
+{
+    const auto iterator = std::find_if(project.sampleSources.begin(),
+                                       project.sampleSources.end(),
+                                       [&](const drs::engine::RuntimeProjectSampleSource& sampleSource)
+                                       {
+                                           return sampleSource.id == sampleSourceId;
+                                       });
+    return iterator == project.sampleSources.end() ? nullptr : &*iterator;
+}
 
 juce::File ensureProjectExtension(juce::File file)
 {
@@ -24,6 +46,24 @@ juce::File ensureProjectExtension(juce::File file)
         return file;
 
     return file.withFileExtension(".drsproj");
+}
+
+juce::File getDefaultProjectDirectory()
+{
+    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+        .getChildFile("DecentRhapsodyStudio")
+        .getChildFile("Projects");
+}
+
+bool ensureDirectoryExists(const juce::File& directory)
+{
+    if (directory == juce::File())
+        return false;
+
+    if (directory.exists())
+        return directory.isDirectory();
+
+    return directory.createDirectory();
 }
 
 std::string makeProjectId()
@@ -71,7 +111,8 @@ class PreferencesComponent final : public juce::Component
 {
 public:
     PreferencesComponent(juce::File initialLibraryLocation,
-                         std::function<void(juce::File)> onSave)
+                         juce::File initialProjectDirectory,
+                         std::function<void(juce::File, juce::File)> onSave)
         : onSaveCallback(std::move(onSave))
     {
         titleLabel.setText("Preferences", juce::dontSendNotification);
@@ -81,39 +122,30 @@ public:
         libraryLocationLabel.setText("Library Location", juce::dontSendNotification);
         libraryLocationLabel.setJustificationType(juce::Justification::centredLeft);
 
-        helpLabel.setText("Choose the default folder for browsing projects and sample imports.",
-                          juce::dontSendNotification);
-        helpLabel.setJustificationType(juce::Justification::centredLeft);
+        projectDirectoryLabel.setText("Default Project Directory", juce::dontSendNotification);
+        projectDirectoryLabel.setJustificationType(juce::Justification::centredLeft);
+
+        libraryHelpLabel.setText("Used as the default starting folder for WAV imports.",
+                                 juce::dontSendNotification);
+        libraryHelpLabel.setJustificationType(juce::Justification::centredLeft);
+
+        projectHelpLabel.setText("Open/Save Project uses the most recent project folder first, then this default folder.",
+                                 juce::dontSendNotification);
+        projectHelpLabel.setJustificationType(juce::Justification::centredLeft);
 
         libraryLocationEditor.setText(initialLibraryLocation.getFullPathName(), juce::dontSendNotification);
+        projectDirectoryEditor.setText(initialProjectDirectory.getFullPathName(), juce::dontSendNotification);
 
-        browseButton.setButtonText("Browse...");
-        browseButton.onClick = [this]
+        libraryBrowseButton.setButtonText("Browse...");
+        libraryBrowseButton.onClick = [this]
         {
-            auto initialDirectory = juce::File(libraryLocationEditor.getText().trim());
-            if (initialDirectory == juce::File())
-                initialDirectory = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
+            browseForDirectory(libraryLocationEditor, "Choose library location");
+        };
 
-            directoryChooser = std::make_unique<juce::FileChooser>("Choose library location",
-                                                                   initialDirectory,
-                                                                   "*",
-                                                                   true,
-                                                                   false,
-                                                                   this);
-            auto safeThis = juce::Component::SafePointer<PreferencesComponent>(this);
-            directoryChooser->launchAsync(juce::FileBrowserComponent::openMode
-                                              | juce::FileBrowserComponent::canSelectDirectories,
-                                          [safeThis](const juce::FileChooser& chooser)
-                                          {
-                                              if (safeThis == nullptr)
-                                                  return;
-
-                                              const auto selectedDirectory = chooser.getResult();
-                                              safeThis->directoryChooser.reset();
-                                              if (selectedDirectory != juce::File())
-                                                  safeThis->libraryLocationEditor.setText(selectedDirectory.getFullPathName(),
-                                                                                         juce::dontSendNotification);
-                                          });
+        projectBrowseButton.setButtonText("Browse...");
+        projectBrowseButton.onClick = [this]
+        {
+            browseForDirectory(projectDirectoryEditor, "Choose default project directory");
         };
 
         saveButton.setButtonText("Save");
@@ -124,15 +156,12 @@ public:
             {
                 chosenDirectory = {};
             }
-            else if (!chosenDirectory.exists())
+            else if (!ensureDirectoryExists(chosenDirectory))
             {
-                if (!chosenDirectory.createDirectory())
-                {
-                    juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-                                                           "Invalid Library Location",
-                                                           "The selected library folder could not be created.");
-                    return;
-                }
+                juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                                       "Invalid Library Location",
+                                                       "The selected library folder could not be created.");
+                return;
             }
             else if (!chosenDirectory.isDirectory())
             {
@@ -142,8 +171,28 @@ public:
                 return;
             }
 
+            auto chosenProjectDirectory = juce::File(projectDirectoryEditor.getText().trim());
+            if (chosenProjectDirectory == juce::File())
+                chosenProjectDirectory = getDefaultProjectDirectory();
+
+            if (!ensureDirectoryExists(chosenProjectDirectory))
+            {
+                juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                                       "Invalid Project Directory",
+                                                       "The selected project folder could not be created.");
+                return;
+            }
+
+            if (!chosenProjectDirectory.isDirectory())
+            {
+                juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                                       "Invalid Project Directory",
+                                                       "The selected path is not a folder.");
+                return;
+            }
+
             if (onSaveCallback)
-                onSaveCallback(chosenDirectory);
+                onSaveCallback(chosenDirectory, chosenProjectDirectory);
 
             closeDialog(saveButtonResult);
         };
@@ -157,9 +206,13 @@ public:
         for (auto* component : {
                  static_cast<juce::Component*>(&titleLabel),
                  static_cast<juce::Component*>(&libraryLocationLabel),
-                 static_cast<juce::Component*>(&helpLabel),
+                 static_cast<juce::Component*>(&projectDirectoryLabel),
+                 static_cast<juce::Component*>(&libraryHelpLabel),
+                 static_cast<juce::Component*>(&projectHelpLabel),
                  static_cast<juce::Component*>(&libraryLocationEditor),
-                 static_cast<juce::Component*>(&browseButton),
+                 static_cast<juce::Component*>(&projectDirectoryEditor),
+                 static_cast<juce::Component*>(&libraryBrowseButton),
+                 static_cast<juce::Component*>(&projectBrowseButton),
                  static_cast<juce::Component*>(&saveButton),
                  static_cast<juce::Component*>(&cancelButton)
              })
@@ -167,7 +220,7 @@ public:
             addAndMakeVisible(component);
         }
 
-        setSize(560, 170);
+        setSize(720, 230);
     }
 
     void resized() override
@@ -177,16 +230,143 @@ public:
         area.removeFromTop(8);
         libraryLocationLabel.setBounds(area.removeFromTop(24));
         auto editorRow = area.removeFromTop(28);
-        libraryLocationEditor.setBounds(editorRow.removeFromLeft(editorRow.proportionOfWidth(0.78f)));
+        libraryLocationEditor.setBounds(editorRow.removeFromLeft(editorRow.proportionOfWidth(0.8f)));
         editorRow.removeFromLeft(8);
-        browseButton.setBounds(editorRow);
+        libraryBrowseButton.setBounds(editorRow);
         area.removeFromTop(8);
-        helpLabel.setBounds(area.removeFromTop(22));
+        libraryHelpLabel.setBounds(area.removeFromTop(22));
+        area.removeFromTop(12);
+        projectDirectoryLabel.setBounds(area.removeFromTop(24));
+        auto projectRow = area.removeFromTop(28);
+        projectDirectoryEditor.setBounds(projectRow.removeFromLeft(projectRow.proportionOfWidth(0.8f)));
+        projectRow.removeFromLeft(8);
+        projectBrowseButton.setBounds(projectRow);
+        area.removeFromTop(8);
+        projectHelpLabel.setBounds(area.removeFromTop(22));
         area.removeFromTop(16);
         auto buttonRow = area.removeFromBottom(28);
         cancelButton.setBounds(buttonRow.removeFromRight(100));
         buttonRow.removeFromRight(8);
         saveButton.setBounds(buttonRow.removeFromRight(100));
+    }
+
+private:
+    void browseForDirectory(juce::TextEditor& targetEditor, const juce::String& dialogTitle)
+    {
+        auto initialDirectory = juce::File(targetEditor.getText().trim());
+        if (initialDirectory == juce::File())
+            initialDirectory = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
+
+        directoryChooser = std::make_unique<juce::FileChooser>(dialogTitle,
+                                                               initialDirectory,
+                                                               "*",
+                                                               true,
+                                                               false,
+                                                               this);
+        auto safeThis = juce::Component::SafePointer<PreferencesComponent>(this);
+        directoryChooser->launchAsync(juce::FileBrowserComponent::openMode
+                                          | juce::FileBrowserComponent::canSelectDirectories,
+                                      [safeThis, target = juce::Component::SafePointer<juce::TextEditor>(&targetEditor)]
+                                      (const juce::FileChooser& chooser)
+                                      {
+                                          if (safeThis == nullptr || target == nullptr)
+                                              return;
+
+                                          const auto selectedDirectory = chooser.getResult();
+                                          safeThis->directoryChooser.reset();
+                                          if (selectedDirectory != juce::File())
+                                              target->setText(selectedDirectory.getFullPathName(),
+                                                              juce::dontSendNotification);
+                                      });
+    }
+
+    void closeDialog(int result)
+    {
+        if (auto* dialog = findParentComponentOfClass<juce::DialogWindow>())
+            dialog->exitModalState(result);
+    }
+
+    std::function<void(juce::File, juce::File)> onSaveCallback;
+    std::unique_ptr<juce::FileChooser> directoryChooser;
+    juce::Label titleLabel;
+    juce::Label libraryLocationLabel;
+    juce::Label projectDirectoryLabel;
+    juce::Label libraryHelpLabel;
+    juce::Label projectHelpLabel;
+    juce::TextEditor libraryLocationEditor;
+    juce::TextEditor projectDirectoryEditor;
+    juce::TextButton libraryBrowseButton;
+    juce::TextButton projectBrowseButton;
+    juce::TextButton saveButton;
+    juce::TextButton cancelButton;
+};
+
+class RootKeySelectionComponent final : public juce::Component
+{
+public:
+    RootKeySelectionComponent(const juce::String& message,
+                              int initialRootKey,
+                              std::optional<int>& selectedRootKeyOut)
+        : selectedRootKeyResult(selectedRootKeyOut)
+    {
+        messageLabel.setText(message, juce::dontSendNotification);
+        messageLabel.setJustificationType(juce::Justification::topLeft);
+
+        rootKeyLabel.setText("Root Key", juce::dontSendNotification);
+        rootKeyLabel.setJustificationType(juce::Justification::centredLeft);
+
+        juce::StringArray rootKeyChoices;
+        rootKeyChoices.ensureStorageAllocated(128);
+        for (int midiNote = 0; midiNote < 128; ++midiNote)
+            rootKeyChoices.add(formatMidiNoteLabel(midiNote));
+
+        rootKeySelector.addItemList(rootKeyChoices, 1);
+        rootKeySelector.setSelectedItemIndex(juce::jlimit(0, 127, initialRootKey), juce::dontSendNotification);
+
+        useButton.setButtonText("Use Root Key");
+        useButton.onClick = [this]
+        {
+            selectedRootKeyResult = rootKeySelector.getSelectedItemIndex();
+            closeDialog(1);
+        };
+
+        cancelButton.setButtonText("Cancel");
+        cancelButton.onClick = [this]
+        {
+            selectedRootKeyResult.reset();
+            closeDialog(0);
+        };
+
+        for (auto* component : {
+                 static_cast<juce::Component*>(&messageLabel),
+                 static_cast<juce::Component*>(&rootKeyLabel),
+                 static_cast<juce::Component*>(&rootKeySelector),
+                 static_cast<juce::Component*>(&useButton),
+                 static_cast<juce::Component*>(&cancelButton)
+             })
+        {
+            addAndMakeVisible(component);
+        }
+
+        setSize(520, 170);
+    }
+
+    void resized() override
+    {
+        auto area = getLocalBounds().reduced(16);
+        messageLabel.setBounds(area.removeFromTop(64));
+        area.removeFromTop(8);
+
+        auto selectorRow = area.removeFromTop(28);
+        rootKeyLabel.setBounds(selectorRow.removeFromLeft(72));
+        selectorRow.removeFromLeft(8);
+        rootKeySelector.setBounds(selectorRow);
+
+        area.removeFromTop(18);
+        auto buttonRow = area.removeFromBottom(28);
+        cancelButton.setBounds(buttonRow.removeFromRight(100));
+        buttonRow.removeFromRight(8);
+        useButton.setBounds(buttonRow.removeFromRight(120));
     }
 
 private:
@@ -196,14 +376,11 @@ private:
             dialog->exitModalState(result);
     }
 
-    std::function<void(juce::File)> onSaveCallback;
-    std::unique_ptr<juce::FileChooser> directoryChooser;
-    juce::Label titleLabel;
-    juce::Label libraryLocationLabel;
-    juce::Label helpLabel;
-    juce::TextEditor libraryLocationEditor;
-    juce::TextButton browseButton;
-    juce::TextButton saveButton;
+    std::optional<int>& selectedRootKeyResult;
+    juce::Label messageLabel;
+    juce::Label rootKeyLabel;
+    juce::ComboBox rootKeySelector;
+    juce::TextButton useButton;
     juce::TextButton cancelButton;
 };
 } // namespace
@@ -239,6 +416,10 @@ MainComponent::MainComponent(bool enableAudioOutput)
                      [this](int midiNoteNumber)
                      {
                          processor.queuePerformanceSurfaceNoteOff(midiNoteNumber);
+                     },
+                     [this]
+                     {
+                         restoreSelectedZoneRootKey();
                      })
 {
     juce::PropertiesFile::Options appSettingsOptions;
@@ -256,7 +437,8 @@ MainComponent::MainComponent(bool enableAudioOutput)
     workspaceTabs.addTab("Perform", juce::Colour::fromRGB(28, 126, 214), &performancePanel, false);
     workspaceTabs.addTab("Map", juce::Colour::fromRGB(181, 96, 21), &authoringPanel, false);
     addAndMakeVisible(workspaceTabs);
-    setSize(860, 760);
+    setSize(drs::app::authoring::expandedBaselineShellWidth,
+            drs::app::authoring::expandedBaselineShellHeight);
 
     if (enableAudioOutput)
         initializeAudioOutput();
@@ -490,18 +672,28 @@ void MainComponent::importWavFiles()
                 const auto samplesDirectory = safeThis->currentProjectFile.getParentDirectory().getChildFile("Samples");
                 samplesDirectory.createDirectory();
 
-                std::vector<std::string> copiedPaths;
-                copiedPaths.reserve(selectedFiles.size());
+                struct PendingImportState
+                {
+                    drs::engine::RuntimeProjectModel currentProject;
+                    drs::engine::AuthoringImportQueue importQueue;
+                    std::unordered_set<std::string> usedSampleSourceIds;
+                    std::unordered_set<std::string> usedZoneIds;
+                    std::vector<drs::engine::RuntimeProjectSampleSource> importedSampleSources;
+                    std::vector<drs::engine::RuntimeProjectZoneDefinition> importedZones;
+                    std::size_t warningCount = 0;
+                    std::size_t skippedCount = 0;
+                    std::size_t itemIndex = 0;
+                    std::vector<std::string> details;
+                };
 
-                std::size_t skippedCount = 0;
-                std::vector<std::string> details;
+                auto state = std::make_shared<PendingImportState>();
 
                 for (const auto& sourceFile : selectedFiles)
                 {
                     if (!sourceFile.existsAsFile())
                     {
-                        ++skippedCount;
-                        details.push_back("Skipped missing file: " + sourceFile.getFullPathName().toStdString());
+                        ++state->skippedCount;
+                        state->details.push_back("Skipped missing file: " + sourceFile.getFullPathName().toStdString());
                         continue;
                     }
 
@@ -513,112 +705,165 @@ void MainComponent::importWavFiles()
                                                                               false);
                         if (!sourceFile.copyFileTo(managedCopy))
                         {
-                            ++skippedCount;
-                            details.push_back("Could not copy " + sourceFile.getFileName().toStdString()
-                                              + " into the project Samples folder.");
+                            ++state->skippedCount;
+                            state->details.push_back("Could not copy " + sourceFile.getFileName().toStdString()
+                                                     + " into the project Samples folder.");
                             continue;
                         }
                     }
 
-                    copiedPaths.push_back(managedCopy.getFullPathName().toStdString());
+                    drs::engine::AuthoringImportQueueItem queuedItem;
+                    queuedItem.sourcePath = managedCopy.getFullPathName().toStdString();
+                    state->importQueue.items.push_back(std::move(queuedItem));
                 }
 
-                if (copiedPaths.empty())
+                if (state->importQueue.items.empty())
                 {
                     juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
                                                            "Import WAV Failed",
-                                                           safeThis->buildImportSummaryMessage(0, 0, skippedCount, details));
+                                                           safeThis->buildImportSummaryMessage(0, 0, state->skippedCount, state->details));
                     return;
                 }
 
-                const auto& currentProject = safeThis->processor.getAuthoringSession().getProject();
-                auto importQueue = drs::engine::createAuthoringImportQueue(copiedPaths, currentProject.contentRootPath);
-                while (drs::engine::processNextAuthoringImportQueueItem(importQueue).processed)
+                std::vector<std::string> copiedPaths;
+                copiedPaths.reserve(state->importQueue.items.size());
+                for (const auto& item : state->importQueue.items)
+                    copiedPaths.push_back(item.sourcePath);
+
+                state->currentProject = safeThis->processor.getAuthoringSession().getProject();
+                state->importQueue = drs::engine::createAuthoringImportQueue(copiedPaths, state->currentProject.contentRootPath);
+                while (drs::engine::processNextAuthoringImportQueueItem(state->importQueue).processed)
                 {
                 }
 
-                std::unordered_set<std::string> usedSampleSourceIds;
-                for (const auto& sampleSource : currentProject.sampleSources)
-                    usedSampleSourceIds.insert(sampleSource.id);
+                for (const auto& sampleSource : state->currentProject.sampleSources)
+                    state->usedSampleSourceIds.insert(sampleSource.id);
 
-                std::unordered_set<std::string> usedZoneIds;
-                for (const auto& zone : currentProject.authoring.zones)
-                    usedZoneIds.insert(zone.id);
+                for (const auto& zone : state->currentProject.authoring.zones)
+                    state->usedZoneIds.insert(zone.id);
 
-                std::vector<drs::engine::RuntimeProjectSampleSource> importedSampleSources;
-                std::vector<drs::engine::RuntimeProjectZoneDefinition> importedZones;
-                std::size_t warningCount = 0;
-
-                for (const auto& item : importQueue.items)
+                auto processNextItem = std::make_shared<std::function<void()>>();
+                *processNextItem = [safeThis, state, processNextItem]()
                 {
-                    if (item.state != drs::engine::AuthoringImportItemState::inferred
-                        && item.state != drs::engine::AuthoringImportItemState::warning)
+                    if (safeThis == nullptr)
+                        return;
+
+                    auto appendImportedItem = [state](const drs::engine::AuthoringImportQueueItem& item,
+                                                      drs::engine::RuntimeProjectZoneDefinition zone)
                     {
-                        ++skippedCount;
-                        if (!item.importResult.issues.empty())
-                            details.push_back(item.importResult.issues.front());
-                        else
-                            details.push_back("Skipped " + fs::path(item.sourcePath).filename().generic_string() + ".");
-                        continue;
+                        auto sampleSourceId = makeUniqueId(
+                            item.suggestedZone.sourceSampleId.empty()
+                                ? fs::path(item.sourcePath).stem().generic_string()
+                                : item.suggestedZone.sourceSampleId,
+                            state->usedSampleSourceIds);
+
+                        drs::engine::RuntimeProjectSampleSource sampleSource;
+                        sampleSource.id = sampleSourceId;
+                        sampleSource.path = item.sourcePath;
+                        sampleSource.role = item.suggestedZone.zone.articulationId.empty()
+                            ? "imported"
+                            : "imported-" + item.suggestedZone.zone.articulationId;
+
+                        zone.id = makeUniqueId(zone.id.empty() ? sampleSourceId : zone.id, state->usedZoneIds);
+                        zone.sampleSourceId = sampleSourceId;
+
+                        state->importedSampleSources.push_back(std::move(sampleSource));
+                        state->importedZones.push_back(std::move(zone));
+                    };
+
+                    while (state->itemIndex < state->importQueue.items.size())
+                    {
+                        const auto& item = state->importQueue.items[state->itemIndex++];
+
+                        if (item.state != drs::engine::AuthoringImportItemState::inferred
+                            && item.state != drs::engine::AuthoringImportItemState::warning)
+                        {
+                            ++state->skippedCount;
+                            if (!item.importResult.issues.empty())
+                                state->details.push_back(item.importResult.issues.front());
+                            else
+                                state->details.push_back("Skipped " + fs::path(item.sourcePath).filename().generic_string() + ".");
+                            continue;
+                        }
+
+                        auto zone = item.suggestedZone.zone;
+                        if (item.suggestedZone.rootKeySource == "manual")
+                        {
+                            safeThis->promptForRootKeySelection(
+                                "Root Key Required",
+                                "Could not infer a root key for '" + juce::String::fromUTF8(fs::path(item.sourcePath).filename().generic_string().c_str())
+                                    + "'. Select the sample's native pitch to continue importing.",
+                                zone.rootKey,
+                                [safeThis, state, processNextItem, item, zone, appendImportedItem](std::optional<int> selectedRootKey) mutable
+                                {
+                                    if (safeThis == nullptr)
+                                        return;
+
+                                    if (!selectedRootKey.has_value())
+                                    {
+                                        ++state->skippedCount;
+                                        state->details.push_back("Skipped " + fs::path(item.sourcePath).filename().generic_string()
+                                                                 + " because its root key was not confirmed.");
+                                        (*processNextItem)();
+                                        return;
+                                    }
+
+                                    zone.rootKey = *selectedRootKey;
+                                    appendImportedItem(item, zone);
+                                    ++state->warningCount;
+                                    state->details.push_back("Selected root key "
+                                                             + juce::MidiMessage::getMidiNoteName(zone.rootKey, true, true, 4).toStdString()
+                                                             + " for " + fs::path(item.sourcePath).filename().generic_string() + ".");
+                                    (*processNextItem)();
+                                });
+                            return;
+                        }
+
+                        appendImportedItem(item, zone);
+
+                        if (item.state == drs::engine::AuthoringImportItemState::warning)
+                        {
+                            ++state->warningCount;
+                            if (!item.findings.empty())
+                                state->details.push_back(item.findings.front().summary + ": " + item.findings.front().detail);
+                        }
                     }
 
-                    auto sampleSourceId = makeUniqueId(
-                        item.suggestedZone.sourceSampleId.empty()
-                            ? fs::path(item.sourcePath).stem().generic_string()
-                            : item.suggestedZone.sourceSampleId,
-                        usedSampleSourceIds);
-
-                    drs::engine::RuntimeProjectSampleSource sampleSource;
-                    sampleSource.id = sampleSourceId;
-                    sampleSource.path = item.sourcePath;
-                    sampleSource.role = item.suggestedZone.zone.articulationId.empty()
-                        ? "imported"
-                        : "imported-" + item.suggestedZone.zone.articulationId;
-
-                    auto zone = item.suggestedZone.zone;
-                    zone.id = makeUniqueId(zone.id.empty() ? sampleSourceId : zone.id, usedZoneIds);
-                    zone.sampleSourceId = sampleSourceId;
-
-                    importedSampleSources.push_back(std::move(sampleSource));
-                    importedZones.push_back(std::move(zone));
-
-                    if (item.state == drs::engine::AuthoringImportItemState::warning)
+                    if (state->importedSampleSources.empty() || state->importedZones.empty())
                     {
-                        ++warningCount;
-                        if (!item.findings.empty())
-                            details.push_back(item.findings.front().summary + ": " + item.findings.front().detail);
+                        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                                               "Import WAV Failed",
+                                                               safeThis->buildImportSummaryMessage(0,
+                                                                                                  state->warningCount,
+                                                                                                  state->skippedCount,
+                                                                                                  state->details));
+                        return;
                     }
-                }
 
-                if (importedSampleSources.empty() || importedZones.empty())
-                {
-                    juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-                                                           "Import WAV Failed",
-                                                           safeThis->buildImportSummaryMessage(0, warningCount, skippedCount, details));
-                    return;
-                }
+                    const auto importedCount = state->importedSampleSources.size();
+                    const auto importResult = safeThis->processor.getAuthoringSession().appendImportedContent(
+                        std::move(state->importedSampleSources),
+                        std::move(state->importedZones),
+                        "Import WAV files");
+                    if (!importResult.applied)
+                    {
+                        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                                               "Import WAV Failed",
+                                                               safeThis->buildProjectIssueSummary(importResult.issues));
+                        return;
+                    }
 
-                const auto importedCount = importedSampleSources.size();
-                const auto importResult = safeThis->processor.getAuthoringSession().appendImportedContent(
-                    std::move(importedSampleSources),
-                    std::move(importedZones),
-                    "Import WAV files");
-                if (!importResult.applied)
-                {
-                    juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-                                                           "Import WAV Failed",
-                                                           safeThis->buildProjectIssueSummary(importResult.issues));
-                    return;
-                }
+                    safeThis->refreshProjectViews();
 
-                safeThis->refreshProjectViews();
+                    juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon,
+                                                           "Import WAV Complete",
+                                                           safeThis->buildImportSummaryMessage(importedCount,
+                                                                                              state->warningCount,
+                                                                                              state->skippedCount,
+                                                                                              state->details));
+                };
 
-                juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon,
-                                                       "Import WAV Complete",
-                                                       safeThis->buildImportSummaryMessage(importedCount,
-                                                                                           warningCount,
-                                                                                           skippedCount,
-                                                                                           details));
+                (*processNextItem)();
             });
     };
 
@@ -631,18 +876,118 @@ void MainComponent::importWavFiles()
     beginImport(true);
 }
 
+void MainComponent::restoreSelectedZoneRootKey()
+{
+    auto& authoringSession = processor.getAuthoringSession();
+    const auto selectedZone = authoringSession.getSelectedZone();
+    if (!selectedZone.has_value())
+        return;
+
+    const auto* sampleSource = findSampleSource(authoringSession.getProject(), selectedZone->sampleSourceId);
+    if (sampleSource == nullptr)
+    {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Restore Root Key Failed",
+                                               "The selected zone's sample source could not be found in the current project.");
+        return;
+    }
+
+    const auto importResult = drs::engine::importSampleFile(sampleSource->path);
+    if (!importResult.imported)
+    {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Restore Root Key Failed",
+                                               buildProjectIssueSummary(importResult.issues));
+        return;
+    }
+
+    const auto inference = drs::engine::inferSampleRootKey(sampleSource->path, &importResult.sample.metadata);
+    auto applyRestoredRootKey = [this, selectedZone](int restoredRootKey)
+    {
+        if (restoredRootKey == selectedZone->rootKey)
+            return;
+
+        auto updatedZone = *selectedZone;
+        updatedZone.rootKey = restoredRootKey;
+
+        const auto updateResult = processor.getAuthoringSession().updateSelectedZone(updatedZone, "Restore zone root key");
+        if (!updateResult.applied)
+        {
+            juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                                   "Restore Root Key Failed",
+                                                   buildProjectIssueSummary(updateResult.issues));
+            return;
+        }
+
+        refreshProjectViews();
+    };
+
+    if (inference.resolved)
+    {
+        applyRestoredRootKey(inference.rootKey);
+        return;
+    }
+
+    promptForRootKeySelection(
+        "Restore Root Key",
+        "Could not infer a root key for '" + juce::String::fromUTF8(selectedZone->displayName.c_str())
+            + "'. Select the sample's native pitch to restore the mapping value.",
+        selectedZone->rootKey,
+        [applyRestoredRootKey](std::optional<int> selectedRootKey)
+        {
+            if (!selectedRootKey.has_value())
+                return;
+
+            applyRestoredRootKey(*selectedRootKey);
+        });
+}
+
+void MainComponent::promptForRootKeySelection(const juce::String& title,
+                                              const juce::String& message,
+                                              int initialRootKey,
+                                              std::function<void(std::optional<int>)> completion) const
+{
+    juce::DialogWindow::LaunchOptions options;
+    options.dialogTitle = title;
+    options.dialogBackgroundColour = juce::Colour::fromRGB(244, 240, 232);
+    auto selectedRootKey = std::make_shared<std::optional<int>>();
+    options.content.setOwned(new RootKeySelectionComponent(message, initialRootKey, *selectedRootKey));
+    options.componentToCentreAround = const_cast<MainComponent*>(this);
+    options.escapeKeyTriggersCloseButton = true;
+    options.useNativeTitleBar = true;
+    options.resizable = false;
+    options.useBottomRightCornerResizer = false;
+    auto* dialog = options.create();
+    dialog->enterModalState(true,
+                            juce::ModalCallbackFunction::create(
+                                [selectedRootKey, completion = std::move(completion)](int result) mutable
+                                {
+                                    if (result == 0)
+                                    {
+                                        completion(std::nullopt);
+                                        return;
+                                    }
+
+                                    completion(*selectedRootKey);
+                                }),
+                            true);
+}
+
 void MainComponent::showPreferencesDialog()
 {
     juce::DialogWindow::LaunchOptions options;
     options.dialogTitle = "Preferences";
     options.dialogBackgroundColour = juce::Colour::fromRGB(244, 240, 232);
     options.content.setOwned(new PreferencesComponent(getLibraryLocation(),
-                                                      [safeThis = juce::Component::SafePointer<MainComponent>(this)](juce::File folder)
+                                                      getProjectDirectory(),
+                                                      [safeThis = juce::Component::SafePointer<MainComponent>(this)](juce::File libraryFolder,
+                                                                                                                     juce::File projectFolder)
                                                       {
                                                           if (safeThis == nullptr)
                                                               return;
 
-                                                          safeThis->setLibraryLocation(folder);
+                                                          safeThis->setLibraryLocation(libraryFolder);
+                                                          safeThis->setProjectDirectory(projectFolder);
                                                       }));
     options.componentToCentreAround = this;
     options.escapeKeyTriggersCloseButton = true;
@@ -655,7 +1000,20 @@ void MainComponent::showPreferencesDialog()
 bool MainComponent::saveProjectToFile(const juce::File& file)
 {
     const auto targetFile = ensureProjectExtension(file);
-    const auto& project = processor.getAuthoringSession().getProject();
+    auto project = processor.getAuthoringSession().getProject();
+    const auto savingUnsavedProject = currentProjectFile == juce::File();
+    const auto targetDirectory = targetFile.getParentDirectory();
+    const auto targetInstrumentFile = targetFile.withFileExtension(".drinst");
+
+    if (savingUnsavedProject || project.contentRootPath.empty())
+        project.contentRootPath = targetDirectory.getFullPathName().toStdString();
+
+    if (savingUnsavedProject || project.defaultInstrumentManifestPath.empty())
+        project.defaultInstrumentManifestPath = targetInstrumentFile.getFullPathName().toStdString();
+
+    if (project.displayName.empty() || project.displayName == "No Project Loaded")
+        project.displayName = targetFile.getFileNameWithoutExtension().toStdString();
+
     const auto serializedProject = drs::engine::serializeRuntimeProjectManifest(project,
                                                                                 targetFile.getFullPathName().toStdString());
 
@@ -672,6 +1030,9 @@ bool MainComponent::saveProjectToFile(const juce::File& file)
     }
 
     currentProjectFile = targetFile;
+    if (savingUnsavedProject)
+        processor.replaceAuthoringProject(project);
+    setRecentProjectDirectory(targetFile.getParentDirectory());
     processor.getAuthoringSession().markSaved();
     refreshProjectViews();
     return true;
@@ -690,6 +1051,7 @@ bool MainComponent::loadProjectFromFile(const juce::File& file)
     }
 
     currentProjectFile = targetFile;
+    setRecentProjectDirectory(targetFile.getParentDirectory());
     processor.replaceAuthoringProject(loadResult.project);
     refreshProjectViews();
     return true;
@@ -744,15 +1106,16 @@ void MainComponent::updateWindowTitle()
 
 drs::engine::RuntimeProjectModel MainComponent::buildEmptyProjectTemplate() const
 {
-    const auto& currentProject = processor.getAuthoringSession().getProject();
+    const auto defaultProjectDirectory = buildChooserBaseDirectory();
+    const auto defaultInstrumentFile = defaultProjectDirectory.getChildFile("Untitled Project.drinst");
 
     drs::engine::RuntimeProjectModel project;
     project.schemaName = "drs.project";
     project.schemaVersion = 2;
     project.projectId = makeProjectId();
     project.displayName = "Untitled Project";
-    project.contentRootPath = currentProject.contentRootPath;
-    project.defaultInstrumentManifestPath = currentProject.defaultInstrumentManifestPath;
+    project.contentRootPath = defaultProjectDirectory.getFullPathName().toStdString();
+    project.defaultInstrumentManifestPath = defaultInstrumentFile.getFullPathName().toStdString();
     project.authoring.schemaName = "drs.authoring";
     project.authoring.schemaVersion = 1;
     project.authoring.notes = { "Created in the standalone authoring shell." };
@@ -774,8 +1137,10 @@ juce::String MainComponent::buildWindowTitle() const
 
     if (currentProjectFile != juce::File())
         title += currentProjectFile.getFileNameWithoutExtension();
-    else
+    else if (!processor.getAuthoringSession().getProject().displayName.empty())
         title += juce::String::fromUTF8(processor.getAuthoringSession().getProject().displayName.c_str());
+    else
+        title += "No Project Loaded";
 
     if (processor.getAuthoringSession().getDocumentState().dirty)
         title += " *";
@@ -847,16 +1212,68 @@ void MainComponent::setLibraryLocation(const juce::File& folder)
     }
 }
 
+juce::File MainComponent::getProjectDirectory() const
+{
+    if (auto* settings = appProperties.getUserSettings())
+    {
+        const auto storedPath = settings->getValue(projectDirectoryPropertyKey).trim();
+        if (storedPath.isNotEmpty())
+            return juce::File(storedPath);
+    }
+
+    return getDefaultProjectDirectory();
+}
+
+void MainComponent::setProjectDirectory(const juce::File& folder)
+{
+    if (auto* settings = appProperties.getUserSettings())
+    {
+        settings->setValue(projectDirectoryPropertyKey, folder.getFullPathName());
+        settings->saveIfNeeded();
+    }
+}
+
+juce::File MainComponent::getRecentProjectDirectory() const
+{
+    if (auto* settings = appProperties.getUserSettings())
+    {
+        const auto storedPath = settings->getValue(recentProjectDirectoryPropertyKey).trim();
+        if (storedPath.isNotEmpty())
+            return juce::File(storedPath);
+    }
+
+    return {};
+}
+
+void MainComponent::setRecentProjectDirectory(const juce::File& folder)
+{
+    if (auto* settings = appProperties.getUserSettings())
+    {
+        settings->setValue(recentProjectDirectoryPropertyKey, folder.getFullPathName());
+        settings->saveIfNeeded();
+    }
+}
+
 juce::File MainComponent::buildChooserBaseDirectory() const
 {
     if (currentProjectFile != juce::File())
         return currentProjectFile.getParentDirectory();
 
-    const auto libraryLocation = getLibraryLocation();
-    if (libraryLocation.isDirectory())
-        return libraryLocation;
+    auto recentProjectDirectory = getRecentProjectDirectory();
+    if (recentProjectDirectory != juce::File())
+    {
+        ensureDirectoryExists(recentProjectDirectory);
+        return recentProjectDirectory;
+    }
 
-    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
+    auto projectDirectory = getProjectDirectory();
+    if (projectDirectory != juce::File())
+    {
+        ensureDirectoryExists(projectDirectory);
+        return projectDirectory;
+    }
+
+    return getDefaultProjectDirectory();
 }
 
 juce::File MainComponent::buildDefaultSaveTarget() const

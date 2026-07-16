@@ -8,6 +8,16 @@ set(DRS_APP_SHARED_SOURCES
     src/shared/PerformancePanel.h
     src/shared/StatusPanel.cpp
     src/shared/StatusPanel.h
+    src/shared/authoring/AuthoringViewModels.h
+    src/shared/authoring/AuthoringWorkspaceLayout.h
+    src/shared/authoring/AuthoringSummaryStrip.cpp
+    src/shared/authoring/AuthoringSummaryStrip.h
+    src/shared/authoring/WaveformDetailView.cpp
+    src/shared/authoring/WaveformDetailView.h
+    src/shared/authoring/ZoneMappingEditor.cpp
+    src/shared/authoring/ZoneMappingEditor.h
+    src/shared/authoring/ZoneMapCanvas.cpp
+    src/shared/authoring/ZoneMapCanvas.h
 )
 
 set(DRS_STANDALONE_SOURCES

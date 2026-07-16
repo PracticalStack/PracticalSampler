@@ -1,3 +1,4 @@
+#include "drs/engine/RuntimeLoader.h"
 #include "plugin/PluginProcessor.h"
 
 #include <juce_audio_processors_headless/juce_audio_processors_headless.h>
@@ -7,6 +8,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace
 {
@@ -29,6 +31,52 @@ bool hasVisibleWaveform(const drs::app::AuthoringWaveformPreview& preview)
                                || std::abs(point.maxValue - point.minValue) > amplitudeEpsilon;
                        });
 }
+
+std::vector<float> renderSelectedZonePreview(const std::string& zoneId)
+{
+    drs::plugin::Processor processor;
+    const auto projectLoad = drs::engine::loadPhase2ReferenceProjectManifest();
+    require(projectLoad.loaded, "Phase 2 reference project must load for waveform preview playback validation.");
+    processor.replaceAuthoringProject(projectLoad.project);
+    processor.prepareToPlay(44100.0, 512);
+
+    const auto selectionResult = processor.getAuthoringSession().selectZone(zoneId);
+    require(selectionResult.applied, "Could not select zone '" + zoneId + "' for playback validation.");
+
+    const auto zone = processor.getAuthoringSession().getSelectedZone();
+    require(zone.has_value(), "Selected zone should remain available during playback validation.");
+
+    processor.queuePerformanceSurfaceNoteOn(zone->rootKey, 0.8f);
+
+    juce::AudioBuffer<float> buffer(2, 512);
+    juce::MidiBuffer midiBuffer;
+    processor.processBlock(buffer, midiBuffer);
+
+    std::vector<float> rendered;
+    rendered.reserve(static_cast<std::size_t>(buffer.getNumChannels() * buffer.getNumSamples()));
+    for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
+    {
+        for (int sampleIndex = 0; sampleIndex < buffer.getNumSamples(); ++sampleIndex)
+            rendered.push_back(buffer.getSample(channel, sampleIndex));
+    }
+
+    return rendered;
+}
+
+bool buffersDiffer(const std::vector<float>& first, const std::vector<float>& second)
+{
+    if (first.size() != second.size())
+        return true;
+
+    constexpr auto differenceThreshold = 1.0e-3f;
+    for (std::size_t index = 0; index < first.size(); ++index)
+    {
+        if (std::abs(first[index] - second[index]) > differenceThreshold)
+            return true;
+    }
+
+    return false;
+}
 } // namespace
 
 int main()
@@ -38,6 +86,9 @@ int main()
         juce::ScopedJuceInitialiser_GUI gui;
 
         drs::plugin::Processor processor;
+        const auto projectLoad = drs::engine::loadPhase2ReferenceProjectManifest();
+        require(projectLoad.loaded, "Phase 2 reference project must load for waveform preview validation.");
+        processor.replaceAuthoringProject(projectLoad.project);
 
         const auto metrics = processor.getAuthoringImportResponsivenessSnapshot();
         require(metrics.available, "Authoring import responsiveness snapshot should be available.");
@@ -77,6 +128,11 @@ int main()
         require(loopPreview.loopEnabled, "Looping Phase 2 zone should report loop-enabled preview metadata.");
         require(loopPreview.loopStartFrame == 512, "Looping Phase 2 zone loop start changed unexpectedly.");
         require(loopPreview.loopEndFrame == 22016, "Looping Phase 2 zone loop end changed unexpectedly.");
+
+        const auto leadRender = renderSelectedZonePreview("lead-a4-sustain");
+        const auto padRender = renderSelectedZonePreview("pad-a3-high");
+        require(buffersDiffer(leadRender, padRender),
+                "Selected-zone playback should render different audio for different authoring samples.");
 
         std::cout << "Phase 2 waveform preview tests passed." << std::endl;
         return 0;

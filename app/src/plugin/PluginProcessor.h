@@ -84,7 +84,9 @@ private:
     static juce::String buildMacroParameterId(const std::string& macroId);
     static juce::AudioProcessorValueTreeState::ParameterLayout buildParameterLayout(
         const drs::engine::EngineFacade& engineFacade);
+    bool ensureReferencePlaybackAssetsLoaded();
     void initializeReferencePlaybackAssets();
+    bool startAuthoringVoiceForMidiMessage(const juce::MidiMessage& message);
     void startVoiceForMidiMessage(const juce::MidiMessage& message);
     void releaseVoicesForMidiNote(int midiNoteNumber);
     void renderBlockRange(juce::AudioBuffer<float>& buffer, int startSample, int sampleCount);
@@ -102,6 +104,7 @@ private:
     drs::engine::RuntimeManifestLoadResult referenceManifest;
     drs::engine::RuntimeStreamLoadResult referenceStream;
     std::unordered_map<std::string, LoadedReferenceSample> loadedSamples;
+    std::unordered_map<std::string, LoadedReferenceSample> authoringLoadedSamples;
     std::unordered_map<std::string, drs::app::AuthoringWaveformPreview> authoringWaveformPreviewCache;
     std::vector<ActiveRenderVoice> activeVoices;
     juce::MidiMessageCollector performanceSurfaceMidiCollector;

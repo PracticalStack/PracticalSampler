@@ -321,12 +321,20 @@ void PerformancePanel::refreshSurface()
 
     instrumentLabel.setText(juce::String::fromUTF8(performanceSnapshot.instrumentDisplayName.c_str()),
                             juce::dontSendNotification);
-    patchStatusLabel.setText(
-        "Preset " + juce::String::fromUTF8(performanceSnapshot.presetId.c_str())
-            + " | Load " + juce::String::fromUTF8(performanceSnapshot.loadProfileId.c_str())
-            + " | Articulation " + formatArticulationLabel(performanceSnapshot.selectedArticulationName,
-                                                           performanceSnapshot.selectedArticulationId),
-        juce::dontSendNotification);
+    if (!performanceSnapshot.loaded && performanceSnapshot.instrumentDisplayName == "No instrument loaded")
+    {
+        patchStatusLabel.setText("No instrument loaded yet. Use Load Default or Load Lead Demo.",
+                                 juce::dontSendNotification);
+    }
+    else
+    {
+        patchStatusLabel.setText(
+            "Preset " + juce::String::fromUTF8(performanceSnapshot.presetId.c_str())
+                + " | Load " + juce::String::fromUTF8(performanceSnapshot.loadProfileId.c_str())
+                + " | Articulation " + formatArticulationLabel(performanceSnapshot.selectedArticulationName,
+                                                               performanceSnapshot.selectedArticulationId),
+            juce::dontSendNotification);
+    }
 
     loadIndicatorLabel.setText(juce::String::fromUTF8(performanceSnapshot.loadIndicator.c_str()),
                                juce::dontSendNotification);

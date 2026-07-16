@@ -706,7 +706,6 @@ ParsedSampleFilenameHeuristics parseSampleFilenameHeuristics(const std::string& 
     const auto filenameStem = sourcePath.stem().generic_string();
     const auto rawTokens = splitFilenameStem(filenameStem);
 
-    std::optional<int> detectedRootKey;
     std::optional<int> detectedVelocity;
     std::optional<int> detectedRoundRobin;
     std::optional<std::string> detectedArticulation;
@@ -723,8 +722,6 @@ ParsedSampleFilenameHeuristics parseSampleFilenameHeuristics(const std::string& 
             token.kind = SampleFilenameTokenKind::rootNote;
             token.numericValue = *rootKey;
             token.canonicalValue = noteTokenCanonicalName(*rootKey);
-            if (!detectedRootKey.has_value())
-                detectedRootKey = *rootKey;
         }
         else if (const auto velocity = parseVelocityToken(rawToken); velocity.has_value())
         {
@@ -794,60 +791,24 @@ ParsedSampleFilenameHeuristics parseSampleFilenameHeuristics(const std::string& 
                    {"rr" + std::to_string(*detectedRoundRobin)});
     }
 
-    if (detectedRootKey.has_value())
+    const auto rootKeyInference = inferSampleRootKey(samplePath, metadata);
+    suggestion.rootKeySource = rootKeyInference.source;
+    if (rootKeyInference.resolved)
     {
-        suggestion.zone.rootKey = *detectedRootKey;
-        suggestion.zone.keyLow = *detectedRootKey;
-        suggestion.zone.keyHigh = *detectedRootKey;
-        suggestion.rootKeySource = "filename";
-        addFinding(result.findings,
-                   AuthoringImportFindingSeverity::info,
-                   "root_key.filename",
-                   "Detected root key from filename",
-                   "Filename token inferred root key '" + noteTokenCanonicalName(*detectedRootKey) + "'.",
-                   false,
-                   {noteTokenCanonicalName(*detectedRootKey)});
-    }
-    else if (metadata != nullptr && metadata->rootMidiNotePresent)
-    {
-        suggestion.zone.rootKey = metadata->rootMidiNote;
-        suggestion.zone.keyLow = metadata->rootMidiNote;
-        suggestion.zone.keyHigh = metadata->rootMidiNote;
-        suggestion.rootKeySource = "metadata";
-        addFinding(result.findings,
-                   AuthoringImportFindingSeverity::info,
-                   "root_key.metadata",
-                   "Used embedded root key metadata",
-                   "Sample metadata supplied root key '" + noteTokenCanonicalName(metadata->rootMidiNote) + "'.");
+        suggestion.zone.rootKey = rootKeyInference.rootKey;
+        suggestion.zone.keyLow = rootKeyInference.rootKey;
+        suggestion.zone.keyHigh = rootKeyInference.rootKey;
     }
     else
     {
-        suggestion.zone.rootKey = 60;
+        suggestion.zone.rootKey = rootKeyInference.rootKey;
         suggestion.zone.keyLow = 0;
         suggestion.zone.keyHigh = 127;
-        suggestion.rootKeySource = "manual";
-        addFinding(result.findings,
-                   AuthoringImportFindingSeverity::warning,
-                   "root_key.ambiguous",
-                   "Root key needs confirmation",
-                   "Filename and embedded metadata did not expose a clear root key, so the suggestion kept a full-range draft zone.",
-                   true);
     }
 
-    if (metadata != nullptr && metadata->rootMidiNotePresent && detectedRootKey.has_value()
-        && metadata->rootMidiNote != *detectedRootKey)
-    {
-        addFinding(result.findings,
-                   AuthoringImportFindingSeverity::warning,
-                   "root_key.conflict",
-                   "Filename and metadata disagree on root key",
-                   "Filename suggested '" + noteTokenCanonicalName(*detectedRootKey)
-                       + "' while embedded metadata suggested '"
-                       + noteTokenCanonicalName(metadata->rootMidiNote)
-                       + "'. The filename inference stayed active, but this item needs confirmation.",
-                   true,
-                   {noteTokenCanonicalName(*detectedRootKey), noteTokenCanonicalName(metadata->rootMidiNote)});
-    }
+    result.findings.insert(result.findings.end(),
+                           rootKeyInference.findings.begin(),
+                           rootKeyInference.findings.end());
 
     if (detectedVelocity.has_value())
     {
@@ -872,6 +833,76 @@ ParsedSampleFilenameHeuristics parseSampleFilenameHeuristics(const std::string& 
                    "velocity.default",
                    "No velocity token detected",
                    "Filename did not expose a velocity layer token, so the suggestion kept a full 1-127 range.");
+    }
+
+    return result;
+}
+
+SampleRootKeyInferenceResult inferSampleRootKey(const std::string& samplePath,
+                                                const ImportedSampleMetadata* metadata)
+{
+    SampleRootKeyInferenceResult result;
+
+    const fs::path sourcePath(samplePath);
+    const auto rawTokens = splitFilenameStem(sourcePath.stem().generic_string());
+
+    std::optional<int> detectedRootKey;
+    for (const auto& rawToken : rawTokens)
+    {
+        if (const auto rootKey = parseMidiNoteToken(rawToken); rootKey.has_value())
+        {
+            detectedRootKey = *rootKey;
+            break;
+        }
+    }
+
+    if (detectedRootKey.has_value())
+    {
+        result.resolved = true;
+        result.rootKey = *detectedRootKey;
+        result.source = "filename";
+        addFinding(result.findings,
+                   AuthoringImportFindingSeverity::info,
+                   "root_key.filename",
+                   "Detected root key from filename",
+                   "Filename token inferred root key '" + noteTokenCanonicalName(*detectedRootKey) + "'.",
+                   false,
+                   {noteTokenCanonicalName(*detectedRootKey)});
+    }
+    else if (metadata != nullptr && metadata->rootMidiNotePresent)
+    {
+        result.resolved = true;
+        result.rootKey = metadata->rootMidiNote;
+        result.source = "metadata";
+        addFinding(result.findings,
+                   AuthoringImportFindingSeverity::info,
+                   "root_key.metadata",
+                   "Used embedded root key metadata",
+                   "Sample metadata supplied root key '" + noteTokenCanonicalName(metadata->rootMidiNote) + "'.");
+    }
+    else
+    {
+        addFinding(result.findings,
+                   AuthoringImportFindingSeverity::warning,
+                   "root_key.ambiguous",
+                   "Root key needs confirmation",
+                   "Filename and embedded metadata did not expose a clear root key, so the suggestion kept a full-range draft zone.",
+                   true);
+    }
+
+    if (metadata != nullptr && metadata->rootMidiNotePresent && detectedRootKey.has_value()
+        && metadata->rootMidiNote != *detectedRootKey)
+    {
+        addFinding(result.findings,
+                   AuthoringImportFindingSeverity::warning,
+                   "root_key.conflict",
+                   "Filename and metadata disagree on root key",
+                   "Filename suggested '" + noteTokenCanonicalName(*detectedRootKey)
+                       + "' while embedded metadata suggested '"
+                       + noteTokenCanonicalName(metadata->rootMidiNote)
+                       + "'. The filename inference stayed active, but this item needs confirmation.",
+                   true,
+                   {noteTokenCanonicalName(*detectedRootKey), noteTokenCanonicalName(metadata->rootMidiNote)});
     }
 
     return result;

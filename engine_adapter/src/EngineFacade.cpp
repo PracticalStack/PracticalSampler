@@ -298,6 +298,7 @@ EngineFacade::EngineFacade()
         currentSessionState.transientMetrics.lastFailure = referenceManifest.state;
     }
 
+    referenceInstrumentActive = false;
     refreshDiagnosticsSnapshot();
 }
 
@@ -603,29 +604,45 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
 
 RuntimeManifestLoadResult EngineFacade::loadPhase1ReferenceInstrument() const
 {
-    return referenceManifest;
+    return referenceInstrumentActive ? referenceManifest : RuntimeManifestLoadResult {};
 }
 
 RuntimeStreamLoadResult EngineFacade::loadPhase1ReferenceStream() const
 {
-    return referenceStream;
+    return referenceInstrumentActive ? referenceStream : RuntimeStreamLoadResult {};
 }
 
 EnginePerformanceSnapshot EngineFacade::getPerformanceSnapshot() const
 {
     EnginePerformanceSnapshot snapshot;
-    snapshot.loaded = referenceManifest.loaded && referenceStream.loaded;
-    snapshot.instrumentDisplayName = referenceManifest.loaded ? referenceManifest.instrument.displayName : "Reference instrument unavailable";
-    snapshot.presetId = currentSessionState.presetId;
-    snapshot.loadProfileId = currentSessionState.loadProfileId;
-    snapshot.selectedArticulationId = currentSessionState.selectedArticulationId;
-    snapshot.selectedArticulationName = resolveArticulationName(referenceManifest, currentSessionState);
-    snapshot.loadIndicator = buildLoadIndicator(referenceManifest, referenceStream, currentSessionState);
-    snapshot.previewPlayback = previewPlaybackSnapshot;
-    snapshot.previewPlayback.ready = snapshot.loaded;
-    snapshot.previewPlayback.appliedMacroSummary = buildAppliedMacroSummary(currentSessionState);
-    if (snapshot.previewPlayback.state.empty())
-        snapshot.previewPlayback.state = snapshot.loaded ? "Ready to audition" : snapshot.loadIndicator;
+    snapshot.loaded = referenceInstrumentActive && referenceManifest.loaded && referenceStream.loaded;
+    snapshot.instrumentDisplayName = (referenceInstrumentActive && referenceManifest.loaded)
+        ? referenceManifest.instrument.displayName
+        : "No instrument loaded";
+    snapshot.presetId = referenceInstrumentActive ? currentSessionState.presetId : "none";
+    snapshot.loadProfileId = referenceInstrumentActive ? currentSessionState.loadProfileId : "none";
+    snapshot.selectedArticulationId = referenceInstrumentActive ? currentSessionState.selectedArticulationId : std::string {};
+    snapshot.selectedArticulationName = referenceInstrumentActive
+        ? resolveArticulationName(referenceManifest, currentSessionState)
+        : std::string {};
+    snapshot.loadIndicator = referenceInstrumentActive
+        ? buildLoadIndicator(referenceManifest, referenceStream, currentSessionState)
+        : "Click Load Default or Load Lead Demo";
+
+    if (referenceInstrumentActive)
+    {
+        snapshot.previewPlayback = previewPlaybackSnapshot;
+        snapshot.previewPlayback.ready = snapshot.loaded;
+        snapshot.previewPlayback.appliedMacroSummary = buildAppliedMacroSummary(currentSessionState);
+        if (snapshot.previewPlayback.state.empty())
+            snapshot.previewPlayback.state = snapshot.loaded ? "Ready to audition" : snapshot.loadIndicator;
+    }
+    else
+    {
+        snapshot.previewPlayback.state = snapshot.loadIndicator;
+        snapshot.previewPlayback.appliedMacroSummary = "No instrument loaded";
+    }
+
     return snapshot;
 }
 
@@ -633,7 +650,7 @@ std::vector<EngineArticulationDescriptor> EngineFacade::getArticulationDescripto
 {
     std::vector<EngineArticulationDescriptor> descriptors;
 
-    if (!referenceManifest.loaded)
+    if (!referenceInstrumentActive || !referenceManifest.loaded)
         return descriptors;
 
     descriptors.reserve(referenceManifest.instrument.articulations.size());
@@ -654,7 +671,7 @@ std::vector<EngineMacroDescriptor> EngineFacade::getMacroDescriptors() const
 {
     std::vector<EngineMacroDescriptor> descriptors;
 
-    if (!referenceManifest.loaded)
+    if (!referenceInstrumentActive || !referenceManifest.loaded)
         return descriptors;
 
     descriptors.reserve(referenceManifest.instrument.macros.size());
@@ -691,7 +708,7 @@ std::vector<EngineMacroDescriptor> EngineFacade::getMacroDescriptors() const
 
 bool EngineFacade::setSelectedArticulation(const std::string& articulationId)
 {
-    if (!referenceManifest.loaded)
+    if (!referenceInstrumentActive || !referenceManifest.loaded)
         return false;
 
     if (findArticulationDefinition(referenceManifest.instrument, articulationId) == nullptr)
@@ -709,7 +726,7 @@ bool EngineFacade::setSelectedArticulation(const std::string& articulationId)
 
 bool EngineFacade::setMacroValue(const std::string& macroId, double value)
 {
-    if (!referenceManifest.loaded)
+    if (!referenceInstrumentActive || !referenceManifest.loaded)
         return false;
 
     const auto definitionIterator = std::find_if(referenceManifest.instrument.macros.begin(),
@@ -751,6 +768,13 @@ EnginePreviewPlaybackSnapshot EngineFacade::auditionPreviewNote(int midiNote, in
     previewPlaybackSnapshot.effectiveVelocity = velocity;
     previewPlaybackSnapshot.articulationId = currentSessionState.selectedArticulationId;
     previewPlaybackSnapshot.appliedMacroSummary = buildAppliedMacroSummary(currentSessionState);
+
+    if (!referenceInstrumentActive)
+    {
+        previewPlaybackSnapshot.state = "Preview unavailable";
+        previewPlaybackSnapshot.errorMessage = "No instrument is loaded. Use Load Default or Load Lead Demo first.";
+        return previewPlaybackSnapshot;
+    }
 
     if (!referenceManifest.loaded)
     {
@@ -895,6 +919,7 @@ EnginePresetStateRestoreResult EngineFacade::restorePresetStateJson(const std::s
     currentSessionState.notes = parsedState.preset.notes;
     currentSessionState.transientMetrics.integrationState = "Preset state restored";
     currentSessionState.transientMetrics.lastFailure.clear();
+    referenceInstrumentActive = true;
     previewPlaybackSnapshot = {};
     previewPlaybackSnapshot.ready = referenceManifest.loaded && referenceStream.loaded;
     previewPlaybackSnapshot.articulationId = currentSessionState.selectedArticulationId;
@@ -956,6 +981,7 @@ void EngineFacade::resetSessionStateToDefault()
 {
     if (!referenceManifest.loaded)
     {
+        referenceInstrumentActive = false;
         currentSessionState = {};
         currentSessionState.transientMetrics.integrationState = "Reference manifest unavailable";
         currentSessionState.transientMetrics.lastFailure = referenceManifest.state;
@@ -964,6 +990,7 @@ void EngineFacade::resetSessionStateToDefault()
         return;
     }
 
+    referenceInstrumentActive = true;
     currentSessionState = buildDefaultRuntimeSessionState(referenceManifest);
     currentSessionState.transientMetrics.integrationState = "Default preset state loaded";
     currentSessionState.transientMetrics.lastFailure.clear();
@@ -979,6 +1006,13 @@ void EngineFacade::refreshDiagnosticsSnapshot()
 {
     diagnosticsSnapshot = {};
     syncSessionSelectionsIntoDiagnostics(currentSessionState, diagnosticsSnapshot);
+
+    if (!referenceInstrumentActive)
+    {
+        diagnosticsSnapshot.headline = "No instrument loaded";
+        diagnosticsSnapshot.failureState = "Reference instrument is available but inactive.";
+        return;
+    }
 
     if (!referenceManifest.loaded)
     {

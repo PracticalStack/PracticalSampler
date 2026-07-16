@@ -1,5 +1,7 @@
 #include "plugin/PluginEditor.h"
 
+#include "shared/authoring/AuthoringWorkspaceLayout.h"
+
 namespace drs::plugin
 {
 Editor::Editor(Processor& owner)
@@ -41,7 +43,7 @@ Editor::Editor(Processor& owner)
     workspaceTabs.addTab("Perform", juce::Colour::fromRGB(28, 126, 214), &performancePanel, false);
     workspaceTabs.addTab("Map", juce::Colour::fromRGB(181, 96, 21), &authoringPanel, false);
     addAndMakeVisible(workspaceTabs);
-    setSize(820, 700);
+    setSize(drs::app::authoring::compactShellWidth, drs::app::authoring::compactShellHeight);
 }
 
 void Editor::resized()

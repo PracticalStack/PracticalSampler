@@ -1,5 +1,7 @@
 #include "shared/AuthoringPanel.h"
 
+#include "shared/authoring/AuthoringWorkspaceLayout.h"
+
 #include <algorithm>
 #include <array>
 
@@ -146,77 +148,28 @@ bool isExpandedLayout(AuthoringPanel::LayoutMode layoutMode)
 }
 } // namespace
 
-void AuthoringPanel::ZoneMapComponent::setZoneSummaries(std::vector<drs::engine::AuthoringZoneSummary> summaries)
-{
-    zoneSummaries = std::move(summaries);
-    repaint();
-}
-
-void AuthoringPanel::ZoneMapComponent::paint(juce::Graphics& g)
-{
-    auto bounds = getLocalBounds().toFloat();
-    g.fillAll(juce::Colours::transparentBlack);
-    g.setColour(authoringPanelGrid);
-    g.fillRoundedRectangle(bounds, 14.0f);
-
-    const auto inner = bounds.reduced(12.0f);
-    g.setColour(juce::Colour::fromRGBA(24, 29, 33, 24));
-
-    for (int key = 0; key <= 8; ++key)
-    {
-        const auto x = inner.getX() + (inner.getWidth() * static_cast<float>(key) / 8.0f);
-        g.drawVerticalLine(static_cast<int>(x), inner.getY(), inner.getBottom());
-    }
-
-    for (int velocity = 0; velocity <= 4; ++velocity)
-    {
-        const auto y = inner.getY() + (inner.getHeight() * static_cast<float>(velocity) / 4.0f);
-        g.drawHorizontalLine(static_cast<int>(y), inner.getX(), inner.getRight());
-    }
-
-    for (const auto& zone : zoneSummaries)
-    {
-        const auto x = inner.getX() + inner.getWidth() * (static_cast<float>(zone.keyLow) / 127.0f);
-        const auto width = std::max(10.0f,
-                                    inner.getWidth() * (static_cast<float>(zone.keyHigh - zone.keyLow + 1) / 128.0f));
-        const auto normalizedVelocityLow = 1.0f - (static_cast<float>(zone.velocityHigh) / 127.0f);
-        const auto normalizedVelocityHigh = 1.0f - (static_cast<float>(zone.velocityLow) / 127.0f);
-        const auto y = inner.getY() + inner.getHeight() * normalizedVelocityLow;
-        const auto height = std::max(14.0f, inner.getHeight() * (normalizedVelocityHigh - normalizedVelocityLow));
-
-        const juce::Rectangle<float> zoneBounds(x, y, width, height);
-        g.setColour(zone.selected ? authoringPanelSelected : authoringPanelAccent.withMultipliedAlpha(0.72f));
-        g.fillRoundedRectangle(zoneBounds, 8.0f);
-
-        g.setColour(juce::Colours::white);
-        g.setFont(juce::FontOptions(12.0f, juce::Font::bold));
-        g.drawFittedText(juce::String::fromUTF8(zone.displayName.c_str()),
-                         zoneBounds.toNearestInt().reduced(6, 4),
-                         juce::Justification::centredLeft,
-                         1);
-    }
-}
-
 AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
                                WaveformPreviewProvider previewProvider,
                                ImportResponsivenessProvider responsivenessProvider,
                                LayoutMode nextLayoutMode,
                                NotePreviewStartedCallback notePreviewStarted,
-                               NotePreviewEndedCallback notePreviewEnded)
+                               NotePreviewEndedCallback notePreviewEnded,
+                               RestoreRootKeyCallback restoreRootKeyRequested)
     : authoringSession(session),
       waveformPreviewProvider(std::move(previewProvider)),
       importResponsivenessProvider(std::move(responsivenessProvider)),
       layoutMode(nextLayoutMode),
       onNotePreviewStarted(std::move(notePreviewStarted)),
-      onNotePreviewEnded(std::move(notePreviewEnded))
+      onNotePreviewEnded(std::move(notePreviewEnded)),
+      onRestoreRootKeyRequested(std::move(restoreRootKeyRequested)),
+      zoneMappingEditor(isExpandedLayout(nextLayoutMode)
+                            ? authoring::ZoneMappingEditor::LayoutMode::expanded
+                            : authoring::ZoneMappingEditor::LayoutMode::compact)
 {
-    titleLabel.setText("Phase 2 Authoring Workspace", juce::dontSendNotification);
-    titleLabel.setFont(juce::FontOptions(24.0f, juce::Font::bold));
-    titleLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+    setComponentID("authoringWorkspace");
+    drawerState.open = isExpandedLayout(layoutMode);
+    drawerState.activeTab = authoring::DrawerTab::waveform;
 
-    statusLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
-    sourceLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
-    articulationLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
     waveformInfoLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
     loopInfoLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
     importMetricsLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
@@ -234,13 +187,6 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     configureSectionLabel(performanceSectionLabel, "Performance Bank");
 
     configureFieldLabel(inspectorModeLabel, "Editor");
-    configureFieldLabel(rootKeyLabel, "Root Key");
-    configureFieldLabel(keyLowLabel, "Key Low");
-    configureFieldLabel(keyHighLabel, "Key High");
-    configureFieldLabel(velocityLowLabel, "Velocity Low");
-    configureFieldLabel(velocityHighLabel, "Velocity High");
-    configureFieldLabel(gainLabel, "Gain (dB)");
-    configureFieldLabel(panLabel, "Pan");
     configureFieldLabel(macroAssignmentLabel, "Parameter");
     configureFieldLabel(macroRoleLabel, "Role");
     configureFieldLabel(macroDefaultLabel, "Default");
@@ -256,13 +202,6 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     configureFieldLabel(chordModeLabel, "Chord Rule");
     configureFieldLabel(phraseImportPathLabel, "MIDI Path");
 
-    configureEditorSlider(rootKeySlider, 0, 127, 1);
-    configureEditorSlider(keyLowSlider, 0, 127, 1);
-    configureEditorSlider(keyHighSlider, 0, 127, 1);
-    configureEditorSlider(velocityLowSlider, 1, 127, 1);
-    configureEditorSlider(velocityHighSlider, 1, 127, 1);
-    configureEditorSlider(gainSlider, -24.0, 12.0, 0.1);
-    configureEditorSlider(panSlider, -1.0, 1.0, 0.01);
     configureEditorSlider(macroDefaultSlider, 0.0, 1.0, 0.01);
     configureEditorSlider(macroMinSlider, 0.0, 1.0, 0.01);
     configureEditorSlider(macroMaxSlider, 0.0, 1.0, 0.01);
@@ -283,16 +222,47 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     zoneMap.setComponentID("authoringZoneMap");
     waveformPreview.setComponentID("authoringWaveformPreview");
     macroSelector.setComponentID("authoringMacroSelector");
+    macroAssignmentSelector.setComponentID("authoringMacroAssignmentSelector");
+    macroRoleSelector.setComponentID("authoringMacroRoleSelector");
+    macroDefaultSlider.setComponentID("authoringMacroDefaultSlider");
+    macroMinSlider.setComponentID("authoringMacroMinSlider");
+    macroMaxSlider.setComponentID("authoringMacroMaxSlider");
+    macroMoveUpButton.setComponentID("authoringMacroMoveUpButton");
+    macroMoveDownButton.setComponentID("authoringMacroMoveDownButton");
     fxSelector.setComponentID("authoringFxSelector");
+    fxTypeSelector.setComponentID("authoringFxTypeSelector");
+    fxBypassedToggle.setComponentID("authoringFxBypassedToggle");
     routingBusSelector.setComponentID("authoringRoutingSelector");
+    routingInputSelector.setComponentID("authoringRoutingInputSelector");
+    routingInsertOneSelector.setComponentID("authoringRoutingInsertOneSelector");
+    routingInsertTwoSelector.setComponentID("authoringRoutingInsertTwoSelector");
     performanceBankSelector.setComponentID("authoringPerformanceBankSelector");
     triggerSlotSelector.setComponentID("authoringTriggerSlotSelector");
+    triggerEventSelector.setComponentID("authoringTriggerEventSelector");
+    targetArticulationSelector.setComponentID("authoringTargetArticulationSelector");
     phraseAssetSelector.setComponentID("authoringPhraseAssetSelector");
+    chordModeSelector.setComponentID("authoringChordModeSelector");
     phraseImportPathEditor.setComponentID("authoringPhraseImportPath");
-    previewButton.setComponentID("authoringPreviewButton");
-    undoButton.setComponentID("authoringUndoButton");
-    redoButton.setComponentID("authoringRedoButton");
-    saveCheckpointButton.setComponentID("authoringSaveButton");
+
+    authoring::SelectionSummaryCallbacks summaryCallbacks;
+    summaryCallbacks.onPreviewRequested = [this] { previewSelectedZone(); };
+    summaryCallbacks.onUndoRequested = [this] { undoLastEdit(); };
+    summaryCallbacks.onRedoRequested = [this] { redoLastEdit(); };
+    summaryCallbacks.onMarkSavedRequested = [this] { markSavedCheckpoint(); };
+    summaryStrip.setCallbacks(std::move(summaryCallbacks));
+
+    authoring::ZoneFieldCallbacks zoneCallbacks;
+    zoneCallbacks.onCommitRequested = [this](const authoring::ZoneFieldValuesViewModel& values,
+                                             const std::string& label)
+    {
+        applySelectedZoneEdit(values, juce::String::fromUTF8(label.c_str()));
+    };
+    zoneCallbacks.onRestoreRootKeyRequested = [this]
+    {
+        if (onRestoreRootKeyRequested)
+            onRestoreRootKeyRequested();
+    };
+    zoneMappingEditor.setCallbacks(std::move(zoneCallbacks));
 
     zoneSelector.onChange = [this]
     {
@@ -370,25 +340,9 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         };
     };
 
-    bindCommitOnDragEnd(rootKeySlider, "Update zone root key", [this](const juce::String& label) { applySelectedZoneEdit(label); });
-    bindCommitOnDragEnd(keyLowSlider, "Update zone key range", [this](const juce::String& label) { applySelectedZoneEdit(label); });
-    bindCommitOnDragEnd(keyHighSlider, "Update zone key range", [this](const juce::String& label) { applySelectedZoneEdit(label); });
-    bindCommitOnDragEnd(velocityLowSlider, "Update zone velocity range", [this](const juce::String& label) { applySelectedZoneEdit(label); });
-    bindCommitOnDragEnd(velocityHighSlider, "Update zone velocity range", [this](const juce::String& label) { applySelectedZoneEdit(label); });
-    bindCommitOnDragEnd(gainSlider, "Update zone gain", [this](const juce::String& label) { applySelectedZoneEdit(label); });
-    bindCommitOnDragEnd(panSlider, "Update zone pan", [this](const juce::String& label) { applySelectedZoneEdit(label); });
     bindCommitOnDragEnd(macroDefaultSlider, "Update macro default", [this](const juce::String& label) { applySelectedMacroEdit(label); });
     bindCommitOnDragEnd(macroMinSlider, "Update macro range", [this](const juce::String& label) { applySelectedMacroEdit(label); });
     bindCommitOnDragEnd(macroMaxSlider, "Update macro range", [this](const juce::String& label) { applySelectedMacroEdit(label); });
-
-    loopEnabledToggle.setButtonText("Loop Enabled");
-    loopEnabledToggle.onClick = [this]
-    {
-        if (isRefreshing)
-            return;
-
-        applySelectedZoneEdit("Toggle zone loop");
-    };
 
     macroAssignmentSelector.onChange = [this]
     {
@@ -491,52 +445,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         importPhraseForSelectedBank();
     };
 
-    previewButton.setButtonText("Preview Selected Zone");
-    previewButton.onClick = [this]
-    {
-        const auto request = authoringSession.buildSelectedZonePreviewRequest();
-        if (!request.available)
-            return;
-
-        if (onNotePreviewStarted)
-            onNotePreviewStarted(request.midiNote, static_cast<float>(request.velocity) / 127.0f);
-
-        if (onNotePreviewEnded)
-        {
-            juce::Timer::callAfterDelay(180,
-                                        [callback = onNotePreviewEnded, midiNote = request.midiNote]()
-                                        {
-                                            callback(midiNote);
-                                        });
-        }
-    };
-
-    undoButton.setButtonText("Undo");
-    undoButton.onClick = [this]
-    {
-        authoringSession.undo();
-        refreshFromSession();
-    };
-
-    redoButton.setButtonText("Redo");
-    redoButton.onClick = [this]
-    {
-        authoringSession.redo();
-        refreshFromSession();
-    };
-
-    saveCheckpointButton.setButtonText("Mark Saved");
-    saveCheckpointButton.onClick = [this]
-    {
-        authoringSession.markSaved();
-        refreshFromSession();
-    };
-
     for (auto* component : {
-             static_cast<juce::Component*>(&titleLabel),
-             static_cast<juce::Component*>(&statusLabel),
-             static_cast<juce::Component*>(&sourceLabel),
-             static_cast<juce::Component*>(&articulationLabel),
+             static_cast<juce::Component*>(&summaryStrip),
              static_cast<juce::Component*>(&waveformLabel),
              static_cast<juce::Component*>(&waveformInfoLabel),
              static_cast<juce::Component*>(&loopInfoLabel),
@@ -546,21 +456,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&zoneLabel),
              static_cast<juce::Component*>(&zoneSelector),
              static_cast<juce::Component*>(&zoneMap),
+             static_cast<juce::Component*>(&zoneMappingEditor),
              static_cast<juce::Component*>(&waveformPreview),
-             static_cast<juce::Component*>(&rootKeySlider),
-             static_cast<juce::Component*>(&keyLowSlider),
-             static_cast<juce::Component*>(&keyHighSlider),
-             static_cast<juce::Component*>(&velocityLowSlider),
-             static_cast<juce::Component*>(&velocityHighSlider),
-             static_cast<juce::Component*>(&gainSlider),
-             static_cast<juce::Component*>(&panSlider),
-             static_cast<juce::Component*>(&rootKeyLabel),
-             static_cast<juce::Component*>(&keyLowLabel),
-             static_cast<juce::Component*>(&keyHighLabel),
-             static_cast<juce::Component*>(&velocityLowLabel),
-             static_cast<juce::Component*>(&velocityHighLabel),
-             static_cast<juce::Component*>(&gainLabel),
-             static_cast<juce::Component*>(&panLabel),
              static_cast<juce::Component*>(&macroSectionLabel),
              static_cast<juce::Component*>(&macroSelector),
              static_cast<juce::Component*>(&macroAssignmentLabel),
@@ -606,12 +503,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&phraseImportPathEditor),
              static_cast<juce::Component*>(&phraseImportButton),
              static_cast<juce::Component*>(&performanceSummaryLabel),
-             static_cast<juce::Component*>(&phraseSummaryLabel),
-             static_cast<juce::Component*>(&loopEnabledToggle),
-             static_cast<juce::Component*>(&previewButton),
-             static_cast<juce::Component*>(&undoButton),
-             static_cast<juce::Component*>(&redoButton),
-             static_cast<juce::Component*>(&saveCheckpointButton)
+             static_cast<juce::Component*>(&phraseSummaryLabel)
          })
     {
         addAndMakeVisible(component);
@@ -632,79 +524,11 @@ void AuthoringPanel::paint(juce::Graphics& g)
     g.fillRoundedRectangle(bounds.reduced(4.0f), 18.0f);
 }
 
-void AuthoringPanel::WaveformPreviewComponent::setPreview(AuthoringWaveformPreview nextPreview)
-{
-    preview = std::move(nextPreview);
-    repaint();
-}
-
-void AuthoringPanel::WaveformPreviewComponent::paint(juce::Graphics& g)
-{
-    auto bounds = getLocalBounds().toFloat();
-    g.setColour(authoringPanelGrid);
-    g.fillRoundedRectangle(bounds, 14.0f);
-
-    const auto inner = bounds.reduced(12.0f);
-    g.setColour(juce::Colour::fromRGBA(24, 29, 33, 42));
-    g.drawHorizontalLine(static_cast<int>(inner.getCentreY()), inner.getX(), inner.getRight());
-
-    if (!preview.available || preview.points.empty())
-    {
-        g.setColour(authoringPanelMuted);
-        g.drawFittedText(preview.state.empty() ? "Waveform unavailable" : juce::String::fromUTF8(preview.state.c_str()),
-                         getLocalBounds().reduced(12),
-                         juce::Justification::centred,
-                         2);
-        return;
-    }
-
-    juce::Path waveformPath;
-    const auto widthPerPoint = inner.getWidth() / static_cast<float>(preview.points.size());
-    for (std::size_t index = 0; index < preview.points.size(); ++index)
-    {
-        const auto x = inner.getX() + (static_cast<float>(index) + 0.5f) * widthPerPoint;
-        const auto minY = juce::jmap(preview.points[index].minValue, -1.0f, 1.0f, inner.getBottom(), inner.getY());
-        const auto maxY = juce::jmap(preview.points[index].maxValue, -1.0f, 1.0f, inner.getBottom(), inner.getY());
-        waveformPath.startNewSubPath(x, minY);
-        waveformPath.lineTo(x, maxY);
-    }
-
-    g.setColour(authoringPanelSelected);
-    g.strokePath(waveformPath, juce::PathStrokeType(1.3f));
-
-    if (preview.loopEnabled && preview.frameCount > 0)
-    {
-        const auto startX = inner.getX() + inner.getWidth()
-            * (static_cast<float>(preview.loopStartFrame) / static_cast<float>(preview.frameCount));
-        const auto endX = inner.getX() + inner.getWidth()
-            * (static_cast<float>(preview.loopEndFrame) / static_cast<float>(preview.frameCount));
-        g.setColour(authoringPanelAccent);
-        g.drawVerticalLine(static_cast<int>(startX), inner.getY(), inner.getBottom());
-        g.drawVerticalLine(static_cast<int>(endX), inner.getY(), inner.getBottom());
-    }
-}
-
 void AuthoringPanel::resized()
 {
     auto area = getLocalBounds().reduced(28);
 
-    auto hero = area.removeFromTop(76);
-    auto heroLeft = hero.removeFromLeft(hero.proportionOfWidth(0.62f));
-    titleLabel.setBounds(heroLeft.removeFromTop(30));
-    heroLeft.removeFromTop(6);
-    statusLabel.setBounds(heroLeft.removeFromTop(20));
-    sourceLabel.setBounds(heroLeft.removeFromTop(20));
-    articulationLabel.setBounds(heroLeft.removeFromTop(20));
-
-    auto heroButtons = hero.removeFromRight(320);
-    auto topRow = heroButtons.removeFromTop(28);
-    undoButton.setBounds(topRow.removeFromLeft(92));
-    topRow.removeFromLeft(8);
-    redoButton.setBounds(topRow.removeFromLeft(92));
-    topRow.removeFromLeft(8);
-    saveCheckpointButton.setBounds(topRow.removeFromLeft(120));
-    heroButtons.removeFromTop(10);
-    previewButton.setBounds(heroButtons.removeFromTop(30));
+    summaryStrip.setBounds(area.removeFromTop(authoring::heroHeight));
 
     area.removeFromTop(12);
     zoneLabel.setBounds(area.removeFromTop(24));
@@ -714,7 +538,7 @@ void AuthoringPanel::resized()
     area.removeFromTop(12);
     waveformLabel.setBounds(area.removeFromTop(24));
     area.removeFromTop(6);
-    waveformPreview.setBounds(area.removeFromTop(150));
+    waveformPreview.setBounds(area.removeFromTop(authoring::waveformPreviewHeight));
     area.removeFromTop(6);
     waveformInfoLabel.setBounds(area.removeFromTop(22));
     loopInfoLabel.setBounds(area.removeFromTop(22));
@@ -730,36 +554,45 @@ void AuthoringPanel::resized()
     auto inspector = area;
     const auto expanded = isExpandedLayout(layoutMode);
 
+    auto layoutLabelAndField = [](juce::Rectangle<int> row,
+                                  juce::Label& label,
+                                  juce::Component& field,
+                                  int labelWidth)
+    {
+        label.setBounds(row.removeFromLeft(labelWidth));
+        row.removeFromLeft(6);
+        field.setBounds(row);
+    };
+
+    auto layoutDualLabelAndFieldRow = [&](juce::Rectangle<int> row,
+                                          juce::Label& leftLabel,
+                                          juce::Component& leftField,
+                                          int leftLabelWidth,
+                                          juce::Label& rightLabel,
+                                          juce::Component& rightField,
+                                          int rightLabelWidth)
+    {
+        auto left = row.removeFromLeft((row.getWidth() - 12) / 2);
+        row.removeFromLeft(12);
+        auto right = row;
+        layoutLabelAndField(left, leftLabel, leftField, leftLabelWidth);
+        layoutLabelAndField(right, rightLabel, rightField, rightLabelWidth);
+    };
+
     if (inspectorModeSelector.getSelectedId() == 1)
     {
-        zoneMap.setBounds(inspector.removeFromTop(expanded ? 190 : 160));
-        inspector.removeFromTop(12);
-
-        auto leftColumn = inspector.removeFromLeft(inspector.proportionOfWidth(0.5f));
-        auto rightColumn = inspector;
-
-        auto layoutSliderRow = [](juce::Rectangle<int>& column, juce::Label& label, juce::Slider& slider)
-        {
-            auto row = column.removeFromTop(30);
-            label.setBounds(row.removeFromLeft(120));
-            slider.setBounds(row);
-            column.removeFromTop(8);
-        };
-
-        layoutSliderRow(leftColumn, rootKeyLabel, rootKeySlider);
-        layoutSliderRow(leftColumn, keyLowLabel, keyLowSlider);
-        layoutSliderRow(leftColumn, keyHighLabel, keyHighSlider);
-        layoutSliderRow(leftColumn, velocityLowLabel, velocityLowSlider);
-        layoutSliderRow(leftColumn, velocityHighLabel, velocityHighSlider);
-
-        layoutSliderRow(rightColumn, gainLabel, gainSlider);
-        layoutSliderRow(rightColumn, panLabel, panSlider);
-        loopEnabledToggle.setBounds(rightColumn.removeFromTop(28));
+        constexpr int mappingColumns = 3;
+        const auto desiredMapWidth = expanded ? 320 : 280;
+        const auto mapWidth = juce::jlimit(240, inspector.getWidth() / 2, desiredMapWidth);
+        auto mapArea = inspector.removeFromLeft(mapWidth);
+        inspector.removeFromLeft(14);
+        zoneMap.setBounds(mapArea);
+        zoneMappingEditor.setBounds(inspector);
     }
     else if (inspectorModeSelector.getSelectedId() == 2)
     {
         macroSectionLabel.setBounds(inspector.removeFromTop(24));
-        inspector.removeFromTop(6);
+        inspector.removeFromTop(4);
 
         auto selectorRow = inspector.removeFromTop(28);
         macroSelector.setBounds(selectorRow.removeFromLeft(260));
@@ -768,114 +601,125 @@ void AuthoringPanel::resized()
         selectorRow.removeFromLeft(8);
         macroMoveDownButton.setBounds(selectorRow.removeFromLeft(90));
 
-        inspector.removeFromTop(10);
+        inspector.removeFromTop(4);
 
-        auto layoutSliderRow = [](juce::Rectangle<int>& section,
-                                  juce::Label& label,
-                                  juce::Component& field)
-        {
-            auto row = section.removeFromTop(30);
-            label.setBounds(row.removeFromLeft(120));
-            field.setBounds(row);
-            section.removeFromTop(8);
-        };
+        auto row = inspector.removeFromTop(28);
+        layoutDualLabelAndFieldRow(row,
+                                   macroAssignmentLabel,
+                                   macroAssignmentSelector,
+                                   76,
+                                   macroRoleLabel,
+                                   macroRoleSelector,
+                                   56);
+        inspector.removeFromTop(4);
 
-        layoutSliderRow(inspector, macroAssignmentLabel, macroAssignmentSelector);
-        layoutSliderRow(inspector, macroRoleLabel, macroRoleSelector);
-        layoutSliderRow(inspector, macroDefaultLabel, macroDefaultSlider);
-        layoutSliderRow(inspector, macroMinLabel, macroMinSlider);
-        layoutSliderRow(inspector, macroMaxLabel, macroMaxSlider);
+        row = inspector.removeFromTop(28);
+        layoutDualLabelAndFieldRow(row,
+                                   macroDefaultLabel,
+                                   macroDefaultSlider,
+                                   56,
+                                   macroMinLabel,
+                                   macroMinSlider,
+                                   40);
+        inspector.removeFromTop(4);
+
+        row = inspector.removeFromTop(28);
+        layoutLabelAndField(row, macroMaxLabel, macroMaxSlider, 44);
 
         if (expanded)
         {
-            inspector.removeFromTop(6);
-            macroSummaryLabel.setBounds(inspector.removeFromTop(42));
+            inspector.removeFromTop(4);
+            macroSummaryLabel.setBounds(inspector.removeFromTop(24));
         }
     }
     else if (inspectorModeSelector.getSelectedId() == 3)
     {
-        auto topSection = inspector.removeFromTop(expanded ? 122 : 96);
-        fxSectionLabel.setBounds(topSection.removeFromTop(24));
-        topSection.removeFromTop(6);
+        auto headerRow = inspector.removeFromTop(24);
+        auto leftHeader = headerRow.removeFromLeft((headerRow.getWidth() - 12) / 2);
+        headerRow.removeFromLeft(12);
+        fxSectionLabel.setBounds(leftHeader);
+        routingSectionLabel.setBounds(headerRow);
+        inspector.removeFromTop(4);
 
-        auto fxSelectorRow = topSection.removeFromTop(28);
-        fxSelector.setBounds(fxSelectorRow.removeFromLeft(260));
-        topSection.removeFromTop(8);
+        auto row = inspector.removeFromTop(28);
+        auto left = row.removeFromLeft((row.getWidth() - 12) / 2);
+        row.removeFromLeft(12);
+        auto right = row;
+        fxSelector.setBounds(left);
+        routingBusSelector.setBounds(right);
+        inspector.removeFromTop(4);
 
-        auto fxTypeRow = topSection.removeFromTop(30);
-        fxTypeLabel.setBounds(fxTypeRow.removeFromLeft(120));
-        fxTypeSelector.setBounds(fxTypeRow);
-        topSection.removeFromTop(8);
-        fxBypassedToggle.setBounds(topSection.removeFromTop(28));
+        row = inspector.removeFromTop(28);
+        left = row.removeFromLeft((row.getWidth() - 12) / 2);
+        row.removeFromLeft(12);
+        right = row;
+        layoutLabelAndField(left, fxTypeLabel, fxTypeSelector, 44);
+        layoutLabelAndField(right, routingInputLabel, routingInputSelector, 44);
+        inspector.removeFromTop(4);
 
-        if (expanded)
-        {
-            topSection.removeFromTop(6);
-            fxSummaryLabel.setBounds(topSection.removeFromTop(34));
-        }
+        row = inspector.removeFromTop(28);
+        left = row.removeFromLeft((row.getWidth() - 12) / 2);
+        row.removeFromLeft(12);
+        right = row;
+        fxBypassedToggle.setBounds(left);
+        layoutLabelAndField(right, routingInsertOneLabel, routingInsertOneSelector, 44);
+        inspector.removeFromTop(4);
 
-        inspector.removeFromTop(12);
-        routingSectionLabel.setBounds(inspector.removeFromTop(24));
-        inspector.removeFromTop(6);
-        routingBusSelector.setBounds(inspector.removeFromTop(28).removeFromLeft(260));
-        inspector.removeFromTop(10);
-
-        auto layoutComboRow = [](juce::Rectangle<int>& section,
-                                 juce::Label& label,
-                                 juce::ComboBox& combo)
-        {
-            auto row = section.removeFromTop(30);
-            label.setBounds(row.removeFromLeft(120));
-            combo.setBounds(row);
-            section.removeFromTop(8);
-        };
-
-        layoutComboRow(inspector, routingInputLabel, routingInputSelector);
-        layoutComboRow(inspector, routingInsertOneLabel, routingInsertOneSelector);
-        layoutComboRow(inspector, routingInsertTwoLabel, routingInsertTwoSelector);
+        row = inspector.removeFromTop(28);
+        layoutLabelAndField(row, routingInsertTwoLabel, routingInsertTwoSelector, 56);
 
         if (expanded)
         {
-            inspector.removeFromTop(6);
-            routingSummaryLabel.setBounds(inspector.removeFromTop(42));
+            inspector.removeFromTop(4);
+            fxSummaryLabel.setBounds(inspector.removeFromTop(20));
+            inspector.removeFromTop(2);
+            routingSummaryLabel.setBounds(inspector.removeFromTop(20));
         }
     }
     else
     {
         performanceSectionLabel.setBounds(inspector.removeFromTop(24));
-        inspector.removeFromTop(6);
+        inspector.removeFromTop(4);
 
         auto selectorRow = inspector.removeFromTop(28);
         performanceBankSelector.setBounds(selectorRow.removeFromLeft(250));
         selectorRow.removeFromLeft(10);
         triggerSlotSelector.setBounds(selectorRow.removeFromLeft(250));
 
-        inspector.removeFromTop(10);
+        inspector.removeFromTop(4);
 
-        auto layoutComboRow = [](juce::Rectangle<int>& section,
-                                 juce::Label& label,
-                                 juce::Component& field)
-        {
-            auto row = section.removeFromTop(30);
-            label.setBounds(row.removeFromLeft(120));
-            field.setBounds(row);
-            section.removeFromTop(8);
-        };
+        auto row = inspector.removeFromTop(28);
+        layoutDualLabelAndFieldRow(row,
+                                   triggerEventLabel,
+                                   triggerEventSelector,
+                                   52,
+                                   targetArticulationLabel,
+                                   targetArticulationSelector,
+                                   72);
+        inspector.removeFromTop(4);
 
-        layoutComboRow(inspector, triggerEventLabel, triggerEventSelector);
-        layoutComboRow(inspector, targetArticulationLabel, targetArticulationSelector);
-        layoutComboRow(inspector, phraseAssetLabel, phraseAssetSelector);
-        layoutComboRow(inspector, chordModeLabel, chordModeSelector);
-        layoutComboRow(inspector, phraseImportPathLabel, phraseImportPathEditor);
+        row = inspector.removeFromTop(28);
+        layoutDualLabelAndFieldRow(row,
+                                   phraseAssetLabel,
+                                   phraseAssetSelector,
+                                   48,
+                                   chordModeLabel,
+                                   chordModeSelector,
+                                   72);
+        inspector.removeFromTop(4);
 
-        auto importRow = inspector.removeFromTop(30);
-        phraseImportButton.setBounds(importRow.removeFromLeft(180));
+        row = inspector.removeFromTop(28);
+        auto buttonArea = row.removeFromRight(180);
+        row.removeFromRight(10);
+        layoutLabelAndField(row, phraseImportPathLabel, phraseImportPathEditor, 56);
+        phraseImportButton.setBounds(buttonArea);
 
         if (expanded)
         {
-            inspector.removeFromTop(10);
-            performanceSummaryLabel.setBounds(inspector.removeFromTop(42));
-            phraseSummaryLabel.setBounds(inspector.removeFromTop(60));
+            inspector.removeFromTop(6);
+            performanceSummaryLabel.setBounds(inspector.removeFromTop(20));
+            inspector.removeFromTop(4);
+            phraseSummaryLabel.setBounds(inspector.removeFromTop(24));
         }
     }
 }
@@ -883,6 +727,53 @@ void AuthoringPanel::resized()
 void AuthoringPanel::reloadFromSession()
 {
     refreshFromSession();
+}
+
+authoring::SelectionSummaryViewModel AuthoringPanel::buildSelectionSummaryViewModel() const
+{
+    authoring::SelectionSummaryViewModel viewModel;
+    const auto& documentState = authoringSession.getDocumentState();
+    viewModel.title = "Phase 2 Authoring Workspace";
+    viewModel.statusText = "Revision " + std::to_string(documentState.revision)
+        + " | dirty=" + std::string(documentState.dirty ? "yes" : "no")
+        + " | undo=" + std::to_string(documentState.undoDepth)
+        + " | redo=" + std::to_string(documentState.redoDepth);
+    viewModel.sourceText = "Sample source: none";
+    viewModel.articulationText = "Articulation: none";
+    viewModel.canUndo = documentState.undoDepth > 0;
+    viewModel.canRedo = documentState.redoDepth > 0;
+    viewModel.dirty = documentState.dirty;
+
+    if (const auto zone = authoringSession.getSelectedZone(); zone.has_value())
+    {
+        viewModel.sourceText = "Sample source: " + zone->sampleSourceId;
+        viewModel.articulationText = "Articulation: " + zone->articulationId;
+        viewModel.canPreview = true;
+        viewModel.canRestoreRootKey = true;
+    }
+
+    return viewModel;
+}
+
+authoring::ZoneFieldValuesViewModel AuthoringPanel::buildZoneFieldValuesViewModel() const
+{
+    authoring::ZoneFieldValuesViewModel viewModel;
+    viewModel.emptyStateText = "Select a zone to edit mapping values.";
+
+    if (const auto zone = authoringSession.getSelectedZone(); zone.has_value())
+    {
+        viewModel.hasSelection = true;
+        viewModel.rootKey = zone->rootKey;
+        viewModel.keyLow = zone->keyLow;
+        viewModel.keyHigh = zone->keyHigh;
+        viewModel.velocityLow = zone->velocityLow;
+        viewModel.velocityHigh = zone->velocityHigh;
+        viewModel.gainDb = zone->gainDb;
+        viewModel.pan = zone->pan;
+        viewModel.loopEnabled = zone->loopEnabled;
+    }
+
+    return viewModel;
 }
 
 void AuthoringPanel::rebuildZoneSelector()
@@ -1038,21 +929,7 @@ void AuthoringPanel::refreshInspectorVisibility()
     const auto expanded = isExpandedLayout(layoutMode);
 
     zoneMap.setVisible(mappingMode);
-    rootKeyLabel.setVisible(mappingMode);
-    rootKeySlider.setVisible(mappingMode);
-    keyLowLabel.setVisible(mappingMode);
-    keyLowSlider.setVisible(mappingMode);
-    keyHighLabel.setVisible(mappingMode);
-    keyHighSlider.setVisible(mappingMode);
-    velocityLowLabel.setVisible(mappingMode);
-    velocityLowSlider.setVisible(mappingMode);
-    velocityHighLabel.setVisible(mappingMode);
-    velocityHighSlider.setVisible(mappingMode);
-    gainLabel.setVisible(mappingMode);
-    gainSlider.setVisible(mappingMode);
-    panLabel.setVisible(mappingMode);
-    panSlider.setVisible(mappingMode);
-    loopEnabledToggle.setVisible(mappingMode);
+    zoneMappingEditor.setVisible(mappingMode);
 
     macroSectionLabel.setVisible(macroMode);
     macroSelector.setVisible(macroMode);
@@ -1117,36 +994,11 @@ void AuthoringPanel::refreshFromSession()
     zoneMap.setZoneSummaries(authoringSession.getZoneSummaries());
 
     const auto& project = authoringSession.getProject();
-    const auto& documentState = authoringSession.getDocumentState();
-    statusLabel.setText("Revision " + juce::String(static_cast<int>(documentState.revision))
-                            + " | dirty=" + juce::String(documentState.dirty ? "yes" : "no")
-                            + " | undo=" + juce::String(static_cast<int>(documentState.undoDepth))
-                            + " | redo=" + juce::String(static_cast<int>(documentState.redoDepth)),
-                        juce::dontSendNotification);
+    selectionSummaryViewModel = buildSelectionSummaryViewModel();
+    zoneFieldValuesViewModel = buildZoneFieldValuesViewModel();
 
-    if (const auto zone = authoringSession.getSelectedZone(); zone.has_value())
-    {
-        sourceLabel.setText("Sample source: " + juce::String::fromUTF8(zone->sampleSourceId.c_str()),
-                            juce::dontSendNotification);
-        articulationLabel.setText("Articulation: " + juce::String::fromUTF8(zone->articulationId.c_str()),
-                                  juce::dontSendNotification);
-
-        rootKeySlider.setValue(zone->rootKey, juce::dontSendNotification);
-        keyLowSlider.setValue(zone->keyLow, juce::dontSendNotification);
-        keyHighSlider.setValue(zone->keyHigh, juce::dontSendNotification);
-        velocityLowSlider.setValue(zone->velocityLow, juce::dontSendNotification);
-        velocityHighSlider.setValue(zone->velocityHigh, juce::dontSendNotification);
-        gainSlider.setValue(zone->gainDb, juce::dontSendNotification);
-        panSlider.setValue(zone->pan, juce::dontSendNotification);
-        loopEnabledToggle.setToggleState(zone->loopEnabled, juce::dontSendNotification);
-        previewButton.setEnabled(true);
-    }
-    else
-    {
-        sourceLabel.setText("Sample source: none", juce::dontSendNotification);
-        articulationLabel.setText("Articulation: none", juce::dontSendNotification);
-        previewButton.setEnabled(false);
-    }
+    summaryStrip.setViewModel(selectionSummaryViewModel);
+    zoneMappingEditor.setViewModel(zoneFieldValuesViewModel);
 
     if (!project.authoring.macros.empty())
     {
@@ -1448,27 +1300,63 @@ void AuthoringPanel::refreshFromSession()
     }
 
     refreshInspectorVisibility();
-    undoButton.setEnabled(documentState.undoDepth > 0);
-    redoButton.setEnabled(documentState.redoDepth > 0);
 }
 
-void AuthoringPanel::applySelectedZoneEdit(const juce::String& label)
+void AuthoringPanel::applySelectedZoneEdit(const authoring::ZoneFieldValuesViewModel& values,
+                                           const juce::String& label)
 {
     const auto currentZone = authoringSession.getSelectedZone();
     if (!currentZone.has_value())
         return;
 
     auto editedZone = *currentZone;
-    editedZone.rootKey = static_cast<int>(rootKeySlider.getValue());
-    editedZone.keyLow = static_cast<int>(keyLowSlider.getValue());
-    editedZone.keyHigh = static_cast<int>(keyHighSlider.getValue());
-    editedZone.velocityLow = static_cast<int>(velocityLowSlider.getValue());
-    editedZone.velocityHigh = static_cast<int>(velocityHighSlider.getValue());
-    editedZone.gainDb = gainSlider.getValue();
-    editedZone.pan = panSlider.getValue();
-    editedZone.loopEnabled = loopEnabledToggle.getToggleState();
+    editedZone.rootKey = values.rootKey;
+    editedZone.keyLow = values.keyLow;
+    editedZone.keyHigh = values.keyHigh;
+    editedZone.velocityLow = values.velocityLow;
+    editedZone.velocityHigh = values.velocityHigh;
+    editedZone.gainDb = values.gainDb;
+    editedZone.pan = values.pan;
+    editedZone.loopEnabled = values.loopEnabled;
 
     authoringSession.updateSelectedZone(editedZone, label.toStdString());
+    refreshFromSession();
+}
+
+void AuthoringPanel::previewSelectedZone()
+{
+    const auto request = authoringSession.buildSelectedZonePreviewRequest();
+    if (!request.available)
+        return;
+
+    if (onNotePreviewStarted)
+        onNotePreviewStarted(request.midiNote, static_cast<float>(request.velocity) / 127.0f);
+
+    if (onNotePreviewEnded)
+    {
+        juce::Timer::callAfterDelay(180,
+                                    [callback = onNotePreviewEnded, midiNote = request.midiNote]()
+                                    {
+                                        callback(midiNote);
+                                    });
+    }
+}
+
+void AuthoringPanel::undoLastEdit()
+{
+    authoringSession.undo();
+    refreshFromSession();
+}
+
+void AuthoringPanel::redoLastEdit()
+{
+    authoringSession.redo();
+    refreshFromSession();
+}
+
+void AuthoringPanel::markSavedCheckpoint()
+{
+    authoringSession.markSaved();
     refreshFromSession();
 }
 
