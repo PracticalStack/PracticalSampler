@@ -191,6 +191,10 @@ int main()
         require(pluginRoot != nullptr, "Plugin editor root workspace container was missing.");
         require(findDescendantById(*editor, "workspaceTabs") != nullptr,
                 "Plugin editor should expose the workspace tab container.");
+        require(findDescendantById(*editor, "pluginFileMenuButton") != nullptr,
+                "Plugin editor should expose the File menu entry point.");
+        require(findDescendantById(*editor, "pluginSettingsMenuButton") != nullptr,
+                "Plugin editor should expose the Settings menu entry point.");
         require(findDescendantById(*editor, "performanceKeyboard") != nullptr,
                 "Plugin editor should expose the Sprint 5 keyboard surface.");
         require(findDescendantById(*editor, "performanceDiagnosticsToggle") != nullptr,

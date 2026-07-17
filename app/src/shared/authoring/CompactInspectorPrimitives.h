@@ -53,8 +53,11 @@ public:
     bool isExpanded() const { return expanded; }
     int getPreferredHeight() const;
     void setOnExpandedChanged(std::function<void(bool)> nextCallback);
+    juce::TextButton& getDisclosureButton() { return disclosureButton; }
+    const juce::TextButton& getDisclosureButton() const { return disclosureButton; }
 
 private:
+    juce::String sectionTitle;
     bool expanded = true;
     int expandedContentHeight = 0;
     std::function<void(bool)> onExpandedChanged;

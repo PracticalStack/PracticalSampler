@@ -14,7 +14,8 @@ namespace drs::standalone
 {
 class MainComponent final : public juce::Component,
                             private juce::MenuBarModel,
-                            private juce::Timer
+                            private juce::Timer,
+                            private juce::ChangeListener
 {
 public:
     explicit MainComponent(bool enableAudioOutput = true);
@@ -39,9 +40,11 @@ private:
     {
         newProjectCommandId = 1,
         openProjectCommandId,
+        closeProjectCommandId,
         saveProjectCommandId,
         saveProjectAsCommandId,
         importWavCommandId,
+        audioDeviceSettingsCommandId,
         preferencesCommandId,
         exitApplicationCommandId
     };
@@ -50,14 +53,18 @@ private:
     juce::PopupMenu getMenuForIndex(int topLevelMenuIndex, const juce::String& menuName) override;
     void menuItemSelected(int menuItemID, int topLevelMenuIndex) override;
     void timerCallback() override;
+    void changeListenerCallback(juce::ChangeBroadcaster* source) override;
 
     void initializeAudioOutput();
+    void synchronizeAudioOutputRegistration();
     void shutdownAudioOutput();
     void createNewProject();
     void openProject();
+    void closeProject();
     void saveProject(std::function<void(bool)> completion = {});
     void saveProjectAs(std::function<void(bool)> completion = {});
     void importWavFiles();
+    void showAudioDeviceSettingsDialog();
     void showPreferencesDialog();
     void restoreSelectedZoneRootKey();
     bool saveProjectToFile(const juce::File& file);
@@ -65,6 +72,7 @@ private:
     void confirmSafeToDiscardChanges(const juce::String& nextAction, std::function<void(bool)> completion);
     void refreshProjectViews();
     void updateWindowTitle();
+    drs::engine::RuntimeProjectModel buildUnloadedProjectState() const;
     drs::engine::RuntimeProjectModel buildEmptyProjectTemplate() const;
     juce::String buildWindowTitle() const;
     juce::String buildProjectIssueSummary(const std::vector<std::string>& issues) const;
@@ -78,6 +86,8 @@ private:
     void setProjectDirectory(const juce::File& folder);
     juce::File getRecentProjectDirectory() const;
     void setRecentProjectDirectory(const juce::File& folder);
+    std::unique_ptr<juce::XmlElement> loadSavedAudioDeviceState() const;
+    void saveAudioDeviceSettings();
     juce::File buildChooserBaseDirectory() const;
     juce::File buildDefaultSaveTarget() const;
     void launchOpenProjectChooser(std::function<void(juce::File)> completion);

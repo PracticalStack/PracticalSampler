@@ -32,6 +32,9 @@ private:
     public:
         explicit KeyboardNavigableListBox(RepeatedStructureList& owner);
         bool keyPressed(const juce::KeyPress& key) override;
+        void paint(juce::Graphics& g) override;
+        void focusGained(FocusChangeType cause) override;
+        void focusLost(FocusChangeType cause) override;
 
     private:
         RepeatedStructureList& owner;

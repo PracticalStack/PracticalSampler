@@ -12,15 +12,29 @@ const auto zoneMapSelected = juce::Colour::fromRGB(28, 108, 88);
 const auto zoneMapAccent = juce::Colour::fromRGB(181, 96, 21);
 const auto zoneMapLabelFill = juce::Colour::fromRGBA(20, 25, 31, 168);
 const auto zoneMapOutline = juce::Colour::fromRGBA(24, 29, 33, 92);
-const auto zoneMapFocusRing = juce::Colour::fromRGB(234, 186, 77);
+const auto zoneMapFocusRing = juce::Colour::fromRGB(24, 29, 33);
+const auto zoneMapFocusHalo = juce::Colour::fromRGBA(255, 255, 255, 232);
 constexpr float rangeHandleRadius = 6.0f;
 constexpr float rangeHandleHitRadius = 12.0f;
+
+void drawFocusRing(juce::Graphics& g,
+                   juce::Rectangle<float> bounds,
+                   float cornerSize,
+                   const juce::Colour& outlineColour)
+{
+    g.setColour(zoneMapFocusHalo);
+    g.drawRoundedRectangle(bounds.expanded(1.0f), cornerSize + 1.0f, 3.0f);
+    g.setColour(outlineColour);
+    g.drawRoundedRectangle(bounds, cornerSize, 1.8f);
+}
 } // namespace
 
 ZoneMapCanvas::ZoneMapCanvas()
 {
     setWantsKeyboardFocus(true);
     setMouseClickGrabsKeyboardFocus(true);
+    setColour(juce::ListBox::backgroundColourId, zoneMapGrid);
+    setColour(juce::TextEditor::focusedOutlineColourId, zoneMapFocusRing);
 }
 
 void ZoneMapCanvas::setZoneSummaries(std::vector<drs::engine::AuthoringZoneSummary> summaries)
@@ -89,14 +103,11 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
     g.fillAll(juce::Colours::transparentBlack);
-    g.setColour(zoneMapGrid);
+    g.setColour(findColour(juce::ListBox::backgroundColourId));
     g.fillRoundedRectangle(bounds, 14.0f);
 
     if (hasKeyboardFocus(false))
-    {
-        g.setColour(zoneMapFocusRing);
-        g.drawRoundedRectangle(bounds.reduced(1.5f), 14.0f, 2.0f);
-    }
+        drawFocusRing(g, bounds.reduced(2.0f), 14.0f, findColour(juce::TextEditor::focusedOutlineColourId));
 
     const auto inner = getInnerBounds();
     g.setColour(juce::Colour::fromRGBA(24, 29, 33, 24));
@@ -156,7 +167,7 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
                 const auto activeHandle = activeGesture.has_value()
                     && activeGesture->zoneIndex == zoneIndex
                     && activeGesture->handle == handle;
-                g.setColour(activeHandle ? zoneMapFocusRing : juce::Colours::white);
+                g.setColour(activeHandle ? findColour(juce::TextEditor::focusedOutlineColourId) : juce::Colours::white);
                 g.fillEllipse(center.x - rangeHandleRadius,
                               center.y - rangeHandleRadius,
                               rangeHandleRadius * 2.0f,

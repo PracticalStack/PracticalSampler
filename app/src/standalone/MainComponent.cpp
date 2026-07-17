@@ -22,6 +22,7 @@ constexpr int cancelButtonResult = 0;
 constexpr auto libraryLocationPropertyKey = "libraryLocation";
 constexpr auto projectDirectoryPropertyKey = "projectDirectory";
 constexpr auto recentProjectDirectoryPropertyKey = "recentProjectDirectory";
+constexpr auto audioDeviceStatePropertyKey = "audioDeviceState";
 
 juce::String formatMidiNoteLabel(int midiNote)
 {
@@ -411,11 +412,11 @@ MainComponent::MainComponent(bool enableAudioOutput)
                      drs::app::AuthoringPanel::LayoutMode::expanded,
                      [this](int midiNoteNumber, float velocity)
                      {
-                         processor.queuePerformanceSurfaceNoteOn(midiNoteNumber, velocity);
+                         processor.queueAuthoringPreviewNoteOn(midiNoteNumber, velocity);
                      },
                      [this](int midiNoteNumber)
                      {
-                         processor.queuePerformanceSurfaceNoteOff(midiNoteNumber);
+                         processor.queueAuthoringPreviewNoteOff(midiNoteNumber);
                      },
                      [this]
                      {
@@ -506,6 +507,7 @@ juce::PopupMenu MainComponent::getMenuForIndex(int topLevelMenuIndex, const juce
     {
         menu.addItem(newProjectCommandId, "New Project");
         menu.addItem(openProjectCommandId, "Open Project...");
+        menu.addItem(closeProjectCommandId, "Close");
         menu.addSeparator();
         menu.addItem(saveProjectCommandId, "Save");
         menu.addItem(saveProjectAsCommandId, "Save As...");
@@ -515,6 +517,8 @@ juce::PopupMenu MainComponent::getMenuForIndex(int topLevelMenuIndex, const juce
     }
     else if (topLevelMenuIndex == 1)
     {
+        menu.addItem(audioDeviceSettingsCommandId, "Audio Device Settings...");
+        menu.addSeparator();
         menu.addItem(preferencesCommandId, "Preferences...");
     }
 
@@ -531,6 +535,9 @@ void MainComponent::menuItemSelected(int menuItemID, int)
         case openProjectCommandId:
             openProject();
             break;
+        case closeProjectCommandId:
+            closeProject();
+            break;
         case saveProjectCommandId:
             saveProject({});
             break;
@@ -539,6 +546,9 @@ void MainComponent::menuItemSelected(int menuItemID, int)
             break;
         case importWavCommandId:
             importWavFiles();
+            break;
+        case audioDeviceSettingsCommandId:
+            showAudioDeviceSettingsDialog();
             break;
         case preferencesCommandId:
             showPreferencesDialog();
@@ -560,27 +570,54 @@ void MainComponent::timerCallback()
     updateWindowTitle();
 }
 
+void MainComponent::changeListenerCallback(juce::ChangeBroadcaster* source)
+{
+    if (source != &audioDeviceManager)
+        return;
+
+    synchronizeAudioOutputRegistration();
+    saveAudioDeviceSettings();
+}
+
 void MainComponent::initializeAudioOutput()
 {
+    audioDeviceManager.addChangeListener(this);
     audioProcessorPlayer.setProcessor(&processor);
 
-    const auto setupError = audioDeviceManager.initialise(0, 2, nullptr, true);
-    if (setupError.isNotEmpty())
+    auto savedAudioDeviceState = loadSavedAudioDeviceState();
+    audioDeviceError = audioDeviceManager.initialise(0, 2, savedAudioDeviceState.get(), true);
+    synchronizeAudioOutputRegistration();
+    saveAudioDeviceSettings();
+}
+
+void MainComponent::synchronizeAudioOutputRegistration()
+{
+    const auto hasCurrentAudioDevice = audioDeviceManager.getCurrentAudioDevice() != nullptr;
+
+    if (hasCurrentAudioDevice && !audioOutputEnabled)
     {
-        audioDeviceError = setupError;
-        audioProcessorPlayer.setProcessor(nullptr);
-        return;
+        audioDeviceManager.addAudioCallback(&audioProcessorPlayer);
+        audioOutputEnabled = true;
+    }
+    else if (!hasCurrentAudioDevice && audioOutputEnabled)
+    {
+        audioDeviceManager.removeAudioCallback(&audioProcessorPlayer);
+        audioOutputEnabled = false;
     }
 
-    audioDeviceManager.addAudioCallback(&audioProcessorPlayer);
-    audioOutputEnabled = true;
+    if (hasCurrentAudioDevice)
+        audioDeviceError = {};
 }
 
 void MainComponent::shutdownAudioOutput()
 {
+    saveAudioDeviceSettings();
+
     if (audioOutputEnabled)
         audioDeviceManager.removeAudioCallback(&audioProcessorPlayer);
 
+    audioDeviceManager.removeChangeListener(this);
+    audioDeviceManager.closeAudioDevice();
     audioProcessorPlayer.setProcessor(nullptr);
     audioOutputEnabled = false;
 }
@@ -618,6 +655,19 @@ void MainComponent::openProject()
                                             safeThis->loadProjectFromFile(selectedFile);
                                         });
                                 });
+}
+
+void MainComponent::closeProject()
+{
+    handleCloseRequest([safeThis = juce::Component::SafePointer<MainComponent>(this)](bool shouldClose)
+    {
+        if (!shouldClose || safeThis == nullptr)
+            return;
+
+        safeThis->currentProjectFile = {};
+        safeThis->processor.replaceAuthoringProject(safeThis->buildUnloadedProjectState());
+        safeThis->refreshProjectViews();
+    });
 }
 
 void MainComponent::saveProject(std::function<void(bool)> completion)
@@ -973,6 +1023,31 @@ void MainComponent::promptForRootKeySelection(const juce::String& title,
                             true);
 }
 
+void MainComponent::showAudioDeviceSettingsDialog()
+{
+    auto* selector = new juce::AudioDeviceSelectorComponent(audioDeviceManager,
+                                                            0,
+                                                            0,
+                                                            0,
+                                                            2,
+                                                            false,
+                                                            false,
+                                                            true,
+                                                            false);
+    selector->setSize(560, 460);
+
+    juce::DialogWindow::LaunchOptions options;
+    options.dialogTitle = "Audio Device Settings";
+    options.dialogBackgroundColour = juce::Colour::fromRGB(244, 240, 232);
+    options.content.setOwned(selector);
+    options.componentToCentreAround = this;
+    options.escapeKeyTriggersCloseButton = true;
+    options.useNativeTitleBar = true;
+    options.resizable = true;
+    options.useBottomRightCornerResizer = true;
+    options.launchAsync();
+}
+
 void MainComponent::showPreferencesDialog()
 {
     juce::DialogWindow::LaunchOptions options;
@@ -1102,6 +1177,19 @@ void MainComponent::updateWindowTitle()
 {
     if (auto* window = findParentComponentOfClass<juce::TopLevelWindow>())
         window->setName(buildWindowTitle());
+}
+
+drs::engine::RuntimeProjectModel MainComponent::buildUnloadedProjectState() const
+{
+    drs::engine::RuntimeProjectModel project;
+    project.schemaName = "drs.project";
+    project.schemaVersion = 2;
+    project.displayName = "No Project Loaded";
+    project.authoring.schemaName = "drs.authoring";
+    project.authoring.schemaVersion = 1;
+    project.authoring.notes = { "Open a project or create a new one to begin authoring." };
+    project.notes = { "This session starts without loading the checked-in reference project." };
+    return project;
 }
 
 drs::engine::RuntimeProjectModel MainComponent::buildEmptyProjectTemplate() const
@@ -1250,6 +1338,31 @@ void MainComponent::setRecentProjectDirectory(const juce::File& folder)
     if (auto* settings = appProperties.getUserSettings())
     {
         settings->setValue(recentProjectDirectoryPropertyKey, folder.getFullPathName());
+        settings->saveIfNeeded();
+    }
+}
+
+std::unique_ptr<juce::XmlElement> MainComponent::loadSavedAudioDeviceState() const
+{
+    if (auto* settings = appProperties.getUserSettings())
+    {
+        const auto xmlText = settings->getValue(audioDeviceStatePropertyKey).trim();
+        if (xmlText.isNotEmpty())
+            return juce::parseXML(xmlText);
+    }
+
+    return {};
+}
+
+void MainComponent::saveAudioDeviceSettings()
+{
+    if (auto* settings = appProperties.getUserSettings())
+    {
+        if (auto audioDeviceState = audioDeviceManager.createStateXml())
+            settings->setValue(audioDeviceStatePropertyKey, audioDeviceState->toString());
+        else
+            settings->removeValue(audioDeviceStatePropertyKey);
+
         settings->saveIfNeeded();
     }
 }

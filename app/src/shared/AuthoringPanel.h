@@ -39,12 +39,45 @@ public:
                             NotePreviewStartedCallback onNotePreviewStarted = {},
                             NotePreviewEndedCallback onNotePreviewEnded = {},
                             RestoreRootKeyCallback onRestoreRootKeyRequested = {});
+    ~AuthoringPanel() override;
 
     void paint(juce::Graphics& g) override;
     void resized() override;
     void reloadFromSession();
 
 private:
+    class AuthoringControlLookAndFeel final : public juce::LookAndFeel_V4
+    {
+    public:
+        AuthoringControlLookAndFeel();
+
+        void drawButtonBackground(juce::Graphics& g,
+                                  juce::Button& button,
+                                  const juce::Colour& backgroundColour,
+                                  bool shouldDrawButtonAsHighlighted,
+                                  bool shouldDrawButtonAsDown) override;
+        void drawToggleButton(juce::Graphics& g,
+                              juce::ToggleButton& button,
+                              bool shouldDrawButtonAsHighlighted,
+                              bool shouldDrawButtonAsDown) override;
+        void drawComboBox(juce::Graphics& g,
+                          int width,
+                          int height,
+                          bool isButtonDown,
+                          int buttonX,
+                          int buttonY,
+                          int buttonW,
+                          int buttonH,
+                          juce::ComboBox& box) override;
+        void drawLinearSliderOutline(juce::Graphics& g,
+                                     int x,
+                                     int y,
+                                     int width,
+                                     int height,
+                                     const juce::Slider::SliderStyle style,
+                                     juce::Slider& slider) override;
+    };
+
     void rebuildZoneSelector();
     void rebuildMacroList();
     void rebuildFxSelector();
@@ -53,6 +86,7 @@ private:
     void rebuildTriggerSlotSelector();
     void refreshInspectorVisibility();
     void refreshDrawerContextLabels();
+    void refreshContextualAccessibility();
     void refreshWaveformDrawerContent();
     void refreshFromSession();
     void applySelectedZoneEdit(const authoring::ZoneFieldValuesViewModel& values, const juce::String& label);
@@ -68,6 +102,7 @@ private:
     void markSavedCheckpoint();
     void setDrawerOpen(bool shouldOpen);
     void setActiveDrawerTab(authoring::DrawerTab nextTab);
+    void configureAccessibilityAndFocus();
     void refreshDrawerVisibility();
     authoring::SelectionSummaryViewModel buildSelectionSummaryViewModel() const;
     authoring::ZoneFieldValuesViewModel buildZoneFieldValuesViewModel() const;
@@ -88,6 +123,7 @@ private:
     authoring::DrawerState drawerState;
     authoring::SelectionSummaryViewModel selectionSummaryViewModel;
     authoring::ZoneFieldValuesViewModel zoneFieldValuesViewModel;
+    AuthoringControlLookAndFeel authoringLookAndFeel;
 
     authoring::AuthoringSummaryStrip summaryStrip;
     juce::Label waveformLabel;
@@ -110,7 +146,6 @@ private:
     authoring::ZoneMappingEditor zoneMappingEditor;
     authoring::WaveformDetailView waveformPreview;
 
-    juce::Label macroSectionLabel;
     authoring::RepeatedStructureList macroList;
     juce::Label macroAssignmentLabel;
     juce::ComboBox macroAssignmentSelector;
@@ -143,7 +178,6 @@ private:
     juce::ComboBox routingInsertTwoSelector;
     juce::Label routingSummaryLabel;
 
-    juce::Label performanceSectionLabel;
     juce::ComboBox performanceBankSelector;
     juce::ComboBox triggerSlotSelector;
     juce::Label triggerEventLabel;

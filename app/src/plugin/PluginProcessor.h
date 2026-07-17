@@ -53,11 +53,21 @@ public:
     drs::app::AuthoringWaveformPreview getAuthoringWaveformPreview();
     drs::app::AuthoringImportResponsivenessSnapshot getAuthoringImportResponsivenessSnapshot() const;
     void replaceAuthoringProject(drs::engine::RuntimeProjectModel project);
+    const juce::File& getAuthoringProjectFile() const { return authoringProjectFile; }
+    void setAuthoringProjectFile(juce::File file) { authoringProjectFile = std::move(file); }
     void setMacroValueFromShell(const std::string& macroId, double value);
+    void queueAuthoringPreviewNoteOn(int midiNoteNumber, float velocity);
+    void queueAuthoringPreviewNoteOff(int midiNoteNumber);
     void queuePerformanceSurfaceNoteOn(int midiNoteNumber, float velocity);
     void queuePerformanceSurfaceNoteOff(int midiNoteNumber);
 
 private:
+    enum class VoiceSource
+    {
+        performance,
+        authoringPreview
+    };
+
     struct LoadedReferenceSample
     {
         drs::engine::ImportedSampleData sample;
@@ -70,6 +80,7 @@ private:
         int effectiveMidiNote = 0;
         int effectiveVelocity = 0;
         int rootKey = 60;
+        VoiceSource source = VoiceSource::performance;
         std::string zoneId;
         std::string sampleId;
         const LoadedReferenceSample* loadedSample = nullptr;
@@ -88,7 +99,8 @@ private:
     void initializeReferencePlaybackAssets();
     bool startAuthoringVoiceForMidiMessage(const juce::MidiMessage& message);
     void startVoiceForMidiMessage(const juce::MidiMessage& message);
-    void releaseVoicesForMidiNote(int midiNoteNumber);
+    void releaseVoicesForMidiNote(int midiNoteNumber, VoiceSource source);
+    void clearVoices(VoiceSource source);
     void renderBlockRange(juce::AudioBuffer<float>& buffer, int startSample, int sampleCount);
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     void syncEngineFromParameters();
@@ -107,9 +119,11 @@ private:
     std::unordered_map<std::string, LoadedReferenceSample> authoringLoadedSamples;
     std::unordered_map<std::string, drs::app::AuthoringWaveformPreview> authoringWaveformPreviewCache;
     std::vector<ActiveRenderVoice> activeVoices;
+    juce::MidiMessageCollector authoringPreviewMidiCollector;
     juce::MidiMessageCollector performanceSurfaceMidiCollector;
     juce::AudioProcessorValueTreeState parameterState;
     drs::app::AuthoringImportResponsivenessSnapshot authoringImportResponsivenessSnapshot;
+    juce::File authoringProjectFile;
     double currentSampleRate = 44100.0;
     std::uint64_t nextRenderVoiceId = 1;
     bool isSynchronizingParameterState = false;

@@ -4,6 +4,43 @@ namespace drs::app::authoring
 {
 namespace
 {
+void configureAccessibleMetadata(juce::Component& component,
+                                 const juce::String& title,
+                                 const juce::String& description,
+                                 const juce::String& helpText = {})
+{
+    component.setTitle(title);
+    component.setDescription(description);
+
+    if (helpText.isNotEmpty())
+        component.setHelpText(helpText);
+}
+
+void setAccessibleRecursively(juce::Component& component, bool shouldExpose)
+{
+    component.setAccessible(shouldExpose);
+
+    for (int childIndex = 0; childIndex < component.getNumChildComponents(); ++childIndex)
+        setAccessibleRecursively(*component.getChildComponent(childIndex), shouldExpose);
+}
+
+void setVisibleAndAccessible(juce::Component& component, bool shouldShow)
+{
+    component.setVisible(shouldShow);
+    setAccessibleRecursively(component, shouldShow);
+}
+
+bool isFocusedWithin(const juce::Component* focusedComponent, const juce::Component& ancestor)
+{
+    for (auto* current = focusedComponent; current != nullptr; current = current->getParentComponent())
+    {
+        if (current == &ancestor)
+            return true;
+    }
+
+    return false;
+}
+
 void configureInspectorLabel(juce::Label& label,
                              const juce::String& text,
                              float fontHeight,
@@ -121,16 +158,27 @@ void CompactInspectorCommitSlider::detachTextBoxListener()
 CompactInspectorSection::CompactInspectorSection(const juce::String& titleText,
                                                  const juce::String& sectionComponentId,
                                                  bool startsExpanded)
-    : expanded(startsExpanded)
+    : sectionTitle(titleText),
+      expanded(startsExpanded)
 {
     setComponentID(sectionComponentId);
 
     configureInspectorLabel(titleLabel, titleText, 13.0f, true);
+    configureAccessibleMetadata(*this,
+                                titleText + " inspector section",
+                                "Groups related " + titleText.toLowerCase() + " controls.");
+    configureAccessibleMetadata(titleLabel,
+                                titleText,
+                                "Inspector section heading.");
 
     disclosureButton.setClickingTogglesState(true);
     disclosureButton.setComponentID(sectionComponentId + "Disclosure");
     disclosureButton.setToggleState(expanded, juce::dontSendNotification);
     disclosureButton.setButtonText(expanded ? "Hide" : "Show");
+    configureAccessibleMetadata(disclosureButton,
+                                (expanded ? "Hide " : "Show ") + titleText + " section",
+                                "Shows or hides the " + titleText.toLowerCase() + " inspector section.",
+                                "Press to expand or collapse this section.");
     disclosureButton.onClick = [this]
     {
         setExpanded(!expanded);
@@ -149,7 +197,7 @@ void CompactInspectorSection::resized()
 
     if (content != nullptr)
     {
-        content->setVisible(expanded);
+        setVisibleAndAccessible(*content, expanded);
         content->setBounds(area);
     }
 }
@@ -161,7 +209,10 @@ void CompactInspectorSection::setContent(juce::Component* nextContent)
     {
         addAndMakeVisible(content);
         expandedContentHeight = content->getHeight();
-        content->setVisible(expanded);
+        configureAccessibleMetadata(*content,
+                                    sectionTitle + " section content",
+                                    "Contains editable " + sectionTitle.toLowerCase() + " inspector controls.");
+        setVisibleAndAccessible(*content, expanded);
     }
 
     resized();
@@ -172,11 +223,17 @@ void CompactInspectorSection::setExpanded(bool shouldExpand)
     if (expanded == shouldExpand)
         return;
 
+    const auto* focusedComponent = juce::Component::getCurrentlyFocusedComponent();
+    const auto focusInsideContent = content != nullptr && isFocusedWithin(focusedComponent, *content);
+
     expanded = shouldExpand;
     disclosureButton.setToggleState(expanded, juce::dontSendNotification);
     disclosureButton.setButtonText(expanded ? "Hide" : "Show");
+    disclosureButton.setTitle((expanded ? "Hide " : "Show ") + sectionTitle + " section");
     if (content != nullptr)
-        content->setVisible(expanded);
+        setVisibleAndAccessible(*content, expanded);
+    if (!expanded && focusInsideContent)
+        disclosureButton.grabKeyboardFocus();
     if (onExpandedChanged)
         onExpandedChanged(expanded);
     resized();
@@ -201,6 +258,13 @@ CompactInspectorSliderRow::CompactInspectorSliderRow(const juce::String& labelTe
     setComponentID(rowComponentId);
     configureInspectorLabel(label, labelText, 12.5f, true);
     configureInspectorSlider(slider, minValue, maxValue, interval);
+    configureAccessibleMetadata(label,
+                                labelText,
+                                "Inspector field label.");
+    configureAccessibleMetadata(slider,
+                                labelText,
+                                "Adjusts " + labelText.toLowerCase() + ".",
+                                "Drag the slider or enter a numeric value.");
     addAndMakeVisible(label);
     addAndMakeVisible(slider);
 }
@@ -227,6 +291,23 @@ CompactInspectorRangeRow::CompactInspectorRangeRow(const juce::String& titleText
     configureInspectorLabel(highLabel, highLabelText, 11.5f, false);
     configureInspectorSlider(lowSlider, minValue, maxValue, interval);
     configureInspectorSlider(highSlider, minValue, maxValue, interval);
+    configureAccessibleMetadata(titleLabel,
+                                titleText,
+                                "Inspector field label.");
+    configureAccessibleMetadata(lowLabel,
+                                titleText + " low label",
+                                "Low value label for " + titleText.toLowerCase() + ".");
+    configureAccessibleMetadata(highLabel,
+                                titleText + " high label",
+                                "High value label for " + titleText.toLowerCase() + ".");
+    configureAccessibleMetadata(lowSlider,
+                                titleText + " low",
+                                "Adjusts the low value for " + titleText.toLowerCase() + ".",
+                                "Drag the slider or enter a numeric value.");
+    configureAccessibleMetadata(highSlider,
+                                titleText + " high",
+                                "Adjusts the high value for " + titleText.toLowerCase() + ".",
+                                "Drag the slider or enter a numeric value.");
 
     addAndMakeVisible(titleLabel);
     addAndMakeVisible(lowLabel);
@@ -263,6 +344,13 @@ CompactInspectorToggleRow::CompactInspectorToggleRow(const juce::String& titleTe
     setComponentID(rowComponentId);
     configureInspectorLabel(label, titleText, 12.5f, true);
     toggle.setButtonText(toggleText);
+    configureAccessibleMetadata(label,
+                                titleText,
+                                "Inspector field label.");
+    configureAccessibleMetadata(toggle,
+                                titleText,
+                                "Toggles the " + titleText.toLowerCase() + " state.",
+                                "Press to turn this setting on or off.");
     addAndMakeVisible(label);
     addAndMakeVisible(toggle);
 }
@@ -282,6 +370,13 @@ CompactInspectorActionRow::CompactInspectorActionRow(const juce::String& titleTe
     setComponentID(rowComponentId);
     configureInspectorLabel(label, titleText, 12.5f, true);
     button.setButtonText(buttonText);
+    configureAccessibleMetadata(label,
+                                titleText,
+                                "Inspector action label.");
+    configureAccessibleMetadata(button,
+                                buttonText,
+                                "Runs the " + titleText.toLowerCase() + " action.",
+                                "Press to apply this action.");
     addAndMakeVisible(label);
     addAndMakeVisible(button);
 }
@@ -301,6 +396,9 @@ CompactInspectorMessage::CompactInspectorMessage(const juce::String& messageComp
     label.setJustificationType(justification);
     label.setColour(juce::Label::textColourId, juce::Colour::fromRGB(82, 86, 94));
     label.setFont(juce::FontOptions(12.5f, juce::Font::plain));
+    configureAccessibleMetadata(*this,
+                                "Inspector message",
+                                "Displays compact inspector guidance or validation feedback.");
     addAndMakeVisible(label);
 }
 
@@ -312,5 +410,8 @@ void CompactInspectorMessage::resized()
 void CompactInspectorMessage::setText(const juce::String& text)
 {
     label.setText(text, juce::dontSendNotification);
+    configureAccessibleMetadata(label,
+                                text,
+                                "Inspector message text.");
 }
 } // namespace drs::app::authoring

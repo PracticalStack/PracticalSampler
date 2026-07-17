@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <limits>
 #include <optional>
 
 namespace drs::plugin
@@ -132,6 +133,7 @@ Processor::Processor()
       parameterState(*this, nullptr, "macroParameters", buildParameterLayout(engineFacade))
 {
     performanceSurfaceMidiCollector.reset(currentSampleRate);
+    authoringPreviewMidiCollector.reset(currentSampleRate);
     initializeAuthoringImportMetrics();
 
     for (const auto& macro : engineFacade.getMacroDescriptors())
@@ -150,6 +152,7 @@ void Processor::prepareToPlay(double sampleRate, int)
 {
     currentSampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;
     performanceSurfaceMidiCollector.reset(currentSampleRate);
+    authoringPreviewMidiCollector.reset(currentSampleRate);
     activeVoices.clear();
 }
 
@@ -171,27 +174,53 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
     for (auto channel = 0; channel < buffer.getNumChannels(); ++channel)
         buffer.clear(channel, 0, buffer.getNumSamples());
 
-    juce::MidiBuffer combinedMidiMessages;
-    combinedMidiMessages.addEvents(midiMessages, 0, buffer.getNumSamples(), 0);
-    performanceSurfaceMidiCollector.removeNextBlockOfMessages(combinedMidiMessages, buffer.getNumSamples());
+    juce::MidiBuffer performanceMidiMessages;
+    performanceMidiMessages.addEvents(midiMessages, 0, buffer.getNumSamples(), 0);
+    performanceSurfaceMidiCollector.removeNextBlockOfMessages(performanceMidiMessages, buffer.getNumSamples());
 
-    if (combinedMidiMessages.isEmpty() && activeVoices.empty())
+    juce::MidiBuffer authoringPreviewMessages;
+    authoringPreviewMidiCollector.removeNextBlockOfMessages(authoringPreviewMessages, buffer.getNumSamples());
+
+    if (performanceMidiMessages.isEmpty() && authoringPreviewMessages.isEmpty() && activeVoices.empty())
         return;
 
     int renderedSamples = 0;
+    auto performanceIterator = performanceMidiMessages.begin();
+    auto authoringIterator = authoringPreviewMessages.begin();
+    const auto performanceEnd = performanceMidiMessages.end();
+    const auto authoringEnd = authoringPreviewMessages.end();
 
-    for (const auto metadata : combinedMidiMessages)
+    while (performanceIterator != performanceEnd || authoringIterator != authoringEnd)
     {
+        const auto performanceSamplePosition = performanceIterator != performanceEnd
+            ? (*performanceIterator).samplePosition
+            : std::numeric_limits<int>::max();
+        const auto authoringSamplePosition = authoringIterator != authoringEnd
+            ? (*authoringIterator).samplePosition
+            : std::numeric_limits<int>::max();
+        const auto useAuthoringMessage = performanceIterator == performanceEnd
+            || (authoringIterator != authoringEnd && authoringSamplePosition <= performanceSamplePosition);
+        const auto metadata = useAuthoringMessage ? *authoringIterator++ : *performanceIterator++;
         const auto eventSample = std::clamp(metadata.samplePosition, 0, buffer.getNumSamples());
         renderBlockRange(buffer, renderedSamples, eventSample - renderedSamples);
 
         const auto message = metadata.getMessage();
+        const auto voiceSource = useAuthoringMessage ? VoiceSource::authoringPreview : VoiceSource::performance;
         if (message.isNoteOn())
-            startVoiceForMidiMessage(message);
+        {
+            if (useAuthoringMessage)
+                startAuthoringVoiceForMidiMessage(message);
+            else
+                startVoiceForMidiMessage(message);
+        }
         else if (message.isNoteOff())
-            releaseVoicesForMidiNote(message.getNoteNumber());
+        {
+            releaseVoicesForMidiNote(message.getNoteNumber(), voiceSource);
+        }
         else if (message.isAllNotesOff() || message.isAllSoundOff())
-            activeVoices.clear();
+        {
+            clearVoices(voiceSource);
+        }
 
         renderedSamples = eventSample;
     }
@@ -235,6 +264,22 @@ void Processor::setMacroValueFromShell(const std::string& macroId, double value)
         parameter->setValueNotifyingHost(parameter->convertTo0to1(static_cast<float>(value)));
         parameter->endChangeGesture();
     }
+}
+
+void Processor::queueAuthoringPreviewNoteOn(int midiNoteNumber, float velocity)
+{
+    auto message = juce::MidiMessage::noteOn(1,
+                                             clampMidiValue(midiNoteNumber),
+                                             std::clamp(velocity, 0.0f, 1.0f));
+    message.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001);
+    authoringPreviewMidiCollector.addMessageToQueue(message);
+}
+
+void Processor::queueAuthoringPreviewNoteOff(int midiNoteNumber)
+{
+    auto message = juce::MidiMessage::noteOff(1, clampMidiValue(midiNoteNumber));
+    message.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001);
+    authoringPreviewMidiCollector.addMessageToQueue(message);
 }
 
 drs::app::AuthoringWaveformPreview Processor::getAuthoringWaveformPreview()
@@ -503,6 +548,7 @@ bool Processor::startAuthoringVoiceForMidiMessage(const juce::MidiMessage& messa
     voice.effectiveMidiNote = message.getNoteNumber();
     voice.effectiveVelocity = std::clamp(static_cast<int>(std::round(message.getFloatVelocity() * 127.0f)), 1, 127);
     voice.rootKey = selectedZone->rootKey;
+    voice.source = VoiceSource::authoringPreview;
     voice.zoneId = selectedZone->id;
     voice.sampleId = projectSampleSource->id;
     voice.loadedSample = &sampleIterator->second;
@@ -525,9 +571,6 @@ bool Processor::startAuthoringVoiceForMidiMessage(const juce::MidiMessage& messa
 
 void Processor::startVoiceForMidiMessage(const juce::MidiMessage& message)
 {
-    if (startAuthoringVoiceForMidiMessage(message))
-        return;
-
     if (!ensureReferencePlaybackAssetsLoaded())
         return;
 
@@ -565,6 +608,7 @@ void Processor::startVoiceForMidiMessage(const juce::MidiMessage& message)
     voice.effectiveMidiNote = effectiveMidiNote;
     voice.effectiveVelocity = effectiveVelocity;
     voice.rootKey = zone->rootKey;
+    voice.source = VoiceSource::performance;
     voice.zoneId = route.zoneId;
     voice.sampleId = route.sampleId;
     voice.loadedSample = &sampleIterator->second;
@@ -582,17 +626,28 @@ void Processor::startVoiceForMidiMessage(const juce::MidiMessage& message)
     }
 }
 
-void Processor::releaseVoicesForMidiNote(int midiNoteNumber)
+void Processor::releaseVoicesForMidiNote(int midiNoteNumber, VoiceSource source)
 {
     for (auto& voice : activeVoices)
     {
-        if (voice.sourceMidiNote != midiNoteNumber || voice.releasing)
+        if (voice.source != source || voice.sourceMidiNote != midiNoteNumber || voice.releasing)
             continue;
 
         voice.releasing = true;
         voice.releaseSamplesTotal = 2048;
         voice.releaseSamplesRemaining = voice.releaseSamplesTotal;
     }
+}
+
+void Processor::clearVoices(VoiceSource source)
+{
+    activeVoices.erase(std::remove_if(activeVoices.begin(),
+                                      activeVoices.end(),
+                                      [source](const ActiveRenderVoice& voice)
+                                      {
+                                          return voice.source == source;
+                                      }),
+                       activeVoices.end());
 }
 
 void Processor::renderBlockRange(juce::AudioBuffer<float>& buffer, int startSample, int sampleCount)

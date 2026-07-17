@@ -62,6 +62,34 @@ struct RepeatedStructureListViewModel
     int selectedIndex = -1;
 };
 
+struct RepeatedStructureSelectionPathViewModel
+{
+    std::string scopeLabel;
+    std::string breadcrumbText;
+};
+
+struct RepeatedStructureDetailViewModel
+{
+    std::string title;
+    std::string statusText;
+    std::string bodyText;
+};
+
+struct RepeatedStructurePaneViewModel
+{
+    std::string title;
+    RepeatedStructureSelectionPathViewModel selectionPath;
+    RepeatedStructureListViewModel list;
+    RepeatedStructureDetailViewModel detail;
+};
+
+struct RepeatedStructureEditIntent
+{
+    std::string rowKey;
+    std::string actionId;
+    std::string actionLabel;
+};
+
 struct SelectionSummaryCallbacks
 {
     std::function<void()> onPreviewRequested;
@@ -78,4 +106,11 @@ struct ZoneFieldCallbacks
 
 using RefreshEditIntent = std::function<void(const std::string&)>;
 using RepeatedStructureSelectionCallback = std::function<void(int)>;
+using RepeatedStructureEditIntentHandler = std::function<void(const RepeatedStructureEditIntent&)>;
+
+struct RepeatedStructureAdapterCallbacks
+{
+    RepeatedStructureSelectionCallback onSelectionRequested;
+    RepeatedStructureEditIntentHandler onEditIntentRequested;
+};
 } // namespace drs::app::authoring

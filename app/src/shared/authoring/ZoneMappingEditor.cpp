@@ -18,6 +18,12 @@ void addOwnedRow(juce::Component& parent, juce::Component& child, int height)
     parent.addAndMakeVisible(child);
     child.setSize(0, height);
 }
+
+void setVisibleAndAccessible(juce::Component& component, bool shouldShow)
+{
+    component.setVisible(shouldShow);
+    component.setAccessible(shouldShow);
+}
 } // namespace
 
 ZoneMappingEditor::ZoneMappingEditor()
@@ -36,6 +42,8 @@ ZoneMappingEditor::ZoneMappingEditor()
       validationMessage("authoringZoneValidationMessage", juce::Justification::centredLeft)
 {
     setComponentID("authoringZoneFieldEditor");
+    setTitle("Zone mapping inspector");
+    setDescription("Edits the selected zone mapping, sample, mix, and advanced settings.");
 
     emptyStateMessage.setText("Select a zone to edit mapping fields.");
     validationMessage.setText("Ranges are normalized on commit to keep low and high values valid.");
@@ -49,6 +57,21 @@ ZoneMappingEditor::ZoneMappingEditor()
     panRow.getSlider().setComponentID("authoringPanSlider");
     loopToggleRow.getToggle().setComponentID("authoringLoopEnabledToggle");
     restoreRootKeyRow.getButton().setComponentID("authoringRestoreRootKeyButton");
+    mapSection.getDisclosureButton().setExplicitFocusOrder(40);
+    rootKeyRow.getSlider().setExplicitFocusOrder(41);
+    keyRangeRow.getLowSlider().setExplicitFocusOrder(42);
+    keyRangeRow.getHighSlider().setExplicitFocusOrder(43);
+    sampleSection.getDisclosureButton().setExplicitFocusOrder(44);
+    velocityRangeRow.getLowSlider().setExplicitFocusOrder(45);
+    velocityRangeRow.getHighSlider().setExplicitFocusOrder(46);
+    mixSection.getDisclosureButton().setExplicitFocusOrder(47);
+    gainRow.getSlider().setExplicitFocusOrder(48);
+    panRow.getSlider().setExplicitFocusOrder(49);
+    advancedSection.getDisclosureButton().setExplicitFocusOrder(50);
+    loopToggleRow.getToggle().setExplicitFocusOrder(51);
+    restoreRootKeyRow.getButton().setExplicitFocusOrder(52);
+    restoreRootKeyRow.getButton().setHelpText(
+        "Restores the selected zone root key from the imported sample reference pitch.");
 
     addOwnedRow(mapSectionContent, rootKeyRow, sliderRowHeight);
     addOwnedRow(mapSectionContent, keyRangeRow, rangeRowHeight);
@@ -167,7 +190,7 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
 
     const auto hasSelection = viewModel.hasSelection;
 
-    emptyStateMessage.setVisible(!hasSelection);
+    setVisibleAndAccessible(emptyStateMessage, !hasSelection);
     for (auto* component : {
              static_cast<juce::Component*>(&mapSection),
              static_cast<juce::Component*>(&sampleSection),
@@ -196,7 +219,7 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
              static_cast<juce::Component*>(&restoreRootKeyRow.getButton())
          })
     {
-        component->setVisible(hasSelection);
+        setVisibleAndAccessible(*component, hasSelection);
     }
 
     restoreRootKeyRow.getButton().setEnabled(viewModel.hasSelection);

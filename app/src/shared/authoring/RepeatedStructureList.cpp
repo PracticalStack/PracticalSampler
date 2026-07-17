@@ -13,6 +13,31 @@ const auto repeatedStructureSelectedSurface = repeatedStructureSelected.withAlph
 const auto repeatedStructureTitle = juce::Colour::fromRGB(24, 29, 33);
 const auto repeatedStructureMuted = juce::Colour::fromRGB(82, 86, 94);
 const auto repeatedStructureDisabled = juce::Colour::fromRGB(151, 154, 160);
+const auto repeatedStructureFocusRing = juce::Colour::fromRGB(24, 29, 33);
+const auto repeatedStructureFocusHalo = juce::Colour::fromRGBA(255, 255, 255, 232);
+
+void configureAccessibleMetadata(juce::Component& component,
+                                 const juce::String& title,
+                                 const juce::String& description,
+                                 const juce::String& helpText = {})
+{
+    component.setTitle(title);
+    component.setDescription(description);
+
+    if (helpText.isNotEmpty())
+        component.setHelpText(helpText);
+}
+
+void drawFocusRing(juce::Graphics& g,
+                   juce::Rectangle<float> bounds,
+                   float cornerSize,
+                   const juce::Colour& outlineColour)
+{
+    g.setColour(repeatedStructureFocusHalo);
+    g.drawRoundedRectangle(bounds.expanded(1.0f), cornerSize + 1.0f, 3.0f);
+    g.setColour(outlineColour);
+    g.drawRoundedRectangle(bounds, cornerSize, 1.8f);
+}
 } // namespace
 
 class RepeatedStructureList::RowComponent final : public juce::Component
@@ -42,12 +67,14 @@ public:
         titleLabel.setColour(juce::Label::textColourId,
                              row.enabled ? repeatedStructureTitle
                                          : repeatedStructureDisabled);
+        titleLabel.setTooltip(title);
 
-        statusLabel.setText(juce::String::fromUTF8(row.statusText.c_str()),
-                            juce::dontSendNotification);
+        const auto status = juce::String::fromUTF8(row.statusText.c_str());
+        statusLabel.setText(status, juce::dontSendNotification);
         statusLabel.setColour(juce::Label::textColourId,
                               row.enabled ? repeatedStructureMuted
                                           : repeatedStructureDisabled);
+        statusLabel.setTooltip(status);
         repaint();
     }
 
@@ -92,6 +119,31 @@ bool RepeatedStructureList::KeyboardNavigableListBox::keyPressed(const juce::Key
     return juce::ListBox::keyPressed(key);
 }
 
+void RepeatedStructureList::KeyboardNavigableListBox::paint(juce::Graphics& g)
+{
+    juce::ListBox::paint(g);
+
+    if (hasKeyboardFocus(true))
+    {
+        drawFocusRing(g,
+                      getLocalBounds().toFloat().reduced(2.0f),
+                      9.0f,
+                      findColour(juce::TextEditor::focusedOutlineColourId));
+    }
+}
+
+void RepeatedStructureList::KeyboardNavigableListBox::focusGained(FocusChangeType cause)
+{
+    juce::ListBox::focusGained(cause);
+    repaint();
+}
+
+void RepeatedStructureList::KeyboardNavigableListBox::focusLost(FocusChangeType cause)
+{
+    juce::ListBox::focusLost(cause);
+    repaint();
+}
+
 RepeatedStructureList::RepeatedStructureList(const juce::String& componentId,
                                              const juce::String& listBoxComponentId,
                                              const juce::String& emptyStateComponentId)
@@ -99,14 +151,23 @@ RepeatedStructureList::RepeatedStructureList(const juce::String& componentId,
       emptyStateMessage(emptyStateComponentId, juce::Justification::centred)
 {
     setComponentID(componentId);
+    configureAccessibleMetadata(*this,
+                                "Repeated structure list",
+                                "Shows a compact selectable list of repeated project structures.");
 
     listBox.setComponentID(listBoxComponentId);
     listBox.setModel(this);
     listBox.setMultipleSelectionEnabled(false);
     listBox.setRowHeight(24);
     listBox.setOutlineThickness(0);
-    listBox.setColour(juce::ListBox::backgroundColourId, juce::Colours::transparentBlack);
-    listBox.setColour(juce::ListBox::outlineColourId, juce::Colours::transparentBlack);
+    listBox.setColour(juce::ListBox::backgroundColourId, repeatedStructureSurface);
+    listBox.setColour(juce::ListBox::outlineColourId, repeatedStructureBorder);
+    listBox.setColour(juce::TextEditor::focusedOutlineColourId, repeatedStructureFocusRing);
+    listBox.setMouseClickGrabsKeyboardFocus(true);
+    configureAccessibleMetadata(listBox,
+                                "Repeated structure rows",
+                                "Lists compact project rows and supports keyboard selection changes.",
+                                "Use the up and down arrow keys to move between rows.");
 
     addAndMakeVisible(listBox);
     addAndMakeVisible(emptyStateMessage);

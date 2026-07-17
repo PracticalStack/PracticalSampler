@@ -13,8 +13,15 @@ const auto authoringPanelBackground = juce::Colour::fromRGB(18, 24, 29);
 const auto authoringPanelCard = juce::Colour::fromRGB(250, 247, 240);
 const auto authoringPanelAccent = juce::Colour::fromRGB(181, 96, 21);
 const auto authoringPanelMuted = juce::Colour::fromRGB(82, 86, 94);
-const auto authoringPanelSelected = juce::Colour::fromRGB(28, 108, 88);
-const auto authoringPanelGrid = juce::Colour::fromRGB(230, 220, 207);
+const auto authoringControlSurface = juce::Colour::fromRGB(251, 248, 242);
+const auto authoringControlSurfaceHover = juce::Colour::fromRGB(244, 239, 231);
+const auto authoringControlOutline = juce::Colour::fromRGB(176, 160, 141);
+const auto authoringFocusRing = juce::Colour::fromRGB(24, 29, 33);
+const auto authoringFocusHalo = juce::Colour::fromRGBA(255, 255, 255, 232);
+const auto authoringButtonFill = juce::Colour::fromRGB(122, 64, 18);
+const auto authoringButtonFillPressed = juce::Colour::fromRGB(102, 52, 14);
+const auto authoringButtonText = juce::Colours::white;
+const auto authoringToggleTick = juce::Colour::fromRGB(28, 108, 88);
 
 struct CuratedMacroAssignment
 {
@@ -95,6 +102,17 @@ void configureMetadataLabel(juce::Label& label)
     label.setJustificationType(juce::Justification::centredLeft);
 }
 
+void drawAuthoringFocusRing(juce::Graphics& g,
+                            juce::Rectangle<float> bounds,
+                            float cornerSize,
+                            const juce::Colour& outlineColour)
+{
+    g.setColour(authoringFocusHalo);
+    g.drawRoundedRectangle(bounds.expanded(1.0f), cornerSize + 1.0f, 3.0f);
+    g.setColour(outlineColour);
+    g.drawRoundedRectangle(bounds, cornerSize, 1.8f);
+}
+
 juce::String formatZoneRange(const drs::engine::AuthoringZoneSummary& zone)
 {
     return "Keys " + juce::String(zone.keyLow) + "-" + juce::String(zone.keyHigh)
@@ -165,6 +183,51 @@ bool isExpandedLayout(AuthoringPanel::LayoutMode layoutMode)
     return layoutMode == AuthoringPanel::LayoutMode::expanded;
 }
 
+void configureAccessibleMetadata(juce::Component& component,
+                                 const juce::String& title,
+                                 const juce::String& description,
+                                 const juce::String& helpText = {})
+{
+    component.setTitle(title);
+    component.setDescription(description);
+
+    if (helpText.isNotEmpty())
+        component.setHelpText(helpText);
+}
+
+void updateDynamicAccessibleText(juce::Component& component,
+                                 const juce::String& text,
+                                 const juce::String& descriptionPrefix)
+{
+    component.setTitle(text);
+    component.setDescription(descriptionPrefix + text);
+}
+
+void updateAccessibleDescriptionAndHelpText(juce::Component& component,
+                                            const juce::String& description,
+                                            const juce::String& helpText)
+{
+    component.setDescription(description);
+    component.setHelpText(helpText);
+}
+
+void setVisibleAndAccessible(juce::Component& component, bool shouldShow)
+{
+    component.setVisible(shouldShow);
+    component.setAccessible(shouldShow);
+}
+
+bool isComponentFocusedWithin(const juce::Component* focusedComponent, const juce::Component& ancestor)
+{
+    for (auto* current = focusedComponent; current != nullptr; current = current->getParentComponent())
+    {
+        if (current == &ancestor)
+            return true;
+    }
+
+    return false;
+}
+
 juce::String buildMacroListStatusText(const drs::engine::RuntimeProjectMacroDefinition& macro)
 {
     if (macro.targets.empty())
@@ -190,6 +253,148 @@ juce::String buildMacroListStatusText(const drs::engine::RuntimeProjectMacroDefi
 
 } // namespace
 
+AuthoringPanel::AuthoringControlLookAndFeel::AuthoringControlLookAndFeel()
+{
+    setColour(juce::TextButton::buttonColourId, authoringButtonFill);
+    setColour(juce::TextButton::buttonOnColourId, authoringButtonFillPressed);
+    setColour(juce::TextButton::textColourOffId, authoringButtonText);
+    setColour(juce::TextButton::textColourOnId, authoringButtonText);
+
+    setColour(juce::ToggleButton::textColourId, authoringFocusRing);
+    setColour(juce::ToggleButton::tickColourId, authoringToggleTick);
+    setColour(juce::ToggleButton::tickDisabledColourId, authoringControlOutline);
+
+    setColour(juce::ComboBox::backgroundColourId, authoringControlSurface);
+    setColour(juce::ComboBox::textColourId, authoringFocusRing);
+    setColour(juce::ComboBox::arrowColourId, authoringFocusRing.withAlpha(0.82f));
+    setColour(juce::ComboBox::outlineColourId, authoringControlOutline);
+    setColour(juce::ComboBox::focusedOutlineColourId, authoringFocusRing);
+
+    setColour(juce::TextEditor::backgroundColourId, authoringControlSurface);
+    setColour(juce::TextEditor::textColourId, authoringFocusRing);
+    setColour(juce::TextEditor::outlineColourId, authoringControlOutline);
+    setColour(juce::TextEditor::focusedOutlineColourId, authoringFocusRing);
+    setColour(juce::TextEditor::highlightColourId, authoringToggleTick.withAlpha(0.18f));
+    setColour(juce::TextEditor::highlightedTextColourId, authoringFocusRing);
+
+    setColour(juce::Label::textColourId, authoringFocusRing);
+    setColour(juce::Slider::thumbColourId, authoringButtonFill);
+    setColour(juce::Slider::trackColourId, authoringToggleTick.withAlpha(0.76f));
+    setColour(juce::Slider::backgroundColourId, authoringControlSurfaceHover);
+    setColour(juce::Slider::textBoxTextColourId, authoringFocusRing);
+    setColour(juce::Slider::textBoxBackgroundColourId, authoringControlSurface);
+    setColour(juce::Slider::textBoxOutlineColourId, authoringControlOutline);
+
+    setColour(juce::ListBox::backgroundColourId, authoringControlSurfaceHover);
+    setColour(juce::ListBox::outlineColourId, authoringControlOutline);
+}
+
+void AuthoringPanel::AuthoringControlLookAndFeel::drawButtonBackground(juce::Graphics& g,
+                                                                       juce::Button& button,
+                                                                       const juce::Colour& backgroundColour,
+                                                                       bool shouldDrawButtonAsHighlighted,
+                                                                       bool shouldDrawButtonAsDown)
+{
+    auto bounds = button.getLocalBounds().toFloat().reduced(0.5f);
+    const auto cornerSize = 7.0f;
+    const auto hasFocus = button.hasKeyboardFocus(true);
+
+    if (hasFocus)
+    {
+        drawAuthoringFocusRing(g, bounds.reduced(1.0f), cornerSize, findColour(juce::TextEditor::focusedOutlineColourId));
+        bounds = bounds.reduced(3.0f);
+    }
+
+    auto fillColour = backgroundColour.withMultipliedAlpha(button.isEnabled() ? 1.0f : 0.42f);
+    if (shouldDrawButtonAsDown)
+        fillColour = fillColour.interpolatedWith(authoringButtonFillPressed, 0.45f);
+    else if (shouldDrawButtonAsHighlighted)
+        fillColour = fillColour.interpolatedWith(authoringControlSurface, 0.12f);
+
+    g.setColour(fillColour);
+    g.fillRoundedRectangle(bounds, cornerSize);
+    g.setColour(button.findColour(juce::ComboBox::outlineColourId));
+    g.drawRoundedRectangle(bounds, cornerSize, hasFocus ? 1.2f : 1.0f);
+}
+
+void AuthoringPanel::AuthoringControlLookAndFeel::drawToggleButton(juce::Graphics& g,
+                                                                   juce::ToggleButton& button,
+                                                                   bool shouldDrawButtonAsHighlighted,
+                                                                   bool shouldDrawButtonAsDown)
+{
+    if (button.hasKeyboardFocus(true))
+        drawAuthoringFocusRing(g,
+                               button.getLocalBounds().toFloat().reduced(1.0f),
+                               6.0f,
+                               findColour(juce::TextEditor::focusedOutlineColourId));
+
+    juce::LookAndFeel_V4::drawToggleButton(g, button, shouldDrawButtonAsHighlighted, shouldDrawButtonAsDown);
+}
+
+void AuthoringPanel::AuthoringControlLookAndFeel::drawComboBox(juce::Graphics& g,
+                                                               int width,
+                                                               int height,
+                                                               bool,
+                                                               int,
+                                                               int,
+                                                               int,
+                                                               int,
+                                                               juce::ComboBox& box)
+{
+    const auto cornerSize = 4.0f;
+    auto bounds = juce::Rectangle<float>(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)).reduced(0.5f);
+    const auto hasFocus = box.hasKeyboardFocus(true);
+
+    if (hasFocus)
+    {
+        drawAuthoringFocusRing(g, bounds.reduced(1.0f), cornerSize, box.findColour(juce::ComboBox::focusedOutlineColourId));
+        bounds = bounds.reduced(3.0f);
+    }
+
+    g.setColour(box.findColour(juce::ComboBox::backgroundColourId));
+    g.fillRoundedRectangle(bounds, cornerSize);
+    g.setColour(box.findColour(hasFocus ? juce::ComboBox::focusedOutlineColourId
+                                        : juce::ComboBox::outlineColourId));
+    g.drawRoundedRectangle(bounds, cornerSize, hasFocus ? 1.6f : 1.0f);
+
+    const auto arrowZone = juce::Rectangle<float>(bounds.getRight() - 24.0f, bounds.getY(), 16.0f, bounds.getHeight());
+    juce::Path path;
+    path.startNewSubPath(arrowZone.getX() + 1.5f, arrowZone.getCentreY() - 2.0f);
+    path.lineTo(arrowZone.getCentreX(), arrowZone.getCentreY() + 2.5f);
+    path.lineTo(arrowZone.getRight() - 1.5f, arrowZone.getCentreY() - 2.0f);
+    g.setColour(box.findColour(juce::ComboBox::arrowColourId).withAlpha(box.isEnabled() ? 0.95f : 0.28f));
+    g.strokePath(path, juce::PathStrokeType(2.0f));
+}
+
+void AuthoringPanel::AuthoringControlLookAndFeel::drawLinearSliderOutline(juce::Graphics& g,
+                                                                          int x,
+                                                                          int y,
+                                                                          int width,
+                                                                          int height,
+                                                                          const juce::Slider::SliderStyle style,
+                                                                          juce::Slider& slider)
+{
+    juce::ignoreUnused(x, y, width, height, style);
+
+    if (slider.hasKeyboardFocus(true))
+    {
+        drawAuthoringFocusRing(g,
+                               slider.getLocalBounds().toFloat().reduced(1.0f),
+                               6.0f,
+                               findColour(juce::TextEditor::focusedOutlineColourId));
+    }
+    else
+    {
+        juce::LookAndFeel_V4::drawLinearSliderOutline(g,
+                                                      x,
+                                                      y,
+                                                      width,
+                                                      height,
+                                                      style,
+                                                      slider);
+    }
+}
+
 AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
                                WaveformPreviewProvider previewProvider,
                                ImportResponsivenessProvider responsivenessProvider,
@@ -208,6 +413,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
                 "authoringMacroListBox",
                 "authoringMacroListEmptyState")
 {
+    setLookAndFeel(&authoringLookAndFeel);
     setComponentID("authoringWorkspace");
     drawerState.open = isExpandedLayout(layoutMode);
     drawerState.activeTab = authoring::DrawerTab::waveform;
@@ -225,10 +431,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
 
     configureSectionLabel(waveformLabel, "Waveform Detail");
     configureSectionLabel(zoneLabel, "Selected Zone");
-    configureSectionLabel(macroSectionLabel, "Macro Assignment");
     configureSectionLabel(fxSectionLabel, "Selected FX");
     configureSectionLabel(routingSectionLabel, "Selected Bus");
-    configureSectionLabel(performanceSectionLabel, "Performance Bank");
 
     configureFieldLabel(macroAssignmentLabel, "Parameter");
     configureFieldLabel(macroRoleLabel, "Role");
@@ -286,6 +490,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     targetArticulationSelector.setComponentID("authoringTargetArticulationSelector");
     phraseAssetSelector.setComponentID("authoringPhraseAssetSelector");
     chordModeSelector.setComponentID("authoringChordModeSelector");
+    performanceSummaryLabel.setComponentID("authoringPerformanceSummaryLabel");
+    phraseSummaryLabel.setComponentID("authoringPhraseSummaryLabel");
     phraseImportPathEditor.setComponentID("authoringPhraseImportPath");
 
     drawerToggleButton.onClick = [this]
@@ -300,6 +506,11 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     drawerMacrosTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::macros); };
     drawerRoutingTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::routing); };
     drawerPerformanceTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::performance); };
+    phraseImportPathEditor.onTextChange = [this]
+    {
+        refreshContextualAccessibility();
+    };
+    configureAccessibilityAndFocus();
 
     authoring::SelectionSummaryCallbacks summaryCallbacks;
     summaryCallbacks.onPreviewRequested = [this] { previewSelectedZone(); };
@@ -550,7 +761,6 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&zoneMap),
              static_cast<juce::Component*>(&zoneMappingEditor),
              static_cast<juce::Component*>(&waveformPreview),
-             static_cast<juce::Component*>(&macroSectionLabel),
              static_cast<juce::Component*>(&macroList),
              static_cast<juce::Component*>(&macroAssignmentLabel),
              static_cast<juce::Component*>(&macroAssignmentSelector),
@@ -580,7 +790,6 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&routingInsertTwoLabel),
              static_cast<juce::Component*>(&routingInsertTwoSelector),
              static_cast<juce::Component*>(&routingSummaryLabel),
-             static_cast<juce::Component*>(&performanceSectionLabel),
              static_cast<juce::Component*>(&performanceBankSelector),
              static_cast<juce::Component*>(&triggerSlotSelector),
              static_cast<juce::Component*>(&triggerEventLabel),
@@ -602,6 +811,214 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     }
 
     refreshFromSession();
+}
+
+AuthoringPanel::~AuthoringPanel()
+{
+    setLookAndFeel(nullptr);
+}
+
+void AuthoringPanel::configureAccessibilityAndFocus()
+{
+    configureAccessibleMetadata(*this,
+                                "Authoring workspace",
+                                "Phase 2 authoring workspace for zone mapping, compact drawers, routing, and performance editing.");
+    configureAccessibleMetadata(zoneLabel,
+                                "Selected zone label",
+                                "Labels the selected zone chooser.");
+    configureAccessibleMetadata(zoneSelector,
+                                "Zone selector",
+                                "Chooses the active zone for map and inspector editing.",
+                                "Open the list or use arrow keys to change the selected zone.");
+    zoneSelector.setExplicitFocusOrder(20);
+
+    configureAccessibleMetadata(zoneMap,
+                                "Zone map",
+                                "Displays project zones across key and velocity ranges.",
+                                "Use arrow keys to move selection or drag handles to edit ranges.");
+    zoneMap.setExplicitFocusOrder(30);
+
+    configureAccessibleMetadata(drawerRegion,
+                                "Authoring drawer",
+                                "Hosts the waveform, macros, routing, and performance drawer surfaces.");
+    configureAccessibleMetadata(drawerTabStrip,
+                                "Drawer tab strip",
+                                "Contains the drawer visibility control and drawer tab buttons.");
+    configureAccessibleMetadata(drawerContentHost,
+                                "Drawer content",
+                                "Displays the active drawer body when the drawer is open.");
+
+    configureAccessibleMetadata(drawerToggleButton,
+                                "Drawer visibility",
+                                "Shows or hides the active drawer content.",
+                                "Press to collapse or expand the drawer.");
+    drawerToggleButton.setExplicitFocusOrder(60);
+
+    configureAccessibleMetadata(drawerWaveformTabButton,
+                                "Waveform drawer tab",
+                                "Shows zone-scoped waveform detail.",
+                                "Press to switch the drawer to waveform detail.");
+    configureAccessibleMetadata(drawerMacrosTabButton,
+                                "Macros drawer tab",
+                                "Shows project-scoped macro assignments.",
+                                "Press to switch the drawer to macro editing.");
+    configureAccessibleMetadata(drawerRoutingTabButton,
+                                "Routing drawer tab",
+                                "Shows project-scoped FX and bus routing detail.",
+                                "Press to switch the drawer to routing detail.");
+    configureAccessibleMetadata(drawerPerformanceTabButton,
+                                "Performance drawer tab",
+                                "Shows bank-scoped performance and trigger detail.",
+                                "Press to switch the drawer to performance detail.");
+    drawerWaveformTabButton.setExplicitFocusOrder(61);
+    drawerMacrosTabButton.setExplicitFocusOrder(62);
+    drawerRoutingTabButton.setExplicitFocusOrder(63);
+    drawerPerformanceTabButton.setExplicitFocusOrder(64);
+
+    configureAccessibleMetadata(waveformLabel,
+                                "Drawer title",
+                                "Names the active drawer surface.");
+    configureAccessibleMetadata(waveformScopeLabel,
+                                "Drawer scope",
+                                "Shows whether the active drawer is zone-, project-, bank-, or trigger-scoped.");
+    configureAccessibleMetadata(drawerBreadcrumbLabel,
+                                "Drawer breadcrumb",
+                                "Shows the selection path for the active drawer.");
+    configureAccessibleMetadata(waveformPreview,
+                                "Waveform preview",
+                                "Displays the selected zone waveform and loop region.");
+    configureAccessibleMetadata(waveformInfoLabel,
+                                "Waveform metadata",
+                                "Shows source and format information for the selected waveform.");
+    configureAccessibleMetadata(loopInfoLabel,
+                                "Loop metadata",
+                                "Shows loop state information for the selected waveform.");
+    configureAccessibleMetadata(importMetricsLabel,
+                                "Import responsiveness",
+                                "Shows import responsiveness metrics for the current project.");
+
+    configureAccessibleMetadata(macroList,
+                                "Macro list",
+                                "Lists project macros in compact rows.");
+    macroList.getListBox().setExplicitFocusOrder(70);
+    configureAccessibleMetadata(macroAssignmentSelector,
+                                "Macro parameter",
+                                "Chooses the parameter assigned to the selected macro.",
+                                "Open the list to choose a parameter target.");
+    configureAccessibleMetadata(macroRoleSelector,
+                                "Macro role",
+                                "Chooses the semantic role for the selected macro.",
+                                "Open the list to choose a macro role.");
+    configureAccessibleMetadata(macroDefaultSlider,
+                                "Macro default",
+                                "Adjusts the selected macro default value.",
+                                "Drag the slider or enter a numeric value.");
+    configureAccessibleMetadata(macroMinSlider,
+                                "Macro minimum",
+                                "Adjusts the selected macro minimum value.",
+                                "Drag the slider or enter a numeric value.");
+    configureAccessibleMetadata(macroMaxSlider,
+                                "Macro maximum",
+                                "Adjusts the selected macro maximum value.",
+                                "Drag the slider or enter a numeric value.");
+    configureAccessibleMetadata(macroMoveUpButton,
+                                "Move macro up",
+                                "Moves the selected macro earlier in the list.",
+                                "Press to move the selected macro up.");
+    configureAccessibleMetadata(macroMoveDownButton,
+                                "Move macro down",
+                                "Moves the selected macro later in the list.",
+                                "Press to move the selected macro down.");
+    macroAssignmentSelector.setExplicitFocusOrder(71);
+    macroRoleSelector.setExplicitFocusOrder(72);
+    macroDefaultSlider.setExplicitFocusOrder(73);
+    macroMinSlider.setExplicitFocusOrder(74);
+    macroMaxSlider.setExplicitFocusOrder(75);
+    macroMoveUpButton.setExplicitFocusOrder(76);
+    macroMoveDownButton.setExplicitFocusOrder(77);
+
+    configureAccessibleMetadata(fxSelector,
+                                "FX selector",
+                                "Chooses the active FX slot for routing detail.",
+                                "Open the list to choose an FX slot.");
+    configureAccessibleMetadata(fxTypeSelector,
+                                "FX type",
+                                "Chooses the effect type for the selected FX slot.",
+                                "Open the list to choose an effect type.");
+    configureAccessibleMetadata(fxBypassedToggle,
+                                "FX bypass",
+                                "Toggles bypass for the selected FX slot.",
+                                "Press to toggle FX bypass.");
+    configureAccessibleMetadata(routingBusSelector,
+                                "Routing bus selector",
+                                "Chooses the active routing bus.",
+                                "Open the list to choose a routing bus.");
+    configureAccessibleMetadata(routingInputSelector,
+                                "Routing input source",
+                                "Chooses the input source for the selected routing bus.",
+                                "Open the list to choose an input source.");
+    configureAccessibleMetadata(routingInsertOneSelector,
+                                "Routing insert A",
+                                "Chooses the first insert effect for the selected routing bus.",
+                                "Open the list to choose the first insert.");
+    configureAccessibleMetadata(routingInsertTwoSelector,
+                                "Routing insert B",
+                                "Chooses the second insert effect for the selected routing bus.",
+                                "Open the list to choose the second insert.");
+    fxSelector.setExplicitFocusOrder(80);
+    fxTypeSelector.setExplicitFocusOrder(81);
+    fxBypassedToggle.setExplicitFocusOrder(82);
+    routingBusSelector.setExplicitFocusOrder(83);
+    routingInputSelector.setExplicitFocusOrder(84);
+    routingInsertOneSelector.setExplicitFocusOrder(85);
+    routingInsertTwoSelector.setExplicitFocusOrder(86);
+
+    configureAccessibleMetadata(performanceBankSelector,
+                                "Performance bank selector",
+                                "Chooses the active performance bank.",
+                                "Open the list to choose a performance bank.");
+    configureAccessibleMetadata(triggerSlotSelector,
+                                "Trigger slot selector",
+                                "Chooses the active trigger slot within the selected bank.",
+                                "Open the list to choose a trigger slot.");
+    configureAccessibleMetadata(triggerEventSelector,
+                                "Trigger event",
+                                "Chooses the event that activates the selected trigger slot.",
+                                "Open the list to choose a trigger event.");
+    configureAccessibleMetadata(targetArticulationSelector,
+                                "Target articulation",
+                                "Chooses the articulation targeted by the selected trigger slot.",
+                                "Open the list to choose an articulation.");
+    configureAccessibleMetadata(phraseAssetSelector,
+                                "Phrase asset",
+                                "Chooses the phrase asset for the selected trigger slot.",
+                                "Open the list to choose a phrase.");
+    configureAccessibleMetadata(chordModeSelector,
+                                "Chord rule",
+                                "Chooses the chord-follow behavior for the selected phrase.",
+                                "Open the list to choose a chord rule.");
+    configureAccessibleMetadata(phraseImportPathEditor,
+                                "MIDI phrase path",
+                                "Edits the import path used for phrase import.",
+                                "Type a MIDI file path for phrase import.");
+    configureAccessibleMetadata(phraseImportButton,
+                                "Import MIDI phrase",
+                                "Imports the MIDI phrase at the current path into the selected bank.",
+                                "Press to import the specified MIDI phrase.");
+    configureAccessibleMetadata(performanceSummaryLabel,
+                                "Performance summary",
+                                "Summarizes the active performance trigger state.");
+    configureAccessibleMetadata(phraseSummaryLabel,
+                                "Phrase summary",
+                                "Summarizes the active phrase library or phrase import state.");
+    performanceBankSelector.setExplicitFocusOrder(90);
+    triggerSlotSelector.setExplicitFocusOrder(91);
+    triggerEventSelector.setExplicitFocusOrder(92);
+    targetArticulationSelector.setExplicitFocusOrder(93);
+    phraseAssetSelector.setExplicitFocusOrder(94);
+    chordModeSelector.setExplicitFocusOrder(95);
+    phraseImportPathEditor.setExplicitFocusOrder(96);
+    phraseImportButton.setExplicitFocusOrder(97);
 }
 
 void AuthoringPanel::paint(juce::Graphics& g)
@@ -1083,72 +1500,389 @@ void AuthoringPanel::refreshDrawerVisibility()
     const auto performanceTab = drawerState.activeTab == authoring::DrawerTab::performance;
     const auto drawerContentVisible = drawerState.open;
     const auto expanded = isExpandedLayout(layoutMode);
+    const auto* focusedComponent = juce::Component::getCurrentlyFocusedComponent();
+    const auto focusWithinWaveform = isComponentFocusedWithin(focusedComponent, waveformPreview)
+        || isComponentFocusedWithin(focusedComponent, waveformInfoLabel)
+        || isComponentFocusedWithin(focusedComponent, loopInfoLabel)
+        || isComponentFocusedWithin(focusedComponent, importMetricsLabel);
+    const auto focusWithinMacros = isComponentFocusedWithin(focusedComponent, macroList)
+        || isComponentFocusedWithin(focusedComponent, macroAssignmentSelector)
+        || isComponentFocusedWithin(focusedComponent, macroRoleSelector)
+        || isComponentFocusedWithin(focusedComponent, macroDefaultSlider)
+        || isComponentFocusedWithin(focusedComponent, macroMinSlider)
+        || isComponentFocusedWithin(focusedComponent, macroMaxSlider)
+        || isComponentFocusedWithin(focusedComponent, macroMoveUpButton)
+        || isComponentFocusedWithin(focusedComponent, macroMoveDownButton);
+    const auto focusWithinRouting = isComponentFocusedWithin(focusedComponent, fxSelector)
+        || isComponentFocusedWithin(focusedComponent, fxTypeSelector)
+        || isComponentFocusedWithin(focusedComponent, fxBypassedToggle)
+        || isComponentFocusedWithin(focusedComponent, routingBusSelector)
+        || isComponentFocusedWithin(focusedComponent, routingInputSelector)
+        || isComponentFocusedWithin(focusedComponent, routingInsertOneSelector)
+        || isComponentFocusedWithin(focusedComponent, routingInsertTwoSelector);
+    const auto focusWithinPerformance = isComponentFocusedWithin(focusedComponent, performanceBankSelector)
+        || isComponentFocusedWithin(focusedComponent, triggerSlotSelector)
+        || isComponentFocusedWithin(focusedComponent, triggerEventSelector)
+        || isComponentFocusedWithin(focusedComponent, targetArticulationSelector)
+        || isComponentFocusedWithin(focusedComponent, phraseAssetSelector)
+        || isComponentFocusedWithin(focusedComponent, chordModeSelector)
+        || isComponentFocusedWithin(focusedComponent, phraseImportPathEditor)
+        || isComponentFocusedWithin(focusedComponent, phraseImportButton);
 
     refreshDrawerContextLabels();
 
     drawerToggleButton.setButtonText(drawerState.open ? "Hide Drawer" : "Show Drawer");
-    drawerContentHost.setVisible(drawerContentVisible);
-    waveformLabel.setVisible(drawerContentVisible);
-    waveformScopeLabel.setVisible(drawerContentVisible);
-    drawerBreadcrumbLabel.setVisible(drawerContentVisible);
-    waveformPreview.setVisible(drawerContentVisible && waveformTab);
-    waveformInfoLabel.setVisible(drawerContentVisible && waveformTab);
-    loopInfoLabel.setVisible(drawerContentVisible && waveformTab);
-    importMetricsLabel.setVisible(drawerContentVisible && waveformTab);
+    drawerToggleButton.setTitle(drawerToggleButton.getButtonText());
+    setVisibleAndAccessible(drawerContentHost, drawerContentVisible);
+    setVisibleAndAccessible(waveformLabel, drawerContentVisible);
+    setVisibleAndAccessible(waveformScopeLabel, drawerContentVisible);
+    setVisibleAndAccessible(drawerBreadcrumbLabel, drawerContentVisible);
+    setVisibleAndAccessible(waveformPreview, drawerContentVisible && waveformTab);
+    setVisibleAndAccessible(waveformInfoLabel, drawerContentVisible && waveformTab);
+    setVisibleAndAccessible(loopInfoLabel, drawerContentVisible && waveformTab);
+    setVisibleAndAccessible(importMetricsLabel, drawerContentVisible && waveformTab);
 
-    macroSectionLabel.setVisible(drawerContentVisible && macrosTab);
-    macroList.setVisible(drawerContentVisible && macrosTab);
-    macroAssignmentLabel.setVisible(drawerContentVisible && macrosTab);
-    macroAssignmentSelector.setVisible(drawerContentVisible && macrosTab);
-    macroRoleLabel.setVisible(drawerContentVisible && macrosTab);
-    macroRoleSelector.setVisible(drawerContentVisible && macrosTab);
-    macroDefaultLabel.setVisible(drawerContentVisible && macrosTab);
-    macroDefaultSlider.setVisible(drawerContentVisible && macrosTab);
-    macroMinLabel.setVisible(drawerContentVisible && macrosTab);
-    macroMinSlider.setVisible(drawerContentVisible && macrosTab);
-    macroMaxLabel.setVisible(drawerContentVisible && macrosTab);
-    macroMaxSlider.setVisible(drawerContentVisible && macrosTab);
-    macroMoveUpButton.setVisible(drawerContentVisible && macrosTab);
-    macroMoveDownButton.setVisible(drawerContentVisible && macrosTab);
-    macroSummaryLabel.setVisible(drawerContentVisible && macrosTab && expanded);
+    setVisibleAndAccessible(macroList, drawerContentVisible && macrosTab);
+    setVisibleAndAccessible(macroAssignmentLabel, drawerContentVisible && macrosTab);
+    setVisibleAndAccessible(macroAssignmentSelector, drawerContentVisible && macrosTab);
+    setVisibleAndAccessible(macroRoleLabel, drawerContentVisible && macrosTab);
+    setVisibleAndAccessible(macroRoleSelector, drawerContentVisible && macrosTab);
+    setVisibleAndAccessible(macroDefaultLabel, drawerContentVisible && macrosTab);
+    setVisibleAndAccessible(macroDefaultSlider, drawerContentVisible && macrosTab);
+    setVisibleAndAccessible(macroMinLabel, drawerContentVisible && macrosTab);
+    setVisibleAndAccessible(macroMinSlider, drawerContentVisible && macrosTab);
+    setVisibleAndAccessible(macroMaxLabel, drawerContentVisible && macrosTab);
+    setVisibleAndAccessible(macroMaxSlider, drawerContentVisible && macrosTab);
+    setVisibleAndAccessible(macroMoveUpButton, drawerContentVisible && macrosTab);
+    setVisibleAndAccessible(macroMoveDownButton, drawerContentVisible && macrosTab);
+    setVisibleAndAccessible(macroSummaryLabel, drawerContentVisible && macrosTab && expanded);
 
-    fxSectionLabel.setVisible(drawerContentVisible && routingTab);
-    fxSelector.setVisible(drawerContentVisible && routingTab);
-    fxTypeLabel.setVisible(drawerContentVisible && routingTab);
-    fxTypeSelector.setVisible(drawerContentVisible && routingTab);
-    fxBypassedToggle.setVisible(drawerContentVisible && routingTab);
-    fxSummaryLabel.setVisible(drawerContentVisible && routingTab && expanded);
-    routingSectionLabel.setVisible(drawerContentVisible && routingTab);
-    routingBusSelector.setVisible(drawerContentVisible && routingTab);
-    routingInputLabel.setVisible(drawerContentVisible && routingTab);
-    routingInputSelector.setVisible(drawerContentVisible && routingTab);
-    routingInsertOneLabel.setVisible(drawerContentVisible && routingTab);
-    routingInsertOneSelector.setVisible(drawerContentVisible && routingTab);
-    routingInsertTwoLabel.setVisible(drawerContentVisible && routingTab);
-    routingInsertTwoSelector.setVisible(drawerContentVisible && routingTab);
-    routingSummaryLabel.setVisible(drawerContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxSectionLabel, drawerContentVisible && routingTab);
+    setVisibleAndAccessible(fxSelector, drawerContentVisible && routingTab);
+    setVisibleAndAccessible(fxTypeLabel, drawerContentVisible && routingTab);
+    setVisibleAndAccessible(fxTypeSelector, drawerContentVisible && routingTab);
+    setVisibleAndAccessible(fxBypassedToggle, drawerContentVisible && routingTab);
+    setVisibleAndAccessible(fxSummaryLabel, drawerContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(routingSectionLabel, drawerContentVisible && routingTab);
+    setVisibleAndAccessible(routingBusSelector, drawerContentVisible && routingTab);
+    setVisibleAndAccessible(routingInputLabel, drawerContentVisible && routingTab);
+    setVisibleAndAccessible(routingInputSelector, drawerContentVisible && routingTab);
+    setVisibleAndAccessible(routingInsertOneLabel, drawerContentVisible && routingTab);
+    setVisibleAndAccessible(routingInsertOneSelector, drawerContentVisible && routingTab);
+    setVisibleAndAccessible(routingInsertTwoLabel, drawerContentVisible && routingTab);
+    setVisibleAndAccessible(routingInsertTwoSelector, drawerContentVisible && routingTab);
+    setVisibleAndAccessible(routingSummaryLabel, drawerContentVisible && routingTab && expanded);
 
-    performanceSectionLabel.setVisible(false);
-    performanceBankSelector.setVisible(drawerContentVisible && performanceTab);
-    triggerSlotSelector.setVisible(drawerContentVisible && performanceTab);
-    triggerEventLabel.setVisible(drawerContentVisible && performanceTab);
-    triggerEventSelector.setVisible(drawerContentVisible && performanceTab);
-    targetArticulationLabel.setVisible(drawerContentVisible && performanceTab);
-    targetArticulationSelector.setVisible(drawerContentVisible && performanceTab);
-    phraseAssetLabel.setVisible(drawerContentVisible && performanceTab);
-    phraseAssetSelector.setVisible(drawerContentVisible && performanceTab);
-    chordModeLabel.setVisible(drawerContentVisible && performanceTab);
-    chordModeSelector.setVisible(drawerContentVisible && performanceTab);
-    phraseImportPathLabel.setVisible(drawerContentVisible && performanceTab);
-    phraseImportPathEditor.setVisible(drawerContentVisible && performanceTab);
-    phraseImportButton.setVisible(drawerContentVisible && performanceTab);
-    performanceSummaryLabel.setVisible(drawerContentVisible && performanceTab && expanded);
-    phraseSummaryLabel.setVisible(drawerContentVisible && performanceTab && expanded);
+    setVisibleAndAccessible(performanceBankSelector, drawerContentVisible && performanceTab);
+    setVisibleAndAccessible(triggerSlotSelector, drawerContentVisible && performanceTab);
+    setVisibleAndAccessible(triggerEventLabel, drawerContentVisible && performanceTab);
+    setVisibleAndAccessible(triggerEventSelector, drawerContentVisible && performanceTab);
+    setVisibleAndAccessible(targetArticulationLabel, drawerContentVisible && performanceTab);
+    setVisibleAndAccessible(targetArticulationSelector, drawerContentVisible && performanceTab);
+    setVisibleAndAccessible(phraseAssetLabel, drawerContentVisible && performanceTab);
+    setVisibleAndAccessible(phraseAssetSelector, drawerContentVisible && performanceTab);
+    setVisibleAndAccessible(chordModeLabel, drawerContentVisible && performanceTab);
+    setVisibleAndAccessible(chordModeSelector, drawerContentVisible && performanceTab);
+    setVisibleAndAccessible(phraseImportPathLabel, drawerContentVisible && performanceTab);
+    setVisibleAndAccessible(phraseImportPathEditor, drawerContentVisible && performanceTab);
+    setVisibleAndAccessible(phraseImportButton, drawerContentVisible && performanceTab);
+    setVisibleAndAccessible(performanceSummaryLabel, drawerContentVisible && performanceTab && expanded);
+    setVisibleAndAccessible(phraseSummaryLabel, drawerContentVisible && performanceTab && expanded);
 
     drawerWaveformTabButton.setToggleState(waveformTab, juce::dontSendNotification);
     drawerMacrosTabButton.setToggleState(macrosTab, juce::dontSendNotification);
     drawerRoutingTabButton.setToggleState(routingTab, juce::dontSendNotification);
     drawerPerformanceTabButton.setToggleState(performanceTab, juce::dontSendNotification);
+
+    const auto focusedDrawerContentBecameHidden = !drawerContentVisible
+        ? (focusWithinWaveform || focusWithinMacros || focusWithinRouting || focusWithinPerformance)
+        : (waveformTab ? (focusWithinMacros || focusWithinRouting || focusWithinPerformance)
+                       : macrosTab ? (focusWithinWaveform || focusWithinRouting || focusWithinPerformance)
+                                   : routingTab ? (focusWithinWaveform || focusWithinMacros || focusWithinPerformance)
+                                                : (focusWithinWaveform || focusWithinMacros || focusWithinRouting));
+
+    if (focusedDrawerContentBecameHidden)
+    {
+        if (!drawerContentVisible)
+            drawerToggleButton.grabKeyboardFocus();
+        else if (waveformTab)
+            drawerWaveformTabButton.grabKeyboardFocus();
+        else if (macrosTab)
+            drawerMacrosTabButton.grabKeyboardFocus();
+        else if (routingTab)
+            drawerRoutingTabButton.grabKeyboardFocus();
+        else
+            drawerPerformanceTabButton.grabKeyboardFocus();
+    }
+}
+
+void AuthoringPanel::refreshContextualAccessibility()
+{
+    const auto& project = authoringSession.getProject();
+    const auto describeCurrentValue = [](const juce::String& value, const juce::String& fallback)
+    {
+        const auto trimmed = value.trim();
+        return trimmed.isNotEmpty() ? trimmed : fallback;
+    };
+    const auto hasSelectedMacro = !project.authoring.macros.empty()
+        && selectedMacroIndex >= 0
+        && static_cast<std::size_t>(selectedMacroIndex) < project.authoring.macros.size();
+    const auto macroName = hasSelectedMacro
+        ? juce::String::fromUTF8(project.authoring.macros[static_cast<std::size_t>(selectedMacroIndex)].name.c_str())
+        : juce::String("the selected macro");
+
+    updateAccessibleDescriptionAndHelpText(macroAssignmentSelector,
+                                           hasSelectedMacro
+                                               ? "Chooses the parameter assigned to " + macroName + "."
+                                               : "Unavailable because no macro is selected.",
+                                           hasSelectedMacro
+                                               ? "Open the list to choose a parameter target for " + macroName + "."
+                                               : "Author a macro before editing its parameter assignment.");
+    updateAccessibleDescriptionAndHelpText(macroRoleSelector,
+                                           hasSelectedMacro
+                                               ? "Chooses the semantic role for " + macroName + "."
+                                               : "Unavailable because no macro is selected.",
+                                           hasSelectedMacro
+                                               ? "Open the list to choose a role for " + macroName + "."
+                                               : "Author a macro before editing its role.");
+    updateAccessibleDescriptionAndHelpText(macroDefaultSlider,
+                                           hasSelectedMacro
+                                               ? "Adjusts the default value for " + macroName + "."
+                                               : "Unavailable because no macro is selected.",
+                                           hasSelectedMacro
+                                               ? "Drag the slider or enter a numeric default value for " + macroName + "."
+                                               : "Author a macro before editing its default value.");
+    updateAccessibleDescriptionAndHelpText(macroMinSlider,
+                                           hasSelectedMacro
+                                               ? "Adjusts the minimum value for " + macroName + "."
+                                               : "Unavailable because no macro is selected.",
+                                           hasSelectedMacro
+                                               ? "Drag the slider or enter a numeric minimum value for " + macroName + "."
+                                               : "Author a macro before editing its range.");
+    updateAccessibleDescriptionAndHelpText(macroMaxSlider,
+                                           hasSelectedMacro
+                                               ? "Adjusts the maximum value for " + macroName + "."
+                                               : "Unavailable because no macro is selected.",
+                                           hasSelectedMacro
+                                               ? "Drag the slider or enter a numeric maximum value for " + macroName + "."
+                                               : "Author a macro before editing its range.");
+    updateAccessibleDescriptionAndHelpText(macroMoveUpButton,
+                                           hasSelectedMacro
+                                               ? (macroMoveUpButton.isEnabled()
+                                                      ? "Moves " + macroName + " earlier in the list."
+                                                      : macroName + " is already the first macro.")
+                                               : "Unavailable because no macros are authored.",
+                                           hasSelectedMacro
+                                               ? (macroMoveUpButton.isEnabled()
+                                                      ? "Press to move " + macroName + " toward the start of the macro list."
+                                                      : "Select a later macro to enable moving upward.")
+                                               : "Author macros before changing their order.");
+    updateAccessibleDescriptionAndHelpText(macroMoveDownButton,
+                                           hasSelectedMacro
+                                               ? (macroMoveDownButton.isEnabled()
+                                                      ? "Moves " + macroName + " later in the list."
+                                                      : macroName + " is already the last macro.")
+                                               : "Unavailable because no macros are authored.",
+                                           hasSelectedMacro
+                                               ? (macroMoveDownButton.isEnabled()
+                                                      ? "Press to move " + macroName + " toward the end of the macro list."
+                                                      : "Select an earlier macro to enable moving downward.")
+                                               : "Author macros before changing their order.");
+
+    const auto hasSelectedFxSlot = !project.authoring.fxSlots.empty()
+        && selectedFxSlotIndex >= 0
+        && static_cast<std::size_t>(selectedFxSlotIndex) < project.authoring.fxSlots.size();
+    const auto fxName = hasSelectedFxSlot
+        ? juce::String::fromUTF8(project.authoring.fxSlots[static_cast<std::size_t>(selectedFxSlotIndex)].displayName.c_str())
+        : juce::String("the selected FX slot");
+    const auto fxType = hasSelectedFxSlot
+        ? describeCurrentValue(juce::String::fromUTF8(project.authoring.fxSlots[static_cast<std::size_t>(selectedFxSlotIndex)].effectType.c_str()),
+                               "(unspecified)")
+        : juce::String{};
+    const auto fxState = hasSelectedFxSlot
+        ? juce::String(project.authoring.fxSlots[static_cast<std::size_t>(selectedFxSlotIndex)].bypassed ? "bypassed"
+                                                                                                            : "active")
+        : juce::String{};
+
+    updateAccessibleDescriptionAndHelpText(fxSelector,
+                                           hasSelectedFxSlot
+                                               ? "Chooses the active FX slot for routing detail. Current FX slot: " + fxName + "."
+                                               : "Unavailable because no FX slots are authored.",
+                                           hasSelectedFxSlot
+                                               ? "Open the list to switch routing detail to another FX slot."
+                                               : "Author an FX slot before editing routing FX detail.");
+    updateAccessibleDescriptionAndHelpText(fxTypeSelector,
+                                           hasSelectedFxSlot
+                                               ? "Chooses the effect type for " + fxName + ". Current effect type: " + fxType + "."
+                                               : "Unavailable because no FX slots are authored.",
+                                           hasSelectedFxSlot
+                                               ? "Open the list to choose a new effect type for " + fxName + "."
+                                               : "Author an FX slot before choosing an effect type.");
+    updateAccessibleDescriptionAndHelpText(fxBypassedToggle,
+                                           hasSelectedFxSlot
+                                               ? "Toggles bypass for " + fxName + ". Current state: " + fxState + "."
+                                               : "Unavailable because no FX slots are authored.",
+                                           hasSelectedFxSlot
+                                               ? "Press to toggle whether " + fxName + " is bypassed."
+                                               : "Author an FX slot before toggling bypass.");
+
+    const auto hasSelectedRoutingBus = !project.authoring.routingBuses.empty()
+        && selectedRoutingBusIndex >= 0
+        && static_cast<std::size_t>(selectedRoutingBusIndex) < project.authoring.routingBuses.size();
+    const auto busName = hasSelectedRoutingBus
+        ? juce::String::fromUTF8(project.authoring.routingBuses[static_cast<std::size_t>(selectedRoutingBusIndex)].displayName.c_str())
+        : juce::String("the selected routing bus");
+    const auto inputSource = hasSelectedRoutingBus
+        ? describeCurrentValue(juce::String::fromUTF8(project.authoring.routingBuses[static_cast<std::size_t>(selectedRoutingBusIndex)].inputSourceId.c_str()),
+                               "(none)")
+        : juce::String{};
+    const auto insertOne = hasSelectedRoutingBus
+        ? (project.authoring.routingBuses[static_cast<std::size_t>(selectedRoutingBusIndex)].fxSlotIds.empty()
+               ? juce::String("(none)")
+               : juce::String::fromUTF8(project.authoring.routingBuses[static_cast<std::size_t>(selectedRoutingBusIndex)].fxSlotIds.front().c_str()))
+        : juce::String{};
+    const auto insertTwo = hasSelectedRoutingBus
+        ? (project.authoring.routingBuses[static_cast<std::size_t>(selectedRoutingBusIndex)].fxSlotIds.size() < 2
+               ? juce::String("(none)")
+               : juce::String::fromUTF8(project.authoring.routingBuses[static_cast<std::size_t>(selectedRoutingBusIndex)].fxSlotIds[1].c_str()))
+        : juce::String{};
+
+    updateAccessibleDescriptionAndHelpText(routingBusSelector,
+                                           hasSelectedRoutingBus
+                                               ? "Chooses the active routing bus. Current bus: " + busName + "."
+                                               : "Unavailable because no routing buses are authored.",
+                                           hasSelectedRoutingBus
+                                               ? "Open the list to switch routing detail to another routing bus."
+                                               : "Author a routing bus before editing its signal path.");
+    updateAccessibleDescriptionAndHelpText(routingInputSelector,
+                                           hasSelectedRoutingBus
+                                               ? "Chooses the input source for " + busName + ". Current source: " + inputSource + "."
+                                               : "Unavailable because no routing buses are authored.",
+                                           hasSelectedRoutingBus
+                                               ? "Open the list to choose a new input source for " + busName + "."
+                                               : "Author a routing bus before choosing an input source.");
+    updateAccessibleDescriptionAndHelpText(routingInsertOneSelector,
+                                           hasSelectedRoutingBus
+                                               ? "Chooses the first insert effect for " + busName + ". Current insert A: " + insertOne + "."
+                                               : "Unavailable because no routing buses are authored.",
+                                           hasSelectedRoutingBus
+                                               ? "Open the list to choose the first insert effect for " + busName + "."
+                                               : "Author a routing bus before assigning insert effects.");
+    updateAccessibleDescriptionAndHelpText(routingInsertTwoSelector,
+                                           hasSelectedRoutingBus
+                                               ? "Chooses the second insert effect for " + busName + ". Current insert B: " + insertTwo + "."
+                                               : "Unavailable because no routing buses are authored.",
+                                           hasSelectedRoutingBus
+                                               ? "Open the list to choose the second insert effect for " + busName + "."
+                                               : "Author a routing bus before assigning insert effects.");
+
+    if (const auto selectedPerformanceBank = authoringSession.getSelectedPerformanceBank(); selectedPerformanceBank.has_value())
+    {
+        const auto bankName = juce::String::fromUTF8(selectedPerformanceBank->displayName.c_str());
+        const auto hasSelectedTriggerSlot = selectedTriggerSlotIndex >= 0
+            && static_cast<std::size_t>(selectedTriggerSlotIndex) < selectedPerformanceBank->triggerSlots.size();
+        const auto triggerName = hasSelectedTriggerSlot
+            ? juce::String::fromUTF8(selectedPerformanceBank->triggerSlots[static_cast<std::size_t>(selectedTriggerSlotIndex)].displayName.c_str())
+            : juce::String("the selected trigger slot");
+        const auto triggerEvent = hasSelectedTriggerSlot
+            ? describeCurrentValue(juce::String::fromUTF8(
+                                       selectedPerformanceBank->triggerSlots[static_cast<std::size_t>(selectedTriggerSlotIndex)].triggerEvent.c_str()),
+                                   "(unspecified)")
+            : juce::String{};
+        const auto targetArticulation = hasSelectedTriggerSlot
+            ? describeCurrentValue(
+                  juce::String::fromUTF8(
+                      selectedPerformanceBank->triggerSlots[static_cast<std::size_t>(selectedTriggerSlotIndex)].targetArticulationId.c_str()),
+                  "(none)")
+            : juce::String{};
+        const auto selectedPhraseText = describeCurrentValue(phraseAssetSelector.getText(), "(none)");
+        const auto selectedChordMode = describeCurrentValue(chordModeSelector.getText(), "(unspecified)");
+        const auto midiPath = phraseImportPathEditor.getText().trim();
+
+        updateAccessibleDescriptionAndHelpText(performanceBankSelector,
+                                               "Chooses the active performance bank. Current bank: " + bankName + ".",
+                                               "Open the list to switch to another performance bank.");
+        updateAccessibleDescriptionAndHelpText(triggerSlotSelector,
+                                               hasSelectedTriggerSlot
+                                                   ? "Chooses the active trigger slot within " + bankName + ". Current trigger slot: " + triggerName + "."
+                                                   : "Unavailable because " + bankName + " has no trigger slots.",
+                                               hasSelectedTriggerSlot
+                                                   ? "Open the list to choose a different trigger slot in " + bankName + "."
+                                                   : "Author a trigger slot in " + bankName + " before editing trigger detail.");
+        updateAccessibleDescriptionAndHelpText(triggerEventSelector,
+                                               hasSelectedTriggerSlot
+                                                   ? "Chooses the event that activates " + triggerName + " in " + bankName
+                                                         + ". Current event: " + triggerEvent + "."
+                                                   : "Unavailable because no trigger slot is selected in " + bankName + ".",
+                                               hasSelectedTriggerSlot
+                                                   ? "Open the list to choose the trigger event for " + triggerName + "."
+                                                   : "Select a trigger slot before changing its trigger event.");
+        updateAccessibleDescriptionAndHelpText(targetArticulationSelector,
+                                               hasSelectedTriggerSlot
+                                                   ? "Chooses the articulation targeted by " + triggerName + " in " + bankName
+                                                         + ". Current articulation: " + targetArticulation + "."
+                                                   : "Unavailable because no trigger slot is selected in " + bankName + ".",
+                                               hasSelectedTriggerSlot
+                                                   ? "Open the list to choose the target articulation for " + triggerName + "."
+                                                   : "Select a trigger slot before changing its target articulation.");
+        updateAccessibleDescriptionAndHelpText(phraseAssetSelector,
+                                               hasSelectedTriggerSlot
+                                                   ? "Chooses the phrase asset for " + triggerName + " in " + bankName
+                                                         + ". Current phrase asset: " + selectedPhraseText + "."
+                                                   : "Unavailable because no trigger slot is selected in " + bankName + ".",
+                                               hasSelectedTriggerSlot
+                                                   ? "Open the list to choose the phrase asset used by " + triggerName + "."
+                                                   : "Select a trigger slot before assigning a phrase asset.");
+        updateAccessibleDescriptionAndHelpText(chordModeSelector,
+                                               hasSelectedTriggerSlot
+                                                   ? "Chooses the chord-follow behavior for " + triggerName + " in " + bankName
+                                                         + ". Current chord rule: " + selectedChordMode + "."
+                                                   : "Unavailable because no trigger slot is selected in " + bankName + ".",
+                                               hasSelectedTriggerSlot
+                                                   ? "Open the list to choose the chord-follow rule for " + triggerName + "."
+                                                   : "Select a trigger slot before changing its chord-follow rule.");
+        updateAccessibleDescriptionAndHelpText(phraseImportPathEditor,
+                                               midiPath.isEmpty()
+                                                   ? "Edits the MIDI import path for " + bankName + ". No MIDI file path is entered yet."
+                                                   : "Edits the MIDI import path for " + bankName + ". Current path: " + midiPath,
+                                               midiPath.isEmpty()
+                                                   ? "Type a MIDI file path before pressing Import MIDI Phrase."
+                                                   : "Edit the current MIDI file path before importing it into " + bankName + ".");
+        updateAccessibleDescriptionAndHelpText(phraseImportButton,
+                                               midiPath.isEmpty()
+                                                   ? "Unavailable until a MIDI file path is entered for " + bankName + "."
+                                                   : "Imports the MIDI phrase at " + midiPath + " into " + bankName + ".",
+                                               midiPath.isEmpty()
+                                                   ? "Enter a MIDI file path before importing."
+                                                   : "Press to import the current MIDI file into " + bankName + ".");
+    }
+    else
+    {
+        updateAccessibleDescriptionAndHelpText(performanceBankSelector,
+                                               "Unavailable because no performance bank is selected.",
+                                               "Select a performance bank before editing performance trigger detail.");
+        updateAccessibleDescriptionAndHelpText(triggerSlotSelector,
+                                               "Unavailable because no performance bank is selected.",
+                                               "Select a performance bank before choosing a trigger slot.");
+        updateAccessibleDescriptionAndHelpText(triggerEventSelector,
+                                               "Unavailable because no performance bank is selected.",
+                                               "Select a performance bank and trigger slot before changing the trigger event.");
+        updateAccessibleDescriptionAndHelpText(targetArticulationSelector,
+                                               "Unavailable because no performance bank is selected.",
+                                               "Select a performance bank and trigger slot before changing the target articulation.");
+        updateAccessibleDescriptionAndHelpText(phraseAssetSelector,
+                                               "Unavailable because no performance bank is selected.",
+                                               "Select a performance bank and trigger slot before assigning a phrase asset.");
+        updateAccessibleDescriptionAndHelpText(chordModeSelector,
+                                               "Unavailable because no performance bank is selected.",
+                                               "Select a performance bank and trigger slot before changing the chord-follow rule.");
+        updateAccessibleDescriptionAndHelpText(phraseImportPathEditor,
+                                               "Unavailable because no performance bank is selected.",
+                                               "Select a performance bank before entering a MIDI file path.");
+        updateAccessibleDescriptionAndHelpText(phraseImportButton,
+                                               "Unavailable because no performance bank is selected.",
+                                               "Select a performance bank before importing a phrase.");
+    }
 }
 
 void AuthoringPanel::refreshInspectorVisibility()
@@ -1255,6 +1989,10 @@ void AuthoringPanel::refreshDrawerContextLabels()
         default:
             break;
     }
+
+    updateDynamicAccessibleText(waveformLabel, waveformLabel.getText(), "Active drawer title: ");
+    updateDynamicAccessibleText(waveformScopeLabel, waveformScopeLabel.getText(), "Active drawer scope: ");
+    updateDynamicAccessibleText(drawerBreadcrumbLabel, drawerBreadcrumbLabel.getText(), "Active drawer breadcrumb: ");
 }
 
 void AuthoringPanel::refreshWaveformDrawerContent()
@@ -1312,6 +2050,10 @@ void AuthoringPanel::refreshWaveformDrawerContent()
     {
         importMetricsLabel.setText("Import responsiveness unavailable", juce::dontSendNotification);
     }
+
+    updateDynamicAccessibleText(waveformInfoLabel, waveformInfoLabel.getText(), "Waveform metadata: ");
+    updateDynamicAccessibleText(loopInfoLabel, loopInfoLabel.getText(), "Loop metadata: ");
+    updateDynamicAccessibleText(importMetricsLabel, importMetricsLabel.getText(), "Import responsiveness: ");
 }
 
 void AuthoringPanel::refreshFromSession()
@@ -1604,6 +2346,14 @@ void AuthoringPanel::refreshFromSession()
         phraseSummaryLabel.setText("Performance phrases unavailable.", juce::dontSendNotification);
     }
 
+    updateDynamicAccessibleText(performanceSummaryLabel,
+                                performanceSummaryLabel.getText(),
+                                "Performance summary: ");
+    updateDynamicAccessibleText(phraseSummaryLabel,
+                                phraseSummaryLabel.getText(),
+                                "Phrase summary: ");
+    refreshContextualAccessibility();
+
     refreshWaveformDrawerContent();
     refreshInspectorVisibility();
 }
@@ -1805,6 +2555,9 @@ void AuthoringPanel::importPhraseForSelectedBank()
     {
         phraseSummaryLabel.setText("Choose a MIDI file path before importing a phrase.",
                                    juce::dontSendNotification);
+        updateDynamicAccessibleText(phraseSummaryLabel,
+                                    phraseSummaryLabel.getText(),
+                                    "Phrase summary: ");
         return;
     }
 
@@ -1820,6 +2573,9 @@ void AuthoringPanel::importPhraseForSelectedBank()
                                                                     ? importResult.state.c_str()
                                                                     : importResult.issues.front().c_str()),
                                    juce::dontSendNotification);
+        updateDynamicAccessibleText(phraseSummaryLabel,
+                                    phraseSummaryLabel.getText(),
+                                    "Phrase summary: ");
         return;
     }
 
@@ -1857,6 +2613,9 @@ void AuthoringPanel::importPhraseForSelectedBank()
             + " imported | notes=" + juce::String(static_cast<int>(importResult.phraseAsset.notes.size()))
             + " | chord=" + juce::String::fromUTF8(importResult.phraseAsset.chordHint.c_str()),
         juce::dontSendNotification);
+    updateDynamicAccessibleText(phraseSummaryLabel,
+                                phraseSummaryLabel.getText(),
+                                "Phrase summary: ");
     refreshFromSession();
 }
 } // namespace drs::app

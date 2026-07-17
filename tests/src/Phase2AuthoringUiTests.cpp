@@ -13,6 +13,7 @@
 #include <fstream>
 #include <cmath>
 #include <iostream>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -21,10 +22,52 @@ namespace
 {
 namespace fs = std::filesystem;
 
+class DesktopHostedComponent final : public juce::Component
+{
+public:
+    explicit DesktopHostedComponent(juce::Component& contentToHost)
+        : hostedContent(contentToHost)
+    {
+        addAndMakeVisible(hostedContent);
+        setSize(hostedContent.getWidth(), hostedContent.getHeight());
+        addToDesktop(0);
+        setVisible(true);
+        toFront(true);
+        resized();
+    }
+
+    ~DesktopHostedComponent() override
+    {
+        removeChildComponent(&hostedContent);
+        setVisible(false);
+        removeFromDesktop();
+    }
+
+    void resized() override
+    {
+        hostedContent.setBounds(getLocalBounds());
+    }
+
+private:
+    juce::Component& hostedContent;
+};
+
 void require(bool condition, const std::string& message)
 {
     if (!condition)
         throw std::runtime_error(message);
+}
+
+void pumpMessages(int millis = 20)
+{
+   #if JUCE_MODAL_LOOPS_PERMITTED
+    if (auto* messageManager = juce::MessageManager::getInstanceWithoutCreating())
+        messageManager->runDispatchLoopUntil(millis);
+    else
+        juce::Thread::sleep(millis);
+   #else
+    juce::Thread::sleep(millis);
+   #endif
 }
 
 juce::Component* findDescendantById(juce::Component& root, const juce::String& componentId)
@@ -143,6 +186,135 @@ drs::app::authoring::ZoneMapCanvas& requireZoneMapCanvas(juce::Component& root, 
     return *zoneMap;
 }
 
+bool isDescendantOrSelf(const juce::Component* component, const juce::Component& ancestor)
+{
+    for (auto* current = component; current != nullptr; current = current->getParentComponent())
+    {
+        if (current == &ancestor)
+            return true;
+    }
+
+    return false;
+}
+
+void requireFocusedWithin(const juce::Component& component, const std::string& message)
+{
+    const auto* focusedComponent = juce::Component::getCurrentlyFocusedComponent();
+    require(focusedComponent != nullptr && isDescendantOrSelf(focusedComponent, component), message);
+}
+
+void requireAccessibilityAction(juce::Component& component,
+                                juce::AccessibilityActionType actionType,
+                                const std::string& message)
+{
+    auto* handler = component.getAccessibilityHandler();
+    require(handler != nullptr, message + " should expose an accessibility handler.");
+    require(handler->getActions().contains(actionType),
+            message + " should expose the expected accessibility action.");
+}
+
+double toLinearChannel(double channel)
+{
+    return channel <= 0.04045 ? (channel / 12.92)
+                              : std::pow((channel + 0.055) / 1.055, 2.4);
+}
+
+double relativeLuminance(juce::Colour colour)
+{
+    const auto red = toLinearChannel(colour.getFloatRed());
+    const auto green = toLinearChannel(colour.getFloatGreen());
+    const auto blue = toLinearChannel(colour.getFloatBlue());
+    return (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
+}
+
+double contrastRatio(juce::Colour first, juce::Colour second)
+{
+    const auto lighter = std::max(relativeLuminance(first), relativeLuminance(second));
+    const auto darker = std::min(relativeLuminance(first), relativeLuminance(second));
+    return (lighter + 0.05) / (darker + 0.05);
+}
+
+void requireContrastAtLeast(juce::Colour foreground,
+                            juce::Colour background,
+                            double minimumRatio,
+                            const std::string& message)
+{
+    require(contrastRatio(foreground, background) >= minimumRatio, message);
+}
+
+void requireNonEmptyAccessibilityTitle(juce::Component& root, const juce::String& componentId)
+{
+    auto* component = findDescendantById(root, componentId);
+    require(component != nullptr, "Missing component ID for accessibility title: " + componentId.toStdString());
+    require(component->getTitle().isNotEmpty(),
+            "Component should expose a non-empty accessibility title: " + componentId.toStdString());
+}
+
+void requireNonEmptyAccessibilityDescription(juce::Component& root, const juce::String& componentId)
+{
+    auto* component = findDescendantById(root, componentId);
+    require(component != nullptr, "Missing component ID for accessibility description: " + componentId.toStdString());
+    require(component->getDescription().isNotEmpty(),
+            "Component should expose a non-empty accessibility description: " + componentId.toStdString());
+}
+
+void requireNonEmptyAccessibilityHelpText(juce::Component& root, const juce::String& componentId)
+{
+    auto* component = findDescendantById(root, componentId);
+    require(component != nullptr, "Missing component ID for accessibility help text: " + componentId.toStdString());
+    require(component->getHelpText().isNotEmpty(),
+            "Component should expose non-empty accessibility help text: " + componentId.toStdString());
+}
+
+void requireAccessibilityTitleEquals(juce::Component& root,
+                                     const juce::String& componentId,
+                                     const juce::String& expectedTitle)
+{
+    auto* component = findDescendantById(root, componentId);
+    require(component != nullptr, "Missing component ID for accessibility title equality: " + componentId.toStdString());
+    require(component->getTitle() == expectedTitle,
+            "Component accessibility title should match the live text: " + componentId.toStdString());
+}
+
+void requireAccessibilityDescriptionContains(juce::Component& root,
+                                             const juce::String& componentId,
+                                             const juce::String& expectedFragment)
+{
+    auto* component = findDescendantById(root, componentId);
+    require(component != nullptr,
+            "Missing component ID for accessibility description check: " + componentId.toStdString());
+    require(component->getDescription().contains(expectedFragment),
+            "Component accessibility description should include the expected fragment: " + componentId.toStdString());
+}
+
+void requireAccessibilityHandlerState(juce::Component& root,
+                                      const juce::String& componentId,
+                                      bool expectedHandler)
+{
+    auto* component = findDescendantById(root, componentId);
+    require(component != nullptr, "Missing component ID for accessibility handler: " + componentId.toStdString());
+    require(component->isAccessible() == expectedHandler,
+            "Unexpected accessibility visibility state for: " + componentId.toStdString());
+}
+
+void requireIncreasingFocusOrder(juce::Component& root,
+                                 std::initializer_list<juce::String> componentIds)
+{
+    auto previousFocusOrder = -1;
+
+    for (const auto& componentId : componentIds)
+    {
+        auto* component = findDescendantById(root, componentId);
+        require(component != nullptr, "Missing component ID for focus-order check: " + componentId.toStdString());
+        const auto currentFocusOrder = component->getExplicitFocusOrder();
+        require(currentFocusOrder > 0,
+                "Component should expose an explicit positive focus order: " + componentId.toStdString());
+        require(currentFocusOrder > previousFocusOrder,
+                "Component focus order should increase monotonically: " + componentId.toStdString());
+        previousFocusOrder = currentFocusOrder;
+    }
+}
+
 int countDescendantsById(juce::Component& root, const juce::String& componentId)
 {
     auto count = root.getComponentID() == componentId ? 1 : 0;
@@ -151,6 +323,46 @@ int countDescendantsById(juce::Component& root, const juce::String& componentId)
         count += countDescendantsById(*root.getChildComponent(index), componentId);
 
     return count;
+}
+
+void collectComponentIdCounts(juce::Component& root,
+                              std::map<std::string, int>& componentIdCounts)
+{
+    if (!root.getComponentID().isEmpty())
+        ++componentIdCounts[root.getComponentID().toStdString()];
+
+    for (int index = 0; index < root.getNumChildComponents(); ++index)
+        collectComponentIdCounts(*root.getChildComponent(index), componentIdCounts);
+}
+
+void requireUniqueNonEmptyComponentIds(juce::Component& root)
+{
+    std::map<std::string, int> componentIdCounts;
+    collectComponentIdCounts(root, componentIdCounts);
+
+    std::vector<std::string> duplicateIds;
+    for (const auto& [componentId, count] : componentIdCounts)
+    {
+        if (count > 1)
+            duplicateIds.push_back(componentId + " x" + std::to_string(count));
+    }
+
+    require(duplicateIds.empty(),
+            "Authoring panel should not expose duplicate non-empty component IDs. Duplicates: "
+                + (duplicateIds.empty() ? std::string{} : duplicateIds.front()));
+}
+
+void requireRetiredTemporaryIdsAbsent(juce::Component& root)
+{
+    for (const auto& componentId : {
+             juce::String("authoringModeSelector"),
+             juce::String("authoringDrawerPlaceholder"),
+             juce::String("authoringMacroSelector")
+         })
+    {
+        require(findDescendantById(root, componentId) == nullptr,
+                "Retired temporary component ID should remain absent: " + componentId.toStdString());
+    }
 }
 
 bool componentTreeContainsLabelText(juce::Component& root, const juce::String& expectedText)
@@ -362,6 +574,30 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
     requireComponentVisibleWithin(strip, "authoringUndoButton", bounds);
     requireComponentVisibleWithin(strip, "authoringRedoButton", bounds);
     requireComponentVisibleWithin(strip, "authoringSaveButton", bounds);
+    requireAccessibilityTitleEquals(strip, "authoringSummaryTitleLabel", "Lead Sustain");
+    requireAccessibilityTitleEquals(strip, "authoringSummaryStatusLabel", "Selected zone is ready to preview");
+    requireAccessibilityTitleEquals(strip,
+                                    "authoringSummarySourceLabel",
+                                    "Source: fixtures/phase2/lead-a4-sustain.wav");
+    requireAccessibilityTitleEquals(strip, "authoringSummaryArticulationLabel", "Articulation: sustain");
+    requireAccessibilityDescriptionContains(strip, "authoringSummaryTitleLabel", "Selected zone title: Lead Sustain");
+    requireAccessibilityDescriptionContains(strip,
+                                            "authoringSummaryStatusLabel",
+                                            "Selection status: Selected zone is ready to preview");
+    requireAccessibilityDescriptionContains(strip,
+                                            "authoringSummarySourceLabel",
+                                            "Selected zone source: Source: fixtures/phase2/lead-a4-sustain.wav");
+    requireAccessibilityDescriptionContains(strip,
+                                            "authoringSummaryArticulationLabel",
+                                            "Selected zone articulation: Articulation: sustain");
+    requireAccessibilityDescriptionContains(strip, "authoringPreviewButton", "Previews the selected zone.");
+    requireAccessibilityDescriptionContains(strip, "authoringUndoButton", "Reverts the most recent authoring change.");
+    requireAccessibilityDescriptionContains(strip, "authoringRedoButton", "Reapplies the most recently undone authoring change.");
+    requireAccessibilityDescriptionContains(strip, "authoringSaveButton", "Marks the current authoring state as saved.");
+    requireNonEmptyAccessibilityHelpText(strip, "authoringPreviewButton");
+    requireNonEmptyAccessibilityHelpText(strip, "authoringUndoButton");
+    requireNonEmptyAccessibilityHelpText(strip, "authoringRedoButton");
+    requireNonEmptyAccessibilityHelpText(strip, "authoringSaveButton");
     require(requireButton(strip, "authoringPreviewButton").isEnabled(),
             "Summary strip preview button should reflect the fixture view model.");
     require(requireButton(strip, "authoringUndoButton").isEnabled(),
@@ -380,6 +616,35 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
     require(undoRequests == 1, "Summary strip should emit exactly one undo callback.");
     require(redoRequests == 1, "Summary strip should emit exactly one redo callback.");
     require(saveRequests == 1, "Summary strip should emit exactly one save callback.");
+
+    viewModel.canPreview = false;
+    viewModel.canUndo = false;
+    viewModel.canRedo = false;
+    viewModel.dirty = false;
+    strip.setViewModel(viewModel);
+    require(!requireButton(strip, "authoringPreviewButton").isEnabled(),
+            "Summary strip preview button should disable when preview is unavailable.");
+    require(!requireButton(strip, "authoringUndoButton").isEnabled(),
+            "Summary strip undo button should disable when undo is unavailable.");
+    require(!requireButton(strip, "authoringRedoButton").isEnabled(),
+            "Summary strip redo button should disable when redo is unavailable.");
+    requireAccessibilityDescriptionContains(strip,
+                                            "authoringPreviewButton",
+                                            "Unavailable because no zone preview is available.");
+    requireAccessibilityDescriptionContains(strip,
+                                            "authoringUndoButton",
+                                            "Unavailable because there is no change to undo.");
+    requireAccessibilityDescriptionContains(strip,
+                                            "authoringRedoButton",
+                                            "Unavailable because there is no change to redo.");
+    requireAccessibilityDescriptionContains(strip,
+                                            "authoringSaveButton",
+                                            "Project is already marked saved.");
+    requireAccessibilityDescriptionContains(strip,
+                                            "authoringSaveButton",
+                                            "Project is already marked saved.");
+    require(requireButton(strip, "authoringSaveButton").getHelpText().contains("Make a change before marking a new saved state."),
+            "Summary strip save button should explain when the project is already saved.");
 
     saveComponentPng(strip, outputDirectory / "leaf-summary-strip.png");
 }
@@ -401,6 +666,8 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     requireComponentVisible(editor, "authoringZoneFieldEmptyState");
     require(!requireSlider(editor, "authoringRootKeySlider").isShowing(),
             "Zone mapping editor should hide mapping controls when no zone is selected.");
+    requireAccessibilityHandlerState(editor, "authoringZoneFieldEmptyState", true);
+    requireAccessibilityHandlerState(editor, "authoringRootKeySlider", false);
 
     int commitRequests = 0;
     int restoreRequests = 0;
@@ -456,6 +723,58 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
 
     for (const auto& componentId : {
              juce::String("authoringMapInspectorSection"),
+             juce::String("authoringMapInspectorSectionDisclosure"),
+             juce::String("authoringRootKeySlider"),
+             juce::String("authoringKeyLowSlider"),
+             juce::String("authoringKeyHighSlider"),
+             juce::String("authoringSampleInspectorSection"),
+             juce::String("authoringSampleInspectorSectionDisclosure"),
+             juce::String("authoringMixInspectorSection"),
+             juce::String("authoringMixInspectorSectionDisclosure"),
+             juce::String("authoringAdvancedInspectorSection"),
+             juce::String("authoringAdvancedInspectorSectionDisclosure"),
+             juce::String("authoringRestoreRootKeyButton")
+         })
+    {
+        requireNonEmptyAccessibilityTitle(editor, componentId);
+        requireNonEmptyAccessibilityDescription(editor, componentId);
+    }
+
+    requireNonEmptyAccessibilityHelpText(editor, "authoringRootKeySlider");
+    requireNonEmptyAccessibilityHelpText(editor, "authoringKeyLowSlider");
+    requireNonEmptyAccessibilityHelpText(editor, "authoringKeyHighSlider");
+    requireNonEmptyAccessibilityHelpText(editor, "authoringRestoreRootKeyButton");
+    requireIncreasingFocusOrder(editor,
+                                {
+                                    "authoringMapInspectorSectionDisclosure",
+                                    "authoringRootKeySlider",
+                                    "authoringKeyLowSlider",
+                                    "authoringKeyHighSlider",
+                                    "authoringSampleInspectorSectionDisclosure",
+                                    "authoringVelocityLowSlider",
+                                    "authoringVelocityHighSlider",
+                                    "authoringMixInspectorSectionDisclosure",
+                                    "authoringGainSlider",
+                                    "authoringPanSlider",
+                                    "authoringAdvancedInspectorSectionDisclosure",
+                                    "authoringLoopEnabledToggle",
+                                    "authoringRestoreRootKeyButton"
+                                });
+
+    requireAccessibilityHandlerState(editor, "authoringMapInspectorSection", true);
+    requireAccessibilityHandlerState(editor, "authoringMapInspectorSectionDisclosure", true);
+    requireAccessibilityHandlerState(editor, "authoringRootKeySlider", true);
+    requireAccessibilityHandlerState(editor, "authoringKeyLowSlider", true);
+    requireAccessibilityHandlerState(editor, "authoringKeyHighSlider", true);
+    requireAccessibilityHandlerState(editor, "authoringVelocityLowSlider", false);
+    requireAccessibilityHandlerState(editor, "authoringVelocityHighSlider", false);
+    requireAccessibilityHandlerState(editor, "authoringGainSlider", false);
+    requireAccessibilityHandlerState(editor, "authoringPanSlider", false);
+    requireAccessibilityHandlerState(editor, "authoringLoopEnabledToggle", false);
+    requireAccessibilityHandlerState(editor, "authoringRestoreRootKeyButton", false);
+
+    for (const auto& componentId : {
+             juce::String("authoringMapInspectorSection"),
              juce::String("authoringSampleInspectorSection"),
              juce::String("authoringMixInspectorSection"),
              juce::String("authoringAdvancedInspectorSection"),
@@ -481,18 +800,26 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
         requireButton(editor, "authoringSampleInspectorSectionDisclosure").onClick();
     requireComponentVisibleWithin(editor, "authoringVelocityLowSlider", bounds);
     requireComponentVisibleWithin(editor, "authoringVelocityHighSlider", bounds);
+    requireAccessibilityHandlerState(editor, "authoringVelocityLowSlider", true);
+    requireAccessibilityHandlerState(editor, "authoringVelocityHighSlider", true);
     requireButton(editor, "authoringSampleInspectorSectionDisclosure").onClick();
+    requireAccessibilityHandlerState(editor, "authoringVelocityLowSlider", false);
+    requireAccessibilityHandlerState(editor, "authoringVelocityHighSlider", false);
 
     if (findDescendantById(editor, "authoringGainSlider")->getBounds().isEmpty())
         requireButton(editor, "authoringMixInspectorSectionDisclosure").onClick();
     requireComponentVisibleWithin(editor, "authoringGainSlider", bounds);
     requireComponentVisibleWithin(editor, "authoringPanSlider", bounds);
+    requireAccessibilityHandlerState(editor, "authoringGainSlider", true);
+    requireAccessibilityHandlerState(editor, "authoringPanSlider", true);
 
     if (findDescendantById(editor, "authoringRestoreRootKeyButton")->getBounds().isEmpty())
         requireButton(editor, "authoringAdvancedInspectorSectionDisclosure").onClick();
     requireComponentVisibleWithin(editor, "authoringLoopEnabledToggle", bounds);
     requireComponentVisibleWithin(editor, "authoringRestoreRootKeyButton", bounds);
     requireComponentVisibleWithin(editor, "authoringZoneValidationMessage", bounds);
+    requireAccessibilityHandlerState(editor, "authoringLoopEnabledToggle", true);
+    requireAccessibilityHandlerState(editor, "authoringRestoreRootKeyButton", true);
 
     auto& rootKeySlider = requireSlider(editor, "authoringRootKeySlider");
     require(static_cast<bool>(rootKeySlider.onDragStart),
@@ -588,6 +915,7 @@ void writeReachabilityChecklist(std::ostream& inventory)
     inventory << "- Macros drawer content: authoringMacroList, authoringMacroListBox, authoringMacroAssignmentSelector, authoringMacroRoleSelector, authoringMacroDefaultSlider, authoringMacroMinSlider, authoringMacroMaxSlider, authoringMacroMoveUpButton, authoringMacroMoveDownButton\n";
     inventory << "- Routing drawer content: authoringFxSelector, authoringFxTypeSelector, authoringFxBypassedToggle, authoringRoutingSelector, authoringRoutingInputSelector, authoringRoutingInsertOneSelector, authoringRoutingInsertTwoSelector\n";
     inventory << "- Performance drawer content: authoringPerformanceBankSelector, authoringTriggerSlotSelector, authoringTriggerEventSelector, authoringTargetArticulationSelector, authoringPhraseAssetSelector, authoringChordModeSelector, authoringPhraseImportPath, authoringPhraseImportButton\n";
+    inventory << "- Retired temporary IDs absent: authoringModeSelector, authoringDrawerPlaceholder, authoringMacroSelector\n";
     inventory << "\n";
 }
 
@@ -1054,6 +1382,628 @@ void exerciseDrawerEditorTransactions(drs::app::AuthoringPanel& panel,
             "Routing drawer edits should persist through the authoring session.");
 }
 
+void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
+                                           const std::string& shellName)
+{
+    auto& toggleButton = requireButton(panel, "authoringDrawerToggleButton");
+    auto& waveformTabButton = requireButton(panel, "authoringDrawerWaveformTab");
+    auto& macrosTabButton = requireButton(panel, "authoringDrawerMacrosTab");
+    auto& routingTabButton = requireButton(panel, "authoringDrawerRoutingTab");
+    auto& performanceTabButton = requireButton(panel, "authoringDrawerPerformanceTab");
+    auto& macroAssignmentSelector = requireComboBox(panel, "authoringMacroAssignmentSelector");
+    auto& macroMoveUpButton = requireButton(panel, "authoringMacroMoveUpButton");
+    auto& macroMoveDownButton = requireButton(panel, "authoringMacroMoveDownButton");
+    auto& fxSelector = requireComboBox(panel, "authoringFxSelector");
+    auto& fxTypeSelector = requireComboBox(panel, "authoringFxTypeSelector");
+    auto& fxBypassedToggle = requireButton(panel, "authoringFxBypassedToggle");
+    auto& routingBusSelector = requireComboBox(panel, "authoringRoutingSelector");
+    auto& routingInputSelector = requireComboBox(panel, "authoringRoutingInputSelector");
+    auto& routingInsertOneSelector = requireComboBox(panel, "authoringRoutingInsertOneSelector");
+    auto& routingInsertTwoSelector = requireComboBox(panel, "authoringRoutingInsertTwoSelector");
+    auto& performanceBankSelector = requireComboBox(panel, "authoringPerformanceBankSelector");
+    auto& triggerSlotSelector = requireComboBox(panel, "authoringTriggerSlotSelector");
+    auto& triggerEventSelector = requireComboBox(panel, "authoringTriggerEventSelector");
+    auto& targetArticulationSelector = requireComboBox(panel, "authoringTargetArticulationSelector");
+    auto& phraseAssetSelector = requireComboBox(panel, "authoringPhraseAssetSelector");
+    auto& chordModeSelector = requireComboBox(panel, "authoringChordModeSelector");
+    auto* phraseImportPath = findDescendantById(panel, "authoringPhraseImportPath");
+    auto& phraseImportButton = requireButton(panel, "authoringPhraseImportButton");
+    auto& zoneSelector = requireComboBox(panel, "authoringZoneSelector");
+    auto& zoneMap = requireZoneMapCanvas(panel, "authoringZoneMap");
+    auto& macroList = requireRepeatedStructureList(panel, "authoringMacroList");
+    require(phraseImportPath != nullptr, "Performance drawer accessibility checks require the phrase import path.");
+
+    for (const auto& componentId : {
+             juce::String("authoringPreviewButton"),
+             juce::String("authoringUndoButton"),
+             juce::String("authoringRedoButton"),
+             juce::String("authoringSaveButton"),
+             juce::String("authoringZoneSelector"),
+             juce::String("authoringZoneMap"),
+             juce::String("authoringDrawerToggleButton"),
+             juce::String("authoringDrawerWaveformTab"),
+             juce::String("authoringDrawerMacrosTab"),
+             juce::String("authoringDrawerRoutingTab"),
+             juce::String("authoringDrawerPerformanceTab")
+         })
+    {
+        requireNonEmptyAccessibilityTitle(panel, componentId);
+        requireAccessibilityHandlerState(panel, componentId, true);
+    }
+
+    requireContrastAtLeast(zoneSelector.findColour(juce::ComboBox::focusedOutlineColourId),
+                           zoneSelector.findColour(juce::ComboBox::backgroundColourId),
+                           3.0,
+                           "Zone selector focus styling should remain visually distinct from its background.");
+    requireContrastAtLeast(zoneMap.findColour(juce::TextEditor::focusedOutlineColourId),
+                           zoneMap.findColour(juce::ListBox::backgroundColourId),
+                           3.0,
+                           "Zone map focus styling should remain visually distinct from the map background.");
+    requireContrastAtLeast(macroList.getListBox().findColour(juce::TextEditor::focusedOutlineColourId),
+                           macroList.getListBox().findColour(juce::ListBox::backgroundColourId),
+                           3.0,
+                           "Repeated-structure list focus styling should remain visually distinct from the list background.");
+    requireContrastAtLeast(phraseImportPath->findColour(juce::TextEditor::focusedOutlineColourId),
+                           phraseImportPath->findColour(juce::TextEditor::backgroundColourId),
+                           3.0,
+                           "Text-entry focus styling should remain visually distinct from the editor background.");
+
+    requireIncreasingFocusOrder(panel,
+                                {
+                                    "authoringUndoButton",
+                                    "authoringRedoButton",
+                                    "authoringSaveButton",
+                                    "authoringPreviewButton",
+                                    "authoringZoneSelector",
+                                    "authoringZoneMap",
+                                    "authoringDrawerToggleButton",
+                                    "authoringDrawerWaveformTab",
+                                    "authoringDrawerMacrosTab",
+                                    "authoringDrawerRoutingTab",
+                                    "authoringDrawerPerformanceTab"
+                                });
+
+    if (shellName == "compact" && toggleButton.getButtonText() == "Show Drawer")
+    {
+        toggleButton.onClick();
+    }
+
+    const auto initialSummarySource = requireLabel(panel, "authoringSummarySourceLabel").getText();
+    const auto initialSummaryArticulation = requireLabel(panel, "authoringSummaryArticulationLabel").getText();
+    requireAccessibilityTitleEquals(panel, "authoringSummarySourceLabel", initialSummarySource);
+    requireAccessibilityTitleEquals(panel, "authoringSummaryArticulationLabel", initialSummaryArticulation);
+    requireAccessibilityDescriptionContains(panel, "authoringSummarySourceLabel", initialSummarySource);
+    requireAccessibilityDescriptionContains(panel, "authoringSummaryArticulationLabel", initialSummaryArticulation);
+
+    auto summarySourceChanged = false;
+    for (int candidateId = 1; candidateId <= zoneSelector.getNumItems(); ++candidateId)
+    {
+        if (candidateId == zoneSelector.getSelectedId())
+            continue;
+
+        zoneSelector.setSelectedId(candidateId, juce::sendNotificationSync);
+        if (requireLabel(panel, "authoringSummarySourceLabel").getText() != initialSummarySource)
+        {
+            summarySourceChanged = true;
+            break;
+        }
+    }
+
+    const auto updatedSummarySource = requireLabel(panel, "authoringSummarySourceLabel").getText();
+    const auto updatedSummaryArticulation = requireLabel(panel, "authoringSummaryArticulationLabel").getText();
+    require(summarySourceChanged && updatedSummarySource != initialSummarySource,
+            "Changing the selected zone should refresh the summary-strip source text.");
+    requireAccessibilityTitleEquals(panel, "authoringSummarySourceLabel", updatedSummarySource);
+    requireAccessibilityTitleEquals(panel, "authoringSummaryArticulationLabel", updatedSummaryArticulation);
+    requireAccessibilityDescriptionContains(panel, "authoringSummarySourceLabel", updatedSummarySource);
+    requireAccessibilityDescriptionContains(panel, "authoringSummaryArticulationLabel", updatedSummaryArticulation);
+
+    requireAccessibilityTitleEquals(panel, "authoringDrawerTitleLabel", requireLabel(panel, "authoringDrawerTitleLabel").getText());
+    requireAccessibilityTitleEquals(panel, "authoringDrawerScopeLabel", requireLabel(panel, "authoringDrawerScopeLabel").getText());
+    requireAccessibilityTitleEquals(panel,
+                                    "authoringDrawerBreadcrumbLabel",
+                                    requireLabel(panel, "authoringDrawerBreadcrumbLabel").getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringDrawerScopeLabel",
+                                            requireLabel(panel, "authoringDrawerScopeLabel").getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringDrawerBreadcrumbLabel",
+                                            requireLabel(panel, "authoringDrawerBreadcrumbLabel").getText());
+    requireAccessibilityTitleEquals(panel, "authoringWaveformInfoLabel", requireLabel(panel, "authoringWaveformInfoLabel").getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringWaveformInfoLabel",
+                                            requireLabel(panel, "authoringWaveformInfoLabel").getText());
+
+    macrosTabButton.onClick();
+    require(macroAssignmentSelector.isVisible(),
+            "Macro drawer controls should be visible when the macros tab is active.");
+    requireAccessibilityHandlerState(panel, "authoringMacroAssignmentSelector", true);
+    requireAccessibilityTitleEquals(panel, "authoringDrawerTitleLabel", "Macro Assignment");
+    requireAccessibilityTitleEquals(panel,
+                                    "authoringDrawerScopeLabel",
+                                    requireLabel(panel, "authoringDrawerScopeLabel").getText());
+    requireAccessibilityDescriptionContains(panel, "authoringDrawerScopeLabel", "Project-scoped");
+    requireAccessibilityDescriptionContains(panel, "authoringDrawerBreadcrumbLabel", "Project > Macros");
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringMacroAssignmentSelector",
+                                            "Chooses the parameter assigned to");
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringMacroRoleSelector",
+                                            "Chooses the semantic role for");
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringMacroDefaultSlider",
+                                            "Adjusts the default value for");
+    require(!macroMoveUpButton.isEnabled(),
+            "The first macro should not be movable upward.");
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringMacroMoveUpButton",
+                                            "already the first macro");
+    auto& macroListBox = macroList.getListBox();
+    if (macroList.getRowCount() > 1)
+    {
+        macroListBox.selectRow(macroList.getRowCount() - 1);
+        require(macroMoveUpButton.isEnabled(),
+                "The last macro should still be movable upward.");
+        require(!macroMoveDownButton.isEnabled(),
+                "The last macro should not be movable downward.");
+        requireAccessibilityDescriptionContains(panel,
+                                                "authoringMacroMoveUpButton",
+                                                "earlier in the list");
+        requireAccessibilityDescriptionContains(panel,
+                                                "authoringMacroMoveDownButton",
+                                                "already the last macro");
+        macroListBox.selectRow(0);
+    }
+
+    routingTabButton.onClick();
+    require(!macroAssignmentSelector.isVisible(),
+            "Macro drawer controls should be hidden after switching to routing.");
+    requireAccessibilityHandlerState(panel, "authoringMacroAssignmentSelector", false);
+    requireAccessibilityTitleEquals(panel, "authoringDrawerTitleLabel", "Routing Detail");
+    requireAccessibilityDescriptionContains(panel, "authoringDrawerScopeLabel", "Project-scoped");
+    requireAccessibilityDescriptionContains(panel, "authoringDrawerBreadcrumbLabel", "Project > Routing >");
+    require(fxSelector.isVisible(),
+            "FX selector should be visible when the routing tab is active.");
+    require(fxBypassedToggle.isVisible(),
+            "FX bypass toggle should be visible when the routing tab is active.");
+    require(routingBusSelector.isVisible(),
+            "Routing bus selector should be visible when the routing tab is active.");
+    require(routingInputSelector.isVisible(),
+            "Routing drawer controls should be visible when the routing tab is active.");
+    require(routingInsertOneSelector.isVisible(),
+            "Routing insert A selector should be visible when the routing tab is active.");
+    require(routingInsertTwoSelector.isVisible(),
+            "Routing insert B selector should be visible when the routing tab is active.");
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringFxSelector",
+                                            "Current FX slot: " + fxSelector.getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringFxTypeSelector",
+                                            fxSelector.getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringFxTypeSelector",
+                                            fxTypeSelector.getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringFxBypassedToggle",
+                                            fxSelector.getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringRoutingSelector",
+                                            "Current bus: " + routingBusSelector.getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringRoutingInputSelector",
+                                            routingBusSelector.getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringRoutingInputSelector",
+                                            routingInputSelector.getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringRoutingInsertOneSelector",
+                                            routingBusSelector.getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringRoutingInsertTwoSelector",
+                                            routingBusSelector.getText());
+    const auto initialFxId = fxSelector.getSelectedId();
+    const auto initialRoutingBusId = routingBusSelector.getSelectedId();
+    if (fxSelector.getNumItems() > 1)
+    {
+        const auto initialFxName = fxSelector.getText();
+        const auto nextFxId = fxSelector.getSelectedId() == fxSelector.getNumItems() ? 1 : fxSelector.getSelectedId() + 1;
+        fxSelector.setSelectedId(nextFxId, juce::sendNotificationSync);
+        pumpMessages();
+        require(fxSelector.getText() != initialFxName,
+                "Selecting a different FX slot should update the active routing detail.");
+        requireAccessibilityDescriptionContains(panel,
+                                                "authoringFxSelector",
+                                                "Current FX slot: " + fxSelector.getText());
+        requireAccessibilityDescriptionContains(panel,
+                                                "authoringFxTypeSelector",
+                                                fxSelector.getText());
+        requireAccessibilityDescriptionContains(panel,
+                                                "authoringFxBypassedToggle",
+                                                fxSelector.getText());
+    }
+    if (routingBusSelector.getNumItems() > 1)
+    {
+        const auto initialBusName = routingBusSelector.getText();
+        const auto nextBusId = routingBusSelector.getSelectedId() == routingBusSelector.getNumItems()
+            ? 1
+            : routingBusSelector.getSelectedId() + 1;
+        routingBusSelector.setSelectedId(nextBusId, juce::sendNotificationSync);
+        pumpMessages();
+        require(routingBusSelector.getText() != initialBusName,
+                "Selecting a different routing bus should update the active routing detail.");
+        requireAccessibilityDescriptionContains(panel,
+                                                "authoringRoutingSelector",
+                                                "Current bus: " + routingBusSelector.getText());
+        requireAccessibilityDescriptionContains(panel,
+                                                "authoringRoutingInputSelector",
+                                                routingBusSelector.getText());
+        requireAccessibilityDescriptionContains(panel,
+                                                "authoringRoutingInsertOneSelector",
+                                                routingBusSelector.getText());
+        requireAccessibilityDescriptionContains(panel,
+                                                "authoringRoutingInsertTwoSelector",
+                                                routingBusSelector.getText());
+    }
+    if (fxSelector.getSelectedId() != initialFxId)
+    {
+        fxSelector.setSelectedId(initialFxId, juce::sendNotificationSync);
+        pumpMessages();
+    }
+    if (routingBusSelector.getSelectedId() != initialRoutingBusId)
+    {
+        routingBusSelector.setSelectedId(initialRoutingBusId, juce::sendNotificationSync);
+        pumpMessages();
+    }
+    toggleButton.onClick();
+    require(!routingInputSelector.isVisible(),
+            "Routing drawer controls should be hidden after closing the drawer.");
+    requireAccessibilityHandlerState(panel, "authoringRoutingInputSelector", false);
+
+    performanceTabButton.onClick();
+    requireAccessibilityTitleEquals(panel, "authoringDrawerTitleLabel", "Performance Detail");
+    requireAccessibilityDescriptionContains(panel, "authoringDrawerScopeLabel", "Bank-scoped");
+    requireAccessibilityDescriptionContains(panel, "authoringDrawerBreadcrumbLabel", "Project > Performance");
+    require(performanceBankSelector.isVisible(),
+            "Performance bank selector should be visible when the performance tab is active.");
+    require(triggerSlotSelector.isVisible(),
+            "Trigger slot selector should be visible when the performance tab is active.");
+    require(triggerEventSelector.isVisible(),
+            "Trigger event selector should be visible when the performance tab is active.");
+    require(targetArticulationSelector.isVisible(),
+            "Target articulation selector should be visible when the performance tab is active.");
+    require(phraseAssetSelector.isVisible(),
+            "Phrase asset selector should be visible when the performance tab is active.");
+    require(chordModeSelector.isVisible(),
+            "Chord mode selector should be visible when the performance tab is active.");
+    require(phraseImportPath->isVisible(),
+            "Phrase import path should be visible when the performance tab is active.");
+    require(phraseImportButton.isVisible(),
+            "Phrase import button should be visible when the performance tab is active.");
+    for (const auto& componentId : {
+             juce::String("authoringPerformanceBankSelector"),
+             juce::String("authoringTriggerSlotSelector"),
+             juce::String("authoringTriggerEventSelector"),
+             juce::String("authoringTargetArticulationSelector"),
+             juce::String("authoringPhraseAssetSelector"),
+             juce::String("authoringChordModeSelector"),
+             juce::String("authoringPhraseImportPath"),
+             juce::String("authoringPhraseImportButton")
+         })
+    {
+        requireNonEmptyAccessibilityTitle(panel, componentId);
+        requireNonEmptyAccessibilityDescription(panel, componentId);
+        requireAccessibilityHandlerState(panel, componentId, true);
+    }
+    requireIncreasingFocusOrder(panel,
+                                {
+                                    "authoringPerformanceBankSelector",
+                                    "authoringTriggerSlotSelector",
+                                    "authoringTriggerEventSelector",
+                                    "authoringTargetArticulationSelector",
+                                    "authoringPhraseAssetSelector",
+                                    "authoringChordModeSelector",
+                                    "authoringPhraseImportPath",
+                                    "authoringPhraseImportButton"
+                                });
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringPerformanceBankSelector",
+                                            "Current bank: " + performanceBankSelector.getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringTriggerSlotSelector",
+                                            performanceBankSelector.getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringTriggerSlotSelector",
+                                            triggerSlotSelector.getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringTriggerEventSelector",
+                                            triggerSlotSelector.getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringTriggerEventSelector",
+                                            triggerEventSelector.getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringTargetArticulationSelector",
+                                            triggerSlotSelector.getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringTargetArticulationSelector",
+                                            targetArticulationSelector.getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringPhraseAssetSelector",
+                                            triggerSlotSelector.getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringPhraseAssetSelector",
+                                            phraseAssetSelector.getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringChordModeSelector",
+                                            triggerSlotSelector.getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringChordModeSelector",
+                                            chordModeSelector.getText());
+    const auto initialPhraseImportPathDescription = phraseImportPath->getDescription();
+    const auto initialPhraseImportButtonDescription = phraseImportButton.getDescription();
+    require(!initialPhraseImportPathDescription.isEmpty(),
+            "Phrase import path should expose a contextual accessibility description.");
+    require(!initialPhraseImportButtonDescription.isEmpty(),
+            "Phrase import button should expose a contextual accessibility description.");
+    const auto initialTriggerSlotId = triggerSlotSelector.getSelectedId();
+    if (triggerSlotSelector.getNumItems() > 1)
+    {
+        const auto initialTriggerName = triggerSlotSelector.getText();
+        const auto nextTriggerId = triggerSlotSelector.getSelectedId() == triggerSlotSelector.getNumItems()
+            ? 1
+            : triggerSlotSelector.getSelectedId() + 1;
+        triggerSlotSelector.setSelectedId(nextTriggerId, juce::sendNotificationSync);
+        pumpMessages();
+        require(triggerSlotSelector.getText() != initialTriggerName,
+                "Selecting a different trigger slot should update the active performance detail.");
+        requireAccessibilityDescriptionContains(panel,
+                                                "authoringTriggerSlotSelector",
+                                                triggerSlotSelector.getText());
+        requireAccessibilityDescriptionContains(panel,
+                                                "authoringTriggerEventSelector",
+                                                triggerSlotSelector.getText());
+        requireAccessibilityDescriptionContains(panel,
+                                                "authoringTargetArticulationSelector",
+                                                triggerSlotSelector.getText());
+        requireAccessibilityDescriptionContains(panel,
+                                                "authoringPhraseAssetSelector",
+                                                triggerSlotSelector.getText());
+        requireAccessibilityDescriptionContains(panel,
+                                                "authoringChordModeSelector",
+                                                triggerSlotSelector.getText());
+    }
+    if (triggerSlotSelector.getSelectedId() != initialTriggerSlotId)
+    {
+        triggerSlotSelector.setSelectedId(initialTriggerSlotId, juce::sendNotificationSync);
+        pumpMessages();
+    }
+    auto* phraseImportTextEditor = dynamic_cast<juce::TextEditor*>(phraseImportPath);
+    require(phraseImportTextEditor != nullptr,
+            "Performance drawer accessibility checks require the phrase import path editor.");
+    phraseImportTextEditor->setText("C:/fixtures/phase2/accessibility-check.mid");
+    if (phraseImportTextEditor->onTextChange)
+        phraseImportTextEditor->onTextChange();
+    pumpMessages();
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringPhraseImportPath",
+                                            "Current path: C:/fixtures/phase2/accessibility-check.mid");
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringPhraseImportButton",
+                                            "C:/fixtures/phase2/accessibility-check.mid");
+    if (auto* performanceSummary = findDescendantById(panel, "authoringPerformanceSummaryLabel");
+        performanceSummary != nullptr && performanceSummary->isVisible())
+    {
+        requireAccessibilityTitleEquals(panel,
+                                        "authoringPerformanceSummaryLabel",
+                                        requireLabel(panel, "authoringPerformanceSummaryLabel").getText());
+        requireAccessibilityDescriptionContains(panel,
+                                                "authoringPerformanceSummaryLabel",
+                                                requireLabel(panel, "authoringPerformanceSummaryLabel").getText());
+    }
+    if (auto* phraseSummary = findDescendantById(panel, "authoringPhraseSummaryLabel");
+        phraseSummary != nullptr && phraseSummary->isVisible())
+    {
+        requireAccessibilityTitleEquals(panel,
+                                        "authoringPhraseSummaryLabel",
+                                        requireLabel(panel, "authoringPhraseSummaryLabel").getText());
+        requireAccessibilityDescriptionContains(panel,
+                                                "authoringPhraseSummaryLabel",
+                                                requireLabel(panel, "authoringPhraseSummaryLabel").getText());
+    }
+
+    waveformTabButton.onClick();
+    requireAccessibilityHandlerState(panel, "authoringWaveformPreview", true);
+    requireAccessibilityTitleEquals(panel, "authoringDrawerTitleLabel", "Waveform Detail");
+    requireAccessibilityDescriptionContains(panel, "authoringDrawerScopeLabel", "Zone-scoped");
+    requireAccessibilityDescriptionContains(panel, "authoringDrawerBreadcrumbLabel", "Project > Zones >");
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringWaveformInfoLabel",
+                                            requireLabel(panel, "authoringWaveformInfoLabel").getText());
+    requireAccessibilityHandlerState(panel, "authoringPerformanceBankSelector", false);
+    requireAccessibilityHandlerState(panel, "authoringTriggerSlotSelector", false);
+    requireAccessibilityHandlerState(panel, "authoringTriggerEventSelector", false);
+    requireAccessibilityHandlerState(panel, "authoringTargetArticulationSelector", false);
+    requireAccessibilityHandlerState(panel, "authoringPhraseAssetSelector", false);
+    requireAccessibilityHandlerState(panel, "authoringChordModeSelector", false);
+    requireAccessibilityHandlerState(panel, "authoringPhraseImportPath", false);
+    requireAccessibilityHandlerState(panel, "authoringPhraseImportButton", false);
+}
+
+void exerciseHostedFocusTransitions(drs::app::AuthoringPanel& panel, const std::string& shellName)
+{
+    DesktopHostedComponent hostedPanel(panel);
+    pumpMessages();
+
+    auto& toggleButton = requireButton(panel, "authoringDrawerToggleButton");
+    auto& waveformTabButton = requireButton(panel, "authoringDrawerWaveformTab");
+    auto& macrosTabButton = requireButton(panel, "authoringDrawerMacrosTab");
+    auto& routingTabButton = requireButton(panel, "authoringDrawerRoutingTab");
+    auto& performanceTabButton = requireButton(panel, "authoringDrawerPerformanceTab");
+    auto& macroAssignmentSelector = requireComboBox(panel, "authoringMacroAssignmentSelector");
+    auto& macroList = requireRepeatedStructureList(panel, "authoringMacroList");
+    auto& phraseImportButton = requireButton(panel, "authoringPhraseImportButton");
+    auto& sampleDisclosureButton = requireButton(panel, "authoringSampleInspectorSectionDisclosure");
+    auto& velocityLowSlider = requireSlider(panel, "authoringVelocityLowSlider");
+
+    if (shellName == "compact" && toggleButton.getButtonText() == "Show Drawer")
+    {
+        toggleButton.onClick();
+        pumpMessages();
+    }
+
+    macrosTabButton.onClick();
+    pumpMessages();
+    macroList.getListBox().grabKeyboardFocus();
+    pumpMessages();
+    requireFocusedWithin(macroList.getListBox(),
+                         "Repeated-structure lists should expose a visible keyboard focus target in a desktop host.");
+    macroAssignmentSelector.grabKeyboardFocus();
+    pumpMessages();
+    requireFocusedWithin(macroAssignmentSelector,
+                         "Visible macro controls should be able to take keyboard focus in a desktop host.");
+
+    routingTabButton.onClick();
+    pumpMessages();
+    requireFocusedWithin(routingTabButton,
+                         "Switching away from a focused macro control should redirect focus to the routing tab.");
+
+    performanceTabButton.onClick();
+    pumpMessages();
+    phraseImportButton.grabKeyboardFocus();
+    pumpMessages();
+    requireFocusedWithin(phraseImportButton,
+                         "Visible performance drawer controls should be able to take keyboard focus in a desktop host.");
+
+    waveformTabButton.onClick();
+    pumpMessages();
+    requireFocusedWithin(waveformTabButton,
+                         "Switching away from a focused performance control should redirect focus to the waveform tab.");
+
+    performanceTabButton.onClick();
+    pumpMessages();
+    phraseImportButton.grabKeyboardFocus();
+    pumpMessages();
+    requireFocusedWithin(phraseImportButton,
+                         "Performance drawer import button should regain focus when revisited.");
+
+    toggleButton.onClick();
+    pumpMessages();
+    requireFocusedWithin(toggleButton,
+                         "Collapsing the drawer while a drawer control is focused should redirect focus to the toggle.");
+
+    if (findDescendantById(panel, "authoringVelocityLowSlider")->getBounds().isEmpty())
+    {
+        sampleDisclosureButton.onClick();
+        pumpMessages();
+    }
+
+    velocityLowSlider.grabKeyboardFocus();
+    pumpMessages();
+    requireFocusedWithin(velocityLowSlider,
+                         "Expanded inspector controls should be able to take keyboard focus in a desktop host.");
+
+    sampleDisclosureButton.onClick();
+    pumpMessages();
+    requireFocusedWithin(sampleDisclosureButton,
+                         "Collapsing a section while one of its controls is focused should redirect focus to the disclosure button.");
+}
+
+void exerciseKeyboardOnlyWorkflowSmoke(drs::app::AuthoringPanel& panel,
+                                       drs::engine::AuthoringSession& session,
+                                       const std::string& shellName)
+{
+    DesktopHostedComponent host(panel);
+    auto& waveformTabButton = requireButton(panel, "authoringDrawerWaveformTab");
+    auto& macrosTabButton = requireButton(panel, "authoringDrawerMacrosTab");
+    auto& undoButton = requireButton(panel, "authoringUndoButton");
+    auto& redoButton = requireButton(panel, "authoringRedoButton");
+    auto& saveButton = requireButton(panel, "authoringSaveButton");
+    auto& previewButton = requireButton(panel, "authoringPreviewButton");
+    auto& zoneSelector = requireComboBox(panel, "authoringZoneSelector");
+    auto& zoneMap = requireZoneMapCanvas(panel, "authoringZoneMap");
+    auto& drawerToggleButton = requireButton(panel, "authoringDrawerToggleButton");
+    auto& restoreRootKeyButton = requireButton(panel, "authoringRestoreRootKeyButton");
+    auto& macroList = requireRepeatedStructureList(panel, "authoringMacroList");
+    auto ensureSectionOpen = [&](const juce::String& targetComponentId, const juce::String& disclosureButtonId)
+    {
+        if (findDescendantById(panel, targetComponentId)->getBounds().isEmpty())
+            requireButton(panel, disclosureButtonId).onClick();
+    };
+
+    zoneSelector.setSelectedId(2, juce::sendNotificationSync);
+    pumpMessages();
+    require(session.getSelectedZone()->id == "pad-a3-high",
+            "Keyboard workflow smoke test requires the Phase 2 pad-a3-high zone.");
+    ensureSectionOpen("authoringRestoreRootKeyButton", "authoringAdvancedInspectorSectionDisclosure");
+    pumpMessages();
+    const auto originalZoneId = session.getSelectedZone()->id;
+    const auto originalMacroIndex = macroList.getSelectedIndex();
+
+    previewButton.grabKeyboardFocus();
+    pumpMessages();
+    requireFocusedWithin(previewButton,
+                         "Keyboard workflow should begin on a reachable summary action.");
+    zoneSelector.grabKeyboardFocus();
+    pumpMessages();
+    requireFocusedWithin(zoneSelector,
+                         "Keyboard workflow should allow the zone selector to take keyboard focus.");
+    zoneMap.grabKeyboardFocus();
+    pumpMessages();
+    requireFocusedWithin(zoneMap,
+                         "Keyboard workflow should allow the zone map to take keyboard focus.");
+    drawerToggleButton.grabKeyboardFocus();
+    pumpMessages();
+    requireFocusedWithin(drawerToggleButton,
+                         "Keyboard workflow should allow the drawer toggle to take keyboard focus.");
+
+    macrosTabButton.onClick();
+    pumpMessages();
+    auto& macroListBox = macroList.getListBox();
+    macroListBox.grabKeyboardFocus();
+    pumpMessages();
+    requireFocusedWithin(macroListBox,
+                         "Keyboard workflow should allow the macro list to take keyboard focus.");
+    if (macroList.getRowCount() > 1)
+    {
+        require(macroListBox.keyPressed(juce::KeyPress(juce::KeyPress::downKey)),
+                "Keyboard workflow should allow the macro list to respond to the down arrow.");
+        require(macroList.getSelectedIndex() != originalMacroIndex,
+                "Keyboard workflow should move the macro selection when navigating the list by keyboard.");
+    }
+
+    waveformTabButton.onClick();
+    pumpMessages();
+    zoneMap.grabKeyboardFocus();
+    pumpMessages();
+    requireFocusedWithin(zoneMap,
+                         "Keyboard workflow should restore focus to the zone map after returning to waveform detail.");
+    const auto zoneBeforeKeyNavigation = session.getSelectedZone()->id;
+    require(zoneMap.keyPressed(juce::KeyPress(juce::KeyPress::rightKey)),
+            "Keyboard workflow should allow the zone map to respond to arrow-key navigation.");
+    require(session.getSelectedZone()->id != zoneBeforeKeyNavigation,
+            "Keyboard workflow should change the selected zone after zone-map keyboard navigation.");
+
+    requireAccessibilityAction(previewButton, juce::AccessibilityActionType::press, "Preview button");
+    requireAccessibilityAction(undoButton, juce::AccessibilityActionType::press, "Undo button");
+    requireAccessibilityAction(redoButton, juce::AccessibilityActionType::press, "Redo button");
+    requireAccessibilityAction(saveButton, juce::AccessibilityActionType::press, "Mark saved button");
+    requireAccessibilityAction(restoreRootKeyButton,
+                               juce::AccessibilityActionType::press,
+                               "Restore root key button");
+
+    if (originalMacroIndex >= 0 && originalMacroIndex < macroList.getRowCount())
+        macroList.getListBox().selectRow(originalMacroIndex);
+    if (session.getSelectedZone()->id != originalZoneId)
+        zoneSelector.setSelectedId(2, juce::sendNotificationSync);
+
+    waveformTabButton.onClick();
+    pumpMessages();
+    if (shellName == "compact" && findDescendantById(panel, "authoringWaveformPreview")->isVisible())
+    {
+        drawerToggleButton.onClick();
+        pumpMessages();
+    }
+}
+
 void exerciseMapSelectionBehavior(drs::app::AuthoringPanel& panel,
                                   drs::engine::AuthoringSession& session)
 {
@@ -1364,6 +2314,8 @@ int main()
 
             require(panel.getWidth() == width && panel.getHeight() == height,
                     "Authoring panel size did not match the requested shell baseline.");
+            requireRetiredTemporaryIdsAbsent(panel);
+            requireUniqueNonEmptyComponentIds(panel);
 
             exerciseMapSelectionBehavior(panel, session);
             exerciseGateAWorkflow(panel,
@@ -1376,12 +2328,15 @@ int main()
                                   restoreRootKeyCount,
                                   lastPreviewMidiNote,
                                   lastPreviewVelocity);
+            exerciseKeyboardOnlyWorkflowSmoke(panel, session, shellName);
             exerciseDrawerBehavior(panel, shellName, baselineFindings);
+            exerciseAccessibilityAndFocusBehavior(panel, shellName);
             exerciseDrawerEditorTransactions(panel, session);
             exerciseSurface(panel, 1, shellName, "mapping", outputDirectory, inventory, baselineFindings);
             exerciseSurface(panel, 2, shellName, "macros", outputDirectory, inventory, baselineFindings);
             exerciseSurface(panel, 3, shellName, "routing", outputDirectory, inventory, baselineFindings);
             exerciseSurface(panel, 4, shellName, "performance", outputDirectory, inventory, baselineFindings);
+            exerciseHostedFocusTransitions(panel, shellName);
         };
 
         runShell("compact",
