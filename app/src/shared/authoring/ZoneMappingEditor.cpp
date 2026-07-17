@@ -6,109 +6,108 @@ namespace drs::app::authoring
 {
 namespace
 {
-void configureEditorSlider(juce::Slider& slider,
-                           double minValue,
-                           double maxValue,
-                           double interval)
-{
-    slider.setSliderStyle(juce::Slider::LinearHorizontal);
-    slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 56, 24);
-    slider.setRange(minValue, maxValue, interval);
-}
+constexpr int sectionGap = 8;
+constexpr int sliderRowHeight = 44;
+constexpr int rangeRowHeight = 58;
+constexpr int toggleRowHeight = 24;
+constexpr int actionRowHeight = 24;
+constexpr int messageRowHeight = 20;
 
-void configureFieldLabel(juce::Label& label, const char* text)
+void addOwnedRow(juce::Component& parent, juce::Component& child, int height)
 {
-    label.setText(text, juce::dontSendNotification);
-    label.setColour(juce::Label::textColourId, juce::Colour::fromRGB(24, 29, 33));
-    label.setFont(juce::FontOptions(14.0f, juce::Font::bold));
+    parent.addAndMakeVisible(child);
+    child.setSize(0, height);
 }
 } // namespace
 
-ZoneMappingEditor::ZoneMappingEditor(LayoutMode nextLayoutMode)
-    : layoutMode(nextLayoutMode)
+ZoneMappingEditor::ZoneMappingEditor()
+    : emptyStateMessage("authoringZoneFieldEmptyState", juce::Justification::centred),
+      mapSection("Map", "authoringMapInspectorSection", true),
+      sampleSection("Sample", "authoringSampleInspectorSection", false),
+      mixSection("Mix", "authoringMixInspectorSection", false),
+      advancedSection("Advanced", "authoringAdvancedInspectorSection", false),
+      rootKeyRow("Root Key", "authoringRootKeyRow", 0, 127, 1),
+      keyRangeRow("Key Range", "authoringKeyRangeRow", "Low", "High", 0, 127, 1),
+      velocityRangeRow("Velocity Range", "authoringVelocityRangeRow", "Low", "High", 1, 127, 1),
+      gainRow("Gain (dB)", "authoringGainRow", -24.0, 12.0, 0.1),
+      panRow("Pan", "authoringPanRow", -1.0, 1.0, 0.01),
+      loopToggleRow("Loop", "authoringLoopRow", "Enabled"),
+      restoreRootKeyRow("Reference", "authoringRestoreRootKeyRow", "Restore Root Key"),
+      validationMessage("authoringZoneValidationMessage", juce::Justification::centredLeft)
 {
     setComponentID("authoringZoneFieldEditor");
 
-    emptyStateLabel.setComponentID("authoringZoneFieldEmptyState");
-    emptyStateLabel.setJustificationType(juce::Justification::centred);
-    emptyStateLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(82, 86, 94));
+    emptyStateMessage.setText("Select a zone to edit mapping fields.");
+    validationMessage.setText("Ranges are normalized on commit to keep low and high values valid.");
 
-    configureFieldLabel(rootKeyLabel, "Root Key");
-    configureFieldLabel(keyLowLabel, "Key Low");
-    configureFieldLabel(keyHighLabel, "Key High");
-    configureFieldLabel(velocityLowLabel, "Velocity Low");
-    configureFieldLabel(velocityHighLabel, "Velocity High");
-    configureFieldLabel(gainLabel, "Gain (dB)");
-    configureFieldLabel(panLabel, "Pan");
+    rootKeyRow.getSlider().setComponentID("authoringRootKeySlider");
+    keyRangeRow.getLowSlider().setComponentID("authoringKeyLowSlider");
+    keyRangeRow.getHighSlider().setComponentID("authoringKeyHighSlider");
+    velocityRangeRow.getLowSlider().setComponentID("authoringVelocityLowSlider");
+    velocityRangeRow.getHighSlider().setComponentID("authoringVelocityHighSlider");
+    gainRow.getSlider().setComponentID("authoringGainSlider");
+    panRow.getSlider().setComponentID("authoringPanSlider");
+    loopToggleRow.getToggle().setComponentID("authoringLoopEnabledToggle");
+    restoreRootKeyRow.getButton().setComponentID("authoringRestoreRootKeyButton");
 
-    configureEditorSlider(rootKeySlider, 0, 127, 1);
-    configureEditorSlider(keyLowSlider, 0, 127, 1);
-    configureEditorSlider(keyHighSlider, 0, 127, 1);
-    configureEditorSlider(velocityLowSlider, 1, 127, 1);
-    configureEditorSlider(velocityHighSlider, 1, 127, 1);
-    configureEditorSlider(gainSlider, -24.0, 12.0, 0.1);
-    configureEditorSlider(panSlider, -1.0, 1.0, 0.01);
+    addOwnedRow(mapSectionContent, rootKeyRow, sliderRowHeight);
+    addOwnedRow(mapSectionContent, keyRangeRow, rangeRowHeight);
+    mapSectionContent.setSize(0, sliderRowHeight + 6 + rangeRowHeight);
 
-    rootKeySlider.setComponentID("authoringRootKeySlider");
-    keyLowSlider.setComponentID("authoringKeyLowSlider");
-    keyHighSlider.setComponentID("authoringKeyHighSlider");
-    velocityLowSlider.setComponentID("authoringVelocityLowSlider");
-    velocityHighSlider.setComponentID("authoringVelocityHighSlider");
-    gainSlider.setComponentID("authoringGainSlider");
-    panSlider.setComponentID("authoringPanSlider");
-    loopEnabledToggle.setComponentID("authoringLoopEnabledToggle");
-    restoreRootKeyButton.setComponentID("authoringRestoreRootKeyButton");
+    addOwnedRow(sampleSectionContent, velocityRangeRow, rangeRowHeight);
+    sampleSectionContent.setSize(0, rangeRowHeight);
 
-    loopEnabledToggle.setButtonText("Loop Enabled");
-    restoreRootKeyButton.setButtonText("Restore Root Key");
+    addOwnedRow(mixSectionContent, gainRow, sliderRowHeight);
+    addOwnedRow(mixSectionContent, panRow, sliderRowHeight);
+    mixSectionContent.setSize(0, sliderRowHeight + 6 + sliderRowHeight);
 
-    auto bindCommitOnDragEnd = [this](juce::Slider& slider, const char* labelText)
+    addOwnedRow(advancedSectionContent, loopToggleRow, toggleRowHeight);
+    addOwnedRow(advancedSectionContent, restoreRootKeyRow, actionRowHeight);
+    addOwnedRow(advancedSectionContent, validationMessage, messageRowHeight);
+    advancedSectionContent.setSize(0, toggleRowHeight + 6 + actionRowHeight + 6 + messageRowHeight);
+
+    mapSection.setContent(&mapSectionContent);
+    sampleSection.setContent(&sampleSectionContent);
+    mixSection.setContent(&mixSectionContent);
+    advancedSection.setContent(&advancedSectionContent);
+    mapSection.setOnExpandedChanged([this](bool) { resized(); });
+    sampleSection.setOnExpandedChanged([this](bool) { resized(); });
+    mixSection.setOnExpandedChanged([this](bool) { resized(); });
+    advancedSection.setOnExpandedChanged([this](bool) { resized(); });
+
+    auto bindCommitOnGestureFinished = [this](CompactInspectorCommitSlider& slider, const char* labelText)
     {
-        slider.onDragEnd = [this, label = juce::String(labelText)]
+        slider.setOnCommitFinished([this, label = juce::String(labelText)](CompactInspectorCommitSlider::CommitSource)
         {
-            if (callbacks.onCommitRequested)
-                callbacks.onCommitRequested(collectCurrentValues(), label.toStdString());
-        };
+            commitCurrentValues(label);
+        });
     };
 
-    bindCommitOnDragEnd(rootKeySlider, "Update zone root key");
-    bindCommitOnDragEnd(keyLowSlider, "Update zone key range");
-    bindCommitOnDragEnd(keyHighSlider, "Update zone key range");
-    bindCommitOnDragEnd(velocityLowSlider, "Update zone velocity range");
-    bindCommitOnDragEnd(velocityHighSlider, "Update zone velocity range");
-    bindCommitOnDragEnd(gainSlider, "Update zone gain");
-    bindCommitOnDragEnd(panSlider, "Update zone pan");
+    bindCommitOnGestureFinished(rootKeyRow.getSlider(), "Update zone root key");
+    bindCommitOnGestureFinished(keyRangeRow.getLowSlider(), "Update zone key range");
+    bindCommitOnGestureFinished(keyRangeRow.getHighSlider(), "Update zone key range");
+    bindCommitOnGestureFinished(velocityRangeRow.getLowSlider(), "Update zone velocity range");
+    bindCommitOnGestureFinished(velocityRangeRow.getHighSlider(), "Update zone velocity range");
+    bindCommitOnGestureFinished(gainRow.getSlider(), "Update zone gain");
+    bindCommitOnGestureFinished(panRow.getSlider(), "Update zone pan");
 
-    loopEnabledToggle.onClick = [this]
+    loopToggleRow.getToggle().onClick = [this]
     {
-        if (callbacks.onCommitRequested)
-            callbacks.onCommitRequested(collectCurrentValues(), "Toggle zone loop");
+        commitCurrentValues("Toggle zone loop");
     };
 
-    restoreRootKeyButton.onClick = [this]
+    restoreRootKeyRow.getButton().onClick = [this]
     {
         if (callbacks.onRestoreRootKeyRequested)
             callbacks.onRestoreRootKeyRequested();
     };
 
     for (auto* component : {
-             static_cast<juce::Component*>(&emptyStateLabel),
-             static_cast<juce::Component*>(&rootKeyLabel),
-             static_cast<juce::Component*>(&keyLowLabel),
-             static_cast<juce::Component*>(&keyHighLabel),
-             static_cast<juce::Component*>(&velocityLowLabel),
-             static_cast<juce::Component*>(&velocityHighLabel),
-             static_cast<juce::Component*>(&gainLabel),
-             static_cast<juce::Component*>(&panLabel),
-             static_cast<juce::Component*>(&rootKeySlider),
-             static_cast<juce::Component*>(&keyLowSlider),
-             static_cast<juce::Component*>(&keyHighSlider),
-             static_cast<juce::Component*>(&velocityLowSlider),
-             static_cast<juce::Component*>(&velocityHighSlider),
-             static_cast<juce::Component*>(&gainSlider),
-             static_cast<juce::Component*>(&panSlider),
-             static_cast<juce::Component*>(&loopEnabledToggle),
-             static_cast<juce::Component*>(&restoreRootKeyButton)
+             static_cast<juce::Component*>(&emptyStateMessage),
+             static_cast<juce::Component*>(&mapSection),
+             static_cast<juce::Component*>(&sampleSection),
+             static_cast<juce::Component*>(&mixSection),
+             static_cast<juce::Component*>(&advancedSection)
          })
     {
         addAndMakeVisible(component);
@@ -121,93 +120,87 @@ void ZoneMappingEditor::resized()
 
     if (!viewModel.hasSelection)
     {
-        emptyStateLabel.setBounds(area);
+        emptyStateMessage.setBounds(area);
         return;
     }
 
-    constexpr int mappingColumns = 3;
-    constexpr int columnGap = 12;
-    constexpr int rowGap = 8;
-    const auto cellHeight = layoutMode == LayoutMode::expanded ? 56 : 50;
-    const auto cellWidth = (area.getWidth() - ((mappingColumns - 1) * columnGap)) / mappingColumns;
-
-    auto getCellBounds = [&](int index)
+    auto layoutSection = [&](CompactInspectorSection& section, bool addGap)
     {
-        const auto column = index % mappingColumns;
-        const auto row = index / mappingColumns;
-        return juce::Rectangle<int>(area.getX() + column * (cellWidth + columnGap),
-                                    area.getY() + row * (cellHeight + rowGap),
-                                    cellWidth,
-                                    cellHeight);
+        const auto sectionHeight = section.getPreferredHeight();
+        section.setBounds(area.removeFromTop(sectionHeight));
+        if (addGap)
+            area.removeFromTop(sectionGap);
     };
 
-    auto layoutSliderCell = [&](int index, juce::Label& label, juce::Slider& slider)
-    {
-        auto cell = getCellBounds(index);
-        label.setBounds(cell.removeFromTop(16));
-        cell.removeFromTop(4);
-        slider.setBounds(cell.removeFromTop(28));
-    };
+    layoutSection(mapSection, true);
+    layoutSection(sampleSection, true);
+    layoutSection(mixSection, true);
+    layoutSection(advancedSection, false);
 
-    auto layoutToggleCell = [&](int index, juce::ToggleButton& toggle)
-    {
-        auto cell = getCellBounds(index);
-        cell.removeFromTop(18);
-        toggle.setBounds(cell.removeFromTop(28));
-    };
+    auto mapArea = mapSectionContent.getLocalBounds();
+    rootKeyRow.setBounds(mapArea.removeFromTop(sliderRowHeight));
+    mapArea.removeFromTop(6);
+    keyRangeRow.setBounds(mapArea.removeFromTop(rangeRowHeight));
 
-    layoutSliderCell(0, rootKeyLabel, rootKeySlider);
-    layoutSliderCell(1, keyLowLabel, keyLowSlider);
-    layoutSliderCell(2, keyHighLabel, keyHighSlider);
-    layoutSliderCell(3, velocityLowLabel, velocityLowSlider);
-    layoutSliderCell(4, velocityHighLabel, velocityHighSlider);
-    layoutSliderCell(5, gainLabel, gainSlider);
-    layoutSliderCell(6, panLabel, panSlider);
-    layoutToggleCell(7, loopEnabledToggle);
+    auto sampleArea = sampleSectionContent.getLocalBounds();
+    velocityRangeRow.setBounds(sampleArea.removeFromTop(rangeRowHeight));
 
-    auto restoreCell = getCellBounds(8);
-    restoreRootKeyButton.setBounds(restoreCell.withHeight(28)
-                                              .withY(restoreCell.getCentreY() - 14));
+    auto mixArea = mixSectionContent.getLocalBounds();
+    gainRow.setBounds(mixArea.removeFromTop(sliderRowHeight));
+    mixArea.removeFromTop(6);
+    panRow.setBounds(mixArea.removeFromTop(sliderRowHeight));
+
+    auto advancedArea = advancedSectionContent.getLocalBounds();
+    loopToggleRow.setBounds(advancedArea.removeFromTop(toggleRowHeight));
+    advancedArea.removeFromTop(6);
+    restoreRootKeyRow.setBounds(advancedArea.removeFromTop(actionRowHeight));
+    advancedArea.removeFromTop(6);
+    validationMessage.setBounds(advancedArea.removeFromTop(messageRowHeight));
 }
 
 void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
 {
     viewModel = std::move(nextViewModel);
-    emptyStateLabel.setText(juce::String::fromUTF8(viewModel.emptyStateText.c_str()), juce::dontSendNotification);
+    emptyStateMessage.setText(juce::String::fromUTF8(viewModel.emptyStateText.c_str()));
 
-    rootKeySlider.setValue(viewModel.rootKey, juce::dontSendNotification);
-    keyLowSlider.setValue(viewModel.keyLow, juce::dontSendNotification);
-    keyHighSlider.setValue(viewModel.keyHigh, juce::dontSendNotification);
-    velocityLowSlider.setValue(viewModel.velocityLow, juce::dontSendNotification);
-    velocityHighSlider.setValue(viewModel.velocityHigh, juce::dontSendNotification);
-    gainSlider.setValue(viewModel.gainDb, juce::dontSendNotification);
-    panSlider.setValue(viewModel.pan, juce::dontSendNotification);
-    loopEnabledToggle.setToggleState(viewModel.loopEnabled, juce::dontSendNotification);
+    applyValuesToControls(viewModel);
 
-    emptyStateLabel.setVisible(!viewModel.hasSelection);
+    const auto hasSelection = viewModel.hasSelection;
+
+    emptyStateMessage.setVisible(!hasSelection);
     for (auto* component : {
-             static_cast<juce::Component*>(&rootKeyLabel),
-             static_cast<juce::Component*>(&keyLowLabel),
-             static_cast<juce::Component*>(&keyHighLabel),
-             static_cast<juce::Component*>(&velocityLowLabel),
-             static_cast<juce::Component*>(&velocityHighLabel),
-             static_cast<juce::Component*>(&gainLabel),
-             static_cast<juce::Component*>(&panLabel),
-             static_cast<juce::Component*>(&rootKeySlider),
-             static_cast<juce::Component*>(&keyLowSlider),
-             static_cast<juce::Component*>(&keyHighSlider),
-             static_cast<juce::Component*>(&velocityLowSlider),
-             static_cast<juce::Component*>(&velocityHighSlider),
-             static_cast<juce::Component*>(&gainSlider),
-             static_cast<juce::Component*>(&panSlider),
-             static_cast<juce::Component*>(&loopEnabledToggle),
-             static_cast<juce::Component*>(&restoreRootKeyButton)
+             static_cast<juce::Component*>(&mapSection),
+             static_cast<juce::Component*>(&sampleSection),
+             static_cast<juce::Component*>(&mixSection),
+             static_cast<juce::Component*>(&advancedSection),
+             static_cast<juce::Component*>(&mapSectionContent),
+             static_cast<juce::Component*>(&sampleSectionContent),
+             static_cast<juce::Component*>(&mixSectionContent),
+             static_cast<juce::Component*>(&advancedSectionContent),
+             static_cast<juce::Component*>(&rootKeyRow),
+             static_cast<juce::Component*>(&keyRangeRow),
+             static_cast<juce::Component*>(&velocityRangeRow),
+             static_cast<juce::Component*>(&gainRow),
+             static_cast<juce::Component*>(&panRow),
+             static_cast<juce::Component*>(&loopToggleRow),
+             static_cast<juce::Component*>(&restoreRootKeyRow),
+             static_cast<juce::Component*>(&validationMessage),
+             static_cast<juce::Component*>(&rootKeyRow.getSlider()),
+             static_cast<juce::Component*>(&keyRangeRow.getLowSlider()),
+             static_cast<juce::Component*>(&keyRangeRow.getHighSlider()),
+             static_cast<juce::Component*>(&velocityRangeRow.getLowSlider()),
+             static_cast<juce::Component*>(&velocityRangeRow.getHighSlider()),
+             static_cast<juce::Component*>(&gainRow.getSlider()),
+             static_cast<juce::Component*>(&panRow.getSlider()),
+             static_cast<juce::Component*>(&loopToggleRow.getToggle()),
+             static_cast<juce::Component*>(&restoreRootKeyRow.getButton())
          })
     {
-        component->setVisible(viewModel.hasSelection);
+        component->setVisible(hasSelection);
     }
 
-    restoreRootKeyButton.setEnabled(viewModel.hasSelection);
+    restoreRootKeyRow.getButton().setEnabled(viewModel.hasSelection);
+    refreshValidationMessage({});
     resized();
 }
 
@@ -216,18 +209,67 @@ void ZoneMappingEditor::setCallbacks(ZoneFieldCallbacks nextCallbacks)
     callbacks = std::move(nextCallbacks);
 }
 
-ZoneFieldValuesViewModel ZoneMappingEditor::collectCurrentValues() const
+ZoneMappingEditor::CommitValues ZoneMappingEditor::collectCurrentValues() const
 {
-    auto values = viewModel;
+    CommitValues commitValues;
+    auto& values = commitValues.values;
+    values = viewModel;
     values.hasSelection = true;
-    values.rootKey = static_cast<int>(rootKeySlider.getValue());
-    values.keyLow = static_cast<int>(keyLowSlider.getValue());
-    values.keyHigh = static_cast<int>(keyHighSlider.getValue());
-    values.velocityLow = static_cast<int>(velocityLowSlider.getValue());
-    values.velocityHigh = static_cast<int>(velocityHighSlider.getValue());
-    values.gainDb = gainSlider.getValue();
-    values.pan = panSlider.getValue();
-    values.loopEnabled = loopEnabledToggle.getToggleState();
-    return values;
+    values.rootKey = static_cast<int>(rootKeyRow.getSlider().getValue());
+    values.keyLow = static_cast<int>(keyRangeRow.getLowSlider().getValue());
+    values.keyHigh = static_cast<int>(keyRangeRow.getHighSlider().getValue());
+    values.velocityLow = static_cast<int>(velocityRangeRow.getLowSlider().getValue());
+    values.velocityHigh = static_cast<int>(velocityRangeRow.getHighSlider().getValue());
+    values.gainDb = gainRow.getSlider().getValue();
+    values.pan = panRow.getSlider().getValue();
+    values.loopEnabled = loopToggleRow.getToggle().getToggleState();
+
+    const auto normalizedKeyRange = values.keyLow > values.keyHigh;
+    const auto normalizedVelocityRange = values.velocityLow > values.velocityHigh;
+
+    if (normalizedKeyRange)
+        std::swap(values.keyLow, values.keyHigh);
+    if (normalizedVelocityRange)
+        std::swap(values.velocityLow, values.velocityHigh);
+
+    if (normalizedKeyRange && normalizedVelocityRange)
+        commitValues.validationMessage = "Key and velocity ranges were normalized to keep Low <= High.";
+    else if (normalizedKeyRange)
+        commitValues.validationMessage = "Key range was normalized to keep Low <= High.";
+    else if (normalizedVelocityRange)
+        commitValues.validationMessage = "Velocity range was normalized to keep Low <= High.";
+
+    return commitValues;
+}
+
+void ZoneMappingEditor::commitCurrentValues(const juce::String& label)
+{
+    if (!callbacks.onCommitRequested || !viewModel.hasSelection)
+        return;
+
+    auto commitValues = collectCurrentValues();
+    viewModel = commitValues.values;
+    applyValuesToControls(viewModel);
+    refreshValidationMessage(commitValues.validationMessage);
+    callbacks.onCommitRequested(viewModel, label.toStdString());
+}
+
+void ZoneMappingEditor::applyValuesToControls(const ZoneFieldValuesViewModel& values)
+{
+    rootKeyRow.getSlider().setValue(values.rootKey, juce::dontSendNotification);
+    keyRangeRow.getLowSlider().setValue(values.keyLow, juce::dontSendNotification);
+    keyRangeRow.getHighSlider().setValue(values.keyHigh, juce::dontSendNotification);
+    velocityRangeRow.getLowSlider().setValue(values.velocityLow, juce::dontSendNotification);
+    velocityRangeRow.getHighSlider().setValue(values.velocityHigh, juce::dontSendNotification);
+    gainRow.getSlider().setValue(values.gainDb, juce::dontSendNotification);
+    panRow.getSlider().setValue(values.pan, juce::dontSendNotification);
+    loopToggleRow.getToggle().setToggleState(values.loopEnabled, juce::dontSendNotification);
+}
+
+void ZoneMappingEditor::refreshValidationMessage(const juce::String& messageText)
+{
+    validationMessage.setText(messageText.isEmpty()
+                                  ? "Ranges are normalized on commit to keep low and high values valid."
+                                  : messageText);
 }
 } // namespace drs::app::authoring

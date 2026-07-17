@@ -10,6 +10,8 @@ set(DRS_APP_SHARED_SOURCES
     src/shared/StatusPanel.h
     src/shared/authoring/AuthoringViewModels.h
     src/shared/authoring/AuthoringWorkspaceLayout.h
+    src/shared/authoring/CompactInspectorPrimitives.cpp
+    src/shared/authoring/CompactInspectorPrimitives.h
     src/shared/authoring/AuthoringSummaryStrip.cpp
     src/shared/authoring/AuthoringSummaryStrip.h
     src/shared/authoring/WaveformDetailView.cpp

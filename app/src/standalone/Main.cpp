@@ -1,4 +1,5 @@
 #include "standalone/MainComponent.h"
+#include "shared/authoring/AuthoringWorkspaceLayout.h"
 
 #include <juce_gui_extra/juce_gui_extra.h>
 
@@ -40,6 +41,11 @@ private:
                                    juce::DocumentWindow::allButtons)
         {
             setUsingNativeTitleBar(true);
+            setResizable(true, true);
+            setResizeLimits(drs::app::authoring::expandedMinimumShellWidth,
+                            drs::app::authoring::minimumShellHeight,
+                            8192,
+                            8192);
             setContentOwned(new drs::standalone::MainComponent(), true);
             centreWithSize(getWidth(), getHeight());
             setVisible(true);

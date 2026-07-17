@@ -63,6 +63,9 @@ private:
     void undoLastEdit();
     void redoLastEdit();
     void markSavedCheckpoint();
+    void setDrawerOpen(bool shouldOpen);
+    void setActiveDrawerTab(authoring::DrawerTab nextTab);
+    void refreshDrawerVisibility();
     authoring::SelectionSummaryViewModel buildSelectionSummaryViewModel() const;
     authoring::ZoneFieldValuesViewModel buildZoneFieldValuesViewModel() const;
 
@@ -88,6 +91,15 @@ private:
     juce::Label waveformInfoLabel;
     juce::Label loopInfoLabel;
     juce::Label importMetricsLabel;
+    juce::Component drawerRegion;
+    juce::Component drawerTabStrip;
+    juce::Component drawerContentHost;
+    juce::TextButton drawerToggleButton;
+    juce::TextButton drawerWaveformTabButton;
+    juce::TextButton drawerMacrosTabButton;
+    juce::TextButton drawerRoutingTabButton;
+    juce::TextButton drawerPerformanceTabButton;
+    juce::Label drawerPlaceholderLabel;
     juce::Label inspectorModeLabel;
     juce::ComboBox inspectorModeSelector;
     juce::Label zoneLabel;

@@ -41,7 +41,7 @@ Sprint 1 keeps the current baseline sizes intact. The larger expanded target is 
 - Drawer state is UI-only state and must not be serialized into the project document.
 - Compact shell default drawer state: closed.
 - Expanded shell default drawer state: open to Waveform.
-- Until Sprint 4, drawer state is modeled but not yet rendered as a visible drawer host.
+- Sprint 2 renders a visible drawer host and tab strip; non-waveform tabs remain placeholder hosts until later migrations land.
 
 ## Keyboard And Focus Rules
 
@@ -67,3 +67,5 @@ Sprint 1 characterization tests must cover:
 - Stable-ID lookup for the workspace root, map, waveform, selectors, and primary actions
 - Bounds and visibility assertions for the current baseline layout
 - Diagnostic image capture for each shell/mode combination
+
+Sprint 2 reachability inventory is tracked in `docs/phase2-ui-parity-inventory.md`.

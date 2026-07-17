@@ -26,4 +26,6 @@ inline constexpr int expandedInspectorPreferredWidth = 340;
 inline constexpr int expandedInspectorMaxWidth = 360;
 inline constexpr int minimumMapVisibleHeight = 160;
 inline constexpr int drawerTabStripHeight = 36;
+inline constexpr int compactDrawerOpenHeight = 220;
+inline constexpr int expandedDrawerOpenHeight = 250;
 } // namespace drs::app::authoring

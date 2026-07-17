@@ -2,6 +2,7 @@
 #include "drs/engine/HiseProjectContent.h"
 #include "drs/engine/RuntimeLoader.h"
 #include "plugin/PluginProcessor.h"
+#include "shared/authoring/AuthoringWorkspaceLayout.h"
 #include "standalone/MainComponent.h"
 
 #include <juce_audio_processors_headless/juce_audio_processors_headless.h>
@@ -146,8 +147,10 @@ int main()
                 "Expected authored HISE XML backup assets under XmlPresetBackups/.");
 
         drs::standalone::MainComponent mainComponent(false);
-        require(mainComponent.getWidth() == 860, "Standalone shell width changed unexpectedly.");
-        require(mainComponent.getHeight() == 760, "Standalone shell height changed unexpectedly.");
+        require(mainComponent.getWidth() == drs::app::authoring::expandedTargetShellWidth,
+                "Standalone shell width changed unexpectedly.");
+        require(mainComponent.getHeight() == drs::app::authoring::expandedTargetShellHeight,
+                "Standalone shell height changed unexpectedly.");
         require(mainComponent.getNumChildComponents() == 1, "Standalone shell should expose exactly one root workspace container.");
         auto* standaloneRoot = mainComponent.getChildComponent(0);
         require(standaloneRoot != nullptr, "Standalone shell root workspace container was missing.");
@@ -179,8 +182,10 @@ int main()
 
         std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
         require(editor != nullptr, "Plugin editor creation failed.");
-        require(editor->getWidth() == 820, "Plugin editor width changed unexpectedly.");
-        require(editor->getHeight() == 700, "Plugin editor height changed unexpectedly.");
+        require(editor->getWidth() == drs::app::authoring::compactShellWidth,
+                "Plugin editor width changed unexpectedly.");
+        require(editor->getHeight() == drs::app::authoring::compactShellHeight,
+                "Plugin editor height changed unexpectedly.");
         require(editor->getNumChildComponents() == 1, "Plugin editor should expose exactly one root workspace container.");
         auto* pluginRoot = editor->getChildComponent(0);
         require(pluginRoot != nullptr, "Plugin editor root workspace container was missing.");

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "shared/authoring/CompactInspectorPrimitives.h"
 #include "shared/authoring/AuthoringViewModels.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -9,42 +10,45 @@ namespace drs::app::authoring
 class ZoneMappingEditor final : public juce::Component
 {
 public:
-    enum class LayoutMode
-    {
-        compact,
-        expanded
-    };
-
-    explicit ZoneMappingEditor(LayoutMode layoutMode);
+    ZoneMappingEditor();
 
     void resized() override;
     void setViewModel(ZoneFieldValuesViewModel nextViewModel);
     void setCallbacks(ZoneFieldCallbacks nextCallbacks);
 
 private:
-    ZoneFieldValuesViewModel collectCurrentValues() const;
+    struct CommitValues
+    {
+        ZoneFieldValuesViewModel values;
+        juce::String validationMessage;
+    };
 
-    LayoutMode layoutMode = LayoutMode::compact;
+    CommitValues collectCurrentValues() const;
+    void commitCurrentValues(const juce::String& label);
+    void applyValuesToControls(const ZoneFieldValuesViewModel& values);
+    void refreshValidationMessage(const juce::String& messageText);
+
     ZoneFieldValuesViewModel viewModel;
     ZoneFieldCallbacks callbacks;
 
-    juce::Label emptyStateLabel;
-    juce::Label rootKeyLabel;
-    juce::Label keyLowLabel;
-    juce::Label keyHighLabel;
-    juce::Label velocityLowLabel;
-    juce::Label velocityHighLabel;
-    juce::Label gainLabel;
-    juce::Label panLabel;
+    CompactInspectorMessage emptyStateMessage;
+    CompactInspectorSection mapSection;
+    CompactInspectorSection sampleSection;
+    CompactInspectorSection mixSection;
+    CompactInspectorSection advancedSection;
 
-    juce::Slider rootKeySlider;
-    juce::Slider keyLowSlider;
-    juce::Slider keyHighSlider;
-    juce::Slider velocityLowSlider;
-    juce::Slider velocityHighSlider;
-    juce::Slider gainSlider;
-    juce::Slider panSlider;
-    juce::ToggleButton loopEnabledToggle;
-    juce::TextButton restoreRootKeyButton;
+    juce::Component mapSectionContent;
+    juce::Component sampleSectionContent;
+    juce::Component mixSectionContent;
+    juce::Component advancedSectionContent;
+
+    CompactInspectorSliderRow rootKeyRow;
+    CompactInspectorRangeRow keyRangeRow;
+    CompactInspectorRangeRow velocityRangeRow;
+    CompactInspectorSliderRow gainRow;
+    CompactInspectorSliderRow panRow;
+    CompactInspectorToggleRow loopToggleRow;
+    CompactInspectorActionRow restoreRootKeyRow;
+    CompactInspectorMessage validationMessage;
 };
 } // namespace drs::app::authoring

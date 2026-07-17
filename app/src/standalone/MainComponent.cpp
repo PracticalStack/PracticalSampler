@@ -437,8 +437,8 @@ MainComponent::MainComponent(bool enableAudioOutput)
     workspaceTabs.addTab("Perform", juce::Colour::fromRGB(28, 126, 214), &performancePanel, false);
     workspaceTabs.addTab("Map", juce::Colour::fromRGB(181, 96, 21), &authoringPanel, false);
     addAndMakeVisible(workspaceTabs);
-    setSize(drs::app::authoring::expandedBaselineShellWidth,
-            drs::app::authoring::expandedBaselineShellHeight);
+    setSize(drs::app::authoring::expandedTargetShellWidth,
+            drs::app::authoring::expandedTargetShellHeight);
 
     if (enableAudioOutput)
         initializeAudioOutput();
