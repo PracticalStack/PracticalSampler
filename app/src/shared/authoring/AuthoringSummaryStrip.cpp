@@ -55,9 +55,11 @@ AuthoringSummaryStrip::AuthoringSummaryStrip()
     statusLabel.setColour(juce::Label::textColourId, summaryMuted);
     sourceLabel.setColour(juce::Label::textColourId, summaryMuted);
     articulationLabel.setColour(juce::Label::textColourId, summaryMuted);
+    playbackLabel.setColour(juce::Label::textColourId, summaryMuted);
     statusLabel.setComponentID("authoringSummaryStatusLabel");
     sourceLabel.setComponentID("authoringSummarySourceLabel");
     articulationLabel.setComponentID("authoringSummaryArticulationLabel");
+    playbackLabel.setComponentID("authoringSummaryPlaybackLabel");
     configureAccessibleMetadata(statusLabel,
                                 "Selection status",
                                 "Displays the current selection state.");
@@ -67,6 +69,9 @@ AuthoringSummaryStrip::AuthoringSummaryStrip()
     configureAccessibleMetadata(articulationLabel,
                                 "Selected zone articulation",
                                 "Displays the selected zone articulation.");
+    configureAccessibleMetadata(playbackLabel,
+                                "Playback revision state",
+                                "Displays the current draft, preview, and published revision state.");
 
     previewButton.setButtonText("Preview Selected Zone");
     previewButton.setComponentID("authoringPreviewButton");
@@ -125,6 +130,7 @@ AuthoringSummaryStrip::AuthoringSummaryStrip()
              static_cast<juce::Component*>(&statusLabel),
              static_cast<juce::Component*>(&sourceLabel),
              static_cast<juce::Component*>(&articulationLabel),
+             static_cast<juce::Component*>(&playbackLabel),
              static_cast<juce::Component*>(&previewButton),
              static_cast<juce::Component*>(&undoButton),
              static_cast<juce::Component*>(&redoButton),
@@ -144,6 +150,7 @@ void AuthoringSummaryStrip::resized()
     statusLabel.setBounds(heroLeft.removeFromTop(20));
     sourceLabel.setBounds(heroLeft.removeFromTop(20));
     articulationLabel.setBounds(heroLeft.removeFromTop(20));
+    playbackLabel.setBounds(heroLeft.removeFromTop(20));
 
     auto heroButtons = hero.removeFromRight(320);
     auto topRow = heroButtons.removeFromTop(28);
@@ -163,10 +170,12 @@ void AuthoringSummaryStrip::setViewModel(SelectionSummaryViewModel nextViewModel
     statusLabel.setText(juce::String::fromUTF8(viewModel.statusText.c_str()), juce::dontSendNotification);
     sourceLabel.setText(juce::String::fromUTF8(viewModel.sourceText.c_str()), juce::dontSendNotification);
     articulationLabel.setText(juce::String::fromUTF8(viewModel.articulationText.c_str()), juce::dontSendNotification);
+    playbackLabel.setText(juce::String::fromUTF8(viewModel.playbackText.c_str()), juce::dontSendNotification);
     updateDynamicAccessibleText(titleLabel, titleLabel.getText(), "Selected zone title: ");
     updateDynamicAccessibleText(statusLabel, statusLabel.getText(), "Selection status: ");
     updateDynamicAccessibleText(sourceLabel, sourceLabel.getText(), "Selected zone source: ");
     updateDynamicAccessibleText(articulationLabel, articulationLabel.getText(), "Selected zone articulation: ");
+    updateDynamicAccessibleText(playbackLabel, playbackLabel.getText(), "Playback revision state: ");
 
     previewButton.setEnabled(viewModel.canPreview);
     undoButton.setEnabled(viewModel.canUndo);

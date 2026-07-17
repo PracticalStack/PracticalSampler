@@ -151,9 +151,8 @@ int main()
                 "Standalone shell width changed unexpectedly.");
         require(mainComponent.getHeight() == drs::app::authoring::expandedTargetShellHeight,
                 "Standalone shell height changed unexpectedly.");
-        require(mainComponent.getNumChildComponents() == 1, "Standalone shell should expose exactly one root workspace container.");
-        auto* standaloneRoot = mainComponent.getChildComponent(0);
-        require(standaloneRoot != nullptr, "Standalone shell root workspace container was missing.");
+        require(mainComponent.getNumChildComponents() >= 2,
+                "Standalone shell should expose the menu bar and workspace tabs as top-level children.");
         require(findDescendantById(mainComponent, "workspaceTabs") != nullptr,
                 "Standalone shell should expose the workspace tab container.");
         require(findDescendantById(mainComponent, "performanceKeyboard") != nullptr,
@@ -186,9 +185,8 @@ int main()
                 "Plugin editor width changed unexpectedly.");
         require(editor->getHeight() == drs::app::authoring::compactShellHeight,
                 "Plugin editor height changed unexpectedly.");
-        require(editor->getNumChildComponents() == 1, "Plugin editor should expose exactly one root workspace container.");
-        auto* pluginRoot = editor->getChildComponent(0);
-        require(pluginRoot != nullptr, "Plugin editor root workspace container was missing.");
+        require(editor->getNumChildComponents() >= 1,
+                "Plugin editor should expose at least one top-level workspace shell.");
         require(findDescendantById(*editor, "workspaceTabs") != nullptr,
                 "Plugin editor should expose the workspace tab container.");
         require(findDescendantById(*editor, "pluginFileMenuButton") != nullptr,

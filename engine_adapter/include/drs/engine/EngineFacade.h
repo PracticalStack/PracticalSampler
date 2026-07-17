@@ -1,5 +1,6 @@
 #pragma once
 
+#include "drs/engine/DraftPlaybackContract.h"
 #include "drs/engine/RuntimePresetState.h"
 #include "drs/engine/RuntimeModel.h"
 
@@ -54,15 +55,19 @@ struct EnginePreviewPlaybackSnapshot
     bool ready = false;
     bool attempted = false;
     bool succeeded = false;
+    std::size_t draftRevision = 0;
+    std::size_t preparedRevision = 0;
     int midiNote = 0;
     int velocity = 0;
     int effectiveMidiNote = 0;
     int effectiveVelocity = 0;
     std::string articulationId;
     std::string zoneId;
+    bool pendingBuild = false;
     bool waitedForPage = false;
     bool acquiredPageLease = false;
     bool voiceFinished = false;
+    std::string revisionState;
     std::string state;
     std::string errorMessage;
     std::string appliedMacroSummary;
@@ -71,11 +76,19 @@ struct EnginePreviewPlaybackSnapshot
 struct EnginePerformanceSnapshot
 {
     bool loaded = false;
+    std::size_t draftRevision = 0;
+    std::size_t previewRevision = 0;
+    std::size_t publishedRevision = 0;
     std::string instrumentDisplayName;
     std::string presetId;
     std::string loadProfileId;
     std::string selectedArticulationId;
     std::string selectedArticulationName;
+    bool previewPending = false;
+    bool publishedPending = false;
+    std::string previewRevisionState;
+    std::string publishedRevisionState;
+    std::string draftPlaybackEvent;
     std::string loadIndicator;
     EnginePreviewPlaybackSnapshot previewPlayback;
 };
@@ -84,10 +97,18 @@ struct EngineDiagnosticsSnapshot
 {
     bool available = false;
     bool hasFailure = false;
+    std::size_t draftRevision = 0;
+    std::size_t previewRevision = 0;
+    std::size_t publishedRevision = 0;
     std::string headline;
     std::string presetId;
     std::string loadProfileId;
     std::string selectedArticulationId;
+    bool previewPending = false;
+    bool publishedPending = false;
+    std::string previewRevisionState;
+    std::string publishedRevisionState;
+    std::string draftPlaybackEvent;
     std::size_t configuredMaxCachedPages = 0;
     std::uint64_t maxPrefetchBytesPerVoice = 0;
     std::size_t cacheHitCount = 0;
@@ -159,10 +180,18 @@ public:
     RuntimeStreamLoadResult loadPhase1ReferenceStream() const;
     EngineDiagnosticsSnapshot getDiagnosticsSnapshot() const { return diagnosticsSnapshot; }
     EnginePerformanceSnapshot getPerformanceSnapshot() const;
+    const DraftPlaybackStatus& getDraftPlaybackStatus() const { return draftPlaybackContract.getStatus(); }
     std::vector<EngineArticulationDescriptor> getArticulationDescriptors() const;
     std::vector<EngineMacroDescriptor> getMacroDescriptors() const;
     bool setSelectedArticulation(const std::string& articulationId);
     bool setMacroValue(const std::string& macroId, double value);
+    bool stageDraftRevision(std::size_t revision);
+    bool refreshPreviewToCurrentDraft();
+    bool publishCurrentDraft();
+    void closeDraftPlaybackProject();
+    bool reopenDraftPlaybackProject(std::size_t revision);
+    bool beginDraftPlaybackDeviceRestart();
+    bool completeDraftPlaybackDeviceRestart(bool restored);
     EnginePreviewPlaybackSnapshot auditionPreviewNote(int midiNote, int velocity);
     std::string exportPresetStateJson() const;
     EnginePresetStateRestoreResult restorePresetStateJson(const std::string& presetStateJson);
@@ -174,6 +203,8 @@ public:
     const EngineContentFailureProbeResult& getLastContentFailureProbe() const { return lastContentFailureProbe; }
 
 private:
+    void syncPreviewSnapshotFromDraftPlayback();
+    void initializeDraftPlaybackContract(bool activatePerformanceRevision);
     void refreshDiagnosticsSnapshot();
 
     RuntimeManifestLoadResult referenceManifest;
@@ -183,6 +214,7 @@ private:
     EngineDiagnosticsSnapshot diagnosticsSnapshot;
     EnginePreviewPlaybackSnapshot previewPlaybackSnapshot;
     EngineContentFailureProbeResult lastContentFailureProbe;
+    DraftPlaybackContract draftPlaybackContract;
     std::uint64_t nextPreviewVoiceId = 4000;
 };
 } // namespace drs::engine

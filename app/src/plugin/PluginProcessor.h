@@ -14,6 +14,32 @@
 
 namespace drs::plugin
 {
+struct ProcessorRealtimeSafetySnapshot
+{
+    bool available = false;
+    std::size_t processBlockCount = 0;
+    std::size_t preparedBlockSize = 0;
+    std::size_t referenceSampleCountLoaded = 0;
+    std::size_t referenceWarmupCount = 0;
+    std::size_t referenceSampleLoadsOnAudioThread = 0;
+    std::size_t authoringSampleLoadsOnAudioThread = 0;
+    std::size_t activeVoiceCapacity = 0;
+    std::size_t activeVoiceCapacityLimit = 0;
+    std::size_t activeVoiceCapacityGrowthCount = 0;
+    std::uint64_t callbackBudgetMicros = 0;
+    std::uint64_t lastProcessBlockMicros = 0;
+    std::uint64_t maxProcessBlockMicros = 0;
+    std::size_t overBudgetCallbackCount = 0;
+    std::string state;
+
+    std::size_t getAudioThreadViolationCount() const
+    {
+        return referenceSampleLoadsOnAudioThread
+            + authoringSampleLoadsOnAudioThread
+            + activeVoiceCapacityGrowthCount;
+    }
+};
+
 class Processor final : public juce::AudioProcessor,
                         private juce::AudioProcessorValueTreeState::Listener
 {
@@ -60,8 +86,11 @@ public:
     void queueAuthoringPreviewNoteOff(int midiNoteNumber);
     void queuePerformanceSurfaceNoteOn(int midiNoteNumber, float velocity);
     void queuePerformanceSurfaceNoteOff(int midiNoteNumber);
+    ProcessorRealtimeSafetySnapshot getRealtimeSafetySnapshot() const { return realtimeSafetySnapshot; }
 
 private:
+    static constexpr std::size_t maxRealtimeActiveVoices = 24;
+
     enum class VoiceSource
     {
         performance,
@@ -95,8 +124,9 @@ private:
     static juce::String buildMacroParameterId(const std::string& macroId);
     static juce::AudioProcessorValueTreeState::ParameterLayout buildParameterLayout(
         const drs::engine::EngineFacade& engineFacade);
-    bool ensureReferencePlaybackAssetsLoaded();
-    void initializeReferencePlaybackAssets();
+    bool ensureReferencePlaybackAssetsLoaded(bool invokedFromAudioThread = false);
+    void initializeReferencePlaybackAssets(bool invokedFromAudioThread);
+    bool ensureSelectedAuthoringSampleLoaded(bool invokedFromAudioThread);
     bool startAuthoringVoiceForMidiMessage(const juce::MidiMessage& message);
     void startVoiceForMidiMessage(const juce::MidiMessage& message);
     void releaseVoicesForMidiNote(int midiNoteNumber, VoiceSource source);
@@ -110,6 +140,8 @@ private:
                                                                      std::uint64_t loopStartFrame,
                                                                      std::uint64_t loopEndFrame) const;
     void initializeAuthoringImportMetrics();
+    void primeRealtimeSafetyState(int samplesPerBlock);
+    void updateRealtimeSafetyState();
 
     drs::engine::AuthoringSession authoringSession;
     drs::engine::EngineFacade engineFacade;
@@ -121,9 +153,12 @@ private:
     std::vector<ActiveRenderVoice> activeVoices;
     juce::MidiMessageCollector authoringPreviewMidiCollector;
     juce::MidiMessageCollector performanceSurfaceMidiCollector;
+    juce::MidiBuffer performanceMidiScratchBuffer;
+    juce::MidiBuffer authoringPreviewMidiScratchBuffer;
     juce::AudioProcessorValueTreeState parameterState;
     drs::app::AuthoringImportResponsivenessSnapshot authoringImportResponsivenessSnapshot;
     juce::File authoringProjectFile;
+    ProcessorRealtimeSafetySnapshot realtimeSafetySnapshot;
     double currentSampleRate = 44100.0;
     std::uint64_t nextRenderVoiceId = 1;
     bool isSynchronizingParameterState = false;

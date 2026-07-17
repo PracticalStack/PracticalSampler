@@ -53,10 +53,14 @@ private:
     juce::Label failureLabel;
     juce::Label routedZonesLabel;
     juce::Label actionsLabel;
+    juce::Label draftPlaybackLabel;
     juce::Label macrosLabel;
     juce::TextButton resetStateButton;
     juce::TextButton loadLeadFixtureButton;
     juce::TextButton injectInvalidStateButton;
+    juce::TextButton stageDraftButton;
+    juce::TextButton preparePreviewButton;
+    juce::TextButton publishDraftButton;
     juce::Label contentProbeLabel;
     juce::TextButton probeMissingContentButton;
     juce::TextButton probeBadChecksumButton;

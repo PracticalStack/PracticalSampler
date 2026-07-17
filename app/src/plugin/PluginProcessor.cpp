@@ -5,6 +5,7 @@
 #include "drs/engine/RuntimeVoice.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <filesystem>
 #include <limits>
@@ -132,14 +133,18 @@ Processor::Processor()
       authoringSession(buildInitialAuthoringProject()),
       parameterState(*this, nullptr, "macroParameters", buildParameterLayout(engineFacade))
 {
+    realtimeSafetySnapshot.available = true;
     performanceSurfaceMidiCollector.reset(currentSampleRate);
     authoringPreviewMidiCollector.reset(currentSampleRate);
+    primeRealtimeSafetyState(512);
     initializeAuthoringImportMetrics();
 
     for (const auto& macro : engineFacade.getMacroDescriptors())
         parameterState.addParameterListener(buildMacroParameterId(macro.id), this);
 
     syncParametersFromEngine();
+    ensureReferencePlaybackAssetsLoaded(false);
+    updateRealtimeSafetyState();
 }
 
 Processor::~Processor()
@@ -148,17 +153,21 @@ Processor::~Processor()
         parameterState.removeParameterListener(buildMacroParameterId(macro.id), this);
 }
 
-void Processor::prepareToPlay(double sampleRate, int)
+void Processor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     currentSampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;
     performanceSurfaceMidiCollector.reset(currentSampleRate);
     authoringPreviewMidiCollector.reset(currentSampleRate);
     activeVoices.clear();
+    primeRealtimeSafetyState(samplesPerBlock > 0 ? samplesPerBlock : 512);
+    ensureReferencePlaybackAssetsLoaded(false);
+    updateRealtimeSafetyState();
 }
 
 void Processor::releaseResources()
 {
     activeVoices.clear();
+    updateRealtimeSafetyState();
 }
 
 bool Processor::isBusesLayoutSupported(const BusesLayout& layouts) const
@@ -169,26 +178,39 @@ bool Processor::isBusesLayoutSupported(const BusesLayout& layouts) const
 
 void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
+    const auto blockStartTime = std::chrono::steady_clock::now();
     juce::ScopedNoDenormals noDenormals;
 
     for (auto channel = 0; channel < buffer.getNumChannels(); ++channel)
         buffer.clear(channel, 0, buffer.getNumSamples());
 
-    juce::MidiBuffer performanceMidiMessages;
-    performanceMidiMessages.addEvents(midiMessages, 0, buffer.getNumSamples(), 0);
-    performanceSurfaceMidiCollector.removeNextBlockOfMessages(performanceMidiMessages, buffer.getNumSamples());
+    performanceMidiScratchBuffer.clear();
+    performanceMidiScratchBuffer.addEvents(midiMessages, 0, buffer.getNumSamples(), 0);
+    performanceSurfaceMidiCollector.removeNextBlockOfMessages(performanceMidiScratchBuffer, buffer.getNumSamples());
 
-    juce::MidiBuffer authoringPreviewMessages;
-    authoringPreviewMidiCollector.removeNextBlockOfMessages(authoringPreviewMessages, buffer.getNumSamples());
+    authoringPreviewMidiScratchBuffer.clear();
+    authoringPreviewMidiCollector.removeNextBlockOfMessages(authoringPreviewMidiScratchBuffer, buffer.getNumSamples());
 
-    if (performanceMidiMessages.isEmpty() && authoringPreviewMessages.isEmpty() && activeVoices.empty())
+    if (performanceMidiScratchBuffer.isEmpty() && authoringPreviewMidiScratchBuffer.isEmpty() && activeVoices.empty())
+    {
+        ++realtimeSafetySnapshot.processBlockCount;
+        realtimeSafetySnapshot.callbackBudgetMicros = static_cast<std::uint64_t>(
+            std::llround(static_cast<double>(buffer.getNumSamples()) * 1000000.0 / std::max(currentSampleRate, 1.0)));
+        const auto elapsedMicros = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - blockStartTime).count());
+        realtimeSafetySnapshot.lastProcessBlockMicros = elapsedMicros;
+        realtimeSafetySnapshot.maxProcessBlockMicros = std::max(realtimeSafetySnapshot.maxProcessBlockMicros, elapsedMicros);
+        if (elapsedMicros > realtimeSafetySnapshot.callbackBudgetMicros)
+            ++realtimeSafetySnapshot.overBudgetCallbackCount;
+        updateRealtimeSafetyState();
         return;
+    }
 
     int renderedSamples = 0;
-    auto performanceIterator = performanceMidiMessages.begin();
-    auto authoringIterator = authoringPreviewMessages.begin();
-    const auto performanceEnd = performanceMidiMessages.end();
-    const auto authoringEnd = authoringPreviewMessages.end();
+    auto performanceIterator = performanceMidiScratchBuffer.begin();
+    auto authoringIterator = authoringPreviewMidiScratchBuffer.begin();
+    const auto performanceEnd = performanceMidiScratchBuffer.end();
+    const auto authoringEnd = authoringPreviewMidiScratchBuffer.end();
 
     while (performanceIterator != performanceEnd || authoringIterator != authoringEnd)
     {
@@ -226,6 +248,17 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
     }
 
     renderBlockRange(buffer, renderedSamples, buffer.getNumSamples() - renderedSamples);
+
+    ++realtimeSafetySnapshot.processBlockCount;
+    realtimeSafetySnapshot.callbackBudgetMicros = static_cast<std::uint64_t>(
+        std::llround(static_cast<double>(buffer.getNumSamples()) * 1000000.0 / std::max(currentSampleRate, 1.0)));
+    const auto elapsedMicros = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - blockStartTime).count());
+    realtimeSafetySnapshot.lastProcessBlockMicros = elapsedMicros;
+    realtimeSafetySnapshot.maxProcessBlockMicros = std::max(realtimeSafetySnapshot.maxProcessBlockMicros, elapsedMicros);
+    if (elapsedMicros > realtimeSafetySnapshot.callbackBudgetMicros)
+        ++realtimeSafetySnapshot.overBudgetCallbackCount;
+    updateRealtimeSafetyState();
 }
 
 juce::AudioProcessorEditor* Processor::createEditor()
@@ -330,6 +363,8 @@ void Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
     authoringWaveformPreviewCache.clear();
     activeVoices.clear();
     initializeAuthoringImportMetrics();
+    ensureSelectedAuthoringSampleLoaded(false);
+    updateRealtimeSafetyState();
 }
 
 void Processor::queuePerformanceSurfaceNoteOn(int midiNoteNumber, float velocity)
@@ -484,7 +519,7 @@ void Processor::initializeAuthoringImportMetrics()
     authoringImportResponsivenessSnapshot.lastProcessedItemId = queue.metrics.lastProcessedItemId;
 }
 
-bool Processor::ensureReferencePlaybackAssetsLoaded()
+bool Processor::ensureReferencePlaybackAssetsLoaded(bool invokedFromAudioThread)
 {
     if (referenceManifest.loaded && referenceStream.loaded && !loadedSamples.empty())
         return true;
@@ -495,16 +530,22 @@ bool Processor::ensureReferencePlaybackAssetsLoaded()
     if (!referenceStream.loaded)
         referenceStream = engineFacade.loadPhase1ReferenceStream();
 
-    initializeReferencePlaybackAssets();
+    initializeReferencePlaybackAssets(invokedFromAudioThread);
+    updateRealtimeSafetyState();
     return referenceManifest.loaded && referenceStream.loaded && !loadedSamples.empty();
 }
 
-void Processor::initializeReferencePlaybackAssets()
+void Processor::initializeReferencePlaybackAssets(bool invokedFromAudioThread)
 {
     loadedSamples.clear();
 
     if (!referenceManifest.loaded || !referenceStream.loaded)
+    {
+        realtimeSafetySnapshot.referenceSampleCountLoaded = 0;
         return;
+    }
+
+    loadedSamples.reserve(referenceStream.container.samples.size());
 
     for (const auto& sample : referenceStream.container.samples)
     {
@@ -515,6 +556,39 @@ void Processor::initializeReferencePlaybackAssets()
 
         loadedSamples.emplace(sample.sampleId, LoadedReferenceSample { importResult.sample });
     }
+
+    realtimeSafetySnapshot.referenceSampleCountLoaded = loadedSamples.size();
+    if (!loadedSamples.empty())
+    {
+        if (invokedFromAudioThread)
+            realtimeSafetySnapshot.referenceSampleLoadsOnAudioThread += loadedSamples.size();
+        else
+            ++realtimeSafetySnapshot.referenceWarmupCount;
+    }
+}
+
+bool Processor::ensureSelectedAuthoringSampleLoaded(bool invokedFromAudioThread)
+{
+    const auto selectedZone = authoringSession.getSelectedZone();
+    if (!selectedZone.has_value())
+        return false;
+
+    const auto projectSampleSource = findProjectSampleSource(authoringSession.getProject(), selectedZone->sampleSourceId);
+    if (!projectSampleSource.has_value())
+        return false;
+
+    if (authoringLoadedSamples.find(projectSampleSource->id) != authoringLoadedSamples.end())
+        return true;
+
+    const auto importResult = drs::engine::importSampleFile(projectSampleSource->path);
+    if (!importResult.imported)
+        return false;
+
+    authoringLoadedSamples.emplace(projectSampleSource->id, LoadedReferenceSample { importResult.sample });
+    if (invokedFromAudioThread)
+        ++realtimeSafetySnapshot.authoringSampleLoadsOnAudioThread;
+    updateRealtimeSafetyState();
+    return true;
 }
 
 bool Processor::startAuthoringVoiceForMidiMessage(const juce::MidiMessage& message)
@@ -527,16 +601,12 @@ bool Processor::startAuthoringVoiceForMidiMessage(const juce::MidiMessage& messa
     if (!projectSampleSource.has_value())
         return false;
 
+    if (!ensureSelectedAuthoringSampleLoaded(true))
+        return false;
+
     auto sampleIterator = authoringLoadedSamples.find(projectSampleSource->id);
     if (sampleIterator == authoringLoadedSamples.end())
-    {
-        const auto importResult = drs::engine::importSampleFile(projectSampleSource->path);
-        if (!importResult.imported)
-            return false;
-
-        sampleIterator = authoringLoadedSamples.emplace(projectSampleSource->id,
-                                                        LoadedReferenceSample { importResult.sample }).first;
-    }
+        return false;
 
     const auto& sample = sampleIterator->second.sample;
     if (sample.normalizedChannels.empty() || sample.metadata.sampleRate <= 0.0)
@@ -557,21 +627,21 @@ bool Processor::startAuthoringVoiceForMidiMessage(const juce::MidiMessage& messa
     voice.baseGain = 0.25f * (static_cast<float>(voice.effectiveVelocity) / 127.0f)
         * static_cast<float>(std::pow(10.0, selectedZone->gainDb / 20.0));
 
+    if (activeVoices.size() >= maxRealtimeActiveVoices)
+    {
+        activeVoices.erase(activeVoices.begin());
+    }
+    else if (activeVoices.size() >= activeVoices.capacity())
+        ++realtimeSafetySnapshot.activeVoiceCapacityGrowthCount;
     activeVoices.push_back(std::move(voice));
 
-    constexpr std::size_t maxActiveVoices = 24;
-    if (activeVoices.size() > maxActiveVoices)
-    {
-        activeVoices.erase(activeVoices.begin(),
-                           activeVoices.begin() + static_cast<std::ptrdiff_t>(activeVoices.size() - maxActiveVoices));
-    }
-
+    updateRealtimeSafetyState();
     return true;
 }
 
 void Processor::startVoiceForMidiMessage(const juce::MidiMessage& message)
 {
-    if (!ensureReferencePlaybackAssetsLoaded())
+    if (!ensureReferencePlaybackAssetsLoaded(true))
         return;
 
     const auto sessionState = engineFacade.getCurrentSessionState();
@@ -616,14 +686,15 @@ void Processor::startVoiceForMidiMessage(const juce::MidiMessage& message)
         * (sample.metadata.sampleRate / std::max(currentSampleRate, 1.0));
     voice.baseGain = 0.25f * (static_cast<float>(effectiveVelocity) / 127.0f);
 
+    if (activeVoices.size() >= maxRealtimeActiveVoices)
+    {
+        activeVoices.erase(activeVoices.begin());
+    }
+    else if (activeVoices.size() >= activeVoices.capacity())
+        ++realtimeSafetySnapshot.activeVoiceCapacityGrowthCount;
     activeVoices.push_back(std::move(voice));
 
-    constexpr std::size_t maxActiveVoices = 24;
-    if (activeVoices.size() > maxActiveVoices)
-    {
-        activeVoices.erase(activeVoices.begin(),
-                           activeVoices.begin() + static_cast<std::ptrdiff_t>(activeVoices.size() - maxActiveVoices));
-    }
+    updateRealtimeSafetyState();
 }
 
 void Processor::releaseVoicesForMidiNote(int midiNoteNumber, VoiceSource source)
@@ -637,6 +708,8 @@ void Processor::releaseVoicesForMidiNote(int midiNoteNumber, VoiceSource source)
         voice.releaseSamplesTotal = 2048;
         voice.releaseSamplesRemaining = voice.releaseSamplesTotal;
     }
+
+    updateRealtimeSafetyState();
 }
 
 void Processor::clearVoices(VoiceSource source)
@@ -648,6 +721,7 @@ void Processor::clearVoices(VoiceSource source)
                                           return voice.source == source;
                                       }),
                        activeVoices.end());
+    updateRealtimeSafetyState();
 }
 
 void Processor::renderBlockRange(juce::AudioBuffer<float>& buffer, int startSample, int sampleCount)
@@ -730,6 +804,38 @@ void Processor::renderBlockRange(juce::AudioBuffer<float>& buffer, int startSamp
                                           return finishedRelease || voice.positionFrames >= frameCount;
                                       }),
                       activeVoices.end());
+    updateRealtimeSafetyState();
+}
+
+void Processor::primeRealtimeSafetyState(int samplesPerBlock)
+{
+    activeVoices.reserve(maxRealtimeActiveVoices);
+    performanceMidiScratchBuffer.ensureSize(std::max<std::size_t>(1024, static_cast<std::size_t>(samplesPerBlock) * 16));
+    authoringPreviewMidiScratchBuffer.ensureSize(std::max<std::size_t>(1024, static_cast<std::size_t>(samplesPerBlock) * 16));
+    realtimeSafetySnapshot.preparedBlockSize = static_cast<std::size_t>(samplesPerBlock);
+    realtimeSafetySnapshot.activeVoiceCapacityLimit = maxRealtimeActiveVoices;
+    updateRealtimeSafetyState();
+}
+
+void Processor::updateRealtimeSafetyState()
+{
+    realtimeSafetySnapshot.available = true;
+    realtimeSafetySnapshot.activeVoiceCapacity = activeVoices.capacity();
+    realtimeSafetySnapshot.referenceSampleCountLoaded = loadedSamples.size();
+
+    if (realtimeSafetySnapshot.getAudioThreadViolationCount() > 0)
+    {
+        realtimeSafetySnapshot.state = "Realtime callback violations recorded";
+        return;
+    }
+
+    if (realtimeSafetySnapshot.referenceSampleCountLoaded == 0)
+    {
+        realtimeSafetySnapshot.state = "Reference playback cache unavailable";
+        return;
+    }
+
+    realtimeSafetySnapshot.state = "Realtime callback primed";
 }
 } // namespace drs::plugin
 

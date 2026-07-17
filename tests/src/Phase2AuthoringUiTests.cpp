@@ -557,6 +557,7 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
     viewModel.statusText = "Selected zone is ready to preview";
     viewModel.sourceText = "Source: fixtures/phase2/lead-a4-sustain.wav";
     viewModel.articulationText = "Articulation: sustain";
+    viewModel.playbackText = "Draft playback: draft r4 | preview r3 (Stale) | published r2 (Active)";
     viewModel.canPreview = true;
     viewModel.canUndo = true;
     viewModel.canRedo = true;
@@ -580,6 +581,9 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
                                     "authoringSummarySourceLabel",
                                     "Source: fixtures/phase2/lead-a4-sustain.wav");
     requireAccessibilityTitleEquals(strip, "authoringSummaryArticulationLabel", "Articulation: sustain");
+    requireAccessibilityTitleEquals(strip,
+                                    "authoringSummaryPlaybackLabel",
+                                    "Draft playback: draft r4 | preview r3 (Stale) | published r2 (Active)");
     requireAccessibilityDescriptionContains(strip, "authoringSummaryTitleLabel", "Selected zone title: Lead Sustain");
     requireAccessibilityDescriptionContains(strip,
                                             "authoringSummaryStatusLabel",
@@ -590,6 +594,9 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
     requireAccessibilityDescriptionContains(strip,
                                             "authoringSummaryArticulationLabel",
                                             "Selected zone articulation: Articulation: sustain");
+    requireAccessibilityDescriptionContains(strip,
+                                            "authoringSummaryPlaybackLabel",
+                                            "Playback revision state: Draft playback: draft r4 | preview r3 (Stale) | published r2 (Active)");
     requireAccessibilityDescriptionContains(strip, "authoringPreviewButton", "Previews the selected zone.");
     requireAccessibilityDescriptionContains(strip, "authoringUndoButton", "Reverts the most recent authoring change.");
     requireAccessibilityDescriptionContains(strip, "authoringRedoButton", "Reapplies the most recently undone authoring change.");
@@ -1470,10 +1477,13 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
 
     const auto initialSummarySource = requireLabel(panel, "authoringSummarySourceLabel").getText();
     const auto initialSummaryArticulation = requireLabel(panel, "authoringSummaryArticulationLabel").getText();
+    const auto initialSummaryPlayback = requireLabel(panel, "authoringSummaryPlaybackLabel").getText();
     requireAccessibilityTitleEquals(panel, "authoringSummarySourceLabel", initialSummarySource);
     requireAccessibilityTitleEquals(panel, "authoringSummaryArticulationLabel", initialSummaryArticulation);
+    requireAccessibilityTitleEquals(panel, "authoringSummaryPlaybackLabel", initialSummaryPlayback);
     requireAccessibilityDescriptionContains(panel, "authoringSummarySourceLabel", initialSummarySource);
     requireAccessibilityDescriptionContains(panel, "authoringSummaryArticulationLabel", initialSummaryArticulation);
+    requireAccessibilityDescriptionContains(panel, "authoringSummaryPlaybackLabel", initialSummaryPlayback);
 
     auto summarySourceChanged = false;
     for (int candidateId = 1; candidateId <= zoneSelector.getNumItems(); ++candidateId)
@@ -1491,12 +1501,15 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
 
     const auto updatedSummarySource = requireLabel(panel, "authoringSummarySourceLabel").getText();
     const auto updatedSummaryArticulation = requireLabel(panel, "authoringSummaryArticulationLabel").getText();
+    const auto updatedSummaryPlayback = requireLabel(panel, "authoringSummaryPlaybackLabel").getText();
     require(summarySourceChanged && updatedSummarySource != initialSummarySource,
             "Changing the selected zone should refresh the summary-strip source text.");
     requireAccessibilityTitleEquals(panel, "authoringSummarySourceLabel", updatedSummarySource);
     requireAccessibilityTitleEquals(panel, "authoringSummaryArticulationLabel", updatedSummaryArticulation);
+    requireAccessibilityTitleEquals(panel, "authoringSummaryPlaybackLabel", updatedSummaryPlayback);
     requireAccessibilityDescriptionContains(panel, "authoringSummarySourceLabel", updatedSummarySource);
     requireAccessibilityDescriptionContains(panel, "authoringSummaryArticulationLabel", updatedSummaryArticulation);
+    requireAccessibilityDescriptionContains(panel, "authoringSummaryPlaybackLabel", updatedSummaryPlayback);
 
     requireAccessibilityTitleEquals(panel, "authoringDrawerTitleLabel", requireLabel(panel, "authoringDrawerTitleLabel").getText());
     requireAccessibilityTitleEquals(panel, "authoringDrawerScopeLabel", requireLabel(panel, "authoringDrawerScopeLabel").getText());

@@ -55,6 +55,8 @@ StatusPanel::StatusPanel(drs::engine::EngineFacade& facade,
     diagnosticsHeadlineLabel.setFont(juce::FontOptions(18.0f, juce::Font::bold));
     actionsLabel.setText("Developer actions", juce::dontSendNotification);
     actionsLabel.setFont(juce::FontOptions(16.0f, juce::Font::bold));
+    draftPlaybackLabel.setText("Draft playback", juce::dontSendNotification);
+    draftPlaybackLabel.setFont(juce::FontOptions(16.0f, juce::Font::bold));
     macrosLabel.setText("Macro bridge", juce::dontSendNotification);
     macrosLabel.setFont(juce::FontOptions(16.0f, juce::Font::bold));
     contentProbeLabel.setText("Content probes", juce::dontSendNotification);
@@ -63,6 +65,9 @@ StatusPanel::StatusPanel(drs::engine::EngineFacade& facade,
     resetStateButton.setButtonText("Reset Default State");
     loadLeadFixtureButton.setButtonText("Load Lead Fixture");
     injectInvalidStateButton.setButtonText("Inject Invalid State");
+    stageDraftButton.setButtonText("Stage Draft");
+    preparePreviewButton.setButtonText("Prepare Preview");
+    publishDraftButton.setButtonText("Publish Draft");
     probeMissingContentButton.setButtonText("Probe Missing");
     probeBadChecksumButton.setButtonText("Probe Checksum");
     probeSchemaMismatchButton.setButtonText("Probe Schema");
@@ -94,6 +99,25 @@ StatusPanel::StatusPanel(drs::engine::EngineFacade& facade,
             / "negative"
             / "transient-diagnostics-leak.drpreset.json";
         engineFacade.restorePresetStateFile(presetPath.generic_string());
+        refreshSnapshot();
+    };
+
+    stageDraftButton.onClick = [this]
+    {
+        const auto nextRevision = engineFacade.getDraftPlaybackStatus().draftRevision + 1;
+        engineFacade.stageDraftRevision(nextRevision);
+        refreshSnapshot();
+    };
+
+    preparePreviewButton.onClick = [this]
+    {
+        engineFacade.refreshPreviewToCurrentDraft();
+        refreshSnapshot();
+    };
+
+    publishDraftButton.onClick = [this]
+    {
+        engineFacade.publishCurrentDraft();
         refreshSnapshot();
     };
 
@@ -153,10 +177,14 @@ StatusPanel::StatusPanel(drs::engine::EngineFacade& facade,
     addAndMakeVisible(failureLabel);
     addAndMakeVisible(routedZonesLabel);
     addAndMakeVisible(actionsLabel);
+    addAndMakeVisible(draftPlaybackLabel);
     addAndMakeVisible(macrosLabel);
     addAndMakeVisible(resetStateButton);
     addAndMakeVisible(loadLeadFixtureButton);
     addAndMakeVisible(injectInvalidStateButton);
+    addAndMakeVisible(stageDraftButton);
+    addAndMakeVisible(preparePreviewButton);
+    addAndMakeVisible(publishDraftButton);
     addAndMakeVisible(contentProbeLabel);
     addAndMakeVisible(probeMissingContentButton);
     addAndMakeVisible(probeBadChecksumButton);
@@ -211,6 +239,16 @@ void StatusPanel::resized()
     loadLeadFixtureButton.setBounds(buttonRow.removeFromLeft(140));
     buttonRow.removeFromLeft(10);
     injectInvalidStateButton.setBounds(buttonRow.removeFromLeft(150));
+
+    area.removeFromTop(12);
+    auto draftPlaybackRow = area.removeFromTop(28);
+    draftPlaybackLabel.setBounds(draftPlaybackRow.removeFromLeft(120));
+    auto draftButtons = draftPlaybackRow;
+    stageDraftButton.setBounds(draftButtons.removeFromLeft(110));
+    draftButtons.removeFromLeft(8);
+    preparePreviewButton.setBounds(draftButtons.removeFromLeft(130));
+    draftButtons.removeFromLeft(8);
+    publishDraftButton.setBounds(draftButtons.removeFromLeft(120));
 
     area.removeFromTop(12);
     auto macroHeaderRow = area.removeFromTop(24);
@@ -301,7 +339,12 @@ void StatusPanel::refreshSnapshot()
     sessionLabel.setText(
         "Session: preset=" + juce::String::fromUTF8(diagnostics.presetId.c_str())
             + " | loadProfile=" + juce::String::fromUTF8(diagnostics.loadProfileId.c_str())
-            + " | articulation=" + juce::String::fromUTF8(diagnostics.selectedArticulationId.c_str()),
+            + " | articulation=" + juce::String::fromUTF8(diagnostics.selectedArticulationId.c_str())
+            + " | draft=" + juce::String(static_cast<juce::int64>(diagnostics.draftRevision))
+            + " | preview=" + juce::String(static_cast<juce::int64>(diagnostics.previewRevision))
+            + " (" + juce::String::fromUTF8(diagnostics.previewRevisionState.c_str()) + ")"
+            + " | published=" + juce::String(static_cast<juce::int64>(diagnostics.publishedRevision))
+            + " (" + juce::String::fromUTF8(diagnostics.publishedRevisionState.c_str()) + ")",
         juce::dontSendNotification);
     voicesLabel.setText(
         "Voices: active=" + juce::String(static_cast<int>(diagnostics.activeVoiceCount))

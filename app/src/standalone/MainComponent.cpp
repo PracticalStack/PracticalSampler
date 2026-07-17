@@ -421,6 +421,10 @@ MainComponent::MainComponent(bool enableAudioOutput)
                      [this]
                      {
                          restoreSelectedZoneRootKey();
+                     },
+                     [this]()
+                     {
+                         return processor.getEngineFacade().getDraftPlaybackStatus();
                      })
 {
     juce::PropertiesFile::Options appSettingsOptions;

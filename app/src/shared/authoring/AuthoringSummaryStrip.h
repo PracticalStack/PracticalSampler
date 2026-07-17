@@ -23,6 +23,7 @@ private:
     juce::Label statusLabel;
     juce::Label sourceLabel;
     juce::Label articulationLabel;
+    juce::Label playbackLabel;
     juce::TextButton previewButton;
     juce::TextButton undoButton;
     juce::TextButton redoButton;

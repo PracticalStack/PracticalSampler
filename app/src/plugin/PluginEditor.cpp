@@ -430,6 +430,10 @@ Editor::Editor(Processor& owner)
                      [this]
                      {
                          restoreSelectedZoneRootKey();
+                     },
+                     [&owner]()
+                     {
+                         return owner.getEngineFacade().getDraftPlaybackStatus();
                      })
 {
     juce::PropertiesFile::Options appSettingsOptions;

@@ -401,7 +401,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
                                LayoutMode nextLayoutMode,
                                NotePreviewStartedCallback notePreviewStarted,
                                NotePreviewEndedCallback notePreviewEnded,
-                               RestoreRootKeyCallback restoreRootKeyRequested)
+                               RestoreRootKeyCallback restoreRootKeyRequested,
+                               DraftPlaybackStatusProvider nextDraftPlaybackStatusProvider)
     : authoringSession(session),
       waveformPreviewProvider(std::move(previewProvider)),
       importResponsivenessProvider(std::move(responsivenessProvider)),
@@ -409,6 +410,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
       onNotePreviewStarted(std::move(notePreviewStarted)),
       onNotePreviewEnded(std::move(notePreviewEnded)),
       onRestoreRootKeyRequested(std::move(restoreRootKeyRequested)),
+      draftPlaybackStatusProvider(std::move(nextDraftPlaybackStatusProvider)),
       macroList("authoringMacroList",
                 "authoringMacroListBox",
                 "authoringMacroListEmptyState")
@@ -1286,9 +1288,20 @@ authoring::SelectionSummaryViewModel AuthoringPanel::buildSelectionSummaryViewMo
         + " | redo=" + std::to_string(documentState.redoDepth);
     viewModel.sourceText = "Sample source: none";
     viewModel.articulationText = "Articulation: none";
+    viewModel.playbackText = "Draft playback: status unavailable";
     viewModel.canUndo = documentState.undoDepth > 0;
     viewModel.canRedo = documentState.redoDepth > 0;
     viewModel.dirty = documentState.dirty;
+
+    if (draftPlaybackStatusProvider)
+    {
+        const auto playbackStatus = draftPlaybackStatusProvider();
+        viewModel.playbackText = "Draft playback: draft r" + std::to_string(playbackStatus.draftRevision)
+            + " | preview r" + std::to_string(playbackStatus.preview.revision)
+            + " (" + playbackStatus.preview.state + ")"
+            + " | published r" + std::to_string(playbackStatus.performance.revision)
+            + " (" + playbackStatus.performance.state + ")";
+    }
 
     if (const auto zone = authoringSession.getSelectedZone(); zone.has_value())
     {

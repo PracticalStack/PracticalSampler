@@ -122,6 +122,19 @@ std::string buildAppliedMacroSummary(const RuntimeSessionStateSnapshot& sessionS
     return "Tone: " + buildToneCurrentEffect(sessionState) + " | Motion: " + buildMotionCurrentEffect(sessionState);
 }
 
+void syncDraftPlaybackIntoDiagnostics(const DraftPlaybackStatus& status,
+                                      EngineDiagnosticsSnapshot& diagnosticsSnapshot)
+{
+    diagnosticsSnapshot.draftRevision = status.draftRevision;
+    diagnosticsSnapshot.previewRevision = status.preview.revision;
+    diagnosticsSnapshot.publishedRevision = status.performance.revision;
+    diagnosticsSnapshot.previewPending = status.pendingPreview.active;
+    diagnosticsSnapshot.publishedPending = status.pendingPerformance.active;
+    diagnosticsSnapshot.previewRevisionState = status.preview.state;
+    diagnosticsSnapshot.publishedRevisionState = status.performance.state;
+    diagnosticsSnapshot.draftPlaybackEvent = status.lastEvent;
+}
+
 void syncSessionSelectionsIntoDiagnostics(const RuntimeSessionStateSnapshot& sessionState,
                                           EngineDiagnosticsSnapshot& diagnosticsSnapshot)
 {
@@ -289,16 +302,16 @@ EngineFacade::EngineFacade()
         currentSessionState = buildDefaultRuntimeSessionState(referenceManifest);
         currentSessionState.transientMetrics.integrationState = "Default preset state loaded";
         referenceStream = loadPhase1ReferenceStreamContainer();
-        previewPlaybackSnapshot.ready = referenceStream.loaded;
-        previewPlaybackSnapshot.state = referenceStream.loaded ? "Ready to audition" : referenceStream.state;
+        referenceInstrumentActive = referenceStream.loaded;
     }
     else
     {
         currentSessionState.transientMetrics.integrationState = "Reference manifest unavailable";
         currentSessionState.transientMetrics.lastFailure = referenceManifest.state;
+        referenceInstrumentActive = false;
     }
 
-    referenceInstrumentActive = false;
+    initializeDraftPlaybackContract(false);
     refreshDiagnosticsSnapshot();
 }
 
@@ -472,6 +485,13 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
     detail << "Selected articulation: "
            << (currentSessionState.selectedArticulationId.empty() ? "unavailable" : currentSessionState.selectedArticulationId) << "\n";
     detail << "Macro values: " << buildMacroSummary(currentSessionState) << "\n";
+    detail << "Draft playback: draft=" << diagnostics.draftRevision
+           << ", preview=" << diagnostics.previewRevision
+           << " (" << (diagnostics.previewRevisionState.empty() ? "unavailable" : diagnostics.previewRevisionState) << ")"
+           << ", published=" << diagnostics.publishedRevision
+           << " (" << (diagnostics.publishedRevisionState.empty() ? "unavailable" : diagnostics.publishedRevisionState) << ")\n";
+    detail << "Draft playback event: "
+           << (diagnostics.draftPlaybackEvent.empty() ? "not reported" : diagnostics.draftPlaybackEvent) << "\n";
     detail << "State recall status: "
            << (currentSessionState.transientMetrics.integrationState.empty()
                    ? "not reported"
@@ -615,7 +635,12 @@ RuntimeStreamLoadResult EngineFacade::loadPhase1ReferenceStream() const
 EnginePerformanceSnapshot EngineFacade::getPerformanceSnapshot() const
 {
     EnginePerformanceSnapshot snapshot;
-    snapshot.loaded = referenceInstrumentActive && referenceManifest.loaded && referenceStream.loaded;
+    const auto& draftStatus = draftPlaybackContract.getStatus();
+    snapshot.loaded = referenceInstrumentActive && referenceManifest.loaded && referenceStream.loaded
+        && draftStatus.performance.available;
+    snapshot.draftRevision = draftStatus.draftRevision;
+    snapshot.previewRevision = draftStatus.preview.revision;
+    snapshot.publishedRevision = draftStatus.performance.revision;
     snapshot.instrumentDisplayName = (referenceInstrumentActive && referenceManifest.loaded)
         ? referenceManifest.instrument.displayName
         : "No instrument loaded";
@@ -625,6 +650,11 @@ EnginePerformanceSnapshot EngineFacade::getPerformanceSnapshot() const
     snapshot.selectedArticulationName = referenceInstrumentActive
         ? resolveArticulationName(referenceManifest, currentSessionState)
         : std::string {};
+    snapshot.previewPending = draftStatus.pendingPreview.active;
+    snapshot.publishedPending = draftStatus.pendingPerformance.active;
+    snapshot.previewRevisionState = draftStatus.preview.state;
+    snapshot.publishedRevisionState = draftStatus.performance.state;
+    snapshot.draftPlaybackEvent = draftStatus.lastEvent;
     snapshot.loadIndicator = referenceInstrumentActive
         ? buildLoadIndicator(referenceManifest, referenceStream, currentSessionState)
         : "Click Load Default or Load Lead Demo";
@@ -717,9 +747,8 @@ bool EngineFacade::setSelectedArticulation(const std::string& articulationId)
     currentSessionState.selectedArticulationId = articulationId;
     currentSessionState.transientMetrics.integrationState = "Performance surface articulation updated";
     previewPlaybackSnapshot = {};
-    previewPlaybackSnapshot.ready = referenceManifest.loaded && referenceStream.loaded;
+    syncPreviewSnapshotFromDraftPlayback();
     previewPlaybackSnapshot.articulationId = articulationId;
-    previewPlaybackSnapshot.state = previewPlaybackSnapshot.ready ? "Ready to audition" : buildLoadIndicator(referenceManifest, referenceStream, currentSessionState);
     syncSessionSelectionsIntoDiagnostics(currentSessionState, diagnosticsSnapshot);
     return true;
 }
@@ -759,9 +788,119 @@ bool EngineFacade::setMacroValue(const std::string& macroId, double value)
     return true;
 }
 
+bool EngineFacade::stageDraftRevision(std::size_t revision)
+{
+    if (!referenceInstrumentActive || !draftPlaybackContract.getStatus().projectOpen)
+        return false;
+
+    if (!draftPlaybackContract.setDraftRevision(revision))
+        return false;
+
+    currentSessionState.transientMetrics.integrationState = "Draft revision staged";
+    previewPlaybackSnapshot = {};
+    syncPreviewSnapshotFromDraftPlayback();
+    refreshDiagnosticsSnapshot();
+    return true;
+}
+
+bool EngineFacade::refreshPreviewToCurrentDraft()
+{
+    if (!referenceInstrumentActive || !referenceManifest.loaded || !referenceStream.loaded)
+        return false;
+
+    const auto request = draftPlaybackContract.requestPreviewBuild();
+    if (!request.accepted)
+        return false;
+
+    if (!draftPlaybackContract.completePreviewBuild(request.requestId))
+        return false;
+
+    currentSessionState.transientMetrics.integrationState = "Preview revision prepared";
+    previewPlaybackSnapshot = {};
+    syncPreviewSnapshotFromDraftPlayback();
+    refreshDiagnosticsSnapshot();
+    return true;
+}
+
+bool EngineFacade::publishCurrentDraft()
+{
+    if (!referenceInstrumentActive || !referenceManifest.loaded || !referenceStream.loaded)
+        return false;
+
+    const auto request = draftPlaybackContract.requestPerformanceBuild();
+    if (!request.accepted)
+        return false;
+
+    if (!draftPlaybackContract.completePerformanceBuild(request.requestId))
+        return false;
+
+    currentSessionState.transientMetrics.integrationState = "Published revision activated";
+    previewPlaybackSnapshot = {};
+    syncPreviewSnapshotFromDraftPlayback();
+    refreshDiagnosticsSnapshot();
+    return true;
+}
+
+void EngineFacade::closeDraftPlaybackProject()
+{
+    draftPlaybackContract.closeProject();
+    referenceInstrumentActive = false;
+    currentSessionState.transientMetrics.integrationState = "Draft playback project closed";
+    currentSessionState.transientMetrics.lastFailure.clear();
+    previewPlaybackSnapshot = {};
+    syncPreviewSnapshotFromDraftPlayback();
+    refreshDiagnosticsSnapshot();
+}
+
+bool EngineFacade::reopenDraftPlaybackProject(std::size_t revision)
+{
+    if (!referenceManifest.loaded)
+        return false;
+
+    draftPlaybackContract.reopenProject(revision);
+    referenceInstrumentActive = true;
+    currentSessionState.transientMetrics.integrationState = "Draft playback project reopened";
+    currentSessionState.transientMetrics.lastFailure.clear();
+    previewPlaybackSnapshot = {};
+    syncPreviewSnapshotFromDraftPlayback();
+    refreshDiagnosticsSnapshot();
+    return true;
+}
+
+bool EngineFacade::beginDraftPlaybackDeviceRestart()
+{
+    if (!draftPlaybackContract.beginDeviceRestart())
+        return false;
+
+    currentSessionState.transientMetrics.integrationState = "Device restart in progress";
+    previewPlaybackSnapshot = {};
+    syncPreviewSnapshotFromDraftPlayback();
+    refreshDiagnosticsSnapshot();
+    return true;
+}
+
+bool EngineFacade::completeDraftPlaybackDeviceRestart(bool restored)
+{
+    if (!draftPlaybackContract.completeDeviceRestart(restored))
+        return false;
+
+    currentSessionState.transientMetrics.integrationState = restored
+        ? "Device restart recovered"
+        : "Device restart failed";
+    if (!restored)
+        currentSessionState.transientMetrics.lastFailure = "Device restart failed to restore the published revision.";
+    else
+        currentSessionState.transientMetrics.lastFailure.clear();
+    previewPlaybackSnapshot = {};
+    syncPreviewSnapshotFromDraftPlayback();
+    refreshDiagnosticsSnapshot();
+    return true;
+}
+
 EnginePreviewPlaybackSnapshot EngineFacade::auditionPreviewNote(int midiNote, int velocity)
 {
     previewPlaybackSnapshot = {};
+    syncPreviewSnapshotFromDraftPlayback();
     previewPlaybackSnapshot.midiNote = midiNote;
     previewPlaybackSnapshot.velocity = velocity;
     previewPlaybackSnapshot.effectiveMidiNote = midiNote;
@@ -790,6 +929,17 @@ EnginePreviewPlaybackSnapshot EngineFacade::auditionPreviewNote(int midiNote, in
         return previewPlaybackSnapshot;
     }
 
+    if ((!draftPlaybackContract.getStatus().preview.available
+         || draftPlaybackContract.getStatus().preview.revision != draftPlaybackContract.getStatus().draftRevision)
+        && !refreshPreviewToCurrentDraft())
+    {
+        previewPlaybackSnapshot.state = "Preview unavailable";
+        previewPlaybackSnapshot.errorMessage = "Preview revision could not be prepared for the current draft.";
+        syncPreviewSnapshotFromDraftPlayback();
+        return previewPlaybackSnapshot;
+    }
+
+    syncPreviewSnapshotFromDraftPlayback();
     const auto loadProfile = findPhase1RuntimeLoadProfile(currentSessionState.loadProfileId);
     if (!loadProfile.has_value())
     {
@@ -866,6 +1016,7 @@ EnginePreviewPlaybackSnapshot EngineFacade::auditionPreviewNote(int midiNote, in
     previewPlaybackSnapshot.state = previewPlaybackSnapshot.succeeded
         ? "Preview played"
         : "Preview did not finish cleanly";
+    syncPreviewSnapshotFromDraftPlayback();
 
     return previewPlaybackSnapshot;
 }
@@ -921,9 +1072,8 @@ EnginePresetStateRestoreResult EngineFacade::restorePresetStateJson(const std::s
     currentSessionState.transientMetrics.lastFailure.clear();
     referenceInstrumentActive = true;
     previewPlaybackSnapshot = {};
-    previewPlaybackSnapshot.ready = referenceManifest.loaded && referenceStream.loaded;
+    initializeDraftPlaybackContract(true);
     previewPlaybackSnapshot.articulationId = currentSessionState.selectedArticulationId;
-    previewPlaybackSnapshot.state = previewPlaybackSnapshot.ready ? "Ready to audition" : buildLoadIndicator(referenceManifest, referenceStream, currentSessionState);
     refreshDiagnosticsSnapshot();
 
     restoreResult.restored = true;
@@ -995,17 +1145,61 @@ void EngineFacade::resetSessionStateToDefault()
     currentSessionState.transientMetrics.integrationState = "Default preset state loaded";
     currentSessionState.transientMetrics.lastFailure.clear();
     previewPlaybackSnapshot = {};
-    previewPlaybackSnapshot.ready = referenceManifest.loaded && referenceStream.loaded;
+    initializeDraftPlaybackContract(true);
     previewPlaybackSnapshot.articulationId = currentSessionState.selectedArticulationId;
-    previewPlaybackSnapshot.state = previewPlaybackSnapshot.ready ? "Ready to audition" : buildLoadIndicator(referenceManifest, referenceStream, currentSessionState);
     lastContentFailureProbe = {};
     refreshDiagnosticsSnapshot();
+}
+
+void EngineFacade::syncPreviewSnapshotFromDraftPlayback()
+{
+    const auto& draftStatus = draftPlaybackContract.getStatus();
+    previewPlaybackSnapshot.ready = draftStatus.preview.available;
+    previewPlaybackSnapshot.draftRevision = draftStatus.draftRevision;
+    previewPlaybackSnapshot.preparedRevision = draftStatus.preview.revision;
+    previewPlaybackSnapshot.pendingBuild = draftStatus.pendingPreview.active;
+    previewPlaybackSnapshot.revisionState = draftStatus.preview.state;
+
+    if (previewPlaybackSnapshot.articulationId.empty())
+        previewPlaybackSnapshot.articulationId = currentSessionState.selectedArticulationId;
+
+    if (previewPlaybackSnapshot.state.empty())
+    {
+        previewPlaybackSnapshot.state = draftStatus.preview.state.empty()
+            ? buildLoadIndicator(referenceManifest, referenceStream, currentSessionState)
+            : draftStatus.preview.state;
+    }
+}
+
+void EngineFacade::initializeDraftPlaybackContract(bool activatePerformanceRevision)
+{
+    draftPlaybackContract.reopenProject(0);
+
+    if (!referenceManifest.loaded || !referenceStream.loaded)
+    {
+        previewPlaybackSnapshot = {};
+        syncPreviewSnapshotFromDraftPlayback();
+        return;
+    }
+
+    if (const auto previewRequest = draftPlaybackContract.requestPreviewBuild(); previewRequest.accepted)
+        draftPlaybackContract.completePreviewBuild(previewRequest.requestId);
+
+    if (activatePerformanceRevision)
+    {
+        if (const auto publishRequest = draftPlaybackContract.requestPerformanceBuild(); publishRequest.accepted)
+            draftPlaybackContract.completePerformanceBuild(publishRequest.requestId);
+    }
+
+    previewPlaybackSnapshot = {};
+    syncPreviewSnapshotFromDraftPlayback();
 }
 
 void EngineFacade::refreshDiagnosticsSnapshot()
 {
     diagnosticsSnapshot = {};
     syncSessionSelectionsIntoDiagnostics(currentSessionState, diagnosticsSnapshot);
+    syncDraftPlaybackIntoDiagnostics(draftPlaybackContract.getStatus(), diagnosticsSnapshot);
 
     if (!referenceInstrumentActive)
     {

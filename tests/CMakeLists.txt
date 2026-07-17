@@ -61,6 +61,82 @@ add_test(
     COMMAND drs_phase1_runtime_contract_tests
 )
 
+juce_add_console_app(drs_phase1_draft_playback_contract_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Draft Playback Contract Tests"
+)
+
+target_sources(drs_phase1_draft_playback_contract_tests
+    PRIVATE
+        src/Phase1DraftPlaybackContractTests.cpp
+)
+
+target_link_libraries(drs_phase1_draft_playback_contract_tests
+    PRIVATE
+        drs_engine_adapter
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase1_draft_playback_contract_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase1.draft_playback_contract
+    COMMAND drs_phase1_draft_playback_contract_tests
+)
+
+juce_add_console_app(drs_phase1_draft_playback_facade_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Draft Playback Facade Tests"
+)
+
+target_sources(drs_phase1_draft_playback_facade_tests
+    PRIVATE
+        src/Phase1DraftPlaybackFacadeTests.cpp
+)
+
+target_link_libraries(drs_phase1_draft_playback_facade_tests
+    PRIVATE
+        drs_engine_adapter
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase1_draft_playback_facade_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase1.draft_playback_facade
+    COMMAND drs_phase1_draft_playback_facade_tests
+)
+
+juce_add_console_app(drs_phase1_realtime_safety_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Realtime Safety Tests"
+)
+
+target_sources(drs_phase1_realtime_safety_tests
+    PRIVATE
+        src/Phase1RealtimeSafetyTests.cpp
+)
+
+target_link_libraries(drs_phase1_realtime_safety_tests
+    PRIVATE
+        drs_plugin_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase1_realtime_safety_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase1.realtime_safety
+    COMMAND drs_phase1_realtime_safety_tests
+)
+
 juce_add_console_app(drs_phase1_preset_state_tests
     PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Preset State Tests"
 )

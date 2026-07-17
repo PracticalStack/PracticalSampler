@@ -332,11 +332,29 @@ void PerformancePanel::refreshSurface()
             "Preset " + juce::String::fromUTF8(performanceSnapshot.presetId.c_str())
                 + " | Load " + juce::String::fromUTF8(performanceSnapshot.loadProfileId.c_str())
                 + " | Articulation " + formatArticulationLabel(performanceSnapshot.selectedArticulationName,
-                                                               performanceSnapshot.selectedArticulationId),
+                                                               performanceSnapshot.selectedArticulationId)
+                + " | Draft r" + juce::String(static_cast<juce::int64>(performanceSnapshot.draftRevision))
+                + " | Preview r" + juce::String(static_cast<juce::int64>(performanceSnapshot.previewRevision))
+                + " (" + juce::String::fromUTF8(performanceSnapshot.previewRevisionState.c_str()) + ")"
+                + " | Published r" + juce::String(static_cast<juce::int64>(performanceSnapshot.publishedRevision))
+                + " (" + juce::String::fromUTF8(performanceSnapshot.publishedRevisionState.c_str()) + ")",
             juce::dontSendNotification);
     }
 
-    loadIndicatorLabel.setText(juce::String::fromUTF8(performanceSnapshot.loadIndicator.c_str()),
+    juce::String loadIndicatorText = juce::String::fromUTF8(performanceSnapshot.loadIndicator.c_str());
+    if (!performanceSnapshot.draftPlaybackEvent.empty())
+    {
+        loadIndicatorText << " | " << juce::String::fromUTF8(performanceSnapshot.draftPlaybackEvent.c_str());
+    }
+    if (performanceSnapshot.previewPending || performanceSnapshot.publishedPending)
+    {
+        loadIndicatorText << " | pending:";
+        if (performanceSnapshot.previewPending)
+            loadIndicatorText << " preview";
+        if (performanceSnapshot.publishedPending)
+            loadIndicatorText << " publish";
+    }
+    loadIndicatorLabel.setText(loadIndicatorText,
                                juce::dontSendNotification);
     const auto hasPreviewError = !performanceSnapshot.previewPlayback.errorMessage.empty();
     loadIndicatorLabel.setColour(juce::Label::backgroundColourId,
@@ -345,14 +363,22 @@ void PerformancePanel::refreshSurface()
                                      : (performanceSnapshot.loaded ? performancePanelSuccess : performancePanelDanger));
     loadIndicatorLabel.setColour(juce::Label::textColourId, juce::Colours::white);
 
-    juce::String previewText = "Preview: "
-        + juce::String::fromUTF8(performanceSnapshot.previewPlayback.state.c_str());
+    juce::String previewText = "Preview: draft r"
+        + juce::String(static_cast<juce::int64>(performanceSnapshot.previewPlayback.draftRevision))
+        + " -> prepared r"
+        + juce::String(static_cast<juce::int64>(performanceSnapshot.previewPlayback.preparedRevision))
+        + " | "
+        + juce::String::fromUTF8(performanceSnapshot.previewPlayback.revisionState.c_str());
     if (performanceSnapshot.previewPlayback.attempted)
     {
         previewText << " | played " << performanceSnapshot.previewPlayback.midiNote
                     << " -> effective " << performanceSnapshot.previewPlayback.effectiveMidiNote
                     << " | velocity " << performanceSnapshot.previewPlayback.effectiveVelocity
                     << " | zone " << juce::String::fromUTF8(performanceSnapshot.previewPlayback.zoneId.c_str());
+    }
+    if (performanceSnapshot.previewPlayback.pendingBuild)
+    {
+        previewText << " | preparing";
     }
     previewText << " | " << juce::String::fromUTF8(performanceSnapshot.previewPlayback.appliedMacroSummary.c_str());
     if (!performanceSnapshot.previewPlayback.errorMessage.empty())

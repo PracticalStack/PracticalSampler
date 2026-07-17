@@ -26,6 +26,7 @@ struct SelectionSummaryViewModel
     std::string statusText;
     std::string sourceText;
     std::string articulationText;
+    std::string playbackText;
     bool canPreview = false;
     bool canRestoreRootKey = false;
     bool canUndo = false;

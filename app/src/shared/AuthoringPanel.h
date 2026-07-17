@@ -9,6 +9,7 @@
 #include "shared/AuthoringPreviewModel.h"
 #include "shared/PerformanceBankImport.h"
 #include "drs/engine/AuthoringSession.h"
+#include "drs/engine/DraftPlaybackContract.h"
 
 #include <juce_gui_extra/juce_gui_extra.h>
 
@@ -31,6 +32,7 @@ public:
     using WaveformPreviewProvider = std::function<AuthoringWaveformPreview()>;
     using ImportResponsivenessProvider = std::function<AuthoringImportResponsivenessSnapshot()>;
     using RestoreRootKeyCallback = std::function<void()>;
+    using DraftPlaybackStatusProvider = std::function<drs::engine::DraftPlaybackStatus()>;
 
     explicit AuthoringPanel(drs::engine::AuthoringSession& authoringSession,
                             WaveformPreviewProvider waveformPreviewProvider = {},
@@ -38,7 +40,8 @@ public:
                             LayoutMode layoutMode = LayoutMode::compact,
                             NotePreviewStartedCallback onNotePreviewStarted = {},
                             NotePreviewEndedCallback onNotePreviewEnded = {},
-                            RestoreRootKeyCallback onRestoreRootKeyRequested = {});
+                            RestoreRootKeyCallback onRestoreRootKeyRequested = {},
+                            DraftPlaybackStatusProvider draftPlaybackStatusProvider = {});
     ~AuthoringPanel() override;
 
     void paint(juce::Graphics& g) override;
@@ -114,6 +117,7 @@ private:
     NotePreviewStartedCallback onNotePreviewStarted;
     NotePreviewEndedCallback onNotePreviewEnded;
     RestoreRootKeyCallback onRestoreRootKeyRequested;
+    DraftPlaybackStatusProvider draftPlaybackStatusProvider;
     bool isRefreshing = false;
     int selectedMacroIndex = 0;
     int selectedFxSlotIndex = 0;
