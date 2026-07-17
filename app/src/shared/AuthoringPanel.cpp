@@ -88,6 +88,13 @@ void configureFieldLabel(juce::Label& label, const char* text)
     label.setFont(juce::FontOptions(14.0f, juce::Font::bold));
 }
 
+void configureMetadataLabel(juce::Label& label)
+{
+    label.setColour(juce::Label::textColourId, authoringPanelMuted);
+    label.setFont(juce::FontOptions(13.0f));
+    label.setJustificationType(juce::Justification::centredLeft);
+}
+
 juce::String formatZoneRange(const drs::engine::AuthoringZoneSummary& zone)
 {
     return "Keys " + juce::String(zone.keyLow) + "-" + juce::String(zone.keyHigh)
@@ -131,6 +138,17 @@ std::vector<std::string> buildArticulationIds(const drs::engine::RuntimeProjectM
     return articulationIds;
 }
 
+const CuratedMacroAssignment* findCuratedMacroAssignment(const std::string& parameterId)
+{
+    for (const auto& assignment : curatedMacroAssignments)
+    {
+        if (parameterId == assignment.parameterId)
+            return &assignment;
+    }
+
+    return nullptr;
+}
+
 int findAssignmentIndex(const std::string& parameterId)
 {
     for (std::size_t index = 0; index < curatedMacroAssignments.size(); ++index)
@@ -147,22 +165,29 @@ bool isExpandedLayout(AuthoringPanel::LayoutMode layoutMode)
     return layoutMode == AuthoringPanel::LayoutMode::expanded;
 }
 
-const char* getDrawerTabName(authoring::DrawerTab tab)
+juce::String buildMacroListStatusText(const drs::engine::RuntimeProjectMacroDefinition& macro)
 {
-    switch (tab)
-    {
-        case authoring::DrawerTab::waveform:
-            return "Waveform";
-        case authoring::DrawerTab::macros:
-            return "Macros";
-        case authoring::DrawerTab::routing:
-            return "Routing";
-        case authoring::DrawerTab::performance:
-            return "Performance";
-        default:
-            return "Drawer";
-    }
+    if (macro.targets.empty())
+        return "Unassigned";
+
+    const auto& target = macro.targets.front();
+    juce::String status;
+
+    if (!target.role.empty())
+        status << juce::String::fromUTF8(target.role.c_str()) << " | ";
+
+    if (const auto* assignment = findCuratedMacroAssignment(target.parameterId))
+        status << assignment->label;
+    else if (!target.parameterPath.empty())
+        status << juce::String::fromUTF8(target.parameterPath.c_str());
+    else if (!target.parameterId.empty())
+        status << juce::String::fromUTF8(target.parameterId.c_str());
+    else
+        status << "Unassigned";
+
+    return status;
 }
+
 } // namespace
 
 AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
@@ -178,30 +203,33 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
       layoutMode(nextLayoutMode),
       onNotePreviewStarted(std::move(notePreviewStarted)),
       onNotePreviewEnded(std::move(notePreviewEnded)),
-      onRestoreRootKeyRequested(std::move(restoreRootKeyRequested))
+      onRestoreRootKeyRequested(std::move(restoreRootKeyRequested)),
+      macroList("authoringMacroList",
+                "authoringMacroListBox",
+                "authoringMacroListEmptyState")
 {
     setComponentID("authoringWorkspace");
     drawerState.open = isExpandedLayout(layoutMode);
     drawerState.activeTab = authoring::DrawerTab::waveform;
 
-    waveformInfoLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
-    loopInfoLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
-    importMetricsLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
-    drawerPlaceholderLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
+    configureMetadataLabel(waveformScopeLabel);
+    configureMetadataLabel(drawerBreadcrumbLabel);
+    configureMetadataLabel(waveformInfoLabel);
+    configureMetadataLabel(loopInfoLabel);
+    configureMetadataLabel(importMetricsLabel);
     macroSummaryLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
     fxSummaryLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
     routingSummaryLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
     performanceSummaryLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
     phraseSummaryLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
 
-    configureSectionLabel(waveformLabel, "Waveform Preview");
+    configureSectionLabel(waveformLabel, "Waveform Detail");
     configureSectionLabel(zoneLabel, "Selected Zone");
     configureSectionLabel(macroSectionLabel, "Macro Assignment");
-    configureSectionLabel(fxSectionLabel, "Curated FX");
-    configureSectionLabel(routingSectionLabel, "Routing");
+    configureSectionLabel(fxSectionLabel, "Selected FX");
+    configureSectionLabel(routingSectionLabel, "Selected Bus");
     configureSectionLabel(performanceSectionLabel, "Performance Bank");
 
-    configureFieldLabel(inspectorModeLabel, "Editor");
     configureFieldLabel(macroAssignmentLabel, "Parameter");
     configureFieldLabel(macroRoleLabel, "Role");
     configureFieldLabel(macroDefaultLabel, "Default");
@@ -216,23 +244,10 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     configureFieldLabel(phraseAssetLabel, "Phrase");
     configureFieldLabel(chordModeLabel, "Chord Rule");
     configureFieldLabel(phraseImportPathLabel, "MIDI Path");
-    drawerPlaceholderLabel.setJustificationType(juce::Justification::centredLeft);
 
     configureEditorSlider(macroDefaultSlider, 0.0, 1.0, 0.01);
     configureEditorSlider(macroMinSlider, 0.0, 1.0, 0.01);
     configureEditorSlider(macroMaxSlider, 0.0, 1.0, 0.01);
-
-    inspectorModeSelector.setComponentID("authoringModeSelector");
-    inspectorModeSelector.addItem("Mapping", 1);
-    inspectorModeSelector.addItem("Macros", 2);
-    inspectorModeSelector.addItem("Routing", 3);
-    inspectorModeSelector.addItem("Performance", 4);
-    inspectorModeSelector.onChange = [this]
-    {
-        refreshInspectorVisibility();
-        resized();
-    };
-    inspectorModeSelector.setSelectedId(1, juce::dontSendNotification);
 
     zoneSelector.setComponentID("authoringZoneSelector");
     zoneMap.setComponentID("authoringZoneMap");
@@ -244,9 +259,13 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     drawerMacrosTabButton.setComponentID("authoringDrawerMacrosTab");
     drawerRoutingTabButton.setComponentID("authoringDrawerRoutingTab");
     drawerPerformanceTabButton.setComponentID("authoringDrawerPerformanceTab");
-    drawerPlaceholderLabel.setComponentID("authoringDrawerPlaceholder");
+    waveformLabel.setComponentID("authoringDrawerTitleLabel");
+    waveformScopeLabel.setComponentID("authoringDrawerScopeLabel");
+    drawerBreadcrumbLabel.setComponentID("authoringDrawerBreadcrumbLabel");
+    waveformInfoLabel.setComponentID("authoringWaveformInfoLabel");
+    loopInfoLabel.setComponentID("authoringWaveformLoopLabel");
+    importMetricsLabel.setComponentID("authoringWaveformImportLabel");
     waveformPreview.setComponentID("authoringWaveformPreview");
-    macroSelector.setComponentID("authoringMacroSelector");
     macroAssignmentSelector.setComponentID("authoringMacroAssignmentSelector");
     macroRoleSelector.setComponentID("authoringMacroRoleSelector");
     macroDefaultSlider.setComponentID("authoringMacroDefaultSlider");
@@ -343,14 +362,14 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         refreshFromSession();
     };
 
-    macroSelector.onChange = [this]
+    macroList.setOnSelectionChanged([this](int nextIndex)
     {
         if (isRefreshing)
             return;
 
-        selectedMacroIndex = std::max(0, macroSelector.getSelectedId() - 1);
+        selectedMacroIndex = std::max(0, nextIndex);
         refreshFromSession();
-    };
+    });
 
     fxSelector.onChange = [this]
     {
@@ -516,6 +535,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&drawerTabStrip),
              static_cast<juce::Component*>(&drawerContentHost),
              static_cast<juce::Component*>(&waveformLabel),
+             static_cast<juce::Component*>(&waveformScopeLabel),
+             static_cast<juce::Component*>(&drawerBreadcrumbLabel),
              static_cast<juce::Component*>(&waveformInfoLabel),
              static_cast<juce::Component*>(&loopInfoLabel),
              static_cast<juce::Component*>(&importMetricsLabel),
@@ -524,16 +545,13 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&drawerMacrosTabButton),
              static_cast<juce::Component*>(&drawerRoutingTabButton),
              static_cast<juce::Component*>(&drawerPerformanceTabButton),
-             static_cast<juce::Component*>(&drawerPlaceholderLabel),
-             static_cast<juce::Component*>(&inspectorModeLabel),
-             static_cast<juce::Component*>(&inspectorModeSelector),
              static_cast<juce::Component*>(&zoneLabel),
              static_cast<juce::Component*>(&zoneSelector),
              static_cast<juce::Component*>(&zoneMap),
              static_cast<juce::Component*>(&zoneMappingEditor),
              static_cast<juce::Component*>(&waveformPreview),
              static_cast<juce::Component*>(&macroSectionLabel),
-             static_cast<juce::Component*>(&macroSelector),
+             static_cast<juce::Component*>(&macroList),
              static_cast<juce::Component*>(&macroAssignmentLabel),
              static_cast<juce::Component*>(&macroAssignmentSelector),
              static_cast<juce::Component*>(&macroRoleLabel),
@@ -608,60 +626,7 @@ void AuthoringPanel::resized()
     auto toolbarRow = area.removeFromTop(28);
     zoneLabel.setBounds(toolbarRow.removeFromLeft(96));
     toolbarRow.removeFromLeft(8);
-    zoneSelector.setBounds(toolbarRow.removeFromLeft(250));
-    toolbarRow.removeFromLeft(18);
-    inspectorModeLabel.setBounds(toolbarRow.removeFromLeft(60));
-    toolbarRow.removeFromLeft(8);
-    inspectorModeSelector.setBounds(toolbarRow.removeFromLeft(210));
-
-    area.removeFromTop(12);
-    const auto expanded = isExpandedLayout(layoutMode);
-    const auto drawerOpenHeight = expanded ? authoring::expandedDrawerOpenHeight
-                                           : authoring::compactDrawerOpenHeight;
-    const auto drawerHeight = authoring::drawerTabStripHeight + (drawerState.open ? drawerOpenHeight : 0);
-    auto drawerArea = area.removeFromBottom(std::min(drawerHeight, area.getHeight()));
-    drawerRegion.setBounds(drawerArea);
-    drawerTabStrip.setBounds(drawerArea.removeFromTop(authoring::drawerTabStripHeight));
-    drawerContentHost.setBounds(drawerArea);
-
-    auto toggleArea = drawerTabStrip.getBounds().reduced(0, 4);
-    drawerToggleButton.setBounds(toggleArea.removeFromRight(110));
-
-    auto tabArea = drawerTabStrip.getBounds().reduced(0, 4);
-    const auto tabWidth = expanded ? 104 : 96;
-    drawerWaveformTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
-    tabArea.removeFromLeft(8);
-    drawerMacrosTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
-    tabArea.removeFromLeft(8);
-    drawerRoutingTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
-    tabArea.removeFromLeft(8);
-    drawerPerformanceTabButton.setBounds(tabArea.removeFromLeft(tabWidth + 10));
-
-    auto drawerContent = drawerContentHost.getBounds().reduced(12, 10);
-    waveformLabel.setBounds(drawerContent.removeFromTop(24));
-    drawerContent.removeFromTop(6);
-    waveformPreview.setBounds(drawerContent.removeFromTop(authoring::waveformPreviewHeight));
-    drawerContent.removeFromTop(6);
-    waveformInfoLabel.setBounds(drawerContent.removeFromTop(22));
-    loopInfoLabel.setBounds(drawerContent.removeFromTop(22));
-    importMetricsLabel.setBounds(drawerContent.removeFromTop(38));
-    drawerPlaceholderLabel.setBounds(drawerContentHost.getBounds().reduced(16, 14));
-
-    area.removeFromTop(8);
-    auto shellArea = area;
-    const auto desiredInspectorWidth = expanded ? authoring::expandedInspectorPreferredWidth
-                                                : authoring::compactInspectorPreferredWidth;
-    const auto minimumInspectorWidth = expanded ? authoring::expandedInspectorMinWidth
-                                                : authoring::compactInspectorMinWidth;
-    const auto maximumInspectorWidth = expanded ? authoring::expandedInspectorMaxWidth
-                                                : authoring::compactInspectorMaxWidth;
-    const auto inspectorWidth = juce::jlimit(minimumInspectorWidth,
-                                             std::min(maximumInspectorWidth, std::max(minimumInspectorWidth, shellArea.getWidth() / 2)),
-                                             desiredInspectorWidth);
-
-    auto inspector = shellArea.removeFromRight(inspectorWidth);
-    shellArea.removeFromRight(14);
-    zoneMap.setBounds(shellArea);
+    zoneSelector.setBounds(toolbarRow.removeFromLeft(std::min(360, toolbarRow.getWidth())));
 
     auto layoutLabelAndField = [](juce::Rectangle<int> row,
                                   juce::Label& label,
@@ -688,37 +653,67 @@ void AuthoringPanel::resized()
         layoutLabelAndField(right, rightLabel, rightField, rightLabelWidth);
     };
 
-    if (inspectorModeSelector.getSelectedId() == 1)
+    area.removeFromTop(12);
+    const auto expanded = isExpandedLayout(layoutMode);
+    const auto drawerOpenHeight = expanded ? authoring::expandedDrawerOpenHeight
+                                           : authoring::compactDrawerOpenHeight;
+    const auto drawerHeight = authoring::drawerTabStripHeight + (drawerState.open ? drawerOpenHeight : 0);
+    auto drawerArea = area.removeFromBottom(std::min(drawerHeight, area.getHeight()));
+    drawerRegion.setBounds(drawerArea);
+    drawerTabStrip.setBounds(drawerArea.removeFromTop(authoring::drawerTabStripHeight));
+    drawerContentHost.setBounds(drawerArea);
+
+    auto toggleArea = drawerTabStrip.getBounds().reduced(0, 4);
+    drawerToggleButton.setBounds(toggleArea.removeFromRight(110));
+
+    auto tabArea = drawerTabStrip.getBounds().reduced(0, 4);
+    const auto tabWidth = expanded ? 104 : 96;
+    drawerWaveformTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
+    tabArea.removeFromLeft(8);
+    drawerMacrosTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
+    tabArea.removeFromLeft(8);
+    drawerRoutingTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
+    tabArea.removeFromLeft(8);
+    drawerPerformanceTabButton.setBounds(tabArea.removeFromLeft(tabWidth + 10));
+
+    auto drawerEditorArea = drawerContentHost.getBounds().reduced(12, 10);
+    waveformLabel.setBounds(drawerEditorArea.removeFromTop(22));
+    drawerEditorArea.removeFromTop(2);
+    waveformScopeLabel.setBounds(drawerEditorArea.removeFromTop(14));
+    drawerEditorArea.removeFromTop(1);
+    drawerBreadcrumbLabel.setBounds(drawerEditorArea.removeFromTop(14));
+    drawerEditorArea.removeFromTop(3);
+
+    if (drawerState.activeTab == authoring::DrawerTab::waveform)
     {
-        zoneMappingEditor.setBounds(inspector);
+        const auto waveformMetadataHeight = 18 + 2 + 18 + 2 + 24;
+        const auto waveformPreviewHeight = juce::jlimit(72,
+                                                        authoring::waveformPreviewHeight,
+                                                        drawerEditorArea.getHeight() - waveformMetadataHeight);
+        waveformPreview.setBounds(drawerEditorArea.removeFromTop(waveformPreviewHeight));
+        drawerEditorArea.removeFromTop(4);
+        waveformInfoLabel.setBounds(drawerEditorArea.removeFromTop(18));
+        drawerEditorArea.removeFromTop(2);
+        loopInfoLabel.setBounds(drawerEditorArea.removeFromTop(18));
+        drawerEditorArea.removeFromTop(2);
+        importMetricsLabel.setBounds(drawerEditorArea.removeFromTop(24));
     }
-    else if (inspectorModeSelector.getSelectedId() == 2)
+
+    if (drawerState.activeTab == authoring::DrawerTab::macros)
     {
-        macroSectionLabel.setBounds(inspector.removeFromTop(24));
-        inspector.removeFromTop(4);
+        constexpr auto macroListHeight = 48;
+        auto selectorRow = drawerEditorArea.removeFromTop(macroListHeight);
+        const auto buttonColumnWidth = selectorRow.getWidth() < 420 ? 96 : 110;
+        const auto listWidth = std::max(180, selectorRow.getWidth() - buttonColumnWidth - 8);
+        macroList.setBounds(selectorRow.removeFromLeft(listWidth));
+        selectorRow.removeFromLeft(8);
+        auto buttonColumn = selectorRow.removeFromLeft(buttonColumnWidth);
+        macroMoveUpButton.setBounds(buttonColumn.removeFromTop(20));
+        buttonColumn.removeFromTop(8);
+        macroMoveDownButton.setBounds(buttonColumn.removeFromTop(20));
 
-        if (inspector.getWidth() < 420)
-        {
-            macroSelector.setBounds(inspector.removeFromTop(28));
-            inspector.removeFromTop(4);
-
-            auto buttonRow = inspector.removeFromTop(28);
-            macroMoveUpButton.setBounds(buttonRow.removeFromLeft((buttonRow.getWidth() - 8) / 2));
-            buttonRow.removeFromLeft(8);
-            macroMoveDownButton.setBounds(buttonRow);
-            inspector.removeFromTop(4);
-        }
-        else
-        {
-            auto selectorRow = inspector.removeFromTop(28);
-            macroSelector.setBounds(selectorRow.removeFromLeft(260));
-            selectorRow.removeFromLeft(8);
-            macroMoveUpButton.setBounds(selectorRow.removeFromLeft(90));
-            selectorRow.removeFromLeft(8);
-            macroMoveDownButton.setBounds(selectorRow.removeFromLeft(90));
-            inspector.removeFromTop(4);
-        }
-        auto row = inspector.removeFromTop(28);
+        drawerEditorArea.removeFromTop(2);
+        auto row = drawerEditorArea.removeFromTop(28);
         layoutDualLabelAndFieldRow(row,
                                    macroAssignmentLabel,
                                    macroAssignmentSelector,
@@ -726,9 +721,9 @@ void AuthoringPanel::resized()
                                    macroRoleLabel,
                                    macroRoleSelector,
                                    56);
-        inspector.removeFromTop(4);
+        drawerEditorArea.removeFromTop(2);
 
-        row = inspector.removeFromTop(28);
+        row = drawerEditorArea.removeFromTop(28);
         layoutDualLabelAndFieldRow(row,
                                    macroDefaultLabel,
                                    macroDefaultSlider,
@@ -736,83 +731,77 @@ void AuthoringPanel::resized()
                                    macroMinLabel,
                                    macroMinSlider,
                                    40);
-        inspector.removeFromTop(4);
+        drawerEditorArea.removeFromTop(2);
 
-        row = inspector.removeFromTop(28);
+        row = drawerEditorArea.removeFromTop(28);
         layoutLabelAndField(row, macroMaxLabel, macroMaxSlider, 44);
-
         if (expanded)
         {
-            inspector.removeFromTop(4);
-            macroSummaryLabel.setBounds(inspector.removeFromTop(24));
+            drawerEditorArea.removeFromTop(2);
+            macroSummaryLabel.setBounds(drawerEditorArea.removeFromTop(20));
         }
     }
-    else if (inspectorModeSelector.getSelectedId() == 3)
+    else if (drawerState.activeTab == authoring::DrawerTab::routing)
     {
-        auto headerRow = inspector.removeFromTop(24);
+        auto headerRow = drawerEditorArea.removeFromTop(24);
         auto leftHeader = headerRow.removeFromLeft((headerRow.getWidth() - 12) / 2);
         headerRow.removeFromLeft(12);
         fxSectionLabel.setBounds(leftHeader);
         routingSectionLabel.setBounds(headerRow);
-        inspector.removeFromTop(4);
+        drawerEditorArea.removeFromTop(4);
 
-        auto row = inspector.removeFromTop(28);
+        auto row = drawerEditorArea.removeFromTop(28);
         auto left = row.removeFromLeft((row.getWidth() - 12) / 2);
         row.removeFromLeft(12);
         auto right = row;
         fxSelector.setBounds(left);
         routingBusSelector.setBounds(right);
-        inspector.removeFromTop(4);
+        drawerEditorArea.removeFromTop(4);
 
-        row = inspector.removeFromTop(28);
+        row = drawerEditorArea.removeFromTop(28);
         left = row.removeFromLeft((row.getWidth() - 12) / 2);
         row.removeFromLeft(12);
         right = row;
         layoutLabelAndField(left, fxTypeLabel, fxTypeSelector, 44);
         layoutLabelAndField(right, routingInputLabel, routingInputSelector, 44);
-        inspector.removeFromTop(4);
+        drawerEditorArea.removeFromTop(4);
 
-        row = inspector.removeFromTop(28);
+        row = drawerEditorArea.removeFromTop(28);
         left = row.removeFromLeft((row.getWidth() - 12) / 2);
         row.removeFromLeft(12);
         right = row;
         fxBypassedToggle.setBounds(left);
         layoutLabelAndField(right, routingInsertOneLabel, routingInsertOneSelector, 44);
-        inspector.removeFromTop(4);
+        drawerEditorArea.removeFromTop(4);
 
-        row = inspector.removeFromTop(28);
+        row = drawerEditorArea.removeFromTop(28);
         layoutLabelAndField(row, routingInsertTwoLabel, routingInsertTwoSelector, 56);
-
         if (expanded)
         {
-            inspector.removeFromTop(4);
-            fxSummaryLabel.setBounds(inspector.removeFromTop(20));
-            inspector.removeFromTop(2);
-            routingSummaryLabel.setBounds(inspector.removeFromTop(20));
+            drawerEditorArea.removeFromTop(4);
+            fxSummaryLabel.setBounds(drawerEditorArea.removeFromTop(20));
+            drawerEditorArea.removeFromTop(2);
+            routingSummaryLabel.setBounds(drawerEditorArea.removeFromTop(20));
         }
     }
-    else
+    else if (drawerState.activeTab == authoring::DrawerTab::performance)
     {
-        performanceSectionLabel.setBounds(inspector.removeFromTop(24));
-        inspector.removeFromTop(4);
-
-        if (inspector.getWidth() < 420)
+        if (drawerEditorArea.getWidth() < 420)
         {
-            performanceBankSelector.setBounds(inspector.removeFromTop(28));
-            inspector.removeFromTop(4);
-            triggerSlotSelector.setBounds(inspector.removeFromTop(28));
-            inspector.removeFromTop(4);
+            performanceBankSelector.setBounds(drawerEditorArea.removeFromTop(28));
+            drawerEditorArea.removeFromTop(4);
+            triggerSlotSelector.setBounds(drawerEditorArea.removeFromTop(28));
         }
         else
         {
-            auto selectorRow = inspector.removeFromTop(28);
-            performanceBankSelector.setBounds(selectorRow.removeFromLeft(250));
+            auto selectorRow = drawerEditorArea.removeFromTop(28);
+            performanceBankSelector.setBounds(selectorRow.removeFromLeft(280));
             selectorRow.removeFromLeft(10);
-            triggerSlotSelector.setBounds(selectorRow.removeFromLeft(250));
-            inspector.removeFromTop(4);
+            triggerSlotSelector.setBounds(selectorRow.removeFromLeft(280));
         }
 
-        auto row = inspector.removeFromTop(28);
+        drawerEditorArea.removeFromTop(4);
+        auto row = drawerEditorArea.removeFromTop(28);
         layoutDualLabelAndFieldRow(row,
                                    triggerEventLabel,
                                    triggerEventSelector,
@@ -820,9 +809,9 @@ void AuthoringPanel::resized()
                                    targetArticulationLabel,
                                    targetArticulationSelector,
                                    72);
-        inspector.removeFromTop(4);
+        drawerEditorArea.removeFromTop(4);
 
-        row = inspector.removeFromTop(28);
+        row = drawerEditorArea.removeFromTop(28);
         layoutDualLabelAndFieldRow(row,
                                    phraseAssetLabel,
                                    phraseAssetSelector,
@@ -830,22 +819,38 @@ void AuthoringPanel::resized()
                                    chordModeLabel,
                                    chordModeSelector,
                                    72);
-        inspector.removeFromTop(4);
+        drawerEditorArea.removeFromTop(4);
 
-        row = inspector.removeFromTop(28);
+        row = drawerEditorArea.removeFromTop(28);
         auto buttonArea = row.removeFromRight(180);
         row.removeFromRight(10);
         layoutLabelAndField(row, phraseImportPathLabel, phraseImportPathEditor, 56);
         phraseImportButton.setBounds(buttonArea);
-
         if (expanded)
         {
-            inspector.removeFromTop(6);
-            performanceSummaryLabel.setBounds(inspector.removeFromTop(20));
-            inspector.removeFromTop(4);
-            phraseSummaryLabel.setBounds(inspector.removeFromTop(24));
+            drawerEditorArea.removeFromTop(6);
+            performanceSummaryLabel.setBounds(drawerEditorArea.removeFromTop(20));
+            drawerEditorArea.removeFromTop(4);
+            phraseSummaryLabel.setBounds(drawerEditorArea.removeFromTop(24));
         }
     }
+
+    area.removeFromTop(8);
+    auto shellArea = area;
+    const auto desiredInspectorWidth = expanded ? authoring::expandedInspectorPreferredWidth
+                                                : authoring::compactInspectorPreferredWidth;
+    const auto minimumInspectorWidth = expanded ? authoring::expandedInspectorMinWidth
+                                                : authoring::compactInspectorMinWidth;
+    const auto maximumInspectorWidth = expanded ? authoring::expandedInspectorMaxWidth
+                                                : authoring::compactInspectorMaxWidth;
+    const auto inspectorWidth = juce::jlimit(minimumInspectorWidth,
+                                             std::min(maximumInspectorWidth, std::max(minimumInspectorWidth, shellArea.getWidth() / 2)),
+                                             desiredInspectorWidth);
+
+    auto inspector = shellArea.removeFromRight(inspectorWidth);
+    shellArea.removeFromRight(14);
+    zoneMap.setBounds(shellArea);
+    zoneMappingEditor.setBounds(inspector);
 }
 
 void AuthoringPanel::reloadFromSession()
@@ -922,25 +927,33 @@ void AuthoringPanel::rebuildZoneSelector()
     zoneSelector.setSelectedId(selectedItemId, juce::dontSendNotification);
 }
 
-void AuthoringPanel::rebuildMacroSelector()
+void AuthoringPanel::rebuildMacroList()
 {
     const auto& macros = authoringSession.getProject().authoring.macros;
-    macroSelector.clear(juce::dontSendNotification);
+    authoring::RepeatedStructureListViewModel viewModel;
+    viewModel.emptyStateText = "No macros are authored in this project yet.";
 
     if (macros.empty())
     {
-        selectedMacroIndex = 0;
+        selectedMacroIndex = -1;
+        macroList.setViewModel(std::move(viewModel));
         return;
     }
 
     selectedMacroIndex = std::clamp(selectedMacroIndex, 0, static_cast<int>(macros.size()) - 1);
+    viewModel.selectedIndex = selectedMacroIndex;
+    viewModel.rows.reserve(macros.size());
+
     for (std::size_t index = 0; index < macros.size(); ++index)
     {
-        macroSelector.addItem(juce::String::fromUTF8(macros[index].name.c_str()),
-                              static_cast<int>(index) + 1);
+        auto row = authoring::RepeatedStructureRowViewModel{};
+        row.key = macros[index].id;
+        row.title = macros[index].name;
+        row.statusText = buildMacroListStatusText(macros[index]).toStdString();
+        viewModel.rows.push_back(std::move(row));
     }
 
-    macroSelector.setSelectedId(selectedMacroIndex + 1, juce::dontSendNotification);
+    macroList.setViewModel(std::move(viewModel));
 }
 
 void AuthoringPanel::rebuildFxSelector()
@@ -1065,91 +1078,240 @@ void AuthoringPanel::setActiveDrawerTab(authoring::DrawerTab nextTab)
 void AuthoringPanel::refreshDrawerVisibility()
 {
     const auto waveformTab = drawerState.activeTab == authoring::DrawerTab::waveform;
+    const auto macrosTab = drawerState.activeTab == authoring::DrawerTab::macros;
+    const auto routingTab = drawerState.activeTab == authoring::DrawerTab::routing;
+    const auto performanceTab = drawerState.activeTab == authoring::DrawerTab::performance;
     const auto drawerContentVisible = drawerState.open;
+    const auto expanded = isExpandedLayout(layoutMode);
+
+    refreshDrawerContextLabels();
 
     drawerToggleButton.setButtonText(drawerState.open ? "Hide Drawer" : "Show Drawer");
     drawerContentHost.setVisible(drawerContentVisible);
-    waveformLabel.setVisible(drawerContentVisible && waveformTab);
+    waveformLabel.setVisible(drawerContentVisible);
+    waveformScopeLabel.setVisible(drawerContentVisible);
+    drawerBreadcrumbLabel.setVisible(drawerContentVisible);
     waveformPreview.setVisible(drawerContentVisible && waveformTab);
     waveformInfoLabel.setVisible(drawerContentVisible && waveformTab);
     loopInfoLabel.setVisible(drawerContentVisible && waveformTab);
     importMetricsLabel.setVisible(drawerContentVisible && waveformTab);
-    drawerPlaceholderLabel.setVisible(drawerContentVisible && !waveformTab);
-    drawerPlaceholderLabel.setText(
-        juce::String::fromUTF8(getDrawerTabName(drawerState.activeTab))
-            + " content remains behind the temporary editor selector during this Sprint 2 migration slice.",
-        juce::dontSendNotification);
+
+    macroSectionLabel.setVisible(drawerContentVisible && macrosTab);
+    macroList.setVisible(drawerContentVisible && macrosTab);
+    macroAssignmentLabel.setVisible(drawerContentVisible && macrosTab);
+    macroAssignmentSelector.setVisible(drawerContentVisible && macrosTab);
+    macroRoleLabel.setVisible(drawerContentVisible && macrosTab);
+    macroRoleSelector.setVisible(drawerContentVisible && macrosTab);
+    macroDefaultLabel.setVisible(drawerContentVisible && macrosTab);
+    macroDefaultSlider.setVisible(drawerContentVisible && macrosTab);
+    macroMinLabel.setVisible(drawerContentVisible && macrosTab);
+    macroMinSlider.setVisible(drawerContentVisible && macrosTab);
+    macroMaxLabel.setVisible(drawerContentVisible && macrosTab);
+    macroMaxSlider.setVisible(drawerContentVisible && macrosTab);
+    macroMoveUpButton.setVisible(drawerContentVisible && macrosTab);
+    macroMoveDownButton.setVisible(drawerContentVisible && macrosTab);
+    macroSummaryLabel.setVisible(drawerContentVisible && macrosTab && expanded);
+
+    fxSectionLabel.setVisible(drawerContentVisible && routingTab);
+    fxSelector.setVisible(drawerContentVisible && routingTab);
+    fxTypeLabel.setVisible(drawerContentVisible && routingTab);
+    fxTypeSelector.setVisible(drawerContentVisible && routingTab);
+    fxBypassedToggle.setVisible(drawerContentVisible && routingTab);
+    fxSummaryLabel.setVisible(drawerContentVisible && routingTab && expanded);
+    routingSectionLabel.setVisible(drawerContentVisible && routingTab);
+    routingBusSelector.setVisible(drawerContentVisible && routingTab);
+    routingInputLabel.setVisible(drawerContentVisible && routingTab);
+    routingInputSelector.setVisible(drawerContentVisible && routingTab);
+    routingInsertOneLabel.setVisible(drawerContentVisible && routingTab);
+    routingInsertOneSelector.setVisible(drawerContentVisible && routingTab);
+    routingInsertTwoLabel.setVisible(drawerContentVisible && routingTab);
+    routingInsertTwoSelector.setVisible(drawerContentVisible && routingTab);
+    routingSummaryLabel.setVisible(drawerContentVisible && routingTab && expanded);
+
+    performanceSectionLabel.setVisible(false);
+    performanceBankSelector.setVisible(drawerContentVisible && performanceTab);
+    triggerSlotSelector.setVisible(drawerContentVisible && performanceTab);
+    triggerEventLabel.setVisible(drawerContentVisible && performanceTab);
+    triggerEventSelector.setVisible(drawerContentVisible && performanceTab);
+    targetArticulationLabel.setVisible(drawerContentVisible && performanceTab);
+    targetArticulationSelector.setVisible(drawerContentVisible && performanceTab);
+    phraseAssetLabel.setVisible(drawerContentVisible && performanceTab);
+    phraseAssetSelector.setVisible(drawerContentVisible && performanceTab);
+    chordModeLabel.setVisible(drawerContentVisible && performanceTab);
+    chordModeSelector.setVisible(drawerContentVisible && performanceTab);
+    phraseImportPathLabel.setVisible(drawerContentVisible && performanceTab);
+    phraseImportPathEditor.setVisible(drawerContentVisible && performanceTab);
+    phraseImportButton.setVisible(drawerContentVisible && performanceTab);
+    performanceSummaryLabel.setVisible(drawerContentVisible && performanceTab && expanded);
+    phraseSummaryLabel.setVisible(drawerContentVisible && performanceTab && expanded);
 
     drawerWaveformTabButton.setToggleState(waveformTab, juce::dontSendNotification);
-    drawerMacrosTabButton.setToggleState(drawerState.activeTab == authoring::DrawerTab::macros,
-                                         juce::dontSendNotification);
-    drawerRoutingTabButton.setToggleState(drawerState.activeTab == authoring::DrawerTab::routing,
-                                          juce::dontSendNotification);
-    drawerPerformanceTabButton.setToggleState(drawerState.activeTab == authoring::DrawerTab::performance,
-                                              juce::dontSendNotification);
+    drawerMacrosTabButton.setToggleState(macrosTab, juce::dontSendNotification);
+    drawerRoutingTabButton.setToggleState(routingTab, juce::dontSendNotification);
+    drawerPerformanceTabButton.setToggleState(performanceTab, juce::dontSendNotification);
 }
 
 void AuthoringPanel::refreshInspectorVisibility()
 {
-    const auto mappingMode = inspectorModeSelector.getSelectedId() == 1;
-    const auto macroMode = inspectorModeSelector.getSelectedId() == 2;
-    const auto routingMode = inspectorModeSelector.getSelectedId() == 3;
-    const auto performanceMode = inspectorModeSelector.getSelectedId() == 4;
-    const auto expanded = isExpandedLayout(layoutMode);
-
     zoneMap.setVisible(true);
-    zoneMappingEditor.setVisible(mappingMode);
-
-    macroSectionLabel.setVisible(macroMode);
-    macroSelector.setVisible(macroMode);
-    macroAssignmentLabel.setVisible(macroMode);
-    macroAssignmentSelector.setVisible(macroMode);
-    macroRoleLabel.setVisible(macroMode);
-    macroRoleSelector.setVisible(macroMode);
-    macroDefaultLabel.setVisible(macroMode);
-    macroDefaultSlider.setVisible(macroMode);
-    macroMinLabel.setVisible(macroMode);
-    macroMinSlider.setVisible(macroMode);
-    macroMaxLabel.setVisible(macroMode);
-    macroMaxSlider.setVisible(macroMode);
-    macroMoveUpButton.setVisible(macroMode);
-    macroMoveDownButton.setVisible(macroMode);
-    macroSummaryLabel.setVisible(macroMode && expanded);
-
-    fxSectionLabel.setVisible(routingMode);
-    fxSelector.setVisible(routingMode);
-    fxTypeLabel.setVisible(routingMode);
-    fxTypeSelector.setVisible(routingMode);
-    fxBypassedToggle.setVisible(routingMode);
-    fxSummaryLabel.setVisible(routingMode && expanded);
-    routingSectionLabel.setVisible(routingMode);
-    routingBusSelector.setVisible(routingMode);
-    routingInputLabel.setVisible(routingMode);
-    routingInputSelector.setVisible(routingMode);
-    routingInsertOneLabel.setVisible(routingMode);
-    routingInsertOneSelector.setVisible(routingMode);
-    routingInsertTwoLabel.setVisible(routingMode);
-    routingInsertTwoSelector.setVisible(routingMode);
-    routingSummaryLabel.setVisible(routingMode && expanded);
-
-    performanceSectionLabel.setVisible(performanceMode);
-    performanceBankSelector.setVisible(performanceMode);
-    triggerSlotSelector.setVisible(performanceMode);
-    triggerEventLabel.setVisible(performanceMode);
-    triggerEventSelector.setVisible(performanceMode);
-    targetArticulationLabel.setVisible(performanceMode);
-    targetArticulationSelector.setVisible(performanceMode);
-    phraseAssetLabel.setVisible(performanceMode);
-    phraseAssetSelector.setVisible(performanceMode);
-    chordModeLabel.setVisible(performanceMode);
-    chordModeSelector.setVisible(performanceMode);
-    phraseImportPathLabel.setVisible(performanceMode);
-    phraseImportPathEditor.setVisible(performanceMode);
-    phraseImportButton.setVisible(performanceMode);
-    performanceSummaryLabel.setVisible(performanceMode && expanded);
-    phraseSummaryLabel.setVisible(performanceMode && expanded);
+    zoneMappingEditor.setVisible(true);
 
     refreshDrawerVisibility();
+}
+
+void AuthoringPanel::refreshDrawerContextLabels()
+{
+    const auto& project = authoringSession.getProject();
+
+    switch (drawerState.activeTab)
+    {
+        case authoring::DrawerTab::waveform:
+        {
+            waveformLabel.setText("Waveform Detail", juce::dontSendNotification);
+            waveformScopeLabel.setText("Zone-scoped selection detail", juce::dontSendNotification);
+
+            if (const auto selectedZone = authoringSession.getSelectedZone(); selectedZone.has_value())
+            {
+                drawerBreadcrumbLabel.setText("Project > Zones > "
+                                                  + juce::String::fromUTF8(selectedZone->displayName.c_str()),
+                                              juce::dontSendNotification);
+            }
+            else
+            {
+                drawerBreadcrumbLabel.setText("Project > Zones", juce::dontSendNotification);
+            }
+            break;
+        }
+        case authoring::DrawerTab::macros:
+        {
+            waveformLabel.setText("Macro Assignment", juce::dontSendNotification);
+            waveformScopeLabel.setText("Project-scoped automation detail", juce::dontSendNotification);
+
+            juce::String breadcrumb = "Project > Macros";
+            if (!project.authoring.macros.empty()
+                && static_cast<std::size_t>(selectedMacroIndex) < project.authoring.macros.size())
+            {
+                breadcrumb << " > "
+                           << juce::String::fromUTF8(project.authoring.macros[static_cast<std::size_t>(selectedMacroIndex)].name.c_str());
+            }
+            drawerBreadcrumbLabel.setText(breadcrumb, juce::dontSendNotification);
+            break;
+        }
+        case authoring::DrawerTab::routing:
+        {
+            waveformLabel.setText("Routing Detail", juce::dontSendNotification);
+            waveformScopeLabel.setText("Project-scoped FX and bus detail", juce::dontSendNotification);
+
+            juce::String fxName = "(none)";
+            if (!project.authoring.fxSlots.empty()
+                && static_cast<std::size_t>(selectedFxSlotIndex) < project.authoring.fxSlots.size())
+            {
+                fxName = juce::String::fromUTF8(project.authoring.fxSlots[static_cast<std::size_t>(selectedFxSlotIndex)].displayName.c_str());
+            }
+
+            juce::String busName = "(none)";
+            if (!project.authoring.routingBuses.empty()
+                && static_cast<std::size_t>(selectedRoutingBusIndex) < project.authoring.routingBuses.size())
+            {
+                busName = juce::String::fromUTF8(project.authoring.routingBuses[static_cast<std::size_t>(selectedRoutingBusIndex)].displayName.c_str());
+            }
+
+            drawerBreadcrumbLabel.setText("Project > Routing > FX: " + fxName + " | Bus: " + busName,
+                                          juce::dontSendNotification);
+            break;
+        }
+        case authoring::DrawerTab::performance:
+        {
+            waveformLabel.setText("Performance Detail", juce::dontSendNotification);
+
+            if (const auto selectedPerformanceBank = authoringSession.getSelectedPerformanceBank();
+                selectedPerformanceBank.has_value())
+            {
+                juce::String breadcrumb = "Project > Performance > "
+                    + juce::String::fromUTF8(selectedPerformanceBank->displayName.c_str());
+
+                if (selectedTriggerSlotIndex >= 0
+                    && static_cast<std::size_t>(selectedTriggerSlotIndex) < selectedPerformanceBank->triggerSlots.size())
+                {
+                    waveformScopeLabel.setText("Bank-scoped trigger detail", juce::dontSendNotification);
+                    breadcrumb << " > "
+                               << juce::String::fromUTF8(
+                                      selectedPerformanceBank->triggerSlots[static_cast<std::size_t>(selectedTriggerSlotIndex)].displayName.c_str());
+                }
+                else
+                {
+                    waveformScopeLabel.setText("Bank-scoped performance detail", juce::dontSendNotification);
+                }
+
+                drawerBreadcrumbLabel.setText(breadcrumb, juce::dontSendNotification);
+            }
+            else
+            {
+                waveformScopeLabel.setText("Bank-scoped performance detail", juce::dontSendNotification);
+                drawerBreadcrumbLabel.setText("Project > Performance", juce::dontSendNotification);
+            }
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+void AuthoringPanel::refreshWaveformDrawerContent()
+{
+    AuthoringWaveformPreview preview;
+    if (waveformPreviewProvider)
+        preview = waveformPreviewProvider();
+
+    waveformPreview.setPreview(preview);
+
+    if (preview.available)
+    {
+        const auto sourceFile = preview.sourcePath.empty()
+            ? juce::String("(source unavailable)")
+            : juce::File(juce::String::fromUTF8(preview.sourcePath.c_str())).getFileName();
+        waveformInfoLabel.setText(
+            "File " + sourceFile
+                + " | " + juce::String::fromUTF8(preview.formatName.c_str())
+                + " | " + juce::String(static_cast<int>(preview.sampleRate)) + " Hz"
+                + " | " + juce::String(static_cast<int>(preview.channelCount)) + " ch"
+                + " | " + juce::String(preview.durationSeconds, 3) + " s",
+            juce::dontSendNotification);
+        loopInfoLabel.setText(
+            preview.loopEnabled
+                ? "Loop " + juce::String(static_cast<int>(preview.loopStartFrame))
+                    + " - " + juce::String(static_cast<int>(preview.loopEndFrame))
+                : "Loop disabled for selected zone",
+            juce::dontSendNotification);
+    }
+    else
+    {
+        waveformInfoLabel.setText(
+            preview.state.empty() ? "Waveform metadata unavailable"
+                                  : "Waveform: " + juce::String::fromUTF8(preview.state.c_str()),
+            juce::dontSendNotification);
+        loopInfoLabel.setText("Loop metadata unavailable", juce::dontSendNotification);
+    }
+
+    if (importResponsivenessProvider)
+    {
+        const auto metrics = importResponsivenessProvider();
+        importMetricsLabel.setText(
+            metrics.available
+                ? "Import " + juce::String(static_cast<int>(metrics.processedCount))
+                    + "/" + juce::String(static_cast<int>(metrics.totalItemCount))
+                    + " | warn " + juce::String(static_cast<int>(metrics.warningItemCount))
+                    + " | fail " + juce::String(static_cast<int>(metrics.failedItemCount))
+                    + " | last " + formatMicros(metrics.lastProcessDurationMicros)
+                    + " avg " + formatMicros(metrics.averageProcessDurationMicros)
+                    + " max " + formatMicros(metrics.maxProcessDurationMicros)
+                : "Import responsiveness unavailable",
+            juce::dontSendNotification);
+    }
+    else
+    {
+        importMetricsLabel.setText("Import responsiveness unavailable", juce::dontSendNotification);
+    }
 }
 
 void AuthoringPanel::refreshFromSession()
@@ -1157,7 +1319,7 @@ void AuthoringPanel::refreshFromSession()
     const juce::ScopedValueSetter<bool> refreshGuard(isRefreshing, true);
 
     rebuildZoneSelector();
-    rebuildMacroSelector();
+    rebuildMacroList();
     rebuildFxSelector();
     rebuildRoutingBusSelector();
     rebuildPerformanceBankSelector();
@@ -1227,12 +1389,22 @@ void AuthoringPanel::refreshFromSession()
                 + " | range " + juce::String(macro.minValue, 2)
                 + " to " + juce::String(macro.maxValue, 2),
             juce::dontSendNotification);
+        macroAssignmentSelector.setEnabled(true);
+        macroRoleSelector.setEnabled(true);
+        macroDefaultSlider.setEnabled(true);
+        macroMinSlider.setEnabled(true);
+        macroMaxSlider.setEnabled(true);
         macroMoveUpButton.setEnabled(selectedMacroIndex > 0);
         macroMoveDownButton.setEnabled(selectedMacroIndex + 1 < static_cast<int>(project.authoring.macros.size()));
     }
     else
     {
         macroSummaryLabel.setText("No macros are authored in this project yet.", juce::dontSendNotification);
+        macroAssignmentSelector.setEnabled(false);
+        macroRoleSelector.setEnabled(false);
+        macroDefaultSlider.setEnabled(false);
+        macroMinSlider.setEnabled(false);
+        macroMaxSlider.setEnabled(false);
         macroMoveUpButton.setEnabled(false);
         macroMoveDownButton.setEnabled(false);
     }
@@ -1432,44 +1604,7 @@ void AuthoringPanel::refreshFromSession()
         phraseSummaryLabel.setText("Performance phrases unavailable.", juce::dontSendNotification);
     }
 
-    if (waveformPreviewProvider)
-    {
-        const auto preview = waveformPreviewProvider();
-        waveformPreview.setPreview(preview);
-        waveformInfoLabel.setText(
-            preview.available
-                ? "Source " + juce::String::fromUTF8(preview.formatName.c_str())
-                    + " | " + juce::String(static_cast<int>(preview.sampleRate)) + " Hz"
-                    + " | " + juce::String(static_cast<int>(preview.channelCount)) + " ch"
-                    + " | " + juce::String(preview.durationSeconds, 3) + " s"
-                : "Waveform: " + juce::String::fromUTF8(preview.state.c_str()),
-            juce::dontSendNotification);
-        loopInfoLabel.setText(
-            preview.available
-                ? (preview.loopEnabled
-                       ? "Loop " + juce::String(static_cast<int>(preview.loopStartFrame))
-                           + " - " + juce::String(static_cast<int>(preview.loopEndFrame))
-                       : "Loop disabled for selected zone")
-                : "Loop metadata unavailable",
-            juce::dontSendNotification);
-    }
-
-    if (importResponsivenessProvider)
-    {
-        const auto metrics = importResponsivenessProvider();
-        importMetricsLabel.setText(
-            metrics.available
-                ? "Import responsiveness: items=" + juce::String(static_cast<int>(metrics.totalItemCount))
-                    + ", processed=" + juce::String(static_cast<int>(metrics.processedCount))
-                    + ", warnings=" + juce::String(static_cast<int>(metrics.warningItemCount))
-                    + ", failures=" + juce::String(static_cast<int>(metrics.failedItemCount))
-                    + " | last=" + formatMicros(metrics.lastProcessDurationMicros)
-                    + ", avg=" + formatMicros(metrics.averageProcessDurationMicros)
-                    + ", max=" + formatMicros(metrics.maxProcessDurationMicros)
-                : "Import responsiveness unavailable",
-            juce::dontSendNotification);
-    }
-
+    refreshWaveformDrawerContent();
     refreshInspectorVisibility();
 }
 

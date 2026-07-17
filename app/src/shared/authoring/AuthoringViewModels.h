@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace drs::app::authoring
 {
@@ -46,6 +47,21 @@ struct ZoneFieldValuesViewModel
     std::string emptyStateText;
 };
 
+struct RepeatedStructureRowViewModel
+{
+    std::string key;
+    std::string title;
+    std::string statusText;
+    bool enabled = true;
+};
+
+struct RepeatedStructureListViewModel
+{
+    std::string emptyStateText;
+    std::vector<RepeatedStructureRowViewModel> rows;
+    int selectedIndex = -1;
+};
+
 struct SelectionSummaryCallbacks
 {
     std::function<void()> onPreviewRequested;
@@ -61,4 +77,5 @@ struct ZoneFieldCallbacks
 };
 
 using RefreshEditIntent = std::function<void(const std::string&)>;
+using RepeatedStructureSelectionCallback = std::function<void(int)>;
 } // namespace drs::app::authoring

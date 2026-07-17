@@ -2,6 +2,7 @@
 
 #include "shared/authoring/AuthoringSummaryStrip.h"
 #include "shared/authoring/AuthoringViewModels.h"
+#include "shared/authoring/RepeatedStructureList.h"
 #include "shared/authoring/ZoneMappingEditor.h"
 #include "shared/authoring/ZoneMapCanvas.h"
 #include "shared/authoring/WaveformDetailView.h"
@@ -45,12 +46,14 @@ public:
 
 private:
     void rebuildZoneSelector();
-    void rebuildMacroSelector();
+    void rebuildMacroList();
     void rebuildFxSelector();
     void rebuildRoutingBusSelector();
     void rebuildPerformanceBankSelector();
     void rebuildTriggerSlotSelector();
     void refreshInspectorVisibility();
+    void refreshDrawerContextLabels();
+    void refreshWaveformDrawerContent();
     void refreshFromSession();
     void applySelectedZoneEdit(const authoring::ZoneFieldValuesViewModel& values, const juce::String& label);
     void applySelectedMacroEdit(const juce::String& label);
@@ -88,6 +91,8 @@ private:
 
     authoring::AuthoringSummaryStrip summaryStrip;
     juce::Label waveformLabel;
+    juce::Label waveformScopeLabel;
+    juce::Label drawerBreadcrumbLabel;
     juce::Label waveformInfoLabel;
     juce::Label loopInfoLabel;
     juce::Label importMetricsLabel;
@@ -99,9 +104,6 @@ private:
     juce::TextButton drawerMacrosTabButton;
     juce::TextButton drawerRoutingTabButton;
     juce::TextButton drawerPerformanceTabButton;
-    juce::Label drawerPlaceholderLabel;
-    juce::Label inspectorModeLabel;
-    juce::ComboBox inspectorModeSelector;
     juce::Label zoneLabel;
     juce::ComboBox zoneSelector;
     authoring::ZoneMapCanvas zoneMap;
@@ -109,7 +111,7 @@ private:
     authoring::WaveformDetailView waveformPreview;
 
     juce::Label macroSectionLabel;
-    juce::ComboBox macroSelector;
+    authoring::RepeatedStructureList macroList;
     juce::Label macroAssignmentLabel;
     juce::ComboBox macroAssignmentSelector;
     juce::Label macroRoleLabel;

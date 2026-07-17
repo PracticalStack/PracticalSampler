@@ -12,6 +12,8 @@ set(DRS_APP_SHARED_SOURCES
     src/shared/authoring/AuthoringWorkspaceLayout.h
     src/shared/authoring/CompactInspectorPrimitives.cpp
     src/shared/authoring/CompactInspectorPrimitives.h
+    src/shared/authoring/RepeatedStructureList.cpp
+    src/shared/authoring/RepeatedStructureList.h
     src/shared/authoring/AuthoringSummaryStrip.cpp
     src/shared/authoring/AuthoringSummaryStrip.h
     src/shared/authoring/WaveformDetailView.cpp

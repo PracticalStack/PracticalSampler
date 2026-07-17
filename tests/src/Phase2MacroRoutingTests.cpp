@@ -120,10 +120,14 @@ int main()
         auto* pluginTabs = dynamic_cast<juce::TabbedComponent*>(findDescendantById(*editor, "workspaceTabs"));
         require(pluginTabs != nullptr, "Plugin shell should expose the workspace tabs during Sprint 5 validation.");
         pluginTabs->setCurrentTabIndex(1);
-        require(findDescendantById(*editor, "authoringModeSelector") != nullptr,
-                "Plugin authoring shell should expose the Sprint 5 mode selector.");
-        require(findDescendantById(*editor, "authoringMacroSelector") != nullptr,
-                "Plugin authoring shell should expose the Sprint 5 macro selector.");
+        require(findDescendantById(*editor, "authoringModeSelector") == nullptr,
+                "Plugin authoring shell should retire the temporary mode selector after UI25-402.");
+        require(findDescendantById(*editor, "authoringDrawerMacrosTab") != nullptr,
+                "Plugin authoring shell should expose the macros drawer tab.");
+        require(findDescendantById(*editor, "authoringDrawerRoutingTab") != nullptr,
+                "Plugin authoring shell should expose the routing drawer tab.");
+        require(findDescendantById(*editor, "authoringMacroList") != nullptr,
+                "Plugin authoring shell should expose the UI25-404 macro repeated-structure list.");
         require(findDescendantById(*editor, "authoringFxSelector") != nullptr,
                 "Plugin authoring shell should expose the Sprint 5 FX selector.");
         require(findDescendantById(*editor, "authoringRoutingSelector") != nullptr,
@@ -134,10 +138,14 @@ int main()
         require(standaloneTabs != nullptr,
                 "Standalone shell should expose the workspace tabs during Sprint 5 validation.");
         standaloneTabs->setCurrentTabIndex(1);
-        require(findDescendantById(standalone, "authoringModeSelector") != nullptr,
-                "Standalone authoring shell should expose the Sprint 5 mode selector.");
-        require(findDescendantById(standalone, "authoringMacroSelector") != nullptr,
-                "Standalone authoring shell should expose the Sprint 5 macro selector.");
+        require(findDescendantById(standalone, "authoringModeSelector") == nullptr,
+                "Standalone authoring shell should retire the temporary mode selector after UI25-402.");
+        require(findDescendantById(standalone, "authoringDrawerMacrosTab") != nullptr,
+                "Standalone authoring shell should expose the macros drawer tab.");
+        require(findDescendantById(standalone, "authoringDrawerRoutingTab") != nullptr,
+                "Standalone authoring shell should expose the routing drawer tab.");
+        require(findDescendantById(standalone, "authoringMacroList") != nullptr,
+                "Standalone authoring shell should expose the UI25-404 macro repeated-structure list.");
         require(findDescendantById(standalone, "authoringFxSelector") != nullptr,
                 "Standalone authoring shell should expose the Sprint 5 FX selector.");
         require(findDescendantById(standalone, "authoringRoutingSelector") != nullptr,
