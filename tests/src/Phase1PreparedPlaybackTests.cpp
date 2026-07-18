@@ -3,6 +3,7 @@
 #include "drs/engine/PreparedPlayback.h"
 #include "drs/engine/ProjectDocument.h"
 #include "drs/engine/RuntimeLoader.h"
+#include "drs/engine/SampleImport.h"
 
 #include <juce_audio_formats/juce_audio_formats.h>
 
@@ -81,10 +82,27 @@ juce::AudioBuffer<float> buildReferenceBuffer()
     return buffer;
 }
 
+juce::AudioBuffer<float> buildAlternateReferenceBuffer()
+{
+    constexpr int frameCount = 480;
+    juce::AudioBuffer<float> buffer(2, frameCount);
+    buffer.clear();
+
+    for (int sampleIndex = 0; sampleIndex < frameCount; ++sampleIndex)
+    {
+        const auto phase = static_cast<float>(sampleIndex) / static_cast<float>(frameCount);
+        buffer.setSample(0, sampleIndex, std::sin((phase * juce::MathConstants<float>::twoPi) * 2.0f) * 0.4f);
+        buffer.setSample(1, sampleIndex, std::cos((phase * juce::MathConstants<float>::twoPi) * 3.0f) * 0.2f);
+    }
+
+    return buffer;
+}
+
 void writeAudioFile(const fs::path& filePath,
                     juce::AudioFormat& format,
                     const juce::AudioBuffer<float>& buffer,
-                    double sampleRate)
+                    double sampleRate,
+                    const juce::StringPairArray& metadata = {})
 {
     auto fileOutput = std::make_unique<juce::FileOutputStream>(juce::File(filePath.generic_string()));
     require(fileOutput->openedOk(), "Could not open prepared-playback fixture for writing: " + filePath.generic_string());
@@ -95,11 +113,34 @@ void writeAudioFile(const fs::path& filePath,
         .withNumChannels(buffer.getNumChannels())
         .withBitsPerSample(24);
 
+    for (const auto& key : metadata.getAllKeys())
+        options = options.withMetadata(key, metadata[key]);
+
     auto writerOwner = format.createWriterFor(output, options);
     require(writerOwner != nullptr,
             "Could not create prepared-playback audio writer for: " + filePath.generic_string());
     require(writerOwner->writeFromAudioSampleBuffer(buffer, 0, buffer.getNumSamples()),
             "Could not write prepared-playback fixture audio: " + filePath.generic_string());
+}
+
+void applyImportedMetadataToStreamSample(const drs::engine::SampleImportResult& importResult,
+                                         drs::engine::RuntimeStreamSampleDefinition& streamSample,
+                                         const std::string& sourcePath)
+{
+    require(importResult.imported,
+            "Prepared-playback invalidation coverage requires a decodable source fixture before stream metadata can be updated.");
+    streamSample.sourcePath = sourcePath;
+    streamSample.sourceChecksumHex = importResult.sample.metadata.sourceChecksumHex;
+    streamSample.formatName = importResult.sample.metadata.formatName;
+    streamSample.channelLayout = importResult.sample.metadata.channelLayout;
+    streamSample.sampleRate = importResult.sample.metadata.sampleRate;
+    streamSample.frameCount = importResult.sample.metadata.frameCount;
+    streamSample.channelCount = importResult.sample.metadata.channelCount;
+    streamSample.rootMidiNotePresent = importResult.sample.metadata.rootMidiNotePresent;
+    streamSample.rootMidiNote = importResult.sample.metadata.rootMidiNote;
+    streamSample.loopRangePresent = importResult.sample.metadata.loopRangePresent;
+    streamSample.loopStartFrame = importResult.sample.metadata.loopStartFrame;
+    streamSample.loopEndFrame = importResult.sample.metadata.loopEndFrame;
 }
 
 std::string normalizePath(const std::string& pathText)
@@ -141,6 +182,33 @@ std::uint64_t computeExpectedPreparedSampleDataBytes(const drs::engine::Immutabl
     }
 
     return sampleDataBytes;
+}
+
+std::vector<std::string> collectPreparedCacheKeys(const drs::engine::ImmutablePreparedPlayback& prepared)
+{
+    std::vector<std::string> cacheKeys;
+    cacheKeys.reserve(prepared.samples.size());
+
+    for (const auto& sample : prepared.samples)
+        cacheKeys.push_back(sample.cacheKey);
+
+    return cacheKeys;
+}
+
+std::size_t countChangedPreparedCacheKeys(const drs::engine::ImmutablePreparedPlayback& before,
+                                          const drs::engine::ImmutablePreparedPlayback& after)
+{
+    require(before.samples.size() == after.samples.size(),
+            "Prepared cache-key comparison requires matching sample counts.");
+
+    std::size_t changedCount = 0;
+    for (std::size_t index = 0; index < before.samples.size(); ++index)
+    {
+        if (before.samples[index].cacheKey != after.samples[index].cacheKey)
+            ++changedCount;
+    }
+
+    return changedCount;
 }
 } // namespace
 
@@ -253,6 +321,11 @@ int main()
                 "Prepared sample handles should expose channel-layout metadata.");
         require(!firstPrepared.prepared.samples[0].sourceFingerprintHex.empty(),
                 "Prepared sample handles should expose source fingerprint metadata.");
+        require(std::find(firstPrepared.prepared.notes.begin(),
+                          firstPrepared.prepared.notes.end(),
+                          "Prepared cache key contract: canonical-source-identity + source-fingerprint + decode-policy + compiler-version")
+                    != firstPrepared.prepared.notes.end(),
+                "Prepared playback should record the prepared cache-key contract in the immutable notes.");
 
         for (const auto& preparedSample : firstPrepared.prepared.samples)
         {
@@ -432,6 +505,75 @@ int main()
                 "Full prepared playback serialization should preserve unique snapshot-build identity across repeated builds.");
         require(secondPreparedContentSerialization == firstPreparedContentSerialization,
                 "Repeated preparation of the same snapshot should preserve deterministic content serialization.");
+        const auto firstPreparedCacheKeys = collectPreparedCacheKeys(firstPrepared.prepared);
+
+        drs::engine::RuntimeProjectDocumentController zoneOnlyController(phase2Project.project);
+        auto zoneOnlyProject = zoneOnlyController.getProject();
+        zoneOnlyProject.authoring.zones[0].rootKey += 2;
+        zoneOnlyProject.authoring.zones[0].keyLow += 1;
+        zoneOnlyProject.authoring.zones[0].keyHigh -= 1;
+        zoneOnlyProject.authoring.zones[0].velocityLow += 4;
+        zoneOnlyProject.authoring.zones[0].velocityHigh -= 5;
+        zoneOnlyProject.authoring.zones[0].gainDb += 1.25;
+        zoneOnlyProject.authoring.zones[0].pan = -0.35;
+        zoneOnlyProject.authoring.zones[0].sampleStartFrame += 32;
+        zoneOnlyProject.authoring.zones[0].loopEnabled = !zoneOnlyProject.authoring.zones[0].loopEnabled;
+        const auto zoneOnlyCommit = zoneOnlyController.commitSnapshot(zoneOnlyProject,
+                                                                      "Adjust zone-only mapping and mix values",
+                                                                      {"authoring.zones[0].rootKey",
+                                                                       "authoring.zones[0].keyLow",
+                                                                       "authoring.zones[0].keyHigh",
+                                                                       "authoring.zones[0].velocityLow",
+                                                                       "authoring.zones[0].velocityHigh",
+                                                                       "authoring.zones[0].gainDb",
+                                                                       "authoring.zones[0].pan",
+                                                                       "authoring.zones[0].sampleStartFrame",
+                                                                       "authoring.zones[0].loopEnabled"});
+        require(zoneOnlyCommit.applied, "Zone-only prepared playback coverage should commit successfully.");
+        const auto zoneOnlySnapshotRequest = snapshotBuilder.requestBuild(zoneOnlyCommit.documentState.revision, true);
+        const auto zoneOnlySnapshot = snapshotBuilder.buildSnapshot(zoneOnlySnapshotRequest, zoneOnlyController.getProject());
+        require(zoneOnlySnapshot.built, "Zone-only prepared playback coverage should still build an immutable snapshot.");
+        require(zoneOnlySnapshot.snapshot.contentDigest != firstSnapshot.snapshot.contentDigest,
+                "Zone-only authoring edits should change the immutable snapshot digest.");
+        const auto zoneOnlyPreparedRequest = preparedService.requestBuild(zoneOnlySnapshot, referenceStream);
+        require(zoneOnlyPreparedRequest.accepted,
+                "Zone-only prepared playback coverage should accept the rebuilt immutable snapshot.");
+        const auto zoneOnlyPrepared = preparedService.prepare(zoneOnlyPreparedRequest, zoneOnlySnapshot, referenceStream);
+        require(zoneOnlyPrepared.built && zoneOnlyPrepared.activationEligible,
+                "Zone-only authoring edits should still prepare successfully.");
+        require(zoneOnlyPrepared.prepared.preparedContentDigest != firstPrepared.prepared.preparedContentDigest,
+                "Zone-only authoring edits should change the prepared digest because zone content changed.");
+        require(zoneOnlyPrepared.metrics.cacheHitCount == phase2Project.project.sampleSources.size(),
+                "Zone-only authoring edits should reuse every prepared sample handle.");
+        require(zoneOnlyPrepared.metrics.cacheMissCount == 0,
+                "Zone-only authoring edits should not invalidate source-backed prepared assets.");
+        require(zoneOnlyPrepared.metrics.decodedBytes == 0,
+                "Zone-only authoring edits should not re-decode prepared sample handles.");
+        require(zoneOnlyPrepared.metrics.preparedSampleDataBytes == firstPrepared.metrics.preparedSampleDataBytes,
+                "Zone-only authoring edits should preserve deterministic prepared sample-data bytes.");
+        require(collectPreparedCacheKeys(zoneOnlyPrepared.prepared) == firstPreparedCacheKeys,
+                "Zone-only authoring edits should preserve prepared cache-key identity.");
+        require(zoneOnlyPrepared.prepared.samples == firstPrepared.prepared.samples,
+                "Zone-only authoring edits should preserve prepared sample handles.");
+        require(zoneOnlyPrepared.prepared.streams == firstPrepared.prepared.streams,
+                "Zone-only authoring edits should preserve prepared stream handles.");
+        require(zoneOnlyPrepared.prepared.ownershipRecords == firstPrepared.prepared.ownershipRecords,
+                "Zone-only authoring edits should preserve ownership records.");
+        require(zoneOnlyPrepared.prepared.zones[0].rootKey == zoneOnlyProject.authoring.zones[0].rootKey
+                    && zoneOnlyPrepared.prepared.zones[0].keyLow == zoneOnlyProject.authoring.zones[0].keyLow
+                    && zoneOnlyPrepared.prepared.zones[0].keyHigh == zoneOnlyProject.authoring.zones[0].keyHigh
+                    && zoneOnlyPrepared.prepared.zones[0].velocityLow == zoneOnlyProject.authoring.zones[0].velocityLow
+                    && zoneOnlyPrepared.prepared.zones[0].velocityHigh == zoneOnlyProject.authoring.zones[0].velocityHigh
+                    && zoneOnlyPrepared.prepared.zones[0].gainDb == zoneOnlyProject.authoring.zones[0].gainDb
+                    && zoneOnlyPrepared.prepared.zones[0].pan == zoneOnlyProject.authoring.zones[0].pan
+                    && zoneOnlyPrepared.prepared.zones[0].sampleStartFrame
+                        == zoneOnlyProject.authoring.zones[0].sampleStartFrame
+                    && zoneOnlyPrepared.prepared.zones[0].loopEnabled == zoneOnlyProject.authoring.zones[0].loopEnabled,
+                "Zone-only authoring edits should still flow into prepared zone mapping and mix content.");
+        require(zoneOnlyPrepared.prepared.zones != firstPrepared.prepared.zones,
+                "Zone-only authoring edits should update prepared zone content even when asset cache keys stay warm.");
+        require(countChangedPreparedCacheKeys(firstPrepared.prepared, zoneOnlyPrepared.prepared) == 0,
+                "Zone-only cache-correctness coverage should keep every prepared cache key warm.");
 
         drs::engine::RuntimeProjectDocumentController controller(phase2Project.project);
         auto editedProject = controller.getProject();
@@ -461,6 +603,18 @@ int main()
                 "Edited prepared playback should preserve deterministic prepared sample-data bytes for the rebuilt content.");
         require(editedPrepared.metrics.decodedBytes > 0,
                 "Changing one source path should re-decode the newly prepared cache miss.");
+        require(editedPrepared.prepared.samples.size() >= 2,
+                "Edited prepared playback coverage expects at least two prepared samples.");
+        require(editedPrepared.prepared.samples[0].sourceFingerprintHex
+                    == editedPrepared.prepared.samples[1].sourceFingerprintHex,
+                "Relinking one source path to another fixture should preserve the same source fingerprint.");
+        require(editedPrepared.prepared.samples[0].canonicalSourceIdentity
+                    != editedPrepared.prepared.samples[1].canonicalSourceIdentity,
+                "Prepared cache identity should distinguish duplicate source files assigned to different sample-source ids.");
+        require(editedPrepared.prepared.samples[0].cacheKey != editedPrepared.prepared.samples[1].cacheKey,
+                "Prepared cache keys should distinguish canonical source identity even when two sample sources point at the same file.");
+        require(countChangedPreparedCacheKeys(firstPrepared.prepared, editedPrepared.prepared) == 1,
+                "Relink cache-correctness coverage should change exactly one prepared cache key.");
         require(editedPrepared.metrics.preparedOwnershipRecordCount == editedPrepared.prepared.ownershipRecords.size(),
                 "Edited prepared playback metrics should expose ownership-record counts.");
         require(editedPrepared.metrics.activeCachedOwnershipRecordCount == editedPrepared.prepared.ownershipRecords.size(),
@@ -593,6 +747,217 @@ int main()
                 "Prepared playback should surface a structured decode-failure finding for policy-rejected sources.");
         require(rejectedDecodeFinding->message.find("Phase 1 sample policy rejected") != std::string::npos,
                 "Prepared decode-failure findings should preserve policy-rejection detail.");
+
+        auto policyShiftStream = referenceStream;
+        policyShiftStream.container.pageSizeBytes += 4096;
+        drs::engine::PreparedPlaybackService policyShiftPreparedService;
+        const auto policyShiftPreparedRequest = policyShiftPreparedService.requestBuild(firstSnapshot, policyShiftStream);
+        require(policyShiftPreparedRequest.accepted,
+                "Prepared playback should accept the same immutable snapshot under an alternate decode policy container.");
+        const auto policyShiftPrepared = policyShiftPreparedService.prepare(policyShiftPreparedRequest,
+                                                                           firstSnapshot,
+                                                                           policyShiftStream);
+        require(policyShiftPrepared.built,
+                "Prepared playback should still build when only the prepared decode policy fingerprint changes.");
+        require(policyShiftPrepared.prepared.samples[0].canonicalSourceIdentity
+                    == firstPrepared.prepared.samples[0].canonicalSourceIdentity,
+                "Decode-policy shifts should preserve canonical source identity.");
+        require(policyShiftPrepared.prepared.samples[0].sourceFingerprintHex
+                    == firstPrepared.prepared.samples[0].sourceFingerprintHex,
+                "Decode-policy shifts should preserve source fingerprint identity.");
+        require(policyShiftPrepared.prepared.samples[0].cacheKey != firstPrepared.prepared.samples[0].cacheKey,
+                "Prepared cache keys should change when the decode policy fingerprint changes.");
+        require(policyShiftPrepared.prepared.streams[0].pageSizeBytes != firstPrepared.prepared.streams[0].pageSizeBytes,
+                "Decode-policy shift coverage should mutate the prepared stream page-size metadata.");
+
+        drs::engine::PreparedPlaybackService compilerSaltPreparedService("phase1-prepared-playback-v2-compiler-salt");
+        const auto compilerSaltPreparedRequest = compilerSaltPreparedService.requestBuild(firstSnapshot, referenceStream);
+        require(compilerSaltPreparedRequest.accepted,
+                "Prepared playback should accept the same immutable snapshot under an alternate compiler salt.");
+        const auto compilerSaltPrepared = compilerSaltPreparedService.prepare(compilerSaltPreparedRequest,
+                                                                             firstSnapshot,
+                                                                             referenceStream);
+        require(compilerSaltPrepared.built,
+                "Prepared playback should still build when only the compiler salt changes.");
+        require(compilerSaltPrepared.prepared.samples[0].canonicalSourceIdentity
+                    == firstPrepared.prepared.samples[0].canonicalSourceIdentity,
+                "Compiler-salt shifts should preserve canonical source identity.");
+        require(compilerSaltPrepared.prepared.samples[0].sourceFingerprintHex
+                    == firstPrepared.prepared.samples[0].sourceFingerprintHex,
+                "Compiler-salt shifts should preserve source fingerprint identity.");
+        require(compilerSaltPrepared.prepared.streams[0].pageSizeBytes
+                    == firstPrepared.prepared.streams[0].pageSizeBytes,
+                "Compiler-salt shifts should not mutate the decode policy metadata.");
+        require(compilerSaltPrepared.prepared.samples[0].cacheKey != firstPrepared.prepared.samples[0].cacheKey,
+                "Prepared cache keys should change when the compiler/version salt changes.");
+
+        const auto replaceSamplePath = scratchDirectory / "prepared-replace-sample-source.wav";
+        juce::WavAudioFormat replaceSampleFormat;
+        juce::StringPairArray replaceSampleMetadata;
+        replaceSampleMetadata.set("NumSampleLoops", "1");
+        replaceSampleMetadata.set("Loop0Start", "48");
+        replaceSampleMetadata.set("Loop0End", "216");
+        writeAudioFile(replaceSamplePath,
+                       replaceSampleFormat,
+                       buildAlternateReferenceBuffer(),
+                       48000.0,
+                       replaceSampleMetadata);
+        auto replaceSampleProject = phase2Project.project;
+        replaceSampleProject.sampleSources[0].path = replaceSamplePath.generic_string();
+        auto replaceSampleStream = referenceStream;
+        const auto replaceSampleImport = drs::engine::importSampleFile(replaceSamplePath.generic_string());
+        applyImportedMetadataToStreamSample(replaceSampleImport,
+                                            replaceSampleStream.container.samples[0],
+                                            replaceSamplePath.generic_string());
+        drs::engine::PreparedPlaybackService replaceSamplePreparedService;
+        const auto replaceBaselinePreparedRequest = replaceSamplePreparedService.requestBuild(firstSnapshot, referenceStream);
+        require(replaceBaselinePreparedRequest.accepted,
+                "Replace-sample cache-correctness coverage should accept the baseline immutable snapshot.");
+        const auto replaceBaselinePrepared = replaceSamplePreparedService.prepare(replaceBaselinePreparedRequest,
+                                                                                  firstSnapshot,
+                                                                                  referenceStream);
+        require(replaceBaselinePrepared.built,
+                "Replace-sample cache-correctness coverage should build the baseline prepared state.");
+        const auto replaceSampleSnapshotRequest = snapshotBuilder.requestBuild(8, true);
+        const auto replaceSampleSnapshot = snapshotBuilder.buildSnapshot(replaceSampleSnapshotRequest,
+                                                                         replaceSampleProject);
+        require(replaceSampleSnapshot.built,
+                "Replace-sample cache-correctness coverage should build a valid immutable snapshot.");
+        const auto replaceSamplePreparedRequest = replaceSamplePreparedService.requestBuild(replaceSampleSnapshot,
+                                                                                           replaceSampleStream);
+        require(replaceSamplePreparedRequest.accepted,
+                "Replace-sample cache-correctness coverage should accept the replaced-source immutable snapshot.");
+        const auto replaceSamplePrepared = replaceSamplePreparedService.prepare(replaceSamplePreparedRequest,
+                                                                               replaceSampleSnapshot,
+                                                                               replaceSampleStream);
+        require(replaceSamplePrepared.built,
+                "Replace-sample cache-correctness coverage should still prepare successfully.");
+        require(replaceSamplePrepared.metrics.cacheHitCount == 1,
+                "Replace-sample cache-correctness coverage should preserve one warm prepared asset.");
+        require(replaceSamplePrepared.metrics.cacheMissCount == 1,
+                "Replace-sample cache-correctness coverage should invalidate exactly one prepared asset.");
+        require(replaceSamplePrepared.metrics.decodedBytes > 0,
+                "Replace-sample cache-correctness coverage should re-decode the replaced prepared asset.");
+        require(replaceSamplePrepared.prepared.samples[0].canonicalSourceIdentity
+                    != replaceBaselinePrepared.prepared.samples[0].canonicalSourceIdentity,
+                "Replace-sample cache-correctness coverage should change canonical source identity for the replaced asset.");
+        require(replaceSamplePrepared.prepared.samples[0].sourceFingerprintHex
+                    != replaceBaselinePrepared.prepared.samples[0].sourceFingerprintHex,
+                "Replace-sample cache-correctness coverage should change the source fingerprint for the replaced asset.");
+        require(countChangedPreparedCacheKeys(replaceBaselinePrepared.prepared, replaceSamplePrepared.prepared) == 1,
+                "Replace-sample cache-correctness coverage should change exactly one prepared cache key.");
+        require(replaceSamplePrepared.prepared.samples[1].cacheKey
+                    == replaceBaselinePrepared.prepared.samples[1].cacheKey,
+                "Replace-sample cache-correctness coverage should preserve the cache key for unchanged assets.");
+
+        const auto checksumShiftPath = scratchDirectory / "prepared-checksum-shift-source.wav";
+        juce::WavAudioFormat wavFormatWithMetadata;
+        juce::StringPairArray loopMetadata;
+        loopMetadata.set("NumSampleLoops", "1");
+        loopMetadata.set("Loop0Start", "96");
+        loopMetadata.set("Loop0End", "240");
+        writeAudioFile(checksumShiftPath,
+                       wavFormatWithMetadata,
+                       buildReferenceBuffer(),
+                       48000.0,
+                       loopMetadata);
+        auto checksumShiftProject = phase2Project.project;
+        checksumShiftProject.sampleSources[0].path = checksumShiftPath.generic_string();
+        auto checksumBaselineStream = referenceStream;
+        const auto checksumBaselineImport = drs::engine::importSampleFile(checksumShiftPath.generic_string());
+        applyImportedMetadataToStreamSample(checksumBaselineImport,
+                                            checksumBaselineStream.container.samples[0],
+                                            checksumShiftPath.generic_string());
+        drs::engine::PreparedPlaybackService checksumPreparedService;
+        const auto checksumBaselineSnapshotRequest = snapshotBuilder.requestBuild(7, true);
+        const auto checksumBaselineSnapshot = snapshotBuilder.buildSnapshot(checksumBaselineSnapshotRequest,
+                                                                            checksumShiftProject);
+        require(checksumBaselineSnapshot.built,
+                "Checksum invalidation coverage should start from a valid immutable snapshot.");
+        const auto checksumBaselinePreparedRequest = checksumPreparedService.requestBuild(checksumBaselineSnapshot,
+                                                                                         checksumBaselineStream);
+        require(checksumBaselinePreparedRequest.accepted,
+                "Checksum invalidation coverage should accept the baseline immutable snapshot.");
+        const auto checksumBaselinePrepared = checksumPreparedService.prepare(checksumBaselinePreparedRequest,
+                                                                             checksumBaselineSnapshot,
+                                                                             checksumBaselineStream);
+        require(checksumBaselinePrepared.built,
+                "Checksum invalidation baseline should prepare successfully.");
+
+        writeAudioFile(checksumShiftPath,
+                       wavFormatWithMetadata,
+                       buildAlternateReferenceBuffer(),
+                       48000.0,
+                       loopMetadata);
+        auto checksumChangedStream = checksumBaselineStream;
+        const auto checksumChangedImport = drs::engine::importSampleFile(checksumShiftPath.generic_string());
+        applyImportedMetadataToStreamSample(checksumChangedImport,
+                                            checksumChangedStream.container.samples[0],
+                                            checksumShiftPath.generic_string());
+        const auto checksumChangedSnapshotRequest = snapshotBuilder.requestBuild(7, true);
+        const auto checksumChangedSnapshot = snapshotBuilder.buildSnapshot(checksumChangedSnapshotRequest,
+                                                                           checksumShiftProject);
+        require(checksumChangedSnapshot.built,
+                "Checksum invalidation coverage should keep the immutable snapshot valid when the source path stays constant.");
+        const auto checksumChangedPreparedRequest = checksumPreparedService.requestBuild(checksumChangedSnapshot,
+                                                                                        checksumChangedStream);
+        require(checksumChangedPreparedRequest.accepted,
+                "Checksum invalidation coverage should accept the rebuilt immutable snapshot.");
+        const auto checksumChangedPrepared = checksumPreparedService.prepare(checksumChangedPreparedRequest,
+                                                                            checksumChangedSnapshot,
+                                                                            checksumChangedStream);
+        require(checksumChangedPrepared.built,
+                "Checksum invalidation coverage should still prepare successfully after content changes.");
+        require(checksumChangedPrepared.metrics.cacheHitCount == 1,
+                "Changing one source checksum should preserve exactly one warm prepared asset.");
+        require(checksumChangedPrepared.metrics.cacheMissCount == 1,
+                "Changing one source checksum should invalidate exactly one prepared asset.");
+        require(checksumChangedPrepared.metrics.decodedBytes > 0,
+                "Changing one source checksum should re-decode the invalidated prepared asset.");
+        require(checksumChangedPrepared.prepared.samples[0].canonicalSourceIdentity
+                    == checksumBaselinePrepared.prepared.samples[0].canonicalSourceIdentity,
+                "Checksum invalidation should preserve canonical source identity when the path stays constant.");
+        require(checksumChangedPrepared.prepared.samples[0].sourceFingerprintHex
+                    != checksumBaselinePrepared.prepared.samples[0].sourceFingerprintHex,
+                "Checksum invalidation should detect a changed source fingerprint.");
+        require(checksumChangedPrepared.prepared.samples[0].cacheKey
+                    != checksumBaselinePrepared.prepared.samples[0].cacheKey,
+                "Checksum invalidation should produce a new prepared cache key for the changed asset.");
+        require(checksumChangedPrepared.prepared.samples[1].cacheKey
+                    == checksumBaselinePrepared.prepared.samples[1].cacheKey,
+                "Checksum invalidation should preserve the cache key for unchanged prepared assets.");
+
+        auto loopPolicyShiftStream = checksumChangedStream;
+        loopPolicyShiftStream.container.samples[0].loopRangePresent = false;
+        loopPolicyShiftStream.container.samples[0].loopStartFrame = 0;
+        loopPolicyShiftStream.container.samples[0].loopEndFrame = 0;
+        const auto loopPolicyShiftPreparedRequest = checksumPreparedService.requestBuild(checksumChangedSnapshot,
+                                                                                         loopPolicyShiftStream);
+        require(loopPolicyShiftPreparedRequest.accepted,
+                "Loop-policy invalidation coverage should accept the immutable snapshot.");
+        const auto loopPolicyShiftPrepared = checksumPreparedService.prepare(loopPolicyShiftPreparedRequest,
+                                                                             checksumChangedSnapshot,
+                                                                             loopPolicyShiftStream);
+        require(loopPolicyShiftPrepared.built,
+                "Loop-policy invalidation coverage should still prepare successfully.");
+        require(loopPolicyShiftPrepared.metrics.cacheHitCount == 1,
+                "Changing loop-relevant decode policy should preserve exactly one unchanged prepared asset.");
+        require(loopPolicyShiftPrepared.metrics.cacheMissCount == 1,
+                "Changing loop-relevant decode policy should invalidate exactly one prepared asset.");
+        require(loopPolicyShiftPrepared.metrics.decodedBytes > 0,
+                "Changing loop-relevant decode policy should force the invalidated asset back through decode.");
+        require(loopPolicyShiftPrepared.prepared.samples[0].canonicalSourceIdentity
+                    == checksumChangedPrepared.prepared.samples[0].canonicalSourceIdentity,
+                "Loop-policy invalidation should preserve canonical source identity.");
+        require(loopPolicyShiftPrepared.prepared.samples[0].sourceFingerprintHex
+                    == checksumChangedPrepared.prepared.samples[0].sourceFingerprintHex,
+                "Loop-policy invalidation should preserve source fingerprint identity.");
+        require(loopPolicyShiftPrepared.prepared.samples[0].cacheKey
+                    != checksumChangedPrepared.prepared.samples[0].cacheKey,
+                "Loop-policy invalidation should produce a new prepared cache key.");
+        require(loopPolicyShiftPrepared.prepared.samples[1].cacheKey
+                    == checksumChangedPrepared.prepared.samples[1].cacheKey,
+                "Loop-policy invalidation should preserve cache keys for unchanged assets.");
 
         const auto phase1Project = drs::engine::loadPhase1ReferenceProjectManifest();
         require(phase1Project.loaded, "Phase 1 reference project must load before migrated prepared-playback coverage runs.");

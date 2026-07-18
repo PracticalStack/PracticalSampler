@@ -189,6 +189,22 @@ std::string buildCanonicalSourceIdentity(const std::string& sampleSourceId, cons
     return sampleSourceId + "|" + canonicalSourcePath;
 }
 
+std::string buildPreparedDecodePolicyFingerprint(const RuntimeStreamSampleDefinition& streamSample,
+                                                 const RuntimeStreamContainerModel& container)
+{
+    std::ostringstream stream;
+    stream << "format=" << streamSample.formatName
+           << "|sampleRate=" << static_cast<int>(streamSample.sampleRate)
+           << "|channelCount=" << streamSample.channelCount
+           << "|channelLayout=" << streamSample.channelLayout
+           << "|loopRangePresent=" << (streamSample.loopRangePresent ? "true" : "false")
+           << "|loopStartFrame=" << streamSample.loopStartFrame
+           << "|loopEndFrame=" << streamSample.loopEndFrame
+           << "|payloadEncoding=" << container.payloadEncoding
+           << "|pageSize=" << container.pageSizeBytes;
+    return stream.str();
+}
+
 std::string buildRetirementToken(std::uint64_t retirementOrdinal,
                                  const std::string& sampleSourceId,
                                  std::uint64_t retiredByBuildId)
@@ -249,14 +265,16 @@ std::string buildCacheKey(const std::string& compilerVersion,
                           const RuntimeStreamSampleDefinition& streamSample,
                           const RuntimeStreamContainerModel& container)
 {
+    // Cache identity intentionally excludes zone-only authoring fields such as gain, pan, and key mapping.
+    // Those edits should change prepared zone content, but they must not invalidate source-backed prepared assets.
+    const auto canonicalSourceIdentity = buildCanonicalSourceIdentity(sampleResolution.sampleSourceId,
+                                                                      sampleResolution.normalizedSourcePath);
+    const auto decodePolicyFingerprint = buildPreparedDecodePolicyFingerprint(streamSample, container);
     std::ostringstream stream;
-    stream << compilerVersion
-           << "|sampleSourceId=" << sampleResolution.sampleSourceId
-           << "|sourcePath=" << sampleResolution.normalizedSourcePath
-           << "|checksum=" << streamSample.sourceChecksumHex
-           << "|format=" << sampleResolution.selectedFormatName
-           << "|encoding=" << container.payloadEncoding
-           << "|pageSize=" << container.pageSizeBytes;
+    stream << "compilerVersion=" << compilerVersion
+           << "|canonicalSourceIdentity=" << canonicalSourceIdentity
+           << "|sourceFingerprint=" << streamSample.sourceChecksumHex
+           << "|decodePolicy=" << decodePolicyFingerprint;
     return "fnv1a64:" + computeFnv1a64Hex(stream.str());
 }
 
@@ -772,6 +790,8 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     if (!snapshotResult.snapshot.contentDigest.empty())
         result.prepared.notes.push_back("Snapshot digest: " + snapshotResult.snapshot.contentDigest);
     result.prepared.notes.push_back("Compiler version: " + compilerVersion);
+    result.prepared.notes.push_back(
+        "Prepared cache key contract: canonical-source-identity + source-fingerprint + decode-policy + compiler-version");
 
     const auto errorCount = static_cast<std::size_t>(std::count_if(result.findings.begin(),
                                                                    result.findings.end(),

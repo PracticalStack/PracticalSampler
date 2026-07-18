@@ -31,6 +31,17 @@ std::uint64_t computePreparedSampleDataBytes(const drs::engine::ImmutablePrepare
     return sampleDataBytes;
 }
 
+std::vector<std::string> collectPreparedCacheKeys(const drs::engine::ImmutablePreparedPlayback& prepared)
+{
+    std::vector<std::string> cacheKeys;
+    cacheKeys.reserve(prepared.samples.size());
+
+    for (const auto& sample : prepared.samples)
+        cacheKeys.push_back(sample.cacheKey);
+
+    return cacheKeys;
+}
+
 drs::engine::PlaybackSnapshotBuildResult buildSnapshot(drs::engine::PlaybackSnapshotBuilder& builder,
                                                        const drs::engine::RuntimeProjectModel& project,
                                                        std::size_t revision,
@@ -153,6 +164,78 @@ int main()
                 "Canceling the last queued preview job should leave no pending worker jobs.");
         require(preparedService.getWorkerStatus().cancellationCount == 1,
                 "Worker status should track canceled preparation jobs.");
+
+        auto zoneOnlyEditedProject = controller.getProject();
+        zoneOnlyEditedProject.authoring.zones[0].rootKey += 2;
+        zoneOnlyEditedProject.authoring.zones[0].keyLow += 1;
+        zoneOnlyEditedProject.authoring.zones[0].keyHigh -= 1;
+        zoneOnlyEditedProject.authoring.zones[0].velocityLow += 3;
+        zoneOnlyEditedProject.authoring.zones[0].velocityHigh -= 4;
+        zoneOnlyEditedProject.authoring.zones[0].gainDb += 0.5;
+        zoneOnlyEditedProject.authoring.zones[0].pan = -0.15;
+        zoneOnlyEditedProject.authoring.zones[0].sampleStartFrame += 24;
+        zoneOnlyEditedProject.authoring.zones[0].loopEnabled = !zoneOnlyEditedProject.authoring.zones[0].loopEnabled;
+        const auto zoneOnlyCommit = controller.commitSnapshot(zoneOnlyEditedProject,
+                                                              "Adjust worker test zone-only mapping values",
+                                                              {"authoring.zones[0].rootKey",
+                                                               "authoring.zones[0].keyLow",
+                                                               "authoring.zones[0].keyHigh",
+                                                               "authoring.zones[0].velocityLow",
+                                                               "authoring.zones[0].velocityHigh",
+                                                               "authoring.zones[0].gainDb",
+                                                               "authoring.zones[0].pan",
+                                                               "authoring.zones[0].sampleStartFrame",
+                                                               "authoring.zones[0].loopEnabled"});
+        require(zoneOnlyCommit.applied, "Zone-only worker test edit should commit successfully.");
+        const auto zoneOnlySnapshot = buildSnapshot(snapshotBuilder,
+                                                    controller.getProject(),
+                                                    zoneOnlyCommit.documentState.revision,
+                                                    false);
+        const auto queuedZoneOnlyPreview = preparedService.enqueuePreviewBuild(zoneOnlySnapshot);
+        require(queuedZoneOnlyPreview.accepted, "Zone-only preview preparation should queue successfully.");
+        const auto processedZoneOnlyPreview = preparedService.processNextQueuedBuild(referenceStream);
+        require(processedZoneOnlyPreview.processed && processedZoneOnlyPreview.result.built,
+                "Zone-only preview preparation should still succeed.");
+        require(processedZoneOnlyPreview.result.metrics.cacheHitCount == phase2Project.project.sampleSources.size(),
+                "Zone-only worker edits should reuse every prepared sample handle.");
+        require(processedZoneOnlyPreview.result.metrics.cacheMissCount == 0,
+                "Zone-only worker edits should not invalidate prepared sample handles.");
+        require(processedZoneOnlyPreview.result.metrics.decodedBytes == 0,
+                "Zone-only worker edits should not re-decode warm prepared sample handles.");
+        require(processedZoneOnlyPreview.result.metrics.preparedSampleDataBytes
+                    == processedPublish.result.metrics.preparedSampleDataBytes,
+                "Zone-only worker edits should preserve deterministic prepared sample-data bytes.");
+        require(collectPreparedCacheKeys(processedZoneOnlyPreview.result.prepared)
+                    == collectPreparedCacheKeys(processedPublish.result.prepared),
+                "Zone-only worker edits should preserve prepared cache-key identity.");
+        require(processedZoneOnlyPreview.result.prepared.samples == processedPublish.result.prepared.samples,
+                "Zone-only worker edits should preserve prepared sample handles.");
+        require(processedZoneOnlyPreview.result.prepared.streams == processedPublish.result.prepared.streams,
+                "Zone-only worker edits should preserve prepared stream handles.");
+        require(processedZoneOnlyPreview.result.prepared.ownershipRecords
+                    == processedPublish.result.prepared.ownershipRecords,
+                "Zone-only worker edits should preserve prepared ownership records.");
+        require(processedZoneOnlyPreview.result.prepared.zones != processedPublish.result.prepared.zones,
+                "Zone-only worker edits should still update prepared zone content.");
+        require(processedZoneOnlyPreview.result.prepared.zones[0].rootKey
+                    == zoneOnlyEditedProject.authoring.zones[0].rootKey
+                    && processedZoneOnlyPreview.result.prepared.zones[0].keyLow
+                        == zoneOnlyEditedProject.authoring.zones[0].keyLow
+                    && processedZoneOnlyPreview.result.prepared.zones[0].keyHigh
+                        == zoneOnlyEditedProject.authoring.zones[0].keyHigh
+                    && processedZoneOnlyPreview.result.prepared.zones[0].velocityLow
+                        == zoneOnlyEditedProject.authoring.zones[0].velocityLow
+                    && processedZoneOnlyPreview.result.prepared.zones[0].velocityHigh
+                        == zoneOnlyEditedProject.authoring.zones[0].velocityHigh
+                    && processedZoneOnlyPreview.result.prepared.zones[0].gainDb
+                        == zoneOnlyEditedProject.authoring.zones[0].gainDb
+                    && processedZoneOnlyPreview.result.prepared.zones[0].pan
+                        == zoneOnlyEditedProject.authoring.zones[0].pan
+                    && processedZoneOnlyPreview.result.prepared.zones[0].sampleStartFrame
+                        == zoneOnlyEditedProject.authoring.zones[0].sampleStartFrame
+                    && processedZoneOnlyPreview.result.prepared.zones[0].loopEnabled
+                        == zoneOnlyEditedProject.authoring.zones[0].loopEnabled,
+                "Zone-only worker edits should flow updated mapping and mix values into prepared zones.");
 
         auto invalidatingProject = controller.getProject();
         invalidatingProject.sampleSources[1].path = invalidatingProject.sampleSources[0].path;
