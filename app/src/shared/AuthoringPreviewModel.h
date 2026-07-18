@@ -28,6 +28,18 @@ struct AuthoringWaveformPreview
     std::vector<AuthoringWaveformPreviewPoint> points;
 };
 
+struct AuthoringPreviewStatusSnapshot
+{
+    bool available = false;
+    std::size_t draftRevision = 0;
+    std::size_t activeRevision = 0;
+    std::size_t pendingRevision = 0;
+    std::string revisionState;
+    std::string failureState;
+    std::string blockingPrerequisite;
+    std::string blockingGuidance;
+};
+
 struct AuthoringImportResponsivenessSnapshot
 {
     bool available = false;

@@ -523,6 +523,32 @@ drs::app::AuthoringImportResponsivenessSnapshot makeImportMetricsFixture()
     return metrics;
 }
 
+drs::engine::DraftPlaybackStatus makeDraftPlaybackStatusFixture()
+{
+    drs::engine::DraftPlaybackStatus status;
+    status.draftRevision = 4;
+    status.preview.available = true;
+    status.preview.revision = 3;
+    status.preview.state = "Stale";
+    status.performance.available = true;
+    status.performance.revision = 2;
+    status.performance.state = "Active";
+    return status;
+}
+
+drs::app::AuthoringPreviewStatusSnapshot makeAuthoringPreviewStatusFixture()
+{
+    drs::app::AuthoringPreviewStatusSnapshot status;
+    status.available = true;
+    status.draftRevision = 4;
+    status.activeRevision = 3;
+    status.revisionState = "Failed";
+    status.failureState = "Selected authoring sample could not be prepared.";
+    status.blockingPrerequisite = "Relink or re-import the selected sample file.";
+    status.blockingGuidance = "Restore the sample file for the selected zone, then prepare the authoring preview again.";
+    return status;
+}
+
 void saveComponentPng(juce::Component& component, const fs::path& path)
 {
     juce::Image image(juce::Image::ARGB, component.getWidth(), component.getHeight(), true);
@@ -918,7 +944,7 @@ void writeReachabilityChecklist(std::ostream& inventory)
     inventory << "- Drawer tabs: authoringDrawerWaveformTab, authoringDrawerMacrosTab, authoringDrawerRoutingTab, authoringDrawerPerformanceTab\n";
     inventory << "- Mapping inspector: authoringRootKeySlider, authoringKeyLowSlider, authoringKeyHighSlider, authoringVelocityLowSlider, authoringVelocityHighSlider, authoringGainSlider, authoringPanSlider, authoringLoopEnabledToggle, authoringRestoreRootKeyButton\n";
     inventory << "- Drawer context: authoringDrawerTitleLabel, authoringDrawerScopeLabel, authoringDrawerBreadcrumbLabel\n";
-    inventory << "- Waveform drawer content: authoringWaveformPreview, authoringWaveformInfoLabel, authoringWaveformLoopLabel, authoringWaveformImportLabel\n";
+    inventory << "- Waveform drawer content: authoringWaveformPreview, authoringWaveformStatusLabel, authoringWaveformInfoLabel, authoringWaveformLoopLabel, authoringWaveformImportLabel\n";
     inventory << "- Macros drawer content: authoringMacroList, authoringMacroListBox, authoringMacroAssignmentSelector, authoringMacroRoleSelector, authoringMacroDefaultSlider, authoringMacroMinSlider, authoringMacroMaxSlider, authoringMacroMoveUpButton, authoringMacroMoveDownButton\n";
     inventory << "- Routing drawer content: authoringFxSelector, authoringFxTypeSelector, authoringFxBypassedToggle, authoringRoutingSelector, authoringRoutingInputSelector, authoringRoutingInsertOneSelector, authoringRoutingInsertTwoSelector\n";
     inventory << "- Performance drawer content: authoringPerformanceBankSelector, authoringTriggerSlotSelector, authoringTriggerEventSelector, authoringTargetArticulationSelector, authoringPhraseAssetSelector, authoringChordModeSelector, authoringPhraseImportPath, authoringPhraseImportButton\n";
@@ -1256,6 +1282,7 @@ void exerciseDrawerBehavior(drs::app::AuthoringPanel& panel,
     requireComponentVisibleWithin(panel, "authoringDrawerTitleLabel", panelBounds);
     requireComponentVisibleWithin(panel, "authoringDrawerScopeLabel", panelBounds);
     requireComponentVisibleWithin(panel, "authoringDrawerBreadcrumbLabel", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformStatusLabel", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformInfoLabel", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformLoopLabel", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformImportLabel", panelBounds);
@@ -1476,12 +1503,21 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
     }
 
     const auto initialSummarySource = requireLabel(panel, "authoringSummarySourceLabel").getText();
+    const auto initialSummaryStatus = requireLabel(panel, "authoringSummaryStatusLabel").getText();
     const auto initialSummaryArticulation = requireLabel(panel, "authoringSummaryArticulationLabel").getText();
     const auto initialSummaryPlayback = requireLabel(panel, "authoringSummaryPlaybackLabel").getText();
+    require(initialSummaryStatus.contains("preview blocked: Selected authoring sample could not be prepared."),
+            "Summary strip should surface the authoring preview failure detail in the status line.");
+    require(initialSummaryStatus.contains("fix: Relink or re-import the selected sample file."),
+            "Summary strip should surface the next authoring prerequisite when preview preparation fails.");
+    require(initialSummaryPlayback.contains("authoring preview r4 (Failed)"),
+            "Summary strip should surface the authoring preview revision state in the playback line.");
     requireAccessibilityTitleEquals(panel, "authoringSummarySourceLabel", initialSummarySource);
+    requireAccessibilityTitleEquals(panel, "authoringSummaryStatusLabel", initialSummaryStatus);
     requireAccessibilityTitleEquals(panel, "authoringSummaryArticulationLabel", initialSummaryArticulation);
     requireAccessibilityTitleEquals(panel, "authoringSummaryPlaybackLabel", initialSummaryPlayback);
     requireAccessibilityDescriptionContains(panel, "authoringSummarySourceLabel", initialSummarySource);
+    requireAccessibilityDescriptionContains(panel, "authoringSummaryStatusLabel", initialSummaryStatus);
     requireAccessibilityDescriptionContains(panel, "authoringSummaryArticulationLabel", initialSummaryArticulation);
     requireAccessibilityDescriptionContains(panel, "authoringSummaryPlaybackLabel", initialSummaryPlayback);
 
@@ -1500,14 +1536,17 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
     }
 
     const auto updatedSummarySource = requireLabel(panel, "authoringSummarySourceLabel").getText();
+    const auto updatedSummaryStatus = requireLabel(panel, "authoringSummaryStatusLabel").getText();
     const auto updatedSummaryArticulation = requireLabel(panel, "authoringSummaryArticulationLabel").getText();
     const auto updatedSummaryPlayback = requireLabel(panel, "authoringSummaryPlaybackLabel").getText();
     require(summarySourceChanged && updatedSummarySource != initialSummarySource,
             "Changing the selected zone should refresh the summary-strip source text.");
     requireAccessibilityTitleEquals(panel, "authoringSummarySourceLabel", updatedSummarySource);
+    requireAccessibilityTitleEquals(panel, "authoringSummaryStatusLabel", updatedSummaryStatus);
     requireAccessibilityTitleEquals(panel, "authoringSummaryArticulationLabel", updatedSummaryArticulation);
     requireAccessibilityTitleEquals(panel, "authoringSummaryPlaybackLabel", updatedSummaryPlayback);
     requireAccessibilityDescriptionContains(panel, "authoringSummarySourceLabel", updatedSummarySource);
+    requireAccessibilityDescriptionContains(panel, "authoringSummaryStatusLabel", updatedSummaryStatus);
     requireAccessibilityDescriptionContains(panel, "authoringSummaryArticulationLabel", updatedSummaryArticulation);
     requireAccessibilityDescriptionContains(panel, "authoringSummaryPlaybackLabel", updatedSummaryPlayback);
 
@@ -1522,6 +1561,17 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
     requireAccessibilityDescriptionContains(panel,
                                             "authoringDrawerBreadcrumbLabel",
                                             requireLabel(panel, "authoringDrawerBreadcrumbLabel").getText());
+    requireAccessibilityTitleEquals(panel,
+                                    "authoringWaveformStatusLabel",
+                                    requireLabel(panel, "authoringWaveformStatusLabel").getText());
+    require(requireLabel(panel, "authoringWaveformStatusLabel").getText().contains("Fix: Relink or re-import the selected sample file."),
+            "Waveform drawer status should include the next prerequisite for failed authoring preview preparation.");
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringWaveformStatusLabel",
+                                            requireLabel(panel, "authoringWaveformStatusLabel").getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringWaveformStatusLabel",
+                                            "Next step: Restore the sample file for the selected zone, then prepare the authoring preview again.");
     requireAccessibilityTitleEquals(panel, "authoringWaveformInfoLabel", requireLabel(panel, "authoringWaveformInfoLabel").getText());
     requireAccessibilityDescriptionContains(panel,
                                             "authoringWaveformInfoLabel",
@@ -1828,6 +1878,15 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
     requireAccessibilityTitleEquals(panel, "authoringDrawerTitleLabel", "Waveform Detail");
     requireAccessibilityDescriptionContains(panel, "authoringDrawerScopeLabel", "Zone-scoped");
     requireAccessibilityDescriptionContains(panel, "authoringDrawerBreadcrumbLabel", "Project > Zones >");
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringWaveformStatusLabel",
+                                            "Preview Failed");
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringWaveformStatusLabel",
+                                            "Fix: Relink or re-import the selected sample file.");
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringWaveformStatusLabel",
+                                            "Selected authoring sample could not be prepared.");
     requireAccessibilityDescriptionContains(panel,
                                             "authoringWaveformInfoLabel",
                                             requireLabel(panel, "authoringWaveformInfoLabel").getText());
@@ -2290,6 +2349,10 @@ int main()
                                            },
                                            []()
                                            {
+                                               return makeAuthoringPreviewStatusFixture();
+                                           },
+                                           []()
+                                           {
                                                return makeImportMetricsFixture();
                                            },
                                            layoutMode,
@@ -2317,6 +2380,10 @@ int main()
 
                                                if (panelPtr != nullptr)
                                                    panelPtr->reloadFromSession();
+                                           },
+                                           []()
+                                           {
+                                               return makeDraftPlaybackStatusFixture();
                                            });
             panelPtr = &panel;
             panel.setTopLeftPosition(0, 0);

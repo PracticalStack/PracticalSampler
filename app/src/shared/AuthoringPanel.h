@@ -30,12 +30,14 @@ public:
     using NotePreviewStartedCallback = std::function<void(int, float)>;
     using NotePreviewEndedCallback = std::function<void(int)>;
     using WaveformPreviewProvider = std::function<AuthoringWaveformPreview()>;
+    using AuthoringPreviewStatusProvider = std::function<AuthoringPreviewStatusSnapshot()>;
     using ImportResponsivenessProvider = std::function<AuthoringImportResponsivenessSnapshot()>;
     using RestoreRootKeyCallback = std::function<void()>;
     using DraftPlaybackStatusProvider = std::function<drs::engine::DraftPlaybackStatus()>;
 
     explicit AuthoringPanel(drs::engine::AuthoringSession& authoringSession,
                             WaveformPreviewProvider waveformPreviewProvider = {},
+                            AuthoringPreviewStatusProvider authoringPreviewStatusProvider = {},
                             ImportResponsivenessProvider importResponsivenessProvider = {},
                             LayoutMode layoutMode = LayoutMode::compact,
                             NotePreviewStartedCallback onNotePreviewStarted = {},
@@ -112,6 +114,7 @@ private:
 
     drs::engine::AuthoringSession& authoringSession;
     WaveformPreviewProvider waveformPreviewProvider;
+    AuthoringPreviewStatusProvider authoringPreviewStatusProvider;
     ImportResponsivenessProvider importResponsivenessProvider;
     LayoutMode layoutMode = LayoutMode::compact;
     NotePreviewStartedCallback onNotePreviewStarted;
@@ -133,6 +136,7 @@ private:
     juce::Label waveformLabel;
     juce::Label waveformScopeLabel;
     juce::Label drawerBreadcrumbLabel;
+    juce::Label waveformStatusLabel;
     juce::Label waveformInfoLabel;
     juce::Label loopInfoLabel;
     juce::Label importMetricsLabel;

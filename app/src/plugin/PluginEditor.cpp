@@ -416,6 +416,10 @@ Editor::Editor(Processor& owner)
                      },
                      [&owner]()
                      {
+                         return owner.getAuthoringPreviewStatusSnapshot();
+                     },
+                     [&owner]()
+                     {
                          return owner.getAuthoringImportResponsivenessSnapshot();
                      },
                      drs::app::AuthoringPanel::LayoutMode::compact,
@@ -1062,7 +1066,7 @@ void Editor::confirmSafeToDiscardChanges(const juce::String& nextAction,
 
 void Editor::timerCallback()
 {
-    processor.getEngineFacade().serviceBackgroundWork();
+    processor.serviceMessageThreadWork();
     updateProjectStatusLabel();
 }
 

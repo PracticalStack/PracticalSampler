@@ -407,6 +407,10 @@ MainComponent::MainComponent(bool enableAudioOutput)
                      },
                      [this]()
                      {
+                         return processor.getAuthoringPreviewStatusSnapshot();
+                     },
+                     [this]()
+                     {
                          return processor.getAuthoringImportResponsivenessSnapshot();
                      },
                      drs::app::AuthoringPanel::LayoutMode::expanded,
@@ -571,7 +575,7 @@ void MainComponent::menuItemSelected(int menuItemID, int)
 
 void MainComponent::timerCallback()
 {
-    processor.getEngineFacade().serviceBackgroundWork();
+    processor.serviceMessageThreadWork();
     updateWindowTitle();
 }
 

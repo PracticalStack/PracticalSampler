@@ -518,6 +518,7 @@ void exerciseMacroDensityInProduction(const fs::path& outputDirectory)
     drs::engine::AuthoringSession session(project);
     drs::app::AuthoringPanel panel(session,
                                    []() { return drs::app::AuthoringWaveformPreview{}; },
+                                   []() { return drs::app::AuthoringPreviewStatusSnapshot{}; },
                                    []() { return drs::app::AuthoringImportResponsivenessSnapshot{}; },
                                    drs::app::AuthoringPanel::LayoutMode::compact);
     panel.setTopLeftPosition(0, 0);

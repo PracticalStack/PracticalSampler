@@ -119,6 +119,30 @@ juce::String formatZoneRange(const drs::engine::AuthoringZoneSummary& zone)
         + " | Vel " + juce::String(zone.velocityLow) + "-" + juce::String(zone.velocityHigh);
 }
 
+juce::String formatAuthoringPreviewStatus(const drs::app::AuthoringPreviewStatusSnapshot& status)
+{
+    if (!status.available)
+        return "Preview status unavailable";
+
+    auto text = "Preview " + juce::String::fromUTF8(status.revisionState.empty() ? "Unknown"
+                                                                                 : status.revisionState.c_str())
+        + " | draft r" + juce::String(static_cast<int>(status.draftRevision));
+
+    if (status.activeRevision > 0)
+        text += " | active r" + juce::String(static_cast<int>(status.activeRevision));
+
+    if (status.pendingRevision > 0 && status.pendingRevision != status.activeRevision)
+        text += " | pending r" + juce::String(static_cast<int>(status.pendingRevision));
+
+    if (!status.blockingPrerequisite.empty())
+        text += " | Fix: " + juce::String::fromUTF8(status.blockingPrerequisite.c_str());
+
+    if (!status.failureState.empty())
+        text += " | " + juce::String::fromUTF8(status.failureState.c_str());
+
+    return text;
+}
+
 juce::String formatMicros(std::uint64_t micros)
 {
     if (micros >= 1000)
@@ -397,6 +421,7 @@ void AuthoringPanel::AuthoringControlLookAndFeel::drawLinearSliderOutline(juce::
 
 AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
                                WaveformPreviewProvider previewProvider,
+                               AuthoringPreviewStatusProvider nextAuthoringPreviewStatusProvider,
                                ImportResponsivenessProvider responsivenessProvider,
                                LayoutMode nextLayoutMode,
                                NotePreviewStartedCallback notePreviewStarted,
@@ -405,6 +430,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
                                DraftPlaybackStatusProvider nextDraftPlaybackStatusProvider)
     : authoringSession(session),
       waveformPreviewProvider(std::move(previewProvider)),
+      authoringPreviewStatusProvider(std::move(nextAuthoringPreviewStatusProvider)),
       importResponsivenessProvider(std::move(responsivenessProvider)),
       layoutMode(nextLayoutMode),
       onNotePreviewStarted(std::move(notePreviewStarted)),
@@ -422,6 +448,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
 
     configureMetadataLabel(waveformScopeLabel);
     configureMetadataLabel(drawerBreadcrumbLabel);
+    configureMetadataLabel(waveformStatusLabel);
     configureMetadataLabel(waveformInfoLabel);
     configureMetadataLabel(loopInfoLabel);
     configureMetadataLabel(importMetricsLabel);
@@ -468,6 +495,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     waveformLabel.setComponentID("authoringDrawerTitleLabel");
     waveformScopeLabel.setComponentID("authoringDrawerScopeLabel");
     drawerBreadcrumbLabel.setComponentID("authoringDrawerBreadcrumbLabel");
+    waveformStatusLabel.setComponentID("authoringWaveformStatusLabel");
     waveformInfoLabel.setComponentID("authoringWaveformInfoLabel");
     loopInfoLabel.setComponentID("authoringWaveformLoopLabel");
     importMetricsLabel.setComponentID("authoringWaveformImportLabel");
@@ -750,6 +778,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&waveformLabel),
              static_cast<juce::Component*>(&waveformScopeLabel),
              static_cast<juce::Component*>(&drawerBreadcrumbLabel),
+             static_cast<juce::Component*>(&waveformStatusLabel),
              static_cast<juce::Component*>(&waveformInfoLabel),
              static_cast<juce::Component*>(&loopInfoLabel),
              static_cast<juce::Component*>(&importMetricsLabel),
@@ -889,6 +918,9 @@ void AuthoringPanel::configureAccessibilityAndFocus()
     configureAccessibleMetadata(waveformPreview,
                                 "Waveform preview",
                                 "Displays the selected zone waveform and loop region.");
+    configureAccessibleMetadata(waveformStatusLabel,
+                                "Waveform preview status",
+                                "Shows the current authoring preview revision state for the selected zone.");
     configureAccessibleMetadata(waveformInfoLabel,
                                 "Waveform metadata",
                                 "Shows source and format information for the selected waveform.");
@@ -1105,12 +1137,14 @@ void AuthoringPanel::resized()
 
     if (drawerState.activeTab == authoring::DrawerTab::waveform)
     {
-        const auto waveformMetadataHeight = 18 + 2 + 18 + 2 + 24;
+        const auto waveformMetadataHeight = 18 + 2 + 18 + 2 + 18 + 2 + 24;
         const auto waveformPreviewHeight = juce::jlimit(72,
                                                         authoring::waveformPreviewHeight,
                                                         drawerEditorArea.getHeight() - waveformMetadataHeight);
         waveformPreview.setBounds(drawerEditorArea.removeFromTop(waveformPreviewHeight));
         drawerEditorArea.removeFromTop(4);
+        waveformStatusLabel.setBounds(drawerEditorArea.removeFromTop(18));
+        drawerEditorArea.removeFromTop(2);
         waveformInfoLabel.setBounds(drawerEditorArea.removeFromTop(18));
         drawerEditorArea.removeFromTop(2);
         loopInfoLabel.setBounds(drawerEditorArea.removeFromTop(18));
@@ -1301,6 +1335,24 @@ authoring::SelectionSummaryViewModel AuthoringPanel::buildSelectionSummaryViewMo
             + " (" + playbackStatus.preview.state + ")"
             + " | published r" + std::to_string(playbackStatus.performance.revision)
             + " (" + playbackStatus.performance.state + ")";
+    }
+
+    if (authoringPreviewStatusProvider)
+    {
+        const auto previewStatus = authoringPreviewStatusProvider();
+        if (previewStatus.available)
+        {
+            viewModel.playbackText += " | authoring preview r" + std::to_string(previewStatus.draftRevision)
+                + " (" + previewStatus.revisionState + ")";
+
+            if (!previewStatus.failureState.empty())
+            {
+                viewModel.statusText += " | preview blocked: " + previewStatus.failureState;
+
+                if (!previewStatus.blockingPrerequisite.empty())
+                    viewModel.statusText += " | fix: " + previewStatus.blockingPrerequisite;
+            }
+        }
     }
 
     if (const auto zone = authoringSession.getSelectedZone(); zone.has_value())
@@ -1515,6 +1567,7 @@ void AuthoringPanel::refreshDrawerVisibility()
     const auto expanded = isExpandedLayout(layoutMode);
     const auto* focusedComponent = juce::Component::getCurrentlyFocusedComponent();
     const auto focusWithinWaveform = isComponentFocusedWithin(focusedComponent, waveformPreview)
+        || isComponentFocusedWithin(focusedComponent, waveformStatusLabel)
         || isComponentFocusedWithin(focusedComponent, waveformInfoLabel)
         || isComponentFocusedWithin(focusedComponent, loopInfoLabel)
         || isComponentFocusedWithin(focusedComponent, importMetricsLabel);
@@ -1551,6 +1604,7 @@ void AuthoringPanel::refreshDrawerVisibility()
     setVisibleAndAccessible(waveformScopeLabel, drawerContentVisible);
     setVisibleAndAccessible(drawerBreadcrumbLabel, drawerContentVisible);
     setVisibleAndAccessible(waveformPreview, drawerContentVisible && waveformTab);
+    setVisibleAndAccessible(waveformStatusLabel, drawerContentVisible && waveformTab);
     setVisibleAndAccessible(waveformInfoLabel, drawerContentVisible && waveformTab);
     setVisibleAndAccessible(loopInfoLabel, drawerContentVisible && waveformTab);
     setVisibleAndAccessible(importMetricsLabel, drawerContentVisible && waveformTab);
@@ -2014,7 +2068,12 @@ void AuthoringPanel::refreshWaveformDrawerContent()
     if (waveformPreviewProvider)
         preview = waveformPreviewProvider();
 
+    AuthoringPreviewStatusSnapshot previewStatus;
+    if (authoringPreviewStatusProvider)
+        previewStatus = authoringPreviewStatusProvider();
+
     waveformPreview.setPreview(preview);
+    waveformStatusLabel.setText(formatAuthoringPreviewStatus(previewStatus), juce::dontSendNotification);
 
     if (preview.available)
     {
@@ -2064,6 +2123,11 @@ void AuthoringPanel::refreshWaveformDrawerContent()
         importMetricsLabel.setText("Import responsiveness unavailable", juce::dontSendNotification);
     }
 
+    waveformStatusLabel.setTitle(waveformStatusLabel.getText());
+    auto waveformStatusDescription = "Waveform preview status: " + waveformStatusLabel.getText().toStdString();
+    if (!previewStatus.blockingGuidance.empty())
+        waveformStatusDescription += " Next step: " + previewStatus.blockingGuidance;
+    waveformStatusLabel.setDescription(waveformStatusDescription);
     updateDynamicAccessibleText(waveformInfoLabel, waveformInfoLabel.getText(), "Waveform metadata: ");
     updateDynamicAccessibleText(loopInfoLabel, loopInfoLabel.getText(), "Loop metadata: ");
     updateDynamicAccessibleText(importMetricsLabel, importMetricsLabel.getText(), "Import responsiveness: ");
