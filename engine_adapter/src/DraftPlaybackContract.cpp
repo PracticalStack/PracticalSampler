@@ -1,9 +1,27 @@
 #include "drs/engine/DraftPlaybackContract.h"
 
+#include <algorithm>
 #include <utility>
 
 namespace drs::engine
 {
+namespace
+{
+std::vector<PlaybackSnapshotFinding> mergeFindings(const PlaybackSnapshotBuildResult* snapshotResult,
+                                                   const PreparedPlaybackBuildResult* preparedResult)
+{
+    std::vector<PlaybackSnapshotFinding> findings;
+
+    if (snapshotResult != nullptr)
+        findings = snapshotResult->findings;
+
+    if (preparedResult != nullptr)
+        findings.insert(findings.end(), preparedResult->findings.begin(), preparedResult->findings.end());
+
+    return findings;
+}
+} // namespace
+
 DraftPlaybackContract::DraftPlaybackContract(std::size_t initialDraftRevision)
 {
     status.draftRevision = initialDraftRevision;
@@ -38,7 +56,7 @@ bool DraftPlaybackContract::completePreviewBuild(std::uint64_t requestId)
     if (!status.pendingPreview.active || status.pendingPreview.requestId != requestId)
         return false;
 
-    return completeBuild(status.pendingPreview, status.preview, "Ready");
+    return completeBuild(status.pendingPreview, status.preview, nullptr, nullptr, "Ready");
 }
 
 bool DraftPlaybackContract::completePerformanceBuild(std::uint64_t requestId)
@@ -46,7 +64,43 @@ bool DraftPlaybackContract::completePerformanceBuild(std::uint64_t requestId)
     if (!status.pendingPerformance.active || status.pendingPerformance.requestId != requestId)
         return false;
 
-    return completeBuild(status.pendingPerformance, status.performance, "Active");
+    return completeBuild(status.pendingPerformance, status.performance, nullptr, nullptr, "Active");
+}
+
+bool DraftPlaybackContract::completePreviewBuild(std::uint64_t requestId, const PlaybackSnapshotBuildResult& buildResult)
+{
+    if (!status.pendingPreview.active || status.pendingPreview.requestId != requestId)
+        return false;
+
+    return completeBuild(status.pendingPreview, status.preview, &buildResult, nullptr, "Ready");
+}
+
+bool DraftPlaybackContract::completePerformanceBuild(std::uint64_t requestId, const PlaybackSnapshotBuildResult& buildResult)
+{
+    if (!status.pendingPerformance.active || status.pendingPerformance.requestId != requestId)
+        return false;
+
+    return completeBuild(status.pendingPerformance, status.performance, &buildResult, nullptr, "Active");
+}
+
+bool DraftPlaybackContract::completePreviewBuild(std::uint64_t requestId,
+                                                 const PlaybackSnapshotBuildResult& snapshotResult,
+                                                 const PreparedPlaybackBuildResult& preparedResult)
+{
+    if (!status.pendingPreview.active || status.pendingPreview.requestId != requestId)
+        return false;
+
+    return completeBuild(status.pendingPreview, status.preview, &snapshotResult, &preparedResult, "Ready");
+}
+
+bool DraftPlaybackContract::completePerformanceBuild(std::uint64_t requestId,
+                                                     const PlaybackSnapshotBuildResult& snapshotResult,
+                                                     const PreparedPlaybackBuildResult& preparedResult)
+{
+    if (!status.pendingPerformance.active || status.pendingPerformance.requestId != requestId)
+        return false;
+
+    return completeBuild(status.pendingPerformance, status.performance, &snapshotResult, &preparedResult, "Active");
 }
 
 bool DraftPlaybackContract::failPreviewBuild(std::uint64_t requestId,
@@ -159,12 +213,16 @@ DraftPlaybackBuildRequest DraftPlaybackContract::requestBuild(DraftPlaybackPendi
 
     pending.active = true;
     pending.requestId = nextRequestId++;
+    pending.cancellationId = pending.requestId;
     pending.requestedRevision = status.draftRevision;
+    pending.lifecycleState = PlaybackSnapshotLifecycleState::preparing;
     pending.state = "Preparing";
 
     request.accepted = true;
     request.requestId = pending.requestId;
+    request.cancellationId = pending.cancellationId;
     request.requestedRevision = pending.requestedRevision;
+    request.lifecycleState = pending.lifecycleState;
     request.state = state;
 
     status.lastEvent = kind + " build requested";
@@ -174,12 +232,65 @@ DraftPlaybackBuildRequest DraftPlaybackContract::requestBuild(DraftPlaybackPendi
 
 bool DraftPlaybackContract::completeBuild(DraftPlaybackPendingRequest& pending,
                                           DraftPlaybackPreparedRevision& prepared,
+                                          const PlaybackSnapshotBuildResult* buildResult,
+                                          const PreparedPlaybackBuildResult* preparedBuildResult,
                                           const std::string& completedState)
 {
+    const auto snapshotFailed = buildResult != nullptr && (!buildResult->built || !buildResult->activationEligible);
+    const auto preparedFailed = preparedBuildResult != nullptr
+        && (!preparedBuildResult->built || !preparedBuildResult->activationEligible);
+    if (snapshotFailed || preparedFailed)
+    {
+        const auto failedState = preparedFailed
+            ? (preparedBuildResult->state.empty() ? completedState + " failed" : preparedBuildResult->state)
+            : (buildResult->state.empty() ? completedState + " failed" : buildResult->state);
+        pending = {};
+        prepared.buildId = buildResult != nullptr ? buildResult->buildId : 0;
+        prepared.preparedBuildId = preparedBuildResult != nullptr ? preparedBuildResult->buildId : 0;
+        prepared.preparedAssetsAvailable = false;
+        prepared.preparationCacheHitCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.cacheHitCount : 0;
+        prepared.preparationCacheMissCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.cacheMissCount : 0;
+        prepared.preparedSampleCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedSampleCount : 0;
+        prepared.preparedStreamCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedStreamCount : 0;
+        prepared.preparedZoneCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedZoneCount : 0;
+        prepared.preparedBytes = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedBytes : 0;
+        prepared.findings = mergeFindings(buildResult, preparedBuildResult);
+        prepared.activationEligible = false;
+        prepared.lifecycleState = preparedBuildResult != nullptr
+            ? preparedBuildResult->lifecycleState
+            : buildResult->lifecycleState;
+
+        if (!prepared.available)
+            prepared.state = failedState;
+
+        status.lastEvent = failedState;
+        refreshPreparedStates();
+        return true;
+    }
+
     prepared.available = true;
     prepared.revision = pending.requestedRevision;
+    prepared.buildId = buildResult != nullptr ? buildResult->buildId : pending.requestId;
+    prepared.preparedAssetsAvailable = preparedBuildResult != nullptr ? preparedBuildResult->built : false;
+    prepared.preparedBuildId = preparedBuildResult != nullptr ? preparedBuildResult->buildId : 0;
+    prepared.activationEligible = preparedBuildResult != nullptr
+        ? preparedBuildResult->activationEligible
+        : (buildResult != nullptr ? buildResult->activationEligible : true);
+    prepared.lifecycleState = preparedBuildResult != nullptr
+        ? preparedBuildResult->lifecycleState
+        : (buildResult != nullptr ? buildResult->lifecycleState : PlaybackSnapshotLifecycleState::ready);
+    prepared.contentDigest = buildResult != nullptr ? buildResult->snapshot.contentDigest : std::string {};
+    prepared.preparedContentDigest = preparedBuildResult != nullptr
+        ? preparedBuildResult->prepared.preparedContentDigest
+        : std::string {};
     prepared.state = completedState;
-    prepared.issues.clear();
+    prepared.preparedSampleCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedSampleCount : 0;
+    prepared.preparedStreamCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedStreamCount : 0;
+    prepared.preparedZoneCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedZoneCount : 0;
+    prepared.preparedBytes = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedBytes : 0;
+    prepared.preparationCacheHitCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.cacheHitCount : 0;
+    prepared.preparationCacheMissCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.cacheMissCount : 0;
+    prepared.findings = mergeFindings(buildResult, preparedBuildResult);
     pending = {};
     status.lastEvent = "Build completed";
     refreshPreparedStates();
@@ -192,7 +303,12 @@ bool DraftPlaybackContract::failBuild(DraftPlaybackPendingRequest& pending,
                                       const std::string& failedState)
 {
     pending = {};
-    prepared.issues = issues;
+    prepared.findings.clear();
+    prepared.findings.reserve(issues.size());
+    for (const auto& issue : issues)
+        prepared.findings.push_back({ PlaybackSnapshotFindingSeverity::error, "contract-failure", "", issue });
+    prepared.activationEligible = false;
+    prepared.lifecycleState = PlaybackSnapshotLifecycleState::failed;
 
     if (!prepared.available)
         prepared.state = failedState;
@@ -228,7 +344,7 @@ void DraftPlaybackContract::refreshPreparedStates()
     }
     else if (!status.preview.available)
     {
-        if (status.preview.issues.empty())
+        if (status.preview.findings.empty())
             status.preview.state = "Idle";
     }
     else
@@ -242,7 +358,7 @@ void DraftPlaybackContract::refreshPreparedStates()
     }
     else if (!status.performance.available)
     {
-        if (status.performance.issues.empty())
+        if (status.performance.findings.empty())
             status.performance.state = "Idle";
     }
     else
@@ -255,7 +371,20 @@ void DraftPlaybackContract::resetPreparedRevision(DraftPlaybackPreparedRevision&
 {
     prepared.available = false;
     prepared.revision = 0;
+    prepared.buildId = 0;
+    prepared.preparedAssetsAvailable = false;
+    prepared.preparedBuildId = 0;
+    prepared.activationEligible = false;
+    prepared.lifecycleState = PlaybackSnapshotLifecycleState::idle;
+    prepared.contentDigest.clear();
+    prepared.preparedContentDigest.clear();
     prepared.state = state;
-    prepared.issues.clear();
+    prepared.preparedSampleCount = 0;
+    prepared.preparedStreamCount = 0;
+    prepared.preparedZoneCount = 0;
+    prepared.preparedBytes = 0;
+    prepared.preparationCacheHitCount = 0;
+    prepared.preparationCacheMissCount = 0;
+    prepared.findings.clear();
 }
 } // namespace drs::engine

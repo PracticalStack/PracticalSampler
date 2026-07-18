@@ -32,6 +32,30 @@ juce::String joinLines(const std::vector<std::string>& lines)
 
     return result;
 }
+
+juce::String summarizeDigest(const std::string& digest)
+{
+    if (digest.empty())
+        return "none";
+
+    constexpr std::size_t prefixLength = 18;
+    if (digest.size() <= prefixLength)
+        return juce::String::fromUTF8(digest.c_str());
+
+    return juce::String::fromUTF8((digest.substr(0, prefixLength) + "...").c_str());
+}
+
+juce::String summarizeFindings(const std::vector<drs::engine::PlaybackSnapshotFinding>& findings)
+{
+    if (findings.empty())
+        return "none";
+
+    juce::String summary = juce::String::fromUTF8(findings.front().message.c_str());
+    if (findings.size() > 1)
+        summary << " (+" << juce::String(static_cast<int>(findings.size() - 1)) << " more)";
+
+    return summary;
+}
 } // namespace
 
 StatusPanel::StatusPanel(drs::engine::EngineFacade& facade,
@@ -289,7 +313,8 @@ void StatusPanel::resized()
 
 void StatusPanel::timerCallback()
 {
-    refreshSnapshot();
+    if (lastObservedStateRevision != engineFacade.getStateRevision())
+        refreshSnapshot();
 }
 
 void StatusPanel::rebuildMacroControls()
@@ -329,6 +354,7 @@ void StatusPanel::rebuildMacroControls()
 void StatusPanel::refreshSnapshot()
 {
     snapshot = engineFacade.getStatusSnapshot();
+    lastObservedStateRevision = engineFacade.getStateRevision();
     const auto& diagnostics = snapshot.diagnostics;
     const auto macros = engineFacade.getMacroDescriptors();
 
@@ -344,7 +370,9 @@ void StatusPanel::refreshSnapshot()
             + " | preview=" + juce::String(static_cast<juce::int64>(diagnostics.previewRevision))
             + " (" + juce::String::fromUTF8(diagnostics.previewRevisionState.c_str()) + ")"
             + " | published=" + juce::String(static_cast<juce::int64>(diagnostics.publishedRevision))
-            + " (" + juce::String::fromUTF8(diagnostics.publishedRevisionState.c_str()) + ")",
+            + " (" + juce::String::fromUTF8(diagnostics.publishedRevisionState.c_str()) + ")"
+            + " | previewBuild=#" + juce::String(static_cast<juce::int64>(diagnostics.previewBuildId))
+            + " | publishBuild=#" + juce::String(static_cast<juce::int64>(diagnostics.publishedBuildId)),
         juce::dontSendNotification);
     voicesLabel.setText(
         "Voices: active=" + juce::String(static_cast<int>(diagnostics.activeVoiceCount))
@@ -358,7 +386,9 @@ void StatusPanel::refreshSnapshot()
             + " bytes | resident=" + juce::String(static_cast<int>(diagnostics.residentPageCount))
             + " | pending=" + juce::String(static_cast<int>(diagnostics.pendingPageCount))
             + " | evicted=" + juce::String(static_cast<int>(diagnostics.evictedPageCount))
-            + " | lastPurgeEvictions=" + juce::String(static_cast<int>(diagnostics.lastPurgeEvictedPageCount)),
+            + " | lastPurgeEvictions=" + juce::String(static_cast<int>(diagnostics.lastPurgeEvictedPageCount))
+            + " | digests p=" + summarizeDigest(diagnostics.previewContentDigest)
+            + " pub=" + summarizeDigest(diagnostics.publishedContentDigest),
         juce::dontSendNotification);
     latencyLabel.setText(
         "Latency: avg=" + juce::String(static_cast<juce::int64>(diagnostics.averageReadLatencyMicros))
@@ -367,9 +397,13 @@ void StatusPanel::refreshSnapshot()
             + " | dormantPurges=" + juce::String(static_cast<int>(diagnostics.dormantPurgeCount)),
         juce::dontSendNotification);
 
-    const auto failureText = diagnostics.failureState.empty()
+    auto failureText = diagnostics.failureState.empty()
         ? juce::String("Failure state: none")
         : juce::String("Failure state: ") + juce::String::fromUTF8(diagnostics.failureState.c_str());
+    failureText << " | previewFindings=" << juce::String(static_cast<int>(diagnostics.previewFindings.size()))
+                << " (" << summarizeFindings(diagnostics.previewFindings) << ")"
+                << " | publishFindings=" << juce::String(static_cast<int>(diagnostics.publishedFindings.size()))
+                << " (" << summarizeFindings(diagnostics.publishedFindings) << ")";
     failureLabel.setText(failureText, juce::dontSendNotification);
     failureLabel.setColour(juce::Label::textColourId,
                            diagnostics.failureState.empty()

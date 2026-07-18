@@ -51,6 +51,7 @@ private:
     NotePreviewStartedCallback onNotePreviewStarted;
     NotePreviewEndedCallback onNotePreviewEnded;
     drs::engine::EnginePerformanceSnapshot performanceSnapshot;
+    std::uint64_t lastObservedStateRevision = 0;
     std::vector<std::unique_ptr<MacroControl>> macroControls;
     std::vector<std::unique_ptr<juce::TextButton>> articulationButtons;
     juce::MidiKeyboardState keyboardState;

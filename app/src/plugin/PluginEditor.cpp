@@ -472,10 +472,12 @@ Editor::Editor(Processor& owner)
 
     setSize(drs::app::authoring::compactShellWidth, drs::app::authoring::compactShellHeight);
     refreshProjectViews();
+    startTimerHz(4);
 }
 
 Editor::~Editor()
 {
+    stopTimer();
     appProperties.saveIfNeeded();
 }
 
@@ -1056,6 +1058,12 @@ void Editor::confirmSafeToDiscardChanges(const juce::String& nextAction,
                                      if (completion)
                                          completion(result == discardButtonResult);
                                  });
+}
+
+void Editor::timerCallback()
+{
+    processor.getEngineFacade().serviceBackgroundWork();
+    updateProjectStatusLabel();
 }
 
 void Editor::refreshProjectViews()

@@ -1,10 +1,15 @@
 #pragma once
 
 #include "drs/engine/DraftPlaybackContract.h"
+#include "drs/engine/PlaybackSnapshot.h"
+#include "drs/engine/PreparedPlayback.h"
 #include "drs/engine/RuntimePresetState.h"
 #include "drs/engine/RuntimeModel.h"
 
+#include <chrono>
+#include <cstdint>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace drs::engine
@@ -79,6 +84,10 @@ struct EnginePerformanceSnapshot
     std::size_t draftRevision = 0;
     std::size_t previewRevision = 0;
     std::size_t publishedRevision = 0;
+    std::uint64_t previewBuildId = 0;
+    std::uint64_t publishedBuildId = 0;
+    std::uint64_t previewPreparedBuildId = 0;
+    std::uint64_t publishedPreparedBuildId = 0;
     std::string instrumentDisplayName;
     std::string presetId;
     std::string loadProfileId;
@@ -86,10 +95,34 @@ struct EnginePerformanceSnapshot
     std::string selectedArticulationName;
     bool previewPending = false;
     bool publishedPending = false;
+    bool previewActivationEligible = false;
+    bool publishedActivationEligible = false;
     std::string previewRevisionState;
     std::string publishedRevisionState;
+    std::string previewContentDigest;
+    std::string publishedContentDigest;
+    std::string previewPreparedContentDigest;
+    std::string publishedPreparedContentDigest;
     std::string draftPlaybackEvent;
     std::string loadIndicator;
+    std::size_t preparedWorkerPendingCount = 0;
+    std::size_t preparedWorkerCancellationCount = 0;
+    std::size_t preparedWorkerSupersededCount = 0;
+    std::size_t preparedWorkerFailureCount = 0;
+    std::uint64_t preparedWorkerRetiredBytes = 0;
+    std::string preparedWorkerEvent;
+    std::size_t previewPreparedSampleCount = 0;
+    std::size_t previewPreparedStreamCount = 0;
+    std::size_t publishedPreparedSampleCount = 0;
+    std::size_t publishedPreparedStreamCount = 0;
+    std::uint64_t previewPreparedBytes = 0;
+    std::uint64_t publishedPreparedBytes = 0;
+    std::size_t previewPreparationCacheHits = 0;
+    std::size_t previewPreparationCacheMisses = 0;
+    std::size_t publishedPreparationCacheHits = 0;
+    std::size_t publishedPreparationCacheMisses = 0;
+    std::vector<PlaybackSnapshotFinding> previewFindings;
+    std::vector<PlaybackSnapshotFinding> publishedFindings;
     EnginePreviewPlaybackSnapshot previewPlayback;
 };
 
@@ -100,15 +133,44 @@ struct EngineDiagnosticsSnapshot
     std::size_t draftRevision = 0;
     std::size_t previewRevision = 0;
     std::size_t publishedRevision = 0;
+    std::uint64_t previewBuildId = 0;
+    std::uint64_t publishedBuildId = 0;
+    std::uint64_t previewPreparedBuildId = 0;
+    std::uint64_t publishedPreparedBuildId = 0;
     std::string headline;
     std::string presetId;
     std::string loadProfileId;
     std::string selectedArticulationId;
     bool previewPending = false;
     bool publishedPending = false;
+    bool previewActivationEligible = false;
+    bool publishedActivationEligible = false;
     std::string previewRevisionState;
     std::string publishedRevisionState;
+    std::string previewContentDigest;
+    std::string publishedContentDigest;
+    std::string previewPreparedContentDigest;
+    std::string publishedPreparedContentDigest;
     std::string draftPlaybackEvent;
+    std::size_t preparedWorkerPendingCount = 0;
+    std::size_t preparedWorkerCancellationCount = 0;
+    std::size_t preparedWorkerSupersededCount = 0;
+    std::size_t preparedWorkerFailureCount = 0;
+    std::size_t preparedWorkerMaxPendingCount = 0;
+    std::uint64_t preparedWorkerRetiredBytes = 0;
+    std::string preparedWorkerEvent;
+    std::size_t previewPreparedSampleCount = 0;
+    std::size_t previewPreparedStreamCount = 0;
+    std::size_t previewPreparedZoneCount = 0;
+    std::size_t publishedPreparedSampleCount = 0;
+    std::size_t publishedPreparedStreamCount = 0;
+    std::size_t publishedPreparedZoneCount = 0;
+    std::uint64_t previewPreparedBytes = 0;
+    std::uint64_t publishedPreparedBytes = 0;
+    std::size_t previewPreparationCacheHits = 0;
+    std::size_t previewPreparationCacheMisses = 0;
+    std::size_t publishedPreparationCacheHits = 0;
+    std::size_t publishedPreparationCacheMisses = 0;
     std::size_t configuredMaxCachedPages = 0;
     std::uint64_t maxPrefetchBytesPerVoice = 0;
     std::size_t cacheHitCount = 0;
@@ -133,6 +195,8 @@ struct EngineDiagnosticsSnapshot
     bool lastContentProbeFailedGracefully = false;
     std::string lastContentProbeState;
     std::vector<std::string> lastContentProbeIssues;
+    std::vector<PlaybackSnapshotFinding> previewFindings;
+    std::vector<PlaybackSnapshotFinding> publishedFindings;
     std::vector<std::string> issues;
 };
 
@@ -175,12 +239,18 @@ public:
     EngineFacade();
 
     std::vector<HiseFrontendExportProfile> getFrontendExportProfiles() const;
+    bool serviceBackgroundWork();
+    std::uint64_t getStateRevision() const { return stateRevision; }
     EngineStatusSnapshot getStatusSnapshot() const;
     RuntimeManifestLoadResult loadPhase1ReferenceInstrument() const;
     RuntimeStreamLoadResult loadPhase1ReferenceStream() const;
-    EngineDiagnosticsSnapshot getDiagnosticsSnapshot() const { return diagnosticsSnapshot; }
+    EngineDiagnosticsSnapshot getDiagnosticsSnapshot() const;
     EnginePerformanceSnapshot getPerformanceSnapshot() const;
     const DraftPlaybackStatus& getDraftPlaybackStatus() const { return draftPlaybackContract.getStatus(); }
+    const PreparedPlaybackWorkerStatus& getPreparedPlaybackWorkerStatus() const
+    {
+        return preparedPlaybackService.getWorkerStatus();
+    }
     std::vector<EngineArticulationDescriptor> getArticulationDescriptors() const;
     std::vector<EngineMacroDescriptor> getMacroDescriptors() const;
     bool setSelectedArticulation(const std::string& articulationId);
@@ -192,6 +262,7 @@ public:
     bool reopenDraftPlaybackProject(std::size_t revision);
     bool beginDraftPlaybackDeviceRestart();
     bool completeDraftPlaybackDeviceRestart(bool restored);
+    bool waitForPreparedPlaybackIdle(std::chrono::milliseconds timeout = std::chrono::milliseconds(1000));
     EnginePreviewPlaybackSnapshot auditionPreviewNote(int midiNote, int velocity);
     std::string exportPresetStateJson() const;
     EnginePresetStateRestoreResult restorePresetStateJson(const std::string& presetStateJson);
@@ -203,18 +274,38 @@ public:
     const EngineContentFailureProbeResult& getLastContentFailureProbe() const { return lastContentFailureProbe; }
 
 private:
+    struct PendingPreparedCompletion
+    {
+        PreparedPlaybackWorkLane lane = PreparedPlaybackWorkLane::preview;
+        std::uint64_t contractRequestId = 0;
+        PlaybackSnapshotBuildResult snapshotResult;
+    };
+
+    PlaybackSnapshotBuildResult buildCurrentPlaybackSnapshot(bool activationRequested);
+    PreparedPlaybackBuildResult buildRejectedPreparedPlayback(const PlaybackSnapshotBuildResult& snapshotResult);
+    bool enqueuePreparedPlaybackBuild(std::uint64_t contractRequestId,
+                                      const PlaybackSnapshotBuildResult& snapshotResult,
+                                      PreparedPlaybackWorkLane lane);
+    bool pumpPreparedPlaybackWorkerCompletions();
+    void markStateChanged();
+    void clearPendingPreparedCompletions();
     void syncPreviewSnapshotFromDraftPlayback();
     void initializeDraftPlaybackContract(bool activatePerformanceRevision);
     void refreshDiagnosticsSnapshot();
 
     RuntimeManifestLoadResult referenceManifest;
     RuntimeStreamLoadResult referenceStream;
+    RuntimeProjectLoadResult authoringProject;
     bool referenceInstrumentActive = false;
     RuntimeSessionStateSnapshot currentSessionState;
     EngineDiagnosticsSnapshot diagnosticsSnapshot;
     EnginePreviewPlaybackSnapshot previewPlaybackSnapshot;
     EngineContentFailureProbeResult lastContentFailureProbe;
     DraftPlaybackContract draftPlaybackContract;
+    PlaybackSnapshotBuilder playbackSnapshotBuilder;
+    PreparedPlaybackService preparedPlaybackService;
+    std::unordered_map<std::uint64_t, PendingPreparedCompletion> pendingPreparedCompletions;
+    std::uint64_t stateRevision = 0;
     std::uint64_t nextPreviewVoiceId = 4000;
 };
 } // namespace drs::engine

@@ -571,6 +571,7 @@ void MainComponent::menuItemSelected(int menuItemID, int)
 
 void MainComponent::timerCallback()
 {
+    processor.getEngineFacade().serviceBackgroundWork();
     updateWindowTitle();
 }
 

@@ -9,7 +9,8 @@
 
 namespace drs::plugin
 {
-class Editor final : public juce::AudioProcessorEditor
+class Editor final : public juce::AudioProcessorEditor,
+                     private juce::Timer
 {
 public:
     explicit Editor(Processor&);
@@ -29,6 +30,7 @@ private:
         preferencesCommandId
     };
 
+    void timerCallback() override;
     void showFileMenu();
     void showSettingsMenu();
     void handleMenuCommand(int menuItemId);

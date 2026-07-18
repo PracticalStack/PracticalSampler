@@ -101,6 +101,12 @@ int main()
                 "Engine snapshot detail must describe the Phase 1 runtime bootstrap seam.");
         require(statusSnapshot.detail.find("Runtime diagnostics:") != std::string::npos,
                 "Engine snapshot detail must describe the runtime diagnostics surface.");
+        require(statusSnapshot.detail.find("Snapshot ids:") != std::string::npos,
+                "Engine snapshot detail must describe playback snapshot build identities.");
+        require(statusSnapshot.detail.find("Snapshot digests:") != std::string::npos,
+                "Engine snapshot detail must describe playback snapshot digests.");
+        require(statusSnapshot.detail.find("Prepared worker:") != std::string::npos,
+                "Engine snapshot detail must describe prepared-playback worker activity.");
         require(!statusSnapshot.nextSteps.empty(), "Engine snapshot must expose at least one Phase 0 next step.");
         require(engineFacade.getArticulationDescriptors().size() == 2,
                 "Engine facade should expose both reference articulations to the Sprint 5 performance surface.");

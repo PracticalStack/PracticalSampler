@@ -18,6 +18,30 @@ const auto performancePanelSuccess = juce::Colour::fromRGB(27, 128, 84);
 const auto performancePanelWarning = juce::Colour::fromRGB(176, 91, 22);
 const auto performancePanelDanger = juce::Colour::fromRGB(172, 41, 41);
 
+juce::String summarizeDigest(const std::string& digest)
+{
+    if (digest.empty())
+        return "none";
+
+    constexpr std::size_t prefixLength = 18;
+    if (digest.size() <= prefixLength)
+        return juce::String::fromUTF8(digest.c_str());
+
+    return juce::String::fromUTF8((digest.substr(0, prefixLength) + "...").c_str());
+}
+
+juce::String summarizeFindings(const std::vector<drs::engine::PlaybackSnapshotFinding>& findings)
+{
+    if (findings.empty())
+        return "none";
+
+    juce::String summary = juce::String::fromUTF8(findings.front().message.c_str());
+    if (findings.size() > 1)
+        summary << " (+" << juce::String(static_cast<int>(findings.size() - 1)) << " more)";
+
+    return summary;
+}
+
 juce::String formatArticulationLabel(const std::string& articulationName, const std::string& articulationId)
 {
     if (!articulationName.empty())
@@ -231,7 +255,8 @@ void PerformancePanel::resized()
 
 void PerformancePanel::timerCallback()
 {
-    refreshSurface();
+    if (lastObservedStateRevision != engineFacade.getStateRevision())
+        refreshSurface();
 }
 
 void PerformancePanel::handleNoteOn(juce::MidiKeyboardState*, int, int midiNoteNumber, float velocity)
@@ -304,6 +329,7 @@ void PerformancePanel::rebuildArticulationButtons()
 void PerformancePanel::refreshSurface()
 {
     performanceSnapshot = engineFacade.getPerformanceSnapshot();
+    lastObservedStateRevision = engineFacade.getStateRevision();
     const auto articulations = engineFacade.getArticulationDescriptors();
     const auto macros = engineFacade.getMacroDescriptors();
 
@@ -337,7 +363,9 @@ void PerformancePanel::refreshSurface()
                 + " | Preview r" + juce::String(static_cast<juce::int64>(performanceSnapshot.previewRevision))
                 + " (" + juce::String::fromUTF8(performanceSnapshot.previewRevisionState.c_str()) + ")"
                 + " | Published r" + juce::String(static_cast<juce::int64>(performanceSnapshot.publishedRevision))
-                + " (" + juce::String::fromUTF8(performanceSnapshot.publishedRevisionState.c_str()) + ")",
+                + " (" + juce::String::fromUTF8(performanceSnapshot.publishedRevisionState.c_str()) + ")"
+                + " | Preview build #" + juce::String(static_cast<juce::int64>(performanceSnapshot.previewBuildId))
+                + " | Publish build #" + juce::String(static_cast<juce::int64>(performanceSnapshot.publishedBuildId)),
             juce::dontSendNotification);
     }
 
@@ -354,6 +382,8 @@ void PerformancePanel::refreshSurface()
         if (performanceSnapshot.publishedPending)
             loadIndicatorText << " publish";
     }
+    loadIndicatorText << " | digests p=" << summarizeDigest(performanceSnapshot.previewContentDigest)
+                      << " pub=" << summarizeDigest(performanceSnapshot.publishedContentDigest);
     loadIndicatorLabel.setText(loadIndicatorText,
                                juce::dontSendNotification);
     const auto hasPreviewError = !performanceSnapshot.previewPlayback.errorMessage.empty();
@@ -380,6 +410,9 @@ void PerformancePanel::refreshSurface()
     {
         previewText << " | preparing";
     }
+    previewText << " | digest " << summarizeDigest(performanceSnapshot.previewContentDigest);
+    if (!performanceSnapshot.previewFindings.empty())
+        previewText << " | findings " << summarizeFindings(performanceSnapshot.previewFindings);
     previewText << " | " << juce::String::fromUTF8(performanceSnapshot.previewPlayback.appliedMacroSummary.c_str());
     if (!performanceSnapshot.previewPlayback.errorMessage.empty())
     {

@@ -111,6 +111,81 @@ add_test(
     COMMAND drs_phase1_draft_playback_facade_tests
 )
 
+juce_add_console_app(drs_phase1_playback_snapshot_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Playback Snapshot Tests"
+)
+
+target_sources(drs_phase1_playback_snapshot_tests
+    PRIVATE
+        src/Phase1PlaybackSnapshotTests.cpp
+)
+
+target_link_libraries(drs_phase1_playback_snapshot_tests
+    PRIVATE
+        drs_engine_adapter
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase1_playback_snapshot_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase1.playback_snapshot
+    COMMAND drs_phase1_playback_snapshot_tests
+)
+
+juce_add_console_app(drs_phase1_prepared_playback_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Prepared Playback Tests"
+)
+
+target_sources(drs_phase1_prepared_playback_tests
+    PRIVATE
+        src/Phase1PreparedPlaybackTests.cpp
+)
+
+target_link_libraries(drs_phase1_prepared_playback_tests
+    PRIVATE
+        drs_engine_adapter
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase1_prepared_playback_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase1.prepared_playback
+    COMMAND drs_phase1_prepared_playback_tests
+)
+
+juce_add_console_app(drs_phase1_prepared_playback_worker_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Prepared Playback Worker Tests"
+)
+
+target_sources(drs_phase1_prepared_playback_worker_tests
+    PRIVATE
+        src/Phase1PreparedPlaybackWorkerTests.cpp
+)
+
+target_link_libraries(drs_phase1_prepared_playback_worker_tests
+    PRIVATE
+        drs_engine_adapter
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase1_prepared_playback_worker_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase1.prepared_playback_worker
+    COMMAND drs_phase1_prepared_playback_worker_tests
+)
+
 juce_add_console_app(drs_phase1_realtime_safety_tests
     PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Realtime Safety Tests"
 )

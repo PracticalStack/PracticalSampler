@@ -1,5 +1,8 @@
 #pragma once
 
+#include "drs/engine/PreparedPlayback.h"
+#include "drs/engine/PlaybackSnapshot.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -11,15 +14,30 @@ struct DraftPlaybackPreparedRevision
 {
     bool available = false;
     std::size_t revision = 0;
+    std::uint64_t buildId = 0;
+    bool preparedAssetsAvailable = false;
+    std::uint64_t preparedBuildId = 0;
+    bool activationEligible = false;
+    PlaybackSnapshotLifecycleState lifecycleState = PlaybackSnapshotLifecycleState::idle;
+    std::string contentDigest;
+    std::string preparedContentDigest;
     std::string state;
-    std::vector<std::string> issues;
+    std::size_t preparedSampleCount = 0;
+    std::size_t preparedStreamCount = 0;
+    std::size_t preparedZoneCount = 0;
+    std::uint64_t preparedBytes = 0;
+    std::size_t preparationCacheHitCount = 0;
+    std::size_t preparationCacheMissCount = 0;
+    std::vector<PlaybackSnapshotFinding> findings;
 };
 
 struct DraftPlaybackPendingRequest
 {
     bool active = false;
     std::uint64_t requestId = 0;
+    std::uint64_t cancellationId = 0;
     std::size_t requestedRevision = 0;
+    PlaybackSnapshotLifecycleState lifecycleState = PlaybackSnapshotLifecycleState::idle;
     std::string state;
 };
 
@@ -27,7 +45,9 @@ struct DraftPlaybackBuildRequest
 {
     bool accepted = false;
     std::uint64_t requestId = 0;
+    std::uint64_t cancellationId = 0;
     std::size_t requestedRevision = 0;
+    PlaybackSnapshotLifecycleState lifecycleState = PlaybackSnapshotLifecycleState::idle;
     std::string state;
 };
 
@@ -57,6 +77,14 @@ public:
 
     bool completePreviewBuild(std::uint64_t requestId);
     bool completePerformanceBuild(std::uint64_t requestId);
+    bool completePreviewBuild(std::uint64_t requestId, const PlaybackSnapshotBuildResult& buildResult);
+    bool completePerformanceBuild(std::uint64_t requestId, const PlaybackSnapshotBuildResult& buildResult);
+    bool completePreviewBuild(std::uint64_t requestId,
+                              const PlaybackSnapshotBuildResult& snapshotResult,
+                              const PreparedPlaybackBuildResult& preparedResult);
+    bool completePerformanceBuild(std::uint64_t requestId,
+                                  const PlaybackSnapshotBuildResult& snapshotResult,
+                                  const PreparedPlaybackBuildResult& preparedResult);
 
     bool failPreviewBuild(std::uint64_t requestId,
                           const std::vector<std::string>& issues,
@@ -79,6 +107,8 @@ private:
                                            const std::string& state);
     bool completeBuild(DraftPlaybackPendingRequest& pending,
                        DraftPlaybackPreparedRevision& prepared,
+                       const PlaybackSnapshotBuildResult* buildResult,
+                       const PreparedPlaybackBuildResult* preparedBuildResult,
                        const std::string& completedState);
     bool failBuild(DraftPlaybackPendingRequest& pending,
                    DraftPlaybackPreparedRevision& prepared,

@@ -1,4 +1,5 @@
 #include "drs/engine/DraftPlaybackContract.h"
+#include "drs/engine/PlaybackSnapshot.h"
 #include "drs/engine/ProjectDocument.h"
 #include "drs/engine/RuntimeLoader.h"
 
@@ -13,6 +14,36 @@ void require(bool condition, const std::string& message)
     if (!condition)
         throw std::runtime_error(message);
 }
+
+drs::engine::PlaybackSnapshotBuildResult buildSnapshot(drs::engine::PlaybackSnapshotBuilder& builder,
+                                                       const drs::engine::RuntimeProjectModel& project,
+                                                       std::size_t revision,
+                                                       bool activationRequested)
+{
+    const auto request = builder.requestBuild(revision, activationRequested);
+    require(request.accepted, "Playback snapshot build request should be accepted during contract tests.");
+    return builder.buildSnapshot(request, project);
+}
+
+struct DraftBuildArtifacts
+{
+    drs::engine::PlaybackSnapshotBuildResult snapshot;
+    drs::engine::PreparedPlaybackBuildResult prepared;
+};
+
+DraftBuildArtifacts buildPrepared(drs::engine::PlaybackSnapshotBuilder& snapshotBuilder,
+                                  drs::engine::PreparedPlaybackService& preparedService,
+                                  const drs::engine::RuntimeStreamLoadResult& streamResult,
+                                  const drs::engine::RuntimeProjectModel& project,
+                                  std::size_t revision,
+                                  bool activationRequested)
+{
+    DraftBuildArtifacts artifacts;
+    artifacts.snapshot = buildSnapshot(snapshotBuilder, project, revision, activationRequested);
+    const auto preparedRequest = preparedService.requestBuild(artifacts.snapshot);
+    artifacts.prepared = preparedService.prepare(preparedRequest, artifacts.snapshot, streamResult);
+    return artifacts;
+}
 } // namespace
 
 int main()
@@ -24,20 +55,54 @@ int main()
 
         drs::engine::RuntimeProjectDocumentController controller(phase2Project.project);
         drs::engine::DraftPlaybackContract contract(controller.getDocumentState().revision);
+        drs::engine::PlaybackSnapshotBuilder snapshotBuilder;
+        drs::engine::PreparedPlaybackService preparedService;
+        const auto referenceManifest = drs::engine::loadPhase1ReferenceInstrumentManifest();
+        require(referenceManifest.loaded, "Phase 1 reference manifest must load before contract preparation coverage runs.");
+        const auto referenceStream = drs::engine::loadRuntimeStreamContainerForInstrument(referenceManifest);
+        require(referenceStream.loaded, "Phase 1 reference stream must load before contract preparation coverage runs.");
 
         const auto initialPreview = contract.requestPreviewBuild();
         require(initialPreview.accepted, "Initial preview build should be accepted.");
-        require(contract.completePreviewBuild(initialPreview.requestId),
+        const auto initialPreviewBuild = buildPrepared(snapshotBuilder,
+                                                       preparedService,
+                                                       referenceStream,
+                                                       controller.getProject(),
+                                                       0,
+                                                       false);
+        require(contract.completePreviewBuild(initialPreview.requestId,
+                                              initialPreviewBuild.snapshot,
+                                              initialPreviewBuild.prepared),
                 "Initial preview build should complete successfully.");
 
         const auto initialPublish = contract.requestPerformanceBuild();
         require(initialPublish.accepted, "Initial publish build should be accepted.");
-        require(contract.completePerformanceBuild(initialPublish.requestId),
+        const auto initialPublishBuild = buildPrepared(snapshotBuilder,
+                                                       preparedService,
+                                                       referenceStream,
+                                                       controller.getProject(),
+                                                       0,
+                                                       true);
+        require(contract.completePerformanceBuild(initialPublish.requestId,
+                                                  initialPublishBuild.snapshot,
+                                                  initialPublishBuild.prepared),
                 "Initial publish build should complete successfully.");
         require(contract.getStatus().preview.available && contract.getStatus().preview.revision == 0,
                 "Initial preview build should track draft revision 0.");
         require(contract.getStatus().performance.available && contract.getStatus().performance.revision == 0,
                 "Initial publish build should track revision 0.");
+        require(!contract.getStatus().preview.contentDigest.empty(),
+                "Initial preview build should carry a playback snapshot digest.");
+        require(contract.getStatus().preview.preparedAssetsAvailable,
+                "Initial preview build should carry prepared playback assets.");
+        require(!contract.getStatus().preview.preparedContentDigest.empty(),
+                "Initial preview build should carry a prepared playback digest.");
+        require(contract.getStatus().preview.preparedSampleCount == phase2Project.project.sampleSources.size(),
+                "Initial preview build should expose prepared sample counts.");
+        require(contract.getStatus().preview.contentDigest == contract.getStatus().performance.contentDigest,
+                "Initial preview and publish for the same draft should share a digest.");
+        require(contract.getStatus().preview.preparedContentDigest == contract.getStatus().performance.preparedContentDigest,
+                "Initial preview and publish for the same draft should share a prepared digest.");
 
         auto firstEdit = controller.getProject();
         firstEdit.authoring.zones[0].gainDb += 1.5;
@@ -55,10 +120,20 @@ int main()
 
         const auto previewRevision1 = contract.requestPreviewBuild();
         require(previewRevision1.accepted, "Revision 1 preview build should be accepted.");
-        require(contract.completePreviewBuild(previewRevision1.requestId),
+        const auto previewRevision1Build = buildPrepared(snapshotBuilder,
+                                                         preparedService,
+                                                         referenceStream,
+                                                         controller.getProject(),
+                                                         firstCommit.documentState.revision,
+                                                         false);
+        require(contract.completePreviewBuild(previewRevision1.requestId,
+                                              previewRevision1Build.snapshot,
+                                              previewRevision1Build.prepared),
                 "Revision 1 preview build should complete successfully.");
         require(contract.getStatus().preview.revision == 1 && contract.getStatus().preview.state == "Ready",
                 "Preview should advance to the latest successfully prepared draft.");
+        require(contract.getStatus().preview.preparedAssetsAvailable,
+                "Latest preview revision should retain prepared assets.");
         require(contract.getStatus().performance.revision == 0,
                 "Preview success must not change the published performance revision.");
 
@@ -66,7 +141,15 @@ int main()
         require(publishRevision1.accepted, "Revision 1 publish build should be accepted.");
         require(contract.getStatus().performance.revision == 0,
                 "Published revision must not change before Apply finishes.");
-        require(contract.completePerformanceBuild(publishRevision1.requestId),
+        const auto publishRevision1Build = buildPrepared(snapshotBuilder,
+                                                         preparedService,
+                                                         referenceStream,
+                                                         controller.getProject(),
+                                                         firstCommit.documentState.revision,
+                                                         true);
+        require(contract.completePerformanceBuild(publishRevision1.requestId,
+                                                  publishRevision1Build.snapshot,
+                                                  publishRevision1Build.prepared),
                 "Revision 1 publish build should complete successfully.");
         require(contract.getStatus().performance.revision == 1,
                 "Published performance revision should change only after a successful Apply.");
@@ -111,36 +194,70 @@ int main()
         require(replacementPublish.accepted, "Superseding publish request should be accepted.");
         require(!contract.completePerformanceBuild(supersededPublish.requestId),
                 "A superseded publish request must not activate an older revision.");
-        require(contract.completePerformanceBuild(replacementPublish.requestId),
+        const auto replacementPublishBuild = buildPrepared(snapshotBuilder,
+                                                           preparedService,
+                                                           referenceStream,
+                                                           controller.getProject(),
+                                                           fourthCommit.documentState.revision,
+                                                           true);
+        require(contract.completePerformanceBuild(replacementPublish.requestId,
+                                                  replacementPublishBuild.snapshot,
+                                                  replacementPublishBuild.prepared),
                 "The newest publish request should activate successfully.");
         require(contract.getStatus().performance.revision == 4,
                 "Published performance revision should advance to the newest completed Apply.");
 
         const auto failedPreview = contract.requestPreviewBuild();
         require(failedPreview.accepted, "Revision 4 preview request should be accepted.");
-        require(contract.failPreviewBuild(failedPreview.requestId,
-                                          { "Missing asset: Samples/LeadMissing.wav" }),
-                "Failed preview preparation should be recorded.");
+        auto invalidPreviewProject = controller.getProject();
+        invalidPreviewProject.authoring.zones[0].sampleSourceId = "missing-source";
+        const auto failedPreviewBuild = buildPrepared(snapshotBuilder,
+                                                      preparedService,
+                                                      referenceStream,
+                                                      invalidPreviewProject,
+                                                      fourthCommit.documentState.revision,
+                                                      false);
+        require(contract.completePreviewBuild(failedPreview.requestId,
+                                              failedPreviewBuild.snapshot,
+                                              failedPreviewBuild.prepared),
+                "Invalid preview snapshot result should still be recorded against the contract.");
         require(contract.getStatus().preview.available && contract.getStatus().preview.revision == 1,
                 "Preview failure should retain the last good preview revision.");
         require(contract.getStatus().preview.state == "Stale",
                 "Preview failure against a newer draft should mark preview stale.");
-        require(!contract.getStatus().preview.issues.empty(),
-                "Preview failure should surface actionable issues.");
+        require(!contract.getStatus().preview.findings.empty(),
+                "Preview failure should surface actionable findings.");
 
         const auto failedPublish = contract.requestPerformanceBuild();
         require(failedPublish.accepted, "Revision 4 publish request should be accepted.");
-        require(contract.failPerformanceBuild(failedPublish.requestId,
-                                              { "Failed preparation: routing graph invalid" }),
-                "Failed publish preparation should be recorded.");
+        auto invalidPublishProject = controller.getProject();
+        invalidPublishProject.authoring.zones[1].sampleSourceId = "missing-source";
+        const auto failedPublishBuild = buildPrepared(snapshotBuilder,
+                                                      preparedService,
+                                                      referenceStream,
+                                                      invalidPublishProject,
+                                                      fourthCommit.documentState.revision,
+                                                      true);
+        require(contract.completePerformanceBuild(failedPublish.requestId,
+                                                  failedPublishBuild.snapshot,
+                                                  failedPublishBuild.prepared),
+                "Invalid publish snapshot result should still be recorded against the contract.");
         require(contract.getStatus().performance.available && contract.getStatus().performance.revision == 4,
                 "Failed publish should preserve the last known-good performance revision.");
-        require(!contract.getStatus().performance.issues.empty(),
-                "Failed publish should surface actionable issues.");
+        require(!contract.getStatus().performance.findings.empty(),
+                "Failed publish should surface actionable findings.");
 
         const auto recoveredPreview = contract.requestPreviewBuild();
         require(recoveredPreview.accepted, "Recovered preview request should be accepted.");
-        require(contract.completePreviewBuild(recoveredPreview.requestId),
+        const auto recoveredPreviewBuild = buildPrepared(snapshotBuilder,
+                                                         preparedService,
+                                                         referenceStream,
+                                                         controller.getProject(),
+                                                         fourthCommit.documentState.revision,
+                                                         false);
+        require(contract.completePreviewBuild(recoveredPreview.requestId,
+                                              recoveredPreviewBuild.snapshot,
+                                              recoveredPreviewBuild.prepared),
                 "Recovered preview request should complete successfully.");
         require(contract.getStatus().preview.revision == 4 && contract.getStatus().preview.state == "Ready",
                 "A successful rebuild should recover preview to the current draft revision.");
@@ -174,12 +291,28 @@ int main()
 
         const auto reopenedPublish = contract.requestPerformanceBuild();
         require(reopenedPublish.accepted, "Publish after reopen should be accepted.");
-        require(contract.completePerformanceBuild(reopenedPublish.requestId),
+        const auto reopenedPublishBuild = buildPrepared(snapshotBuilder,
+                                                        preparedService,
+                                                        referenceStream,
+                                                        controller.getProject(),
+                                                        fifthCommit.documentState.revision,
+                                                        true);
+        require(contract.completePerformanceBuild(reopenedPublish.requestId,
+                                                  reopenedPublishBuild.snapshot,
+                                                  reopenedPublishBuild.prepared),
                 "Publish after reopen should complete successfully.");
 
         const auto reopenedPreview = contract.requestPreviewBuild();
         require(reopenedPreview.accepted, "Preview after reopen should be accepted.");
-        require(contract.completePreviewBuild(reopenedPreview.requestId),
+        const auto reopenedPreviewBuild = buildPrepared(snapshotBuilder,
+                                                        preparedService,
+                                                        referenceStream,
+                                                        controller.getProject(),
+                                                        fifthCommit.documentState.revision,
+                                                        false);
+        require(contract.completePreviewBuild(reopenedPreview.requestId,
+                                              reopenedPreviewBuild.snapshot,
+                                              reopenedPreviewBuild.prepared),
                 "Preview after reopen should complete successfully.");
 
         auto sixthEdit = controller.getProject();

@@ -39,6 +39,29 @@ std::string summarizeIssues(const std::vector<std::string>& issues)
     return issues.front() + " (+" + std::to_string(issues.size() - 1) + " more)";
 }
 
+std::string summarizeSnapshotFindings(const std::vector<PlaybackSnapshotFinding>& findings)
+{
+    if (findings.empty())
+        return {};
+
+    if (findings.size() == 1)
+        return findings.front().message;
+
+    return findings.front().message + " (+" + std::to_string(findings.size() - 1) + " more)";
+}
+
+std::string summarizeDigest(const std::string& digest)
+{
+    if (digest.empty())
+        return "none";
+
+    constexpr std::size_t prefixLength = 18;
+    if (digest.size() <= prefixLength)
+        return digest;
+
+    return digest.substr(0, prefixLength) + "...";
+}
+
 std::string buildMacroSummary(const RuntimeSessionStateSnapshot& sessionState)
 {
     if (sessionState.macroValues.empty())
@@ -128,11 +151,47 @@ void syncDraftPlaybackIntoDiagnostics(const DraftPlaybackStatus& status,
     diagnosticsSnapshot.draftRevision = status.draftRevision;
     diagnosticsSnapshot.previewRevision = status.preview.revision;
     diagnosticsSnapshot.publishedRevision = status.performance.revision;
+    diagnosticsSnapshot.previewBuildId = status.preview.buildId;
+    diagnosticsSnapshot.publishedBuildId = status.performance.buildId;
+    diagnosticsSnapshot.previewPreparedBuildId = status.preview.preparedBuildId;
+    diagnosticsSnapshot.publishedPreparedBuildId = status.performance.preparedBuildId;
     diagnosticsSnapshot.previewPending = status.pendingPreview.active;
     diagnosticsSnapshot.publishedPending = status.pendingPerformance.active;
+    diagnosticsSnapshot.previewActivationEligible = status.preview.activationEligible;
+    diagnosticsSnapshot.publishedActivationEligible = status.performance.activationEligible;
     diagnosticsSnapshot.previewRevisionState = status.preview.state;
     diagnosticsSnapshot.publishedRevisionState = status.performance.state;
+    diagnosticsSnapshot.previewContentDigest = status.preview.contentDigest;
+    diagnosticsSnapshot.publishedContentDigest = status.performance.contentDigest;
+    diagnosticsSnapshot.previewPreparedContentDigest = status.preview.preparedContentDigest;
+    diagnosticsSnapshot.publishedPreparedContentDigest = status.performance.preparedContentDigest;
+    diagnosticsSnapshot.previewPreparedSampleCount = status.preview.preparedSampleCount;
+    diagnosticsSnapshot.previewPreparedStreamCount = status.preview.preparedStreamCount;
+    diagnosticsSnapshot.previewPreparedZoneCount = status.preview.preparedZoneCount;
+    diagnosticsSnapshot.publishedPreparedSampleCount = status.performance.preparedSampleCount;
+    diagnosticsSnapshot.publishedPreparedStreamCount = status.performance.preparedStreamCount;
+    diagnosticsSnapshot.publishedPreparedZoneCount = status.performance.preparedZoneCount;
+    diagnosticsSnapshot.previewPreparedBytes = status.preview.preparedBytes;
+    diagnosticsSnapshot.publishedPreparedBytes = status.performance.preparedBytes;
+    diagnosticsSnapshot.previewPreparationCacheHits = status.preview.preparationCacheHitCount;
+    diagnosticsSnapshot.previewPreparationCacheMisses = status.preview.preparationCacheMissCount;
+    diagnosticsSnapshot.publishedPreparationCacheHits = status.performance.preparationCacheHitCount;
+    diagnosticsSnapshot.publishedPreparationCacheMisses = status.performance.preparationCacheMissCount;
+    diagnosticsSnapshot.previewFindings = status.preview.findings;
+    diagnosticsSnapshot.publishedFindings = status.performance.findings;
     diagnosticsSnapshot.draftPlaybackEvent = status.lastEvent;
+}
+
+void syncPreparedPlaybackWorkerIntoDiagnostics(const PreparedPlaybackWorkerStatus& workerStatus,
+                                               EngineDiagnosticsSnapshot& diagnosticsSnapshot)
+{
+    diagnosticsSnapshot.preparedWorkerPendingCount = workerStatus.pendingWorkCount;
+    diagnosticsSnapshot.preparedWorkerCancellationCount = workerStatus.cancellationCount;
+    diagnosticsSnapshot.preparedWorkerSupersededCount = workerStatus.supersededCount;
+    diagnosticsSnapshot.preparedWorkerFailureCount = workerStatus.failureCount;
+    diagnosticsSnapshot.preparedWorkerMaxPendingCount = workerStatus.maxPendingWorkCount;
+    diagnosticsSnapshot.preparedWorkerRetiredBytes = workerStatus.retiredBytesAwaitingCleanup;
+    diagnosticsSnapshot.preparedWorkerEvent = workerStatus.lastEvent;
 }
 
 void syncSessionSelectionsIntoDiagnostics(const RuntimeSessionStateSnapshot& sessionState,
@@ -295,13 +354,17 @@ fs::path buildChecksumMismatchFixture()
 } // namespace
 
 EngineFacade::EngineFacade()
-    : referenceManifest(loadPhase1ReferenceInstrumentManifest())
+    : referenceManifest(loadPhase1ReferenceInstrumentManifest()),
+      preparedPlaybackService("phase1-prepared-playback-v2", 2, true)
 {
+    authoringProject = loadPhase2ReferenceProjectManifest();
+
     if (referenceManifest.loaded)
     {
         currentSessionState = buildDefaultRuntimeSessionState(referenceManifest);
         currentSessionState.transientMetrics.integrationState = "Default preset state loaded";
         referenceStream = loadPhase1ReferenceStreamContainer();
+        preparedPlaybackService.setBackgroundWorkerStream(referenceStream);
         referenceInstrumentActive = referenceStream.loaded;
     }
     else
@@ -313,6 +376,7 @@ EngineFacade::EngineFacade()
 
     initializeDraftPlaybackContract(false);
     refreshDiagnosticsSnapshot();
+    markStateChanged();
 }
 
 std::vector<HiseFrontendExportProfile> EngineFacade::getFrontendExportProfiles() const
@@ -343,6 +407,11 @@ std::vector<HiseFrontendExportProfile> EngineFacade::getFrontendExportProfiles()
             "Frontend export for a standalone app target. Enables IS_STANDALONE_APP and typically needs the ASIO SDK for Windows low-latency device support."
         }
     };
+}
+
+bool EngineFacade::serviceBackgroundWork()
+{
+    return pumpPreparedPlaybackWorkerCompletions();
 }
 
 EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
@@ -492,6 +561,30 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
            << " (" << (diagnostics.publishedRevisionState.empty() ? "unavailable" : diagnostics.publishedRevisionState) << ")\n";
     detail << "Draft playback event: "
            << (diagnostics.draftPlaybackEvent.empty() ? "not reported" : diagnostics.draftPlaybackEvent) << "\n";
+    detail << "Snapshot ids: previewBuild=" << diagnostics.previewBuildId
+           << ", publishBuild=" << diagnostics.publishedBuildId << "\n";
+    detail << "Snapshot digests: preview=" << summarizeDigest(diagnostics.previewContentDigest)
+           << ", publish=" << summarizeDigest(diagnostics.publishedContentDigest) << "\n";
+    detail << "Snapshot findings: preview=" << diagnostics.previewFindings.size()
+           << ", publish=" << diagnostics.publishedFindings.size() << "\n";
+    detail << "Prepared playback ids: preview=" << diagnostics.previewPreparedBuildId
+           << ", publish=" << diagnostics.publishedPreparedBuildId << "\n";
+    detail << "Prepared playback digests: preview=" << summarizeDigest(diagnostics.previewPreparedContentDigest)
+           << ", publish=" << summarizeDigest(diagnostics.publishedPreparedContentDigest) << "\n";
+    detail << "Prepared playback assets: preview samples=" << diagnostics.previewPreparedSampleCount
+           << ", preview streams=" << diagnostics.previewPreparedStreamCount
+           << ", publish samples=" << diagnostics.publishedPreparedSampleCount
+           << ", publish streams=" << diagnostics.publishedPreparedStreamCount << "\n";
+    detail << "Prepared playback bytes: preview=" << diagnostics.previewPreparedBytes
+           << ", publish=" << diagnostics.publishedPreparedBytes << "\n";
+    detail << "Prepared worker: pending=" << diagnostics.preparedWorkerPendingCount
+           << ", canceled=" << diagnostics.preparedWorkerCancellationCount
+           << ", superseded=" << diagnostics.preparedWorkerSupersededCount
+           << ", failures=" << diagnostics.preparedWorkerFailureCount
+           << ", maxPending=" << diagnostics.preparedWorkerMaxPendingCount
+           << ", retiredBytes=" << diagnostics.preparedWorkerRetiredBytes << "\n";
+    detail << "Prepared worker event: "
+           << (diagnostics.preparedWorkerEvent.empty() ? "not reported" : diagnostics.preparedWorkerEvent) << "\n";
     detail << "State recall status: "
            << (currentSessionState.transientMetrics.integrationState.empty()
                    ? "not reported"
@@ -533,6 +626,20 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
                << " (" << (diagnostics.lastContentProbeFailedGracefully ? "failed gracefully" : "did not fail gracefully")
                << ")\n";
         detail << "Last content probe state: " << diagnostics.lastContentProbeState << "\n";
+    }
+
+    if (!diagnostics.previewFindings.empty())
+    {
+        detail << "Preview snapshot findings:\n";
+        for (const auto& finding : diagnostics.previewFindings)
+            detail << "- [" << toString(finding.severity) << "] " << finding.code << ": " << finding.message << "\n";
+    }
+
+    if (!diagnostics.publishedFindings.empty())
+    {
+        detail << "Publish snapshot findings:\n";
+        for (const auto& finding : diagnostics.publishedFindings)
+            detail << "- [" << toString(finding.severity) << "] " << finding.code << ": " << finding.message << "\n";
     }
 
     if (!diagnostics.routedZones.empty())
@@ -632,6 +739,11 @@ RuntimeStreamLoadResult EngineFacade::loadPhase1ReferenceStream() const
     return referenceInstrumentActive ? referenceStream : RuntimeStreamLoadResult {};
 }
 
+EngineDiagnosticsSnapshot EngineFacade::getDiagnosticsSnapshot() const
+{
+    return diagnosticsSnapshot;
+}
+
 EnginePerformanceSnapshot EngineFacade::getPerformanceSnapshot() const
 {
     EnginePerformanceSnapshot snapshot;
@@ -641,6 +753,10 @@ EnginePerformanceSnapshot EngineFacade::getPerformanceSnapshot() const
     snapshot.draftRevision = draftStatus.draftRevision;
     snapshot.previewRevision = draftStatus.preview.revision;
     snapshot.publishedRevision = draftStatus.performance.revision;
+    snapshot.previewBuildId = draftStatus.preview.buildId;
+    snapshot.publishedBuildId = draftStatus.performance.buildId;
+    snapshot.previewPreparedBuildId = draftStatus.preview.preparedBuildId;
+    snapshot.publishedPreparedBuildId = draftStatus.performance.preparedBuildId;
     snapshot.instrumentDisplayName = (referenceInstrumentActive && referenceManifest.loaded)
         ? referenceManifest.instrument.displayName
         : "No instrument loaded";
@@ -652,12 +768,37 @@ EnginePerformanceSnapshot EngineFacade::getPerformanceSnapshot() const
         : std::string {};
     snapshot.previewPending = draftStatus.pendingPreview.active;
     snapshot.publishedPending = draftStatus.pendingPerformance.active;
+    snapshot.previewActivationEligible = draftStatus.preview.activationEligible;
+    snapshot.publishedActivationEligible = draftStatus.performance.activationEligible;
     snapshot.previewRevisionState = draftStatus.preview.state;
     snapshot.publishedRevisionState = draftStatus.performance.state;
+    snapshot.previewContentDigest = draftStatus.preview.contentDigest;
+    snapshot.publishedContentDigest = draftStatus.performance.contentDigest;
+    snapshot.previewPreparedContentDigest = draftStatus.preview.preparedContentDigest;
+    snapshot.publishedPreparedContentDigest = draftStatus.performance.preparedContentDigest;
     snapshot.draftPlaybackEvent = draftStatus.lastEvent;
     snapshot.loadIndicator = referenceInstrumentActive
         ? buildLoadIndicator(referenceManifest, referenceStream, currentSessionState)
         : "Click Load Default or Load Lead Demo";
+    const auto& workerStatus = preparedPlaybackService.getWorkerStatus();
+    snapshot.preparedWorkerPendingCount = workerStatus.pendingWorkCount;
+    snapshot.preparedWorkerCancellationCount = workerStatus.cancellationCount;
+    snapshot.preparedWorkerSupersededCount = workerStatus.supersededCount;
+    snapshot.preparedWorkerFailureCount = workerStatus.failureCount;
+    snapshot.preparedWorkerRetiredBytes = workerStatus.retiredBytesAwaitingCleanup;
+    snapshot.preparedWorkerEvent = workerStatus.lastEvent;
+    snapshot.previewPreparedSampleCount = draftStatus.preview.preparedSampleCount;
+    snapshot.previewPreparedStreamCount = draftStatus.preview.preparedStreamCount;
+    snapshot.publishedPreparedSampleCount = draftStatus.performance.preparedSampleCount;
+    snapshot.publishedPreparedStreamCount = draftStatus.performance.preparedStreamCount;
+    snapshot.previewPreparedBytes = draftStatus.preview.preparedBytes;
+    snapshot.publishedPreparedBytes = draftStatus.performance.preparedBytes;
+    snapshot.previewPreparationCacheHits = draftStatus.preview.preparationCacheHitCount;
+    snapshot.previewPreparationCacheMisses = draftStatus.preview.preparationCacheMissCount;
+    snapshot.publishedPreparationCacheHits = draftStatus.performance.preparationCacheHitCount;
+    snapshot.publishedPreparationCacheMisses = draftStatus.performance.preparationCacheMissCount;
+    snapshot.previewFindings = draftStatus.preview.findings;
+    snapshot.publishedFindings = draftStatus.performance.findings;
 
     if (referenceInstrumentActive)
     {
@@ -744,12 +885,16 @@ bool EngineFacade::setSelectedArticulation(const std::string& articulationId)
     if (findArticulationDefinition(referenceManifest.instrument, articulationId) == nullptr)
         return false;
 
+    if (currentSessionState.selectedArticulationId == articulationId)
+        return true;
+
     currentSessionState.selectedArticulationId = articulationId;
     currentSessionState.transientMetrics.integrationState = "Performance surface articulation updated";
     previewPlaybackSnapshot = {};
     syncPreviewSnapshotFromDraftPlayback();
     previewPlaybackSnapshot.articulationId = articulationId;
     syncSessionSelectionsIntoDiagnostics(currentSessionState, diagnosticsSnapshot);
+    markStateChanged();
     return true;
 }
 
@@ -777,6 +922,9 @@ bool EngineFacade::setMacroValue(const std::string& macroId, double value)
 
     if (currentIterator != currentSessionState.macroValues.end())
     {
+        if (currentIterator->value == clampedValue)
+            return true;
+
         currentIterator->value = clampedValue;
     }
     else
@@ -785,11 +933,14 @@ bool EngineFacade::setMacroValue(const std::string& macroId, double value)
     }
 
     syncSessionSelectionsIntoDiagnostics(currentSessionState, diagnosticsSnapshot);
+    markStateChanged();
     return true;
 }
 
 bool EngineFacade::stageDraftRevision(std::size_t revision)
 {
+    pumpPreparedPlaybackWorkerCompletions();
+
     if (!referenceInstrumentActive || !draftPlaybackContract.getStatus().projectOpen)
         return false;
 
@@ -800,49 +951,137 @@ bool EngineFacade::stageDraftRevision(std::size_t revision)
     previewPlaybackSnapshot = {};
     syncPreviewSnapshotFromDraftPlayback();
     refreshDiagnosticsSnapshot();
+    markStateChanged();
     return true;
 }
 
 bool EngineFacade::refreshPreviewToCurrentDraft()
 {
-    if (!referenceInstrumentActive || !referenceManifest.loaded || !referenceStream.loaded)
+    pumpPreparedPlaybackWorkerCompletions();
+
+    if (!referenceInstrumentActive || !referenceManifest.loaded || !referenceStream.loaded || !authoringProject.loaded)
         return false;
 
     const auto request = draftPlaybackContract.requestPreviewBuild();
     if (!request.accepted)
         return false;
 
-    if (!draftPlaybackContract.completePreviewBuild(request.requestId))
-        return false;
+    const auto buildResult = buildCurrentPlaybackSnapshot(false);
+    if (!buildResult.built || !buildResult.activationEligible)
+    {
+        const auto preparedResult = buildRejectedPreparedPlayback(buildResult);
+        const auto applied = draftPlaybackContract.completePreviewBuild(request.requestId, buildResult, preparedResult);
+        if (!applied)
+            return false;
 
-    currentSessionState.transientMetrics.integrationState = "Preview revision prepared";
+        currentSessionState.transientMetrics.integrationState = "Preview revision failed";
+        currentSessionState.transientMetrics.lastFailure = summarizeSnapshotFindings(draftPlaybackContract.getStatus().preview.findings);
+        previewPlaybackSnapshot = {};
+        syncPreviewSnapshotFromDraftPlayback();
+        refreshDiagnosticsSnapshot();
+        markStateChanged();
+        return false;
+    }
+
+    if (!enqueuePreparedPlaybackBuild(request.requestId, buildResult, PreparedPlaybackWorkLane::preview))
+    {
+        PreparedPlaybackBuildResult queueRejected;
+        queueRejected.snapshotBuildId = buildResult.buildId;
+        queueRejected.requestedDraftRevision = buildResult.requestedDraftRevision;
+        queueRejected.activationRequested = buildResult.activationRequested;
+        queueRejected.lifecycleState = PlaybackSnapshotLifecycleState::failed;
+        queueRejected.state = "Prepared playback queue is full";
+        queueRejected.metrics.failureCount = 1;
+        queueRejected.findings.push_back({
+            PlaybackSnapshotFindingSeverity::error,
+            "prepared-queue-full",
+            "preparedWorker",
+            "Prepared playback queue is full."
+        });
+        draftPlaybackContract.completePreviewBuild(request.requestId, buildResult, queueRejected);
+        currentSessionState.transientMetrics.integrationState = "Preview revision failed";
+        currentSessionState.transientMetrics.lastFailure = "Prepared playback queue is full.";
+        previewPlaybackSnapshot = {};
+        syncPreviewSnapshotFromDraftPlayback();
+        refreshDiagnosticsSnapshot();
+        markStateChanged();
+        return false;
+    }
+
+    currentSessionState.transientMetrics.integrationState = "Preview revision preparing";
+    currentSessionState.transientMetrics.lastFailure.clear();
     previewPlaybackSnapshot = {};
     syncPreviewSnapshotFromDraftPlayback();
     refreshDiagnosticsSnapshot();
+    markStateChanged();
     return true;
 }
 
 bool EngineFacade::publishCurrentDraft()
 {
-    if (!referenceInstrumentActive || !referenceManifest.loaded || !referenceStream.loaded)
+    pumpPreparedPlaybackWorkerCompletions();
+
+    if (!referenceInstrumentActive || !referenceManifest.loaded || !referenceStream.loaded || !authoringProject.loaded)
         return false;
 
     const auto request = draftPlaybackContract.requestPerformanceBuild();
     if (!request.accepted)
         return false;
 
-    if (!draftPlaybackContract.completePerformanceBuild(request.requestId))
-        return false;
+    const auto buildResult = buildCurrentPlaybackSnapshot(true);
+    if (!buildResult.built || !buildResult.activationEligible)
+    {
+        const auto preparedResult = buildRejectedPreparedPlayback(buildResult);
+        const auto applied = draftPlaybackContract.completePerformanceBuild(request.requestId, buildResult, preparedResult);
+        if (!applied)
+            return false;
 
-    currentSessionState.transientMetrics.integrationState = "Published revision activated";
+        currentSessionState.transientMetrics.integrationState = "Publish preparation failed";
+        currentSessionState.transientMetrics.lastFailure = summarizeSnapshotFindings(draftPlaybackContract.getStatus().performance.findings);
+        previewPlaybackSnapshot = {};
+        syncPreviewSnapshotFromDraftPlayback();
+        refreshDiagnosticsSnapshot();
+        markStateChanged();
+        return false;
+    }
+
+    if (!enqueuePreparedPlaybackBuild(request.requestId, buildResult, PreparedPlaybackWorkLane::performance))
+    {
+        PreparedPlaybackBuildResult queueRejected;
+        queueRejected.snapshotBuildId = buildResult.buildId;
+        queueRejected.requestedDraftRevision = buildResult.requestedDraftRevision;
+        queueRejected.activationRequested = buildResult.activationRequested;
+        queueRejected.lifecycleState = PlaybackSnapshotLifecycleState::failed;
+        queueRejected.state = "Prepared playback queue is full";
+        queueRejected.metrics.failureCount = 1;
+        queueRejected.findings.push_back({
+            PlaybackSnapshotFindingSeverity::error,
+            "prepared-queue-full",
+            "preparedWorker",
+            "Prepared playback queue is full."
+        });
+        draftPlaybackContract.completePerformanceBuild(request.requestId, buildResult, queueRejected);
+        currentSessionState.transientMetrics.integrationState = "Publish preparation failed";
+        currentSessionState.transientMetrics.lastFailure = "Prepared playback queue is full.";
+        previewPlaybackSnapshot = {};
+        syncPreviewSnapshotFromDraftPlayback();
+        refreshDiagnosticsSnapshot();
+        markStateChanged();
+        return false;
+    }
+
+    currentSessionState.transientMetrics.integrationState = "Publish preparation queued";
+    currentSessionState.transientMetrics.lastFailure.clear();
     previewPlaybackSnapshot = {};
     syncPreviewSnapshotFromDraftPlayback();
     refreshDiagnosticsSnapshot();
+    markStateChanged();
     return true;
 }
 
 void EngineFacade::closeDraftPlaybackProject()
 {
+    clearPendingPreparedCompletions();
     draftPlaybackContract.closeProject();
     referenceInstrumentActive = false;
     currentSessionState.transientMetrics.integrationState = "Draft playback project closed";
@@ -850,10 +1089,12 @@ void EngineFacade::closeDraftPlaybackProject()
     previewPlaybackSnapshot = {};
     syncPreviewSnapshotFromDraftPlayback();
     refreshDiagnosticsSnapshot();
+    markStateChanged();
 }
 
 bool EngineFacade::reopenDraftPlaybackProject(std::size_t revision)
 {
+    clearPendingPreparedCompletions();
     if (!referenceManifest.loaded)
         return false;
 
@@ -864,11 +1105,161 @@ bool EngineFacade::reopenDraftPlaybackProject(std::size_t revision)
     previewPlaybackSnapshot = {};
     syncPreviewSnapshotFromDraftPlayback();
     refreshDiagnosticsSnapshot();
+    markStateChanged();
     return true;
+}
+
+PlaybackSnapshotBuildResult EngineFacade::buildCurrentPlaybackSnapshot(bool activationRequested)
+{
+    if (!authoringProject.loaded)
+    {
+        PlaybackSnapshotBuildResult result;
+        result.state = "Authoring project unavailable";
+        result.lifecycleState = PlaybackSnapshotLifecycleState::failed;
+        result.findings.push_back({
+            PlaybackSnapshotFindingSeverity::error,
+            "missing-authoring-project",
+            "authoringProject",
+            "Phase 2 authoring reference project is unavailable for snapshot construction."
+        });
+        return result;
+    }
+
+    const auto request = playbackSnapshotBuilder.requestBuild(draftPlaybackContract.getStatus().draftRevision,
+                                                              activationRequested);
+    return playbackSnapshotBuilder.buildSnapshot(request, authoringProject.project);
+}
+
+PreparedPlaybackBuildResult EngineFacade::buildRejectedPreparedPlayback(const PlaybackSnapshotBuildResult& snapshotResult)
+{
+    const auto request = preparedPlaybackService.requestBuild(snapshotResult);
+    return preparedPlaybackService.prepare(request, snapshotResult, referenceStream);
+}
+
+bool EngineFacade::enqueuePreparedPlaybackBuild(std::uint64_t contractRequestId,
+                                                const PlaybackSnapshotBuildResult& snapshotResult,
+                                                PreparedPlaybackWorkLane lane)
+{
+    const auto priority = lane == PreparedPlaybackWorkLane::performance
+        ? PreparedPlaybackJobPriority::performance
+        : PreparedPlaybackJobPriority::preview;
+    auto submitResult = preparedPlaybackService.enqueueBuild(snapshotResult, lane, priority);
+
+    for (const auto& displacedResult : submitResult.displacedResults)
+        pendingPreparedCompletions.erase(displacedResult.buildId);
+
+    if (!submitResult.accepted)
+        return false;
+
+    pendingPreparedCompletions[submitResult.request.buildId] = {
+        lane,
+        contractRequestId,
+        snapshotResult
+    };
+    return true;
+}
+
+bool EngineFacade::pumpPreparedPlaybackWorkerCompletions()
+{
+    auto completedResults = preparedPlaybackService.drainCompletedBuilds();
+    bool appliedCompletion = false;
+
+    for (const auto& stepResult : completedResults)
+    {
+        const auto pendingIterator = pendingPreparedCompletions.find(stepResult.result.buildId);
+        if (pendingIterator == pendingPreparedCompletions.end())
+            continue;
+
+        const auto pendingCompletion = pendingIterator->second;
+        bool applied = false;
+
+        if (pendingCompletion.lane == PreparedPlaybackWorkLane::preview)
+        {
+            applied = draftPlaybackContract.completePreviewBuild(
+                pendingCompletion.contractRequestId,
+                pendingCompletion.snapshotResult,
+                stepResult.result);
+
+            if (applied)
+            {
+                if (stepResult.result.built && stepResult.result.activationEligible)
+                {
+                    currentSessionState.transientMetrics.integrationState = "Preview revision prepared";
+                    currentSessionState.transientMetrics.lastFailure.clear();
+                }
+                else
+                {
+                    currentSessionState.transientMetrics.integrationState = "Preview revision failed";
+                    currentSessionState.transientMetrics.lastFailure =
+                        summarizeSnapshotFindings(draftPlaybackContract.getStatus().preview.findings);
+                }
+            }
+        }
+        else
+        {
+            applied = draftPlaybackContract.completePerformanceBuild(
+                pendingCompletion.contractRequestId,
+                pendingCompletion.snapshotResult,
+                stepResult.result);
+
+            if (applied)
+            {
+                if (stepResult.result.built && stepResult.result.activationEligible)
+                {
+                    currentSessionState.transientMetrics.integrationState = "Published revision activated";
+                    currentSessionState.transientMetrics.lastFailure.clear();
+                }
+                else
+                {
+                    currentSessionState.transientMetrics.integrationState = "Publish preparation failed";
+                    currentSessionState.transientMetrics.lastFailure =
+                        summarizeSnapshotFindings(draftPlaybackContract.getStatus().performance.findings);
+                }
+            }
+        }
+
+        pendingPreparedCompletions.erase(pendingIterator);
+        appliedCompletion = appliedCompletion || applied;
+    }
+
+    if (appliedCompletion)
+    {
+        previewPlaybackSnapshot = {};
+        syncPreviewSnapshotFromDraftPlayback();
+        refreshDiagnosticsSnapshot();
+        markStateChanged();
+    }
+
+    return appliedCompletion;
+}
+
+void EngineFacade::markStateChanged()
+{
+    ++stateRevision;
+}
+
+void EngineFacade::clearPendingPreparedCompletions()
+{
+    const auto canceledPreview = preparedPlaybackService.cancelQueuedBuilds(
+        PreparedPlaybackWorkLane::preview,
+        "Prepared playback preview build canceled before worker execution");
+    const auto canceledPerformance = preparedPlaybackService.cancelQueuedBuilds(
+        PreparedPlaybackWorkLane::performance,
+        "Prepared playback publish build canceled before worker execution");
+
+    for (const auto& result : canceledPreview)
+        pendingPreparedCompletions.erase(result.buildId);
+
+    for (const auto& result : canceledPerformance)
+        pendingPreparedCompletions.erase(result.buildId);
+
+    pendingPreparedCompletions.clear();
+    preparedPlaybackService.drainCompletedBuilds();
 }
 
 bool EngineFacade::beginDraftPlaybackDeviceRestart()
 {
+    clearPendingPreparedCompletions();
     if (!draftPlaybackContract.beginDeviceRestart())
         return false;
 
@@ -876,11 +1267,13 @@ bool EngineFacade::beginDraftPlaybackDeviceRestart()
     previewPlaybackSnapshot = {};
     syncPreviewSnapshotFromDraftPlayback();
     refreshDiagnosticsSnapshot();
+    markStateChanged();
     return true;
 }
 
 bool EngineFacade::completeDraftPlaybackDeviceRestart(bool restored)
 {
+    pumpPreparedPlaybackWorkerCompletions();
     if (!draftPlaybackContract.completeDeviceRestart(restored))
         return false;
 
@@ -894,11 +1287,43 @@ bool EngineFacade::completeDraftPlaybackDeviceRestart(bool restored)
     previewPlaybackSnapshot = {};
     syncPreviewSnapshotFromDraftPlayback();
     refreshDiagnosticsSnapshot();
+    markStateChanged();
     return true;
+}
+
+bool EngineFacade::waitForPreparedPlaybackIdle(std::chrono::milliseconds timeout)
+{
+    const auto deadline = Clock::now() + timeout;
+
+    while (Clock::now() <= deadline)
+    {
+        serviceBackgroundWork();
+        if (pendingPreparedCompletions.empty()
+            && !draftPlaybackContract.getStatus().pendingPreview.active
+            && !draftPlaybackContract.getStatus().pendingPerformance.active
+            && preparedPlaybackService.getWorkerStatus().pendingWorkCount == 0
+            && preparedPlaybackService.getWorkerStatus().inFlightWorkCount == 0)
+        {
+            return true;
+        }
+
+        const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - Clock::now());
+        if (remaining.count() > 0)
+            preparedPlaybackService.waitForWorkerIdle(remaining.count() > 25 ? 25 : static_cast<std::uint64_t>(remaining.count()));
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+
+    serviceBackgroundWork();
+    return pendingPreparedCompletions.empty()
+        && !draftPlaybackContract.getStatus().pendingPreview.active
+        && !draftPlaybackContract.getStatus().pendingPerformance.active
+        && preparedPlaybackService.getWorkerStatus().pendingWorkCount == 0
+        && preparedPlaybackService.getWorkerStatus().inFlightWorkCount == 0;
 }
 
 EnginePreviewPlaybackSnapshot EngineFacade::auditionPreviewNote(int midiNote, int velocity)
 {
+    pumpPreparedPlaybackWorkerCompletions();
     previewPlaybackSnapshot = {};
     syncPreviewSnapshotFromDraftPlayback();
     previewPlaybackSnapshot.midiNote = midiNote;
@@ -1017,6 +1442,7 @@ EnginePreviewPlaybackSnapshot EngineFacade::auditionPreviewNote(int midiNote, in
         ? "Preview played"
         : "Preview did not finish cleanly";
     syncPreviewSnapshotFromDraftPlayback();
+    markStateChanged();
 
     return previewPlaybackSnapshot;
 }
@@ -1038,6 +1464,7 @@ EnginePresetStateRestoreResult EngineFacade::restorePresetStateJson(const std::s
         currentSessionState.transientMetrics.integrationState = "Preset state restore failed";
         currentSessionState.transientMetrics.lastFailure = summarizeIssues(parsedState.issues);
         refreshDiagnosticsSnapshot();
+        markStateChanged();
         return restoreResult;
     }
 
@@ -1047,6 +1474,7 @@ EnginePresetStateRestoreResult EngineFacade::restorePresetStateJson(const std::s
         currentSessionState.transientMetrics.integrationState = "Preset state restore failed";
         currentSessionState.transientMetrics.lastFailure = restoreResult.issues.front();
         refreshDiagnosticsSnapshot();
+        markStateChanged();
         return restoreResult;
     }
 
@@ -1057,6 +1485,7 @@ EnginePresetStateRestoreResult EngineFacade::restorePresetStateJson(const std::s
         currentSessionState.transientMetrics.integrationState = "Preset state restore failed";
         currentSessionState.transientMetrics.lastFailure = summarizeIssues(validation.issues);
         refreshDiagnosticsSnapshot();
+        markStateChanged();
         return restoreResult;
     }
 
@@ -1075,6 +1504,7 @@ EnginePresetStateRestoreResult EngineFacade::restorePresetStateJson(const std::s
     initializeDraftPlaybackContract(true);
     previewPlaybackSnapshot.articulationId = currentSessionState.selectedArticulationId;
     refreshDiagnosticsSnapshot();
+    markStateChanged();
 
     restoreResult.restored = true;
     restoreResult.state = "Preset state restored";
@@ -1118,6 +1548,7 @@ EngineContentFailureProbeResult EngineFacade::probeContentFailure(const EngineCo
 
     lastContentFailureProbe = probeResult;
     refreshDiagnosticsSnapshot();
+    markStateChanged();
     return probeResult;
 }
 
@@ -1125,6 +1556,7 @@ void EngineFacade::clearContentFailureProbe()
 {
     lastContentFailureProbe = {};
     refreshDiagnosticsSnapshot();
+    markStateChanged();
 }
 
 void EngineFacade::resetSessionStateToDefault()
@@ -1137,6 +1569,7 @@ void EngineFacade::resetSessionStateToDefault()
         currentSessionState.transientMetrics.lastFailure = referenceManifest.state;
         lastContentFailureProbe = {};
         refreshDiagnosticsSnapshot();
+        markStateChanged();
         return;
     }
 
@@ -1149,6 +1582,7 @@ void EngineFacade::resetSessionStateToDefault()
     previewPlaybackSnapshot.articulationId = currentSessionState.selectedArticulationId;
     lastContentFailureProbe = {};
     refreshDiagnosticsSnapshot();
+    markStateChanged();
 }
 
 void EngineFacade::syncPreviewSnapshotFromDraftPlayback()
@@ -1169,10 +1603,15 @@ void EngineFacade::syncPreviewSnapshotFromDraftPlayback()
             ? buildLoadIndicator(referenceManifest, referenceStream, currentSessionState)
             : draftStatus.preview.state;
     }
+
+    if (previewPlaybackSnapshot.errorMessage.empty() && !draftStatus.preview.findings.empty())
+        previewPlaybackSnapshot.errorMessage = summarizeSnapshotFindings(draftStatus.preview.findings);
 }
 
 void EngineFacade::initializeDraftPlaybackContract(bool activatePerformanceRevision)
 {
+    clearPendingPreparedCompletions();
+    preparedPlaybackService.setBackgroundWorkerStream(referenceStream);
     draftPlaybackContract.reopenProject(0);
 
     if (!referenceManifest.loaded || !referenceStream.loaded)
@@ -1182,13 +1621,81 @@ void EngineFacade::initializeDraftPlaybackContract(bool activatePerformanceRevis
         return;
     }
 
-    if (const auto previewRequest = draftPlaybackContract.requestPreviewBuild(); previewRequest.accepted)
-        draftPlaybackContract.completePreviewBuild(previewRequest.requestId);
-
-    if (activatePerformanceRevision)
+    if (authoringProject.loaded)
     {
-        if (const auto publishRequest = draftPlaybackContract.requestPerformanceBuild(); publishRequest.accepted)
-            draftPlaybackContract.completePerformanceBuild(publishRequest.requestId);
+        if (const auto previewRequest = draftPlaybackContract.requestPreviewBuild(); previewRequest.accepted)
+        {
+            const auto previewBuild = buildCurrentPlaybackSnapshot(false);
+            if (!previewBuild.built || !previewBuild.activationEligible)
+            {
+                const auto preparedPreview = buildRejectedPreparedPlayback(previewBuild);
+                draftPlaybackContract.completePreviewBuild(previewRequest.requestId, previewBuild, preparedPreview);
+            }
+            else if (!enqueuePreparedPlaybackBuild(previewRequest.requestId,
+                                                   previewBuild,
+                                                   PreparedPlaybackWorkLane::preview))
+            {
+                PreparedPlaybackBuildResult queueRejected;
+                queueRejected.snapshotBuildId = previewBuild.buildId;
+                queueRejected.requestedDraftRevision = previewBuild.requestedDraftRevision;
+                queueRejected.activationRequested = previewBuild.activationRequested;
+                queueRejected.lifecycleState = PlaybackSnapshotLifecycleState::failed;
+                queueRejected.state = "Prepared playback queue is full";
+                queueRejected.metrics.failureCount = 1;
+                queueRejected.findings.push_back({
+                    PlaybackSnapshotFindingSeverity::error,
+                    "prepared-queue-full",
+                    "preparedWorker",
+                    "Prepared playback queue is full."
+                });
+                draftPlaybackContract.completePreviewBuild(previewRequest.requestId, previewBuild, queueRejected);
+            }
+        }
+
+        if (activatePerformanceRevision)
+        {
+            if (const auto publishRequest = draftPlaybackContract.requestPerformanceBuild(); publishRequest.accepted)
+            {
+                const auto publishBuild = buildCurrentPlaybackSnapshot(true);
+                if (!publishBuild.built || !publishBuild.activationEligible)
+                {
+                    const auto preparedPublish = buildRejectedPreparedPlayback(publishBuild);
+                    draftPlaybackContract.completePerformanceBuild(publishRequest.requestId, publishBuild, preparedPublish);
+                }
+                else if (!enqueuePreparedPlaybackBuild(publishRequest.requestId,
+                                                       publishBuild,
+                                                       PreparedPlaybackWorkLane::performance))
+                {
+                    PreparedPlaybackBuildResult queueRejected;
+                    queueRejected.snapshotBuildId = publishBuild.buildId;
+                    queueRejected.requestedDraftRevision = publishBuild.requestedDraftRevision;
+                    queueRejected.activationRequested = publishBuild.activationRequested;
+                    queueRejected.lifecycleState = PlaybackSnapshotLifecycleState::failed;
+                    queueRejected.state = "Prepared playback queue is full";
+                    queueRejected.metrics.failureCount = 1;
+                    queueRejected.findings.push_back({
+                        PlaybackSnapshotFindingSeverity::error,
+                        "prepared-queue-full",
+                        "preparedWorker",
+                        "Prepared playback queue is full."
+                    });
+                    draftPlaybackContract.completePerformanceBuild(publishRequest.requestId, publishBuild, queueRejected);
+                }
+            }
+        }
+
+        waitForPreparedPlaybackIdle(std::chrono::milliseconds(1000));
+    }
+    else
+    {
+        if (const auto previewRequest = draftPlaybackContract.requestPreviewBuild(); previewRequest.accepted)
+            draftPlaybackContract.completePreviewBuild(previewRequest.requestId);
+
+        if (activatePerformanceRevision)
+        {
+            if (const auto publishRequest = draftPlaybackContract.requestPerformanceBuild(); publishRequest.accepted)
+                draftPlaybackContract.completePerformanceBuild(publishRequest.requestId);
+        }
     }
 
     previewPlaybackSnapshot = {};
@@ -1200,6 +1707,7 @@ void EngineFacade::refreshDiagnosticsSnapshot()
     diagnosticsSnapshot = {};
     syncSessionSelectionsIntoDiagnostics(currentSessionState, diagnosticsSnapshot);
     syncDraftPlaybackIntoDiagnostics(draftPlaybackContract.getStatus(), diagnosticsSnapshot);
+    syncPreparedPlaybackWorkerIntoDiagnostics(preparedPlaybackService.getWorkerStatus(), diagnosticsSnapshot);
 
     if (!referenceInstrumentActive)
     {
@@ -1238,6 +1746,12 @@ void EngineFacade::refreshDiagnosticsSnapshot()
 
     diagnosticsSnapshot.available = true;
     diagnosticsSnapshot.headline = "Reference runtime diagnostics ready";
+
+    for (const auto& finding : draftPlaybackContract.getStatus().preview.findings)
+        diagnosticsSnapshot.issues.push_back("Preview snapshot: " + finding.message);
+
+    for (const auto& finding : draftPlaybackContract.getStatus().performance.findings)
+        diagnosticsSnapshot.issues.push_back("Publish snapshot: " + finding.message);
     diagnosticsSnapshot.configuredMaxCachedPages = loadProfile->maxCachedPages;
     diagnosticsSnapshot.maxPrefetchBytesPerVoice = loadProfile->maxPrefetchBytesPerVoice;
 

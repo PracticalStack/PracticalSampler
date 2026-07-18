@@ -41,6 +41,7 @@ private:
     drs::engine::EngineStatusSnapshot snapshot;
     MacroValueChangedCallback onMacroValueChanged;
     std::vector<std::unique_ptr<MacroControl>> macroControls;
+    std::uint64_t lastObservedStateRevision = 0;
 
     juce::Label titleLabel;
     juce::Label modeLabel;

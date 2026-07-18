@@ -34,6 +34,20 @@ int main()
         require(defaultDiagnostics.available, "Default diagnostics snapshot must be available.");
         require(defaultDiagnostics.loadProfileId == "balanced",
                 "Default diagnostics snapshot should follow the balanced load profile.");
+        require(defaultDiagnostics.previewBuildId != 0,
+                "Default diagnostics snapshot should expose a non-zero preview snapshot build id.");
+        require(!defaultDiagnostics.previewContentDigest.empty(),
+                "Default diagnostics snapshot should expose the preview snapshot digest.");
+        require(defaultDiagnostics.previewPreparedBuildId != 0,
+                "Default diagnostics snapshot should expose a non-zero prepared playback build id.");
+        require(!defaultDiagnostics.previewPreparedContentDigest.empty(),
+                "Default diagnostics snapshot should expose the prepared playback digest.");
+        require(defaultDiagnostics.previewPreparedSampleCount > 0,
+                "Default diagnostics snapshot should expose prepared sample counts.");
+        require(defaultDiagnostics.preparedWorkerPendingCount == 0,
+                "Default diagnostics snapshot should not leave prepared worker jobs pending.");
+        require(defaultDiagnostics.previewFindings.empty() && defaultDiagnostics.publishedFindings.empty(),
+                "Default diagnostics snapshot should not surface snapshot findings for the reference project.");
         require(defaultDiagnostics.configuredMaxCachedPages == 4,
                 "Balanced diagnostics snapshot should expose the balanced cache budget.");
         require(defaultDiagnostics.pageMissCount >= 3,
@@ -58,6 +72,14 @@ int main()
         require(leadDiagnostics.available, "Lead diagnostics snapshot must remain available.");
         require(leadDiagnostics.loadProfileId == "performance",
                 "Lead diagnostics snapshot should follow the restored performance profile.");
+        require(leadDiagnostics.previewBuildId != 0 && leadDiagnostics.publishedBuildId != 0,
+                "Lead diagnostics snapshot should preserve snapshot build identities.");
+        require(!leadDiagnostics.previewContentDigest.empty() && !leadDiagnostics.publishedContentDigest.empty(),
+                "Lead diagnostics snapshot should preserve snapshot digests.");
+        require(leadDiagnostics.previewPreparedBuildId != 0 && leadDiagnostics.publishedPreparedBuildId != 0,
+                "Lead diagnostics snapshot should preserve prepared playback build identities.");
+        require(!leadDiagnostics.previewPreparedContentDigest.empty() && !leadDiagnostics.publishedPreparedContentDigest.empty(),
+                "Lead diagnostics snapshot should preserve prepared playback digests.");
         require(leadDiagnostics.configuredMaxCachedPages == 8,
                 "Performance diagnostics snapshot should expose the performance cache budget.");
         require(leadDiagnostics.selectedArticulationId == "lead",
