@@ -431,6 +431,33 @@ add_test(
     COMMAND drs_phase2_performance_bank_tests
 )
 
+juce_add_console_app(drs_phase2_performance_ui_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Performance UI Tests"
+)
+
+target_sources(drs_phase2_performance_ui_tests
+    PRIVATE
+        src/Phase2PerformanceUiTests.cpp
+)
+
+target_link_libraries(drs_phase2_performance_ui_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+        juce::juce_gui_extra
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase2_performance_ui_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase2.performance_ui
+    COMMAND drs_phase2_performance_ui_tests
+)
+
 juce_add_console_app(drs_phase2_authoring_ui_tests
     PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Authoring UI Tests"
 )
@@ -1002,6 +1029,10 @@ set_target_properties(drs_phase2_macro_routing_tests PROPERTIES
 )
 
 set_target_properties(drs_phase2_performance_bank_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_phase2_performance_ui_tests PROPERTIES
     FOLDER "Tests"
 )
 

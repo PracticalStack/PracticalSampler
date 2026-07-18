@@ -21,6 +21,24 @@ void require(bool condition, const std::string& message)
         throw std::runtime_error(message);
 }
 
+bool containsFinding(const std::vector<drs::engine::PlaybackSnapshotFinding>& findings,
+                     drs::engine::PlaybackSnapshotFindingSeverity severity,
+                     const std::string& code,
+                     const std::string& pathFragment)
+{
+    for (const auto& finding : findings)
+    {
+        if (finding.severity == severity
+            && finding.code == code
+            && finding.path.find(pathFragment) != std::string::npos)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 fs::path getScratchDirectory()
 {
     auto path = fs::temp_directory_path() / "drs-phase1-realtime-safety-tests";
@@ -371,6 +389,170 @@ int main()
                                  "mono or stereo file",
                                  "mono and stereo",
                                  "Channel-policy preview failure");
+
+        const auto phase1Project = drs::engine::loadPhase1ReferenceProjectManifest();
+        require(phase1Project.loaded,
+                "Processor integration coverage should load the Phase 1 reference project before migration.");
+        const auto migratedPhase1 = drs::engine::migrateRuntimeProjectToPhase2Authoring(phase1Project.project);
+        require(migratedPhase1.valid,
+                "Processor integration coverage should migrate the Phase 1 reference project before preview/publish.");
+
+        drs::plugin::Processor migratedProcessor;
+        migratedProcessor.prepareToPlay(44100.0, 512);
+        migratedProcessor.replaceAuthoringProject(migratedPhase1.project);
+
+        auto migratedPerformanceSnapshot = migratedProcessor.getEngineFacade().getPerformanceSnapshot();
+        require(migratedPerformanceSnapshot.draftRevision == 0,
+                "Replacing the processor authoring project should reset the facade draft revision to 0.");
+        require(migratedPerformanceSnapshot.previewRevision == 0
+                    && migratedPerformanceSnapshot.previewRevisionState == "Idle",
+                "Replacing the processor authoring project should reset facade preview state to idle.");
+        require(migratedPerformanceSnapshot.publishedRevision == 0
+                    && migratedPerformanceSnapshot.publishedRevisionState == "Idle",
+                "Replacing the processor authoring project should reset facade published state to idle.");
+
+        require(!migratedProcessor.getEngineFacade().refreshPreviewToCurrentDraft(),
+                "Migrated processor project without imported zones should fail preview preparation.");
+        migratedPerformanceSnapshot = migratedProcessor.getEngineFacade().getPerformanceSnapshot();
+        require(migratedPerformanceSnapshot.previewRevisionState
+                    == "Prepared playback build rejected because the immutable snapshot is unavailable",
+                "Migrated processor preview failure should surface the rejected prepared-playback state.");
+        require(containsFinding(migratedPerformanceSnapshot.previewFindings,
+                                drs::engine::PlaybackSnapshotFindingSeverity::error,
+                                "no-playable-zones",
+                                "authoring.zones"),
+                "Migrated processor preview failure should surface the structured no-playable-zones finding.");
+
+        require(!migratedProcessor.getEngineFacade().publishCurrentDraft(),
+                "Migrated processor project without imported zones should fail publish preparation.");
+        migratedPerformanceSnapshot = migratedProcessor.getEngineFacade().getPerformanceSnapshot();
+        require(migratedPerformanceSnapshot.publishedRevisionState
+                    == "Prepared playback build rejected because the immutable snapshot is unavailable",
+                "Migrated processor publish failure should surface the rejected prepared-playback state.");
+        require(containsFinding(migratedPerformanceSnapshot.publishedFindings,
+                                drs::engine::PlaybackSnapshotFindingSeverity::error,
+                                "no-playable-zones",
+                                "authoring.zones"),
+                "Migrated processor publish failure should surface the structured no-playable-zones finding.");
+
+        drs::engine::RuntimeProjectSampleSource importedSampleSource;
+        importedSampleSource.id = "processor-migrated-sine-a3";
+        importedSampleSource.path = phase1Project.project.sampleSources[0].path;
+        importedSampleSource.role = "imported-sustain";
+
+        drs::engine::RuntimeProjectZoneDefinition importedZone;
+        importedZone.id = "processor-migrated-zone-a3";
+        importedZone.sampleSourceId = importedSampleSource.id;
+        importedZone.displayName = "Processor Migrated Zone A3";
+        importedZone.groupId = "main";
+        importedZone.articulationId = "sustain";
+        importedZone.rootKey = 57;
+        importedZone.keyLow = 57;
+        importedZone.keyHigh = 57;
+        importedZone.velocityLow = 1;
+        importedZone.velocityHigh = 127;
+
+        const auto migratedImport = migratedProcessor.getAuthoringSession().appendImportedContent({ importedSampleSource },
+                                                                                                  { importedZone },
+                                                                                                  "Import migrated processor zone");
+        require(migratedImport.applied,
+                "Processor integration coverage should accept imported authoring content.");
+        require(migratedProcessor.serviceMessageThreadWork(),
+                "Message-thread servicing should sync imported authoring content into the draft-playback facade.");
+        migratedPerformanceSnapshot = migratedProcessor.getEngineFacade().getPerformanceSnapshot();
+        require(migratedPerformanceSnapshot.draftRevision == migratedImport.documentState.revision,
+                "Imported processor authoring content should advance the facade draft revision.");
+
+        require(migratedProcessor.getEngineFacade().refreshPreviewToCurrentDraft(),
+                "Imported processor authoring content should prepare preview successfully.");
+        require(migratedProcessor.getEngineFacade().waitForPreparedPlaybackIdle(),
+                "Imported processor preview should settle through the prepared-playback worker.");
+        require(migratedProcessor.serviceMessageThreadWork(),
+                "Message-thread servicing should apply the imported processor preview build.");
+        migratedPerformanceSnapshot = migratedProcessor.getEngineFacade().getPerformanceSnapshot();
+        require(migratedPerformanceSnapshot.previewRevision == migratedImport.documentState.revision
+                    && migratedPerformanceSnapshot.previewRevisionState == "Ready",
+                "Imported processor authoring content should expose a ready facade preview revision.");
+        require(migratedPerformanceSnapshot.previewPreparedSampleCount
+                    == migratedProcessor.getAuthoringSession().getProject().sampleSources.size(),
+                "Imported processor preview should materialize every migrated sample identity.");
+
+        require(migratedProcessor.getEngineFacade().publishCurrentDraft(),
+                "Imported processor authoring content should publish successfully.");
+        require(migratedProcessor.getEngineFacade().waitForPreparedPlaybackIdle(),
+                "Imported processor publish should settle through the prepared-playback worker.");
+        require(migratedProcessor.serviceMessageThreadWork(),
+                "Message-thread servicing should apply the imported processor publish build.");
+        migratedPerformanceSnapshot = migratedProcessor.getEngineFacade().getPerformanceSnapshot();
+        require(migratedPerformanceSnapshot.loaded,
+                "Imported processor publish should expose a loaded performance context.");
+        require(migratedPerformanceSnapshot.publishedRevision == migratedImport.documentState.revision
+                    && migratedPerformanceSnapshot.publishedRevisionState == "Active",
+                "Imported processor authoring content should expose an active facade published revision.");
+
+        auto editedMigratedZone = *migratedProcessor.getAuthoringSession().getSelectedZone();
+        editedMigratedZone.gainDb = 2.5;
+        editedMigratedZone.pan = -0.2;
+        const auto migratedEdit = migratedProcessor.getAuthoringSession().updateSelectedZone(
+            editedMigratedZone,
+            "Shape migrated processor zone");
+        require(migratedEdit.applied,
+                "Processor integration coverage should commit edited authoring content.");
+        require(migratedProcessor.serviceMessageThreadWork(),
+                "Message-thread servicing should sync edited authoring content into the draft-playback facade.");
+        migratedPerformanceSnapshot = migratedProcessor.getEngineFacade().getPerformanceSnapshot();
+        require(migratedPerformanceSnapshot.draftRevision == migratedEdit.documentState.revision,
+                "Edited processor authoring content should advance the facade draft revision.");
+        require(migratedPerformanceSnapshot.previewRevision == migratedImport.documentState.revision
+                    && migratedPerformanceSnapshot.previewRevisionState == "Stale",
+                "Edited processor authoring content should leave facade preview stale on the last prepared revision.");
+        require(migratedPerformanceSnapshot.publishedRevision == migratedImport.documentState.revision
+                    && migratedPerformanceSnapshot.publishedRevisionState == "Active",
+                "Edited processor authoring content should preserve the last active published revision.");
+
+        require(migratedProcessor.getEngineFacade().refreshPreviewToCurrentDraft(),
+                "Edited processor authoring content should prepare preview successfully.");
+        require(migratedProcessor.getEngineFacade().waitForPreparedPlaybackIdle(),
+                "Edited processor preview should settle through the prepared-playback worker.");
+        require(migratedProcessor.serviceMessageThreadWork(),
+                "Message-thread servicing should apply the edited processor preview build.");
+        migratedPerformanceSnapshot = migratedProcessor.getEngineFacade().getPerformanceSnapshot();
+        require(migratedPerformanceSnapshot.previewRevision == migratedEdit.documentState.revision
+                    && migratedPerformanceSnapshot.previewRevisionState == "Ready",
+                "Edited processor authoring content should advance facade preview to the current revision.");
+
+        require(migratedProcessor.getEngineFacade().publishCurrentDraft(),
+                "Edited processor authoring content should publish successfully.");
+        require(migratedProcessor.getEngineFacade().waitForPreparedPlaybackIdle(),
+                "Edited processor publish should settle through the prepared-playback worker.");
+        require(migratedProcessor.serviceMessageThreadWork(),
+                "Message-thread servicing should apply the edited processor publish build.");
+        migratedPerformanceSnapshot = migratedProcessor.getEngineFacade().getPerformanceSnapshot();
+        require(migratedPerformanceSnapshot.publishedRevision == migratedEdit.documentState.revision
+                    && migratedPerformanceSnapshot.publishedRevisionState == "Active",
+                "Edited processor authoring content should advance the active facade published revision.");
+        require(migratedPerformanceSnapshot.previewContentDigest == migratedPerformanceSnapshot.publishedContentDigest,
+                "Edited processor publish should realign preview and publish snapshot digests.");
+        require(migratedPerformanceSnapshot.previewPreparedContentDigest
+                    == migratedPerformanceSnapshot.publishedPreparedContentDigest,
+                "Edited processor publish should realign preview and publish prepared-playback digests.");
+
+        auto invalidMigratedProject = migratedProcessor.getAuthoringSession().getProject();
+        invalidMigratedProject.authoring.zones[0].sampleSourceId = "missing-source";
+        const auto stableProcessorRevision = migratedProcessor.getAuthoringSession().getDocumentState().revision;
+        const auto stableProcessorSnapshot = migratedProcessor.getEngineFacade().getPerformanceSnapshot();
+        migratedProcessor.replaceAuthoringProject(invalidMigratedProject);
+        migratedPerformanceSnapshot = migratedProcessor.getEngineFacade().getPerformanceSnapshot();
+        require(migratedProcessor.getAuthoringSession().getDocumentState().revision == stableProcessorRevision,
+                "Rejected processor authoring-project replacements must preserve the current authoring document revision.");
+        require(migratedPerformanceSnapshot.draftRevision == stableProcessorSnapshot.draftRevision,
+                "Rejected processor authoring-project replacements must preserve the facade draft revision.");
+        require(migratedPerformanceSnapshot.previewRevision == stableProcessorSnapshot.previewRevision
+                    && migratedPerformanceSnapshot.previewRevisionState == stableProcessorSnapshot.previewRevisionState,
+                "Rejected processor authoring-project replacements must preserve preview state.");
+        require(migratedPerformanceSnapshot.publishedRevision == stableProcessorSnapshot.publishedRevision
+                    && migratedPerformanceSnapshot.publishedRevisionState == stableProcessorSnapshot.publishedRevisionState,
+                "Rejected processor authoring-project replacements must preserve published state.");
 
         require(processor.getEngineFacade().stageDraftRevision(1),
                 "Activation handoff test should stage a new draft revision.");

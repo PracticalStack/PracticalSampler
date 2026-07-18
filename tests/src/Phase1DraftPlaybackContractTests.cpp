@@ -1,3 +1,4 @@
+#include "drs/engine/AuthoringSession.h"
 #include "drs/engine/DraftPlaybackContract.h"
 #include "drs/engine/PlaybackSnapshot.h"
 #include "drs/engine/ProjectDocument.h"
@@ -13,6 +14,24 @@ void require(bool condition, const std::string& message)
 {
     if (!condition)
         throw std::runtime_error(message);
+}
+
+bool containsFinding(const std::vector<drs::engine::PlaybackSnapshotFinding>& findings,
+                     drs::engine::PlaybackSnapshotFindingSeverity severity,
+                     const std::string& code,
+                     const std::string& pathFragment)
+{
+    for (const auto& finding : findings)
+    {
+        if (finding.severity == severity
+            && finding.code == code
+            && finding.path.find(pathFragment) != std::string::npos)
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 drs::engine::PlaybackSnapshotBuildResult buildSnapshot(drs::engine::PlaybackSnapshotBuilder& builder,
@@ -337,6 +356,219 @@ int main()
         require(contract.getStatus().preview.available && contract.getStatus().preview.revision == 5
                     && contract.getStatus().preview.state == "Stale",
                 "Successful device restart should preserve preview identity while acknowledging the newer draft revision.");
+
+        const auto phase1Project = drs::engine::loadPhase1ReferenceProjectManifest();
+        require(phase1Project.loaded, "Phase 1 reference project must load before migrated contract coverage runs.");
+        const auto migratedProject = drs::engine::migrateRuntimeProjectToPhase2Authoring(phase1Project.project);
+        require(migratedProject.valid, "Phase 1 reference project should migrate before contract coverage runs.");
+
+        drs::engine::AuthoringSession migratedSession(migratedProject.project);
+        drs::engine::DraftPlaybackContract migratedContract(migratedSession.getDocumentState().revision);
+        drs::engine::PlaybackSnapshotBuilder migratedSnapshotBuilder;
+        drs::engine::PreparedPlaybackService migratedPreparedService;
+
+        const auto migratedInitialPreview = migratedContract.requestPreviewBuild();
+        require(migratedInitialPreview.accepted,
+                "Migrated project preview request should be accepted before imported zones exist.");
+        const auto migratedInitialPreviewBuild = buildPrepared(migratedSnapshotBuilder,
+                                                               migratedPreparedService,
+                                                               referenceStream,
+                                                               migratedSession.getProject(),
+                                                               migratedSession.getDocumentState().revision,
+                                                               false);
+        require(migratedContract.completePreviewBuild(migratedInitialPreview.requestId,
+                                                     migratedInitialPreviewBuild.snapshot,
+                                                     migratedInitialPreviewBuild.prepared),
+                "Migrated project preview rejection should still complete against the contract.");
+        require(!migratedContract.getStatus().preview.available,
+                "Migrated project without imported zones should not expose an available preview revision.");
+        require(migratedContract.getStatus().preview.state
+                    == "Prepared playback build rejected because the immutable snapshot is unavailable",
+                "Migrated project should preserve the rejected preview state before imported zones exist.");
+        require(containsFinding(migratedContract.getStatus().preview.findings,
+                                drs::engine::PlaybackSnapshotFindingSeverity::error,
+                                "no-playable-zones",
+                                "authoring.zones"),
+                "Migrated project preview rejection should surface the structured no-playable-zones finding.");
+
+        const auto migratedInitialPublish = migratedContract.requestPerformanceBuild();
+        require(migratedInitialPublish.accepted,
+                "Migrated project publish request should be accepted before imported zones exist.");
+        const auto migratedInitialPublishBuild = buildPrepared(migratedSnapshotBuilder,
+                                                               migratedPreparedService,
+                                                               referenceStream,
+                                                               migratedSession.getProject(),
+                                                               migratedSession.getDocumentState().revision,
+                                                               true);
+        require(migratedContract.completePerformanceBuild(migratedInitialPublish.requestId,
+                                                          migratedInitialPublishBuild.snapshot,
+                                                          migratedInitialPublishBuild.prepared),
+                "Migrated project publish rejection should still complete against the contract.");
+        require(!migratedContract.getStatus().performance.available,
+                "Migrated project without imported zones should not expose an active published revision.");
+        require(migratedContract.getStatus().performance.state
+                    == "Prepared playback build rejected because the immutable snapshot is unavailable",
+                "Migrated project should preserve the rejected publish state before imported zones exist.");
+        require(containsFinding(migratedContract.getStatus().performance.findings,
+                                drs::engine::PlaybackSnapshotFindingSeverity::error,
+                                "no-playable-zones",
+                                "authoring.zones"),
+                "Migrated project publish rejection should surface the structured no-playable-zones finding.");
+
+        drs::engine::RuntimeProjectSampleSource importedSampleSource;
+        importedSampleSource.id = "migrated-contract-sine-a3";
+        importedSampleSource.path = phase1Project.project.sampleSources[0].path;
+        importedSampleSource.role = "imported-sustain";
+
+        drs::engine::RuntimeProjectZoneDefinition importedZone;
+        importedZone.id = "migrated-contract-zone-a3";
+        importedZone.sampleSourceId = importedSampleSource.id;
+        importedZone.displayName = "Migrated Contract Zone A3";
+        importedZone.groupId = "main";
+        importedZone.articulationId = "sustain";
+        importedZone.rootKey = 57;
+        importedZone.keyLow = 57;
+        importedZone.keyHigh = 57;
+        importedZone.velocityLow = 1;
+        importedZone.velocityHigh = 127;
+
+        const auto migratedImport = migratedSession.appendImportedContent({ importedSampleSource },
+                                                                          { importedZone },
+                                                                          "Import migrated contract zone");
+        require(migratedImport.applied, "Migrated project should accept imported authoring content for contract coverage.");
+        require(migratedContract.setDraftRevision(migratedImport.documentState.revision),
+                "Migrated contract should accept the imported draft revision.");
+
+        const auto migratedPreviewRevision1 = migratedContract.requestPreviewBuild();
+        require(migratedPreviewRevision1.accepted,
+                "Migrated project preview should be accepted once imported zones exist.");
+        const auto migratedPreviewRevision1Build = buildPrepared(migratedSnapshotBuilder,
+                                                                 migratedPreparedService,
+                                                                 referenceStream,
+                                                                 migratedSession.getProject(),
+                                                                 migratedImport.documentState.revision,
+                                                                 false);
+        require(migratedContract.completePreviewBuild(migratedPreviewRevision1.requestId,
+                                                     migratedPreviewRevision1Build.snapshot,
+                                                     migratedPreviewRevision1Build.prepared),
+                "Migrated project preview should complete successfully after import.");
+        require(migratedContract.getStatus().preview.available
+                    && migratedContract.getStatus().preview.revision == migratedImport.documentState.revision
+                    && migratedContract.getStatus().preview.state == "Ready",
+                "Imported migrated project should expose a ready preview revision.");
+        require(migratedContract.getStatus().preview.preparedAssetsAvailable,
+                "Imported migrated project preview should expose prepared playback assets.");
+        require(migratedContract.getStatus().preview.preparedZoneCount == 1,
+                "Imported migrated project preview should expose the imported playable zone.");
+        require(migratedContract.getStatus().preview.preparedSampleCount == migratedSession.getProject().sampleSources.size(),
+                "Imported migrated project preview should materialize every migrated sample identity.");
+        require(migratedContract.getStatus().preview.preparationCacheMissCount
+                    == migratedSession.getProject().sampleSources.size(),
+                "First successful migrated preview should cold-miss every prepared sample handle.");
+        require(migratedContract.getStatus().preview.preparationCacheHitCount == 0,
+                "First successful migrated preview should not report cache hits.");
+
+        const auto migratedPublishRevision1 = migratedContract.requestPerformanceBuild();
+        require(migratedPublishRevision1.accepted,
+                "Migrated project publish should be accepted once imported zones exist.");
+        const auto migratedPublishRevision1Build = buildPrepared(migratedSnapshotBuilder,
+                                                                 migratedPreparedService,
+                                                                 referenceStream,
+                                                                 migratedSession.getProject(),
+                                                                 migratedImport.documentState.revision,
+                                                                 true);
+        require(migratedContract.completePerformanceBuild(migratedPublishRevision1.requestId,
+                                                          migratedPublishRevision1Build.snapshot,
+                                                          migratedPublishRevision1Build.prepared),
+                "Migrated project publish should complete successfully after import.");
+        require(migratedContract.getStatus().performance.available
+                    && migratedContract.getStatus().performance.revision == migratedImport.documentState.revision
+                    && migratedContract.getStatus().performance.state == "Active",
+                "Imported migrated project should expose an active published revision.");
+        require(migratedContract.getStatus().performance.preparedAssetsAvailable,
+                "Imported migrated project publish should expose prepared playback assets.");
+        require(migratedContract.getStatus().performance.preparationCacheHitCount
+                    == migratedSession.getProject().sampleSources.size(),
+                "Publishing the same imported migrated draft should reuse every prepared sample handle.");
+        require(migratedContract.getStatus().performance.preparationCacheMissCount == 0,
+                "Publishing the same imported migrated draft should not cold-miss prepared sample handles.");
+        require(migratedContract.getStatus().preview.contentDigest
+                    == migratedContract.getStatus().performance.contentDigest,
+                "Imported migrated preview and publish should share a snapshot digest for the same draft.");
+        require(migratedContract.getStatus().preview.preparedContentDigest
+                    == migratedContract.getStatus().performance.preparedContentDigest,
+                "Imported migrated preview and publish should share a prepared digest for the same draft.");
+
+        auto editedMigratedZone = *migratedSession.getSelectedZone();
+        editedMigratedZone.gainDb = 2.5;
+        editedMigratedZone.pan = -0.2;
+        const auto migratedEdit = migratedSession.updateSelectedZone(editedMigratedZone,
+                                                                     "Shape migrated contract zone");
+        require(migratedEdit.applied, "Editing imported migrated content should commit successfully.");
+        require(migratedContract.setDraftRevision(migratedEdit.documentState.revision),
+                "Migrated contract should accept the edited draft revision.");
+        require(migratedContract.getStatus().preview.revision == migratedImport.documentState.revision
+                    && migratedContract.getStatus().preview.state == "Stale",
+                "Editing imported migrated content should leave preview stale on the last prepared revision.");
+        require(migratedContract.getStatus().performance.revision == migratedImport.documentState.revision
+                    && migratedContract.getStatus().performance.state == "Active",
+                "Editing imported migrated content should preserve the last active published revision.");
+
+        const auto migratedPreviewRevision2 = migratedContract.requestPreviewBuild();
+        require(migratedPreviewRevision2.accepted,
+                "Edited migrated draft should accept a new preview request.");
+        const auto migratedPreviewRevision2Build = buildPrepared(migratedSnapshotBuilder,
+                                                                 migratedPreparedService,
+                                                                 referenceStream,
+                                                                 migratedSession.getProject(),
+                                                                 migratedEdit.documentState.revision,
+                                                                 false);
+        require(migratedContract.completePreviewBuild(migratedPreviewRevision2.requestId,
+                                                     migratedPreviewRevision2Build.snapshot,
+                                                     migratedPreviewRevision2Build.prepared),
+                "Edited migrated draft preview should complete successfully.");
+        require(migratedContract.getStatus().preview.revision == migratedEdit.documentState.revision
+                    && migratedContract.getStatus().preview.state == "Ready",
+                "Edited migrated draft should advance preview to the current revision.");
+        require(migratedContract.getStatus().preview.preparationCacheHitCount
+                    == migratedSession.getProject().sampleSources.size(),
+                "Zone-only migrated edits should reuse every prepared sample handle during preview.");
+        require(migratedContract.getStatus().preview.preparationCacheMissCount == 0,
+                "Zone-only migrated edits should not invalidate prepared sample handles during preview.");
+        require(migratedContract.getStatus().preview.contentDigest
+                    != migratedContract.getStatus().performance.contentDigest,
+                "Edited migrated preview should diverge from the older published snapshot digest.");
+        require(migratedContract.getStatus().preview.preparedContentDigest
+                    != migratedContract.getStatus().performance.preparedContentDigest,
+                "Edited migrated preview should diverge from the older published prepared digest.");
+
+        const auto migratedPublishRevision2 = migratedContract.requestPerformanceBuild();
+        require(migratedPublishRevision2.accepted,
+                "Edited migrated draft should accept a publish request.");
+        const auto migratedPublishRevision2Build = buildPrepared(migratedSnapshotBuilder,
+                                                                 migratedPreparedService,
+                                                                 referenceStream,
+                                                                 migratedSession.getProject(),
+                                                                 migratedEdit.documentState.revision,
+                                                                 true);
+        require(migratedContract.completePerformanceBuild(migratedPublishRevision2.requestId,
+                                                          migratedPublishRevision2Build.snapshot,
+                                                          migratedPublishRevision2Build.prepared),
+                "Edited migrated draft publish should complete successfully.");
+        require(migratedContract.getStatus().performance.revision == migratedEdit.documentState.revision
+                    && migratedContract.getStatus().performance.state == "Active",
+                "Edited migrated draft should advance the active published revision.");
+        require(migratedContract.getStatus().performance.preparationCacheHitCount
+                    == migratedSession.getProject().sampleSources.size(),
+                "Publishing the edited migrated draft should reuse every prepared sample handle.");
+        require(migratedContract.getStatus().performance.preparationCacheMissCount == 0,
+                "Publishing the edited migrated draft should not invalidate prepared sample handles.");
+        require(migratedContract.getStatus().preview.contentDigest
+                    == migratedContract.getStatus().performance.contentDigest,
+                "Publishing the edited migrated draft should realign preview and publish snapshot digests.");
+        require(migratedContract.getStatus().preview.preparedContentDigest
+                    == migratedContract.getStatus().performance.preparedContentDigest,
+                "Publishing the edited migrated draft should realign preview and publish prepared digests.");
 
         std::cout << "Phase 1 draft-to-playback contract tests passed." << std::endl;
         return 0;

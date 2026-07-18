@@ -1,4 +1,6 @@
+#include "drs/engine/AuthoringSession.h"
 #include "drs/engine/EngineFacade.h"
+#include "drs/engine/RuntimeLoader.h"
 
 #include <chrono>
 #include <functional>
@@ -13,6 +15,24 @@ void require(bool condition, const std::string& message)
 {
     if (!condition)
         throw std::runtime_error(message);
+}
+
+bool containsFinding(const std::vector<drs::engine::PlaybackSnapshotFinding>& findings,
+                     drs::engine::PlaybackSnapshotFindingSeverity severity,
+                     const std::string& code,
+                     const std::string& pathFragment)
+{
+    for (const auto& finding : findings)
+    {
+        if (finding.severity == severity
+            && finding.code == code
+            && finding.path.find(pathFragment) != std::string::npos)
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 bool waitForWorkerToSettle(drs::engine::EngineFacade& engineFacade,
@@ -313,6 +333,228 @@ int main()
         require(snapshot.publishedRevision == 0 && snapshot.publishedRevisionState == "Idle",
                 "Reopening should require publish activation again.");
         requireFacadeSnapshotConsistency(engineFacade, "Facade state after reopen");
+
+        const auto phase1Project = drs::engine::loadPhase1ReferenceProjectManifest();
+        require(phase1Project.loaded, "Phase 1 reference project must load before migrated facade coverage runs.");
+        const auto migratedProject = drs::engine::migrateRuntimeProjectToPhase2Authoring(phase1Project.project);
+        require(migratedProject.valid, "Phase 1 reference project should migrate before facade coverage runs.");
+
+        drs::engine::AuthoringSession migratedSession(migratedProject.project);
+        engineFacade.closeDraftPlaybackProject();
+        require(engineFacade.replaceDraftPlaybackAuthoringProject(migratedSession.getProject()),
+                "Engine facade should accept a validated migrated authoring project replacement.");
+        require(engineFacade.reopenDraftPlaybackProject(0),
+                "Engine facade should reopen against the migrated authoring project.");
+        snapshot = engineFacade.getPerformanceSnapshot();
+        draftStatus = engineFacade.getDraftPlaybackStatus();
+        require(snapshot.draftRevision == 0,
+                "Migrated facade coverage should reopen at draft revision 0.");
+        require(snapshot.previewRevision == 0 && snapshot.previewRevisionState == "Idle",
+                "Migrated facade coverage should begin with an idle preview state.");
+        require(snapshot.publishedRevision == 0 && snapshot.publishedRevisionState == "Idle",
+                "Migrated facade coverage should begin with an idle published state.");
+        requireFacadeSnapshotConsistency(engineFacade, "Migrated facade state after reopen");
+
+        require(!engineFacade.refreshPreviewToCurrentDraft(),
+                "Migrated project without imported zones should fail preview preparation through the facade.");
+        snapshot = engineFacade.getPerformanceSnapshot();
+        draftStatus = engineFacade.getDraftPlaybackStatus();
+        require(snapshot.previewRevision == 0,
+                "Failed migrated preview should not advance the prepared preview revision.");
+        require(snapshot.previewRevisionState
+                    == "Prepared playback build rejected because the immutable snapshot is unavailable",
+                "Failed migrated preview should surface the rejected prepared-playback state.");
+        require(!snapshot.previewActivationEligible,
+                "Failed migrated preview should never become activation-eligible.");
+        require(containsFinding(snapshot.previewFindings,
+                                drs::engine::PlaybackSnapshotFindingSeverity::error,
+                                "no-playable-zones",
+                                "authoring.zones"),
+                "Failed migrated preview should surface the structured no-playable-zones finding.");
+        requireFacadeSnapshotConsistency(engineFacade, "Migrated facade state after rejected preview");
+
+        require(!engineFacade.publishCurrentDraft(),
+                "Migrated project without imported zones should fail publish preparation through the facade.");
+        snapshot = engineFacade.getPerformanceSnapshot();
+        draftStatus = engineFacade.getDraftPlaybackStatus();
+        require(!snapshot.loaded,
+                "Failed migrated publish should not expose a loaded published performance context.");
+        require(snapshot.publishedRevision == 0,
+                "Failed migrated publish should not advance the published revision.");
+        require(snapshot.publishedRevisionState
+                    == "Prepared playback build rejected because the immutable snapshot is unavailable",
+                "Failed migrated publish should surface the rejected prepared-playback state.");
+        require(!snapshot.publishedActivationEligible,
+                "Failed migrated publish should never become activation-eligible.");
+        require(containsFinding(snapshot.publishedFindings,
+                                drs::engine::PlaybackSnapshotFindingSeverity::error,
+                                "no-playable-zones",
+                                "authoring.zones"),
+                "Failed migrated publish should surface the structured no-playable-zones finding.");
+        requireFacadeSnapshotConsistency(engineFacade, "Migrated facade state after rejected publish");
+
+        drs::engine::RuntimeProjectSampleSource importedSampleSource;
+        importedSampleSource.id = "migrated-facade-sine-a3";
+        importedSampleSource.path = phase1Project.project.sampleSources[0].path;
+        importedSampleSource.role = "imported-sustain";
+
+        drs::engine::RuntimeProjectZoneDefinition importedZone;
+        importedZone.id = "migrated-facade-zone-a3";
+        importedZone.sampleSourceId = importedSampleSource.id;
+        importedZone.displayName = "Migrated Facade Zone A3";
+        importedZone.groupId = "main";
+        importedZone.articulationId = "sustain";
+        importedZone.rootKey = 57;
+        importedZone.keyLow = 57;
+        importedZone.keyHigh = 57;
+        importedZone.velocityLow = 1;
+        importedZone.velocityHigh = 127;
+
+        const auto migratedImport = migratedSession.appendImportedContent({ importedSampleSource },
+                                                                          { importedZone },
+                                                                          "Import migrated facade zone");
+        require(migratedImport.applied, "Migrated facade coverage should accept imported authoring content.");
+        require(engineFacade.replaceDraftPlaybackAuthoringProject(migratedSession.getProject()),
+                "Engine facade should accept the imported migrated authoring project update.");
+        require(engineFacade.stageDraftRevision(migratedImport.documentState.revision),
+                "Engine facade should stage the imported migrated draft revision.");
+        snapshot = engineFacade.getPerformanceSnapshot();
+        require(snapshot.draftRevision == 1,
+                "Imported migrated facade coverage should stage draft revision 1.");
+
+        require(engineFacade.refreshPreviewToCurrentDraft(),
+                "Imported migrated project should prepare preview successfully through the facade.");
+        require(waitForWorkerToSettle(engineFacade),
+                "Imported migrated preview should settle through the prepared-playback worker.");
+        snapshot = engineFacade.getPerformanceSnapshot();
+        require(snapshot.previewPending,
+                "Imported migrated preview should remain pending until background work is serviced.");
+        require(engineFacade.serviceBackgroundWork(),
+                "Background work servicing should apply the imported migrated preview build.");
+        snapshot = engineFacade.getPerformanceSnapshot();
+        draftStatus = engineFacade.getDraftPlaybackStatus();
+        require(snapshot.previewRevision == 1 && snapshot.previewRevisionState == "Ready",
+                "Imported migrated project should expose a ready preview revision.");
+        require(snapshot.previewPreparedSampleCount == migratedSession.getProject().sampleSources.size(),
+                "Imported migrated preview should materialize every migrated sample identity.");
+        require(snapshot.previewPreparationCacheHits + snapshot.previewPreparationCacheMisses
+                    == migratedSession.getProject().sampleSources.size(),
+                "Imported migrated facade preview should account for every prepared sample handle as either a hit or miss.");
+        require(snapshot.previewPreparationCacheMisses >= 1,
+                "Imported migrated facade preview should cold-miss at least the newly imported sample handle.");
+        require(snapshot.previewActivationEligible,
+                "Imported migrated preview should become activation-eligible.");
+        requireFacadeSnapshotConsistency(engineFacade, "Migrated facade state after imported preview");
+
+        require(engineFacade.publishCurrentDraft(),
+                "Imported migrated project should publish successfully through the facade.");
+        require(waitForWorkerToSettle(engineFacade),
+                "Imported migrated publish should settle through the prepared-playback worker.");
+        snapshot = engineFacade.getPerformanceSnapshot();
+        require(snapshot.publishedPending,
+                "Imported migrated publish should remain pending until background work is serviced.");
+        require(engineFacade.serviceBackgroundWork(),
+                "Background work servicing should apply the imported migrated publish build.");
+        snapshot = engineFacade.getPerformanceSnapshot();
+        draftStatus = engineFacade.getDraftPlaybackStatus();
+        require(snapshot.loaded,
+                "Imported migrated publish should expose a loaded performance context.");
+        require(snapshot.publishedRevision == 1 && snapshot.publishedRevisionState == "Active",
+                "Imported migrated project should expose an active published revision.");
+        require(snapshot.previewContentDigest == snapshot.publishedContentDigest,
+                "Imported migrated preview and publish should share a snapshot digest.");
+        require(snapshot.previewPreparedContentDigest == snapshot.publishedPreparedContentDigest,
+                "Imported migrated preview and publish should share a prepared digest.");
+        require(snapshot.publishedPreparationCacheHits == migratedSession.getProject().sampleSources.size(),
+                "Publishing the imported migrated draft should reuse every prepared sample handle.");
+        require(snapshot.publishedPreparationCacheMisses == 0,
+                "Publishing the imported migrated draft should not cold-miss prepared sample handles.");
+        require(snapshot.publishedActivationEligible,
+                "Imported migrated publish should become activation-eligible.");
+        requireFacadeSnapshotConsistency(engineFacade, "Migrated facade state after imported publish");
+
+        auto editedMigratedZone = *migratedSession.getSelectedZone();
+        editedMigratedZone.gainDb = 2.5;
+        editedMigratedZone.pan = -0.2;
+        const auto migratedEdit = migratedSession.updateSelectedZone(editedMigratedZone,
+                                                                     "Shape migrated facade zone");
+        require(migratedEdit.applied, "Editing the imported migrated zone should commit successfully.");
+        require(engineFacade.replaceDraftPlaybackAuthoringProject(migratedSession.getProject()),
+                "Engine facade should accept the edited migrated authoring project update.");
+        require(engineFacade.stageDraftRevision(migratedEdit.documentState.revision),
+                "Engine facade should stage the edited migrated draft revision.");
+        snapshot = engineFacade.getPerformanceSnapshot();
+        draftStatus = engineFacade.getDraftPlaybackStatus();
+        require(snapshot.previewRevision == 1 && snapshot.previewRevisionState == "Stale",
+                "Editing imported migrated content should leave preview stale on the prior prepared revision.");
+        require(snapshot.publishedRevision == 1 && snapshot.publishedRevisionState == "Active",
+                "Editing imported migrated content should preserve the prior active published revision.");
+        requireFacadeSnapshotConsistency(engineFacade, "Migrated facade state after edited draft staging");
+
+        require(engineFacade.refreshPreviewToCurrentDraft(),
+                "Edited migrated draft should prepare preview successfully through the facade.");
+        require(waitForWorkerToSettle(engineFacade),
+                "Edited migrated preview should settle through the prepared-playback worker.");
+        require(engineFacade.serviceBackgroundWork(),
+                "Background work servicing should apply the edited migrated preview build.");
+        snapshot = engineFacade.getPerformanceSnapshot();
+        draftStatus = engineFacade.getDraftPlaybackStatus();
+        require(snapshot.previewRevision == 2 && snapshot.previewRevisionState == "Ready",
+                "Edited migrated draft should advance preview to the current revision.");
+        require(snapshot.previewPreparationCacheHits == migratedSession.getProject().sampleSources.size(),
+                "Zone-only migrated facade edits should reuse every prepared sample handle during preview.");
+        require(snapshot.previewPreparationCacheMisses == 0,
+                "Zone-only migrated facade edits should not invalidate prepared sample handles during preview.");
+        require(snapshot.previewContentDigest != snapshot.publishedContentDigest,
+                "Edited migrated preview should diverge from the older published snapshot digest.");
+        require(snapshot.previewPreparedContentDigest != snapshot.publishedPreparedContentDigest,
+                "Edited migrated preview should diverge from the older published prepared digest.");
+        requireFacadeSnapshotConsistency(engineFacade, "Migrated facade state after edited preview");
+
+        require(engineFacade.publishCurrentDraft(),
+                "Edited migrated draft should publish successfully through the facade.");
+        require(waitForWorkerToSettle(engineFacade),
+                "Edited migrated publish should settle through the prepared-playback worker.");
+        require(engineFacade.serviceBackgroundWork(),
+                "Background work servicing should apply the edited migrated publish build.");
+        snapshot = engineFacade.getPerformanceSnapshot();
+        draftStatus = engineFacade.getDraftPlaybackStatus();
+        require(snapshot.publishedRevision == 2 && snapshot.publishedRevisionState == "Active",
+                "Edited migrated draft should advance the active published revision.");
+        require(snapshot.publishedPreparationCacheHits == migratedSession.getProject().sampleSources.size(),
+                "Publishing the edited migrated draft should reuse every prepared sample handle.");
+        require(snapshot.publishedPreparationCacheMisses == 0,
+                "Publishing the edited migrated draft should not invalidate prepared sample handles.");
+        require(snapshot.previewContentDigest == snapshot.publishedContentDigest,
+                "Publishing the edited migrated draft should realign preview and publish snapshot digests.");
+        require(snapshot.previewPreparedContentDigest == snapshot.publishedPreparedContentDigest,
+                "Publishing the edited migrated draft should realign preview and publish prepared digests.");
+        requireFacadeSnapshotConsistency(engineFacade, "Migrated facade state after edited publish");
+
+        auto invalidMigratedProject = migratedSession.getProject();
+        invalidMigratedProject.authoring.zones[0].sampleSourceId = "missing-source";
+        const auto stableStateRevision = engineFacade.getStateRevision();
+        const auto stableSnapshot = engineFacade.getPerformanceSnapshot();
+        require(!engineFacade.replaceDraftPlaybackAuthoringProject(invalidMigratedProject),
+                "Engine facade should reject invalid authoring project replacements.");
+        snapshot = engineFacade.getPerformanceSnapshot();
+        require(engineFacade.getStateRevision() == stableStateRevision,
+                "Rejected authoring project replacements must not mutate the facade state revision.");
+        require(snapshot.draftRevision == stableSnapshot.draftRevision,
+                "Rejected authoring project replacements must preserve the staged draft revision.");
+        require(snapshot.previewRevision == stableSnapshot.previewRevision
+                    && snapshot.previewRevisionState == stableSnapshot.previewRevisionState,
+                "Rejected authoring project replacements must preserve preview state.");
+        require(snapshot.publishedRevision == stableSnapshot.publishedRevision
+                    && snapshot.publishedRevisionState == stableSnapshot.publishedRevisionState,
+                "Rejected authoring project replacements must preserve published state.");
+        require(snapshot.previewContentDigest == stableSnapshot.previewContentDigest
+                    && snapshot.publishedContentDigest == stableSnapshot.publishedContentDigest,
+                "Rejected authoring project replacements must preserve snapshot digests.");
+        require(snapshot.previewPreparedContentDigest == stableSnapshot.previewPreparedContentDigest
+                    && snapshot.publishedPreparedContentDigest == stableSnapshot.publishedPreparedContentDigest,
+                "Rejected authoring project replacements must preserve prepared-playback digests.");
+        requireFacadeSnapshotConsistency(engineFacade, "Migrated facade state after rejected replacement");
 
         std::cout << "Phase 1 draft playback facade tests passed." << std::endl;
         return 0;

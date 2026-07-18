@@ -65,26 +65,40 @@ StatusPanel::StatusPanel(drs::engine::EngineFacade& facade,
 {
     titleLabel.setText("Engine Status", juce::dontSendNotification);
     titleLabel.setFont(juce::FontOptions(24.0f, juce::Font::bold));
+    titleLabel.setComponentID("statusTitleLabel");
 
     modeLabel.setJustificationType(juce::Justification::centredLeft);
+    modeLabel.setComponentID("statusModeLabel");
     stateLabel.setJustificationType(juce::Justification::centredLeft);
+    stateLabel.setComponentID("statusStateLabel");
     diagnosticsHeadlineLabel.setJustificationType(juce::Justification::centredLeft);
+    diagnosticsHeadlineLabel.setComponentID("statusDiagnosticsHeadlineLabel");
     sessionLabel.setJustificationType(juce::Justification::centredLeft);
+    sessionLabel.setComponentID("statusSessionLabel");
     voicesLabel.setJustificationType(juce::Justification::centredLeft);
+    voicesLabel.setComponentID("statusVoicesLabel");
     cacheLabel.setJustificationType(juce::Justification::centredLeft);
+    cacheLabel.setComponentID("statusCacheLabel");
     latencyLabel.setJustificationType(juce::Justification::centredLeft);
+    latencyLabel.setComponentID("statusLatencyLabel");
     failureLabel.setJustificationType(juce::Justification::centredLeft);
+    failureLabel.setComponentID("statusFailureLabel");
     routedZonesLabel.setJustificationType(juce::Justification::centredLeft);
+    routedZonesLabel.setComponentID("statusRoutedZonesLabel");
 
     diagnosticsHeadlineLabel.setFont(juce::FontOptions(18.0f, juce::Font::bold));
     actionsLabel.setText("Developer actions", juce::dontSendNotification);
     actionsLabel.setFont(juce::FontOptions(16.0f, juce::Font::bold));
+    actionsLabel.setComponentID("statusActionsLabel");
     draftPlaybackLabel.setText("Draft playback", juce::dontSendNotification);
     draftPlaybackLabel.setFont(juce::FontOptions(16.0f, juce::Font::bold));
+    draftPlaybackLabel.setComponentID("statusDraftPlaybackLabel");
     macrosLabel.setText("Macro bridge", juce::dontSendNotification);
     macrosLabel.setFont(juce::FontOptions(16.0f, juce::Font::bold));
+    macrosLabel.setComponentID("statusMacrosLabel");
     contentProbeLabel.setText("Content probes", juce::dontSendNotification);
     contentProbeLabel.setFont(juce::FontOptions(16.0f, juce::Font::bold));
+    contentProbeLabel.setComponentID("statusContentProbeLabel");
 
     resetStateButton.setButtonText("Reset Default State");
     loadLeadFixtureButton.setButtonText("Load Lead Fixture");
@@ -176,6 +190,7 @@ StatusPanel::StatusPanel(drs::engine::EngineFacade& facade,
     };
 
     detailEditor.setMultiLine(true);
+    detailEditor.setComponentID("statusDetailEditor");
     detailEditor.setReadOnly(true);
     detailEditor.setScrollbarsShown(true);
     detailEditor.setCaretVisible(false);
@@ -183,8 +198,10 @@ StatusPanel::StatusPanel(drs::engine::EngineFacade& facade,
 
     nextStepsLabel.setText("Current next steps", juce::dontSendNotification);
     nextStepsLabel.setFont(juce::FontOptions(18.0f, juce::Font::bold));
+    nextStepsLabel.setComponentID("statusNextStepsLabel");
 
     nextStepsEditor.setMultiLine(true);
+    nextStepsEditor.setComponentID("statusNextStepsEditor");
     nextStepsEditor.setReadOnly(true);
     nextStepsEditor.setScrollbarsShown(true);
     nextStepsEditor.setCaretVisible(false);
@@ -309,6 +326,11 @@ void StatusPanel::resized()
     nextStepsLabel.setBounds(area.removeFromTop(24));
     area.removeFromTop(8);
     nextStepsEditor.setBounds(area);
+}
+
+void StatusPanel::refreshNow()
+{
+    refreshSnapshot();
 }
 
 void StatusPanel::timerCallback()

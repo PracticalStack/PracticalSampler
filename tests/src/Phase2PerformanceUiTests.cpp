@@ -1,0 +1,302 @@
+#include "drs/engine/AuthoringSession.h"
+#include "drs/engine/EngineFacade.h"
+#include "drs/engine/RuntimeLoader.h"
+#include "shared/PerformancePanel.h"
+
+#include <juce_gui_extra/juce_gui_extra.h>
+
+#include <chrono>
+#include <stdexcept>
+#include <string>
+#include <thread>
+
+namespace
+{
+class DesktopHostedComponent final : public juce::Component
+{
+public:
+    explicit DesktopHostedComponent(juce::Component& contentToHost)
+        : hostedContent(contentToHost)
+    {
+        addAndMakeVisible(hostedContent);
+        setSize(hostedContent.getWidth(), hostedContent.getHeight());
+        addToDesktop(0);
+        setVisible(true);
+        toFront(true);
+        resized();
+    }
+
+    ~DesktopHostedComponent() override
+    {
+        removeChildComponent(&hostedContent);
+        setVisible(false);
+        removeFromDesktop();
+    }
+
+    void resized() override
+    {
+        hostedContent.setBounds(getLocalBounds());
+    }
+
+private:
+    juce::Component& hostedContent;
+};
+
+void require(bool condition, const std::string& message)
+{
+    if (!condition)
+        throw std::runtime_error(message);
+}
+
+void pumpMessages(int millis = 20)
+{
+   #if JUCE_MODAL_LOOPS_PERMITTED
+    if (auto* messageManager = juce::MessageManager::getInstanceWithoutCreating())
+        messageManager->runDispatchLoopUntil(millis);
+    else
+        juce::Thread::sleep(millis);
+   #else
+    juce::Thread::sleep(millis);
+   #endif
+}
+
+juce::Component* findDescendantById(juce::Component& root, const juce::String& componentId)
+{
+    if (root.getComponentID() == componentId)
+        return &root;
+
+    for (int index = 0; index < root.getNumChildComponents(); ++index)
+    {
+        if (auto* match = findDescendantById(*root.getChildComponent(index), componentId))
+            return match;
+    }
+
+    return nullptr;
+}
+
+juce::Label& requireLabel(juce::Component& root, const juce::String& componentId)
+{
+    auto* label = dynamic_cast<juce::Label*>(findDescendantById(root, componentId));
+    require(label != nullptr, "Missing label ID: " + componentId.toStdString());
+    return *label;
+}
+
+juce::Button& requireButton(juce::Component& root, const juce::String& componentId)
+{
+    auto* button = dynamic_cast<juce::Button*>(findDescendantById(root, componentId));
+    require(button != nullptr, "Missing button ID: " + componentId.toStdString());
+    return *button;
+}
+
+void requireLabelContains(juce::Component& root,
+                          const juce::String& componentId,
+                          const std::string& expectedFragment,
+                          const std::string& message)
+{
+    const auto text = requireLabel(root, componentId).getText().toStdString();
+    require(text.find(expectedFragment) != std::string::npos, message + " Text: " + text);
+}
+
+void refreshPanel(drs::app::PerformancePanel& panel)
+{
+    pumpMessages(20);
+    panel.refreshNow();
+    pumpMessages(20);
+}
+
+bool waitForWorkerToSettle(drs::engine::EngineFacade& engineFacade,
+                           std::chrono::milliseconds timeout = std::chrono::milliseconds(1000))
+{
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+
+    while (std::chrono::steady_clock::now() <= deadline)
+    {
+        const auto& workerStatus = engineFacade.getPreparedPlaybackWorkerStatus();
+        if (workerStatus.pendingWorkCount == 0 && workerStatus.inFlightWorkCount == 0)
+            return true;
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+
+    const auto& workerStatus = engineFacade.getPreparedPlaybackWorkerStatus();
+    return workerStatus.pendingWorkCount == 0 && workerStatus.inFlightWorkCount == 0;
+}
+} // namespace
+
+int main()
+{
+    try
+    {
+        juce::ScopedJuceInitialiser_GUI gui;
+
+        drs::engine::EngineFacade engineFacade;
+        engineFacade.resetSessionStateToDefault();
+        drs::app::PerformancePanel panel(engineFacade);
+        panel.setSize(1280, 960);
+        DesktopHostedComponent host(panel);
+        refreshPanel(panel);
+
+        requireButton(panel, "performanceDiagnosticsToggle").triggerClick();
+        refreshPanel(panel);
+
+        requireLabelContains(panel,
+                             "performancePatchStatusLabel",
+                             "Draft r0 | Preview r0 (Ready) | Published r0 (Active)",
+                             "Performance panel should expose the seeded default draft-playback state.");
+        requireLabelContains(panel,
+                             "statusSessionLabel",
+                             "draft=0 | preview=0 (Ready) | published=0 (Active)",
+                             "Diagnostics panel should expose the seeded default draft-playback state.");
+        requireLabelContains(panel,
+                             "statusFailureLabel",
+                             "previewFindings=0 (none) | publishFindings=0 (none)",
+                             "Diagnostics panel should begin without draft-playback findings.");
+
+        const auto phase1Project = drs::engine::loadPhase1ReferenceProjectManifest();
+        require(phase1Project.loaded, "Phase 1 reference project must load before performance UI migration coverage runs.");
+        const auto migratedProject = drs::engine::migrateRuntimeProjectToPhase2Authoring(phase1Project.project);
+        require(migratedProject.valid, "Phase 1 reference project should migrate before performance UI migration coverage runs.");
+
+        drs::engine::AuthoringSession migratedSession(migratedProject.project);
+        require(engineFacade.replaceDraftPlaybackAuthoringProject(migratedSession.getProject()),
+                "Engine facade should accept the migrated project for performance UI coverage.");
+        require(engineFacade.reopenDraftPlaybackProject(0),
+                "Engine facade should reopen against the migrated project for performance UI coverage.");
+        refreshPanel(panel);
+
+        require(!engineFacade.refreshPreviewToCurrentDraft(),
+                "Migrated project without imported zones should fail preview preparation.");
+        require(!engineFacade.publishCurrentDraft(),
+                "Migrated project without imported zones should fail publish preparation.");
+        refreshPanel(panel);
+
+        requireLabelContains(panel,
+                             "performancePatchStatusLabel",
+                             "Preview r0 (Prepared playback build rejected because the immutable snapshot is unavailable)",
+                             "Performance panel should surface the rejected migrated preview state.");
+        requireLabelContains(panel,
+                             "performancePatchStatusLabel",
+                             "Published r0 (Prepared playback build rejected because the immutable snapshot is unavailable)",
+                             "Performance panel should surface the rejected migrated publish state.");
+        requireLabelContains(panel,
+                             "performancePreviewStatusLabel",
+                             "findings Snapshot requires at least one playable zone before it can become activation-eligible.",
+                             "Performance panel should surface the migrated preview finding summary.");
+        requireLabelContains(panel,
+                             "statusSessionLabel",
+                             "draft=0 | preview=0 (Prepared playback build rejected because the immutable snapshot is unavailable) | published=0 (Prepared playback build rejected because the immutable snapshot is unavailable)",
+                             "Diagnostics panel should surface the rejected migrated draft-playback states.");
+        requireLabelContains(panel,
+                             "statusFailureLabel",
+                             "previewFindings=2",
+                             "Diagnostics panel should surface migrated preview findings.");
+        requireLabelContains(panel,
+                             "statusFailureLabel",
+                             "publishFindings=2",
+                             "Diagnostics panel should surface migrated publish findings.");
+
+        drs::engine::RuntimeProjectSampleSource importedSampleSource;
+        importedSampleSource.id = "performance-ui-migrated-sine-a3";
+        importedSampleSource.path = phase1Project.project.sampleSources[0].path;
+        importedSampleSource.role = "imported-sustain";
+
+        drs::engine::RuntimeProjectZoneDefinition importedZone;
+        importedZone.id = "performance-ui-migrated-zone-a3";
+        importedZone.sampleSourceId = importedSampleSource.id;
+        importedZone.displayName = "Performance UI Migrated Zone A3";
+        importedZone.groupId = "main";
+        importedZone.articulationId = "sustain";
+        importedZone.rootKey = 57;
+        importedZone.keyLow = 57;
+        importedZone.keyHigh = 57;
+        importedZone.velocityLow = 1;
+        importedZone.velocityHigh = 127;
+
+        const auto importResult = migratedSession.appendImportedContent({ importedSampleSource },
+                                                                        { importedZone },
+                                                                        "Import migrated performance UI zone");
+        require(importResult.applied, "Migrated project should accept imported authoring content for performance UI coverage.");
+        require(engineFacade.replaceDraftPlaybackAuthoringProject(migratedSession.getProject()),
+                "Engine facade should accept the imported migrated project.");
+        require(engineFacade.stageDraftRevision(importResult.documentState.revision),
+                "Engine facade should stage the imported migrated draft revision.");
+        require(engineFacade.refreshPreviewToCurrentDraft(),
+                "Imported migrated project should prepare preview successfully.");
+        require(waitForWorkerToSettle(engineFacade, std::chrono::milliseconds(1500)),
+                "Imported migrated preview should settle through the prepared-playback worker.");
+        require(engineFacade.serviceBackgroundWork(),
+                "Background work servicing should apply the imported migrated preview.");
+        require(engineFacade.publishCurrentDraft(),
+                "Imported migrated project should publish successfully.");
+        require(waitForWorkerToSettle(engineFacade, std::chrono::milliseconds(1500)),
+                "Imported migrated publish should settle through the prepared-playback worker.");
+        require(engineFacade.serviceBackgroundWork(),
+                "Background work servicing should apply the imported migrated publish.");
+        refreshPanel(panel);
+
+        requireLabelContains(panel,
+                             "performancePatchStatusLabel",
+                             "Draft r1 | Preview r1 (Ready) | Published r1 (Active)",
+                             "Performance panel should surface the recovered migrated preview/publish state.");
+        requireLabelContains(panel,
+                             "statusSessionLabel",
+                             "draft=1 | preview=1 (Ready) | published=1 (Active)",
+                             "Diagnostics panel should surface the recovered migrated preview/publish state.");
+        requireLabelContains(panel,
+                             "statusFailureLabel",
+                             "previewFindings=0 (none) | publishFindings=0 (none)",
+                             "Diagnostics panel should clear migrated findings once preview/publish recover.");
+
+        auto editedZone = *migratedSession.getSelectedZone();
+        editedZone.gainDb = 2.5;
+        editedZone.pan = -0.2;
+        const auto editResult = migratedSession.updateSelectedZone(editedZone,
+                                                                   "Shape migrated performance UI zone");
+        require(editResult.applied, "Migrated project should accept edited authoring content for performance UI coverage.");
+        require(engineFacade.replaceDraftPlaybackAuthoringProject(migratedSession.getProject()),
+                "Engine facade should accept the edited migrated project.");
+        require(engineFacade.stageDraftRevision(editResult.documentState.revision),
+                "Engine facade should stage the edited migrated draft revision.");
+        refreshPanel(panel);
+
+        requireLabelContains(panel,
+                             "performancePatchStatusLabel",
+                             "Draft r2 | Preview r1 (Stale) | Published r1 (Active)",
+                             "Performance panel should surface the stale-preview edited-draft state.");
+        requireLabelContains(panel,
+                             "statusSessionLabel",
+                             "draft=2 | preview=1 (Stale) | published=1 (Active)",
+                             "Diagnostics panel should surface the stale-preview edited-draft state.");
+
+        require(engineFacade.refreshPreviewToCurrentDraft(),
+                "Edited migrated draft should prepare preview successfully.");
+        require(waitForWorkerToSettle(engineFacade, std::chrono::milliseconds(1500)),
+                "Edited migrated preview should settle through the prepared-playback worker.");
+        require(engineFacade.serviceBackgroundWork(),
+                "Background work servicing should apply the edited migrated preview.");
+        require(engineFacade.publishCurrentDraft(),
+                "Edited migrated draft should publish successfully.");
+        require(waitForWorkerToSettle(engineFacade, std::chrono::milliseconds(1500)),
+                "Edited migrated publish should settle through the prepared-playback worker.");
+        require(engineFacade.serviceBackgroundWork(),
+                "Background work servicing should apply the edited migrated publish.");
+        refreshPanel(panel);
+
+        requireLabelContains(panel,
+                             "performancePatchStatusLabel",
+                             "Draft r2 | Preview r2 (Ready) | Published r2 (Active)",
+                             "Performance panel should surface the republished edited-draft state.");
+        requireLabelContains(panel,
+                             "statusSessionLabel",
+                             "draft=2 | preview=2 (Ready) | published=2 (Active)",
+                             "Diagnostics panel should surface the republished edited-draft state.");
+
+        std::cout << "Phase 2 performance UI tests passed." << std::endl;
+        return 0;
+    }
+    catch (const std::exception& exception)
+    {
+        std::cerr << "Phase 2 performance UI tests failed: " << exception.what() << std::endl;
+        return 1;
+    }
+}

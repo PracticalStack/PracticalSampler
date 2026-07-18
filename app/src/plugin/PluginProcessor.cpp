@@ -477,13 +477,20 @@ drs::app::AuthoringImportResponsivenessSnapshot Processor::getAuthoringImportRes
 
 void Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project)
 {
+    auto draftPlaybackProject = project;
+    if (!engineFacade.replaceDraftPlaybackAuthoringProject(std::move(draftPlaybackProject)))
+        return;
+
     authoringSession.replaceProject(std::move(project));
+    engineFacade.closeDraftPlaybackProject();
+    engineFacade.reopenDraftPlaybackProject(authoringSession.getDocumentState().revision);
     authoringLoadedSamples.clear();
     authoringWaveformPreviewCache.clear();
     lastAuthoringSampleLoadFailureState.clear();
     failedAuthoringPreviewRevision = std::numeric_limits<std::size_t>::max();
     failedAuthoringPreviewState.clear();
     observedAuthoringPreviewRevision = std::numeric_limits<std::size_t>::max();
+    observedDraftPlaybackProjectRevision = authoringSession.getDocumentState().revision;
     initializeAuthoringImportMetrics();
     ensureSelectedAuthoringSampleLoaded(false);
     serviceMessageThreadWork();
@@ -508,6 +515,18 @@ void Processor::queuePerformanceSurfaceNoteOff(int midiNoteNumber)
 
 bool Processor::serviceMessageThreadWork()
 {
+    const auto authoringRevision = authoringSession.getDocumentState().revision;
+    auto synchronizedDraftPlaybackProject = false;
+    if (authoringRevision != observedDraftPlaybackProjectRevision)
+    {
+        auto draftPlaybackProject = authoringSession.getProject();
+        if (engineFacade.replaceDraftPlaybackAuthoringProject(std::move(draftPlaybackProject)))
+        {
+            synchronizedDraftPlaybackProject = engineFacade.stageDraftRevision(authoringRevision);
+            observedDraftPlaybackProjectRevision = authoringRevision;
+        }
+    }
+
     const auto servicedBackgroundWork = engineFacade.serviceBackgroundWork();
     const auto retiredCountBefore = realtimeSafetySnapshot.retiredActivationCount;
     drainRetiredAuthoringPreviewActivationSlots();
@@ -523,7 +542,6 @@ bool Processor::serviceMessageThreadWork()
     }
 
     auto synchronizedAuthoringPreview = false;
-    const auto authoringRevision = authoringSession.getDocumentState().revision;
     if (authoringRevision != observedAuthoringPreviewRevision
         || activeAuthoringPreviewActivationSlotIndex.load(std::memory_order_acquire) < 0)
     {
@@ -534,6 +552,7 @@ bool Processor::serviceMessageThreadWork()
 
     updateRealtimeSafetyState();
     return servicedBackgroundWork
+        || synchronizedDraftPlaybackProject
         || synchronizedAuthoringPreview
         || synchronizedActivation
         || realtimeSafetySnapshot.retiredActivationCount != retiredCountBefore;

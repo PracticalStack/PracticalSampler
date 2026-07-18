@@ -260,6 +260,7 @@ public:
     bool publishCurrentDraft();
     void closeDraftPlaybackProject();
     bool reopenDraftPlaybackProject(std::size_t revision);
+    bool replaceDraftPlaybackAuthoringProject(RuntimeProjectModel project);
     bool beginDraftPlaybackDeviceRestart();
     bool completeDraftPlaybackDeviceRestart(bool restored);
     bool waitForPreparedPlaybackIdle(std::chrono::milliseconds timeout = std::chrono::milliseconds(1000));

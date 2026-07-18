@@ -91,12 +91,19 @@ PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
     titleLabel.setColour(juce::Label::textColourId, juce::Colours::white);
 
     instrumentLabel.setFont(juce::FontOptions(24.0f, juce::Font::bold));
+    instrumentLabel.setComponentID("performanceInstrumentLabel");
     patchStatusLabel.setFont(juce::FontOptions(15.0f));
+    patchStatusLabel.setComponentID("performancePatchStatusLabel");
     previewStatusLabel.setFont(juce::FontOptions(15.0f));
+    previewStatusLabel.setComponentID("performancePreviewStatusLabel");
     macroStripLabel.setFont(juce::FontOptions(16.0f, juce::Font::bold));
+    macroStripLabel.setComponentID("performanceMacroStripLabel");
     articulationLabel.setFont(juce::FontOptions(16.0f, juce::Font::bold));
+    articulationLabel.setComponentID("performanceArticulationLabel");
     keyboardHintLabel.setFont(juce::FontOptions(15.0f));
+    keyboardHintLabel.setComponentID("performanceKeyboardHintLabel");
     loadIndicatorLabel.setFont(juce::FontOptions(15.0f, juce::Font::bold));
+    loadIndicatorLabel.setComponentID("performanceLoadIndicatorLabel");
 
     instrumentLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(14, 20, 27));
     patchStatusLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(52, 64, 84));
@@ -251,6 +258,12 @@ void PerformancePanel::resized()
         area.removeFromTop(14);
         diagnosticsPanel.setBounds(area);
     }
+}
+
+void PerformancePanel::refreshNow()
+{
+    refreshSurface();
+    diagnosticsPanel.refreshNow();
 }
 
 void PerformancePanel::timerCallback()

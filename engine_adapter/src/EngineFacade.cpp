@@ -1109,6 +1109,27 @@ bool EngineFacade::reopenDraftPlaybackProject(std::size_t revision)
     return true;
 }
 
+bool EngineFacade::replaceDraftPlaybackAuthoringProject(RuntimeProjectModel project)
+{
+    const auto validation = validateRuntimeProjectModel(project);
+    if (!validation.valid)
+        return false;
+
+    clearPendingPreparedCompletions();
+    authoringProject = {};
+    authoringProject.manifestFound = true;
+    authoringProject.loaded = true;
+    authoringProject.state = "Draft playback authoring project replaced";
+    authoringProject.project = std::move(project);
+    currentSessionState.transientMetrics.integrationState = "Draft playback authoring project replaced";
+    currentSessionState.transientMetrics.lastFailure.clear();
+    previewPlaybackSnapshot = {};
+    syncPreviewSnapshotFromDraftPlayback();
+    refreshDiagnosticsSnapshot();
+    markStateChanged();
+    return true;
+}
+
 PlaybackSnapshotBuildResult EngineFacade::buildCurrentPlaybackSnapshot(bool activationRequested)
 {
     if (!authoringProject.loaded)

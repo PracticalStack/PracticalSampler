@@ -251,6 +251,7 @@ private:
     std::string failedAuthoringPreviewState;
     std::string lastAuthoringSampleLoadFailureState;
     std::size_t observedAuthoringPreviewRevision = std::numeric_limits<std::size_t>::max();
+    std::size_t observedDraftPlaybackProjectRevision = std::numeric_limits<std::size_t>::max();
     std::uint64_t observedEngineStateRevision = 0;
     double currentSampleRate = 44100.0;
     std::uint64_t nextRenderVoiceId = 1;
