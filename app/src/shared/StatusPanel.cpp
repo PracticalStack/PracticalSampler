@@ -394,7 +394,9 @@ void StatusPanel::refreshSnapshot()
             + " | published=" + juce::String(static_cast<juce::int64>(diagnostics.publishedRevision))
             + " (" + juce::String::fromUTF8(diagnostics.publishedRevisionState.c_str()) + ")"
             + " | previewBuild=#" + juce::String(static_cast<juce::int64>(diagnostics.previewBuildId))
-            + " | publishBuild=#" + juce::String(static_cast<juce::int64>(diagnostics.publishedBuildId)),
+            + " | publishBuild=#" + juce::String(static_cast<juce::int64>(diagnostics.publishedBuildId))
+            + " | surface=" + juce::String::fromUTF8(diagnostics.surfaceStateSource.c_str())
+            + " | renderer=" + juce::String::fromUTF8(diagnostics.rendererMode.c_str()),
         juce::dontSendNotification);
     voicesLabel.setText(
         "Voices: active=" + juce::String(static_cast<int>(diagnostics.activeVoiceCount))

@@ -568,11 +568,15 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
     drs::app::authoring::AuthoringSummaryStrip strip;
 
     int previewRequests = 0;
+    int prepareDraftRequests = 0;
+    int publishDraftRequests = 0;
     int undoRequests = 0;
     int redoRequests = 0;
     int saveRequests = 0;
     drs::app::authoring::SelectionSummaryCallbacks callbacks;
     callbacks.onPreviewRequested = [&previewRequests] { ++previewRequests; };
+    callbacks.onPrepareDraftPlaybackRequested = [&prepareDraftRequests] { ++prepareDraftRequests; };
+    callbacks.onPublishDraftPlaybackRequested = [&publishDraftRequests] { ++publishDraftRequests; };
     callbacks.onUndoRequested = [&undoRequests] { ++undoRequests; };
     callbacks.onRedoRequested = [&redoRequests] { ++redoRequests; };
     callbacks.onMarkSavedRequested = [&saveRequests] { ++saveRequests; };
@@ -585,6 +589,8 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
     viewModel.articulationText = "Articulation: sustain";
     viewModel.playbackText = "Draft playback: draft r4 | preview r3 (Stale) | published r2 (Active)";
     viewModel.canPreview = true;
+    viewModel.canPrepareDraftPlayback = true;
+    viewModel.canPublishDraftPlayback = false;
     viewModel.canUndo = true;
     viewModel.canRedo = true;
     viewModel.dirty = true;
@@ -598,6 +604,8 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
     const auto bounds = strip.getLocalBounds();
     requireComponentVisibleWithin(strip, "authoringSummaryStrip", bounds);
     requireComponentVisibleWithin(strip, "authoringPreviewButton", bounds);
+    requireComponentVisibleWithin(strip, "authoringPrepareDraftButton", bounds);
+    requireComponentVisibleWithin(strip, "authoringPublishDraftButton", bounds);
     requireComponentVisibleWithin(strip, "authoringUndoButton", bounds);
     requireComponentVisibleWithin(strip, "authoringRedoButton", bounds);
     requireComponentVisibleWithin(strip, "authoringSaveButton", bounds);
@@ -624,15 +632,23 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
                                             "authoringSummaryPlaybackLabel",
                                             "Playback revision state: Draft playback: draft r4 | preview r3 (Stale) | published r2 (Active)");
     requireAccessibilityDescriptionContains(strip, "authoringPreviewButton", "Previews the selected zone.");
+    requireAccessibilityDescriptionContains(strip, "authoringPrepareDraftButton", "Builds the latest draft for playback preview.");
+    requireAccessibilityDescriptionContains(strip, "authoringPublishDraftButton", "Unavailable because the latest draft is not ready to publish yet.");
     requireAccessibilityDescriptionContains(strip, "authoringUndoButton", "Reverts the most recent authoring change.");
     requireAccessibilityDescriptionContains(strip, "authoringRedoButton", "Reapplies the most recently undone authoring change.");
     requireAccessibilityDescriptionContains(strip, "authoringSaveButton", "Marks the current authoring state as saved.");
     requireNonEmptyAccessibilityHelpText(strip, "authoringPreviewButton");
+    requireNonEmptyAccessibilityHelpText(strip, "authoringPrepareDraftButton");
+    requireNonEmptyAccessibilityHelpText(strip, "authoringPublishDraftButton");
     requireNonEmptyAccessibilityHelpText(strip, "authoringUndoButton");
     requireNonEmptyAccessibilityHelpText(strip, "authoringRedoButton");
     requireNonEmptyAccessibilityHelpText(strip, "authoringSaveButton");
     require(requireButton(strip, "authoringPreviewButton").isEnabled(),
             "Summary strip preview button should reflect the fixture view model.");
+    require(requireButton(strip, "authoringPrepareDraftButton").isEnabled(),
+            "Summary strip prepare-draft button should reflect the fixture view model.");
+    require(!requireButton(strip, "authoringPublishDraftButton").isEnabled(),
+            "Summary strip publish-draft button should reflect the fixture view model.");
     require(requireButton(strip, "authoringUndoButton").isEnabled(),
             "Summary strip undo button should reflect the fixture view model.");
     require(requireButton(strip, "authoringRedoButton").isEnabled(),
@@ -641,22 +657,31 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
     require(static_cast<bool>(requireButton(strip, "authoringPreviewButton").onClick),
             "Summary strip preview button should expose an onClick callback.");
     requireButton(strip, "authoringPreviewButton").onClick();
+    requireButton(strip, "authoringPrepareDraftButton").onClick();
     requireButton(strip, "authoringUndoButton").onClick();
     requireButton(strip, "authoringRedoButton").onClick();
     requireButton(strip, "authoringSaveButton").onClick();
 
     require(previewRequests == 1, "Summary strip should emit exactly one preview callback.");
+    require(prepareDraftRequests == 1, "Summary strip should emit exactly one prepare-draft callback.");
+    require(publishDraftRequests == 0, "Summary strip should not emit publish-draft callbacks while disabled.");
     require(undoRequests == 1, "Summary strip should emit exactly one undo callback.");
     require(redoRequests == 1, "Summary strip should emit exactly one redo callback.");
     require(saveRequests == 1, "Summary strip should emit exactly one save callback.");
 
     viewModel.canPreview = false;
+    viewModel.canPrepareDraftPlayback = false;
+    viewModel.canPublishDraftPlayback = true;
     viewModel.canUndo = false;
     viewModel.canRedo = false;
     viewModel.dirty = false;
     strip.setViewModel(viewModel);
     require(!requireButton(strip, "authoringPreviewButton").isEnabled(),
             "Summary strip preview button should disable when preview is unavailable.");
+    require(!requireButton(strip, "authoringPrepareDraftButton").isEnabled(),
+            "Summary strip prepare-draft button should disable when preparation is unavailable.");
+    require(requireButton(strip, "authoringPublishDraftButton").isEnabled(),
+            "Summary strip publish-draft button should enable when the latest draft is ready to publish.");
     require(!requireButton(strip, "authoringUndoButton").isEnabled(),
             "Summary strip undo button should disable when undo is unavailable.");
     require(!requireButton(strip, "authoringRedoButton").isEnabled(),
@@ -664,6 +689,12 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
     requireAccessibilityDescriptionContains(strip,
                                             "authoringPreviewButton",
                                             "Unavailable because no zone preview is available.");
+    requireAccessibilityDescriptionContains(strip,
+                                            "authoringPrepareDraftButton",
+                                            "Unavailable because the current draft cannot be prepared for playback yet.");
+    requireAccessibilityDescriptionContains(strip,
+                                            "authoringPublishDraftButton",
+                                            "Publishes the latest prepared draft to the performance path.");
     requireAccessibilityDescriptionContains(strip,
                                             "authoringUndoButton",
                                             "Unavailable because there is no change to undo.");
@@ -678,6 +709,8 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
                                             "Project is already marked saved.");
     require(requireButton(strip, "authoringSaveButton").getHelpText().contains("Make a change before marking a new saved state."),
             "Summary strip save button should explain when the project is already saved.");
+    requireButton(strip, "authoringPublishDraftButton").onClick();
+    require(publishDraftRequests == 1, "Summary strip should emit exactly one publish-draft callback once enabled.");
 
     saveComponentPng(strip, outputDirectory / "leaf-summary-strip.png");
 }
@@ -937,7 +970,8 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
 void writeReachabilityChecklist(std::ostream& inventory)
 {
     inventory << "Reachability checklist\n";
-    inventory << "- Summary strip: authoringSummaryStrip, authoringPreviewButton, authoringUndoButton, authoringRedoButton, authoringSaveButton\n";
+    inventory << "- Summary strip: authoringSummaryStrip, authoringPreviewButton, authoringPrepareDraftButton, authoringPublishDraftButton, authoringUndoButton, authoringRedoButton, authoringSaveButton\n";
+    inventory << "- Playback banner: authoringPlaybackBanner, authoringPlaybackBannerLabel, authoringPlaybackBannerPrepareButton, authoringPlaybackBannerPublishButton\n";
     inventory << "- Toolbar row: authoringZoneSelector\n";
     inventory << "- Persistent map: authoringZoneMap\n";
     inventory << "- Drawer host: authoringDrawer, authoringDrawerTabStrip, authoringDrawerToggleButton\n";
@@ -1010,6 +1044,9 @@ void exerciseSurface(drs::app::AuthoringPanel& panel,
     const auto panelBounds = panel.getLocalBounds();
     requireComponentVisibleWithin(panel, "authoringWorkspace", panelBounds);
     requireComponentVisibleWithin(panel, "authoringZoneSelector", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringPlaybackBanner", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringPlaybackBannerLabel", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringPlaybackBannerPrepareButton", panelBounds);
     requireComponentVisibleWithin(panel, "authoringZoneMap", panelBounds);
     requireComponentVisibleWithin(panel, "authoringDrawer", panelBounds);
     requireComponentVisibleWithin(panel, "authoringDrawerTabStrip", panelBounds);
@@ -1443,12 +1480,17 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
     auto* phraseImportPath = findDescendantById(panel, "authoringPhraseImportPath");
     auto& phraseImportButton = requireButton(panel, "authoringPhraseImportButton");
     auto& zoneSelector = requireComboBox(panel, "authoringZoneSelector");
+    auto& playbackBannerPrepareButton = requireButton(panel, "authoringPlaybackBannerPrepareButton");
+    auto& playbackBannerPublishButton = requireButton(panel, "authoringPlaybackBannerPublishButton");
     auto& zoneMap = requireZoneMapCanvas(panel, "authoringZoneMap");
     auto& macroList = requireRepeatedStructureList(panel, "authoringMacroList");
     require(phraseImportPath != nullptr, "Performance drawer accessibility checks require the phrase import path.");
 
     for (const auto& componentId : {
              juce::String("authoringPreviewButton"),
+             juce::String("authoringPlaybackBanner"),
+             juce::String("authoringPlaybackBannerLabel"),
+             juce::String("authoringPlaybackBannerPrepareButton"),
              juce::String("authoringUndoButton"),
              juce::String("authoringRedoButton"),
              juce::String("authoringSaveButton"),
@@ -1488,6 +1530,7 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
                                     "authoringRedoButton",
                                     "authoringSaveButton",
                                     "authoringPreviewButton",
+                                    "authoringPlaybackBannerPrepareButton",
                                     "authoringZoneSelector",
                                     "authoringZoneMap",
                                     "authoringDrawerToggleButton",
@@ -1506,12 +1549,24 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
     const auto initialSummaryStatus = requireLabel(panel, "authoringSummaryStatusLabel").getText();
     const auto initialSummaryArticulation = requireLabel(panel, "authoringSummaryArticulationLabel").getText();
     const auto initialSummaryPlayback = requireLabel(panel, "authoringSummaryPlaybackLabel").getText();
+    const auto initialPlaybackBannerText = requireLabel(panel, "authoringPlaybackBannerLabel").getText();
     require(initialSummaryStatus.contains("preview blocked: Selected authoring sample could not be prepared."),
             "Summary strip should surface the authoring preview failure detail in the status line.");
     require(initialSummaryStatus.contains("fix: Relink or re-import the selected sample file."),
             "Summary strip should surface the next authoring prerequisite when preview preparation fails.");
+    require(initialSummaryStatus.contains("playback action: Prepare the latest draft for preview."),
+            "Summary strip should surface the next draft-playback action when the performance preview is stale.");
     require(initialSummaryPlayback.contains("authoring preview r4 (Failed)"),
             "Summary strip should surface the authoring preview revision state in the playback line.");
+    requireComponentVisible(panel, "authoringPlaybackBanner");
+    requireComponentVisible(panel, "authoringPlaybackBannerLabel");
+    requireComponentVisible(panel, "authoringPlaybackBannerPrepareButton");
+    require(initialPlaybackBannerText.contains("playback action: Prepare the latest draft for preview."),
+            "Workspace banner should surface the next draft-playback action when the performance preview is stale.");
+    require(playbackBannerPrepareButton.isVisible() && playbackBannerPrepareButton.isEnabled(),
+            "Workspace banner should expose an enabled prepare-draft action when the current draft is stale.");
+    require(!playbackBannerPublishButton.isVisible(),
+            "Workspace banner should hide publish-draft actions until the latest draft is ready to publish.");
     requireAccessibilityTitleEquals(panel, "authoringSummarySourceLabel", initialSummarySource);
     requireAccessibilityTitleEquals(panel, "authoringSummaryStatusLabel", initialSummaryStatus);
     requireAccessibilityTitleEquals(panel, "authoringSummaryArticulationLabel", initialSummaryArticulation);
@@ -1520,6 +1575,14 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
     requireAccessibilityDescriptionContains(panel, "authoringSummaryStatusLabel", initialSummaryStatus);
     requireAccessibilityDescriptionContains(panel, "authoringSummaryArticulationLabel", initialSummaryArticulation);
     requireAccessibilityDescriptionContains(panel, "authoringSummaryPlaybackLabel", initialSummaryPlayback);
+    requireAccessibilityTitleEquals(panel, "authoringPlaybackBannerLabel", initialPlaybackBannerText);
+    requireAccessibilityDescriptionContains(panel, "authoringPlaybackBanner", initialPlaybackBannerText);
+    requireAccessibilityDescriptionContains(panel, "authoringPlaybackBannerLabel", initialPlaybackBannerText);
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringPlaybackBannerPrepareButton",
+                                            "Builds the latest draft for playback preview from the workspace banner.");
+    requireNonEmptyAccessibilityHelpText(panel, "authoringPlaybackBannerPrepareButton");
+    requireAccessibilityHandlerState(panel, "authoringPlaybackBannerPublishButton", false);
 
     auto summarySourceChanged = false;
     for (int candidateId = 1; candidateId <= zoneSelector.getNumItems(); ++candidateId)

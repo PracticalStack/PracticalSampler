@@ -86,6 +86,30 @@ AuthoringSummaryStrip::AuthoringSummaryStrip()
             callbacks.onPreviewRequested();
     };
 
+    prepareDraftButton.setButtonText("Prepare Draft");
+    prepareDraftButton.setComponentID("authoringPrepareDraftButton");
+    configureAccessibleMetadata(prepareDraftButton,
+                                "Prepare draft playback",
+                                "Builds the latest draft for playback preview.",
+                                "Press to prepare the latest draft for playback preview.");
+    prepareDraftButton.onClick = [this]
+    {
+        if (callbacks.onPrepareDraftPlaybackRequested)
+            callbacks.onPrepareDraftPlaybackRequested();
+    };
+
+    publishDraftButton.setButtonText("Publish Draft");
+    publishDraftButton.setComponentID("authoringPublishDraftButton");
+    configureAccessibleMetadata(publishDraftButton,
+                                "Publish draft playback",
+                                "Publishes the latest prepared draft to the performance path.",
+                                "Press to publish the latest prepared draft to the performance path.");
+    publishDraftButton.onClick = [this]
+    {
+        if (callbacks.onPublishDraftPlaybackRequested)
+            callbacks.onPublishDraftPlaybackRequested();
+    };
+
     undoButton.setButtonText("Undo");
     undoButton.setComponentID("authoringUndoButton");
     configureAccessibleMetadata(undoButton,
@@ -132,6 +156,8 @@ AuthoringSummaryStrip::AuthoringSummaryStrip()
              static_cast<juce::Component*>(&articulationLabel),
              static_cast<juce::Component*>(&playbackLabel),
              static_cast<juce::Component*>(&previewButton),
+             static_cast<juce::Component*>(&prepareDraftButton),
+             static_cast<juce::Component*>(&publishDraftButton),
              static_cast<juce::Component*>(&undoButton),
              static_cast<juce::Component*>(&redoButton),
              static_cast<juce::Component*>(&saveCheckpointButton)
@@ -144,7 +170,7 @@ AuthoringSummaryStrip::AuthoringSummaryStrip()
 void AuthoringSummaryStrip::resized()
 {
     auto hero = getLocalBounds();
-    auto heroLeft = hero.removeFromLeft(hero.proportionOfWidth(0.62f));
+    auto heroLeft = hero.removeFromLeft(hero.proportionOfWidth(0.54f));
     titleLabel.setBounds(heroLeft.removeFromTop(30));
     heroLeft.removeFromTop(6);
     statusLabel.setBounds(heroLeft.removeFromTop(20));
@@ -152,7 +178,7 @@ void AuthoringSummaryStrip::resized()
     articulationLabel.setBounds(heroLeft.removeFromTop(20));
     playbackLabel.setBounds(heroLeft.removeFromTop(20));
 
-    auto heroButtons = hero.removeFromRight(320);
+    auto heroButtons = hero.removeFromRight(350);
     auto topRow = heroButtons.removeFromTop(28);
     undoButton.setBounds(topRow.removeFromLeft(92));
     topRow.removeFromLeft(8);
@@ -160,7 +186,12 @@ void AuthoringSummaryStrip::resized()
     topRow.removeFromLeft(8);
     saveCheckpointButton.setBounds(topRow.removeFromLeft(120));
     heroButtons.removeFromTop(10);
-    previewButton.setBounds(heroButtons.removeFromTop(30));
+    auto actionRow = heroButtons.removeFromTop(30);
+    previewButton.setBounds(actionRow.removeFromLeft(140));
+    actionRow.removeFromLeft(8);
+    prepareDraftButton.setBounds(actionRow.removeFromLeft(94));
+    actionRow.removeFromLeft(8);
+    publishDraftButton.setBounds(actionRow.removeFromLeft(94));
 }
 
 void AuthoringSummaryStrip::setViewModel(SelectionSummaryViewModel nextViewModel)
@@ -178,6 +209,8 @@ void AuthoringSummaryStrip::setViewModel(SelectionSummaryViewModel nextViewModel
     updateDynamicAccessibleText(playbackLabel, playbackLabel.getText(), "Playback revision state: ");
 
     previewButton.setEnabled(viewModel.canPreview);
+    prepareDraftButton.setEnabled(viewModel.canPrepareDraftPlayback);
+    publishDraftButton.setEnabled(viewModel.canPublishDraftPlayback);
     undoButton.setEnabled(viewModel.canUndo);
     redoButton.setEnabled(viewModel.canRedo);
     updateActionAccessibilityState(previewButton,
@@ -186,6 +219,18 @@ void AuthoringSummaryStrip::setViewModel(SelectionSummaryViewModel nextViewModel
                                    "Unavailable because no zone preview is available.",
                                    "Press to audition the selected zone.",
                                    "Select a zone to enable preview.");
+    updateActionAccessibilityState(prepareDraftButton,
+                                   viewModel.canPrepareDraftPlayback,
+                                   "Builds the latest draft for playback preview.",
+                                   "Unavailable because the current draft cannot be prepared for playback yet.",
+                                   "Press to prepare the latest draft for playback preview.",
+                                   "Import at least one playable zone to enable draft preparation.");
+    updateActionAccessibilityState(publishDraftButton,
+                                   viewModel.canPublishDraftPlayback,
+                                   "Publishes the latest prepared draft to the performance path.",
+                                   "Unavailable because the latest draft is not ready to publish yet.",
+                                   "Press to publish the latest prepared draft to the performance path.",
+                                   "Prepare the latest draft before publishing it to the performance path.");
     updateActionAccessibilityState(undoButton,
                                    viewModel.canUndo,
                                    "Reverts the most recent authoring change.",

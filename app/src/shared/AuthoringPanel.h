@@ -35,6 +35,7 @@ public:
     using ImportResponsivenessProvider = std::function<AuthoringImportResponsivenessSnapshot()>;
     using RestoreRootKeyCallback = std::function<void()>;
     using DraftPlaybackStatusProvider = std::function<drs::engine::DraftPlaybackStatus()>;
+    using DraftPlaybackActionCallback = std::function<void()>;
 
     explicit AuthoringPanel(drs::engine::AuthoringSession& authoringSession,
                             WaveformPreviewProvider waveformPreviewProvider = {},
@@ -44,7 +45,9 @@ public:
                             NotePreviewStartedCallback onNotePreviewStarted = {},
                             NotePreviewEndedCallback onNotePreviewEnded = {},
                             RestoreRootKeyCallback onRestoreRootKeyRequested = {},
-                            DraftPlaybackStatusProvider draftPlaybackStatusProvider = {});
+                            DraftPlaybackStatusProvider draftPlaybackStatusProvider = {},
+                            DraftPlaybackActionCallback onPrepareDraftPlaybackRequested = {},
+                            DraftPlaybackActionCallback onPublishDraftPlaybackRequested = {});
     ~AuthoringPanel() override;
 
     void paint(juce::Graphics& g) override;
@@ -95,6 +98,7 @@ private:
     void refreshDrawerContextLabels();
     void refreshContextualAccessibility();
     void refreshWaveformDrawerContent();
+    void refreshDraftPlaybackBanner();
     void refreshFromSession();
     void applySelectedZoneEdit(const authoring::ZoneFieldValuesViewModel& values, const juce::String& label);
     void applySelectedMacroEdit(const juce::String& label);
@@ -104,6 +108,8 @@ private:
     void applySelectedTriggerSlotEdit(const juce::String& label);
     void importPhraseForSelectedBank();
     void previewSelectedZone();
+    void prepareDraftPlaybackPreview();
+    void publishDraftPlayback();
     void undoLastEdit();
     void redoLastEdit();
     void markSavedCheckpoint();
@@ -124,6 +130,8 @@ private:
     NotePreviewEndedCallback onNotePreviewEnded;
     RestoreRootKeyCallback onRestoreRootKeyRequested;
     DraftPlaybackStatusProvider draftPlaybackStatusProvider;
+    DraftPlaybackActionCallback onPrepareDraftPlaybackRequested;
+    DraftPlaybackActionCallback onPublishDraftPlaybackRequested;
     bool isRefreshing = false;
     int selectedMacroIndex = 0;
     int selectedFxSlotIndex = 0;
@@ -136,6 +144,10 @@ private:
     AuthoringControlLookAndFeel authoringLookAndFeel;
 
     authoring::AuthoringSummaryStrip summaryStrip;
+    juce::Component playbackBanner;
+    juce::Label playbackBannerLabel;
+    juce::TextButton playbackBannerPrepareButton;
+    juce::TextButton playbackBannerPublishButton;
     juce::Label waveformLabel;
     juce::Label waveformScopeLabel;
     juce::Label drawerBreadcrumbLabel;

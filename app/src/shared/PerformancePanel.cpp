@@ -362,7 +362,11 @@ void PerformancePanel::refreshSurface()
                             juce::dontSendNotification);
     if (!performanceSnapshot.loaded && performanceSnapshot.instrumentDisplayName == "No instrument loaded")
     {
-        patchStatusLabel.setText("No instrument loaded yet. Use Load Default or Load Lead Demo.",
+        patchStatusLabel.setText("No performance instrument loaded yet. Surface "
+                                     + juce::String::fromUTF8(performanceSnapshot.surfaceStateSource.c_str())
+                                     + " | renderer "
+                                     + juce::String::fromUTF8(performanceSnapshot.rendererMode.c_str())
+                                     + ". Use Load Default or Load Lead Demo.",
                                  juce::dontSendNotification);
     }
     else
@@ -378,7 +382,9 @@ void PerformancePanel::refreshSurface()
                 + " | Published r" + juce::String(static_cast<juce::int64>(performanceSnapshot.publishedRevision))
                 + " (" + juce::String::fromUTF8(performanceSnapshot.publishedRevisionState.c_str()) + ")"
                 + " | Preview build #" + juce::String(static_cast<juce::int64>(performanceSnapshot.previewBuildId))
-                + " | Publish build #" + juce::String(static_cast<juce::int64>(performanceSnapshot.publishedBuildId)),
+                + " | Publish build #" + juce::String(static_cast<juce::int64>(performanceSnapshot.publishedBuildId))
+                + " | Surface " + juce::String::fromUTF8(performanceSnapshot.surfaceStateSource.c_str())
+                + " | Renderer " + juce::String::fromUTF8(performanceSnapshot.rendererMode.c_str()),
             juce::dontSendNotification);
     }
 
@@ -396,7 +402,9 @@ void PerformancePanel::refreshSurface()
             loadIndicatorText << " publish";
     }
     loadIndicatorText << " | digests p=" << summarizeDigest(performanceSnapshot.previewContentDigest)
-                      << " pub=" << summarizeDigest(performanceSnapshot.publishedContentDigest);
+                      << " pub=" << summarizeDigest(performanceSnapshot.publishedContentDigest)
+                      << " | surface=" << juce::String::fromUTF8(performanceSnapshot.surfaceStateSource.c_str())
+                      << " | renderer=" << juce::String::fromUTF8(performanceSnapshot.rendererMode.c_str());
     loadIndicatorLabel.setText(loadIndicatorText,
                                juce::dontSendNotification);
     const auto hasPreviewError = !performanceSnapshot.previewPlayback.errorMessage.empty();
@@ -469,52 +477,13 @@ void PerformancePanel::refreshSurface()
 
 void PerformancePanel::syncKeyboardPlayableRange()
 {
-    const auto manifest = engineFacade.loadPhase1ReferenceInstrument();
-    const auto& sessionState = engineFacade.getCurrentSessionState();
-
     int lowestPlayableNote = 36;
     int highestPlayableNote = 96;
 
-    if (manifest.loaded && !manifest.instrument.zones.empty())
+    if (performanceSnapshot.playableRangeAvailable)
     {
-        const auto motionOffset = computeMotionSemitoneOffset(sessionState);
-        auto includeMatchingZones = [&](const std::string& articulationId)
-        {
-            auto foundMatchingZone = false;
-
-            for (const auto& zone : manifest.instrument.zones)
-            {
-                if (!articulationId.empty() && zone.articulationId != articulationId)
-                    continue;
-
-                lowestPlayableNote = std::min(lowestPlayableNote, zone.keyLow - motionOffset);
-                highestPlayableNote = std::max(highestPlayableNote, zone.keyHigh - motionOffset);
-                foundMatchingZone = true;
-            }
-
-            return foundMatchingZone;
-        };
-
-        lowestPlayableNote = 127;
-        highestPlayableNote = 0;
-
-        if (!includeMatchingZones(sessionState.selectedArticulationId))
-        {
-            lowestPlayableNote = 127;
-            highestPlayableNote = 0;
-            includeMatchingZones({});
-        }
-
-        if (lowestPlayableNote <= highestPlayableNote)
-        {
-            lowestPlayableNote = std::clamp(lowestPlayableNote, 0, 127);
-            highestPlayableNote = std::clamp(highestPlayableNote, lowestPlayableNote, 127);
-        }
-        else
-        {
-            lowestPlayableNote = 36;
-            highestPlayableNote = 96;
-        }
+        lowestPlayableNote = std::clamp(performanceSnapshot.lowestPlayableNote, 0, 127);
+        highestPlayableNote = std::clamp(performanceSnapshot.highestPlayableNote, lowestPlayableNote, 127);
     }
 
     keyboardComponent.setAvailableRange(lowestPlayableNote, highestPlayableNote);
@@ -524,7 +493,7 @@ void PerformancePanel::syncKeyboardPlayableRange()
         keyboardComponent.setLowestVisibleKey(lowestPlayableNote);
 
     keyboardHintLabel.setText(
-        "Play the keyboard to audition routing, macro state, and the selected articulation. Range "
+        "Play the keyboard to audition the current performance path, routing, and macro state. Range "
             + juce::MidiMessage::getMidiNoteName(lowestPlayableNote, true, true, 3)
             + " - "
             + juce::MidiMessage::getMidiNoteName(highestPlayableNote, true, true, 3)

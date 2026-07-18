@@ -275,6 +275,93 @@ juce::String buildMacroListStatusText(const drs::engine::RuntimeProjectMacroDefi
     return status;
 }
 
+struct DraftPlaybackGuidance
+{
+    std::string statusText;
+    bool canPrepareDraftPlayback = false;
+    bool canPublishDraftPlayback = false;
+};
+
+bool hasFindingCode(const std::vector<drs::engine::PlaybackSnapshotFinding>& findings,
+                    const std::string& code)
+{
+    return std::any_of(findings.begin(),
+                       findings.end(),
+                       [&](const drs::engine::PlaybackSnapshotFinding& finding)
+                       {
+                           return finding.code == code;
+                       });
+}
+
+DraftPlaybackGuidance buildDraftPlaybackGuidance(const drs::engine::AuthoringSession& authoringSession,
+                                                 const drs::engine::DraftPlaybackStatus& playbackStatus)
+{
+    DraftPlaybackGuidance guidance;
+    const auto hasZones = !authoringSession.getProject().authoring.zones.empty();
+    const auto previewReadyForCurrentDraft = playbackStatus.preview.revision == playbackStatus.draftRevision
+        && playbackStatus.preview.state == "Ready";
+
+    guidance.canPrepareDraftPlayback = playbackStatus.projectOpen
+        && !playbackStatus.deviceRestartInProgress
+        && !playbackStatus.pendingPreview.active
+        && hasZones;
+    guidance.canPublishDraftPlayback = playbackStatus.projectOpen
+        && !playbackStatus.deviceRestartInProgress
+        && !playbackStatus.pendingPerformance.active
+        && previewReadyForCurrentDraft
+        && (playbackStatus.performance.revision != playbackStatus.draftRevision
+            || playbackStatus.performance.state != "Active");
+
+    if (!playbackStatus.projectOpen)
+    {
+        guidance.statusText = "playback blocked: Open a project before preparing draft playback.";
+        return guidance;
+    }
+
+    if (!hasZones
+        || hasFindingCode(playbackStatus.preview.findings, "no-playable-zones")
+        || hasFindingCode(playbackStatus.performance.findings, "no-playable-zones"))
+    {
+        guidance.statusText = "playback blocked: Import a sample and create at least one playable zone.";
+        return guidance;
+    }
+
+    if (playbackStatus.deviceRestartInProgress)
+    {
+        guidance.statusText = "playback paused: Wait for the device restart to finish before preparing or publishing.";
+        return guidance;
+    }
+
+    if (playbackStatus.pendingPreview.active || playbackStatus.pendingPerformance.active)
+    {
+        guidance.statusText = "playback busy: Wait for the current playback build to finish applying.";
+        return guidance;
+    }
+
+    if (playbackStatus.preview.revision != playbackStatus.draftRevision
+        || playbackStatus.preview.state == "Stale")
+    {
+        guidance.statusText = "playback action: Prepare the latest draft for preview.";
+        return guidance;
+    }
+
+    if (previewReadyForCurrentDraft
+        && (playbackStatus.performance.revision != playbackStatus.draftRevision
+            || playbackStatus.performance.state != "Active"))
+    {
+        guidance.statusText = "playback action: Publish the ready draft to the performance path.";
+        return guidance;
+    }
+
+    if (playbackStatus.performance.revision == playbackStatus.draftRevision
+        && playbackStatus.performance.state == "Active")
+    {
+        guidance.statusText = "playback ready: The latest draft is active on the performance path.";
+    }
+
+    return guidance;
+}
+
 } // namespace
 
 AuthoringPanel::AuthoringControlLookAndFeel::AuthoringControlLookAndFeel()
@@ -427,7 +514,9 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
                                NotePreviewStartedCallback notePreviewStarted,
                                NotePreviewEndedCallback notePreviewEnded,
                                RestoreRootKeyCallback restoreRootKeyRequested,
-                               DraftPlaybackStatusProvider nextDraftPlaybackStatusProvider)
+                               DraftPlaybackStatusProvider nextDraftPlaybackStatusProvider,
+                               DraftPlaybackActionCallback prepareDraftPlaybackRequested,
+                               DraftPlaybackActionCallback publishDraftPlaybackRequested)
     : authoringSession(session),
       waveformPreviewProvider(std::move(previewProvider)),
       authoringPreviewStatusProvider(std::move(nextAuthoringPreviewStatusProvider)),
@@ -437,6 +526,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
       onNotePreviewEnded(std::move(notePreviewEnded)),
       onRestoreRootKeyRequested(std::move(restoreRootKeyRequested)),
       draftPlaybackStatusProvider(std::move(nextDraftPlaybackStatusProvider)),
+      onPrepareDraftPlaybackRequested(std::move(prepareDraftPlaybackRequested)),
+      onPublishDraftPlaybackRequested(std::move(publishDraftPlaybackRequested)),
       macroList("authoringMacroList",
                 "authoringMacroListBox",
                 "authoringMacroListEmptyState")
@@ -446,12 +537,19 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     drawerState.open = isExpandedLayout(layoutMode);
     drawerState.activeTab = authoring::DrawerTab::waveform;
 
+    playbackBanner.setComponentID("authoringPlaybackBanner");
+    playbackBannerLabel.setComponentID("authoringPlaybackBannerLabel");
+    playbackBannerPrepareButton.setComponentID("authoringPlaybackBannerPrepareButton");
+    playbackBannerPublishButton.setComponentID("authoringPlaybackBannerPublishButton");
     configureMetadataLabel(waveformScopeLabel);
     configureMetadataLabel(drawerBreadcrumbLabel);
     configureMetadataLabel(waveformStatusLabel);
     configureMetadataLabel(waveformInfoLabel);
     configureMetadataLabel(loopInfoLabel);
     configureMetadataLabel(importMetricsLabel);
+    playbackBannerLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(24, 29, 33));
+    playbackBannerLabel.setFont(juce::FontOptions(13.0f, juce::Font::bold));
+    playbackBannerLabel.setJustificationType(juce::Justification::centredLeft);
     macroSummaryLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
     fxSummaryLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
     routingSummaryLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
@@ -536,6 +634,10 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     drawerMacrosTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::macros); };
     drawerRoutingTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::routing); };
     drawerPerformanceTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::performance); };
+    playbackBannerPrepareButton.setButtonText("Prepare Draft");
+    playbackBannerPrepareButton.onClick = [this] { prepareDraftPlaybackPreview(); };
+    playbackBannerPublishButton.setButtonText("Publish Draft");
+    playbackBannerPublishButton.onClick = [this] { publishDraftPlayback(); };
     phraseImportPathEditor.onTextChange = [this]
     {
         refreshContextualAccessibility();
@@ -544,6 +646,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
 
     authoring::SelectionSummaryCallbacks summaryCallbacks;
     summaryCallbacks.onPreviewRequested = [this] { previewSelectedZone(); };
+    summaryCallbacks.onPrepareDraftPlaybackRequested = [this] { prepareDraftPlaybackPreview(); };
+    summaryCallbacks.onPublishDraftPlaybackRequested = [this] { publishDraftPlayback(); };
     summaryCallbacks.onUndoRequested = [this] { undoLastEdit(); };
     summaryCallbacks.onRedoRequested = [this] { redoLastEdit(); };
     summaryCallbacks.onMarkSavedRequested = [this] { markSavedCheckpoint(); };
@@ -772,6 +876,10 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
 
     for (auto* component : {
              static_cast<juce::Component*>(&summaryStrip),
+             static_cast<juce::Component*>(&playbackBanner),
+             static_cast<juce::Component*>(&playbackBannerLabel),
+             static_cast<juce::Component*>(&playbackBannerPrepareButton),
+             static_cast<juce::Component*>(&playbackBannerPublishButton),
              static_cast<juce::Component*>(&drawerRegion),
              static_cast<juce::Component*>(&drawerTabStrip),
              static_cast<juce::Component*>(&drawerContentHost),
@@ -857,6 +965,22 @@ void AuthoringPanel::configureAccessibilityAndFocus()
     configureAccessibleMetadata(*this,
                                 "Authoring workspace",
                                 "Phase 2 authoring workspace for zone mapping, compact drawers, routing, and performance editing.");
+    configureAccessibleMetadata(playbackBanner,
+                                "Draft playback action banner",
+                                "Surfaces the next draft playback action close to the mapping workspace.");
+    configureAccessibleMetadata(playbackBannerLabel,
+                                "Draft playback action",
+                                "Displays the next recommended draft playback action for the current workspace state.");
+    configureAccessibleMetadata(playbackBannerPrepareButton,
+                                "Prepare draft playback banner action",
+                                "Builds the latest draft for playback preview from the workspace banner.",
+                                "Press to prepare the latest draft for playback preview.");
+    configureAccessibleMetadata(playbackBannerPublishButton,
+                                "Publish draft playback banner action",
+                                "Publishes the latest prepared draft to the performance path from the workspace banner.",
+                                "Press to publish the latest prepared draft to the performance path.");
+    playbackBannerPrepareButton.setExplicitFocusOrder(22);
+    playbackBannerPublishButton.setExplicitFocusOrder(23);
     configureAccessibleMetadata(zoneLabel,
                                 "Selected zone label",
                                 "Labels the selected zone chooser.");
@@ -864,7 +988,7 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "Zone selector",
                                 "Chooses the active zone for map and inspector editing.",
                                 "Open the list or use arrow keys to change the selected zone.");
-    zoneSelector.setExplicitFocusOrder(20);
+    zoneSelector.setExplicitFocusOrder(24);
 
     configureAccessibleMetadata(zoneMap,
                                 "Zone map",
@@ -1068,6 +1192,25 @@ void AuthoringPanel::paint(juce::Graphics& g)
 
     g.setColour(authoringPanelCard);
     g.fillRoundedRectangle(bounds.reduced(4.0f), 18.0f);
+
+    if (playbackBanner.isVisible())
+    {
+        auto bannerBounds = playbackBanner.getBounds().toFloat().expanded(2.0f, 1.0f);
+        auto text = playbackBannerLabel.getText();
+        auto bannerColour = juce::Colour::fromRGB(234, 223, 206);
+
+        if (text.startsWithIgnoreCase("playback blocked"))
+            bannerColour = juce::Colour::fromRGB(246, 223, 212);
+        else if (text.startsWithIgnoreCase("playback action"))
+            bannerColour = juce::Colour::fromRGB(238, 227, 208);
+        else if (text.startsWithIgnoreCase("playback busy") || text.startsWithIgnoreCase("playback paused"))
+            bannerColour = juce::Colour::fromRGB(231, 231, 214);
+
+        g.setColour(bannerColour);
+        g.fillRoundedRectangle(bannerBounds, 10.0f);
+        g.setColour(authoringControlOutline);
+        g.drawRoundedRectangle(bannerBounds, 10.0f, 1.0f);
+    }
 }
 
 void AuthoringPanel::resized()
@@ -1081,6 +1224,51 @@ void AuthoringPanel::resized()
     zoneLabel.setBounds(toolbarRow.removeFromLeft(96));
     toolbarRow.removeFromLeft(8);
     zoneSelector.setBounds(toolbarRow.removeFromLeft(std::min(360, toolbarRow.getWidth())));
+
+    if (playbackBanner.isVisible())
+    {
+        area.removeFromTop(8);
+        auto bannerRow = area.removeFromTop(32);
+        playbackBanner.setBounds(bannerRow);
+        auto bannerContent = bannerRow.reduced(12, 4);
+        auto actionWidth = 96;
+        auto labelArea = bannerContent;
+        if (playbackBannerPublishButton.isVisible())
+            labelArea.removeFromRight(actionWidth + 8);
+        if (playbackBannerPrepareButton.isVisible())
+            labelArea.removeFromRight(actionWidth + 8);
+        playbackBannerLabel.setBounds(labelArea);
+
+        auto actionArea = bannerContent.removeFromRight(bannerContent.getRight() - labelArea.getRight()).withTrimmedLeft(8);
+        if (playbackBannerPrepareButton.isVisible() && playbackBannerPublishButton.isVisible())
+        {
+            playbackBannerPrepareButton.setBounds(actionArea.removeFromLeft(actionWidth));
+            actionArea.removeFromLeft(8);
+            playbackBannerPublishButton.setBounds(actionArea.removeFromLeft(actionWidth));
+        }
+        else if (playbackBannerPrepareButton.isVisible())
+        {
+            playbackBannerPrepareButton.setBounds(actionArea.removeFromLeft(actionWidth));
+            playbackBannerPublishButton.setBounds({});
+        }
+        else if (playbackBannerPublishButton.isVisible())
+        {
+            playbackBannerPublishButton.setBounds(actionArea.removeFromLeft(actionWidth));
+            playbackBannerPrepareButton.setBounds({});
+        }
+        else
+        {
+            playbackBannerPrepareButton.setBounds({});
+            playbackBannerPublishButton.setBounds({});
+        }
+    }
+    else
+    {
+        playbackBanner.setBounds({});
+        playbackBannerLabel.setBounds({});
+        playbackBannerPrepareButton.setBounds({});
+        playbackBannerPublishButton.setBounds({});
+    }
 
     auto layoutLabelAndField = [](juce::Rectangle<int> row,
                                   juce::Label& label,
@@ -1318,7 +1506,93 @@ void AuthoringPanel::refreshNow()
 {
     selectionSummaryViewModel = buildSelectionSummaryViewModel();
     summaryStrip.setViewModel(selectionSummaryViewModel);
+    refreshDraftPlaybackBanner();
     refreshWaveformDrawerContent();
+}
+
+void AuthoringPanel::refreshDraftPlaybackBanner()
+{
+    const auto previousBannerVisible = playbackBanner.isVisible();
+    const auto previousPrepareVisible = playbackBannerPrepareButton.isVisible();
+    const auto previousPublishVisible = playbackBannerPublishButton.isVisible();
+    const auto previousBannerText = playbackBannerLabel.getText();
+
+    auto setButtonState = [](juce::TextButton& button,
+                             bool shouldShow,
+                             const juce::String& enabledDescription,
+                             const juce::String& disabledDescription,
+                             const juce::String& enabledHelpText,
+                             const juce::String& disabledHelpText)
+    {
+        button.setEnabled(shouldShow);
+        setVisibleAndAccessible(button, shouldShow);
+        updateAccessibleDescriptionAndHelpText(button,
+                                              shouldShow ? enabledDescription : disabledDescription,
+                                              shouldShow ? enabledHelpText : disabledHelpText);
+    };
+
+    if (!draftPlaybackStatusProvider)
+    {
+        playbackBannerLabel.setText({}, juce::dontSendNotification);
+        setVisibleAndAccessible(playbackBanner, false);
+        setVisibleAndAccessible(playbackBannerLabel, false);
+        setButtonState(playbackBannerPrepareButton,
+                       false,
+                       "Builds the latest draft for playback preview from the workspace banner.",
+                       "Unavailable because draft playback status is not available in this shell.",
+                       "Press to prepare the latest draft for playback preview.",
+                       "Draft playback status is unavailable in this shell.");
+        setButtonState(playbackBannerPublishButton,
+                       false,
+                       "Publishes the latest prepared draft to the performance path from the workspace banner.",
+                       "Unavailable because draft playback status is not available in this shell.",
+                       "Press to publish the latest prepared draft to the performance path.",
+                       "Draft playback status is unavailable in this shell.");
+    }
+    else
+    {
+        const auto playbackStatus = draftPlaybackStatusProvider();
+        const auto playbackGuidance = buildDraftPlaybackGuidance(authoringSession, playbackStatus);
+        const auto bannerText = juce::String::fromUTF8(playbackGuidance.statusText.c_str());
+        const auto shouldShowBanner = bannerText.isNotEmpty()
+            && !bannerText.startsWithIgnoreCase("playback ready:");
+        const auto shouldShowPrepare = shouldShowBanner && playbackGuidance.canPrepareDraftPlayback;
+        const auto shouldShowPublish = shouldShowBanner && playbackGuidance.canPublishDraftPlayback;
+
+        playbackBannerLabel.setText(bannerText, juce::dontSendNotification);
+        setVisibleAndAccessible(playbackBanner, shouldShowBanner);
+        setVisibleAndAccessible(playbackBannerLabel, shouldShowBanner);
+        playbackBanner.setTitle("Draft playback action banner");
+        playbackBanner.setDescription("Workspace draft playback guidance: " + bannerText);
+        playbackBanner.setHelpText(shouldShowBanner
+                                       ? "Follow the workspace draft playback guidance before moving back into performance playback."
+                                       : "Draft playback is already current on the performance path.");
+        updateDynamicAccessibleText(playbackBannerLabel, bannerText, "Draft playback action: ");
+
+        setButtonState(playbackBannerPrepareButton,
+                       shouldShowPrepare,
+                       "Builds the latest draft for playback preview from the workspace banner.",
+                       "Unavailable because the latest draft does not currently need preview preparation.",
+                       "Press to prepare the latest draft for playback preview.",
+                       "Wait until the banner asks you to prepare the latest draft.");
+        setButtonState(playbackBannerPublishButton,
+                       shouldShowPublish,
+                       "Publishes the latest prepared draft to the performance path from the workspace banner.",
+                       "Unavailable because the latest draft is not ready to publish yet.",
+                       "Press to publish the latest prepared draft to the performance path.",
+                       "Wait until the banner asks you to publish the ready draft.");
+    }
+
+    const auto bannerVisibilityChanged = previousBannerVisible != playbackBanner.isVisible()
+        || previousPrepareVisible != playbackBannerPrepareButton.isVisible()
+        || previousPublishVisible != playbackBannerPublishButton.isVisible();
+    const auto bannerTextChanged = previousBannerText != playbackBannerLabel.getText();
+
+    if (bannerVisibilityChanged)
+        resized();
+
+    if (bannerVisibilityChanged || bannerTextChanged)
+        repaint();
 }
 
 authoring::SelectionSummaryViewModel AuthoringPanel::buildSelectionSummaryViewModel() const
@@ -1340,11 +1614,16 @@ authoring::SelectionSummaryViewModel AuthoringPanel::buildSelectionSummaryViewMo
     if (draftPlaybackStatusProvider)
     {
         const auto playbackStatus = draftPlaybackStatusProvider();
+        const auto playbackGuidance = buildDraftPlaybackGuidance(authoringSession, playbackStatus);
         viewModel.playbackText = "Draft playback: draft r" + std::to_string(playbackStatus.draftRevision)
             + " | preview r" + std::to_string(playbackStatus.preview.revision)
             + " (" + playbackStatus.preview.state + ")"
             + " | published r" + std::to_string(playbackStatus.performance.revision)
             + " (" + playbackStatus.performance.state + ")";
+        viewModel.canPrepareDraftPlayback = playbackGuidance.canPrepareDraftPlayback;
+        viewModel.canPublishDraftPlayback = playbackGuidance.canPublishDraftPlayback;
+        if (!playbackGuidance.statusText.empty())
+            viewModel.statusText += " | " + playbackGuidance.statusText;
     }
 
     if (authoringPreviewStatusProvider)
@@ -2165,6 +2444,7 @@ void AuthoringPanel::refreshFromSession()
     zoneFieldValuesViewModel = buildZoneFieldValuesViewModel();
 
     summaryStrip.setViewModel(selectionSummaryViewModel);
+    refreshDraftPlaybackBanner();
     zoneMappingEditor.setViewModel(zoneFieldValuesViewModel);
 
     if (!project.authoring.macros.empty())
@@ -2488,6 +2768,22 @@ void AuthoringPanel::previewSelectedZone()
                                         callback(midiNote);
                                     });
     }
+}
+
+void AuthoringPanel::prepareDraftPlaybackPreview()
+{
+    if (onPrepareDraftPlaybackRequested)
+        onPrepareDraftPlaybackRequested();
+
+    refreshNow();
+}
+
+void AuthoringPanel::publishDraftPlayback()
+{
+    if (onPublishDraftPlaybackRequested)
+        onPublishDraftPlaybackRequested();
+
+    refreshNow();
 }
 
 void AuthoringPanel::undoLastEdit()

@@ -148,6 +148,14 @@ int main()
                              "draft=0 | preview=0 (Ready) | published=0 (Active)",
                              "Diagnostics panel should expose the seeded default draft-playback state.");
         requireLabelContains(panel,
+                             "performancePatchStatusLabel",
+                             "Surface published draft | Renderer reference-backed",
+                             "Performance panel should expose explicit draft-surface provenance for the seeded runtime.");
+        requireLabelContains(panel,
+                             "statusSessionLabel",
+                             "surface=published draft | renderer=reference-backed",
+                             "Diagnostics panel should expose explicit draft-surface provenance for the seeded runtime.");
+        requireLabelContains(panel,
                              "statusFailureLabel",
                              "previewFindings=0 (none) | publishFindings=0 (none)",
                              "Diagnostics panel should begin without draft-playback findings.");
@@ -187,6 +195,14 @@ int main()
                              "draft=0 | preview=0 (Prepared playback build rejected because the immutable snapshot is unavailable) | published=0 (Prepared playback build rejected because the immutable snapshot is unavailable)",
                              "Diagnostics panel should surface the rejected migrated draft-playback states.");
         requireLabelContains(panel,
+                             "performancePatchStatusLabel",
+                             "Surface default fallback | Renderer reference-backed",
+                             "Performance panel should expose the default fallback surface provenance when no prepared draft state exists.");
+        requireLabelContains(panel,
+                             "statusSessionLabel",
+                             "surface=default fallback | renderer=reference-backed",
+                             "Diagnostics panel should expose the default fallback surface provenance when no prepared draft state exists.");
+        requireLabelContains(panel,
                              "statusFailureLabel",
                              "previewFindings=2",
                              "Diagnostics panel should surface migrated preview findings.");
@@ -194,6 +210,10 @@ int main()
                              "statusFailureLabel",
                              "publishFindings=2",
                              "Diagnostics panel should surface migrated publish findings.");
+        requireLabelContains(panel,
+                             "performanceKeyboardHintLabel",
+                             "Range C1 - C6",
+                             "Performance panel should fall back to the default keyboard range when no prepared draft-playback range exists.");
 
         drs::engine::RuntimeProjectSampleSource importedSampleSource;
         importedSampleSource.id = "performance-ui-migrated-sine-a3";
@@ -243,9 +263,24 @@ int main()
                              "draft=1 | preview=1 (Ready) | published=1 (Active)",
                              "Diagnostics panel should surface the recovered migrated preview/publish state.");
         requireLabelContains(panel,
+                             "performancePatchStatusLabel",
+                             "Surface published draft | Renderer reference-backed",
+                             "Performance panel should expose published draft provenance once a migrated draft is published.");
+        requireLabelContains(panel,
+                             "performanceLoadIndicatorLabel",
+                             "surface=published draft | renderer=reference-backed",
+                             "Performance load indicator should expose published draft provenance once a migrated draft is published.");
+        requireLabelContains(panel,
                              "statusFailureLabel",
                              "previewFindings=0 (none) | publishFindings=0 (none)",
                              "Diagnostics panel should clear migrated findings once preview/publish recover.");
+        requireLabelContains(panel,
+                             "performanceKeyboardHintLabel",
+                             std::string("Range ")
+                                 + juce::MidiMessage::getMidiNoteName(57, true, true, 3).toStdString()
+                                 + " - "
+                                 + juce::MidiMessage::getMidiNoteName(57, true, true, 3).toStdString(),
+                             "Performance panel should derive the keyboard range from the published authored draft instead of the reference manifest.");
 
         auto editedZone = *migratedSession.getSelectedZone();
         editedZone.gainDb = 2.5;
@@ -267,6 +302,10 @@ int main()
                              "statusSessionLabel",
                              "draft=2 | preview=1 (Stale) | published=1 (Active)",
                              "Diagnostics panel should surface the stale-preview edited-draft state.");
+        requireLabelContains(panel,
+                             "performancePatchStatusLabel",
+                             "Surface published draft | Renderer reference-backed",
+                             "Performance panel should keep the published draft provenance while a newer edit is still stale.");
 
         require(engineFacade.refreshPreviewToCurrentDraft(),
                 "Edited migrated draft should prepare preview successfully.");
@@ -290,6 +329,17 @@ int main()
                              "statusSessionLabel",
                              "draft=2 | preview=2 (Ready) | published=2 (Active)",
                              "Diagnostics panel should surface the republished edited-draft state.");
+        requireLabelContains(panel,
+                             "performancePatchStatusLabel",
+                             "Surface published draft | Renderer reference-backed",
+                             "Performance panel should preserve published draft provenance after republishing an edited draft.");
+        requireLabelContains(panel,
+                             "performanceKeyboardHintLabel",
+                             std::string("Range ")
+                                 + juce::MidiMessage::getMidiNoteName(57, true, true, 3).toStdString()
+                                 + " - "
+                                 + juce::MidiMessage::getMidiNoteName(57, true, true, 3).toStdString(),
+                             "Performance panel should preserve the authored playable range after republishing an edited draft.");
 
         std::cout << "Phase 2 performance UI tests passed." << std::endl;
         return 0;

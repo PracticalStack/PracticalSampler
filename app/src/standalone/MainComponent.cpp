@@ -429,6 +429,14 @@ MainComponent::MainComponent(bool enableAudioOutput)
                      [this]()
                      {
                          return processor.getEngineFacade().getDraftPlaybackStatus();
+                     },
+                     [this]()
+                     {
+                         processor.getEngineFacade().refreshPreviewToCurrentDraft();
+                     },
+                     [this]()
+                     {
+                         processor.getEngineFacade().publishCurrentDraft();
                      })
 {
     juce::PropertiesFile::Options appSettingsOptions;

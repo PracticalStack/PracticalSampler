@@ -103,6 +103,12 @@ struct EnginePerformanceSnapshot
     std::string publishedContentDigest;
     std::string previewPreparedContentDigest;
     std::string publishedPreparedContentDigest;
+    bool playableRangeAvailable = false;
+    int lowestPlayableNote = 36;
+    int highestPlayableNote = 96;
+    std::string playableRangeSource;
+    std::string surfaceStateSource;
+    std::string rendererMode;
     std::string draftPlaybackEvent;
     std::string loadIndicator;
     std::size_t preparedWorkerPendingCount = 0;
@@ -151,6 +157,12 @@ struct EngineDiagnosticsSnapshot
     std::string publishedContentDigest;
     std::string previewPreparedContentDigest;
     std::string publishedPreparedContentDigest;
+    bool playableRangeAvailable = false;
+    int lowestPlayableNote = 36;
+    int highestPlayableNote = 96;
+    std::string playableRangeSource;
+    std::string surfaceStateSource;
+    std::string rendererMode;
     std::string draftPlaybackEvent;
     std::size_t preparedWorkerPendingCount = 0;
     std::size_t preparedWorkerCancellationCount = 0;

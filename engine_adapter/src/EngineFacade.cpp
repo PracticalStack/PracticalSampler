@@ -145,6 +145,22 @@ std::string buildAppliedMacroSummary(const RuntimeSessionStateSnapshot& sessionS
     return "Tone: " + buildToneCurrentEffect(sessionState) + " | Motion: " + buildMotionCurrentEffect(sessionState);
 }
 
+std::string resolveDraftSurfaceSource(const DraftPlaybackStatus& status)
+{
+    if (status.performance.available)
+        return "published draft";
+
+    if (status.preview.available)
+        return "preview fallback";
+
+    return "default fallback";
+}
+
+std::string resolveRendererMode(bool referenceInstrumentActive)
+{
+    return referenceInstrumentActive ? "reference-backed" : "inactive";
+}
+
 void syncDraftPlaybackIntoDiagnostics(const DraftPlaybackStatus& status,
                                       EngineDiagnosticsSnapshot& diagnosticsSnapshot)
 {
@@ -179,6 +195,25 @@ void syncDraftPlaybackIntoDiagnostics(const DraftPlaybackStatus& status,
     diagnosticsSnapshot.publishedPreparationCacheMisses = status.performance.preparationCacheMissCount;
     diagnosticsSnapshot.previewFindings = status.preview.findings;
     diagnosticsSnapshot.publishedFindings = status.performance.findings;
+    if (status.performance.playableRangeAvailable && status.performance.available)
+    {
+        diagnosticsSnapshot.playableRangeAvailable = true;
+        diagnosticsSnapshot.lowestPlayableNote = status.performance.lowestPlayableNote;
+        diagnosticsSnapshot.highestPlayableNote = status.performance.highestPlayableNote;
+        diagnosticsSnapshot.playableRangeSource = "published";
+    }
+    else if (status.preview.playableRangeAvailable && status.preview.available)
+    {
+        diagnosticsSnapshot.playableRangeAvailable = true;
+        diagnosticsSnapshot.lowestPlayableNote = status.preview.lowestPlayableNote;
+        diagnosticsSnapshot.highestPlayableNote = status.preview.highestPlayableNote;
+        diagnosticsSnapshot.playableRangeSource = "preview";
+    }
+    else
+    {
+        diagnosticsSnapshot.playableRangeSource = "default";
+    }
+    diagnosticsSnapshot.surfaceStateSource = resolveDraftSurfaceSource(status);
     diagnosticsSnapshot.draftPlaybackEvent = status.lastEvent;
 }
 
@@ -575,6 +610,12 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
            << ", preview streams=" << diagnostics.previewPreparedStreamCount
            << ", publish samples=" << diagnostics.publishedPreparedSampleCount
            << ", publish streams=" << diagnostics.publishedPreparedStreamCount << "\n";
+    detail << "Playable range: source=" << (diagnostics.playableRangeSource.empty() ? "unavailable" : diagnostics.playableRangeSource)
+           << ", available=" << (diagnostics.playableRangeAvailable ? "yes" : "no")
+           << ", low=" << diagnostics.lowestPlayableNote
+           << ", high=" << diagnostics.highestPlayableNote << "\n";
+    detail << "Surface provenance: source=" << (diagnostics.surfaceStateSource.empty() ? "unavailable" : diagnostics.surfaceStateSource)
+           << ", renderer=" << (diagnostics.rendererMode.empty() ? "unavailable" : diagnostics.rendererMode) << "\n";
     detail << "Prepared playback bytes: preview=" << diagnostics.previewPreparedBytes
            << ", publish=" << diagnostics.publishedPreparedBytes << "\n";
     detail << "Prepared worker: pending=" << diagnostics.preparedWorkerPendingCount
@@ -776,6 +817,26 @@ EnginePerformanceSnapshot EngineFacade::getPerformanceSnapshot() const
     snapshot.publishedContentDigest = draftStatus.performance.contentDigest;
     snapshot.previewPreparedContentDigest = draftStatus.preview.preparedContentDigest;
     snapshot.publishedPreparedContentDigest = draftStatus.performance.preparedContentDigest;
+    snapshot.surfaceStateSource = resolveDraftSurfaceSource(draftStatus);
+    snapshot.rendererMode = resolveRendererMode(referenceInstrumentActive);
+    if (draftStatus.performance.playableRangeAvailable && draftStatus.performance.available)
+    {
+        snapshot.playableRangeAvailable = true;
+        snapshot.lowestPlayableNote = draftStatus.performance.lowestPlayableNote;
+        snapshot.highestPlayableNote = draftStatus.performance.highestPlayableNote;
+        snapshot.playableRangeSource = "published";
+    }
+    else if (draftStatus.preview.playableRangeAvailable && draftStatus.preview.available)
+    {
+        snapshot.playableRangeAvailable = true;
+        snapshot.lowestPlayableNote = draftStatus.preview.lowestPlayableNote;
+        snapshot.highestPlayableNote = draftStatus.preview.highestPlayableNote;
+        snapshot.playableRangeSource = "preview";
+    }
+    else
+    {
+        snapshot.playableRangeSource = "default";
+    }
     snapshot.draftPlaybackEvent = draftStatus.lastEvent;
     snapshot.loadIndicator = referenceInstrumentActive
         ? buildLoadIndicator(referenceManifest, referenceStream, currentSessionState)
@@ -1729,11 +1790,12 @@ void EngineFacade::refreshDiagnosticsSnapshot()
     syncSessionSelectionsIntoDiagnostics(currentSessionState, diagnosticsSnapshot);
     syncDraftPlaybackIntoDiagnostics(draftPlaybackContract.getStatus(), diagnosticsSnapshot);
     syncPreparedPlaybackWorkerIntoDiagnostics(preparedPlaybackService.getWorkerStatus(), diagnosticsSnapshot);
+    diagnosticsSnapshot.rendererMode = resolveRendererMode(referenceInstrumentActive);
 
     if (!referenceInstrumentActive)
     {
         diagnosticsSnapshot.headline = "No instrument loaded";
-        diagnosticsSnapshot.failureState = "Reference instrument is available but inactive.";
+        diagnosticsSnapshot.failureState = "Reference-backed renderer is available but inactive.";
         return;
     }
 
@@ -1766,7 +1828,7 @@ void EngineFacade::refreshDiagnosticsSnapshot()
     }
 
     diagnosticsSnapshot.available = true;
-    diagnosticsSnapshot.headline = "Reference runtime diagnostics ready";
+    diagnosticsSnapshot.headline = "Reference-backed runtime diagnostics ready";
 
     for (const auto& finding : draftPlaybackContract.getStatus().preview.findings)
         diagnosticsSnapshot.issues.push_back("Preview snapshot: " + finding.message);

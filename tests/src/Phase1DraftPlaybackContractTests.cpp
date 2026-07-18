@@ -460,6 +460,11 @@ int main()
                 "Imported migrated project preview should expose prepared playback assets.");
         require(migratedContract.getStatus().preview.preparedZoneCount == 1,
                 "Imported migrated project preview should expose the imported playable zone.");
+        require(migratedContract.getStatus().preview.playableRangeAvailable,
+                "Imported migrated project preview should expose a playable-range summary.");
+        require(migratedContract.getStatus().preview.lowestPlayableNote == 57
+                    && migratedContract.getStatus().preview.highestPlayableNote == 57,
+                "Imported migrated project preview should preserve the imported one-note playable range.");
         require(migratedContract.getStatus().preview.preparedSampleCount == migratedSession.getProject().sampleSources.size(),
                 "Imported migrated project preview should materialize every migrated sample identity.");
         require(migratedContract.getStatus().preview.preparationCacheMissCount
@@ -492,6 +497,11 @@ int main()
                 "Publishing the same imported migrated draft should reuse every prepared sample handle.");
         require(migratedContract.getStatus().performance.preparationCacheMissCount == 0,
                 "Publishing the same imported migrated draft should not cold-miss prepared sample handles.");
+        require(migratedContract.getStatus().performance.playableRangeAvailable,
+                "Imported migrated project publish should expose a playable-range summary.");
+        require(migratedContract.getStatus().performance.lowestPlayableNote == 57
+                    && migratedContract.getStatus().performance.highestPlayableNote == 57,
+                "Imported migrated project publish should preserve the imported one-note playable range.");
         require(migratedContract.getStatus().preview.contentDigest
                     == migratedContract.getStatus().performance.contentDigest,
                 "Imported migrated preview and publish should share a snapshot digest for the same draft.");

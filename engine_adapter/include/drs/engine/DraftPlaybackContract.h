@@ -26,6 +26,9 @@ struct DraftPlaybackPreparedRevision
     std::size_t preparedStreamCount = 0;
     std::size_t preparedZoneCount = 0;
     std::uint64_t preparedBytes = 0;
+    bool playableRangeAvailable = false;
+    int lowestPlayableNote = 0;
+    int highestPlayableNote = 127;
     std::size_t preparationCacheHitCount = 0;
     std::size_t preparationCacheMissCount = 0;
     std::vector<PlaybackSnapshotFinding> findings;

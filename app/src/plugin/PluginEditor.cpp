@@ -438,6 +438,14 @@ Editor::Editor(Processor& owner)
                      [&owner]()
                      {
                          return owner.getEngineFacade().getDraftPlaybackStatus();
+                     },
+                     [&owner]()
+                     {
+                         owner.getEngineFacade().refreshPreviewToCurrentDraft();
+                     },
+                     [&owner]()
+                     {
+                         owner.getEngineFacade().publishCurrentDraft();
                      })
 {
     juce::PropertiesFile::Options appSettingsOptions;

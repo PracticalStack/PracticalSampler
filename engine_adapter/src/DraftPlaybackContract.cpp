@@ -7,6 +7,13 @@ namespace drs::engine
 {
 namespace
 {
+struct PlayableRangeSummary
+{
+    bool available = false;
+    int lowestNote = 0;
+    int highestNote = 127;
+};
+
 std::vector<PlaybackSnapshotFinding> mergeFindings(const PlaybackSnapshotBuildResult* snapshotResult,
                                                    const PreparedPlaybackBuildResult* preparedResult)
 {
@@ -19,6 +26,31 @@ std::vector<PlaybackSnapshotFinding> mergeFindings(const PlaybackSnapshotBuildRe
         findings.insert(findings.end(), preparedResult->findings.begin(), preparedResult->findings.end());
 
     return findings;
+}
+
+PlayableRangeSummary summarizePlayableRange(const PlaybackSnapshotBuildResult* snapshotResult)
+{
+    PlayableRangeSummary summary;
+
+    if (snapshotResult == nullptr || snapshotResult->snapshot.zones.empty())
+        return summary;
+
+    auto lowestNote = 127;
+    auto highestNote = 0;
+
+    for (const auto& zone : snapshotResult->snapshot.zones)
+    {
+        lowestNote = std::min(lowestNote, zone.keyLow);
+        highestNote = std::max(highestNote, zone.keyHigh);
+    }
+
+    if (lowestNote > highestNote)
+        return summary;
+
+    summary.available = true;
+    summary.lowestNote = std::clamp(lowestNote, 0, 127);
+    summary.highestNote = std::clamp(highestNote, summary.lowestNote, 127);
+    return summary;
 }
 } // namespace
 
@@ -254,6 +286,9 @@ bool DraftPlaybackContract::completeBuild(DraftPlaybackPendingRequest& pending,
         prepared.preparedStreamCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedStreamCount : 0;
         prepared.preparedZoneCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedZoneCount : 0;
         prepared.preparedBytes = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedBytes : 0;
+        prepared.playableRangeAvailable = false;
+        prepared.lowestPlayableNote = 0;
+        prepared.highestPlayableNote = 127;
         prepared.findings = mergeFindings(buildResult, preparedBuildResult);
         prepared.activationEligible = false;
         prepared.lifecycleState = preparedBuildResult != nullptr
@@ -288,6 +323,10 @@ bool DraftPlaybackContract::completeBuild(DraftPlaybackPendingRequest& pending,
     prepared.preparedStreamCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedStreamCount : 0;
     prepared.preparedZoneCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedZoneCount : 0;
     prepared.preparedBytes = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedBytes : 0;
+    const auto playableRange = summarizePlayableRange(buildResult);
+    prepared.playableRangeAvailable = playableRange.available;
+    prepared.lowestPlayableNote = playableRange.lowestNote;
+    prepared.highestPlayableNote = playableRange.highestNote;
     prepared.preparationCacheHitCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.cacheHitCount : 0;
     prepared.preparationCacheMissCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.cacheMissCount : 0;
     prepared.findings = mergeFindings(buildResult, preparedBuildResult);
@@ -383,6 +422,9 @@ void DraftPlaybackContract::resetPreparedRevision(DraftPlaybackPreparedRevision&
     prepared.preparedStreamCount = 0;
     prepared.preparedZoneCount = 0;
     prepared.preparedBytes = 0;
+    prepared.playableRangeAvailable = false;
+    prepared.lowestPlayableNote = 0;
+    prepared.highestPlayableNote = 127;
     prepared.preparationCacheHitCount = 0;
     prepared.preparationCacheMissCount = 0;
     prepared.findings.clear();

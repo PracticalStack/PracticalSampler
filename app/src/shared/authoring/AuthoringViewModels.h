@@ -28,6 +28,8 @@ struct SelectionSummaryViewModel
     std::string articulationText;
     std::string playbackText;
     bool canPreview = false;
+    bool canPrepareDraftPlayback = false;
+    bool canPublishDraftPlayback = false;
     bool canRestoreRootKey = false;
     bool canUndo = false;
     bool canRedo = false;
@@ -94,6 +96,8 @@ struct RepeatedStructureEditIntent
 struct SelectionSummaryCallbacks
 {
     std::function<void()> onPreviewRequested;
+    std::function<void()> onPrepareDraftPlaybackRequested;
+    std::function<void()> onPublishDraftPlaybackRequested;
     std::function<void()> onUndoRequested;
     std::function<void()> onRedoRequested;
     std::function<void()> onMarkSavedRequested;

@@ -72,6 +72,7 @@ void requireFacadeSnapshotConsistency(drs::engine::EngineFacade& engineFacade, c
 {
     const auto performanceSnapshot = engineFacade.getPerformanceSnapshot();
     const auto diagnosticsSnapshot = engineFacade.getDiagnosticsSnapshot();
+    const auto statusSnapshot = engineFacade.getStatusSnapshot();
     const auto& draftStatus = engineFacade.getDraftPlaybackStatus();
 
     require(performanceSnapshot.draftRevision == draftStatus.draftRevision,
@@ -100,6 +101,44 @@ void requireFacadeSnapshotConsistency(drs::engine::EngineFacade& engineFacade, c
             context + " should mirror the preview prepared-playback digest.");
     require(performanceSnapshot.publishedPreparedContentDigest == draftStatus.performance.preparedContentDigest,
             context + " should mirror the published prepared-playback digest.");
+    const auto expectedPlayableRangeAvailable = draftStatus.performance.playableRangeAvailable || draftStatus.preview.playableRangeAvailable;
+    require(performanceSnapshot.playableRangeAvailable == expectedPlayableRangeAvailable,
+            context + " should mirror whether a prepared draft-playback range is available.");
+    if (draftStatus.performance.playableRangeAvailable && draftStatus.performance.available)
+    {
+        require(performanceSnapshot.playableRangeSource == "published",
+                context + " should prefer the published playable range when it is available.");
+        require(performanceSnapshot.lowestPlayableNote == draftStatus.performance.lowestPlayableNote,
+                context + " should mirror the published lowest playable note.");
+        require(performanceSnapshot.highestPlayableNote == draftStatus.performance.highestPlayableNote,
+                context + " should mirror the published highest playable note.");
+    }
+    else if (draftStatus.preview.playableRangeAvailable && draftStatus.preview.available)
+    {
+        require(performanceSnapshot.playableRangeSource == "preview",
+                context + " should fall back to the preview playable range when publish is unavailable.");
+        require(performanceSnapshot.lowestPlayableNote == draftStatus.preview.lowestPlayableNote,
+                context + " should mirror the preview lowest playable note.");
+        require(performanceSnapshot.highestPlayableNote == draftStatus.preview.highestPlayableNote,
+                context + " should mirror the preview highest playable note.");
+    }
+    else
+    {
+        require(performanceSnapshot.playableRangeSource == "default",
+                context + " should report the default range source when no prepared draft-playback range exists.");
+    }
+    require(performanceSnapshot.surfaceStateSource == diagnosticsSnapshot.surfaceStateSource,
+            context + " should keep diagnostics and performance snapshots aligned on surface provenance.");
+    require(performanceSnapshot.rendererMode == diagnosticsSnapshot.rendererMode,
+            context + " should keep diagnostics and performance snapshots aligned on renderer provenance.");
+    require(diagnosticsSnapshot.playableRangeAvailable == performanceSnapshot.playableRangeAvailable,
+            context + " should keep diagnostics and performance snapshots aligned on playable-range availability.");
+    require(diagnosticsSnapshot.lowestPlayableNote == performanceSnapshot.lowestPlayableNote,
+            context + " should keep diagnostics and performance snapshots aligned on the lowest playable note.");
+    require(diagnosticsSnapshot.highestPlayableNote == performanceSnapshot.highestPlayableNote,
+            context + " should keep diagnostics and performance snapshots aligned on the highest playable note.");
+    require(diagnosticsSnapshot.playableRangeSource == performanceSnapshot.playableRangeSource,
+            context + " should keep diagnostics and performance snapshots aligned on playable-range provenance.");
     require(performanceSnapshot.draftPlaybackEvent == draftStatus.lastEvent,
             context + " should mirror the latest draft-playback event.");
     require(performanceSnapshot.previewFindings.size() == draftStatus.preview.findings.size(),
@@ -145,6 +184,20 @@ void requireFacadeSnapshotConsistency(drs::engine::EngineFacade& engineFacade, c
             context + " should keep diagnostics and performance snapshots aligned on retired prepared bytes.");
     require(diagnosticsSnapshot.preparedWorkerEvent == performanceSnapshot.preparedWorkerEvent,
             context + " should keep diagnostics and performance snapshots aligned on the latest worker event.");
+    require(statusSnapshot.detail.find("Snapshot ids:") != std::string::npos,
+            context + " should keep the shell-facing contract line for snapshot ids.");
+    require(statusSnapshot.detail.find("Snapshot digests:") != std::string::npos,
+            context + " should keep the shell-facing contract line for snapshot digests.");
+    require(statusSnapshot.detail.find("Prepared playback assets:") != std::string::npos,
+            context + " should keep the shell-facing contract line for prepared asset counts.");
+    require(statusSnapshot.detail.find("Playable range:") != std::string::npos,
+            context + " should keep the shell-facing contract line for playable-range summaries.");
+    require(statusSnapshot.detail.find("Surface provenance:") != std::string::npos,
+            context + " should keep the shell-facing contract line for surface provenance.");
+    require(statusSnapshot.detail.find("source=" + performanceSnapshot.surfaceStateSource) != std::string::npos,
+            context + " should report the current surface provenance in the shell-facing status detail.");
+    require(statusSnapshot.detail.find("renderer=" + performanceSnapshot.rendererMode) != std::string::npos,
+            context + " should report the current renderer provenance in the shell-facing status detail.");
 }
 } // namespace
 
@@ -444,6 +497,10 @@ int main()
                 "Imported migrated facade preview should cold-miss at least the newly imported sample handle.");
         require(snapshot.previewActivationEligible,
                 "Imported migrated preview should become activation-eligible.");
+        require(snapshot.playableRangeAvailable && snapshot.playableRangeSource == "preview",
+                "Imported migrated preview should surface a preview-derived playable range before publish.");
+        require(snapshot.lowestPlayableNote == 57 && snapshot.highestPlayableNote == 57,
+                "Imported migrated preview should surface the imported one-note playable range.");
         requireFacadeSnapshotConsistency(engineFacade, "Migrated facade state after imported preview");
 
         require(engineFacade.publishCurrentDraft(),
@@ -471,6 +528,10 @@ int main()
                 "Publishing the imported migrated draft should not cold-miss prepared sample handles.");
         require(snapshot.publishedActivationEligible,
                 "Imported migrated publish should become activation-eligible.");
+        require(snapshot.playableRangeAvailable && snapshot.playableRangeSource == "published",
+                "Imported migrated publish should prefer the published playable range.");
+        require(snapshot.lowestPlayableNote == 57 && snapshot.highestPlayableNote == 57,
+                "Imported migrated publish should preserve the imported one-note playable range.");
         requireFacadeSnapshotConsistency(engineFacade, "Migrated facade state after imported publish");
 
         auto editedMigratedZone = *migratedSession.getSelectedZone();
