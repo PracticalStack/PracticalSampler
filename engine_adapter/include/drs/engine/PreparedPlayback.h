@@ -187,6 +187,10 @@ public:
     ~PreparedPlaybackService();
 
     PreparedPlaybackBuildRequest requestBuild(const PlaybackSnapshotBuildResult& snapshotResult);
+    // Sprint 3 preparation boundary: Preview and Publish are only allowed to enter playback preparation
+    // through these named service calls, not through ad hoc shell-side decode or generic lane plumbing.
+    PreparedPlaybackQueueSubmitResult enqueuePreviewBuild(const PlaybackSnapshotBuildResult& snapshotResult);
+    PreparedPlaybackQueueSubmitResult enqueuePublishBuild(const PlaybackSnapshotBuildResult& snapshotResult);
     PreparedPlaybackBuildResult prepare(const PreparedPlaybackBuildRequest& request,
                                         const PlaybackSnapshotBuildResult& snapshotResult,
                                         const RuntimeStreamLoadResult& streamResult);
@@ -196,13 +200,12 @@ public:
                                                std::uint64_t replacementBuildId,
                                                const std::string& state = "Prepared playback build superseded") const;
     void setBackgroundWorkerStream(const RuntimeStreamLoadResult& streamResult);
-    PreparedPlaybackQueueSubmitResult enqueueBuild(const PlaybackSnapshotBuildResult& snapshotResult,
-                                                   PreparedPlaybackWorkLane lane,
-                                                   PreparedPlaybackJobPriority priority);
     PreparedPlaybackWorkerStepResult processNextQueuedBuild(const RuntimeStreamLoadResult& streamResult);
     std::vector<PreparedPlaybackWorkerStepResult> drainCompletedBuilds();
-    std::vector<PreparedPlaybackBuildResult> cancelQueuedBuilds(
-        PreparedPlaybackWorkLane lane,
+    // Preview/Publish cancellation follows the same named entry-point rule as queue submission.
+    std::vector<PreparedPlaybackBuildResult> cancelQueuedPreviewBuilds(
+        const std::string& state = "Prepared playback build canceled before worker execution");
+    std::vector<PreparedPlaybackBuildResult> cancelQueuedPublishBuilds(
         const std::string& state = "Prepared playback build canceled before worker execution");
     std::size_t retireStaleCacheEntries(std::size_t maxEntries = static_cast<std::size_t>(-1));
     const PreparedPlaybackWorkerStatus& getWorkerStatus() const { return workerStatus; }
@@ -229,6 +232,12 @@ private:
 
     PreparedPlaybackWorkerStepResult processQueuedJob(const QueuedJob& job,
                                                       const RuntimeStreamLoadResult& streamResult);
+    PreparedPlaybackQueueSubmitResult enqueueBuildForLane(const PlaybackSnapshotBuildResult& snapshotResult,
+                                                          PreparedPlaybackWorkLane lane,
+                                                          PreparedPlaybackJobPriority priority);
+    std::vector<PreparedPlaybackBuildResult> cancelQueuedBuildsForLane(
+        PreparedPlaybackWorkLane lane,
+        const std::string& state);
     void runBackgroundWorker();
     void refreshWorkerStatus();
     void retireSupersededCacheEntries(const std::string& sampleSourceId, const std::string& cacheKey);

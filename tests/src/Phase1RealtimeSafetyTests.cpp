@@ -107,8 +107,14 @@ int main()
                 "Performance playback samples should be preloaded before the callback runs.");
         require(primedSnapshot.referenceWarmupCount >= 1,
                 "Realtime safety snapshot should record an off-audio-thread warmup pass.");
+        require(primedSnapshot.samplePathResolutionsOnAudioThread == 0,
+                "Preparing the processor should keep sample-path resolution off the audio thread.");
+        require(primedSnapshot.sampleDecodeEntriesOnAudioThread == 0,
+                "Preparing the processor should keep sample decode entry off the audio thread.");
         require(primedSnapshot.referenceSampleLoadsOnAudioThread == 0,
                 "Preparing the processor should keep reference sample loading off the audio thread.");
+        require(primedSnapshot.largeResourceReleasesOnAudioThread == 0,
+                "Preparing the processor should keep large resource release off the audio thread.");
         require(primedSnapshot.activePublishedRevision == 0,
                 "Realtime safety snapshot should surface the bootstrap published revision as the active activation.");
         require(primedSnapshot.pendingPublishedRevision == 0,
@@ -131,8 +137,14 @@ int main()
         require(playbackSnapshot.processBlockCount >= 1, "Realtime safety snapshot should count processed callbacks.");
         require(playbackSnapshot.callbackBudgetMicros > 0,
                 "Realtime safety snapshot should expose a non-zero callback budget.");
+        require(playbackSnapshot.samplePathResolutionsOnAudioThread == 0,
+                "First rendered note should not resolve sample paths on the audio thread.");
+        require(playbackSnapshot.sampleDecodeEntriesOnAudioThread == 0,
+                "First rendered note should not enter sample decode on the audio thread.");
         require(playbackSnapshot.referenceSampleLoadsOnAudioThread == 0,
                 "First rendered note should not trigger reference sample I/O on the audio thread.");
+        require(playbackSnapshot.largeResourceReleasesOnAudioThread == 0,
+                "First rendered note should not release large resources on the audio thread.");
         require(playbackSnapshot.activeVoiceCapacityGrowthCount == 0,
                 "Voice allocation should not force the active-voice vector to grow in the callback.");
         require(playbackSnapshot.getAudioThreadViolationCount() == 0,
@@ -152,12 +164,42 @@ int main()
         playbackSnapshot = processor.getRealtimeSafetySnapshot();
         require(playbackSnapshot.processBlockCount >= 2,
                 "Realtime safety snapshot should continue counting later callbacks.");
+        require(playbackSnapshot.samplePathResolutionsOnAudioThread == 0,
+                "Queued performance playback should keep sample-path resolution off the callback thread.");
+        require(playbackSnapshot.sampleDecodeEntriesOnAudioThread == 0,
+                "Queued performance playback should keep sample decode entry off the callback thread.");
         require(playbackSnapshot.referenceSampleLoadsOnAudioThread == 0,
                 "Queued performance playback should keep reference sample I/O off the callback thread.");
+        require(playbackSnapshot.largeResourceReleasesOnAudioThread == 0,
+                "Queued performance playback should keep large resource release off the callback thread.");
         require(playbackSnapshot.activeVoiceCapacityGrowthCount == 0,
                 "Burst note starts should respect the pre-reserved active-voice capacity.");
         require(playbackSnapshot.getAudioThreadViolationCount() == 0,
                 "Tracked realtime safety violations should remain at zero after burst playback.");
+
+        drs::plugin::Processor fallbackProcessor;
+        fallbackProcessor.prepareToPlay(44100.0, 512);
+        fallbackProcessor.clearReferencePlaybackCacheForTests();
+
+        juce::AudioBuffer<float> fallbackBuffer(2, 512);
+        fallbackBuffer.clear();
+        juce::MidiBuffer fallbackMidi;
+        fallbackMidi.addEvent(juce::MidiMessage::noteOn(1, 57, static_cast<juce::uint8>(100)), 0);
+        fallbackProcessor.processBlock(fallbackBuffer, fallbackMidi);
+
+        const auto fallbackSnapshot = fallbackProcessor.getRealtimeSafetySnapshot();
+        require(fallbackBuffer.getMagnitude(0, fallbackBuffer.getNumSamples()) > 0.0001f,
+                "Forced callback fallback should still render audible output.");
+        require(fallbackSnapshot.samplePathResolutionsOnAudioThread >= fallbackSnapshot.referenceSampleCountLoaded,
+                "Forced callback fallback should record audio-thread sample-path resolution for reference assets.");
+        require(fallbackSnapshot.sampleDecodeEntriesOnAudioThread >= fallbackSnapshot.referenceSampleCountLoaded,
+                "Forced callback fallback should record audio-thread decode entry for reference assets.");
+        require(fallbackSnapshot.referenceSampleLoadsOnAudioThread >= fallbackSnapshot.referenceSampleCountLoaded,
+                "Forced callback fallback should record reference sample loading on the audio thread.");
+        require(fallbackSnapshot.largeResourceReleasesOnAudioThread == 0,
+                "Forced callback fallback should not need large resource release when the cache was cleared beforehand.");
+        require(fallbackSnapshot.getAudioThreadViolationCount() > 0,
+                "Forced callback fallback should trip the realtime-safety counter seam.");
 
         const auto projectLoad = drs::engine::loadPhase2ReferenceProjectManifest();
         require(projectLoad.loaded, "Authoring preview isolation test should load the Phase 2 reference project.");
@@ -296,8 +338,14 @@ int main()
                 "Authoring preview note pressure should not steal the live performance voice.");
         require(isolationSnapshot.authoringPreviewActiveVoiceCount >= 1,
                 "Authoring preview notes should populate their own realtime voice pool.");
+        require(isolationSnapshot.samplePathResolutionsOnAudioThread == 0,
+                "Preview voice bursts should not resolve sample paths on the audio thread.");
+        require(isolationSnapshot.sampleDecodeEntriesOnAudioThread == 0,
+                "Preview voice bursts should not enter sample decode on the audio thread.");
         require(isolationSnapshot.authoringSampleLoadsOnAudioThread == 0,
                 "Selected authoring sample should be warmed before preview playback reaches the callback thread.");
+        require(isolationSnapshot.largeResourceReleasesOnAudioThread == 0,
+                "Preview voice bursts should not release large resources on the audio thread.");
         require(isolationSnapshot.activeVoiceCapacityGrowthCount == 0,
                 "Preview voice bursts should stay within the pre-reserved realtime voice capacity.");
         require(isolationSnapshot.getAudioThreadViolationCount() == 0,
@@ -374,8 +422,14 @@ int main()
                 "Failed preview status should surface the next prerequisite for a missing sample file.");
         require(failedPreviewStatus.blockingGuidance.find("missing-preview-sample.wav") != std::string::npos,
                 "Failed preview guidance should identify the missing sample file that must be repaired.");
+        require(failedPreviewSnapshot.samplePathResolutionsOnAudioThread == 0,
+                "Failed preview fallback should not resolve sample paths on the audio thread.");
+        require(failedPreviewSnapshot.sampleDecodeEntriesOnAudioThread == 0,
+                "Failed preview fallback should not enter sample decode on the audio thread.");
         require(failedPreviewSnapshot.authoringSampleLoadsOnAudioThread == 0,
                 "Failed preview fallback should not reload authoring samples on the audio thread.");
+        require(failedPreviewSnapshot.largeResourceReleasesOnAudioThread == 0,
+                "Failed preview fallback should not release large resources on the audio thread.");
         require(failedPreviewSnapshot.getAudioThreadViolationCount() == 0,
                 "Failed preview fallback should remain free of tracked realtime violations.");
 
@@ -596,6 +650,8 @@ int main()
                 "Retired published activations should drain after message-thread servicing.");
         require(activationSnapshot.retiredActivationCount >= 1,
                 "Realtime safety snapshot should count retired published activations.");
+        require(activationSnapshot.largeResourceReleasesOnAudioThread == 0,
+                "Published activation retirement should remain off the audio thread.");
 
         std::cout << "Phase 1 realtime safety tests passed." << std::endl;
         return 0;

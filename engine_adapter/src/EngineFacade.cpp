@@ -1222,10 +1222,9 @@ bool EngineFacade::enqueuePreparedPlaybackBuild(std::uint64_t contractRequestId,
                                                 const PlaybackSnapshotBuildResult& snapshotResult,
                                                 PreparedPlaybackWorkLane lane)
 {
-    const auto priority = lane == PreparedPlaybackWorkLane::performance
-        ? PreparedPlaybackJobPriority::performance
-        : PreparedPlaybackJobPriority::preview;
-    auto submitResult = preparedPlaybackService.enqueueBuild(snapshotResult, lane, priority);
+    auto submitResult = lane == PreparedPlaybackWorkLane::performance
+        ? preparedPlaybackService.enqueuePublishBuild(snapshotResult)
+        : preparedPlaybackService.enqueuePreviewBuild(snapshotResult);
 
     for (const auto& displacedResult : submitResult.displacedResults)
         pendingPreparedCompletions.erase(displacedResult.buildId);
@@ -1322,11 +1321,9 @@ void EngineFacade::markStateChanged()
 
 void EngineFacade::clearPendingPreparedCompletions()
 {
-    const auto canceledPreview = preparedPlaybackService.cancelQueuedBuilds(
-        PreparedPlaybackWorkLane::preview,
+    const auto canceledPreview = preparedPlaybackService.cancelQueuedPreviewBuilds(
         "Prepared playback preview build canceled before worker execution");
-    const auto canceledPerformance = preparedPlaybackService.cancelQueuedBuilds(
-        PreparedPlaybackWorkLane::performance,
+    const auto canceledPerformance = preparedPlaybackService.cancelQueuedPublishBuilds(
         "Prepared playback publish build canceled before worker execution");
 
     for (const auto& result : canceledPreview)

@@ -44,9 +44,7 @@ int main()
         drs::engine::RuntimeProjectDocumentController controller(phase2Project.project);
 
         const auto previewRevision0 = buildSnapshot(snapshotBuilder, controller.getProject(), 0, false);
-        const auto queuedPreviewRevision0 = preparedService.enqueueBuild(previewRevision0,
-                                                                         drs::engine::PreparedPlaybackWorkLane::preview,
-                                                                         drs::engine::PreparedPlaybackJobPriority::preview);
+        const auto queuedPreviewRevision0 = preparedService.enqueuePreviewBuild(previewRevision0);
         require(queuedPreviewRevision0.accepted, "Initial preview preparation should queue successfully.");
         require(preparedService.getWorkerStatus().pendingWorkCount == 1,
                 "Worker status should expose the queued preview request.");
@@ -62,9 +60,7 @@ int main()
                                                     controller.getProject(),
                                                     firstCommit.documentState.revision,
                                                     false);
-        const auto queuedPreviewRevision1 = preparedService.enqueueBuild(previewRevision1,
-                                                                         drs::engine::PreparedPlaybackWorkLane::preview,
-                                                                         drs::engine::PreparedPlaybackJobPriority::preview);
+        const auto queuedPreviewRevision1 = preparedService.enqueuePreviewBuild(previewRevision1);
         require(queuedPreviewRevision1.accepted, "Superseding preview preparation should queue successfully.");
         require(queuedPreviewRevision1.displacedResults.size() == 1,
                 "Superseding preview preparation should displace the older queued preview job.");
@@ -80,9 +76,7 @@ int main()
                                                     controller.getProject(),
                                                     firstCommit.documentState.revision,
                                                     true);
-        const auto queuedPublishRevision1 = preparedService.enqueueBuild(publishRevision1,
-                                                                         drs::engine::PreparedPlaybackWorkLane::performance,
-                                                                         drs::engine::PreparedPlaybackJobPriority::performance);
+        const auto queuedPublishRevision1 = preparedService.enqueuePublishBuild(publishRevision1);
         require(queuedPublishRevision1.accepted, "Publish preparation should queue successfully.");
         require(preparedService.getWorkerStatus().pendingWorkCount == 2,
                 "Worker status should expose both queued preview and publish jobs.");
@@ -96,8 +90,7 @@ int main()
         require(preparedService.getWorkerStatus().pendingWorkCount == 1,
                 "Processing the publish job should leave only the preview job queued.");
 
-        const auto canceledPreview = preparedService.cancelQueuedBuilds(
-            drs::engine::PreparedPlaybackWorkLane::preview,
+        const auto canceledPreview = preparedService.cancelQueuedPreviewBuilds(
             "Preview preparation canceled during worker test");
         require(canceledPreview.size() == 1,
                 "Canceling preview work should cancel the remaining queued preview job.");
@@ -119,10 +112,7 @@ int main()
                                                         controller.getProject(),
                                                         secondCommit.documentState.revision,
                                                         false);
-        const auto queuedInvalidatingPreview = preparedService.enqueueBuild(
-            invalidatingSnapshot,
-            drs::engine::PreparedPlaybackWorkLane::preview,
-            drs::engine::PreparedPlaybackJobPriority::preview);
+        const auto queuedInvalidatingPreview = preparedService.enqueuePreviewBuild(invalidatingSnapshot);
         require(queuedInvalidatingPreview.accepted, "Invalidating preview preparation should queue successfully.");
         const auto processedInvalidatingPreview = preparedService.processNextQueuedBuild(referenceStream);
         require(processedInvalidatingPreview.processed && processedInvalidatingPreview.result.built,

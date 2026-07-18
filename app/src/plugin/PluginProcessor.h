@@ -25,6 +25,8 @@ struct ProcessorRealtimeSafetySnapshot
     std::size_t preparedBlockSize = 0;
     std::size_t referenceSampleCountLoaded = 0;
     std::size_t referenceWarmupCount = 0;
+    std::size_t samplePathResolutionsOnAudioThread = 0;
+    std::size_t sampleDecodeEntriesOnAudioThread = 0;
     std::size_t referenceSampleLoadsOnAudioThread = 0;
     std::size_t authoringSampleLoadsOnAudioThread = 0;
     std::size_t performanceActiveVoiceCount = 0;
@@ -36,6 +38,7 @@ struct ProcessorRealtimeSafetySnapshot
     std::size_t performanceActivationCount = 0;
     std::size_t retiredActivationCount = 0;
     std::size_t retiredActivationBacklog = 0;
+    std::size_t largeResourceReleasesOnAudioThread = 0;
     std::uint64_t callbackBudgetMicros = 0;
     std::uint64_t lastProcessBlockMicros = 0;
     std::uint64_t maxProcessBlockMicros = 0;
@@ -53,8 +56,11 @@ struct ProcessorRealtimeSafetySnapshot
 
     std::size_t getAudioThreadViolationCount() const
     {
-        return referenceSampleLoadsOnAudioThread
+        return samplePathResolutionsOnAudioThread
+            + sampleDecodeEntriesOnAudioThread
+            + referenceSampleLoadsOnAudioThread
             + authoringSampleLoadsOnAudioThread
+            + largeResourceReleasesOnAudioThread
             + activeVoiceCapacityGrowthCount;
     }
 };
@@ -108,6 +114,7 @@ public:
     void queuePerformanceSurfaceNoteOff(int midiNoteNumber);
     bool serviceMessageThreadWork();
     ProcessorRealtimeSafetySnapshot getRealtimeSafetySnapshot() const { return realtimeSafetySnapshot; }
+    void clearReferencePlaybackCacheForTests();
 
 private:
     static constexpr std::size_t maxRealtimeActiveVoices = 24;
@@ -256,5 +263,6 @@ private:
     double currentSampleRate = 44100.0;
     std::uint64_t nextRenderVoiceId = 1;
     bool isSynchronizingParameterState = false;
+    bool processingAudioCallback = false;
 };
 } // namespace drs::plugin

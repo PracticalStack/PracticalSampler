@@ -275,6 +275,7 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
 {
     const auto blockStartTime = std::chrono::steady_clock::now();
     juce::ScopedNoDenormals noDenormals;
+    const juce::ScopedValueSetter<bool> audioCallbackScope(processingAudioCallback, true);
 
     for (auto channel = 0; channel < buffer.getNumChannels(); ++channel)
         buffer.clear(channel, 0, buffer.getNumSamples());
@@ -439,6 +440,8 @@ drs::app::AuthoringWaveformPreview Processor::getAuthoringWaveformPreview()
         return preview;
     }
 
+    // Sprint 3 boundary note: waveform preview is a shell-only helper seam.
+    // It may decode for authoring UI today, but it must not become the Preview/Publish playback-preparation path.
     const auto importResult = drs::engine::importSampleFile(projectSampleSource->path);
     if (!importResult.imported)
     {
@@ -511,6 +514,12 @@ void Processor::queuePerformanceSurfaceNoteOff(int midiNoteNumber)
     auto message = juce::MidiMessage::noteOff(1, clampMidiValue(midiNoteNumber));
     message.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001);
     performanceSurfaceMidiCollector.addMessageToQueue(message);
+}
+
+void Processor::clearReferencePlaybackCacheForTests()
+{
+    loadedSamples.clear();
+    updateRealtimeSafetyState();
 }
 
 bool Processor::serviceMessageThreadWork()
@@ -713,6 +722,12 @@ bool Processor::ensureReferencePlaybackAssetsLoaded(bool invokedFromAudioThread)
 
 void Processor::initializeReferencePlaybackAssets(bool invokedFromAudioThread)
 {
+    // Sprint 3 boundary note: this reference fallback path is compatibility scaffolding, not the intended playback
+    // preparation service. Preview/Publish preparation belongs behind PreparedPlaybackService, and audio-thread
+    // fallback here is tracked only so regressions stay visible until the reference-backed renderer is retired.
+    if (invokedFromAudioThread && !loadedSamples.empty())
+        ++realtimeSafetySnapshot.largeResourceReleasesOnAudioThread;
+
     loadedSamples.clear();
 
     if (!referenceManifest.loaded || !referenceStream.loaded)
@@ -725,7 +740,11 @@ void Processor::initializeReferencePlaybackAssets(bool invokedFromAudioThread)
 
     for (const auto& sample : referenceStream.container.samples)
     {
+        if (invokedFromAudioThread)
+            ++realtimeSafetySnapshot.samplePathResolutionsOnAudioThread;
         const auto samplePath = resolveSamplePath(referenceStream.containerPath, sample.sourcePath);
+        if (invokedFromAudioThread)
+            ++realtimeSafetySnapshot.sampleDecodeEntriesOnAudioThread;
         const auto importResult = drs::engine::importSampleFile(samplePath.generic_string());
         if (!importResult.imported)
             continue;
@@ -764,6 +783,11 @@ bool Processor::ensureSelectedAuthoringSampleLoaded(bool invokedFromAudioThread)
         lastAuthoringSampleLoadFailureState.clear();
         return true;
     }
+
+    // Sprint 3 boundary note: selected-zone preview loading is still a shell-side helper seam.
+    // It must not be expanded into the product-owned Preview/Publish preparation boundary.
+    if (invokedFromAudioThread)
+        ++realtimeSafetySnapshot.sampleDecodeEntriesOnAudioThread;
 
     const auto importResult = drs::engine::importSampleFile(projectSampleSource->path);
     if (!importResult.imported)
@@ -1062,6 +1086,9 @@ void Processor::releaseAuthoringPreviewActivationSlot(int slotIndex)
     if (slotIndex < 0)
         return;
 
+    if (processingAudioCallback)
+        ++realtimeSafetySnapshot.largeResourceReleasesOnAudioThread;
+
     authoringPreviewActivationSlots[static_cast<std::size_t>(slotIndex)] = {};
     if (freeAuthoringPreviewActivationSlotCount < freeAuthoringPreviewActivationSlots.size())
         freeAuthoringPreviewActivationSlots[freeAuthoringPreviewActivationSlotCount++] = slotIndex;
@@ -1189,6 +1216,9 @@ void Processor::releasePerformanceActivationSlot(int slotIndex)
 {
     if (slotIndex < 0)
         return;
+
+    if (processingAudioCallback)
+        ++realtimeSafetySnapshot.largeResourceReleasesOnAudioThread;
 
     performanceActivationSlots[static_cast<std::size_t>(slotIndex)] = {};
     if (freePerformanceActivationSlotCount < freePerformanceActivationSlots.size())

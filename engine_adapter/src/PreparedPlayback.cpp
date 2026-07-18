@@ -243,10 +243,29 @@ PreparedPlaybackBuildRequest PreparedPlaybackService::requestBuild(const Playbac
     return request;
 }
 
+PreparedPlaybackQueueSubmitResult PreparedPlaybackService::enqueuePreviewBuild(
+    const PlaybackSnapshotBuildResult& snapshotResult)
+{
+    return enqueueBuildForLane(snapshotResult,
+                               PreparedPlaybackWorkLane::preview,
+                               PreparedPlaybackJobPriority::preview);
+}
+
+PreparedPlaybackQueueSubmitResult PreparedPlaybackService::enqueuePublishBuild(
+    const PlaybackSnapshotBuildResult& snapshotResult)
+{
+    return enqueueBuildForLane(snapshotResult,
+                               PreparedPlaybackWorkLane::performance,
+                               PreparedPlaybackJobPriority::performance);
+}
+
 PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlaybackBuildRequest& request,
                                                              const PlaybackSnapshotBuildResult& snapshotResult,
                                                              const RuntimeStreamLoadResult& streamResult)
 {
+    // Sprint 3 boundary note: this service is the intended playback-preparation seam.
+    // Preview/Publish may build immutable snapshots before this point, but prepared asset realization, cache
+    // ownership, and retirement policy should converge here rather than spreading new decode paths into the shell.
     PreparedPlaybackBuildResult result;
     result.buildId = request.buildId;
     result.cancellationId = request.cancellationId;
@@ -508,9 +527,10 @@ void PreparedPlaybackService::setBackgroundWorkerStream(const RuntimeStreamLoadR
     workerCondition.notify_all();
 }
 
-PreparedPlaybackQueueSubmitResult PreparedPlaybackService::enqueueBuild(const PlaybackSnapshotBuildResult& snapshotResult,
-                                                                       PreparedPlaybackWorkLane lane,
-                                                                       PreparedPlaybackJobPriority priority)
+PreparedPlaybackQueueSubmitResult PreparedPlaybackService::enqueueBuildForLane(
+    const PlaybackSnapshotBuildResult& snapshotResult,
+    PreparedPlaybackWorkLane lane,
+    PreparedPlaybackJobPriority priority)
 {
     PreparedPlaybackQueueSubmitResult submitResult;
     submitResult.request = requestBuild(snapshotResult);
@@ -620,7 +640,17 @@ std::vector<PreparedPlaybackWorkerStepResult> PreparedPlaybackService::drainComp
     return results;
 }
 
-std::vector<PreparedPlaybackBuildResult> PreparedPlaybackService::cancelQueuedBuilds(
+std::vector<PreparedPlaybackBuildResult> PreparedPlaybackService::cancelQueuedPreviewBuilds(const std::string& state)
+{
+    return cancelQueuedBuildsForLane(PreparedPlaybackWorkLane::preview, state);
+}
+
+std::vector<PreparedPlaybackBuildResult> PreparedPlaybackService::cancelQueuedPublishBuilds(const std::string& state)
+{
+    return cancelQueuedBuildsForLane(PreparedPlaybackWorkLane::performance, state);
+}
+
+std::vector<PreparedPlaybackBuildResult> PreparedPlaybackService::cancelQueuedBuildsForLane(
     PreparedPlaybackWorkLane lane,
     const std::string& state)
 {
