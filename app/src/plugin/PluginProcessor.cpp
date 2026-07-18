@@ -157,10 +157,18 @@ AuthoringPreviewBlockingHint buildAuthoringPreviewBlockingHint(const drs::engine
                  "Restore or replace '" + sampleFileLabel + "' for zone '" + zoneLabel + "', then prepare the authoring preview again." };
     }
 
-    if (failureState == "Sample format unsupported")
+    if (failureState == "Sample format unsupported"
+        || failureState.find("supported audio format") != std::string::npos
+        || failureState.find("WAV and FLAC") != std::string::npos)
     {
         return { "Convert the selected sample to a supported format.",
                  "Zone '" + zoneLabel + "' is pointing at '" + sampleFileLabel + "'. Convert it to a supported WAV, AIFF, or FLAC file, then audition again." };
+    }
+
+    if (failureState.find("44100 Hz and 48000 Hz") != std::string::npos)
+    {
+        return { "Use a 44.1 kHz or 48 kHz sample for this zone.",
+                 "Resample '" + sampleFileLabel + "' to 44.1 kHz or 48 kHz so zone '" + zoneLabel + "' can be prepared for preview." };
     }
 
     if (failureState == "Sample channel count invalid"
@@ -741,9 +749,10 @@ bool Processor::ensureSelectedAuthoringSampleLoaded(bool invokedFromAudioThread)
     const auto importResult = drs::engine::importSampleFile(projectSampleSource->path);
     if (!importResult.imported)
     {
-        lastAuthoringSampleLoadFailureState = importResult.state.empty()
-            ? "Selected authoring sample could not be prepared."
-            : importResult.state;
+        lastAuthoringSampleLoadFailureState = !importResult.issues.empty()
+            ? importResult.issues.front()
+            : (importResult.state.empty() ? "Selected authoring sample could not be prepared."
+                                          : importResult.state);
         return false;
     }
 

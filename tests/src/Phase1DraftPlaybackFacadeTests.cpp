@@ -1,6 +1,7 @@
 #include "drs/engine/EngineFacade.h"
 
 #include <chrono>
+#include <functional>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -30,6 +31,100 @@ bool waitForWorkerToSettle(drs::engine::EngineFacade& engineFacade,
 
     const auto& workerStatus = engineFacade.getPreparedPlaybackWorkerStatus();
     return workerStatus.pendingWorkCount == 0 && workerStatus.inFlightWorkCount == 0;
+}
+
+bool waitForCondition(const std::function<bool()>& condition,
+                      std::chrono::milliseconds timeout = std::chrono::milliseconds(250))
+{
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    while (std::chrono::steady_clock::now() <= deadline)
+    {
+        if (condition())
+            return true;
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+
+    return condition();
+}
+
+void requireFacadeSnapshotConsistency(drs::engine::EngineFacade& engineFacade, const std::string& context)
+{
+    const auto performanceSnapshot = engineFacade.getPerformanceSnapshot();
+    const auto diagnosticsSnapshot = engineFacade.getDiagnosticsSnapshot();
+    const auto& draftStatus = engineFacade.getDraftPlaybackStatus();
+
+    require(performanceSnapshot.draftRevision == draftStatus.draftRevision,
+            context + " should mirror the draft revision through the performance snapshot.");
+    require(performanceSnapshot.previewRevision == draftStatus.preview.revision,
+            context + " should mirror the preview revision through the performance snapshot.");
+    require(performanceSnapshot.publishedRevision == draftStatus.performance.revision,
+            context + " should mirror the published revision through the performance snapshot.");
+    require(performanceSnapshot.previewBuildId == draftStatus.preview.buildId,
+            context + " should mirror the preview snapshot build identity.");
+    require(performanceSnapshot.publishedBuildId == draftStatus.performance.buildId,
+            context + " should mirror the published snapshot build identity.");
+    require(performanceSnapshot.previewPreparedBuildId == draftStatus.preview.preparedBuildId,
+            context + " should mirror the preview prepared-playback build identity.");
+    require(performanceSnapshot.publishedPreparedBuildId == draftStatus.performance.preparedBuildId,
+            context + " should mirror the published prepared-playback build identity.");
+    require(performanceSnapshot.previewActivationEligible == draftStatus.preview.activationEligible,
+            context + " should mirror preview activation eligibility.");
+    require(performanceSnapshot.publishedActivationEligible == draftStatus.performance.activationEligible,
+            context + " should mirror published activation eligibility.");
+    require(performanceSnapshot.previewContentDigest == draftStatus.preview.contentDigest,
+            context + " should mirror the preview immutable snapshot digest.");
+    require(performanceSnapshot.publishedContentDigest == draftStatus.performance.contentDigest,
+            context + " should mirror the published immutable snapshot digest.");
+    require(performanceSnapshot.previewPreparedContentDigest == draftStatus.preview.preparedContentDigest,
+            context + " should mirror the preview prepared-playback digest.");
+    require(performanceSnapshot.publishedPreparedContentDigest == draftStatus.performance.preparedContentDigest,
+            context + " should mirror the published prepared-playback digest.");
+    require(performanceSnapshot.draftPlaybackEvent == draftStatus.lastEvent,
+            context + " should mirror the latest draft-playback event.");
+    require(performanceSnapshot.previewFindings.size() == draftStatus.preview.findings.size(),
+            context + " should mirror preview findings.");
+    require(performanceSnapshot.publishedFindings.size() == draftStatus.performance.findings.size(),
+            context + " should mirror published findings.");
+
+    require(diagnosticsSnapshot.draftRevision == performanceSnapshot.draftRevision,
+            context + " should keep diagnostics and performance snapshots on the same draft revision.");
+    require(diagnosticsSnapshot.previewRevision == performanceSnapshot.previewRevision,
+            context + " should keep diagnostics and performance snapshots on the same preview revision.");
+    require(diagnosticsSnapshot.publishedRevision == performanceSnapshot.publishedRevision,
+            context + " should keep diagnostics and performance snapshots on the same published revision.");
+    require(diagnosticsSnapshot.previewBuildId == performanceSnapshot.previewBuildId,
+            context + " should keep diagnostics and performance snapshots on the same preview build identity.");
+    require(diagnosticsSnapshot.publishedBuildId == performanceSnapshot.publishedBuildId,
+            context + " should keep diagnostics and performance snapshots on the same published build identity.");
+    require(diagnosticsSnapshot.previewPreparedBuildId == performanceSnapshot.previewPreparedBuildId,
+            context + " should keep diagnostics and performance snapshots on the same preview prepared build identity.");
+    require(diagnosticsSnapshot.publishedPreparedBuildId == performanceSnapshot.publishedPreparedBuildId,
+            context + " should keep diagnostics and performance snapshots on the same published prepared build identity.");
+    require(diagnosticsSnapshot.previewActivationEligible == performanceSnapshot.previewActivationEligible,
+            context + " should keep diagnostics and performance snapshots aligned on preview activation eligibility.");
+    require(diagnosticsSnapshot.publishedActivationEligible == performanceSnapshot.publishedActivationEligible,
+            context + " should keep diagnostics and performance snapshots aligned on published activation eligibility.");
+    require(diagnosticsSnapshot.previewContentDigest == performanceSnapshot.previewContentDigest,
+            context + " should keep diagnostics and performance snapshots aligned on preview digest.");
+    require(diagnosticsSnapshot.publishedContentDigest == performanceSnapshot.publishedContentDigest,
+            context + " should keep diagnostics and performance snapshots aligned on published digest.");
+    require(diagnosticsSnapshot.previewPreparedContentDigest == performanceSnapshot.previewPreparedContentDigest,
+            context + " should keep diagnostics and performance snapshots aligned on preview prepared digest.");
+    require(diagnosticsSnapshot.publishedPreparedContentDigest == performanceSnapshot.publishedPreparedContentDigest,
+            context + " should keep diagnostics and performance snapshots aligned on published prepared digest.");
+    require(diagnosticsSnapshot.preparedWorkerPendingCount == performanceSnapshot.preparedWorkerPendingCount,
+            context + " should keep diagnostics and performance snapshots aligned on pending worker count.");
+    require(diagnosticsSnapshot.preparedWorkerCancellationCount == performanceSnapshot.preparedWorkerCancellationCount,
+            context + " should keep diagnostics and performance snapshots aligned on worker cancellation count.");
+    require(diagnosticsSnapshot.preparedWorkerSupersededCount == performanceSnapshot.preparedWorkerSupersededCount,
+            context + " should keep diagnostics and performance snapshots aligned on worker supersede count.");
+    require(diagnosticsSnapshot.preparedWorkerFailureCount == performanceSnapshot.preparedWorkerFailureCount,
+            context + " should keep diagnostics and performance snapshots aligned on worker failure count.");
+    require(diagnosticsSnapshot.preparedWorkerRetiredBytes == performanceSnapshot.preparedWorkerRetiredBytes,
+            context + " should keep diagnostics and performance snapshots aligned on retired prepared bytes.");
+    require(diagnosticsSnapshot.preparedWorkerEvent == performanceSnapshot.preparedWorkerEvent,
+            context + " should keep diagnostics and performance snapshots aligned on the latest worker event.");
 }
 } // namespace
 
@@ -71,6 +166,13 @@ int main()
                 "Default preview revision should carry a playback snapshot digest.");
         require(draftStatus.preview.contentDigest == draftStatus.performance.contentDigest,
                 "Default preview and publish revisions should share a digest for the same draft.");
+        require(snapshot.previewActivationEligible && snapshot.publishedActivationEligible,
+                "Default preview and publish revisions should both remain activation-eligible.");
+        requireFacadeSnapshotConsistency(engineFacade, "Default facade state");
+        const auto initialPreviewBuildId = snapshot.previewBuildId;
+        const auto initialPublishedBuildId = snapshot.publishedBuildId;
+        const auto initialPreviewPreparedBuildId = snapshot.previewPreparedBuildId;
+        const auto initialPublishedPreparedBuildId = snapshot.publishedPreparedBuildId;
 
         require(engineFacade.stageDraftRevision(1),
                 "Engine facade should accept a staged draft revision.");
@@ -104,6 +206,13 @@ int main()
                 "Preparing preview should refresh the preview prepared playback build identity.");
         require(draftStatus.preview.contentDigest != revision0Digest,
                 "Preparing a newer draft revision should produce a different snapshot digest.");
+        require(snapshot.previewBuildId != initialPreviewBuildId,
+                "Preparing a newer preview revision should replace the preview snapshot build identity.");
+        require(snapshot.previewPreparedBuildId != initialPreviewPreparedBuildId,
+                "Preparing a newer preview revision should replace the preview prepared-playback build identity.");
+        require(snapshot.previewActivationEligible,
+                "Prepared preview revisions should remain activation-eligible through the facade snapshot.");
+        requireFacadeSnapshotConsistency(engineFacade, "Preview facade state after revision 1");
 
         require(engineFacade.publishCurrentDraft(),
                 "Engine facade should publish the prepared current draft.");
@@ -126,9 +235,51 @@ int main()
                 "Publishing the current draft should surface matching prepared digests.");
         require(draftStatus.preview.contentDigest == draftStatus.performance.contentDigest,
                 "Publishing the current preview should preserve digest identity across both paths.");
+        require(snapshot.publishedBuildId != initialPublishedBuildId,
+                "Publishing a newer draft should replace the published snapshot build identity.");
+        require(snapshot.publishedPreparedBuildId != initialPublishedPreparedBuildId,
+                "Publishing a newer draft should replace the published prepared-playback build identity.");
+        require(snapshot.publishedActivationEligible,
+                "Published revisions should remain activation-eligible through the facade snapshot.");
+        requireFacadeSnapshotConsistency(engineFacade, "Published facade state after revision 1");
+
+        const auto revision1PublishedBuildId = snapshot.publishedBuildId;
+        const auto revision1PublishedPreparedBuildId = snapshot.publishedPreparedBuildId;
 
         require(engineFacade.stageDraftRevision(2),
                 "A second draft revision should stage successfully.");
+        require(engineFacade.refreshPreviewToCurrentDraft(),
+                "Revision 2 preview refresh should be accepted.");
+        require(engineFacade.stageDraftRevision(3),
+                "A third draft revision should stage successfully.");
+        require(engineFacade.refreshPreviewToCurrentDraft(),
+                "Revision 3 preview refresh should be accepted.");
+        require(engineFacade.stageDraftRevision(4),
+                "A fourth draft revision should stage successfully.");
+        require(engineFacade.refreshPreviewToCurrentDraft(),
+                "Revision 4 preview refresh should be accepted.");
+        require(engineFacade.waitForPreparedPlaybackIdle(std::chrono::milliseconds(1500)),
+                "Rapid preview refreshes should settle through the facade idle wait.");
+        snapshot = engineFacade.getPerformanceSnapshot();
+        draftStatus = engineFacade.getDraftPlaybackStatus();
+        require(snapshot.draftRevision == 4,
+                "Rapid preview refreshes should leave the newest draft revision visible.");
+        require(snapshot.previewRevision == 4 && snapshot.previewRevisionState == "Ready",
+                "Rapid preview refreshes should leave the newest preview revision ready.");
+        require(snapshot.publishedRevision == 1 && snapshot.publishedRevisionState == "Active",
+                "Rapid preview refreshes should not change the last published revision.");
+        require(snapshot.previewBuildId != initialPreviewBuildId,
+                "Rapid preview refreshes should keep advancing the preview snapshot build identity.");
+        require(snapshot.previewPreparedBuildId != initialPreviewPreparedBuildId,
+                "Rapid preview refreshes should keep advancing the preview prepared-playback build identity.");
+        require(snapshot.publishedBuildId == revision1PublishedBuildId,
+                "Rapid preview refreshes should preserve the last published snapshot build identity.");
+        require(snapshot.publishedPreparedBuildId == revision1PublishedPreparedBuildId,
+                "Rapid preview refreshes should preserve the last published prepared-playback build identity.");
+        require(snapshot.previewActivationEligible && snapshot.publishedActivationEligible,
+                "Rapid preview refreshes should preserve activation eligibility for both facade paths.");
+        requireFacadeSnapshotConsistency(engineFacade, "Facade state after rapid preview supersede coverage");
+
         require(engineFacade.beginDraftPlaybackDeviceRestart(),
                 "Device restart should begin while the project is open.");
         snapshot = engineFacade.getPerformanceSnapshot();
@@ -141,8 +292,9 @@ int main()
         snapshot = engineFacade.getPerformanceSnapshot();
         require(snapshot.publishedRevision == 1 && snapshot.publishedRevisionState == "Active",
                 "Successful device restart should preserve the last published revision.");
-        require(snapshot.previewRevision == 1 && snapshot.previewRevisionState == "Stale",
-                "Successful device restart should preserve preview identity while acknowledging the newer draft.");
+        require(snapshot.previewRevision == 4 && snapshot.previewRevisionState == "Ready",
+                "Successful device restart should preserve the latest prepared preview identity for the current draft.");
+        requireFacadeSnapshotConsistency(engineFacade, "Facade state after device restart");
 
         engineFacade.closeDraftPlaybackProject();
         snapshot = engineFacade.getPerformanceSnapshot();
@@ -160,6 +312,7 @@ int main()
                 "Reopening should require preview preparation again.");
         require(snapshot.publishedRevision == 0 && snapshot.publishedRevisionState == "Idle",
                 "Reopening should require publish activation again.");
+        requireFacadeSnapshotConsistency(engineFacade, "Facade state after reopen");
 
         std::cout << "Phase 1 draft playback facade tests passed." << std::endl;
         return 0;

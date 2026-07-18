@@ -14,6 +14,24 @@ void require(bool condition, const std::string& message)
     if (!condition)
         throw std::runtime_error(message);
 }
+
+bool containsFinding(const drs::engine::PreparedPlaybackBuildResult& result,
+                     drs::engine::PlaybackSnapshotFindingSeverity severity,
+                     const std::string& code,
+                     const std::string& pathFragment)
+{
+    for (const auto& finding : result.findings)
+    {
+        if (finding.severity == severity
+            && finding.code == code
+            && finding.path.find(pathFragment) != std::string::npos)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
 } // namespace
 
 int main()
@@ -39,9 +57,31 @@ int main()
 
         const auto firstPreparedRequest = preparedService.requestBuild(firstSnapshot);
         require(firstPreparedRequest.accepted, "Prepared playback request should be accepted for a valid snapshot.");
+        require(firstPreparedRequest.snapshotBuildId == firstSnapshot.buildId,
+                "Prepared playback request should track the immutable snapshot build identity.");
+        require(firstPreparedRequest.requestedDraftRevision == firstSnapshot.requestedDraftRevision,
+                "Prepared playback request should track the requested draft revision.");
+        require(firstPreparedRequest.activationRequested == firstSnapshot.activationRequested,
+                "Prepared playback request should preserve whether activation was requested.");
+        require(firstPreparedRequest.cancellationId == firstPreparedRequest.buildId,
+                "Prepared playback request should seed cancellation identity from its build identity.");
+        require(firstPreparedRequest.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::preparing,
+                "Accepted prepared playback requests should begin in the preparing state.");
         const auto firstPrepared = preparedService.prepare(firstPreparedRequest, firstSnapshot, referenceStream);
         require(firstPrepared.built, "Prepared playback should build from the reference snapshot.");
         require(firstPrepared.activationEligible, "Prepared playback should remain activation-eligible for valid content.");
+        require(firstPrepared.buildId == firstPreparedRequest.buildId,
+                "Prepared playback result should preserve the request build identity.");
+        require(firstPrepared.snapshotBuildId == firstPreparedRequest.snapshotBuildId,
+                "Prepared playback result should preserve the immutable snapshot build identity.");
+        require(firstPrepared.requestedDraftRevision == firstPreparedRequest.requestedDraftRevision,
+                "Prepared playback result should preserve the requested draft revision.");
+        require(firstPrepared.activationRequested == firstPreparedRequest.activationRequested,
+                "Prepared playback result should preserve whether activation was requested.");
+        require(firstPrepared.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::ready,
+                "Successful prepared playback should finish in the ready state.");
+        require(firstPrepared.buildDurationMicros > 0,
+                "Prepared playback result should report a non-zero build duration.");
         require(firstPrepared.metrics.preparedSampleCount == phase2Project.project.sampleSources.size(),
                 "Prepared sample count changed unexpectedly.");
         require(firstPrepared.metrics.preparedZoneCount == phase2Project.project.authoring.zones.size(),
@@ -96,9 +136,43 @@ int main()
         const auto rejectedPreparedRequest = preparedService.requestBuild(invalidSnapshot);
         require(!rejectedPreparedRequest.accepted,
                 "Prepared playback request must reject failed immutable snapshots.");
+        require(rejectedPreparedRequest.snapshotBuildId == invalidSnapshot.buildId,
+                "Rejected prepared playback request should still point at the failed snapshot build identity.");
+        require(rejectedPreparedRequest.requestedDraftRevision == invalidSnapshot.requestedDraftRevision,
+                "Rejected prepared playback request should preserve the failed snapshot draft revision.");
+        require(rejectedPreparedRequest.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::failed,
+                "Rejected prepared playback request should surface the failed lifecycle state.");
         const auto rejectedPrepared = preparedService.prepare(rejectedPreparedRequest, invalidSnapshot, referenceStream);
         require(!rejectedPrepared.built && !rejectedPrepared.activationEligible,
                 "Rejected prepared playback result must not become activation-eligible.");
+        require(rejectedPrepared.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::failed,
+                "Rejected prepared playback result should remain in the failed lifecycle state.");
+        require(containsFinding(rejectedPrepared,
+                                drs::engine::PlaybackSnapshotFindingSeverity::error,
+                                "missing-sample-source-asset",
+                                "sampleSources[0].path"),
+                "Rejected prepared playback result should preserve the immutable snapshot findings that caused rejection.");
+
+        const auto canceledPrepared = preparedService.cancelBuild(firstPreparedRequest);
+        require(canceledPrepared.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::canceled,
+                "Canceled prepared playback should report the canceled lifecycle state.");
+        require(!canceledPrepared.activationEligible,
+                "Canceled prepared playback result must never become activation-eligible.");
+        require(canceledPrepared.metrics.cancellationCount == 1,
+                "Canceled prepared playback result should increment the cancellation metric.");
+        require(canceledPrepared.buildId == firstPreparedRequest.buildId
+                    && canceledPrepared.cancellationId == firstPreparedRequest.cancellationId,
+                "Canceled prepared playback result should preserve request and cancellation identities.");
+
+        const auto supersedingPreparedRequest = preparedService.requestBuild(secondSnapshot);
+        const auto supersededPrepared = preparedService.supersedeBuild(firstPreparedRequest,
+                                                                       supersedingPreparedRequest.buildId);
+        require(supersededPrepared.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::superseded,
+                "Superseded prepared playback should report the superseded lifecycle state.");
+        require(!supersededPrepared.activationEligible,
+                "Superseded prepared playback result must never become activation-eligible.");
+        require(supersededPrepared.cancellationId == supersedingPreparedRequest.buildId,
+                "Superseded prepared playback result should point at the replacement build identity.");
 
         std::cout << "Phase 1 prepared playback tests passed." << std::endl;
         return 0;

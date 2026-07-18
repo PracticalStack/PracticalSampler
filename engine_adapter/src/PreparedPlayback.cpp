@@ -266,14 +266,13 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     if (!request.accepted)
     {
         result.metrics.failureCount = 1;
-        if (snapshotResult.findings.empty())
-        {
+        result.findings = snapshotResult.findings;
+        if (result.findings.empty())
             addFinding(result,
                        PlaybackSnapshotFindingSeverity::error,
                        "prepared-build-rejected",
                        "snapshot",
                        "Prepared playback build requires a valid immutable playback snapshot.");
-        }
         result.buildDurationMicros = static_cast<std::uint64_t>(
             std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - startTime).count());
         return result;

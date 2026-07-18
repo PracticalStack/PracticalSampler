@@ -1,20 +1,78 @@
 #include "drs/engine/RuntimeLoader.h"
 #include "plugin/PluginProcessor.h"
 
+#include <juce_audio_formats/juce_audio_formats.h>
 #include <juce_audio_processors_headless/juce_audio_processors_headless.h>
 
 #include <algorithm>
 #include <iostream>
+#include <filesystem>
+#include <memory>
 #include <stdexcept>
 #include <string>
 
 namespace
 {
+namespace fs = std::filesystem;
+
 void require(bool condition, const std::string& message)
 {
     if (!condition)
         throw std::runtime_error(message);
 }
+
+fs::path getScratchDirectory()
+{
+    auto path = fs::temp_directory_path() / "drs-phase1-realtime-safety-tests";
+    fs::create_directories(path);
+    return path;
+}
+
+juce::AudioBuffer<float> buildMultiChannelBuffer(int channelCount)
+{
+    constexpr int frameCount = 480;
+    juce::AudioBuffer<float> buffer(channelCount, frameCount);
+
+    for (int channelIndex = 0; channelIndex < channelCount; ++channelIndex)
+    {
+        for (int sampleIndex = 0; sampleIndex < frameCount; ++sampleIndex)
+        {
+            const auto phase = static_cast<float>(sampleIndex) / static_cast<float>(frameCount);
+            buffer.setSample(channelIndex,
+                             sampleIndex,
+                             std::sin((phase * juce::MathConstants<float>::twoPi)
+                                      + (0.2f * static_cast<float>(channelIndex))) * 0.25f);
+        }
+    }
+
+    return buffer;
+}
+
+void writeAudioFile(const fs::path& filePath,
+                    juce::AudioFormat& format,
+                    const juce::AudioBuffer<float>& buffer,
+                    double sampleRate = 48000.0)
+{
+    auto fileOutput = std::make_unique<juce::FileOutputStream>(juce::File(filePath.generic_string()));
+    require(fileOutput->openedOk(), "Could not open output file for writing: " + filePath.generic_string());
+    std::unique_ptr<juce::OutputStream> output = std::move(fileOutput);
+
+    juce::AudioFormatWriterOptions options;
+    options = options.withSampleRate(sampleRate)
+        .withNumChannels(buffer.getNumChannels())
+        .withBitsPerSample(24);
+
+    auto writerOwner = format.createWriterFor(output, options);
+    require(writerOwner != nullptr, "Could not create audio writer for: " + filePath.generic_string());
+    require(writerOwner->writeFromAudioSampleBuffer(buffer, 0, buffer.getNumSamples()),
+            "Could not write audio samples to: " + filePath.generic_string());
+}
+
+struct ReadyAuthoringPreviewContext
+{
+    std::size_t revision = 0;
+    drs::engine::RuntimeProjectZoneDefinition zone;
+};
 } // namespace
 
 int main()
@@ -85,6 +143,91 @@ int main()
 
         const auto projectLoad = drs::engine::loadPhase2ReferenceProjectManifest();
         require(projectLoad.loaded, "Authoring preview isolation test should load the Phase 2 reference project.");
+        const auto scratchDirectory = getScratchDirectory();
+        const auto unsupportedPath = scratchDirectory / "unsupported-preview-source.txt";
+        const auto surroundPath = scratchDirectory / "surround-preview-source.wav";
+        const auto surroundBuffer = buildMultiChannelBuffer(4);
+        juce::WavAudioFormat wavFormat;
+        writeAudioFile(surroundPath, wavFormat, surroundBuffer);
+        {
+            juce::FileOutputStream unsupportedOutput(juce::File(unsupportedPath.generic_string()));
+            require(unsupportedOutput.openedOk(), "Could not create unsupported realtime preview fixture.");
+            unsupportedOutput.writeText("not audio", false, false, nullptr);
+        }
+
+        const auto stageReadyPreview = [&](drs::plugin::Processor& previewProcessor,
+                                           const std::string& failureMessagePrefix) -> ReadyAuthoringPreviewContext
+        {
+            previewProcessor.prepareToPlay(44100.0, 512);
+            previewProcessor.replaceAuthoringProject(projectLoad.project);
+
+            const auto selection = previewProcessor.getAuthoringSession().selectZone("pad-a3-high");
+            require(selection.applied, failureMessagePrefix + " should select the looping pad zone.");
+            const auto readyRevision = previewProcessor.getAuthoringSession().getDocumentState().revision;
+            require(previewProcessor.serviceMessageThreadWork(),
+                    failureMessagePrefix + " should stage the selected-zone preview revision.");
+
+            juce::AudioBuffer<float> previewBuffer(2, 512);
+            previewBuffer.clear();
+            juce::MidiBuffer emptyMidi;
+            previewProcessor.processBlock(previewBuffer, emptyMidi);
+
+            const auto snapshot = previewProcessor.getRealtimeSafetySnapshot();
+            require(snapshot.activeAuthoringPreviewRevision == readyRevision,
+                    failureMessagePrefix + " should activate the ready preview revision before the invalid edit lands.");
+            require(snapshot.authoringPreviewRevisionState == "Ready",
+                    failureMessagePrefix + " should report a ready authoring preview before the invalid edit lands.");
+
+            const auto selectedZone = previewProcessor.getAuthoringSession().getSelectedZone();
+            require(selectedZone.has_value(), failureMessagePrefix + " should keep the selected zone available.");
+            return { readyRevision, *selectedZone };
+        };
+
+        const auto replaceSelectedZonePath = [&](const ReadyAuthoringPreviewContext& context,
+                                                 const fs::path& samplePath)
+        {
+            auto editedProject = projectLoad.project;
+            auto sampleSourceIterator = std::find_if(
+                editedProject.sampleSources.begin(),
+                editedProject.sampleSources.end(),
+                [&](const drs::engine::RuntimeProjectSampleSource& sampleSource)
+                {
+                    return sampleSource.id == context.zone.sampleSourceId;
+                });
+            require(sampleSourceIterator != editedProject.sampleSources.end(),
+                    "Preview failure coverage should locate the selected-zone sample source before mutating it.");
+            sampleSourceIterator->path = samplePath.generic_string();
+            editedProject.authoring.selectedZoneId = context.zone.id;
+            return editedProject;
+        };
+
+        const auto requireFailedPreviewHint = [&](const fs::path& samplePath,
+                                                  const std::string& expectedPrerequisite,
+                                                  const std::string& guidanceNeedle,
+                                                  const std::string& failureNeedle,
+                                                  const std::string& caseLabel)
+        {
+            drs::plugin::Processor previewProcessor;
+            const auto context = stageReadyPreview(previewProcessor, caseLabel);
+            previewProcessor.replaceAuthoringProject(replaceSelectedZonePath(context, samplePath));
+
+            const auto snapshot = previewProcessor.getRealtimeSafetySnapshot();
+            require(snapshot.activeAuthoringPreviewRevision == context.revision,
+                    caseLabel + " should preserve the last known-good preview revision.");
+            require(snapshot.pendingAuthoringPreviewRevision == 0,
+                    caseLabel + " should not leave a pending authoring preview activation behind.");
+            require(snapshot.authoringPreviewRevisionState == "Failed",
+                    caseLabel + " should surface a failed authoring preview state.");
+            require(snapshot.authoringPreviewFailureState.find(failureNeedle) != std::string::npos,
+                    caseLabel + " should expose the detailed preview failure cause.");
+
+            const auto previewStatus = previewProcessor.getAuthoringPreviewStatusSnapshot();
+            require(previewStatus.blockingPrerequisite == expectedPrerequisite,
+                    caseLabel + " should surface the expected next prerequisite.");
+            require(previewStatus.blockingGuidance.find(guidanceNeedle) != std::string::npos,
+                    caseLabel + " should explain the next repair step.");
+        };
+
         processor.replaceAuthoringProject(projectLoad.project);
 
         const auto authoringSelection = processor.getAuthoringSession().selectZone("pad-a3-high");
@@ -217,6 +360,17 @@ int main()
                 "Failed preview fallback should not reload authoring samples on the audio thread.");
         require(failedPreviewSnapshot.getAudioThreadViolationCount() == 0,
                 "Failed preview fallback should remain free of tracked realtime violations.");
+
+        requireFailedPreviewHint(unsupportedPath,
+                                 "Convert the selected sample to a supported format.",
+                                 "supported WAV, AIFF, or FLAC file",
+                                 "supported audio format",
+                                 "Unsupported-format preview failure");
+        requireFailedPreviewHint(surroundPath,
+                                 "Use a mono or stereo sample for this zone.",
+                                 "mono or stereo file",
+                                 "mono and stereo",
+                                 "Channel-policy preview failure");
 
         require(processor.getEngineFacade().stageDraftRevision(1),
                 "Activation handoff test should stage a new draft revision.");
