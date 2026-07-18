@@ -130,6 +130,7 @@ struct PreparedPlaybackMetrics
     std::size_t preparedOwnershipRecordCount = 0;
     std::uint64_t preparedBytes = 0;
     std::uint64_t preparedOwnershipBytes = 0;
+    std::uint64_t preparedSampleDataBytes = 0;
     std::uint64_t decodedBytes = 0;
     std::size_t cacheHitCount = 0;
     std::size_t cacheMissCount = 0;
@@ -141,6 +142,17 @@ struct PreparedPlaybackMetrics
     std::uint64_t retiredBytesAwaitingCleanup = 0;
 };
 
+struct PreparedPlaybackSampleResolution
+{
+    std::size_t snapshotSampleIndex = 0;
+    std::string sampleSourceId;
+    std::string normalizedSourcePath;
+    std::string selectedStreamSampleId;
+    std::string selectedFormatName;
+    bool matchedBySourcePath = false;
+    bool matchedBySampleSourceId = false;
+};
+
 struct PreparedPlaybackBuildRequest
 {
     bool accepted = false;
@@ -150,6 +162,8 @@ struct PreparedPlaybackBuildRequest
     std::size_t requestedDraftRevision = 0;
     bool activationRequested = false;
     PlaybackSnapshotLifecycleState lifecycleState = PlaybackSnapshotLifecycleState::idle;
+    bool sampleResolutionReady = false;
+    std::vector<PreparedPlaybackSampleResolution> sampleResolutions;
     std::string state;
 };
 
@@ -229,6 +243,8 @@ public:
     ~PreparedPlaybackService();
 
     PreparedPlaybackBuildRequest requestBuild(const PlaybackSnapshotBuildResult& snapshotResult);
+    PreparedPlaybackBuildRequest requestBuild(const PlaybackSnapshotBuildResult& snapshotResult,
+                                             const RuntimeStreamLoadResult& streamResult);
     // Sprint 3 preparation boundary: Preview and Publish are only allowed to enter playback preparation
     // through these named service calls, not through ad hoc shell-side decode or generic lane plumbing.
     PreparedPlaybackQueueSubmitResult enqueuePreviewBuild(const PlaybackSnapshotBuildResult& snapshotResult);
@@ -276,6 +292,9 @@ private:
 
     PreparedPlaybackWorkerStepResult processQueuedJob(const QueuedJob& job,
                                                       const RuntimeStreamLoadResult& streamResult);
+    PreparedPlaybackBuildRequest resolveBuildRequest(const PreparedPlaybackBuildRequest& request,
+                                                     const PlaybackSnapshotBuildResult& snapshotResult,
+                                                     const RuntimeStreamLoadResult& streamResult) const;
     PreparedPlaybackQueueSubmitResult enqueueBuildForLane(const PlaybackSnapshotBuildResult& snapshotResult,
                                                           PreparedPlaybackWorkLane lane,
                                                           PreparedPlaybackJobPriority priority);

@@ -4,9 +4,12 @@
 #include "drs/engine/ProjectDocument.h"
 #include "drs/engine/RuntimeLoader.h"
 
+#include <juce_audio_formats/juce_audio_formats.h>
+
 #include <algorithm>
-#include <iostream>
 #include <filesystem>
+#include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string>
 
@@ -38,6 +41,67 @@ bool containsFinding(const drs::engine::PreparedPlaybackBuildResult& result,
     return false;
 }
 
+const drs::engine::PlaybackSnapshotFinding* findFinding(const drs::engine::PreparedPlaybackBuildResult& result,
+                                                        drs::engine::PlaybackSnapshotFindingSeverity severity,
+                                                        const std::string& code,
+                                                        const std::string& pathFragment)
+{
+    for (const auto& finding : result.findings)
+    {
+        if (finding.severity == severity
+            && finding.code == code
+            && finding.path.find(pathFragment) != std::string::npos)
+        {
+            return &finding;
+        }
+    }
+
+    return nullptr;
+}
+
+fs::path getScratchDirectory()
+{
+    auto path = fs::temp_directory_path() / "drs-phase1-prepared-playback-tests";
+    fs::create_directories(path);
+    return path;
+}
+
+juce::AudioBuffer<float> buildReferenceBuffer()
+{
+    constexpr int frameCount = 480;
+    juce::AudioBuffer<float> buffer(2, frameCount);
+    buffer.clear();
+
+    for (int sampleIndex = 0; sampleIndex < frameCount; ++sampleIndex)
+    {
+        buffer.setSample(0, sampleIndex, 0.25f);
+        buffer.setSample(1, sampleIndex, -0.25f);
+    }
+
+    return buffer;
+}
+
+void writeAudioFile(const fs::path& filePath,
+                    juce::AudioFormat& format,
+                    const juce::AudioBuffer<float>& buffer,
+                    double sampleRate)
+{
+    auto fileOutput = std::make_unique<juce::FileOutputStream>(juce::File(filePath.generic_string()));
+    require(fileOutput->openedOk(), "Could not open prepared-playback fixture for writing: " + filePath.generic_string());
+    std::unique_ptr<juce::OutputStream> output = std::move(fileOutput);
+
+    juce::AudioFormatWriterOptions options;
+    options = options.withSampleRate(sampleRate)
+        .withNumChannels(buffer.getNumChannels())
+        .withBitsPerSample(24);
+
+    auto writerOwner = format.createWriterFor(output, options);
+    require(writerOwner != nullptr,
+            "Could not create prepared-playback audio writer for: " + filePath.generic_string());
+    require(writerOwner->writeFromAudioSampleBuffer(buffer, 0, buffer.getNumSamples()),
+            "Could not write prepared-playback fixture audio: " + filePath.generic_string());
+}
+
 std::string normalizePath(const std::string& pathText)
 {
     return fs::path(pathText).lexically_normal().generic_string();
@@ -64,12 +128,27 @@ std::uint64_t computeExpectedStreamedPayloadBytes(const drs::engine::RuntimeStre
         ? sample.payloadSizeBytes - sample.prefetchBytes
         : 0;
 }
+
+std::uint64_t computeExpectedPreparedSampleDataBytes(const drs::engine::ImmutablePreparedPlayback& prepared)
+{
+    std::uint64_t sampleDataBytes = 0;
+
+    for (const auto& sample : prepared.samples)
+    {
+        sampleDataBytes += static_cast<std::uint64_t>(sample.channelCount)
+            * sample.frameCount
+            * static_cast<std::uint64_t>(sizeof(float));
+    }
+
+    return sampleDataBytes;
+}
 } // namespace
 
 int main()
 {
     try
     {
+        const auto scratchDirectory = getScratchDirectory();
         const auto phase2Project = drs::engine::loadPhase2ReferenceProjectManifest();
         require(phase2Project.loaded, "Phase 2 authoring fixture must load before prepared playback tests run.");
 
@@ -87,7 +166,7 @@ int main()
         const auto firstSnapshot = snapshotBuilder.buildSnapshot(firstSnapshotRequest, phase2Project.project);
         require(firstSnapshot.built, "Initial playback snapshot should build successfully.");
 
-        const auto firstPreparedRequest = preparedService.requestBuild(firstSnapshot);
+        const auto firstPreparedRequest = preparedService.requestBuild(firstSnapshot, referenceStream);
         require(firstPreparedRequest.accepted, "Prepared playback request should be accepted for a valid snapshot.");
         require(firstPreparedRequest.snapshotBuildId == firstSnapshot.buildId,
                 "Prepared playback request should track the immutable snapshot build identity.");
@@ -99,6 +178,17 @@ int main()
                 "Prepared playback request should seed cancellation identity from its build identity.");
         require(firstPreparedRequest.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::preparing,
                 "Accepted prepared playback requests should begin in the preparing state.");
+        require(firstPreparedRequest.sampleResolutionReady,
+                "Prepared playback requests should carry sample-resolution decisions when a stream container is available.");
+        require(firstPreparedRequest.sampleResolutions.size() == firstSnapshot.snapshot.sampleIdentities.size(),
+                "Prepared playback requests should carry one sample-resolution entry per immutable snapshot sample.");
+        require(!firstPreparedRequest.sampleResolutions[0].selectedStreamSampleId.empty(),
+                "Prepared playback sample-resolution entries should select a concrete stream sample id.");
+        require(!firstPreparedRequest.sampleResolutions[0].selectedFormatName.empty(),
+                "Prepared playback sample-resolution entries should select a concrete format name.");
+        require(firstPreparedRequest.sampleResolutions[0].matchedBySourcePath
+                    || firstPreparedRequest.sampleResolutions[0].matchedBySampleSourceId,
+                "Prepared playback sample-resolution entries should record how the worker request matched the stream sample.");
         const auto firstPrepared = preparedService.prepare(firstPreparedRequest, firstSnapshot, referenceStream);
         require(firstPrepared.built, "Prepared playback should build from the reference snapshot.");
         require(firstPrepared.activationEligible, "Prepared playback should remain activation-eligible for valid content.");
@@ -122,6 +212,11 @@ int main()
                 "First prepared playback build should cold-miss every sample handle.");
         require(firstPrepared.metrics.cacheHitCount == 0,
                 "First prepared playback build should not report cache hits.");
+        require(firstPrepared.metrics.preparedSampleDataBytes
+                    == computeExpectedPreparedSampleDataBytes(firstPrepared.prepared),
+                "Prepared playback should expose a deterministic prepared sample-data footprint for the built content.");
+        require(firstPrepared.metrics.decodedBytes == computeExpectedPreparedSampleDataBytes(firstPrepared.prepared),
+                "First prepared playback build should decode every prepared source sample through the preparation service.");
         require(!firstPrepared.prepared.preparedContentDigest.empty(),
                 "Prepared playback builds must carry a deterministic content digest.");
         require(firstPrepared.prepared.preparedContentDigest
@@ -281,7 +376,7 @@ int main()
 
         const auto secondSnapshotRequest = snapshotBuilder.requestBuild(0, true);
         const auto secondSnapshot = snapshotBuilder.buildSnapshot(secondSnapshotRequest, phase2Project.project);
-        const auto secondPreparedRequest = preparedService.requestBuild(secondSnapshot);
+        const auto secondPreparedRequest = preparedService.requestBuild(secondSnapshot, referenceStream);
         const auto secondPrepared = preparedService.prepare(secondPreparedRequest, secondSnapshot, referenceStream);
         require(secondPrepared.built, "Repeated prepared playback build should still succeed.");
         require(secondPrepared.prepared.preparedContentDigest == firstPrepared.prepared.preparedContentDigest,
@@ -293,6 +388,10 @@ int main()
                 "Warm prepared playback build should hit the cache for every sample handle.");
         require(secondPrepared.metrics.cacheMissCount == 0,
                 "Warm prepared playback build should not cold-miss unchanged sample handles.");
+        require(secondPrepared.metrics.preparedSampleDataBytes == firstPrepared.metrics.preparedSampleDataBytes,
+                "Warm prepared playback build should preserve deterministic prepared sample-data bytes.");
+        require(secondPrepared.metrics.decodedBytes == 0,
+                "Warm prepared playback build should not re-decode unchanged sample handles.");
         require(secondPrepared.prepared.samples[0].canonicalSourceIdentity
                     == firstPrepared.prepared.samples[0].canonicalSourceIdentity,
                 "Repeated preparation of the same snapshot should preserve canonical source identity.");
@@ -309,6 +408,13 @@ int main()
                 "Repeated preparation of the same snapshot should preserve ownership-record identity.");
         require(secondPrepared.metrics.preparedOwnershipRecordCount == firstPrepared.metrics.preparedOwnershipRecordCount,
                 "Repeated preparation of the same snapshot should preserve ownership-record counts.");
+        require(secondPrepared.metrics.preparedSampleCount == firstPrepared.metrics.preparedSampleCount
+                    && secondPrepared.metrics.preparedStreamCount == firstPrepared.metrics.preparedStreamCount
+                    && secondPrepared.metrics.preparedZoneCount == firstPrepared.metrics.preparedZoneCount,
+                "Repeated preparation of the same snapshot should preserve deterministic prepared counts.");
+        require(secondPrepared.metrics.preparedBytes == firstPrepared.metrics.preparedBytes
+                    && secondPrepared.metrics.preparedOwnershipBytes == firstPrepared.metrics.preparedOwnershipBytes,
+                "Repeated preparation of the same snapshot should preserve deterministic retained-byte metrics.");
         require(secondPrepared.metrics.activeCachedOwnershipRecordCount
                     == firstPrepared.metrics.activeCachedOwnershipRecordCount,
                 "Repeated preparation of the same snapshot should preserve active cached ownership counts.");
@@ -338,7 +444,7 @@ int main()
         const auto editedSnapshotRequest = snapshotBuilder.requestBuild(commitResult.documentState.revision, true);
         const auto editedSnapshot = snapshotBuilder.buildSnapshot(editedSnapshotRequest, controller.getProject());
         require(editedSnapshot.built, "Edited snapshot should still build successfully.");
-        const auto editedPreparedRequest = preparedService.requestBuild(editedSnapshot);
+        const auto editedPreparedRequest = preparedService.requestBuild(editedSnapshot, referenceStream);
         const auto editedPrepared = preparedService.prepare(editedPreparedRequest, editedSnapshot, referenceStream);
         require(editedPrepared.built, "Edited prepared playback should still succeed.");
         require(editedPrepared.prepared.preparedContentDigest != firstPrepared.prepared.preparedContentDigest,
@@ -350,6 +456,11 @@ int main()
                 "Changing one source path should preserve exactly one cached prepared asset.");
         require(editedPrepared.metrics.cacheMissCount == 1,
                 "Changing one source path should invalidate exactly one cached prepared asset.");
+        require(editedPrepared.metrics.preparedSampleDataBytes
+                    == computeExpectedPreparedSampleDataBytes(editedPrepared.prepared),
+                "Edited prepared playback should preserve deterministic prepared sample-data bytes for the rebuilt content.");
+        require(editedPrepared.metrics.decodedBytes > 0,
+                "Changing one source path should re-decode the newly prepared cache miss.");
         require(editedPrepared.metrics.preparedOwnershipRecordCount == editedPrepared.prepared.ownershipRecords.size(),
                 "Edited prepared playback metrics should expose ownership-record counts.");
         require(editedPrepared.metrics.activeCachedOwnershipRecordCount == editedPrepared.prepared.ownershipRecords.size(),
@@ -385,6 +496,103 @@ int main()
                                 "missing-sample-source-asset",
                                 "sampleSources[0].path"),
                 "Rejected prepared playback result should preserve the immutable snapshot findings that caused rejection.");
+
+        const auto missingPreparedPath = scratchDirectory / "prepared-missing-source.wav";
+        fs::copy_file(phase2Project.project.sampleSources[0].path,
+                      missingPreparedPath,
+                      fs::copy_options::overwrite_existing);
+        auto missingPreparedProject = phase2Project.project;
+        missingPreparedProject.sampleSources[0].path = missingPreparedPath.generic_string();
+        drs::engine::PreparedPlaybackService missingPreparedService;
+        const auto missingPreparedSnapshotRequest = snapshotBuilder.requestBuild(4, true);
+        const auto missingPreparedSnapshot = snapshotBuilder.buildSnapshot(missingPreparedSnapshotRequest,
+                                                                           missingPreparedProject);
+        require(missingPreparedSnapshot.built,
+                "Prepared-playback missing-source coverage should start from a valid immutable snapshot.");
+        const auto missingPreparedRequest = missingPreparedService.requestBuild(missingPreparedSnapshot, referenceStream);
+        require(missingPreparedRequest.accepted,
+                "Prepared-playback missing-source coverage should accept the immutable snapshot before the worker loss occurs.");
+        fs::remove(missingPreparedPath);
+        const auto missingPreparedResult = missingPreparedService.prepare(missingPreparedRequest,
+                                                                         missingPreparedSnapshot,
+                                                                         referenceStream);
+        require(!missingPreparedResult.built && !missingPreparedResult.activationEligible,
+                "Prepared playback should fail when the worker can no longer access the resolved source asset.");
+        const auto* missingPreparedFinding = findFinding(missingPreparedResult,
+                                                         drs::engine::PlaybackSnapshotFindingSeverity::error,
+                                                         "prepared-sample-source-missing",
+                                                         "sampleIdentities[0].sourcePath");
+        require(missingPreparedFinding != nullptr,
+                "Prepared playback should surface a structured source-missing finding when the worker loses the file.");
+        require(missingPreparedFinding->message.find("Sample missing") != std::string::npos,
+                "Prepared source-missing findings should preserve importer state detail.");
+
+        const auto unsupportedPreparedPath = scratchDirectory / "prepared-unsupported-source.wav";
+        fs::copy_file(phase2Project.project.sampleSources[0].path,
+                      unsupportedPreparedPath,
+                      fs::copy_options::overwrite_existing);
+        auto unsupportedPreparedProject = phase2Project.project;
+        unsupportedPreparedProject.sampleSources[0].path = unsupportedPreparedPath.generic_string();
+        drs::engine::PreparedPlaybackService unsupportedPreparedService;
+        const auto unsupportedPreparedSnapshotRequest = snapshotBuilder.requestBuild(5, true);
+        const auto unsupportedPreparedSnapshot = snapshotBuilder.buildSnapshot(unsupportedPreparedSnapshotRequest,
+                                                                               unsupportedPreparedProject);
+        require(unsupportedPreparedSnapshot.built,
+                "Prepared-playback unsupported-format coverage should start from a valid immutable snapshot.");
+        const auto unsupportedPreparedRequest = unsupportedPreparedService.requestBuild(unsupportedPreparedSnapshot,
+                                                                                        referenceStream);
+        require(unsupportedPreparedRequest.accepted,
+                "Prepared-playback unsupported-format coverage should accept the immutable snapshot before the worker decode.");
+        {
+            juce::FileOutputStream unsupportedOutput(juce::File(unsupportedPreparedPath.generic_string()));
+            require(unsupportedOutput.openedOk(),
+                    "Could not rewrite prepared-playback unsupported-format fixture.");
+            unsupportedOutput.setPosition(0);
+            unsupportedOutput.truncate();
+            unsupportedOutput.writeText("not audio", false, false, nullptr);
+        }
+        const auto unsupportedPreparedResult = unsupportedPreparedService.prepare(unsupportedPreparedRequest,
+                                                                                  unsupportedPreparedSnapshot,
+                                                                                  referenceStream);
+        require(!unsupportedPreparedResult.built && !unsupportedPreparedResult.activationEligible,
+                "Prepared playback should fail when the worker sees an unsupported source format.");
+        const auto* unsupportedPreparedFinding = findFinding(unsupportedPreparedResult,
+                                                             drs::engine::PlaybackSnapshotFindingSeverity::error,
+                                                             "prepared-sample-format-unsupported",
+                                                             "sampleIdentities[0].sourcePath");
+        require(unsupportedPreparedFinding != nullptr,
+                "Prepared playback should surface a structured unsupported-format finding.");
+        require(unsupportedPreparedFinding->message.find("Sample format unsupported") != std::string::npos,
+                "Prepared unsupported-format findings should preserve importer state detail.");
+
+        const auto rejectedDecodePath = scratchDirectory / "prepared-high-rate-source.wav";
+        const auto rejectionBuffer = buildReferenceBuffer();
+        juce::WavAudioFormat wavFormat;
+        writeAudioFile(rejectedDecodePath, wavFormat, rejectionBuffer, 96000.0);
+        auto rejectedDecodeProject = phase2Project.project;
+        rejectedDecodeProject.sampleSources[0].path = rejectedDecodePath.generic_string();
+        drs::engine::PreparedPlaybackService rejectedDecodeService;
+        const auto rejectedDecodeSnapshotRequest = snapshotBuilder.requestBuild(6, true);
+        const auto rejectedDecodeSnapshot = snapshotBuilder.buildSnapshot(rejectedDecodeSnapshotRequest,
+                                                                          rejectedDecodeProject);
+        require(rejectedDecodeSnapshot.built,
+                "Prepared-playback decode-failure coverage should start from a valid immutable snapshot.");
+        const auto rejectedDecodeRequest = rejectedDecodeService.requestBuild(rejectedDecodeSnapshot, referenceStream);
+        require(rejectedDecodeRequest.accepted,
+                "Prepared-playback decode-failure coverage should accept the immutable snapshot before policy validation.");
+        const auto rejectedDecodeResult = rejectedDecodeService.prepare(rejectedDecodeRequest,
+                                                                        rejectedDecodeSnapshot,
+                                                                        referenceStream);
+        require(!rejectedDecodeResult.built && !rejectedDecodeResult.activationEligible,
+                "Prepared playback should fail when worker-side decode policy rejects the source.");
+        const auto* rejectedDecodeFinding = findFinding(rejectedDecodeResult,
+                                                        drs::engine::PlaybackSnapshotFindingSeverity::error,
+                                                        "prepared-sample-decode-failed",
+                                                        "sampleIdentities[0].sourcePath");
+        require(rejectedDecodeFinding != nullptr,
+                "Prepared playback should surface a structured decode-failure finding for policy-rejected sources.");
+        require(rejectedDecodeFinding->message.find("Phase 1 sample policy rejected") != std::string::npos,
+                "Prepared decode-failure findings should preserve policy-rejection detail.");
 
         const auto phase1Project = drs::engine::loadPhase1ReferenceProjectManifest();
         require(phase1Project.loaded, "Phase 1 reference project must load before migrated prepared-playback coverage runs.");
@@ -474,6 +682,11 @@ int main()
                 "First successful migrated prepared build should cold-miss every migrated sample handle.");
         require(importedPrepared.metrics.cacheHitCount == 0,
                 "First successful migrated prepared build should not report cache hits.");
+        require(importedPrepared.metrics.preparedSampleDataBytes
+                    == computeExpectedPreparedSampleDataBytes(importedPrepared.prepared),
+                "Imported migrated prepared playback should expose deterministic prepared sample-data bytes.");
+        require(importedPrepared.metrics.decodedBytes == computeExpectedPreparedSampleDataBytes(importedPrepared.prepared),
+                "First successful migrated prepared build should decode imported source samples through the preparation service.");
         require(importedPrepared.prepared.zones.size() == 1,
                 "Imported migrated prepared playback should expose exactly one playable zone.");
         require(importedPrepared.prepared.zones[0].zoneId == importedZone.id,
@@ -508,6 +721,11 @@ int main()
                 "Editing zone-only migrated content should reuse every prepared sample handle.");
         require(editedImportedPrepared.metrics.cacheMissCount == 0,
                 "Editing zone-only migrated content should not invalidate prepared sample handles.");
+        require(editedImportedPrepared.metrics.preparedSampleDataBytes
+                    == importedPrepared.metrics.preparedSampleDataBytes,
+                "Editing zone-only migrated content should preserve deterministic prepared sample-data bytes.");
+        require(editedImportedPrepared.metrics.decodedBytes == 0,
+                "Editing zone-only migrated content should not re-decode warm prepared sample handles.");
         require(editedImportedPrepared.prepared.zones[0].gainDb == editedImportedZone.gainDb
                     && editedImportedPrepared.prepared.zones[0].pan == editedImportedZone.pan,
                 "Prepared playback should preserve edited migrated zone normalization values.");
@@ -523,7 +741,7 @@ int main()
                     && canceledPrepared.cancellationId == firstPreparedRequest.cancellationId,
                 "Canceled prepared playback result should preserve request and cancellation identities.");
 
-        const auto supersedingPreparedRequest = preparedService.requestBuild(secondSnapshot);
+        const auto supersedingPreparedRequest = preparedService.requestBuild(secondSnapshot, referenceStream);
         const auto supersededPrepared = preparedService.supersedeBuild(firstPreparedRequest,
                                                                        supersedingPreparedRequest.buildId);
         require(supersededPrepared.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::superseded,

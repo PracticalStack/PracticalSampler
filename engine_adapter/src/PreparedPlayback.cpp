@@ -1,4 +1,5 @@
 #include "drs/engine/PreparedPlayback.h"
+#include "drs/engine/SampleImport.h"
 
 #include <json/json.hpp>
 
@@ -244,19 +245,120 @@ void populateStreamTopologyMetadata(PreparedPlaybackStreamHandle& streamHandle,
 }
 
 std::string buildCacheKey(const std::string& compilerVersion,
-                          const PlaybackSnapshotSampleIdentity& sampleIdentity,
+                          const PreparedPlaybackSampleResolution& sampleResolution,
                           const RuntimeStreamSampleDefinition& streamSample,
                           const RuntimeStreamContainerModel& container)
 {
     std::ostringstream stream;
     stream << compilerVersion
-           << "|sampleSourceId=" << sampleIdentity.sampleSourceId
-           << "|sourcePath=" << normalizePath(sampleIdentity.sourcePath)
+           << "|sampleSourceId=" << sampleResolution.sampleSourceId
+           << "|sourcePath=" << sampleResolution.normalizedSourcePath
            << "|checksum=" << streamSample.sourceChecksumHex
-           << "|format=" << streamSample.formatName
+           << "|format=" << sampleResolution.selectedFormatName
            << "|encoding=" << container.payloadEncoding
            << "|pageSize=" << container.pageSizeBytes;
     return "fnv1a64:" + computeFnv1a64Hex(stream.str());
+}
+
+std::string summarizeIssues(const std::vector<std::string>& issues)
+{
+    if (issues.empty())
+        return {};
+
+    if (issues.size() == 1)
+        return issues.front();
+
+    return issues.front() + " (+" + std::to_string(issues.size() - 1) + " more)";
+}
+
+struct PreparedSampleImportFailure
+{
+    std::string code;
+    std::string summary;
+};
+
+PreparedSampleImportFailure classifyPreparedSampleImportFailure(const SampleImportResult& result)
+{
+    if (!result.fileFound || result.state == "Sample missing")
+    {
+        return {
+            "prepared-sample-source-missing",
+            "Prepared playback source sample is missing"
+        };
+    }
+
+    if (result.state == "Sample format unsupported")
+    {
+        return {
+            "prepared-sample-format-unsupported",
+            "Prepared playback source sample uses an unsupported format"
+        };
+    }
+
+    return {
+        "prepared-sample-decode-failed",
+        "Prepared playback source sample failed decode or policy validation"
+    };
+}
+
+std::string describePreparedSampleImportFailure(const SampleImportResult& result)
+{
+    if (result.state.empty())
+        return summarizeIssues(result.issues);
+
+    if (result.issues.empty())
+        return result.state;
+
+    return result.state + " - " + summarizeIssues(result.issues);
+}
+
+std::uint64_t computeDecodedSampleBytes(const ImportedSampleData& sample)
+{
+    return static_cast<std::uint64_t>(sample.metadata.channelCount)
+        * sample.metadata.frameCount
+        * static_cast<std::uint64_t>(sizeof(float));
+}
+
+std::uint64_t computePreparedSampleDataBytes(const PreparedPlaybackSampleHandle& sample)
+{
+    return static_cast<std::uint64_t>(sample.channelCount)
+        * sample.frameCount
+        * static_cast<std::uint64_t>(sizeof(float));
+}
+
+std::vector<std::string> collectDecodeMismatches(const ImportedSampleMetadata& decoded,
+                                                 const RuntimeStreamSampleDefinition& streamSample)
+{
+    std::vector<std::string> mismatches;
+
+    if (decoded.sourceChecksumHex != streamSample.sourceChecksumHex)
+    {
+        mismatches.push_back("checksum decoded=" + decoded.sourceChecksumHex
+                             + " compiled=" + streamSample.sourceChecksumHex);
+    }
+
+    if (decoded.formatName != streamSample.formatName)
+        mismatches.push_back("format decoded=" + decoded.formatName + " compiled=" + streamSample.formatName);
+
+    if (decoded.sampleRate != streamSample.sampleRate)
+    {
+        mismatches.push_back("sample rate decoded=" + std::to_string(static_cast<int>(decoded.sampleRate))
+                             + " compiled=" + std::to_string(static_cast<int>(streamSample.sampleRate)));
+    }
+
+    if (decoded.frameCount != streamSample.frameCount)
+    {
+        mismatches.push_back("frame count decoded=" + std::to_string(decoded.frameCount)
+                             + " compiled=" + std::to_string(streamSample.frameCount));
+    }
+
+    if (decoded.channelCount != streamSample.channelCount)
+    {
+        mismatches.push_back("channel count decoded=" + std::to_string(decoded.channelCount)
+                             + " compiled=" + std::to_string(streamSample.channelCount));
+    }
+
+    return mismatches;
 }
 
 const RuntimeStreamSampleDefinition* findStreamSampleByPath(const RuntimeStreamContainerModel& container,
@@ -336,6 +438,57 @@ PreparedPlaybackBuildRequest PreparedPlaybackService::requestBuild(const Playbac
     return request;
 }
 
+PreparedPlaybackBuildRequest PreparedPlaybackService::requestBuild(const PlaybackSnapshotBuildResult& snapshotResult,
+                                                                  const RuntimeStreamLoadResult& streamResult)
+{
+    return resolveBuildRequest(requestBuild(snapshotResult), snapshotResult, streamResult);
+}
+
+PreparedPlaybackBuildRequest PreparedPlaybackService::resolveBuildRequest(
+    const PreparedPlaybackBuildRequest& request,
+    const PlaybackSnapshotBuildResult& snapshotResult,
+    const RuntimeStreamLoadResult& streamResult) const
+{
+    auto resolvedRequest = request;
+    resolvedRequest.sampleResolutions.clear();
+    resolvedRequest.sampleResolutionReady = false;
+
+    if (!resolvedRequest.accepted || !streamResult.loaded)
+        return resolvedRequest;
+
+    resolvedRequest.sampleResolutions.reserve(snapshotResult.snapshot.sampleIdentities.size());
+
+    for (std::size_t index = 0; index < snapshotResult.snapshot.sampleIdentities.size(); ++index)
+    {
+        const auto& sampleIdentity = snapshotResult.snapshot.sampleIdentities[index];
+        PreparedPlaybackSampleResolution resolution;
+        resolution.snapshotSampleIndex = index;
+        resolution.sampleSourceId = sampleIdentity.sampleSourceId;
+        resolution.normalizedSourcePath = normalizePath(sampleIdentity.sourcePath);
+
+        if (const auto* streamSample = findStreamSampleByPath(streamResult.container, resolution.normalizedSourcePath))
+        {
+            resolution.selectedStreamSampleId = streamSample->sampleId;
+            resolution.selectedFormatName = streamSample->formatName;
+            resolution.matchedBySourcePath = true;
+        }
+        else if (!sampleIdentity.sampleSourceId.empty())
+        {
+            if (const auto* streamSampleById = findStreamSampleById(streamResult.container, sampleIdentity.sampleSourceId))
+            {
+                resolution.selectedStreamSampleId = streamSampleById->sampleId;
+                resolution.selectedFormatName = streamSampleById->formatName;
+                resolution.matchedBySampleSourceId = true;
+            }
+        }
+
+        resolvedRequest.sampleResolutions.push_back(std::move(resolution));
+    }
+
+    resolvedRequest.sampleResolutionReady = true;
+    return resolvedRequest;
+}
+
 PreparedPlaybackQueueSubmitResult PreparedPlaybackService::enqueuePreviewBuild(
     const PlaybackSnapshotBuildResult& snapshotResult)
 {
@@ -405,6 +558,10 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
         return result;
     }
 
+    const auto resolvedRequest = request.sampleResolutionReady
+        ? request
+        : resolveBuildRequest(request, snapshotResult, streamResult);
+
     result.prepared.snapshotBuildId = snapshotResult.buildId;
     result.prepared.snapshotContentDigest = snapshotResult.snapshot.contentDigest;
     result.prepared.compilerVersion = compilerVersion;
@@ -417,20 +574,17 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     std::unordered_map<std::string, std::size_t> sampleIndices;
     std::unordered_map<std::string, std::size_t> streamIndices;
 
-    result.prepared.ownershipRecords.reserve(snapshotResult.snapshot.sampleIdentities.size());
-    result.prepared.samples.reserve(snapshotResult.snapshot.sampleIdentities.size());
-    result.prepared.streams.reserve(snapshotResult.snapshot.sampleIdentities.size());
+    result.prepared.ownershipRecords.reserve(resolvedRequest.sampleResolutions.size());
+    result.prepared.samples.reserve(resolvedRequest.sampleResolutions.size());
+    result.prepared.streams.reserve(resolvedRequest.sampleResolutions.size());
     result.prepared.zones.reserve(snapshotResult.snapshot.zones.size());
 
-    for (std::size_t index = 0; index < snapshotResult.snapshot.sampleIdentities.size(); ++index)
+    for (const auto& sampleResolution : resolvedRequest.sampleResolutions)
     {
-        const auto& sampleIdentity = snapshotResult.snapshot.sampleIdentities[index];
-        const auto path = "sampleIdentities[" + std::to_string(index) + "]";
-        const auto normalizedPath = normalizePath(sampleIdentity.sourcePath);
-
-        const auto* streamSample = findStreamSampleByPath(streamResult.container, normalizedPath);
-        if (streamSample == nullptr && !sampleIdentity.sampleSourceId.empty())
-            streamSample = findStreamSampleById(streamResult.container, sampleIdentity.sampleSourceId);
+        const auto path = "sampleIdentities[" + std::to_string(sampleResolution.snapshotSampleIndex) + "]";
+        const auto* streamSample = sampleResolution.selectedStreamSampleId.empty()
+            ? nullptr
+            : findStreamSampleById(streamResult.container, sampleResolution.selectedStreamSampleId);
 
         if (streamSample == nullptr)
         {
@@ -438,11 +592,11 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
                        PlaybackSnapshotFindingSeverity::error,
                        "missing-prepared-stream-sample",
                        path + ".sourcePath",
-                       "No compiled stream sample matches snapshot sample source '" + sampleIdentity.sampleSourceId + "'.");
+                       "No compiled stream sample matches snapshot sample source '" + sampleResolution.sampleSourceId + "'.");
             continue;
         }
 
-        const auto cacheKey = buildCacheKey(compilerVersion, sampleIdentity, *streamSample, streamResult.container);
+        const auto cacheKey = buildCacheKey(compilerVersion, sampleResolution, *streamSample, streamResult.container);
         const auto cacheIterator = std::find_if(cacheEntries.begin(),
                                                 cacheEntries.end(),
                                                 [&](const auto& entry)
@@ -462,28 +616,55 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
         }
         else
         {
-            sampleHandle.sampleSourceId = sampleIdentity.sampleSourceId;
+            const auto decodedSample = importSampleFile(sampleResolution.normalizedSourcePath);
+            if (!decodedSample.imported)
+            {
+                const auto failure = classifyPreparedSampleImportFailure(decodedSample);
+                addFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           failure.code,
+                           path + ".sourcePath",
+                           failure.summary + " '" + sampleResolution.normalizedSourcePath + "': "
+                               + describePreparedSampleImportFailure(decodedSample));
+                continue;
+            }
+
+            const auto decodeMismatches = collectDecodeMismatches(decodedSample.sample.metadata, *streamSample);
+            if (!decodeMismatches.empty())
+            {
+                addFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           "prepared-sample-stream-mismatch",
+                           path + ".sourcePath",
+                           "Prepared playback decoded source sample '" + sampleResolution.normalizedSourcePath
+                               + "', but the compiled stream metadata no longer matches: "
+                               + summarizeIssues(decodeMismatches));
+                continue;
+            }
+
+            sampleHandle.sampleSourceId = sampleResolution.sampleSourceId;
             sampleHandle.streamSampleId = streamSample->sampleId;
-            sampleHandle.sourcePath = normalizedPath;
-            sampleHandle.canonicalSourcePath = normalizedPath;
-            sampleHandle.canonicalSourceIdentity = buildCanonicalSourceIdentity(sampleIdentity.sampleSourceId,
-                                                                                normalizedPath);
-            sampleHandle.sourceFingerprintHex = streamSample->sourceChecksumHex;
-            sampleHandle.formatName = streamSample->formatName;
-            sampleHandle.role = sampleIdentity.role.empty() ? streamSample->role : sampleIdentity.role;
+            sampleHandle.sourcePath = sampleResolution.normalizedSourcePath;
+            sampleHandle.canonicalSourcePath = sampleResolution.normalizedSourcePath;
+            sampleHandle.canonicalSourceIdentity = buildCanonicalSourceIdentity(sampleResolution.sampleSourceId,
+                                                                                sampleResolution.normalizedSourcePath);
+            sampleHandle.sourceFingerprintHex = decodedSample.sample.metadata.sourceChecksumHex;
+            sampleHandle.formatName = decodedSample.sample.metadata.formatName;
+            const auto& snapshotRole = snapshotResult.snapshot.sampleIdentities[sampleResolution.snapshotSampleIndex].role;
+            sampleHandle.role = snapshotRole.empty() ? streamSample->role : snapshotRole;
             sampleHandle.channelLayout = streamSample->channelLayout;
-            sampleHandle.sampleRate = streamSample->sampleRate;
-            sampleHandle.frameCount = streamSample->frameCount;
-            sampleHandle.channelCount = streamSample->channelCount;
-            sampleHandle.rootMidiNotePresent = streamSample->rootMidiNotePresent;
-            sampleHandle.rootMidiNote = streamSample->rootMidiNote;
-            sampleHandle.loopRangePresent = streamSample->loopRangePresent;
-            sampleHandle.loopStartFrame = streamSample->loopStartFrame;
-            sampleHandle.loopEndFrame = streamSample->loopEndFrame;
+            sampleHandle.sampleRate = decodedSample.sample.metadata.sampleRate;
+            sampleHandle.frameCount = decodedSample.sample.metadata.frameCount;
+            sampleHandle.channelCount = decodedSample.sample.metadata.channelCount;
+            sampleHandle.rootMidiNotePresent = decodedSample.sample.metadata.rootMidiNotePresent;
+            sampleHandle.rootMidiNote = decodedSample.sample.metadata.rootMidiNote;
+            sampleHandle.loopRangePresent = decodedSample.sample.metadata.loopRangePresent;
+            sampleHandle.loopStartFrame = decodedSample.sample.metadata.loopStartFrame;
+            sampleHandle.loopEndFrame = decodedSample.sample.metadata.loopEndFrame;
             sampleHandle.ownershipToken = "cache:" + cacheKey;
             sampleHandle.cacheKey = cacheKey;
 
-            streamHandle.sampleSourceId = sampleIdentity.sampleSourceId;
+            streamHandle.sampleSourceId = sampleResolution.sampleSourceId;
             streamHandle.streamSampleId = streamSample->sampleId;
             streamHandle.containerId = streamResult.container.containerId;
             streamHandle.containerPath = streamResult.containerPath;
@@ -499,12 +680,12 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             for (const auto& page : streamSample->pages)
                 streamHandle.pages.push_back({ page.pageIndex, page.offsetBytes, page.sizeBytes });
 
-            retireSupersededCacheEntries(sampleIdentity.sampleSourceId, cacheKey, request.buildId);
+            retireSupersededCacheEntries(sampleResolution.sampleSourceId, cacheKey, request.buildId);
 
             CacheEntry entry;
             entry.ownership.ownershipToken = sampleHandle.ownershipToken;
             entry.ownership.cacheKey = cacheKey;
-            entry.ownership.sampleSourceId = sampleIdentity.sampleSourceId;
+            entry.ownership.sampleSourceId = sampleResolution.sampleSourceId;
             entry.ownership.streamSampleId = streamSample->sampleId;
             entry.ownership.lifetimeState = "active-cache-entry";
             entry.ownership.retainedBytes = streamSample->payloadSizeBytes;
@@ -514,6 +695,7 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             entry.retainedBytes = streamSample->payloadSizeBytes;
             cacheEntries.push_back({ cacheKey, std::move(entry) });
             ++result.metrics.cacheMissCount;
+            result.metrics.decodedBytes += computeDecodedSampleBytes(decodedSample.sample);
         }
 
         const auto ownershipRecordIndex = result.prepared.ownershipRecords.size();
@@ -526,13 +708,14 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
 
         const auto sampleIndex = result.prepared.samples.size();
         result.prepared.samples.push_back(sampleHandle);
-        sampleIndices.emplace(sampleIdentity.sampleSourceId, sampleIndex);
+        sampleIndices.emplace(sampleResolution.sampleSourceId, sampleIndex);
 
         const auto streamIndex = result.prepared.streams.size();
         result.prepared.streams.push_back(streamHandle);
-        streamIndices.emplace(sampleIdentity.sampleSourceId, streamIndex);
+        streamIndices.emplace(sampleResolution.sampleSourceId, streamIndex);
 
         result.metrics.preparedBytes += streamHandle.payloadSizeBytes;
+        result.metrics.preparedSampleDataBytes += computePreparedSampleDataBytes(sampleHandle);
     }
 
     for (std::size_t index = 0; index < snapshotResult.snapshot.zones.size(); ++index)
@@ -861,7 +1044,8 @@ PreparedPlaybackWorkerStepResult PreparedPlaybackService::processQueuedJob(const
     stepResult.processed = true;
     stepResult.lane = job.lane;
     stepResult.priority = job.priority;
-    stepResult.result = prepare(job.request, job.snapshotResult, streamResult);
+    const auto resolvedRequest = resolveBuildRequest(job.request, job.snapshotResult, streamResult);
+    stepResult.result = prepare(resolvedRequest, job.snapshotResult, streamResult);
     return stepResult;
 }
 

@@ -68,11 +68,13 @@ juce_add_console_app(drs_phase1_draft_playback_contract_tests
 target_sources(drs_phase1_draft_playback_contract_tests
     PRIVATE
         src/Phase1DraftPlaybackContractTests.cpp
+        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
 )
 
 target_link_libraries(drs_phase1_draft_playback_contract_tests
     PRIVATE
         drs_engine_adapter
+        juce::juce_audio_formats
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
@@ -93,11 +95,13 @@ juce_add_console_app(drs_phase1_draft_playback_facade_tests
 target_sources(drs_phase1_draft_playback_facade_tests
     PRIVATE
         src/Phase1DraftPlaybackFacadeTests.cpp
+        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
 )
 
 target_link_libraries(drs_phase1_draft_playback_facade_tests
     PRIVATE
         drs_engine_adapter
+        juce::juce_audio_formats
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
@@ -143,11 +147,13 @@ juce_add_console_app(drs_phase1_prepared_playback_tests
 target_sources(drs_phase1_prepared_playback_tests
     PRIVATE
         src/Phase1PreparedPlaybackTests.cpp
+        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
 )
 
 target_link_libraries(drs_phase1_prepared_playback_tests
     PRIVATE
         drs_engine_adapter
+        juce::juce_audio_formats
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
@@ -168,11 +174,13 @@ juce_add_console_app(drs_phase1_prepared_playback_worker_tests
 target_sources(drs_phase1_prepared_playback_worker_tests
     PRIVATE
         src/Phase1PreparedPlaybackWorkerTests.cpp
+        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
 )
 
 target_link_libraries(drs_phase1_prepared_playback_worker_tests
     PRIVATE
         drs_engine_adapter
+        juce::juce_audio_formats
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
@@ -301,7 +309,6 @@ juce_add_console_app(drs_phase2_authoring_import_tests
 target_sources(drs_phase2_authoring_import_tests
     PRIVATE
         src/Phase2AuthoringImportTests.cpp
-        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
 )
 
 target_link_libraries(drs_phase2_authoring_import_tests
@@ -438,12 +445,14 @@ juce_add_console_app(drs_phase2_performance_ui_tests
 target_sources(drs_phase2_performance_ui_tests
     PRIVATE
         src/Phase2PerformanceUiTests.cpp
+        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
 )
 
 target_link_libraries(drs_phase2_performance_ui_tests
     PRIVATE
         drs_app_shared
         drs_engine_adapter
+        juce::juce_audio_formats
         juce::juce_gui_extra
     PUBLIC
         juce::juce_recommended_config_flags
@@ -544,11 +553,13 @@ juce_add_console_app(drs_phase1_diagnostics_tests
 target_sources(drs_phase1_diagnostics_tests
     PRIVATE
         src/Phase1DiagnosticsTests.cpp
+        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
 )
 
 target_link_libraries(drs_phase1_diagnostics_tests
     PRIVATE
         drs_engine_adapter
+        juce::juce_audio_formats
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
@@ -569,11 +580,13 @@ juce_add_console_app(drs_phase1_failure_handling_tests
 target_sources(drs_phase1_failure_handling_tests
     PRIVATE
         src/Phase1FailureHandlingTests.cpp
+        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
 )
 
 target_link_libraries(drs_phase1_failure_handling_tests
     PRIVATE
         drs_engine_adapter
+        juce::juce_audio_formats
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
@@ -646,7 +659,6 @@ juce_add_console_app(drs_phase1_sample_import_tests
 target_sources(drs_phase1_sample_import_tests
     PRIVATE
         src/Phase1SampleImportTests.cpp
-        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
 )
 
 target_link_libraries(drs_phase1_sample_import_tests
@@ -678,7 +690,6 @@ juce_add_console_app(drs_phase1_compile_path_tests
 target_sources(drs_phase1_compile_path_tests
     PRIVATE
         src/Phase1CompilePathTests.cpp
-        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
 )
 
 target_link_libraries(drs_phase1_compile_path_tests
@@ -711,7 +722,6 @@ juce_add_console_app(drs_phase1_pipeline_report
 target_sources(drs_phase1_pipeline_report
     PRIVATE
         src/Phase1PipelineReport.cpp
-        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
 )
 
 target_link_libraries(drs_phase1_pipeline_report

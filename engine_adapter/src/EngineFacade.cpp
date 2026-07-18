@@ -1232,7 +1232,7 @@ PlaybackSnapshotBuildResult EngineFacade::buildCurrentPlaybackSnapshot(bool acti
 
 PreparedPlaybackBuildResult EngineFacade::buildRejectedPreparedPlayback(const PlaybackSnapshotBuildResult& snapshotResult)
 {
-    const auto request = preparedPlaybackService.requestBuild(snapshotResult);
+    const auto request = preparedPlaybackService.requestBuild(snapshotResult, referenceStream);
     return preparedPlaybackService.prepare(request, snapshotResult, referenceStream);
 }
 

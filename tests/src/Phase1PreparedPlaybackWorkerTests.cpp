@@ -1,8 +1,10 @@
+#include "drs/engine/AuthoringSession.h"
 #include "drs/engine/PlaybackSnapshot.h"
 #include "drs/engine/PreparedPlayback.h"
 #include "drs/engine/ProjectDocument.h"
 #include "drs/engine/RuntimeLoader.h"
 
+#include <algorithm>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -13,6 +15,20 @@ void require(bool condition, const std::string& message)
 {
     if (!condition)
         throw std::runtime_error(message);
+}
+
+std::uint64_t computePreparedSampleDataBytes(const drs::engine::ImmutablePreparedPlayback& prepared)
+{
+    std::uint64_t sampleDataBytes = 0;
+
+    for (const auto& sample : prepared.samples)
+    {
+        sampleDataBytes += static_cast<std::uint64_t>(sample.channelCount)
+            * sample.frameCount
+            * static_cast<std::uint64_t>(sizeof(float));
+    }
+
+    return sampleDataBytes;
 }
 
 drs::engine::PlaybackSnapshotBuildResult buildSnapshot(drs::engine::PlaybackSnapshotBuilder& builder,
@@ -42,6 +58,35 @@ int main()
         drs::engine::PlaybackSnapshotBuilder snapshotBuilder;
         drs::engine::PreparedPlaybackService preparedService;
         drs::engine::RuntimeProjectDocumentController controller(phase2Project.project);
+
+        drs::engine::PreparedPlaybackService previewDecodeService;
+        const auto coldPreviewRevision0 = buildSnapshot(snapshotBuilder, controller.getProject(), 0, false);
+        const auto queuedColdPreviewRevision0 = previewDecodeService.enqueuePreviewBuild(coldPreviewRevision0);
+        require(queuedColdPreviewRevision0.accepted, "Cold preview preparation should queue successfully.");
+        const auto processedColdPreview = previewDecodeService.processNextQueuedBuild(referenceStream);
+        require(processedColdPreview.processed, "Cold preview preparation should process through the worker.");
+        require(processedColdPreview.lane == drs::engine::PreparedPlaybackWorkLane::preview,
+                "Cold preview preparation should stay on the preview lane.");
+        require(processedColdPreview.result.built,
+                "Cold preview preparation should succeed for the reference content.");
+        require(processedColdPreview.result.metrics.preparedSampleDataBytes
+                    == computePreparedSampleDataBytes(processedColdPreview.result.prepared),
+                "Cold preview preparation should expose deterministic prepared sample-data bytes.");
+        require(processedColdPreview.result.metrics.decodedBytes > 0,
+                "Cold preview preparation should decode source samples through the worker-owned preparation seam.");
+        const auto queuedWarmPreviewRevision0 = previewDecodeService.enqueuePreviewBuild(coldPreviewRevision0);
+        require(queuedWarmPreviewRevision0.accepted, "Warm preview preparation should queue successfully.");
+        const auto processedWarmPreview = previewDecodeService.processNextQueuedBuild(referenceStream);
+        require(processedWarmPreview.processed && processedWarmPreview.result.built,
+                "Warm preview preparation should still succeed for the same reference content.");
+        require(processedWarmPreview.result.prepared.preparedContentDigest
+                    == processedColdPreview.result.prepared.preparedContentDigest,
+                "Warm preview preparation should preserve the prepared digest for unchanged content.");
+        require(processedWarmPreview.result.metrics.preparedSampleDataBytes
+                    == processedColdPreview.result.metrics.preparedSampleDataBytes,
+                "Warm preview preparation should preserve deterministic prepared sample-data bytes.");
+        require(processedWarmPreview.result.metrics.decodedBytes == 0,
+                "Warm preview preparation should not re-decode unchanged sample handles.");
 
         const auto previewRevision0 = buildSnapshot(snapshotBuilder, controller.getProject(), 0, false);
         const auto queuedPreviewRevision0 = preparedService.enqueuePreviewBuild(previewRevision0);
@@ -87,6 +132,14 @@ int main()
                 "Publish preparation should run ahead of preview work.");
         require(processedPublish.result.built,
                 "Processed publish preparation should succeed for the reference content.");
+        require(processedPublish.result.metrics.preparedSampleDataBytes
+                    == computePreparedSampleDataBytes(processedPublish.result.prepared),
+                "Cold publish preparation should expose deterministic prepared sample-data bytes.");
+        require(processedPublish.result.metrics.preparedSampleDataBytes
+                    == processedColdPreview.result.metrics.preparedSampleDataBytes,
+                "Equivalent cold preview and publish source content should report the same prepared sample-data bytes.");
+        require(processedPublish.result.metrics.decodedBytes > 0,
+                "Cold publish preparation should decode source samples through the worker-owned preparation seam.");
         require(preparedService.getWorkerStatus().pendingWorkCount == 1,
                 "Processing the publish job should leave only the preview job queued.");
 
@@ -121,6 +174,11 @@ int main()
                 "Invalidating one source should preserve exactly one warm prepared handle.");
         require(processedInvalidatingPreview.result.metrics.cacheMissCount == 1,
                 "Invalidating one source should rebuild exactly one prepared handle.");
+        require(processedInvalidatingPreview.result.metrics.preparedSampleDataBytes
+                    == computePreparedSampleDataBytes(processedInvalidatingPreview.result.prepared),
+                "Invalidating preview preparation should preserve deterministic prepared sample-data bytes.");
+        require(processedInvalidatingPreview.result.metrics.decodedBytes > 0,
+                "Invalidating one source should re-decode the worker-owned cold-miss handle.");
         require(processedInvalidatingPreview.result.metrics.activeCachedOwnershipRecordCount == 2,
                 "Worker metrics should expose the active cached ownership-record count after invalidation.");
         require(processedInvalidatingPreview.result.metrics.retiredOwnershipRecordCount == 1,
@@ -150,6 +208,111 @@ int main()
                 "Retiring stale prepared cache entries should clear the retained-byte backlog.");
         require(preparedService.snapshotRetiredOwnershipRecords().empty(),
                 "Draining stale prepared cache entries should clear the retired ownership backlog.");
+
+        const auto phase1Project = drs::engine::loadPhase1ReferenceProjectManifest();
+        require(phase1Project.loaded, "Phase 1 reference project must load before migrated worker coverage runs.");
+        const auto migratedProject = drs::engine::migrateRuntimeProjectToPhase2Authoring(phase1Project.project);
+        require(migratedProject.valid, "Phase 1 reference project should migrate before worker coverage runs.");
+
+        drs::engine::AuthoringSession migratedSession(migratedProject.project);
+        drs::engine::RuntimeProjectSampleSource importedSampleSource;
+        importedSampleSource.id = "migrated-worker-sine-a3";
+        importedSampleSource.path = phase1Project.project.sampleSources[0].path;
+        importedSampleSource.role = "imported-sustain";
+
+        drs::engine::RuntimeProjectZoneDefinition importedZone;
+        importedZone.id = "migrated-worker-zone-a3";
+        importedZone.sampleSourceId = importedSampleSource.id;
+        importedZone.displayName = "Migrated Worker Zone A3";
+        importedZone.groupId = "main";
+        importedZone.articulationId = "sustain";
+        importedZone.rootKey = 57;
+        importedZone.keyLow = 57;
+        importedZone.keyHigh = 57;
+        importedZone.velocityLow = 1;
+        importedZone.velocityHigh = 127;
+
+        const auto migratedImport = migratedSession.appendImportedContent({ importedSampleSource },
+                                                                          { importedZone },
+                                                                          "Import migrated worker zone");
+        require(migratedImport.applied, "Migrated worker coverage should accept imported authoring content.");
+        require(migratedImport.documentState.revision == 1,
+                "Imported migrated worker content should advance the draft revision.");
+
+        drs::engine::PlaybackSnapshotBuilder migratedSnapshotBuilder;
+        drs::engine::PreparedPlaybackService migratedPreparedWorker;
+        const auto migratedPreviewSnapshot = buildSnapshot(migratedSnapshotBuilder,
+                                                           migratedSession.getProject(),
+                                                           migratedImport.documentState.revision,
+                                                           false);
+        require(migratedPreviewSnapshot.built,
+                "Imported migrated worker content should build a valid preview snapshot.");
+        const auto queuedMigratedPreview = migratedPreparedWorker.enqueuePreviewBuild(migratedPreviewSnapshot);
+        require(queuedMigratedPreview.accepted,
+                "Imported migrated worker preview should queue successfully.");
+        const auto processedMigratedPreview = migratedPreparedWorker.processNextQueuedBuild(referenceStream);
+        require(processedMigratedPreview.processed, "Imported migrated worker preview should process.");
+        require(processedMigratedPreview.lane == drs::engine::PreparedPlaybackWorkLane::preview,
+                "Imported migrated worker preview should stay on the preview lane.");
+        require(processedMigratedPreview.result.built && processedMigratedPreview.result.activationEligible,
+                "Imported migrated worker preview should prepare successfully.");
+        require(processedMigratedPreview.result.metrics.preparedSampleCount
+                    == migratedSession.getProject().sampleSources.size(),
+                "Imported migrated worker preview should materialize every migrated sample identity.");
+        require(processedMigratedPreview.result.metrics.preparedZoneCount
+                    == migratedSession.getProject().authoring.zones.size(),
+                "Imported migrated worker preview should materialize every migrated playable zone.");
+        require(processedMigratedPreview.result.metrics.cacheMissCount
+                    == migratedSession.getProject().sampleSources.size(),
+                "Imported migrated worker preview should cold-miss every prepared sample handle on first build.");
+        require(processedMigratedPreview.result.metrics.cacheHitCount == 0,
+                "Imported migrated worker preview should not report cache hits on the first build.");
+        require(processedMigratedPreview.result.metrics.preparedSampleDataBytes
+                    == computePreparedSampleDataBytes(processedMigratedPreview.result.prepared),
+                "Imported migrated worker preview should expose deterministic prepared sample-data bytes.");
+        require(processedMigratedPreview.result.metrics.decodedBytes
+                    == processedMigratedPreview.result.metrics.preparedSampleDataBytes,
+                "Imported migrated worker preview should decode the full prepared sample-data footprint.");
+        require(processedMigratedPreview.result.prepared.zones.size() == 1,
+                "Imported migrated worker preview should expose one imported playable zone.");
+        require(processedMigratedPreview.result.prepared.zones.front().zoneId == importedZone.id,
+                "Imported migrated worker preview should preserve the imported zone identity.");
+
+        const auto migratedPublishSnapshot = buildSnapshot(migratedSnapshotBuilder,
+                                                           migratedSession.getProject(),
+                                                           migratedImport.documentState.revision,
+                                                           true);
+        require(migratedPublishSnapshot.built,
+                "Imported migrated worker content should build a valid publish snapshot.");
+        const auto queuedMigratedPublish = migratedPreparedWorker.enqueuePublishBuild(migratedPublishSnapshot);
+        require(queuedMigratedPublish.accepted,
+                "Imported migrated worker publish should queue successfully.");
+        const auto processedMigratedPublish = migratedPreparedWorker.processNextQueuedBuild(referenceStream);
+        require(processedMigratedPublish.processed, "Imported migrated worker publish should process.");
+        require(processedMigratedPublish.lane == drs::engine::PreparedPlaybackWorkLane::performance,
+                "Imported migrated worker publish should stay on the publish lane.");
+        require(processedMigratedPublish.result.built && processedMigratedPublish.result.activationEligible,
+                "Imported migrated worker publish should prepare successfully.");
+        require(processedMigratedPublish.result.prepared.snapshotContentDigest
+                    == processedMigratedPreview.result.prepared.snapshotContentDigest,
+                "Imported migrated worker preview and publish should share the same immutable snapshot digest.");
+        require(processedMigratedPublish.result.prepared.preparedContentDigest
+                    == processedMigratedPreview.result.prepared.preparedContentDigest,
+                "Imported migrated worker preview and publish should share the same prepared digest.");
+        require(processedMigratedPublish.result.metrics.cacheHitCount
+                    == migratedSession.getProject().sampleSources.size(),
+                "Imported migrated worker publish should reuse every prepared sample handle.");
+        require(processedMigratedPublish.result.metrics.cacheMissCount == 0,
+                "Imported migrated worker publish should not cold-miss after preview warmed the cache.");
+        require(processedMigratedPublish.result.metrics.preparedSampleDataBytes
+                    == processedMigratedPreview.result.metrics.preparedSampleDataBytes,
+                "Imported migrated worker publish should preserve deterministic prepared sample-data bytes.");
+        require(processedMigratedPublish.result.metrics.decodedBytes == 0,
+                "Imported migrated worker publish should not re-decode warm prepared sample handles.");
+        require(processedMigratedPublish.result.prepared.zones.size() == 1,
+                "Imported migrated worker publish should preserve the imported playable zone.");
+        require(processedMigratedPublish.result.prepared.zones.front().zoneId == importedZone.id,
+                "Imported migrated worker publish should preserve the imported zone identity.");
 
         std::cout << "Phase 1 prepared playback worker tests passed." << std::endl;
         return 0;
