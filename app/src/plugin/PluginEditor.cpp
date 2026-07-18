@@ -1067,6 +1067,8 @@ void Editor::confirmSafeToDiscardChanges(const juce::String& nextAction,
 void Editor::timerCallback()
 {
     processor.serviceMessageThreadWork();
+    performancePanel.refreshNow();
+    authoringPanel.refreshNow();
     updateProjectStatusLabel();
 }
 

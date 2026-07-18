@@ -842,10 +842,13 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     }
 
     refreshFromSession();
+    if (waveformPreviewProvider || authoringPreviewStatusProvider || importResponsivenessProvider || draftPlaybackStatusProvider)
+        startTimerHz(4);
 }
 
 AuthoringPanel::~AuthoringPanel()
 {
+    stopTimer();
     setLookAndFeel(nullptr);
 }
 
@@ -1311,6 +1314,13 @@ void AuthoringPanel::reloadFromSession()
     refreshFromSession();
 }
 
+void AuthoringPanel::refreshNow()
+{
+    selectionSummaryViewModel = buildSelectionSummaryViewModel();
+    summaryStrip.setViewModel(selectionSummaryViewModel);
+    refreshWaveformDrawerContent();
+}
+
 authoring::SelectionSummaryViewModel AuthoringPanel::buildSelectionSummaryViewModel() const
 {
     authoring::SelectionSummaryViewModel viewModel;
@@ -1555,6 +1565,11 @@ void AuthoringPanel::setActiveDrawerTab(authoring::DrawerTab nextTab)
     drawerState.open = true;
     refreshDrawerVisibility();
     resized();
+}
+
+void AuthoringPanel::timerCallback()
+{
+    refreshNow();
 }
 
 void AuthoringPanel::refreshDrawerVisibility()

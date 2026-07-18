@@ -18,7 +18,8 @@
 
 namespace drs::app
 {
-class AuthoringPanel final : public juce::Component
+class AuthoringPanel final : public juce::Component,
+                             private juce::Timer
 {
 public:
     enum class LayoutMode
@@ -49,6 +50,7 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
     void reloadFromSession();
+    void refreshNow();
 
 private:
     class AuthoringControlLookAndFeel final : public juce::LookAndFeel_V4
@@ -109,6 +111,7 @@ private:
     void setActiveDrawerTab(authoring::DrawerTab nextTab);
     void configureAccessibilityAndFocus();
     void refreshDrawerVisibility();
+    void timerCallback() override;
     authoring::SelectionSummaryViewModel buildSelectionSummaryViewModel() const;
     authoring::ZoneFieldValuesViewModel buildZoneFieldValuesViewModel() const;
 

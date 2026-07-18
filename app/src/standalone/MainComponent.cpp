@@ -576,6 +576,8 @@ void MainComponent::menuItemSelected(int menuItemID, int)
 void MainComponent::timerCallback()
 {
     processor.serviceMessageThreadWork();
+    performancePanel.refreshNow();
+    authoringPanel.refreshNow();
     updateWindowTitle();
 }
 

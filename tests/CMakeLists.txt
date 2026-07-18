@@ -458,6 +458,33 @@ add_test(
     COMMAND drs_phase2_performance_ui_tests
 )
 
+juce_add_console_app(drs_phase2_authoring_playback_integration_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Authoring Playback Integration Tests"
+)
+
+target_sources(drs_phase2_authoring_playback_integration_tests
+    PRIVATE
+        src/Phase2AuthoringPlaybackIntegrationTests.cpp
+)
+
+target_link_libraries(drs_phase2_authoring_playback_integration_tests
+    PRIVATE
+        drs_plugin_shell
+        drs_standalone_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase2_authoring_playback_integration_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase2.authoring_playback_integration
+    COMMAND drs_phase2_authoring_playback_integration_tests
+)
+
 juce_add_console_app(drs_phase2_authoring_ui_tests
     PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Authoring UI Tests"
 )
@@ -1033,6 +1060,10 @@ set_target_properties(drs_phase2_performance_bank_tests PROPERTIES
 )
 
 set_target_properties(drs_phase2_performance_ui_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_phase2_authoring_playback_integration_tests PROPERTIES
     FOLDER "Tests"
 )
 
