@@ -4,12 +4,16 @@
 #include "drs/engine/ProjectDocument.h"
 #include "drs/engine/RuntimeLoader.h"
 
+#include <algorithm>
 #include <iostream>
+#include <filesystem>
 #include <stdexcept>
 #include <string>
 
 namespace
 {
+namespace fs = std::filesystem;
+
 void require(bool condition, const std::string& message)
 {
     if (!condition)
@@ -32,6 +36,33 @@ bool containsFinding(const drs::engine::PreparedPlaybackBuildResult& result,
     }
 
     return false;
+}
+
+std::string normalizePath(const std::string& pathText)
+{
+    return fs::path(pathText).lexically_normal().generic_string();
+}
+
+const drs::engine::RuntimeStreamSampleDefinition* findStreamSample(
+    const drs::engine::RuntimeStreamLoadResult& stream,
+    const std::string& sampleId)
+{
+    const auto iterator = std::find_if(
+        stream.container.samples.begin(),
+        stream.container.samples.end(),
+        [&sampleId](const drs::engine::RuntimeStreamSampleDefinition& sample)
+        {
+            return sample.sampleId == sampleId;
+        });
+
+    return iterator == stream.container.samples.end() ? nullptr : &(*iterator);
+}
+
+std::uint64_t computeExpectedStreamedPayloadBytes(const drs::engine::RuntimeStreamSampleDefinition& sample)
+{
+    return sample.payloadSizeBytes >= sample.prefetchBytes
+        ? sample.payloadSizeBytes - sample.prefetchBytes
+        : 0;
 }
 } // namespace
 
@@ -93,8 +124,160 @@ int main()
                 "First prepared playback build should not report cache hits.");
         require(!firstPrepared.prepared.preparedContentDigest.empty(),
                 "Prepared playback builds must carry a deterministic content digest.");
+        require(firstPrepared.prepared.preparedContentDigest
+                    == drs::engine::computePreparedPlaybackContentDigest(firstPrepared.prepared),
+                "Prepared playback builds must expose a digest derived from deterministic prepared serialization.");
+        require(firstPrepared.metrics.preparedOwnershipRecordCount == firstPrepared.prepared.ownershipRecords.size(),
+                "Prepared playback metrics should expose ownership-record counts.");
+        require(firstPrepared.metrics.preparedOwnershipBytes == firstPrepared.metrics.preparedBytes,
+                "Prepared playback metrics should expose ownership-safe retained-byte totals.");
+        require(firstPrepared.metrics.activeCachedOwnershipRecordCount == firstPrepared.prepared.ownershipRecords.size(),
+                "Prepared playback metrics should expose active cached ownership-record counts.");
+        require(firstPrepared.metrics.retiredOwnershipRecordCount == 0,
+                "Fresh prepared playback builds should not report retired ownership backlog.");
+        require(firstPrepared.metrics.retiredBytesAwaitingCleanup == 0,
+                "Fresh prepared playback builds should not report retired ownership bytes.");
+        require(firstPrepared.prepared.ownershipRecords.size() == firstPrepared.prepared.samples.size(),
+                "Prepared playback should expose one ownership record per prepared cache-backed sample.");
         require(firstPrepared.prepared.samples[0].ownershipToken.find("cache:") == 0,
                 "Prepared sample handles should expose an explicit ownership token.");
+        const auto firstPreparedSerialization = drs::engine::serializeImmutablePreparedPlayback(firstPrepared.prepared);
+        const auto firstPreparedContentSerialization = drs::engine::serializePreparedPlaybackContent(firstPrepared.prepared);
+        require(firstPreparedSerialization == drs::engine::serializeImmutablePreparedPlayback(firstPrepared.prepared),
+                "Prepared playback serialization should be deterministic when repeated for the same immutable payload.");
+        require(firstPreparedContentSerialization == drs::engine::serializePreparedPlaybackContent(firstPrepared.prepared),
+                "Prepared playback content serialization should be deterministic when repeated for the same immutable payload.");
+        require(firstPrepared.prepared.samples[0].canonicalSourcePath
+                    == normalizePath(firstPrepared.prepared.samples[0].sourcePath),
+                "Prepared sample handles should expose a normalized canonical source path.");
+        require(firstPrepared.prepared.samples[0].canonicalSourceIdentity
+                    == firstPrepared.prepared.samples[0].sampleSourceId + "|"
+                        + firstPrepared.prepared.samples[0].canonicalSourcePath,
+                "Prepared sample handles should expose a canonical source identity derived from source id and path.");
+        require(!firstPrepared.prepared.samples[0].channelLayout.empty(),
+                "Prepared sample handles should expose channel-layout metadata.");
+        require(!firstPrepared.prepared.samples[0].sourceFingerprintHex.empty(),
+                "Prepared sample handles should expose source fingerprint metadata.");
+
+        for (const auto& preparedSample : firstPrepared.prepared.samples)
+        {
+            const auto* streamSample = findStreamSample(referenceStream, preparedSample.streamSampleId);
+            require(streamSample != nullptr,
+                    "Prepared sample handles should map back to a runtime stream sample definition.");
+            require(preparedSample.ownershipRecordIndex < firstPrepared.prepared.ownershipRecords.size(),
+                    "Prepared sample handles should point at a valid ownership record.");
+            const auto& ownershipRecord = firstPrepared.prepared.ownershipRecords[preparedSample.ownershipRecordIndex];
+            require(ownershipRecord.ownershipToken == preparedSample.ownershipToken,
+                    "Prepared sample handles should preserve ownership-token identity through the ownership record.");
+            require(ownershipRecord.cacheKey == preparedSample.cacheKey,
+                    "Prepared sample handles should preserve cache-key identity through the ownership record.");
+            require(ownershipRecord.sampleSourceId == preparedSample.sampleSourceId,
+                    "Prepared sample handles should preserve sample-source identity through the ownership record.");
+            require(ownershipRecord.streamSampleId == preparedSample.streamSampleId,
+                    "Prepared sample handles should preserve stream-sample identity through the ownership record.");
+            require(ownershipRecord.lifetimeState == "active-cache-entry",
+                    "Fresh prepared ownership records should begin in the active cache-entry state.");
+            require(ownershipRecord.retirementToken.empty(),
+                    "Active prepared ownership records should not carry a retirement token yet.");
+            require(ownershipRecord.preparedBuildId == firstPrepared.buildId,
+                    "Fresh ownership records should track the build that created the cache entry.");
+            require(ownershipRecord.retiredByBuildId == 0,
+                    "Fresh ownership records should not report a retiring build id.");
+            require(preparedSample.channelLayout == streamSample->channelLayout,
+                    "Prepared sample handles should preserve runtime stream channel-layout metadata.");
+            require(preparedSample.sampleRate == streamSample->sampleRate,
+                    "Prepared sample handles should preserve runtime stream sample-rate metadata.");
+            require(preparedSample.frameCount == streamSample->frameCount,
+                    "Prepared sample handles should preserve runtime stream frame-count metadata.");
+            require(preparedSample.sourceFingerprintHex == streamSample->sourceChecksumHex,
+                    "Prepared sample handles should preserve runtime stream source fingerprint metadata.");
+            require(preparedSample.loopRangePresent == streamSample->loopRangePresent,
+                    "Prepared sample handles should preserve loop-range presence metadata.");
+
+            if (streamSample->loopRangePresent)
+            {
+                require(preparedSample.loopStartFrame == streamSample->loopStartFrame,
+                        "Prepared sample handles should preserve loop start metadata.");
+                require(preparedSample.loopEndFrame == streamSample->loopEndFrame,
+                        "Prepared sample handles should preserve loop end metadata.");
+                require(preparedSample.loopEndFrame >= preparedSample.loopStartFrame,
+                        "Prepared sample loop metadata should preserve a valid loop range.");
+            }
+        }
+
+        for (const auto& preparedStream : firstPrepared.prepared.streams)
+        {
+            const auto* streamSample = findStreamSample(referenceStream, preparedStream.streamSampleId);
+            require(streamSample != nullptr,
+                    "Prepared stream handles should map back to a runtime stream sample definition.");
+            require(preparedStream.ownershipRecordIndex < firstPrepared.prepared.ownershipRecords.size(),
+                    "Prepared stream handles should point at a valid ownership record.");
+            const auto& ownershipRecord = firstPrepared.prepared.ownershipRecords[preparedStream.ownershipRecordIndex];
+            require(ownershipRecord.ownershipToken == preparedStream.ownershipToken,
+                    "Prepared stream handles should preserve ownership-token identity through the ownership record.");
+            require(ownershipRecord.cacheKey == preparedStream.cacheKey,
+                    "Prepared stream handles should preserve cache-key identity through the ownership record.");
+            require(preparedStream.containerId == referenceStream.container.containerId,
+                    "Prepared stream handles should preserve runtime stream container identity.");
+            require(preparedStream.containerPath == referenceStream.containerPath,
+                    "Prepared stream handles should preserve runtime stream container path.");
+            require(preparedStream.payloadEncoding == referenceStream.container.payloadEncoding,
+                    "Prepared stream handles should preserve runtime stream payload encoding.");
+            require(preparedStream.pageSizeBytes == referenceStream.container.pageSizeBytes,
+                    "Prepared stream handles should preserve runtime stream page size.");
+            require(preparedStream.payloadOffsetBytes == streamSample->payloadOffsetBytes,
+                    "Prepared stream handles should preserve runtime stream payload offset.");
+            require(preparedStream.payloadSizeBytes == streamSample->payloadSizeBytes,
+                    "Prepared stream handles should preserve runtime stream payload size.");
+            require(preparedStream.prefetchBytes == streamSample->prefetchBytes,
+                    "Prepared stream handles should preserve runtime stream prefetch size.");
+            require(preparedStream.streamedPayloadOffsetBytes
+                        == streamSample->payloadOffsetBytes + streamSample->prefetchBytes,
+                    "Prepared stream handles should expose the streamed payload start offset.");
+            require(preparedStream.streamedPayloadBytes == computeExpectedStreamedPayloadBytes(*streamSample),
+                    "Prepared stream handles should expose the streamed payload byte count.");
+
+            if (streamSample->pages.empty())
+            {
+                require(preparedStream.topologyKind == "explicit-pages",
+                        "Prefetch-only runtime stream samples should expose an explicit empty page topology.");
+                require(preparedStream.pageCount == 0,
+                        "Prepared stream handles should preserve zero page count for prefetch-only samples.");
+                require(!preparedStream.pageRangePresent,
+                        "Prepared stream handles should not claim a page range when no streamed pages exist.");
+            }
+            else
+            {
+                require(preparedStream.topologyKind == "explicit-pages",
+                        "Prepared stream handles should expose explicit page topology when page tables are available.");
+                require(preparedStream.pageCount == streamSample->pages.size(),
+                        "Prepared stream handles should preserve runtime stream page counts.");
+                require(preparedStream.pageRangePresent,
+                        "Prepared stream handles should expose a page range when streamed pages exist.");
+                require(preparedStream.firstPageIndex == streamSample->pages.front().pageIndex,
+                        "Prepared stream handles should preserve first page index metadata.");
+                require(preparedStream.lastPageIndex == streamSample->pages.back().pageIndex,
+                        "Prepared stream handles should preserve last page index metadata.");
+                require(preparedStream.firstPageOffsetBytes == streamSample->pages.front().offsetBytes,
+                        "Prepared stream handles should preserve first page offset metadata.");
+                require(preparedStream.lastPageOffsetBytes == streamSample->pages.back().offsetBytes,
+                        "Prepared stream handles should preserve last page offset metadata.");
+                require(preparedStream.lastPageSizeBytes == streamSample->pages.back().sizeBytes,
+                        "Prepared stream handles should preserve last page size metadata.");
+                require(preparedStream.pages.size() == streamSample->pages.size(),
+                        "Prepared stream handles should preserve explicit page tables.");
+
+                for (std::size_t pageIndex = 0; pageIndex < streamSample->pages.size(); ++pageIndex)
+                {
+                    require(preparedStream.pages[pageIndex].pageIndex == streamSample->pages[pageIndex].pageIndex,
+                            "Prepared stream handle page indices should preserve runtime stream topology.");
+                    require(preparedStream.pages[pageIndex].offsetBytes == streamSample->pages[pageIndex].offsetBytes,
+                            "Prepared stream handle page offsets should preserve runtime stream topology.");
+                    require(preparedStream.pages[pageIndex].sizeBytes == streamSample->pages[pageIndex].sizeBytes,
+                            "Prepared stream handle page sizes should preserve runtime stream topology.");
+                }
+            }
+        }
 
         const auto secondSnapshotRequest = snapshotBuilder.requestBuild(0, true);
         const auto secondSnapshot = snapshotBuilder.buildSnapshot(secondSnapshotRequest, phase2Project.project);
@@ -103,10 +286,46 @@ int main()
         require(secondPrepared.built, "Repeated prepared playback build should still succeed.");
         require(secondPrepared.prepared.preparedContentDigest == firstPrepared.prepared.preparedContentDigest,
                 "Repeated preparation of the same snapshot should produce the same prepared digest.");
+        require(secondPrepared.prepared.preparedContentDigest
+                    == drs::engine::computePreparedPlaybackContentDigest(secondPrepared.prepared),
+                "Repeated prepared playback builds must preserve the deterministic prepared digest contract.");
         require(secondPrepared.metrics.cacheHitCount == phase2Project.project.sampleSources.size(),
                 "Warm prepared playback build should hit the cache for every sample handle.");
         require(secondPrepared.metrics.cacheMissCount == 0,
                 "Warm prepared playback build should not cold-miss unchanged sample handles.");
+        require(secondPrepared.prepared.samples[0].canonicalSourceIdentity
+                    == firstPrepared.prepared.samples[0].canonicalSourceIdentity,
+                "Repeated preparation of the same snapshot should preserve canonical source identity.");
+        require(secondPrepared.prepared.samples[0].channelLayout == firstPrepared.prepared.samples[0].channelLayout,
+                "Repeated preparation of the same snapshot should preserve channel-layout metadata.");
+        require(secondPrepared.prepared.samples[0].ownershipToken == firstPrepared.prepared.samples[0].ownershipToken,
+                "Repeated preparation of the same snapshot should preserve ownership-token identity.");
+        require(secondPrepared.prepared.streams[0].topologyKind == firstPrepared.prepared.streams[0].topologyKind,
+                "Repeated preparation of the same snapshot should preserve stream topology kind.");
+        require(secondPrepared.prepared.streams[0].pageCount == firstPrepared.prepared.streams[0].pageCount,
+                "Repeated preparation of the same snapshot should preserve stream topology page counts.");
+        require(secondPrepared.prepared.ownershipRecords[0].ownershipToken
+                    == firstPrepared.prepared.ownershipRecords[0].ownershipToken,
+                "Repeated preparation of the same snapshot should preserve ownership-record identity.");
+        require(secondPrepared.metrics.preparedOwnershipRecordCount == firstPrepared.metrics.preparedOwnershipRecordCount,
+                "Repeated preparation of the same snapshot should preserve ownership-record counts.");
+        require(secondPrepared.metrics.activeCachedOwnershipRecordCount
+                    == firstPrepared.metrics.activeCachedOwnershipRecordCount,
+                "Repeated preparation of the same snapshot should preserve active cached ownership counts.");
+        require(secondPrepared.prepared.samples == firstPrepared.prepared.samples,
+                "Repeated preparation of the same snapshot should preserve prepared sample-handle equality.");
+        require(secondPrepared.prepared.streams == firstPrepared.prepared.streams,
+                "Repeated preparation of the same snapshot should preserve prepared stream-handle equality.");
+        require(secondPrepared.prepared.ownershipRecords == firstPrepared.prepared.ownershipRecords,
+                "Repeated preparation of the same snapshot should preserve prepared ownership-record equality.");
+        require(secondPrepared.prepared.zones == firstPrepared.prepared.zones,
+                "Repeated preparation of the same snapshot should preserve prepared zone-handle equality.");
+        const auto secondPreparedSerialization = drs::engine::serializeImmutablePreparedPlayback(secondPrepared.prepared);
+        const auto secondPreparedContentSerialization = drs::engine::serializePreparedPlaybackContent(secondPrepared.prepared);
+        require(secondPreparedSerialization != firstPreparedSerialization,
+                "Full prepared playback serialization should preserve unique snapshot-build identity across repeated builds.");
+        require(secondPreparedContentSerialization == firstPreparedContentSerialization,
+                "Repeated preparation of the same snapshot should preserve deterministic content serialization.");
 
         drs::engine::RuntimeProjectDocumentController controller(phase2Project.project);
         auto editedProject = controller.getProject();
@@ -124,10 +343,23 @@ int main()
         require(editedPrepared.built, "Edited prepared playback should still succeed.");
         require(editedPrepared.prepared.preparedContentDigest != firstPrepared.prepared.preparedContentDigest,
                 "Changing a sample source path should invalidate the prepared digest.");
+        require(editedPrepared.prepared.preparedContentDigest
+                    == drs::engine::computePreparedPlaybackContentDigest(editedPrepared.prepared),
+                "Edited prepared playback builds must recompute the deterministic prepared digest.");
         require(editedPrepared.metrics.cacheHitCount == 1,
                 "Changing one source path should preserve exactly one cached prepared asset.");
         require(editedPrepared.metrics.cacheMissCount == 1,
                 "Changing one source path should invalidate exactly one cached prepared asset.");
+        require(editedPrepared.metrics.preparedOwnershipRecordCount == editedPrepared.prepared.ownershipRecords.size(),
+                "Edited prepared playback metrics should expose ownership-record counts.");
+        require(editedPrepared.metrics.activeCachedOwnershipRecordCount == editedPrepared.prepared.ownershipRecords.size(),
+                "Edited prepared playback metrics should expose active cached ownership counts.");
+        require(editedPrepared.metrics.retiredOwnershipRecordCount >= 1,
+                "Edited prepared playback metrics should expose retired ownership backlog after invalidation.");
+        require(editedPrepared.metrics.retiredBytesAwaitingCleanup > 0,
+                "Edited prepared playback metrics should expose retired ownership bytes after invalidation.");
+        require(drs::engine::serializePreparedPlaybackContent(editedPrepared.prepared) != firstPreparedContentSerialization,
+                "Changing a sample source path should produce different prepared content serialization text.");
 
         auto invalidProject = phase2Project.project;
         invalidProject.sampleSources[0].path = invalidProject.contentRootPath + "/Samples/does-not-exist.wav";

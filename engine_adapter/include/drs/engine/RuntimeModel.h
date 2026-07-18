@@ -202,6 +202,7 @@ struct RuntimeStreamSampleDefinition
     std::string sourceChecksumHex;
     std::string formatName;
     std::string role;
+    std::string channelLayout;
     double sampleRate = 0.0;
     std::uint64_t frameCount = 0;
     std::uint32_t channelCount = 0;

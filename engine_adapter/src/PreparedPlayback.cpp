@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
+#include <numeric>
 #include <sstream>
 #include <unordered_map>
 
@@ -59,6 +60,23 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
     if (includeDigest)
         root["preparedContentDigest"] = prepared.preparedContentDigest;
 
+    ordered_json ownershipRecords = ordered_json::array();
+    for (const auto& ownership : prepared.ownershipRecords)
+    {
+        ordered_json ownershipObject;
+        ownershipObject["ownershipToken"] = ownership.ownershipToken;
+        ownershipObject["retirementToken"] = ownership.retirementToken;
+        ownershipObject["cacheKey"] = ownership.cacheKey;
+        ownershipObject["sampleSourceId"] = ownership.sampleSourceId;
+        ownershipObject["streamSampleId"] = ownership.streamSampleId;
+        ownershipObject["lifetimeState"] = ownership.lifetimeState;
+        ownershipObject["retainedBytes"] = ownership.retainedBytes;
+        ownershipObject["preparedBuildId"] = ownership.preparedBuildId;
+        ownershipObject["retiredByBuildId"] = ownership.retiredByBuildId;
+        ownershipRecords.push_back(std::move(ownershipObject));
+    }
+    root["ownershipRecords"] = std::move(ownershipRecords);
+
     ordered_json samples = ordered_json::array();
     for (const auto& sample : prepared.samples)
     {
@@ -66,9 +84,12 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
         sampleObject["sampleSourceId"] = sample.sampleSourceId;
         sampleObject["streamSampleId"] = sample.streamSampleId;
         sampleObject["sourcePath"] = sample.sourcePath;
+        sampleObject["canonicalSourcePath"] = sample.canonicalSourcePath;
+        sampleObject["canonicalSourceIdentity"] = sample.canonicalSourceIdentity;
         sampleObject["sourceFingerprintHex"] = sample.sourceFingerprintHex;
         sampleObject["formatName"] = sample.formatName;
         sampleObject["role"] = sample.role;
+        sampleObject["channelLayout"] = sample.channelLayout;
         sampleObject["sampleRate"] = sample.sampleRate;
         sampleObject["frameCount"] = sample.frameCount;
         sampleObject["channelCount"] = sample.channelCount;
@@ -79,6 +100,7 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
         sampleObject["loopEndFrame"] = sample.loopEndFrame;
         sampleObject["ownershipToken"] = sample.ownershipToken;
         sampleObject["cacheKey"] = sample.cacheKey;
+        sampleObject["ownershipRecordIndex"] = sample.ownershipRecordIndex;
         samples.push_back(std::move(sampleObject));
     }
     root["samples"] = std::move(samples);
@@ -92,12 +114,23 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
         streamObject["containerId"] = streamHandle.containerId;
         streamObject["containerPath"] = streamHandle.containerPath;
         streamObject["payloadEncoding"] = streamHandle.payloadEncoding;
+        streamObject["topologyKind"] = streamHandle.topologyKind;
         streamObject["pageSizeBytes"] = streamHandle.pageSizeBytes;
         streamObject["payloadOffsetBytes"] = streamHandle.payloadOffsetBytes;
         streamObject["payloadSizeBytes"] = streamHandle.payloadSizeBytes;
         streamObject["prefetchBytes"] = streamHandle.prefetchBytes;
+        streamObject["streamedPayloadOffsetBytes"] = streamHandle.streamedPayloadOffsetBytes;
+        streamObject["streamedPayloadBytes"] = streamHandle.streamedPayloadBytes;
+        streamObject["pageCount"] = streamHandle.pageCount;
+        streamObject["pageRangePresent"] = streamHandle.pageRangePresent;
+        streamObject["firstPageIndex"] = streamHandle.firstPageIndex;
+        streamObject["lastPageIndex"] = streamHandle.lastPageIndex;
+        streamObject["firstPageOffsetBytes"] = streamHandle.firstPageOffsetBytes;
+        streamObject["lastPageOffsetBytes"] = streamHandle.lastPageOffsetBytes;
+        streamObject["lastPageSizeBytes"] = streamHandle.lastPageSizeBytes;
         streamObject["ownershipToken"] = streamHandle.ownershipToken;
         streamObject["cacheKey"] = streamHandle.cacheKey;
+        streamObject["ownershipRecordIndex"] = streamHandle.ownershipRecordIndex;
 
         ordered_json pages = ordered_json::array();
         for (const auto& page : streamHandle.pages)
@@ -148,6 +181,66 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
 std::string normalizePath(const std::string& pathText)
 {
     return fs::path(pathText).lexically_normal().generic_string();
+}
+
+std::string buildCanonicalSourceIdentity(const std::string& sampleSourceId, const std::string& canonicalSourcePath)
+{
+    return sampleSourceId + "|" + canonicalSourcePath;
+}
+
+std::string buildRetirementToken(std::uint64_t retirementOrdinal,
+                                 const std::string& sampleSourceId,
+                                 std::uint64_t retiredByBuildId)
+{
+    return "retire:" + std::to_string(retirementOrdinal) + ":" + sampleSourceId + ":" + std::to_string(retiredByBuildId);
+}
+
+std::uint64_t computeStreamedPayloadBytes(const RuntimeStreamSampleDefinition& streamSample)
+{
+    return streamSample.payloadSizeBytes >= streamSample.prefetchBytes
+        ? streamSample.payloadSizeBytes - streamSample.prefetchBytes
+        : 0;
+}
+
+void populateStreamTopologyMetadata(PreparedPlaybackStreamHandle& streamHandle,
+                                    const RuntimeStreamSampleDefinition& streamSample,
+                                    std::uint64_t containerPageSizeBytes)
+{
+    streamHandle.streamedPayloadOffsetBytes = streamSample.payloadOffsetBytes + streamSample.prefetchBytes;
+    streamHandle.streamedPayloadBytes = computeStreamedPayloadBytes(streamSample);
+
+    const auto computedPageCount = containerPageSizeBytes == 0
+        ? static_cast<std::size_t>(0)
+        : static_cast<std::size_t>(
+              (streamHandle.streamedPayloadBytes + containerPageSizeBytes - 1) / containerPageSizeBytes);
+    const auto hasExplicitTopology = !streamSample.pages.empty() || computedPageCount == 0;
+
+    streamHandle.topologyKind = hasExplicitTopology ? "explicit-pages" : "bounded-fallback";
+    streamHandle.pageCount = hasExplicitTopology ? streamSample.pages.size() : computedPageCount;
+
+    if (streamHandle.pageCount == 0)
+        return;
+
+    streamHandle.pageRangePresent = true;
+
+    if (hasExplicitTopology)
+    {
+        streamHandle.firstPageIndex = streamSample.pages.front().pageIndex;
+        streamHandle.lastPageIndex = streamSample.pages.back().pageIndex;
+        streamHandle.firstPageOffsetBytes = streamSample.pages.front().offsetBytes;
+        streamHandle.lastPageOffsetBytes = streamSample.pages.back().offsetBytes;
+        streamHandle.lastPageSizeBytes = streamSample.pages.back().sizeBytes;
+        return;
+    }
+
+    streamHandle.firstPageIndex = 0;
+    streamHandle.lastPageIndex = static_cast<std::uint32_t>(streamHandle.pageCount - 1);
+    streamHandle.firstPageOffsetBytes = streamHandle.streamedPayloadOffsetBytes;
+    streamHandle.lastPageOffsetBytes =
+        streamHandle.firstPageOffsetBytes + (static_cast<std::uint64_t>(streamHandle.pageCount - 1) * containerPageSizeBytes);
+    const auto fullPagesBytes = static_cast<std::uint64_t>(streamHandle.pageCount - 1) * containerPageSizeBytes;
+    streamHandle.lastPageSizeBytes = std::min(containerPageSizeBytes,
+                                              streamHandle.streamedPayloadBytes - fullPagesBytes);
 }
 
 std::string buildCacheKey(const std::string& compilerVersion,
@@ -324,6 +417,7 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     std::unordered_map<std::string, std::size_t> sampleIndices;
     std::unordered_map<std::string, std::size_t> streamIndices;
 
+    result.prepared.ownershipRecords.reserve(snapshotResult.snapshot.sampleIdentities.size());
     result.prepared.samples.reserve(snapshotResult.snapshot.sampleIdentities.size());
     result.prepared.streams.reserve(snapshotResult.snapshot.sampleIdentities.size());
     result.prepared.zones.reserve(snapshotResult.snapshot.zones.size());
@@ -355,11 +449,12 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
                                                 {
                                                     return entry.first == cacheKey;
                                                 });
+        const auto cacheHit = cacheIterator != cacheEntries.end();
 
         PreparedPlaybackSampleHandle sampleHandle;
         PreparedPlaybackStreamHandle streamHandle;
 
-        if (cacheIterator != cacheEntries.end())
+        if (cacheHit)
         {
             sampleHandle = cacheIterator->second.sample;
             streamHandle = cacheIterator->second.stream;
@@ -370,9 +465,13 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             sampleHandle.sampleSourceId = sampleIdentity.sampleSourceId;
             sampleHandle.streamSampleId = streamSample->sampleId;
             sampleHandle.sourcePath = normalizedPath;
+            sampleHandle.canonicalSourcePath = normalizedPath;
+            sampleHandle.canonicalSourceIdentity = buildCanonicalSourceIdentity(sampleIdentity.sampleSourceId,
+                                                                                normalizedPath);
             sampleHandle.sourceFingerprintHex = streamSample->sourceChecksumHex;
             sampleHandle.formatName = streamSample->formatName;
             sampleHandle.role = sampleIdentity.role.empty() ? streamSample->role : sampleIdentity.role;
+            sampleHandle.channelLayout = streamSample->channelLayout;
             sampleHandle.sampleRate = streamSample->sampleRate;
             sampleHandle.frameCount = streamSample->frameCount;
             sampleHandle.channelCount = streamSample->channelCount;
@@ -393,21 +492,37 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             streamHandle.payloadOffsetBytes = streamSample->payloadOffsetBytes;
             streamHandle.payloadSizeBytes = streamSample->payloadSizeBytes;
             streamHandle.prefetchBytes = streamSample->prefetchBytes;
+            populateStreamTopologyMetadata(streamHandle, *streamSample, streamResult.container.pageSizeBytes);
             streamHandle.ownershipToken = "cache:" + cacheKey;
             streamHandle.cacheKey = cacheKey;
             streamHandle.pages.reserve(streamSample->pages.size());
             for (const auto& page : streamSample->pages)
                 streamHandle.pages.push_back({ page.pageIndex, page.offsetBytes, page.sizeBytes });
 
-            retireSupersededCacheEntries(sampleIdentity.sampleSourceId, cacheKey);
+            retireSupersededCacheEntries(sampleIdentity.sampleSourceId, cacheKey, request.buildId);
 
             CacheEntry entry;
+            entry.ownership.ownershipToken = sampleHandle.ownershipToken;
+            entry.ownership.cacheKey = cacheKey;
+            entry.ownership.sampleSourceId = sampleIdentity.sampleSourceId;
+            entry.ownership.streamSampleId = streamSample->sampleId;
+            entry.ownership.lifetimeState = "active-cache-entry";
+            entry.ownership.retainedBytes = streamSample->payloadSizeBytes;
+            entry.ownership.preparedBuildId = request.buildId;
             entry.sample = sampleHandle;
             entry.stream = streamHandle;
             entry.retainedBytes = streamSample->payloadSizeBytes;
             cacheEntries.push_back({ cacheKey, std::move(entry) });
             ++result.metrics.cacheMissCount;
         }
+
+        const auto ownershipRecordIndex = result.prepared.ownershipRecords.size();
+        const auto& ownershipRecord = cacheHit
+            ? cacheIterator->second.ownership
+            : cacheEntries.back().second.ownership;
+        result.prepared.ownershipRecords.push_back(ownershipRecord);
+        sampleHandle.ownershipRecordIndex = ownershipRecordIndex;
+        streamHandle.ownershipRecordIndex = ownershipRecordIndex;
 
         const auto sampleIndex = result.prepared.samples.size();
         result.prepared.samples.push_back(sampleHandle);
@@ -458,6 +573,18 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     result.metrics.preparedSampleCount = result.prepared.samples.size();
     result.metrics.preparedStreamCount = result.prepared.streams.size();
     result.metrics.preparedZoneCount = result.prepared.zones.size();
+    result.metrics.preparedOwnershipRecordCount = result.prepared.ownershipRecords.size();
+    result.metrics.preparedOwnershipBytes = std::accumulate(
+        result.prepared.ownershipRecords.begin(),
+        result.prepared.ownershipRecords.end(),
+        static_cast<std::uint64_t>(0),
+        [](std::uint64_t total, const PreparedPlaybackOwnershipRecord& ownership)
+        {
+            return total + ownership.retainedBytes;
+        });
+    result.metrics.activeCachedOwnershipRecordCount = cacheEntries.size();
+    result.metrics.retiredOwnershipRecordCount = retiredCacheEntries.size();
+    result.metrics.retiredBytesAwaitingCleanup = workerStatus.retiredBytesAwaitingCleanup;
 
     if (!snapshotResult.snapshot.contentDigest.empty())
         result.prepared.notes.push_back("Snapshot digest: " + snapshotResult.snapshot.contentDigest);
@@ -480,7 +607,7 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     result.metrics.failureCount = errorCount == 0 ? 0 : 1;
 
     if (result.built)
-        result.prepared.preparedContentDigest = "fnv1a64:" + computeFnv1a64Hex(serializePrepared(result.prepared, false).dump());
+        result.prepared.preparedContentDigest = computePreparedPlaybackContentDigest(result.prepared);
 
     result.buildDurationMicros = static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - startTime).count());
@@ -702,6 +829,18 @@ std::size_t PreparedPlaybackService::retireStaleCacheEntries(std::size_t maxEntr
     return retiredCount;
 }
 
+std::vector<PreparedPlaybackOwnershipRecord> PreparedPlaybackService::snapshotRetiredOwnershipRecords() const
+{
+    std::vector<PreparedPlaybackOwnershipRecord> records;
+    std::lock_guard<std::mutex> lock(workerMutex);
+    records.reserve(retiredCacheEntries.size());
+
+    for (const auto& entry : retiredCacheEntries)
+        records.push_back(entry.second.ownership);
+
+    return records;
+}
+
 bool PreparedPlaybackService::waitForWorkerIdle(std::uint64_t timeoutMillis)
 {
     std::unique_lock<std::mutex> lock(workerMutex);
@@ -785,14 +924,22 @@ void PreparedPlaybackService::refreshWorkerStatus()
 {
     workerStatus.pendingWorkCount = queuedJobs.size();
     workerStatus.maxPendingWorkCount = std::max(workerStatus.maxPendingWorkCount, workerStatus.pendingWorkCount);
+    workerStatus.activeOwnershipRecordCount = cacheEntries.size();
+    workerStatus.retiredOwnershipRecordCount = retiredCacheEntries.size();
 }
 
-void PreparedPlaybackService::retireSupersededCacheEntries(const std::string& sampleSourceId, const std::string& cacheKey)
+void PreparedPlaybackService::retireSupersededCacheEntries(const std::string& sampleSourceId,
+                                                           const std::string& cacheKey,
+                                                           std::uint64_t retiredByBuildId)
 {
     for (auto iterator = cacheEntries.begin(); iterator != cacheEntries.end();)
     {
         if (iterator->first != cacheKey && iterator->second.sample.sampleSourceId == sampleSourceId)
         {
+            iterator->second.ownership.retirementToken =
+                buildRetirementToken(nextRetirementToken++, sampleSourceId, retiredByBuildId);
+            iterator->second.ownership.lifetimeState = "retired-awaiting-cleanup";
+            iterator->second.ownership.retiredByBuildId = retiredByBuildId;
             workerStatus.retiredBytesAwaitingCleanup += iterator->second.retainedBytes;
             retiredCacheEntries.push_back(*iterator);
             iterator = cacheEntries.erase(iterator);
@@ -806,6 +953,125 @@ void PreparedPlaybackService::retireSupersededCacheEntries(const std::string& sa
 std::string serializeImmutablePreparedPlayback(const ImmutablePreparedPlayback& prepared)
 {
     return serializePrepared(prepared, true).dump(2) + "\n";
+}
+
+std::string computePreparedPlaybackContentDigest(const ImmutablePreparedPlayback& prepared)
+{
+    return "fnv1a64:" + computeFnv1a64Hex(serializePrepared(prepared, false).dump());
+}
+
+std::string serializePreparedPlaybackContent(const ImmutablePreparedPlayback& prepared)
+{
+    return serializePrepared(prepared, false).dump(2) + "\n";
+}
+
+bool operator==(const PreparedPlaybackPageHandle& left, const PreparedPlaybackPageHandle& right)
+{
+    return left.pageIndex == right.pageIndex
+        && left.offsetBytes == right.offsetBytes
+        && left.sizeBytes == right.sizeBytes;
+}
+
+bool operator==(const PreparedPlaybackOwnershipRecord& left, const PreparedPlaybackOwnershipRecord& right)
+{
+    return left.ownershipToken == right.ownershipToken
+        && left.retirementToken == right.retirementToken
+        && left.cacheKey == right.cacheKey
+        && left.sampleSourceId == right.sampleSourceId
+        && left.streamSampleId == right.streamSampleId
+        && left.lifetimeState == right.lifetimeState
+        && left.retainedBytes == right.retainedBytes
+        && left.preparedBuildId == right.preparedBuildId
+        && left.retiredByBuildId == right.retiredByBuildId;
+}
+
+bool operator==(const PreparedPlaybackSampleHandle& left, const PreparedPlaybackSampleHandle& right)
+{
+    return left.sampleSourceId == right.sampleSourceId
+        && left.streamSampleId == right.streamSampleId
+        && left.sourcePath == right.sourcePath
+        && left.canonicalSourcePath == right.canonicalSourcePath
+        && left.canonicalSourceIdentity == right.canonicalSourceIdentity
+        && left.sourceFingerprintHex == right.sourceFingerprintHex
+        && left.formatName == right.formatName
+        && left.role == right.role
+        && left.channelLayout == right.channelLayout
+        && left.sampleRate == right.sampleRate
+        && left.frameCount == right.frameCount
+        && left.channelCount == right.channelCount
+        && left.rootMidiNotePresent == right.rootMidiNotePresent
+        && left.rootMidiNote == right.rootMidiNote
+        && left.loopRangePresent == right.loopRangePresent
+        && left.loopStartFrame == right.loopStartFrame
+        && left.loopEndFrame == right.loopEndFrame
+        && left.ownershipToken == right.ownershipToken
+        && left.cacheKey == right.cacheKey
+        && left.ownershipRecordIndex == right.ownershipRecordIndex;
+}
+
+bool operator==(const PreparedPlaybackStreamHandle& left, const PreparedPlaybackStreamHandle& right)
+{
+    return left.sampleSourceId == right.sampleSourceId
+        && left.streamSampleId == right.streamSampleId
+        && left.containerId == right.containerId
+        && left.containerPath == right.containerPath
+        && left.payloadEncoding == right.payloadEncoding
+        && left.topologyKind == right.topologyKind
+        && left.pageSizeBytes == right.pageSizeBytes
+        && left.payloadOffsetBytes == right.payloadOffsetBytes
+        && left.payloadSizeBytes == right.payloadSizeBytes
+        && left.prefetchBytes == right.prefetchBytes
+        && left.streamedPayloadOffsetBytes == right.streamedPayloadOffsetBytes
+        && left.streamedPayloadBytes == right.streamedPayloadBytes
+        && left.pageCount == right.pageCount
+        && left.pageRangePresent == right.pageRangePresent
+        && left.firstPageIndex == right.firstPageIndex
+        && left.lastPageIndex == right.lastPageIndex
+        && left.firstPageOffsetBytes == right.firstPageOffsetBytes
+        && left.lastPageOffsetBytes == right.lastPageOffsetBytes
+        && left.lastPageSizeBytes == right.lastPageSizeBytes
+        && left.ownershipToken == right.ownershipToken
+        && left.cacheKey == right.cacheKey
+        && left.ownershipRecordIndex == right.ownershipRecordIndex
+        && left.pages == right.pages;
+}
+
+bool operator==(const PreparedPlaybackZoneHandle& left, const PreparedPlaybackZoneHandle& right)
+{
+    return left.zoneId == right.zoneId
+        && left.sampleSourceId == right.sampleSourceId
+        && left.streamSampleId == right.streamSampleId
+        && left.preparedSampleIndex == right.preparedSampleIndex
+        && left.preparedStreamIndex == right.preparedStreamIndex
+        && left.rootKey == right.rootKey
+        && left.keyLow == right.keyLow
+        && left.keyHigh == right.keyHigh
+        && left.velocityLow == right.velocityLow
+        && left.velocityHigh == right.velocityHigh
+        && left.gainDb == right.gainDb
+        && left.pan == right.pan
+        && left.sampleStartFrame == right.sampleStartFrame
+        && left.loopEnabled == right.loopEnabled
+        && left.loopStartFrame == right.loopStartFrame
+        && left.loopEndFrame == right.loopEndFrame;
+}
+
+bool operator==(const ImmutablePreparedPlayback& left, const ImmutablePreparedPlayback& right)
+{
+    return left.snapshotBuildId == right.snapshotBuildId
+        && left.snapshotContentDigest == right.snapshotContentDigest
+        && left.compilerVersion == right.compilerVersion
+        && left.draftRevision == right.draftRevision
+        && left.containerId == right.containerId
+        && left.containerPath == right.containerPath
+        && left.payloadEncoding == right.payloadEncoding
+        && left.pageSizeBytes == right.pageSizeBytes
+        && left.preparedContentDigest == right.preparedContentDigest
+        && left.ownershipRecords == right.ownershipRecords
+        && left.samples == right.samples
+        && left.streams == right.streams
+        && left.zones == right.zones
+        && left.notes == right.notes;
 }
 
 std::string toString(PreparedPlaybackWorkLane lane)

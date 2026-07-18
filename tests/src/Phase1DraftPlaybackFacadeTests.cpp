@@ -101,6 +101,14 @@ void requireFacadeSnapshotConsistency(drs::engine::EngineFacade& engineFacade, c
             context + " should mirror the preview prepared-playback digest.");
     require(performanceSnapshot.publishedPreparedContentDigest == draftStatus.performance.preparedContentDigest,
             context + " should mirror the published prepared-playback digest.");
+    require(performanceSnapshot.previewPreparedOwnershipRecordCount == draftStatus.preview.preparedOwnershipRecordCount,
+            context + " should mirror preview prepared ownership-record counts.");
+    require(performanceSnapshot.publishedPreparedOwnershipRecordCount == draftStatus.performance.preparedOwnershipRecordCount,
+            context + " should mirror published prepared ownership-record counts.");
+    require(performanceSnapshot.previewPreparedOwnershipBytes == draftStatus.preview.preparedOwnershipBytes,
+            context + " should mirror preview prepared ownership bytes.");
+    require(performanceSnapshot.publishedPreparedOwnershipBytes == draftStatus.performance.preparedOwnershipBytes,
+            context + " should mirror published prepared ownership bytes.");
     const auto expectedPlayableRangeAvailable = draftStatus.performance.playableRangeAvailable || draftStatus.preview.playableRangeAvailable;
     require(performanceSnapshot.playableRangeAvailable == expectedPlayableRangeAvailable,
             context + " should mirror whether a prepared draft-playback range is available.");
@@ -180,16 +188,36 @@ void requireFacadeSnapshotConsistency(drs::engine::EngineFacade& engineFacade, c
             context + " should keep diagnostics and performance snapshots aligned on worker supersede count.");
     require(diagnosticsSnapshot.preparedWorkerFailureCount == performanceSnapshot.preparedWorkerFailureCount,
             context + " should keep diagnostics and performance snapshots aligned on worker failure count.");
+    require(diagnosticsSnapshot.preparedWorkerActiveOwnershipRecordCount
+                == performanceSnapshot.preparedWorkerActiveOwnershipRecordCount,
+            context + " should keep diagnostics and performance snapshots aligned on active ownership-record count.");
+    require(diagnosticsSnapshot.preparedWorkerRetiredOwnershipRecordCount
+                == performanceSnapshot.preparedWorkerRetiredOwnershipRecordCount,
+            context + " should keep diagnostics and performance snapshots aligned on retired ownership-record count.");
     require(diagnosticsSnapshot.preparedWorkerRetiredBytes == performanceSnapshot.preparedWorkerRetiredBytes,
             context + " should keep diagnostics and performance snapshots aligned on retired prepared bytes.");
     require(diagnosticsSnapshot.preparedWorkerEvent == performanceSnapshot.preparedWorkerEvent,
             context + " should keep diagnostics and performance snapshots aligned on the latest worker event.");
+    require(diagnosticsSnapshot.previewPreparedOwnershipRecordCount
+                == performanceSnapshot.previewPreparedOwnershipRecordCount,
+            context + " should keep diagnostics and performance snapshots aligned on preview ownership-record counts.");
+    require(diagnosticsSnapshot.publishedPreparedOwnershipRecordCount
+                == performanceSnapshot.publishedPreparedOwnershipRecordCount,
+            context + " should keep diagnostics and performance snapshots aligned on published ownership-record counts.");
+    require(diagnosticsSnapshot.previewPreparedOwnershipBytes == performanceSnapshot.previewPreparedOwnershipBytes,
+            context + " should keep diagnostics and performance snapshots aligned on preview ownership bytes.");
+    require(diagnosticsSnapshot.publishedPreparedOwnershipBytes == performanceSnapshot.publishedPreparedOwnershipBytes,
+            context + " should keep diagnostics and performance snapshots aligned on published ownership bytes.");
     require(statusSnapshot.detail.find("Snapshot ids:") != std::string::npos,
             context + " should keep the shell-facing contract line for snapshot ids.");
     require(statusSnapshot.detail.find("Snapshot digests:") != std::string::npos,
             context + " should keep the shell-facing contract line for snapshot digests.");
     require(statusSnapshot.detail.find("Prepared playback assets:") != std::string::npos,
             context + " should keep the shell-facing contract line for prepared asset counts.");
+    require(statusSnapshot.detail.find("preview ownership=") != std::string::npos,
+            context + " should keep the shell-facing contract line for prepared ownership counts.");
+    require(statusSnapshot.detail.find("activeOwnership=") != std::string::npos,
+            context + " should keep the shell-facing contract line for worker ownership backlog.");
     require(statusSnapshot.detail.find("Playable range:") != std::string::npos,
             context + " should keep the shell-facing contract line for playable-range summaries.");
     require(statusSnapshot.detail.find("Surface provenance:") != std::string::npos,

@@ -44,8 +44,16 @@ int main()
                 "Default diagnostics snapshot should expose the prepared playback digest.");
         require(defaultDiagnostics.previewPreparedSampleCount > 0,
                 "Default diagnostics snapshot should expose prepared sample counts.");
+        require(defaultDiagnostics.previewPreparedOwnershipRecordCount > 0,
+                "Default diagnostics snapshot should expose prepared ownership-record counts.");
+        require(defaultDiagnostics.previewPreparedOwnershipBytes == defaultDiagnostics.previewPreparedBytes,
+                "Default diagnostics snapshot should expose ownership-safe prepared byte totals.");
         require(defaultDiagnostics.preparedWorkerPendingCount == 0,
                 "Default diagnostics snapshot should not leave prepared worker jobs pending.");
+        require(defaultDiagnostics.preparedWorkerActiveOwnershipRecordCount > 0,
+                "Default diagnostics snapshot should expose active worker ownership-record counts.");
+        require(defaultDiagnostics.preparedWorkerRetiredOwnershipRecordCount == 0,
+                "Default diagnostics snapshot should not expose retired worker ownership backlog by default.");
         require(defaultDiagnostics.previewFindings.empty() && defaultDiagnostics.publishedFindings.empty(),
                 "Default diagnostics snapshot should not surface snapshot findings for the reference project.");
         require(defaultDiagnostics.configuredMaxCachedPages == 4,
@@ -80,6 +88,9 @@ int main()
                 "Lead diagnostics snapshot should preserve prepared playback build identities.");
         require(!leadDiagnostics.previewPreparedContentDigest.empty() && !leadDiagnostics.publishedPreparedContentDigest.empty(),
                 "Lead diagnostics snapshot should preserve prepared playback digests.");
+        require(leadDiagnostics.previewPreparedOwnershipRecordCount > 0
+                    && leadDiagnostics.publishedPreparedOwnershipRecordCount > 0,
+                "Lead diagnostics snapshot should preserve prepared ownership-record counts.");
         require(leadDiagnostics.configuredMaxCachedPages == 8,
                 "Performance diagnostics snapshot should expose the performance cache budget.");
         require(leadDiagnostics.selectedArticulationId == "lead",

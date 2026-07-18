@@ -208,6 +208,7 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         streamSample.sourceChecksumHex = sampleSource.metadata.sourceChecksumHex;
         streamSample.formatName = sampleSource.metadata.formatName;
         streamSample.role = sampleSource.role;
+        streamSample.channelLayout = sampleSource.metadata.channelLayout;
         streamSample.sampleRate = sampleSource.metadata.sampleRate;
         streamSample.frameCount = sampleSource.metadata.frameCount;
         streamSample.channelCount = sampleSource.metadata.channelCount;
@@ -288,6 +289,7 @@ std::string serializePrototypeStreamContainer(const RuntimeCompileResult& result
         sampleObject["sourceChecksumHex"] = sample.sourceChecksumHex;
         sampleObject["formatName"] = sample.formatName;
         sampleObject["role"] = sample.role;
+        sampleObject["channelLayout"] = sample.channelLayout;
         sampleObject["sampleRate"] = sample.sampleRate;
         sampleObject["frameCount"] = sample.frameCount;
         sampleObject["channelCount"] = sample.channelCount;

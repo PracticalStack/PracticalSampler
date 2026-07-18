@@ -138,6 +138,21 @@ std::string computeFnv1aChecksumHex(const fs::path& path)
     return stream.str();
 }
 
+std::string inferChannelLayout(std::uint32_t channelCount)
+{
+    switch (channelCount)
+    {
+    case 0:
+        return {};
+    case 1:
+        return "mono";
+    case 2:
+        return "stereo";
+    default:
+        return std::to_string(channelCount) + " channels";
+    }
+}
+
 std::uint64_t alignUp(std::uint64_t value, std::uint64_t alignment)
 {
     if (alignment == 0)
@@ -288,6 +303,22 @@ RuntimeStreamLoadResult loadRuntimeStreamContainer(const std::string& containerP
 
             if (const auto channelCount = readRequired<std::uint32_t>(sampleObject, result, "channelCount", context.c_str()))
                 sample.channelCount = *channelCount;
+
+            if (const auto channelLayoutIterator = sampleObject.find("channelLayout");
+                channelLayoutIterator != sampleObject.end())
+            {
+                if (!channelLayoutIterator->is_string())
+                {
+                    addIssue(result, context + " field 'channelLayout' must be a string when present.");
+                }
+                else
+                {
+                    sample.channelLayout = channelLayoutIterator->get<std::string>();
+                }
+            }
+
+            if (sample.channelLayout.empty())
+                sample.channelLayout = inferChannelLayout(sample.channelCount);
 
             if (const auto payloadOffsetBytes = readRequired<std::uint64_t>(sampleObject, result, "payloadOffsetBytes", context.c_str()))
                 sample.payloadOffsetBytes = *payloadOffsetBytes;

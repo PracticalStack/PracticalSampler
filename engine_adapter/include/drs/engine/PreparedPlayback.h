@@ -20,14 +20,30 @@ struct PreparedPlaybackPageHandle
     std::uint64_t sizeBytes = 0;
 };
 
+struct PreparedPlaybackOwnershipRecord
+{
+    std::string ownershipToken;
+    std::string retirementToken;
+    std::string cacheKey;
+    std::string sampleSourceId;
+    std::string streamSampleId;
+    std::string lifetimeState;
+    std::uint64_t retainedBytes = 0;
+    std::uint64_t preparedBuildId = 0;
+    std::uint64_t retiredByBuildId = 0;
+};
+
 struct PreparedPlaybackSampleHandle
 {
     std::string sampleSourceId;
     std::string streamSampleId;
     std::string sourcePath;
+    std::string canonicalSourcePath;
+    std::string canonicalSourceIdentity;
     std::string sourceFingerprintHex;
     std::string formatName;
     std::string role;
+    std::string channelLayout;
     double sampleRate = 0.0;
     std::uint64_t frameCount = 0;
     std::uint32_t channelCount = 0;
@@ -38,6 +54,7 @@ struct PreparedPlaybackSampleHandle
     std::uint64_t loopEndFrame = 0;
     std::string ownershipToken;
     std::string cacheKey;
+    std::size_t ownershipRecordIndex = 0;
 };
 
 struct PreparedPlaybackStreamHandle
@@ -47,12 +64,23 @@ struct PreparedPlaybackStreamHandle
     std::string containerId;
     std::string containerPath;
     std::string payloadEncoding;
+    std::string topologyKind;
     std::uint64_t pageSizeBytes = 0;
     std::uint64_t payloadOffsetBytes = 0;
     std::uint64_t payloadSizeBytes = 0;
     std::uint64_t prefetchBytes = 0;
+    std::uint64_t streamedPayloadOffsetBytes = 0;
+    std::uint64_t streamedPayloadBytes = 0;
+    std::size_t pageCount = 0;
+    bool pageRangePresent = false;
+    std::uint32_t firstPageIndex = 0;
+    std::uint32_t lastPageIndex = 0;
+    std::uint64_t firstPageOffsetBytes = 0;
+    std::uint64_t lastPageOffsetBytes = 0;
+    std::uint64_t lastPageSizeBytes = 0;
     std::string ownershipToken;
     std::string cacheKey;
+    std::size_t ownershipRecordIndex = 0;
     std::vector<PreparedPlaybackPageHandle> pages;
 };
 
@@ -87,6 +115,7 @@ struct ImmutablePreparedPlayback
     std::string payloadEncoding;
     std::uint64_t pageSizeBytes = 0;
     std::string preparedContentDigest;
+    std::vector<PreparedPlaybackOwnershipRecord> ownershipRecords;
     std::vector<PreparedPlaybackSampleHandle> samples;
     std::vector<PreparedPlaybackStreamHandle> streams;
     std::vector<PreparedPlaybackZoneHandle> zones;
@@ -98,13 +127,17 @@ struct PreparedPlaybackMetrics
     std::size_t preparedSampleCount = 0;
     std::size_t preparedStreamCount = 0;
     std::size_t preparedZoneCount = 0;
+    std::size_t preparedOwnershipRecordCount = 0;
     std::uint64_t preparedBytes = 0;
+    std::uint64_t preparedOwnershipBytes = 0;
     std::uint64_t decodedBytes = 0;
     std::size_t cacheHitCount = 0;
     std::size_t cacheMissCount = 0;
     std::size_t failureCount = 0;
     std::size_t cancellationCount = 0;
     std::size_t pendingWorkCount = 0;
+    std::size_t activeCachedOwnershipRecordCount = 0;
+    std::size_t retiredOwnershipRecordCount = 0;
     std::uint64_t retiredBytesAwaitingCleanup = 0;
 };
 
@@ -174,9 +207,18 @@ struct PreparedPlaybackWorkerStatus
     std::size_t supersededCount = 0;
     std::size_t failureCount = 0;
     std::size_t maxPendingWorkCount = 0;
+    std::size_t activeOwnershipRecordCount = 0;
+    std::size_t retiredOwnershipRecordCount = 0;
     std::uint64_t retiredBytesAwaitingCleanup = 0;
     std::string lastEvent;
 };
+
+bool operator==(const PreparedPlaybackPageHandle& left, const PreparedPlaybackPageHandle& right);
+bool operator==(const PreparedPlaybackOwnershipRecord& left, const PreparedPlaybackOwnershipRecord& right);
+bool operator==(const PreparedPlaybackSampleHandle& left, const PreparedPlaybackSampleHandle& right);
+bool operator==(const PreparedPlaybackStreamHandle& left, const PreparedPlaybackStreamHandle& right);
+bool operator==(const PreparedPlaybackZoneHandle& left, const PreparedPlaybackZoneHandle& right);
+bool operator==(const ImmutablePreparedPlayback& left, const ImmutablePreparedPlayback& right);
 
 class PreparedPlaybackService
 {
@@ -208,6 +250,7 @@ public:
     std::vector<PreparedPlaybackBuildResult> cancelQueuedPublishBuilds(
         const std::string& state = "Prepared playback build canceled before worker execution");
     std::size_t retireStaleCacheEntries(std::size_t maxEntries = static_cast<std::size_t>(-1));
+    std::vector<PreparedPlaybackOwnershipRecord> snapshotRetiredOwnershipRecords() const;
     const PreparedPlaybackWorkerStatus& getWorkerStatus() const { return workerStatus; }
     bool hasPendingQueuedBuilds() const { return !queuedJobs.empty(); }
     bool waitForWorkerIdle(std::uint64_t timeoutMillis);
@@ -216,6 +259,7 @@ public:
 private:
     struct CacheEntry
     {
+        PreparedPlaybackOwnershipRecord ownership;
         PreparedPlaybackSampleHandle sample;
         PreparedPlaybackStreamHandle stream;
         std::uint64_t retainedBytes = 0;
@@ -240,11 +284,14 @@ private:
         const std::string& state);
     void runBackgroundWorker();
     void refreshWorkerStatus();
-    void retireSupersededCacheEntries(const std::string& sampleSourceId, const std::string& cacheKey);
+    void retireSupersededCacheEntries(const std::string& sampleSourceId,
+                                      const std::string& cacheKey,
+                                      std::uint64_t retiredByBuildId);
 
     std::string compilerVersion;
     std::uint64_t nextBuildId = 1;
     std::uint64_t nextQueueOrdinal = 1;
+    std::uint64_t nextRetirementToken = 1;
     std::size_t maxPendingJobs = 2;
     bool backgroundWorkerEnabled = false;
     bool stopWorkerRequested = false;
@@ -260,6 +307,8 @@ private:
     std::condition_variable workerIdleCondition;
 };
 
+std::string computePreparedPlaybackContentDigest(const ImmutablePreparedPlayback& prepared);
+std::string serializePreparedPlaybackContent(const ImmutablePreparedPlayback& prepared);
 std::string serializeImmutablePreparedPlayback(const ImmutablePreparedPlayback& prepared);
 std::string toString(PreparedPlaybackWorkLane lane);
 std::string toString(PreparedPlaybackJobPriority priority);

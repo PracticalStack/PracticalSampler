@@ -184,11 +184,15 @@ void syncDraftPlaybackIntoDiagnostics(const DraftPlaybackStatus& status,
     diagnosticsSnapshot.previewPreparedSampleCount = status.preview.preparedSampleCount;
     diagnosticsSnapshot.previewPreparedStreamCount = status.preview.preparedStreamCount;
     diagnosticsSnapshot.previewPreparedZoneCount = status.preview.preparedZoneCount;
+    diagnosticsSnapshot.previewPreparedOwnershipRecordCount = status.preview.preparedOwnershipRecordCount;
     diagnosticsSnapshot.publishedPreparedSampleCount = status.performance.preparedSampleCount;
     diagnosticsSnapshot.publishedPreparedStreamCount = status.performance.preparedStreamCount;
     diagnosticsSnapshot.publishedPreparedZoneCount = status.performance.preparedZoneCount;
+    diagnosticsSnapshot.publishedPreparedOwnershipRecordCount = status.performance.preparedOwnershipRecordCount;
     diagnosticsSnapshot.previewPreparedBytes = status.preview.preparedBytes;
     diagnosticsSnapshot.publishedPreparedBytes = status.performance.preparedBytes;
+    diagnosticsSnapshot.previewPreparedOwnershipBytes = status.preview.preparedOwnershipBytes;
+    diagnosticsSnapshot.publishedPreparedOwnershipBytes = status.performance.preparedOwnershipBytes;
     diagnosticsSnapshot.previewPreparationCacheHits = status.preview.preparationCacheHitCount;
     diagnosticsSnapshot.previewPreparationCacheMisses = status.preview.preparationCacheMissCount;
     diagnosticsSnapshot.publishedPreparationCacheHits = status.performance.preparationCacheHitCount;
@@ -225,6 +229,8 @@ void syncPreparedPlaybackWorkerIntoDiagnostics(const PreparedPlaybackWorkerStatu
     diagnosticsSnapshot.preparedWorkerSupersededCount = workerStatus.supersededCount;
     diagnosticsSnapshot.preparedWorkerFailureCount = workerStatus.failureCount;
     diagnosticsSnapshot.preparedWorkerMaxPendingCount = workerStatus.maxPendingWorkCount;
+    diagnosticsSnapshot.preparedWorkerActiveOwnershipRecordCount = workerStatus.activeOwnershipRecordCount;
+    diagnosticsSnapshot.preparedWorkerRetiredOwnershipRecordCount = workerStatus.retiredOwnershipRecordCount;
     diagnosticsSnapshot.preparedWorkerRetiredBytes = workerStatus.retiredBytesAwaitingCleanup;
     diagnosticsSnapshot.preparedWorkerEvent = workerStatus.lastEvent;
 }
@@ -608,8 +614,10 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
            << ", publish=" << summarizeDigest(diagnostics.publishedPreparedContentDigest) << "\n";
     detail << "Prepared playback assets: preview samples=" << diagnostics.previewPreparedSampleCount
            << ", preview streams=" << diagnostics.previewPreparedStreamCount
+           << ", preview ownership=" << diagnostics.previewPreparedOwnershipRecordCount
            << ", publish samples=" << diagnostics.publishedPreparedSampleCount
-           << ", publish streams=" << diagnostics.publishedPreparedStreamCount << "\n";
+           << ", publish streams=" << diagnostics.publishedPreparedStreamCount
+           << ", publish ownership=" << diagnostics.publishedPreparedOwnershipRecordCount << "\n";
     detail << "Playable range: source=" << (diagnostics.playableRangeSource.empty() ? "unavailable" : diagnostics.playableRangeSource)
            << ", available=" << (diagnostics.playableRangeAvailable ? "yes" : "no")
            << ", low=" << diagnostics.lowestPlayableNote
@@ -617,12 +625,16 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
     detail << "Surface provenance: source=" << (diagnostics.surfaceStateSource.empty() ? "unavailable" : diagnostics.surfaceStateSource)
            << ", renderer=" << (diagnostics.rendererMode.empty() ? "unavailable" : diagnostics.rendererMode) << "\n";
     detail << "Prepared playback bytes: preview=" << diagnostics.previewPreparedBytes
-           << ", publish=" << diagnostics.publishedPreparedBytes << "\n";
+           << ", publish=" << diagnostics.publishedPreparedBytes
+           << ", previewOwnership=" << diagnostics.previewPreparedOwnershipBytes
+           << ", publishOwnership=" << diagnostics.publishedPreparedOwnershipBytes << "\n";
     detail << "Prepared worker: pending=" << diagnostics.preparedWorkerPendingCount
            << ", canceled=" << diagnostics.preparedWorkerCancellationCount
            << ", superseded=" << diagnostics.preparedWorkerSupersededCount
            << ", failures=" << diagnostics.preparedWorkerFailureCount
            << ", maxPending=" << diagnostics.preparedWorkerMaxPendingCount
+           << ", activeOwnership=" << diagnostics.preparedWorkerActiveOwnershipRecordCount
+           << ", retiredOwnership=" << diagnostics.preparedWorkerRetiredOwnershipRecordCount
            << ", retiredBytes=" << diagnostics.preparedWorkerRetiredBytes << "\n";
     detail << "Prepared worker event: "
            << (diagnostics.preparedWorkerEvent.empty() ? "not reported" : diagnostics.preparedWorkerEvent) << "\n";
@@ -846,14 +858,20 @@ EnginePerformanceSnapshot EngineFacade::getPerformanceSnapshot() const
     snapshot.preparedWorkerCancellationCount = workerStatus.cancellationCount;
     snapshot.preparedWorkerSupersededCount = workerStatus.supersededCount;
     snapshot.preparedWorkerFailureCount = workerStatus.failureCount;
+    snapshot.preparedWorkerActiveOwnershipRecordCount = workerStatus.activeOwnershipRecordCount;
+    snapshot.preparedWorkerRetiredOwnershipRecordCount = workerStatus.retiredOwnershipRecordCount;
     snapshot.preparedWorkerRetiredBytes = workerStatus.retiredBytesAwaitingCleanup;
     snapshot.preparedWorkerEvent = workerStatus.lastEvent;
     snapshot.previewPreparedSampleCount = draftStatus.preview.preparedSampleCount;
     snapshot.previewPreparedStreamCount = draftStatus.preview.preparedStreamCount;
+    snapshot.previewPreparedOwnershipRecordCount = draftStatus.preview.preparedOwnershipRecordCount;
     snapshot.publishedPreparedSampleCount = draftStatus.performance.preparedSampleCount;
     snapshot.publishedPreparedStreamCount = draftStatus.performance.preparedStreamCount;
+    snapshot.publishedPreparedOwnershipRecordCount = draftStatus.performance.preparedOwnershipRecordCount;
     snapshot.previewPreparedBytes = draftStatus.preview.preparedBytes;
     snapshot.publishedPreparedBytes = draftStatus.performance.preparedBytes;
+    snapshot.previewPreparedOwnershipBytes = draftStatus.preview.preparedOwnershipBytes;
+    snapshot.publishedPreparedOwnershipBytes = draftStatus.performance.preparedOwnershipBytes;
     snapshot.previewPreparationCacheHits = draftStatus.preview.preparationCacheHitCount;
     snapshot.previewPreparationCacheMisses = draftStatus.preview.preparationCacheMissCount;
     snapshot.publishedPreparationCacheHits = draftStatus.performance.preparationCacheHitCount;

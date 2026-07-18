@@ -121,12 +121,35 @@ int main()
                 "Invalidating one source should preserve exactly one warm prepared handle.");
         require(processedInvalidatingPreview.result.metrics.cacheMissCount == 1,
                 "Invalidating one source should rebuild exactly one prepared handle.");
+        require(processedInvalidatingPreview.result.metrics.activeCachedOwnershipRecordCount == 2,
+                "Worker metrics should expose the active cached ownership-record count after invalidation.");
+        require(processedInvalidatingPreview.result.metrics.retiredOwnershipRecordCount == 1,
+                "Worker metrics should expose one retired ownership record before cleanup.");
+        require(processedInvalidatingPreview.result.metrics.retiredBytesAwaitingCleanup > 0,
+                "Worker metrics should expose retired ownership bytes before cleanup.");
         require(preparedService.getWorkerStatus().retiredBytesAwaitingCleanup > 0,
                 "Replacing a prepared cache key should leave retired bytes awaiting cleanup.");
+        require(preparedService.getWorkerStatus().activeOwnershipRecordCount == 2,
+                "Worker status should expose the active ownership-record backlog.");
+        require(preparedService.getWorkerStatus().retiredOwnershipRecordCount == 1,
+                "Worker status should expose the retired ownership-record backlog.");
+        const auto retiredOwnershipRecords = preparedService.snapshotRetiredOwnershipRecords();
+        require(retiredOwnershipRecords.size() == 1,
+                "Replacing one prepared cache key should expose one retired ownership record before cleanup.");
+        require(retiredOwnershipRecords.front().lifetimeState == "retired-awaiting-cleanup",
+                "Retired ownership records should preserve an explicit retired-awaiting-cleanup state.");
+        require(!retiredOwnershipRecords.front().retirementToken.empty(),
+                "Retired ownership records should carry a retirement token that survives worker completion.");
+        require(retiredOwnershipRecords.front().retiredByBuildId == processedInvalidatingPreview.result.buildId,
+                "Retired ownership records should track the build that superseded the stale cache entry.");
         require(preparedService.retireStaleCacheEntries() > 0,
                 "Worker should retire stale prepared cache entries on request.");
+        require(preparedService.getWorkerStatus().retiredOwnershipRecordCount == 0,
+                "Draining stale prepared cache entries should clear the retired ownership-record count.");
         require(preparedService.getWorkerStatus().retiredBytesAwaitingCleanup == 0,
                 "Retiring stale prepared cache entries should clear the retained-byte backlog.");
+        require(preparedService.snapshotRetiredOwnershipRecords().empty(),
+                "Draining stale prepared cache entries should clear the retired ownership backlog.");
 
         std::cout << "Phase 1 prepared playback worker tests passed." << std::endl;
         return 0;
