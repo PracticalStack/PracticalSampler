@@ -36,6 +36,7 @@ int main()
 {
     try
     {
+        const auto phase2ProjectPath = fs::path(drs::engine::getPhase2ReferenceProjectManifestPath());
         const auto phase1Project = drs::engine::loadPhase1ReferenceProjectManifest();
         require(phase1Project.loaded, "Phase 1 reference project must continue to load before Sprint 1 migration tests run.");
 
@@ -47,10 +48,34 @@ int main()
                 "Migrated Phase 1 project must gain the authoring schema.");
         require(migratedPhase1.project.authoring.schemaVersion == 1,
                 "Migrated Phase 1 authoring schema version changed unexpectedly.");
+        require(migratedPhase1.project.sampleSources.size() == phase1Project.project.sampleSources.size(),
+                "Phase 1 migration must preserve the existing sample-source inventory.");
+        require(migratedPhase1.project.authoring.selectedZoneId.empty(),
+                "Phase 1 migration must not invent a selected zone before imported zones exist.");
+        require(migratedPhase1.project.authoring.selectedPerformanceBankId.empty(),
+                "Phase 1 migration must not invent a selected performance bank early.");
         require(migratedPhase1.project.authoring.zones.empty(),
                 "Phase 1 migration should not invent authoring zones before the importer exists.");
+        require(migratedPhase1.project.authoring.macros.empty(),
+                "Phase 1 migration should not invent authoring macros before authoring data exists.");
+        require(migratedPhase1.project.authoring.fxSlots.empty(),
+                "Phase 1 migration should not invent authoring FX slots before authoring data exists.");
+        require(migratedPhase1.project.authoring.routingBuses.empty(),
+                "Phase 1 migration should not invent authoring routing buses before authoring data exists.");
+        require(migratedPhase1.project.authoring.performanceBanks.empty(),
+                "Phase 1 migration should not invent performance banks before authoring data exists.");
+        const auto migratedPhase1Json = drs::engine::serializeRuntimeProjectManifest(
+            migratedPhase1.project,
+            phase2ProjectPath.generic_string());
+        require(migratedPhase1Json.find("\"authoring\"") != std::string::npos,
+                "Migrated Phase 1 project must serialize the Phase 2 authoring container.");
+        require(migratedPhase1Json.find("roundRobin") == std::string::npos,
+                "Migrated Phase 1 project serialization must not invent Round Robin entities early.");
+        require(migratedPhase1Json.find("micPosition") == std::string::npos,
+                "Migrated Phase 1 project serialization must not invent mic-position entities early.");
+        require(migratedPhase1Json.find("sfz") == std::string::npos,
+                "Migrated Phase 1 project serialization must not invent SFZ entities early.");
 
-        const auto phase2ProjectPath = fs::path(drs::engine::getPhase2ReferenceProjectManifestPath());
         const auto phase2Project = drs::engine::loadPhase2ReferenceProjectManifest();
         require(phase2Project.loaded, "Phase 2 authoring foundation fixture must load successfully.");
         require(phase2Project.project.schemaVersion == 2, "Phase 2 authoring fixture schemaVersion changed unexpectedly.");

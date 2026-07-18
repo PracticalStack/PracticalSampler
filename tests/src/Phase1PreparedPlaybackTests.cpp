@@ -1,3 +1,4 @@
+#include "drs/engine/AuthoringSession.h"
 #include "drs/engine/PlaybackSnapshot.h"
 #include "drs/engine/PreparedPlayback.h"
 #include "drs/engine/ProjectDocument.h"
@@ -152,6 +153,132 @@ int main()
                                 "missing-sample-source-asset",
                                 "sampleSources[0].path"),
                 "Rejected prepared playback result should preserve the immutable snapshot findings that caused rejection.");
+
+        const auto phase1Project = drs::engine::loadPhase1ReferenceProjectManifest();
+        require(phase1Project.loaded, "Phase 1 reference project must load before migrated prepared-playback coverage runs.");
+        const auto migratedProject = drs::engine::migrateRuntimeProjectToPhase2Authoring(phase1Project.project);
+        require(migratedProject.valid, "Phase 1 reference project should migrate before prepared-playback coverage runs.");
+
+        drs::engine::PlaybackSnapshotBuilder migratedSnapshotBuilder;
+        drs::engine::PreparedPlaybackService migratedPreparedService;
+
+        const auto migratedSnapshotRequest = migratedSnapshotBuilder.requestBuild(0, true);
+        const auto migratedSnapshot = migratedSnapshotBuilder.buildSnapshot(migratedSnapshotRequest, migratedProject.project);
+        require(!migratedSnapshot.built,
+                "Migrated Phase 1 project should not build an activation-eligible snapshot before imported zones exist.");
+        const auto migratedPreparedRequest = migratedPreparedService.requestBuild(migratedSnapshot);
+        require(!migratedPreparedRequest.accepted,
+                "Prepared playback request must reject migrated snapshots that still lack playable zones.");
+        const auto migratedPreparedRejected = migratedPreparedService.prepare(migratedPreparedRequest,
+                                                                             migratedSnapshot,
+                                                                             referenceStream);
+        require(!migratedPreparedRejected.built,
+                "Prepared playback must stay rejected while the migrated project has no imported zones.");
+        require(migratedPreparedRejected.snapshotBuildId == migratedSnapshot.buildId,
+                "Rejected migrated prepared playback should preserve the snapshot build identity.");
+        require(migratedPreparedRejected.requestedDraftRevision == migratedSnapshot.requestedDraftRevision,
+                "Rejected migrated prepared playback should preserve the requested draft revision.");
+        require(migratedPreparedRejected.prepared.draftRevision == migratedSnapshot.snapshot.draftRevision,
+                "Rejected migrated prepared playback should still report the snapshot draft revision.");
+        require(migratedPreparedRejected.prepared.samples.empty() && migratedPreparedRejected.prepared.zones.empty(),
+                "Rejected migrated prepared playback must not fabricate prepared samples or zones.");
+        require(containsFinding(migratedPreparedRejected,
+                                drs::engine::PlaybackSnapshotFindingSeverity::error,
+                                "no-playable-zones",
+                                "authoring.zones"),
+                "Rejected migrated prepared playback should preserve the structured no-playable-zones finding.");
+        require(!containsFinding(migratedPreparedRejected,
+                                 drs::engine::PlaybackSnapshotFindingSeverity::error,
+                                 "no-sample-identities",
+                                 "sampleSources"),
+                "Rejected migrated prepared playback should preserve the migrated sample identities while zones are missing.");
+
+        drs::engine::AuthoringSession migratedSession(migratedProject.project);
+        drs::engine::RuntimeProjectSampleSource importedSampleSource;
+        importedSampleSource.id = "migrated-import-sine-a3";
+        importedSampleSource.path = phase1Project.project.sampleSources[0].path;
+        importedSampleSource.role = "imported-sustain";
+
+        drs::engine::RuntimeProjectZoneDefinition importedZone;
+        importedZone.id = "migrated-zone-sine-a3";
+        importedZone.sampleSourceId = importedSampleSource.id;
+        importedZone.displayName = "Migrated Imported Sine A3";
+        importedZone.groupId = "main";
+        importedZone.articulationId = "sustain";
+        importedZone.rootKey = 57;
+        importedZone.keyLow = 57;
+        importedZone.keyHigh = 57;
+        importedZone.velocityLow = 1;
+        importedZone.velocityHigh = 127;
+
+        const auto importResult = migratedSession.appendImportedContent({ importedSampleSource },
+                                                                        { importedZone },
+                                                                        "Import migrated authoring content");
+        require(importResult.applied, "Migrated Phase 1 project should accept imported authoring content.");
+        require(importResult.documentState.revision == 1,
+                "Imported migrated authoring content should advance the document revision.");
+        require(migratedSession.getProject().authoring.selectedZoneId == importedZone.id,
+                "Imported migrated authoring content should select the imported zone.");
+
+        const auto importedSnapshotRequest = migratedSnapshotBuilder.requestBuild(importResult.documentState.revision, true);
+        const auto importedSnapshot = migratedSnapshotBuilder.buildSnapshot(importedSnapshotRequest, migratedSession.getProject());
+        require(importedSnapshot.built,
+                "Migrated project with imported authoring content should build an immutable snapshot.");
+        require(importedSnapshot.snapshot.selectedZoneId == importedZone.id,
+                "Imported migrated snapshot should preserve the selected zone.");
+        const auto importedPreparedRequest = migratedPreparedService.requestBuild(importedSnapshot);
+        require(importedPreparedRequest.accepted,
+                "Prepared playback should accept migrated snapshots once imported zones exist.");
+        const auto importedPrepared = migratedPreparedService.prepare(importedPreparedRequest, importedSnapshot, referenceStream);
+        require(importedPrepared.built && importedPrepared.activationEligible,
+                "Prepared playback should succeed for migrated projects once imported authoring content exists.");
+        require(importedPrepared.prepared.draftRevision == importResult.documentState.revision,
+                "Prepared playback should preserve the imported draft revision.");
+        require(importedPrepared.metrics.preparedSampleCount == migratedSession.getProject().sampleSources.size(),
+                "Prepared playback should materialize every migrated sample identity after import.");
+        require(importedPrepared.metrics.preparedZoneCount == migratedSession.getProject().authoring.zones.size(),
+                "Prepared playback should materialize the imported migrated zone.");
+        require(importedPrepared.metrics.cacheMissCount == migratedSession.getProject().sampleSources.size(),
+                "First successful migrated prepared build should cold-miss every migrated sample handle.");
+        require(importedPrepared.metrics.cacheHitCount == 0,
+                "First successful migrated prepared build should not report cache hits.");
+        require(importedPrepared.prepared.zones.size() == 1,
+                "Imported migrated prepared playback should expose exactly one playable zone.");
+        require(importedPrepared.prepared.zones[0].zoneId == importedZone.id,
+                "Imported migrated prepared playback should preserve the imported zone identity.");
+
+        auto editedImportedZone = *migratedSession.getSelectedZone();
+        editedImportedZone.gainDb = 2.5;
+        editedImportedZone.pan = -0.2;
+        const auto editedZoneResult = migratedSession.updateSelectedZone(editedImportedZone,
+                                                                         "Shape imported migrated zone");
+        require(editedZoneResult.applied, "Editing the imported migrated zone should commit successfully.");
+        require(editedZoneResult.documentState.revision == 2,
+                "Editing the imported migrated zone should advance the draft revision.");
+
+        const auto editedImportedSnapshotRequest = migratedSnapshotBuilder.requestBuild(editedZoneResult.documentState.revision,
+                                                                                        true);
+        const auto editedImportedSnapshot = migratedSnapshotBuilder.buildSnapshot(editedImportedSnapshotRequest,
+                                                                                  migratedSession.getProject());
+        require(editedImportedSnapshot.built,
+                "Edited migrated authoring content should still build an immutable snapshot.");
+        require(editedImportedSnapshot.snapshot.contentDigest != importedSnapshot.snapshot.contentDigest,
+                "Editing imported migrated authoring content should change the immutable snapshot digest.");
+        const auto editedImportedPreparedRequest = migratedPreparedService.requestBuild(editedImportedSnapshot);
+        const auto editedImportedPrepared = migratedPreparedService.prepare(editedImportedPreparedRequest,
+                                                                           editedImportedSnapshot,
+                                                                           referenceStream);
+        require(editedImportedPrepared.built,
+                "Edited migrated authoring content should still prepare successfully.");
+        require(editedImportedPrepared.prepared.preparedContentDigest != importedPrepared.prepared.preparedContentDigest,
+                "Editing imported migrated authoring content should change the prepared-playback digest.");
+        require(editedImportedPrepared.metrics.cacheHitCount == migratedSession.getProject().sampleSources.size(),
+                "Editing zone-only migrated content should reuse every prepared sample handle.");
+        require(editedImportedPrepared.metrics.cacheMissCount == 0,
+                "Editing zone-only migrated content should not invalidate prepared sample handles.");
+        require(editedImportedPrepared.prepared.zones[0].gainDb == editedImportedZone.gainDb
+                    && editedImportedPrepared.prepared.zones[0].pan == editedImportedZone.pan,
+                "Prepared playback should preserve edited migrated zone normalization values.");
 
         const auto canceledPrepared = preparedService.cancelBuild(firstPreparedRequest);
         require(canceledPrepared.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::canceled,

@@ -52,8 +52,24 @@ int main()
         require(firstResult.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::ready,
                 "Successful playback snapshot build should finish in the ready state.");
         require(firstResult.findings.empty(), "Reference Phase 2 project should not produce playback snapshot findings.");
+        require(firstResult.snapshot.schemaName == "drs.playbackSnapshot",
+                "Playback snapshot schemaName changed unexpectedly.");
+        require(firstResult.snapshot.schemaVersion == 1,
+                "Playback snapshot schemaVersion changed unexpectedly.");
+        require(firstResult.snapshot.sourceProjectSchemaName == phase2Project.project.schemaName,
+                "Playback snapshot must record the source project schema name.");
+        require(firstResult.snapshot.sourceProjectSchemaVersion == phase2Project.project.schemaVersion,
+                "Playback snapshot must record the source project schema version.");
+        require(firstResult.snapshot.sourceAuthoringSchemaName == phase2Project.project.authoring.schemaName,
+                "Playback snapshot must record the source authoring schema name.");
+        require(firstResult.snapshot.sourceAuthoringSchemaVersion == phase2Project.project.authoring.schemaVersion,
+                "Playback snapshot must record the source authoring schema version.");
         require(firstResult.snapshot.draftRevision == 0,
                 "Playback snapshot should record the requested draft revision.");
+        require(firstResult.snapshot.selectedZoneId == phase2Project.project.authoring.selectedZoneId,
+                "Playback snapshot should preserve the selected zone identity.");
+        require(firstResult.snapshot.selectedPerformanceBankId == phase2Project.project.authoring.selectedPerformanceBankId,
+                "Playback snapshot should preserve the selected performance-bank identity.");
         require(firstResult.snapshot.sampleIdentities.size() == phase2Project.project.sampleSources.size(),
                 "Playback snapshot sample identity count changed unexpectedly.");
         require(firstResult.snapshot.macroDefaults.size() == phase2Project.project.authoring.macros.size(),
@@ -125,11 +141,38 @@ int main()
                 "Migrated Phase 1 project must not become activation-eligible before playable zones exist.");
         require(migratedResult.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::failed,
                 "Migrated Phase 1 project without imported zones should fail predictably.");
+        require(migratedResult.snapshot.sourceProjectSchemaName == migratedProject.project.schemaName,
+                "Migrated Phase 1 snapshot must report the migrated project schema name.");
+        require(migratedResult.snapshot.sourceProjectSchemaVersion == migratedProject.project.schemaVersion,
+                "Migrated Phase 1 snapshot must report the migrated project schema version.");
+        require(migratedResult.snapshot.sourceAuthoringSchemaName == migratedProject.project.authoring.schemaName,
+                "Migrated Phase 1 snapshot must report the migrated authoring schema name.");
+        require(migratedResult.snapshot.sourceAuthoringSchemaVersion == migratedProject.project.authoring.schemaVersion,
+                "Migrated Phase 1 snapshot must report the migrated authoring schema version.");
+        require(migratedResult.snapshot.sampleIdentities.size() == migratedProject.project.sampleSources.size(),
+                "Migrated Phase 1 snapshot must preserve the migrated sample-source inventory.");
+        require(migratedResult.snapshot.macroDefaults.empty(),
+                "Migrated Phase 1 snapshot must not invent macro defaults before authoring data exists.");
+        require(migratedResult.snapshot.fxSlots.empty(),
+                "Migrated Phase 1 snapshot must not invent FX slots before authoring data exists.");
+        require(migratedResult.snapshot.routingBuses.empty(),
+                "Migrated Phase 1 snapshot must not invent routing buses before authoring data exists.");
+        require(migratedResult.snapshot.articulationRoutes.empty(),
+                "Migrated Phase 1 snapshot must not invent articulation routes before zones exist.");
+        require(migratedResult.snapshot.groupRoutes.empty(),
+                "Migrated Phase 1 snapshot must not invent group routes before zones exist.");
+        require(migratedResult.snapshot.zones.empty(),
+                "Migrated Phase 1 snapshot must not invent zones before imported authoring content exists.");
         require(containsFinding(migratedResult,
                                 drs::engine::PlaybackSnapshotFindingSeverity::error,
                                 "no-playable-zones",
                                 "authoring.zones"),
                 "Migrated Phase 1 project should report a structured no-playable-zones finding.");
+        require(!containsFinding(migratedResult,
+                                 drs::engine::PlaybackSnapshotFindingSeverity::error,
+                                 "no-sample-identities",
+                                 "sampleSources"),
+                "Migrated Phase 1 project should preserve sample identities even while zones are still missing.");
         const auto migratedSerialized = drs::engine::serializeImmutablePlaybackSnapshot(migratedResult.snapshot);
         require(migratedSerialized.find("roundRobin") == std::string::npos,
                 "Migrated Phase 1 snapshot coverage must not invent Round Robin entities early.");
