@@ -21,9 +21,9 @@ velocity range, sample start offset, loop, source assignment, selection, Preview
 authored topology changes. `buildAuthoringPreviewRequestSignature` combines scope, selected-zone
 identity, category, and an authored-content fingerprint.
 
-The processor fingerprint currently covers selected-zone source assignment, root/key/velocity
-bounds, gain, pan, start offset, loop enable/range, scope, and selection. Mini Sprint 5.4 extends
-the preparation boundary to full current-draft topology and source provenance.
+The processor fingerprint covers selected-zone source assignment/path, root/key/velocity bounds,
+gain, pan, start offset, loop enable/range, scope, and selection. Current-draft scope hashes the full
+serialized authored project. Mini Sprint 5.4 completed the corresponding preparation boundary.
 
 ## Supersession and cancellation
 
@@ -47,7 +47,7 @@ own request ID, revision, and cancellation generation; only the immutable prepar
 is reusable. Different selections are never equivalent. Project reset clears warm records.
 
 The index retains at most eight records by default and contains no prepared payload ownership.
-Actual cross-revision model materialization remains part of Mini Sprint 5.4.
+Mini Sprint 5.4 materializes warm worker payloads through the scope-specific immutable model boundary.
 
 ## Bounded records and counters
 
@@ -58,4 +58,3 @@ identity, terminal outcome, build ID, and acceptance; the default ring retains a
 
 The prepared worker retains its existing two-job queue and one-job in-flight bounds. Controller
 pending depth and worker queue metrics are tested independently.
-

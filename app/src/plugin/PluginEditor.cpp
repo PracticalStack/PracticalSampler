@@ -441,7 +441,8 @@ Editor::Editor(Processor& owner)
                      },
                      [&owner]()
                      {
-                         owner.getEngineFacade().refreshPreviewToCurrentDraft();
+                         owner.requestAuthoringPreview(
+                             drs::engine::AuthoringPreviewScope::currentDraft);
                      },
                      [&owner]()
                      {

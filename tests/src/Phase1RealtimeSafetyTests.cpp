@@ -93,6 +93,21 @@ struct ReadyAuthoringPreviewContext
     std::size_t revision = 0;
     drs::engine::RuntimeProjectZoneDefinition zone;
 };
+
+bool waitForAuthoringPreviewState(
+    drs::plugin::Processor& processor,
+    drs::engine::AuthoringPreviewPreparationState expected)
+{
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+    while (std::chrono::steady_clock::now() < deadline)
+    {
+        processor.serviceMessageThreadWork();
+        if (processor.getAuthoringPreviewControllerSnapshot().preparationState == expected)
+            return true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    return false;
+}
 } // namespace
 
 int main()
@@ -219,8 +234,9 @@ int main()
             require(previewProcessor.serviceMessageThreadWork(),
                     failureMessagePrefix + " should queue the selected-zone preview revision.");
             std::this_thread::sleep_for(std::chrono::milliseconds(15));
-            require(previewProcessor.serviceMessageThreadWork(),
-                    failureMessagePrefix + " should stage the selected-zone revision after coalescing.");
+            require(waitForAuthoringPreviewState(
+                        previewProcessor, drs::engine::AuthoringPreviewPreparationState::ready),
+                    failureMessagePrefix + " should settle the selected-zone worker after coalescing.");
 
             juce::AudioBuffer<float> previewBuffer(2, 512);
             previewBuffer.clear();
@@ -265,6 +281,9 @@ int main()
             drs::plugin::Processor previewProcessor;
             const auto context = stageReadyPreview(previewProcessor, caseLabel);
             previewProcessor.replaceAuthoringProject(replaceSelectedZonePath(context, samplePath));
+            require(waitForAuthoringPreviewState(
+                        previewProcessor, drs::engine::AuthoringPreviewPreparationState::failed),
+                    caseLabel + " should settle a structured failed Preview result.");
 
             const auto snapshot = previewProcessor.getRealtimeSafetySnapshot();
             require(snapshot.activeAuthoringPreviewRevision == context.revision,
@@ -292,20 +311,26 @@ int main()
         require(processor.serviceMessageThreadWork(),
                 "Message-thread servicing should queue the selected authoring preview revision.");
         std::this_thread::sleep_for(std::chrono::milliseconds(15));
-        require(processor.serviceMessageThreadWork(),
-                "Message-thread servicing should launch the revision after its bounded coalescing window.");
+        require(waitForAuthoringPreviewState(
+                    processor, drs::engine::AuthoringPreviewPreparationState::ready),
+                "Message-thread servicing should settle the revision after its bounded coalescing window.");
 
         const auto selectedZone = processor.getAuthoringSession().getSelectedZone();
         require(selectedZone.has_value(),
                 "Authoring preview isolation test should keep the selected zone available.");
 
         auto previewActivationSnapshot = processor.getRealtimeSafetySnapshot();
-        require(previewActivationSnapshot.activeAuthoringPreviewRevision == 0,
-                "Authoring preview should keep the previous selected-zone activation active until the next block boundary.");
-        require(previewActivationSnapshot.pendingAuthoringPreviewRevision == selectedPreviewRevision,
-                "Message-thread servicing should queue the selected authoring revision as a pending preview activation.");
-        require(previewActivationSnapshot.authoringPreviewRevisionState == "Preparing",
-                "Queued authoring preview revisions should surface a preparing state before the callback handoff.");
+        const auto installedForPreparation
+            = previewActivationSnapshot.activeAuthoringPreviewRevision == selectedPreviewRevision
+            && previewActivationSnapshot.pendingAuthoringPreviewRevision == 0;
+        const auto pendingBlockBoundary
+            = previewActivationSnapshot.activeAuthoringPreviewRevision == 0
+            && previewActivationSnapshot.pendingAuthoringPreviewRevision == selectedPreviewRevision;
+        require(installedForPreparation || pendingBlockBoundary,
+                "A first Preview activation must be installed during preparation or queued for the next block boundary.");
+        require(previewActivationSnapshot.authoringPreviewRevisionState
+                    == (installedForPreparation ? "Ready" : "Preparing"),
+                "Preview status must agree with whether the first activation is installed or pending.");
 
         processor.queuePerformanceSurfaceNoteOn(57, 0.8f);
 
@@ -358,8 +383,9 @@ int main()
         require(failedPreviewProcessor.serviceMessageThreadWork(),
                 "Failed-preview regression test should queue the selected-zone preview revision.");
         std::this_thread::sleep_for(std::chrono::milliseconds(15));
-        require(failedPreviewProcessor.serviceMessageThreadWork(),
-                "Failed-preview regression test should stage the selected-zone revision after coalescing.");
+        require(waitForAuthoringPreviewState(
+                    failedPreviewProcessor, drs::engine::AuthoringPreviewPreparationState::ready),
+                "Failed-preview regression test should settle the selected-zone revision after coalescing.");
 
         juce::AudioBuffer<float> failedPreviewBuffer(2, 512);
         failedPreviewBuffer.clear();
@@ -387,6 +413,9 @@ int main()
         sampleSourceIterator->path = invalidProject.contentRootPath + "/missing-preview-sample.wav";
         invalidProject.authoring.selectedZoneId = selectedZoneId;
         failedPreviewProcessor.replaceAuthoringProject(invalidProject);
+        require(waitForAuthoringPreviewState(
+                    failedPreviewProcessor, drs::engine::AuthoringPreviewPreparationState::failed),
+                "Invalid selected-zone edits should settle as a failed Preview request.");
 
         failedPreviewSnapshot = failedPreviewProcessor.getRealtimeSafetySnapshot();
         require(failedPreviewSnapshot.activeAuthoringPreviewRevision == readyPreviewRevision,
@@ -418,7 +447,9 @@ int main()
                 "Auditioning after a failed preview edit should keep the failed status visible until the draft changes.");
         const auto failedPreviewStatus = failedPreviewProcessor.getAuthoringPreviewStatusSnapshot();
         require(failedPreviewStatus.blockingPrerequisite == "Relink or re-import the selected sample file.",
-                "Failed preview status should surface the next prerequisite for a missing sample file.");
+                "Failed preview status should surface the next prerequisite for a missing sample file; got '"
+                    + failedPreviewStatus.blockingPrerequisite + "' from '"
+                    + failedPreviewSnapshot.authoringPreviewFailureState + "'.");
         require(failedPreviewStatus.blockingGuidance.find("missing-preview-sample.wav") != std::string::npos,
                 "Failed preview guidance should identify the missing sample file that must be repaired.");
         require(failedPreviewSnapshot.samplePathResolutionsOnAudioThread == 0,

@@ -181,4 +181,5 @@ private:
 std::string toString(PlaybackSnapshotLifecycleState state);
 std::string toString(PlaybackSnapshotFindingSeverity severity);
 std::string serializeImmutablePlaybackSnapshot(const ImmutablePlaybackSnapshot& snapshot);
+std::string computePlaybackSnapshotContentDigest(const ImmutablePlaybackSnapshot& snapshot);
 } // namespace drs::engine

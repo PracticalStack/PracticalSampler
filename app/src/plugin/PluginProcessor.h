@@ -153,6 +153,7 @@ public:
     const juce::File& getAuthoringProjectFile() const { return authoringProjectFile; }
     void setAuthoringProjectFile(juce::File file) { authoringProjectFile = std::move(file); }
     void setMacroValueFromShell(const std::string& macroId, double value);
+    void requestAuthoringPreview(drs::engine::AuthoringPreviewScope scope);
     void queueAuthoringPreviewNoteOn(int midiNoteNumber, float velocity);
     void queueAuthoringPreviewNoteOff(int midiNoteNumber);
     void queuePerformanceSurfaceNoteOn(int midiNoteNumber, float velocity);
@@ -186,15 +187,9 @@ private:
         std::atomic<std::uint32_t> readIndex { 0 };
     };
 
-    struct LoadedAuthoringSample
-    {
-        drs::engine::ImportedSampleData sample;
-    };
-
     static juce::String buildMacroParameterId(const std::string& macroId);
     static juce::AudioProcessorValueTreeState::ParameterLayout buildParameterLayout(
         const drs::engine::EngineFacade& engineFacade);
-    bool ensureSelectedAuthoringSampleLoaded(bool invokedFromAudioThread);
     void drainRealtimeNoteEvents(RealtimeNoteEventQueue& queue,
                                  drs::engine::SamplerEventBlock& destination) noexcept;
     bool stageAuthoringPreviewActivation(const drs::engine::AuthoringPreviewRequest& request,
@@ -301,7 +296,6 @@ private:
     drs::engine::AuthoringSession authoringSession;
     drs::engine::AuthoringPreviewController authoringPreviewController;
     drs::engine::EngineFacade engineFacade;
-    std::unordered_map<std::string, LoadedAuthoringSample> authoringLoadedSamples;
     std::unordered_map<std::string, drs::app::AuthoringWaveformPreview> authoringWaveformPreviewCache;
     drs::engine::SamplerPlaybackContext performancePlaybackContext {
         drs::engine::PlaybackActivationLane::performance
@@ -344,10 +338,11 @@ private:
     std::size_t authoringPreviewPeakReleasingVoiceCount = 0;
     std::size_t failedAuthoringPreviewRevision = std::numeric_limits<std::size_t>::max();
     std::string failedAuthoringPreviewState;
-    std::string lastAuthoringSampleLoadFailureState;
     std::size_t observedDraftPlaybackProjectRevision = std::numeric_limits<std::size_t>::max();
     std::uint64_t observedEngineStateRevision = 0;
     bool authoringPreviewDirectAuditionRequested = false;
+    drs::engine::AuthoringPreviewScope authoringPreviewRequestedScope
+        = drs::engine::AuthoringPreviewScope::selectedZone;
     double currentSampleRate = 44100.0;
     bool isSynchronizingParameterState = false;
     RealtimeGuardState realtimeGuardState;

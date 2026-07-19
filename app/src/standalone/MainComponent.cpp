@@ -432,7 +432,8 @@ MainComponent::MainComponent(bool enableAudioOutput)
                      },
                      [this]()
                      {
-                         processor.getEngineFacade().refreshPreviewToCurrentDraft();
+                         processor.requestAuthoringPreview(
+                             drs::engine::AuthoringPreviewScope::currentDraft);
                      },
                      [this]()
                      {

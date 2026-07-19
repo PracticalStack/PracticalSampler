@@ -574,4 +574,9 @@ std::string serializeImmutablePlaybackSnapshot(const ImmutablePlaybackSnapshot& 
 {
     return serializeSnapshot(snapshot, true).dump(2) + "\n";
 }
+
+std::string computePlaybackSnapshotContentDigest(const ImmutablePlaybackSnapshot& snapshot)
+{
+    return "fnv1a64:" + computeFnv1a64Hex(serializeSnapshot(snapshot, false).dump());
+}
 } // namespace drs::engine

@@ -44,6 +44,12 @@ Bounded coalescing, cancellation signaling, completion records, and warm-result 
 implemented without changing the four remaining source seams. The audit is expected to remain red
 at exactly four until Mini Sprints 5.4, 5.5, and 5.7 retire their assigned implementation gaps.
 
+## Mini Sprint 5.4 update
+
+The processor-owned immediate payload construction and synchronous selected-sample warming seams
+were removed. The direct audit now reports exactly two remaining seams: implicit note-on message
+servicing and string-only public presentation state. Their owners remain Mini Sprints 5.5 and 5.7.
+
 The green `drs.sprint5.preview_contract` target is registered immediately. It freezes request scope,
 request identity, legal preparation transitions, and active-note policy while the red implementation
 gaps are resolved incrementally.

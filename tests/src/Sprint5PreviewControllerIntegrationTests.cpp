@@ -24,6 +24,20 @@ void crossBlockBoundary(drs::plugin::Processor& processor)
     processor.processBlock(buffer, midi);
     processor.serviceMessageThreadWork();
 }
+
+bool waitForPreviewState(drs::plugin::Processor& processor,
+                         drs::engine::AuthoringPreviewPreparationState expected)
+{
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+    while (std::chrono::steady_clock::now() < deadline)
+    {
+        processor.serviceMessageThreadWork();
+        if (processor.getAuthoringPreviewControllerSnapshot().preparationState == expected)
+            return true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    return false;
+}
 } // namespace
 
 int main()
@@ -51,7 +65,8 @@ int main()
         require(coalescing.preparationState == AuthoringPreviewPreparationState::queued,
                 "Selection edits should remain queued during the bounded coalescing window.");
         std::this_thread::sleep_for(std::chrono::milliseconds(15));
-        processor.serviceMessageThreadWork();
+        require(waitForPreviewState(processor, AuthoringPreviewPreparationState::ready),
+                "Selection Preview preparation should settle through the asynchronous worker.");
         const auto selected = processor.getAuthoringPreviewControllerSnapshot();
         require(selected.hasRequest
                     && selected.currentRequest.identity.requestId > initial.currentRequest.identity.requestId

@@ -149,10 +149,12 @@ target_compile_definitions(drs_sample_import
 target_compile_features(drs_sample_import PUBLIC cxx_std_17)
 
 add_library(drs_sampler_core STATIC
+    src/AuthoringPreviewPreparation.cpp
     src/SamplerPlaybackContext.cpp
     src/SamplerRenderModel.cpp
     src/SamplerVoice.cpp
     src/SamplerVoicePool.cpp
+    include/drs/engine/AuthoringPreviewPreparation.h
     include/drs/engine/SamplerPlaybackContext.h
     include/drs/engine/SamplerRenderModel.h
     include/drs/engine/SamplerVoice.h
@@ -208,6 +210,11 @@ target_link_libraries(drs_engine_adapter
         drs_hise_frontend_bridge
 )
 
+target_link_libraries(drs_sampler_core
+    PUBLIC
+        drs_engine_adapter
+)
+
 add_library(drs_hise_frontend_plugin_probe STATIC
     src/HiseFrontendPluginProbe.cpp
 )
@@ -226,6 +233,7 @@ set_target_properties(drs_hise_frontend_plugin_probe PROPERTIES
 )
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
+    src/AuthoringPreviewPreparation.cpp
     src/AuthoringPreviewController.cpp
     src/AuthoringSession.cpp
     src/DraftPlaybackContract.cpp
@@ -248,6 +256,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     src/SamplerVoice.cpp
     src/SamplerVoicePool.cpp
     src/SampleImport.cpp
+    include/drs/engine/AuthoringPreviewPreparation.h
     include/drs/engine/AuthoringPreviewContract.h
     include/drs/engine/AuthoringPreviewController.h
     include/drs/engine/AuthoringSession.h

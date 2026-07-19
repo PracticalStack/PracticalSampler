@@ -1,6 +1,9 @@
 #include "plugin/PluginProcessor.h"
 #include "plugin/PluginEditor.h"
 
+#include "drs/engine/AuthoringPreviewPreparation.h"
+#include "drs/engine/RuntimeLoader.h"
+
 #include <algorithm>
 #include <cctype>
 #include <chrono>
@@ -101,13 +104,20 @@ drs::engine::AuthoringPreviewInvalidationCategory classifyPreviewInvalidation(
     return Category::authoredTopology;
 }
 
+std::optional<drs::engine::RuntimeProjectSampleSource> findProjectSampleSource(
+    const drs::engine::RuntimeProjectModel& project,
+    const std::string& sampleSourceId);
+
 std::string buildSelectedZonePreviewFingerprint(
+    const drs::engine::RuntimeProjectModel& project,
     const std::optional<drs::engine::RuntimeProjectZoneDefinition>& selectedZone)
 {
     if (!selectedZone.has_value())
         return "no-selection";
     const auto& zone = *selectedZone;
-    return zone.sampleSourceId + "|" + std::to_string(zone.rootKey)
+    const auto sampleSource = findProjectSampleSource(project, zone.sampleSourceId);
+    const auto sourcePath = sampleSource.has_value() ? sampleSource->path : std::string {};
+    return zone.sampleSourceId + "|" + sourcePath + "|" + std::to_string(zone.rootKey)
         + "|" + std::to_string(zone.keyLow) + "|" + std::to_string(zone.keyHigh)
         + "|" + std::to_string(zone.velocityLow) + "|" + std::to_string(zone.velocityHigh)
         + "|" + std::to_string(zone.gainDb) + "|" + std::to_string(zone.pan)
@@ -115,6 +125,27 @@ std::string buildSelectedZonePreviewFingerprint(
         + "|" + std::to_string(zone.loopEnabled)
         + "|" + std::to_string(zone.loopStartFrame)
         + "|" + std::to_string(zone.loopEndFrame);
+}
+
+std::string buildCurrentDraftPreviewFingerprint(const drs::engine::RuntimeProjectModel& project)
+{
+    constexpr std::uint64_t offsetBasis = 1469598103934665603ull;
+    constexpr std::uint64_t prime = 1099511628211ull;
+    auto hash = offsetBasis;
+    for (const auto byte : drs::engine::serializeRuntimeProjectManifest(project, {}))
+    {
+        hash ^= static_cast<unsigned char>(byte);
+        hash *= prime;
+    }
+
+    constexpr char digits[] = "0123456789abcdef";
+    std::string result(16, '0');
+    for (auto index = 0; index < 16; ++index)
+    {
+        result[15 - index] = digits[hash & 0x0f];
+        hash >>= 4;
+    }
+    return result;
 }
 
 int computeToneRenderVelocity(const drs::engine::RuntimeSessionStateSnapshot& sessionState)
@@ -207,7 +238,10 @@ AuthoringPreviewBlockingHint buildAuthoringPreviewBlockingHint(const drs::engine
     }
 
     const auto sampleFileLabel = describeSampleFileLabel(sampleSource->path);
-    if (failureState == "Sample missing" || failureState.find("not found") != std::string::npos)
+    if (failureState == "Sample missing"
+        || failureState.find("missing-sample-source-asset") != std::string::npos
+        || failureState.find("not found") != std::string::npos
+        || failureState.find("does not exist") != std::string::npos)
     {
         return { "Relink or re-import the selected sample file.",
                  "Restore or replace '" + sampleFileLabel + "' for zone '" + zoneLabel + "', then prepare the authoring preview again." };
@@ -509,11 +543,19 @@ void Processor::setMacroValueFromShell(const std::string& macroId, double value)
 
 void Processor::queueAuthoringPreviewNoteOn(int midiNoteNumber, float velocity)
 {
+    authoringPreviewRequestedScope = drs::engine::AuthoringPreviewScope::selectedZone;
     authoringPreviewDirectAuditionRequested = true;
     serviceMessageThreadWork();
     if (!authoringPreviewNoteQueue.push(
             { clampMidiValue(midiNoteNumber), std::clamp(velocity, 0.0f, 1.0f), true }))
         diagnosticsAuthoringPreviewDroppedNoteCount.fetch_add(1, std::memory_order_relaxed);
+}
+
+void Processor::requestAuthoringPreview(drs::engine::AuthoringPreviewScope scope)
+{
+    authoringPreviewRequestedScope = scope;
+    authoringPreviewDirectAuditionRequested = true;
+    serviceMessageThreadWork();
 }
 
 void Processor::queueAuthoringPreviewNoteOff(int midiNoteNumber)
@@ -590,16 +632,14 @@ void Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
     authoringSession.replaceProject(std::move(project));
     engineFacade.closeDraftPlaybackProject();
     engineFacade.reopenDraftPlaybackProject(authoringSession.getDocumentState().revision);
-    authoringLoadedSamples.clear();
     authoringWaveformPreviewCache.clear();
-    lastAuthoringSampleLoadFailureState.clear();
     failedAuthoringPreviewRevision = std::numeric_limits<std::size_t>::max();
     failedAuthoringPreviewState.clear();
     authoringPreviewController.reset();
     authoringPreviewDirectAuditionRequested = false;
+    authoringPreviewRequestedScope = drs::engine::AuthoringPreviewScope::selectedZone;
     observedDraftPlaybackProjectRevision = authoringSession.getDocumentState().revision;
     initializeAuthoringImportMetrics();
-    ensureSelectedAuthoringSampleLoaded(false);
     serviceMessageThreadWork();
     updateRealtimeSafetyState();
 }
@@ -698,13 +738,24 @@ bool Processor::serviceMessageThreadWork()
     }
 
     const auto previewContextSnapshot = authoringPreviewPlaybackContext.getSnapshot();
+    const auto& authoredProject = authoringSession.getProject();
     const auto selectedZone = authoringSession.getSelectedZone();
     const auto selectedZoneId = selectedZone.has_value() ? selectedZone->id : std::string {};
+    const auto requestedScope = authoringPreviewRequestedScope;
+    const auto requestSelectedZoneId = requestedScope
+            == drs::engine::AuthoringPreviewScope::selectedZone
+        ? selectedZoneId
+        : std::string {};
     const auto controllerBeforeRequest = authoringPreviewController.getSnapshot();
-    const auto selectionChanged = controllerBeforeRequest.hasRequest
+    const auto scopeChanged = controllerBeforeRequest.hasRequest
+        && controllerBeforeRequest.currentRequest.identity.scope != requestedScope;
+    const auto selectionChanged = requestedScope == drs::engine::AuthoringPreviewScope::selectedZone
+        && controllerBeforeRequest.hasRequest
         && controllerBeforeRequest.currentRequest.identity.selectedZoneId != selectedZoneId;
     const auto requestReason = authoringPreviewDirectAuditionRequested
-        ? drs::engine::AuthoringPreviewRequestReason::explicitSelectedZoneAudition
+        ? (requestedScope == drs::engine::AuthoringPreviewScope::currentDraft
+               ? drs::engine::AuthoringPreviewRequestReason::explicitCurrentDraftAudition
+               : drs::engine::AuthoringPreviewRequestReason::explicitSelectedZoneAudition)
         : (!controllerBeforeRequest.hasRequest
         ? drs::engine::AuthoringPreviewRequestReason::projectOpened
         : (selectionChanged
@@ -712,19 +763,25 @@ bool Processor::serviceMessageThreadWork()
                : drs::engine::AuthoringPreviewRequestReason::authoringChanged));
     const auto observesNewRevision = !controllerBeforeRequest.hasRequest
         || controllerBeforeRequest.currentRequest.identity.draftRevision != authoringRevision;
-    const auto invalidationCategory = observesNewRevision
+    const auto invalidationCategory = scopeChanged
+        ? drs::engine::AuthoringPreviewInvalidationCategory::previewScope
+        : (observesNewRevision
         ? classifyPreviewInvalidation(authoringSession.getDocumentState().lastChangeLabel,
                                       selectionChanged)
-        : controllerBeforeRequest.currentRequest.invalidationCategory;
+        : controllerBeforeRequest.currentRequest.invalidationCategory);
+    const auto authoredContentFingerprint
+        = requestedScope == drs::engine::AuthoringPreviewScope::currentDraft
+        ? buildCurrentDraftPreviewFingerprint(authoredProject)
+        : buildSelectedZonePreviewFingerprint(authoredProject, selectedZone);
     const auto requestSignature = drs::engine::buildAuthoringPreviewRequestSignature(
-        drs::engine::AuthoringPreviewScope::selectedZone,
-        selectedZoneId,
+        requestedScope,
+        requestSelectedZoneId,
         invalidationCategory,
-        buildSelectedZonePreviewFingerprint(selectedZone));
+        authoredContentFingerprint);
     const auto requestResult = authoringPreviewController.request(
-        drs::engine::AuthoringPreviewScope::selectedZone,
+        requestedScope,
         authoringRevision,
-        selectedZoneId,
+        requestSelectedZoneId,
         requestReason,
         invalidationCategory,
         requestSignature,
@@ -756,11 +813,53 @@ bool Processor::serviceMessageThreadWork()
         serviceTimeMicros, directAuditionContentPrepared);
     if (launch.launched)
     {
-        if (!directAuditionContentPrepared)
-            engineFacade.refreshPreviewToCurrentDraft();
+        if (!directAuditionContentPrepared && !engineFacade.refreshPreviewToCurrentDraft())
+        {
+            failedAuthoringPreviewRevision = authoringRevision;
+            const auto& draftStatus = engineFacade.getDraftPlaybackStatus();
+            if (!draftStatus.preview.findings.empty())
+            {
+                const auto& finding = draftStatus.preview.findings.front();
+                failedAuthoringPreviewState = "[" + finding.code + "] " + finding.message;
+            }
+            else
+            {
+                failedAuthoringPreviewState = "[preview-worker-request-rejected] "
+                    + (draftStatus.lastEvent.empty()
+                           ? std::string("Preview worker request was rejected.")
+                           : draftStatus.lastEvent);
+            }
+            authoringPreviewController.fail(launch.request.identity, failedAuthoringPreviewState);
+            synchronizedAuthoringPreview = true;
+        }
+        controllerSnapshot = authoringPreviewController.getSnapshot();
+    }
+
+    const auto preparedAfterLaunch = engineFacade.getPreviewActivationPayload();
+    if (controllerSnapshot.hasRequest
+        && controllerSnapshot.preparationState
+            == drs::engine::AuthoringPreviewPreparationState::preparing
+        && preparedAfterLaunch != nullptr
+        && preparedAfterLaunch->revision == authoringRevision)
+    {
         synchronizedAuthoringPreview = stageAuthoringPreviewActivation(
-            launch.request,
+            controllerSnapshot.currentRequest,
             !previewContextSnapshot.hasActiveActivation) || synchronizedAuthoringPreview;
+    }
+    else if (controllerSnapshot.hasRequest
+             && controllerSnapshot.preparationState
+                 == drs::engine::AuthoringPreviewPreparationState::preparing)
+    {
+        const auto& draftStatus = engineFacade.getDraftPlaybackStatus();
+        if (!draftStatus.pendingPreview.active && !draftStatus.preview.findings.empty())
+        {
+            const auto& finding = draftStatus.preview.findings.front();
+            failedAuthoringPreviewRevision = authoringRevision;
+            failedAuthoringPreviewState = "[" + finding.code + "] " + finding.message;
+            authoringPreviewController.fail(controllerSnapshot.currentRequest.identity,
+                                             failedAuthoringPreviewState);
+            synchronizedAuthoringPreview = true;
+        }
     }
 
     updateRealtimeSafetyState();
@@ -911,56 +1010,6 @@ void Processor::initializeAuthoringImportMetrics()
     authoringImportResponsivenessSnapshot.lastProcessedItemId = queue.metrics.lastProcessedItemId;
 }
 
-bool Processor::ensureSelectedAuthoringSampleLoaded(bool invokedFromAudioThread)
-{
-    const auto selectedZone = authoringSession.getSelectedZone();
-    if (!selectedZone.has_value())
-    {
-        lastAuthoringSampleLoadFailureState = "No zone selected.";
-        return false;
-    }
-
-    const auto projectSampleSource = findProjectSampleSource(authoringSession.getProject(), selectedZone->sampleSourceId);
-    if (!projectSampleSource.has_value())
-    {
-        lastAuthoringSampleLoadFailureState = "Selected zone sample source is missing from the project.";
-        return false;
-    }
-
-    if (authoringLoadedSamples.find(projectSampleSource->id) != authoringLoadedSamples.end())
-    {
-        lastAuthoringSampleLoadFailureState.clear();
-        return true;
-    }
-
-    // Sprint 3 boundary note: selected-zone preview loading is still a shell-side helper seam.
-    // It must not be expanded into the product-owned Preview/Publish preparation boundary.
-    if (invokedFromAudioThread)
-    {
-        recordRealtimeGuardOperation(RealtimeGuardOperation::pathResolution);
-        recordRealtimeGuardOperation(RealtimeGuardOperation::fileOpen);
-        recordRealtimeGuardOperation(RealtimeGuardOperation::fileRead);
-        recordRealtimeGuardOperation(RealtimeGuardOperation::sampleDecode);
-    }
-
-    const auto importResult = drs::engine::importSampleFile(projectSampleSource->path);
-    if (!importResult.imported)
-    {
-        lastAuthoringSampleLoadFailureState = !importResult.issues.empty()
-            ? importResult.issues.front()
-            : (importResult.state.empty() ? "Selected authoring sample could not be prepared."
-                                          : importResult.state);
-        return false;
-    }
-
-    authoringLoadedSamples.emplace(projectSampleSource->id, LoadedAuthoringSample { importResult.sample });
-    lastAuthoringSampleLoadFailureState.clear();
-    if (invokedFromAudioThread)
-        diagnosticsAuthoringSampleLoadsOnAudioThread.fetch_add(1, std::memory_order_relaxed);
-    updateRealtimeSafetyState();
-    return true;
-}
-
 bool Processor::stageAuthoringPreviewActivation(const drs::engine::AuthoringPreviewRequest& request,
                                                 bool installImmediately)
 {
@@ -980,121 +1029,21 @@ bool Processor::stageAuthoringPreviewActivation(const drs::engine::AuthoringPrev
         || request.identity.draftRevision != currentRevision)
         return false;
 
-    const auto selectedZone = authoringSession.getSelectedZone();
-    if (!selectedZone.has_value())
+    const auto payload = engineFacade.getPreviewActivationPayload();
+    const auto preparation = drs::engine::prepareAuthoringPreviewRenderModel(payload, request);
+    if (!preparation.prepared || preparation.model == nullptr)
     {
-        failedAuthoringPreviewRevision = std::numeric_limits<std::size_t>::max();
-        failedAuthoringPreviewState.clear();
-        return false;
+        if (preparation.findings.empty())
+            return failPreviewActivation("Authoring preview preparation failed without a finding.");
+        const auto& finding = preparation.findings.front();
+        return failPreviewActivation("[" + finding.code + "] " + finding.message
+                                     + (finding.path.empty() ? std::string {}
+                                                             : " (" + finding.path + ")"));
     }
-    if (selectedZone->id != request.identity.selectedZoneId)
+    if (!authoringPreviewController.acceptPrepared(request.identity,
+                                                    preparation.scopedPayload->preparedBuildId))
         return false;
-
-    auto payload = engineFacade.getPreviewActivationPayload();
-    if (payload == nullptr || payload->revision != currentRevision)
-    {
-        const auto projectSampleSource = findProjectSampleSource(authoringSession.getProject(),
-                                                                 selectedZone->sampleSourceId);
-        if (!projectSampleSource.has_value())
-            return failPreviewActivation("Selected zone sample source is missing from the project.");
-        if (!ensureSelectedAuthoringSampleLoaded(false))
-            return failPreviewActivation(lastAuthoringSampleLoadFailureState);
-        const auto sampleIterator = authoringLoadedSamples.find(projectSampleSource->id);
-        if (sampleIterator == authoringLoadedSamples.end())
-            return failPreviewActivation("Selected authoring sample was not cached after preparation.");
-
-        const auto& imported = sampleIterator->second.sample;
-        auto decoded = std::make_shared<drs::engine::PreparedPlaybackDecodedSampleData>();
-        decoded->normalizedChannels = imported.normalizedChannels;
-        const auto snapshotBuildId = 0x8000000000000000ull
-            | static_cast<std::uint64_t>(currentRevision + 1);
-        const auto preparedBuildId = 0x4000000000000000ull
-            | static_cast<std::uint64_t>(currentRevision + 1);
-        const auto digestSuffix = std::to_string(currentRevision) + "-" + selectedZone->id
-            + "-" + projectSampleSource->id;
-
-        drs::engine::ImmutablePlaybackSnapshot snapshot;
-        snapshot.draftRevision = currentRevision;
-        snapshot.selectedZoneId = selectedZone->id;
-        snapshot.contentDigest = "processor-preview-snapshot-" + digestSuffix;
-        snapshot.zones.push_back({ selectedZone->id,
-                                   projectSampleSource->id,
-                                   selectedZone->displayName,
-                                   selectedZone->groupId,
-                                   selectedZone->articulationId,
-                                   selectedZone->rootKey,
-                                   selectedZone->keyLow,
-                                   selectedZone->keyHigh,
-                                   selectedZone->velocityLow,
-                                   selectedZone->velocityHigh,
-                                   selectedZone->gainDb,
-                                   selectedZone->pan,
-                                   selectedZone->sampleStartFrame,
-                                   selectedZone->loopEnabled,
-                                   selectedZone->loopStartFrame,
-                                   selectedZone->loopEndFrame });
-
-        drs::engine::PreparedPlaybackSampleHandle sample;
-        sample.sampleSourceId = projectSampleSource->id;
-        sample.streamSampleId = "processor-preview-stream-" + projectSampleSource->id;
-        sample.sampleRate = imported.metadata.sampleRate;
-        sample.frameCount = imported.metadata.frameCount;
-        sample.channelCount = imported.metadata.channelCount;
-        sample.decodedSampleData = std::move(decoded);
-
-        drs::engine::ImmutablePreparedPlayback prepared;
-        prepared.snapshotBuildId = snapshotBuildId;
-        prepared.snapshotContentDigest = snapshot.contentDigest;
-        prepared.draftRevision = currentRevision;
-        prepared.preparedContentDigest = "processor-preview-prepared-" + digestSuffix;
-        prepared.samples.push_back(std::move(sample));
-        prepared.zones.push_back({ selectedZone->id,
-                                   projectSampleSource->id,
-                                   "processor-preview-stream-" + projectSampleSource->id,
-                                   0,
-                                   0,
-                                   selectedZone->rootKey,
-                                   selectedZone->keyLow,
-                                   selectedZone->keyHigh,
-                                   selectedZone->velocityLow,
-                                   selectedZone->velocityHigh,
-                                   selectedZone->gainDb,
-                                   selectedZone->pan,
-                                   selectedZone->sampleStartFrame,
-                                   selectedZone->loopEnabled,
-                                   selectedZone->loopStartFrame,
-                                   selectedZone->loopEndFrame });
-
-        auto immediatePayload = std::make_shared<drs::engine::PlaybackActivationPayload>();
-        immediatePayload->lane = drs::engine::PlaybackActivationLane::preview;
-        immediatePayload->revision = currentRevision;
-        immediatePayload->snapshotBuildId = snapshotBuildId;
-        immediatePayload->preparedBuildId = preparedBuildId;
-        immediatePayload->lifecycleState = drs::engine::PlaybackSnapshotLifecycleState::ready;
-        immediatePayload->activationEligible = true;
-        immediatePayload->snapshotContentDigest = snapshot.contentDigest;
-        immediatePayload->preparedContentDigest = prepared.preparedContentDigest;
-        immediatePayload->retainedPreparedBytes = imported.metadata.frameCount
-            * imported.metadata.channelCount * sizeof(float);
-        immediatePayload->snapshot
-            = std::make_shared<const drs::engine::ImmutablePlaybackSnapshot>(std::move(snapshot));
-        immediatePayload->prepared
-            = std::make_shared<const drs::engine::ImmutablePreparedPlayback>(std::move(prepared));
-        payload = std::move(immediatePayload);
-    }
-
-    if (!authoringPreviewController.acceptPrepared(request.identity, payload->preparedBuildId))
-        return false;
-
-    drs::engine::SamplerRenderModelBuildOptions options;
-    options.selectedZoneId = selectedZone->id;
-    options.auditionSelectedZone = true;
-    const auto modelResult = drs::engine::buildSamplerRenderModel(payload, options);
-    if (!modelResult.built || modelResult.model == nullptr)
-        return failPreviewActivation(modelResult.findings.empty()
-                                         ? "Authoring preview route normalization failed."
-                                         : modelResult.findings.front().message);
-    if (!authoringPreviewPlaybackContext.stageActivation(modelResult.model))
+    if (!authoringPreviewPlaybackContext.stageActivation(preparation.model))
         return failPreviewActivation("Authoring preview activation slots are exhausted.");
     if (!authoringPreviewController.markActivationPending(request.identity))
         return false;
