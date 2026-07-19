@@ -114,8 +114,6 @@ int main()
                 "Preparing the processor should keep sample-path resolution off the audio thread.");
         require(primedSnapshot.sampleDecodeEntriesOnAudioThread == 0,
                 "Preparing the processor should keep sample decode entry off the audio thread.");
-        require(primedSnapshot.referenceSampleLoadsOnAudioThread == 0,
-                "Preparing the processor should keep reference sample loading off the audio thread.");
         require(primedSnapshot.largeResourceReleasesOnAudioThread == 0,
                 "Preparing the processor should keep large resource release off the audio thread.");
         require(primedSnapshot.activePublishedRevision == 0,
@@ -144,12 +142,8 @@ int main()
                 "First rendered note should not resolve sample paths on the audio thread.");
         require(playbackSnapshot.sampleDecodeEntriesOnAudioThread == 0,
                 "First rendered note should not enter sample decode on the audio thread.");
-        require(playbackSnapshot.referenceSampleLoadsOnAudioThread == 0,
-                "First rendered note should not trigger reference sample I/O on the audio thread.");
         require(playbackSnapshot.largeResourceReleasesOnAudioThread == 0,
                 "First rendered note should not release large resources on the audio thread.");
-        require(playbackSnapshot.activeVoiceCapacityGrowthCount == 0,
-                "Voice allocation should not force the active-voice vector to grow in the callback.");
         require(playbackSnapshot.getAudioThreadViolationCount() == 0,
                 "Performance callback should remain free of tracked realtime safety violations.");
 
@@ -171,12 +165,8 @@ int main()
                 "Queued performance playback should keep sample-path resolution off the callback thread.");
         require(playbackSnapshot.sampleDecodeEntriesOnAudioThread == 0,
                 "Queued performance playback should keep sample decode entry off the callback thread.");
-        require(playbackSnapshot.referenceSampleLoadsOnAudioThread == 0,
-                "Queued performance playback should keep reference sample I/O off the callback thread.");
         require(playbackSnapshot.largeResourceReleasesOnAudioThread == 0,
                 "Queued performance playback should keep large resource release off the callback thread.");
-        require(playbackSnapshot.activeVoiceCapacityGrowthCount == 0,
-                "Burst note starts should respect the pre-reserved active-voice capacity.");
         require(playbackSnapshot.getAudioThreadViolationCount() == 0,
                 "Tracked realtime safety violations should remain at zero after burst playback.");
 
@@ -196,8 +186,6 @@ int main()
                 "No-route playback must not resolve fixture paths on the audio thread.");
         require(fallbackSnapshot.sampleDecodeEntriesOnAudioThread == 0,
                 "No-route playback must not decode fixture samples on the audio thread.");
-        require(fallbackSnapshot.referenceSampleLoadsOnAudioThread == 0,
-                "No-route playback must not load reference samples on the audio thread.");
         require(fallbackSnapshot.largeResourceReleasesOnAudioThread == 0,
                 "Forced callback fallback should not need large resource release when the cache was cleared beforehand.");
         require(fallbackSnapshot.getAudioThreadViolationCount() == 0,
@@ -348,8 +336,6 @@ int main()
                 "Selected authoring sample should be warmed before preview playback reaches the callback thread.");
         require(isolationSnapshot.largeResourceReleasesOnAudioThread == 0,
                 "Preview voice bursts should not release large resources on the audio thread.");
-        require(isolationSnapshot.activeVoiceCapacityGrowthCount == 0,
-                "Preview voice bursts should stay within the pre-reserved realtime voice capacity.");
         require(isolationSnapshot.getAudioThreadViolationCount() == 0,
                 "Voice-pool isolation should keep the callback free of tracked realtime violations.");
 

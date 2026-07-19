@@ -26,6 +26,10 @@ target_compile_definitions(drs_phase0_smoke_tests
         JUCE_PLUGINHOST_VST3=1
 )
 
+# The smoke executable scans the built VST3 bundle; make that runtime fixture a
+# build dependency so a narrow smoke-only build is self-contained.
+add_dependencies(drs_phase0_smoke_tests DecentRhapsodyStudioPlugin)
+
 add_test(
     NAME drs.phase0.smoke
     COMMAND drs_phase0_smoke_tests
@@ -278,6 +282,33 @@ add_test(
     COMMAND drs_sprint4_entry_diagnostics_concurrency_tests
 )
 
+# Sprint 4 closure soak: two live contexts, activation churn, retirement, and UI polling.
+juce_add_console_app(drs_sprint4_concurrency_soak_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Sprint 4 Concurrency Soak Tests"
+)
+
+target_sources(drs_sprint4_concurrency_soak_tests
+    PRIVATE
+        src/Sprint4ConcurrencySoakTests.cpp
+)
+
+target_link_libraries(drs_sprint4_concurrency_soak_tests
+    PRIVATE
+        drs_plugin_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_sprint4_concurrency_soak_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint4.concurrency_soak
+    COMMAND drs_sprint4_concurrency_soak_tests
+)
+
 # Sprint 4 Entry Gate EG4 focused real-time guard and negative-injection matrix.
 juce_add_console_app(drs_sprint4_entry_realtime_guard_tests
     PRODUCT_NAME "Decent Rhapsody Studio Sprint 4 Entry Realtime Guard Tests"
@@ -444,6 +475,35 @@ target_compile_features(drs_sprint4_shell_cutover_tests PRIVATE cxx_std_17)
 add_test(
     NAME drs.sprint4.shell_cutover
     COMMAND drs_sprint4_shell_cutover_tests
+)
+
+# Sprint 4.7 deterministic shell-free offline render conformance matrix.
+add_executable(drs_sprint4_offline_renderer_tests
+    src/Sprint4OfflineRendererTests.cpp
+    support/Sprint4OfflineRenderHarness.cpp
+    support/Sprint4OfflineRenderHarness.h
+)
+
+target_link_libraries(drs_sprint4_offline_renderer_tests
+    PRIVATE
+        drs_sampler_core
+)
+
+target_include_directories(drs_sprint4_offline_renderer_tests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/support
+)
+
+target_compile_definitions(drs_sprint4_offline_renderer_tests
+    PRIVATE
+        DRS_SPRINT4_OFFLINE_BASELINE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/baselines/sprint4-offline-render-baselines.txt"
+)
+
+target_compile_features(drs_sprint4_offline_renderer_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint4.offline_renderer
+    COMMAND drs_sprint4_offline_renderer_tests
 )
 
 juce_add_console_app(drs_phase1_realtime_safety_tests
@@ -1292,6 +1352,7 @@ add_dependencies(drs_all_tests
     drs_sprint4_entry_authored_input_tests
     drs_sprint4_entry_activation_payload_tests
     drs_sprint4_entry_diagnostics_concurrency_tests
+    drs_sprint4_concurrency_soak_tests
     drs_sprint4_entry_realtime_guard_tests
     drs_sprint4_entry_shell_parity_tests
     drs_sprint4_render_model_tests
@@ -1300,6 +1361,7 @@ add_dependencies(drs_all_tests
     drs_sprint4_voice_lifecycle_tests
     drs_sprint4_playback_context_tests
     drs_sprint4_shell_cutover_tests
+    drs_sprint4_offline_renderer_tests
     drs_phase0_smoke_tests
     drs_phase1_runtime_contract_tests
     drs_phase1_draft_playback_contract_tests

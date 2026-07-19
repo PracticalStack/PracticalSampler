@@ -31,6 +31,11 @@ Early Phase 1 responsibilities now started in the same seam:
 - load a versioned reference `.drinst` fixture into an in-memory runtime object graph
 - validate the reference corpus paths and expose loader metrics to the shell
 
+Sprint 4 adds a shell-free `drs_sampler_core` target in this layer. It owns immutable render-model
+validation, sample interpolation, pitch/gain/pan math, fixed voice/event storage, loop/release
+lifecycle, and one mutable `SamplerPlaybackContext` per lane. Preview and Performance share this
+code but no voices, event scratch, activation slots, retirement queues, or counters.
+
 Future HISE-backed runtime objects, preset loading orchestration, and processor-construction boundaries should be introduced here first.
 
 ### `content/`
@@ -48,6 +53,9 @@ This layer validates the product-owned seams without becoming a second applicati
 - `drs_phase0_smoke_tests` exercises `EngineFacade`
 - the smoke harness validates that the authored HISE content root is present and populated
 - the same executable instantiates the standalone and plugin shell components to catch immediate bootstrap failures
+- Sprint 4 focused tests validate render-model rejection, voice vectors, scheduling, lifecycle,
+  playback-context isolation, shell cutover, reviewed offline baselines, callback guards, and
+  concurrent activation/diagnostic soak behavior
 
 ### `third_party/`
 
@@ -80,3 +88,20 @@ The intended dependency flow is:
 - Windows bootstrap builds the standalone shell, VST3 shell, HISE frontend compile probe, and smoke harness.
 - The smoke harness runs through CTest and is wired into GitHub Actions.
 - The shell can already surface adapter-driven status information without a full HISE runtime handshake.
+
+## Sprint 4 renderer boundary
+
+`PluginProcessor::processBlock()` is now an I/O adapter. It clears the host buffer, translates
+bounded UI/host events, invokes the Performance and Preview contexts additively, and publishes
+primitive diagnostics. It does not own voice DSP, route traversal, interpolation, envelopes,
+looping, sample lookup, file access, decoding, or a reference-sample callback cache.
+
+Immutable activation payloads are normalized into `SamplerRenderModel` instances off audio.
+Message-owned code stages fixed activation slots; the callback exchanges only primitive slot
+tokens at block boundaries. Voices retain raw const model views until completion, after which the
+audio side returns a retirement token and message-owned service performs final payload release.
+
+The sequenced diagnostic frame identifies each context and includes renderer timing, current and
+peak active/releasing voices, steals, core/event-block drops, producer note-queue drops, activation
+identity, payload bytes, and retirement state. UI readers consume immutable snapshots and never
+inspect mutable renderer state.

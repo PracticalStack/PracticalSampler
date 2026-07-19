@@ -348,6 +348,11 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
         }
     }
 
+    diagnosticsPerformanceDroppedEventCount.fetch_add(performanceEvents.droppedEventCount(),
+                                                       std::memory_order_relaxed);
+    diagnosticsAuthoringPreviewDroppedEventCount.fetch_add(authoringPreviewEvents.droppedEventCount(),
+                                                            std::memory_order_relaxed);
+
     if (frameCount > 0 && buffer.getNumChannels() > 0)
     {
         drs::engine::SamplerAudioBufferView output {
@@ -355,10 +360,33 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
             static_cast<std::uint32_t>(buffer.getNumChannels()),
             static_cast<std::uint32_t>(frameCount)
         };
+        const auto performanceRenderStart = std::chrono::steady_clock::now();
         const auto performanceResult = performancePlaybackContext.renderBlock(
             output, performanceEvents.view());
+        const auto performanceRenderEnd = std::chrono::steady_clock::now();
         const auto previewResult = authoringPreviewPlaybackContext.renderBlock(
             output, authoringPreviewEvents.view());
+        const auto previewRenderEnd = std::chrono::steady_clock::now();
+        lastPerformanceRenderMicros = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(performanceRenderEnd - performanceRenderStart).count());
+        lastAuthoringPreviewRenderMicros = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(previewRenderEnd - performanceRenderEnd).count());
+        maxPerformanceRenderMicros = std::max(maxPerformanceRenderMicros, lastPerformanceRenderMicros);
+        maxAuthoringPreviewRenderMicros = std::max(maxAuthoringPreviewRenderMicros,
+                                                   lastAuthoringPreviewRenderMicros);
+        const auto performanceSnapshot = performancePlaybackContext.getSnapshot();
+        const auto previewSnapshot = authoringPreviewPlaybackContext.getSnapshot();
+        performancePeakActiveVoiceCount = std::max(performancePeakActiveVoiceCount,
+                                                   static_cast<std::size_t>(performanceSnapshot.activeVoiceCount));
+        performancePeakReleasingVoiceCount = std::max(
+            performancePeakReleasingVoiceCount,
+            static_cast<std::size_t>(performanceSnapshot.releasingVoiceCount));
+        authoringPreviewPeakActiveVoiceCount = std::max(
+            authoringPreviewPeakActiveVoiceCount,
+            static_cast<std::size_t>(previewSnapshot.activeVoiceCount));
+        authoringPreviewPeakReleasingVoiceCount = std::max(
+            authoringPreviewPeakReleasingVoiceCount,
+            static_cast<std::size_t>(previewSnapshot.releasingVoiceCount));
         if (performanceResult.activationApplied)
             diagnosticsPerformanceActivationCount.fetch_add(1, std::memory_order_relaxed);
         if (previewResult.activationApplied)
@@ -424,13 +452,15 @@ void Processor::setMacroValueFromShell(const std::string& macroId, double value)
 void Processor::queueAuthoringPreviewNoteOn(int midiNoteNumber, float velocity)
 {
     serviceMessageThreadWork();
-    authoringPreviewNoteQueue.push(
-        { clampMidiValue(midiNoteNumber), std::clamp(velocity, 0.0f, 1.0f), true });
+    if (!authoringPreviewNoteQueue.push(
+            { clampMidiValue(midiNoteNumber), std::clamp(velocity, 0.0f, 1.0f), true }))
+        diagnosticsAuthoringPreviewDroppedNoteCount.fetch_add(1, std::memory_order_relaxed);
 }
 
 void Processor::queueAuthoringPreviewNoteOff(int midiNoteNumber)
 {
-    authoringPreviewNoteQueue.push({ clampMidiValue(midiNoteNumber), 0.0f, false });
+    if (!authoringPreviewNoteQueue.push({ clampMidiValue(midiNoteNumber), 0.0f, false }))
+        diagnosticsAuthoringPreviewDroppedNoteCount.fetch_add(1, std::memory_order_relaxed);
 }
 
 drs::app::AuthoringWaveformPreview Processor::getAuthoringWaveformPreview()
@@ -517,13 +547,15 @@ void Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
 
 void Processor::queuePerformanceSurfaceNoteOn(int midiNoteNumber, float velocity)
 {
-    performanceSurfaceNoteQueue.push(
-        { clampMidiValue(midiNoteNumber), std::clamp(velocity, 0.0f, 1.0f), true });
+    if (!performanceSurfaceNoteQueue.push(
+            { clampMidiValue(midiNoteNumber), std::clamp(velocity, 0.0f, 1.0f), true }))
+        diagnosticsPerformanceDroppedNoteCount.fetch_add(1, std::memory_order_relaxed);
 }
 
 void Processor::queuePerformanceSurfaceNoteOff(int midiNoteNumber)
 {
-    performanceSurfaceNoteQueue.push({ clampMidiValue(midiNoteNumber), 0.0f, false });
+    if (!performanceSurfaceNoteQueue.push({ clampMidiValue(midiNoteNumber), 0.0f, false }))
+        diagnosticsPerformanceDroppedNoteCount.fetch_add(1, std::memory_order_relaxed);
 }
 
 void Processor::setRealtimeGuardTestInjection(RealtimeGuardOperation operation)
@@ -1073,6 +1105,16 @@ Processor::AudioDiagnosticsValues Processor::captureActivationDiagnostics() cons
         + performance.pendingActivationPayloadBytes;
     values.retiredActivationPayloadBytes = preview.retiredActivationPayloadBytes
         + performance.retiredActivationPayloadBytes;
+    values.performanceContextIdentity = static_cast<std::uint32_t>(performance.lane) + 1u;
+    values.authoringPreviewContextIdentity = static_cast<std::uint32_t>(preview.lane) + 1u;
+    values.performanceVoiceStealCount = performance.counters.stolenVoiceCount;
+    values.authoringPreviewVoiceStealCount = preview.counters.stolenVoiceCount;
+    values.performanceDroppedEventCount = performance.counters.droppedEventCount
+        + diagnosticsPerformanceDroppedEventCount.load(std::memory_order_relaxed);
+    values.authoringPreviewDroppedEventCount = preview.counters.droppedEventCount
+        + diagnosticsAuthoringPreviewDroppedEventCount.load(std::memory_order_relaxed);
+    values.performanceDroppedNoteCount = diagnosticsPerformanceDroppedNoteCount.load(std::memory_order_relaxed);
+    values.authoringPreviewDroppedNoteCount = diagnosticsAuthoringPreviewDroppedNoteCount.load(std::memory_order_relaxed);
 
     return values;
 }
@@ -1085,11 +1127,35 @@ void Processor::publishAudioDiagnostics()
     values.performanceActiveVoiceCount = performance.activeVoiceCount + performance.releasingVoiceCount;
     values.authoringPreviewActiveVoiceCount = preview.activeVoiceCount + preview.releasingVoiceCount;
     values.activeVoiceCapacity = maxRealtimeActiveVoices * 2;
+    values.lastPerformanceRenderMicros = lastPerformanceRenderMicros;
+    values.maxPerformanceRenderMicros = maxPerformanceRenderMicros;
+    values.lastAuthoringPreviewRenderMicros = lastAuthoringPreviewRenderMicros;
+    values.maxAuthoringPreviewRenderMicros = maxAuthoringPreviewRenderMicros;
+    values.performancePeakActiveVoiceCount = performancePeakActiveVoiceCount;
+    values.performancePeakReleasingVoiceCount = performancePeakReleasingVoiceCount;
+    values.authoringPreviewPeakActiveVoiceCount = authoringPreviewPeakActiveVoiceCount;
+    values.authoringPreviewPeakReleasingVoiceCount = authoringPreviewPeakReleasingVoiceCount;
 
     auto sequence = audioDiagnosticsPublication.sequence.fetch_add(1, std::memory_order_acq_rel) + 1;
     audioDiagnosticsPublication.performanceActiveVoiceCount.store(values.performanceActiveVoiceCount, std::memory_order_relaxed);
     audioDiagnosticsPublication.authoringPreviewActiveVoiceCount.store(values.authoringPreviewActiveVoiceCount, std::memory_order_relaxed);
     audioDiagnosticsPublication.activeVoiceCapacity.store(values.activeVoiceCapacity, std::memory_order_relaxed);
+    audioDiagnosticsPublication.performanceContextIdentity.store(values.performanceContextIdentity, std::memory_order_relaxed);
+    audioDiagnosticsPublication.authoringPreviewContextIdentity.store(values.authoringPreviewContextIdentity, std::memory_order_relaxed);
+    audioDiagnosticsPublication.lastPerformanceRenderMicros.store(values.lastPerformanceRenderMicros, std::memory_order_relaxed);
+    audioDiagnosticsPublication.maxPerformanceRenderMicros.store(values.maxPerformanceRenderMicros, std::memory_order_relaxed);
+    audioDiagnosticsPublication.lastAuthoringPreviewRenderMicros.store(values.lastAuthoringPreviewRenderMicros, std::memory_order_relaxed);
+    audioDiagnosticsPublication.maxAuthoringPreviewRenderMicros.store(values.maxAuthoringPreviewRenderMicros, std::memory_order_relaxed);
+    audioDiagnosticsPublication.performancePeakActiveVoiceCount.store(values.performancePeakActiveVoiceCount, std::memory_order_relaxed);
+    audioDiagnosticsPublication.performancePeakReleasingVoiceCount.store(values.performancePeakReleasingVoiceCount, std::memory_order_relaxed);
+    audioDiagnosticsPublication.authoringPreviewPeakActiveVoiceCount.store(values.authoringPreviewPeakActiveVoiceCount, std::memory_order_relaxed);
+    audioDiagnosticsPublication.authoringPreviewPeakReleasingVoiceCount.store(values.authoringPreviewPeakReleasingVoiceCount, std::memory_order_relaxed);
+    audioDiagnosticsPublication.performanceVoiceStealCount.store(values.performanceVoiceStealCount, std::memory_order_relaxed);
+    audioDiagnosticsPublication.authoringPreviewVoiceStealCount.store(values.authoringPreviewVoiceStealCount, std::memory_order_relaxed);
+    audioDiagnosticsPublication.performanceDroppedEventCount.store(values.performanceDroppedEventCount, std::memory_order_relaxed);
+    audioDiagnosticsPublication.authoringPreviewDroppedEventCount.store(values.authoringPreviewDroppedEventCount, std::memory_order_relaxed);
+    audioDiagnosticsPublication.performanceDroppedNoteCount.store(values.performanceDroppedNoteCount, std::memory_order_relaxed);
+    audioDiagnosticsPublication.authoringPreviewDroppedNoteCount.store(values.authoringPreviewDroppedNoteCount, std::memory_order_relaxed);
     audioDiagnosticsPublication.activeAuthoringPreviewRevision.store(values.activeAuthoringPreviewRevision, std::memory_order_relaxed);
     audioDiagnosticsPublication.pendingAuthoringPreviewRevision.store(values.pendingAuthoringPreviewRevision, std::memory_order_relaxed);
     audioDiagnosticsPublication.activePublishedRevision.store(values.activePublishedRevision, std::memory_order_relaxed);
@@ -1119,6 +1185,22 @@ Processor::AudioDiagnosticsValues Processor::readAudioDiagnostics(std::uint64_t&
         values.performanceActiveVoiceCount = audioDiagnosticsPublication.performanceActiveVoiceCount.load(std::memory_order_relaxed);
         values.authoringPreviewActiveVoiceCount = audioDiagnosticsPublication.authoringPreviewActiveVoiceCount.load(std::memory_order_relaxed);
         values.activeVoiceCapacity = audioDiagnosticsPublication.activeVoiceCapacity.load(std::memory_order_relaxed);
+        values.performanceContextIdentity = audioDiagnosticsPublication.performanceContextIdentity.load(std::memory_order_relaxed);
+        values.authoringPreviewContextIdentity = audioDiagnosticsPublication.authoringPreviewContextIdentity.load(std::memory_order_relaxed);
+        values.lastPerformanceRenderMicros = audioDiagnosticsPublication.lastPerformanceRenderMicros.load(std::memory_order_relaxed);
+        values.maxPerformanceRenderMicros = audioDiagnosticsPublication.maxPerformanceRenderMicros.load(std::memory_order_relaxed);
+        values.lastAuthoringPreviewRenderMicros = audioDiagnosticsPublication.lastAuthoringPreviewRenderMicros.load(std::memory_order_relaxed);
+        values.maxAuthoringPreviewRenderMicros = audioDiagnosticsPublication.maxAuthoringPreviewRenderMicros.load(std::memory_order_relaxed);
+        values.performancePeakActiveVoiceCount = audioDiagnosticsPublication.performancePeakActiveVoiceCount.load(std::memory_order_relaxed);
+        values.performancePeakReleasingVoiceCount = audioDiagnosticsPublication.performancePeakReleasingVoiceCount.load(std::memory_order_relaxed);
+        values.authoringPreviewPeakActiveVoiceCount = audioDiagnosticsPublication.authoringPreviewPeakActiveVoiceCount.load(std::memory_order_relaxed);
+        values.authoringPreviewPeakReleasingVoiceCount = audioDiagnosticsPublication.authoringPreviewPeakReleasingVoiceCount.load(std::memory_order_relaxed);
+        values.performanceVoiceStealCount = audioDiagnosticsPublication.performanceVoiceStealCount.load(std::memory_order_relaxed);
+        values.authoringPreviewVoiceStealCount = audioDiagnosticsPublication.authoringPreviewVoiceStealCount.load(std::memory_order_relaxed);
+        values.performanceDroppedEventCount = audioDiagnosticsPublication.performanceDroppedEventCount.load(std::memory_order_relaxed);
+        values.authoringPreviewDroppedEventCount = audioDiagnosticsPublication.authoringPreviewDroppedEventCount.load(std::memory_order_relaxed);
+        values.performanceDroppedNoteCount = audioDiagnosticsPublication.performanceDroppedNoteCount.load(std::memory_order_relaxed);
+        values.authoringPreviewDroppedNoteCount = audioDiagnosticsPublication.authoringPreviewDroppedNoteCount.load(std::memory_order_relaxed);
         values.activeAuthoringPreviewRevision = audioDiagnosticsPublication.activeAuthoringPreviewRevision.load(std::memory_order_relaxed);
         values.pendingAuthoringPreviewRevision = audioDiagnosticsPublication.pendingAuthoringPreviewRevision.load(std::memory_order_relaxed);
         values.activePublishedRevision = audioDiagnosticsPublication.activePublishedRevision.load(std::memory_order_relaxed);
@@ -1152,16 +1234,28 @@ ProcessorRealtimeSafetySnapshot Processor::composeDiagnosticsSnapshot(
     snapshot.publicationSequence = publicationSequence;
     snapshot.processBlockCount = diagnosticsProcessBlockCount.load(std::memory_order_acquire);
     snapshot.preparedBlockSize = diagnosticsPreparedBlockSize.load(std::memory_order_acquire);
-    snapshot.referenceSampleCountLoaded = diagnosticsReferenceSampleCountLoaded.load(std::memory_order_acquire);
-    snapshot.referenceWarmupCount = diagnosticsReferenceWarmupCount.load(std::memory_order_acquire);
-    snapshot.referenceSampleLoadsOnAudioThread = diagnosticsReferenceSampleLoadsOnAudioThread.load(std::memory_order_acquire);
     snapshot.authoringSampleLoadsOnAudioThread = diagnosticsAuthoringSampleLoadsOnAudioThread.load(std::memory_order_acquire);
     snapshot.performanceActiveVoiceCount = audioValues.performanceActiveVoiceCount;
     snapshot.authoringPreviewActiveVoiceCount = audioValues.authoringPreviewActiveVoiceCount;
     snapshot.activeVoiceCapacity = std::max(audioValues.activeVoiceCapacity,
                                             diagnosticsPrimedActiveVoiceCapacity.load(std::memory_order_acquire));
     snapshot.activeVoiceCapacityLimit = diagnosticsActiveVoiceCapacityLimit.load(std::memory_order_acquire);
-    snapshot.activeVoiceCapacityGrowthCount = diagnosticsActiveVoiceCapacityGrowthCount.load(std::memory_order_acquire);
+    snapshot.performanceContextIdentity = audioValues.performanceContextIdentity;
+    snapshot.authoringPreviewContextIdentity = audioValues.authoringPreviewContextIdentity;
+    snapshot.lastPerformanceRenderMicros = audioValues.lastPerformanceRenderMicros;
+    snapshot.maxPerformanceRenderMicros = audioValues.maxPerformanceRenderMicros;
+    snapshot.lastAuthoringPreviewRenderMicros = audioValues.lastAuthoringPreviewRenderMicros;
+    snapshot.maxAuthoringPreviewRenderMicros = audioValues.maxAuthoringPreviewRenderMicros;
+    snapshot.performancePeakActiveVoiceCount = audioValues.performancePeakActiveVoiceCount;
+    snapshot.performancePeakReleasingVoiceCount = audioValues.performancePeakReleasingVoiceCount;
+    snapshot.authoringPreviewPeakActiveVoiceCount = audioValues.authoringPreviewPeakActiveVoiceCount;
+    snapshot.authoringPreviewPeakReleasingVoiceCount = audioValues.authoringPreviewPeakReleasingVoiceCount;
+    snapshot.performanceVoiceStealCount = audioValues.performanceVoiceStealCount;
+    snapshot.authoringPreviewVoiceStealCount = audioValues.authoringPreviewVoiceStealCount;
+    snapshot.performanceDroppedEventCount = audioValues.performanceDroppedEventCount;
+    snapshot.authoringPreviewDroppedEventCount = audioValues.authoringPreviewDroppedEventCount;
+    snapshot.performanceDroppedNoteCount = audioValues.performanceDroppedNoteCount;
+    snapshot.authoringPreviewDroppedNoteCount = audioValues.authoringPreviewDroppedNoteCount;
     snapshot.authoringPreviewActivationCount = diagnosticsAuthoringPreviewActivationCount.load(std::memory_order_acquire);
     snapshot.performanceActivationCount = diagnosticsPerformanceActivationCount.load(std::memory_order_acquire);
     snapshot.retiredActivationCount = diagnosticsRetiredActivationCount.load(std::memory_order_acquire);
@@ -1202,8 +1296,6 @@ ProcessorRealtimeSafetySnapshot Processor::composeDiagnosticsSnapshot(
 
     if (snapshot.getAudioThreadViolationCount() > 0)
         snapshot.state = "Realtime callback violations recorded";
-    else if (snapshot.referenceSampleCountLoaded == 0)
-        snapshot.state = "Reference playback cache unavailable";
     else if (!audioValues.hasActivePerformanceActivation && audioValues.hasPendingPerformanceActivation)
         snapshot.state = "Published activation pending";
     else if (!audioValues.hasActiveAuthoringPreviewActivation && audioValues.hasPendingAuthoringPreviewActivation)
@@ -1250,6 +1342,14 @@ void Processor::publishMessageDiagnostics()
     audioValues.activeActivationPayloadBytes = activationValues.activeActivationPayloadBytes;
     audioValues.pendingActivationPayloadBytes = activationValues.pendingActivationPayloadBytes;
     audioValues.retiredActivationPayloadBytes = activationValues.retiredActivationPayloadBytes;
+    audioValues.performanceContextIdentity = activationValues.performanceContextIdentity;
+    audioValues.authoringPreviewContextIdentity = activationValues.authoringPreviewContextIdentity;
+    audioValues.performanceVoiceStealCount = activationValues.performanceVoiceStealCount;
+    audioValues.authoringPreviewVoiceStealCount = activationValues.authoringPreviewVoiceStealCount;
+    audioValues.performanceDroppedEventCount = activationValues.performanceDroppedEventCount;
+    audioValues.authoringPreviewDroppedEventCount = activationValues.authoringPreviewDroppedEventCount;
+    audioValues.performanceDroppedNoteCount = activationValues.performanceDroppedNoteCount;
+    audioValues.authoringPreviewDroppedNoteCount = activationValues.authoringPreviewDroppedNoteCount;
     audioValues.hasActiveAuthoringPreviewActivation = activationValues.hasActiveAuthoringPreviewActivation;
     audioValues.hasPendingAuthoringPreviewActivation = activationValues.hasPendingAuthoringPreviewActivation;
     audioValues.hasActivePerformanceActivation = activationValues.hasActivePerformanceActivation;
@@ -1273,15 +1373,27 @@ ProcessorRealtimeSafetySnapshot Processor::getRealtimeSafetySnapshot() const
     // primitives onto this private value copy; formatted strings remain message-owned.
     snapshot.publicationSequence = audioSequence;
     snapshot.processBlockCount = diagnosticsProcessBlockCount.load(std::memory_order_acquire);
-    snapshot.referenceSampleCountLoaded = diagnosticsReferenceSampleCountLoaded.load(std::memory_order_acquire);
-    snapshot.referenceWarmupCount = diagnosticsReferenceWarmupCount.load(std::memory_order_acquire);
-    snapshot.referenceSampleLoadsOnAudioThread = diagnosticsReferenceSampleLoadsOnAudioThread.load(std::memory_order_acquire);
     snapshot.authoringSampleLoadsOnAudioThread = diagnosticsAuthoringSampleLoadsOnAudioThread.load(std::memory_order_acquire);
     snapshot.performanceActiveVoiceCount = audioValues.performanceActiveVoiceCount;
     snapshot.authoringPreviewActiveVoiceCount = audioValues.authoringPreviewActiveVoiceCount;
     snapshot.activeVoiceCapacity = std::max(audioValues.activeVoiceCapacity,
                                             diagnosticsPrimedActiveVoiceCapacity.load(std::memory_order_acquire));
-    snapshot.activeVoiceCapacityGrowthCount = diagnosticsActiveVoiceCapacityGrowthCount.load(std::memory_order_acquire);
+    snapshot.performanceContextIdentity = audioValues.performanceContextIdentity;
+    snapshot.authoringPreviewContextIdentity = audioValues.authoringPreviewContextIdentity;
+    snapshot.lastPerformanceRenderMicros = audioValues.lastPerformanceRenderMicros;
+    snapshot.maxPerformanceRenderMicros = audioValues.maxPerformanceRenderMicros;
+    snapshot.lastAuthoringPreviewRenderMicros = audioValues.lastAuthoringPreviewRenderMicros;
+    snapshot.maxAuthoringPreviewRenderMicros = audioValues.maxAuthoringPreviewRenderMicros;
+    snapshot.performancePeakActiveVoiceCount = audioValues.performancePeakActiveVoiceCount;
+    snapshot.performancePeakReleasingVoiceCount = audioValues.performancePeakReleasingVoiceCount;
+    snapshot.authoringPreviewPeakActiveVoiceCount = audioValues.authoringPreviewPeakActiveVoiceCount;
+    snapshot.authoringPreviewPeakReleasingVoiceCount = audioValues.authoringPreviewPeakReleasingVoiceCount;
+    snapshot.performanceVoiceStealCount = audioValues.performanceVoiceStealCount;
+    snapshot.authoringPreviewVoiceStealCount = audioValues.authoringPreviewVoiceStealCount;
+    snapshot.performanceDroppedEventCount = audioValues.performanceDroppedEventCount;
+    snapshot.authoringPreviewDroppedEventCount = audioValues.authoringPreviewDroppedEventCount;
+    snapshot.performanceDroppedNoteCount = audioValues.performanceDroppedNoteCount;
+    snapshot.authoringPreviewDroppedNoteCount = audioValues.authoringPreviewDroppedNoteCount;
     snapshot.authoringPreviewActivationCount = diagnosticsAuthoringPreviewActivationCount.load(std::memory_order_acquire);
     snapshot.performanceActivationCount = diagnosticsPerformanceActivationCount.load(std::memory_order_acquire);
     snapshot.retiredActivationCount = diagnosticsRetiredActivationCount.load(std::memory_order_acquire);
@@ -1319,8 +1431,6 @@ ProcessorRealtimeSafetySnapshot Processor::getRealtimeSafetySnapshot() const
 
     if (snapshot.getAudioThreadViolationCount() > 0)
         snapshot.state = "Realtime callback violations recorded";
-    else if (snapshot.referenceSampleCountLoaded == 0)
-        snapshot.state = "Reference playback cache unavailable";
     else if (!audioValues.hasActivePerformanceActivation && audioValues.hasPendingPerformanceActivation)
         snapshot.state = "Published activation pending";
     else if (!audioValues.hasActiveAuthoringPreviewActivation && audioValues.hasPendingAuthoringPreviewActivation)

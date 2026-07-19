@@ -26,17 +26,29 @@ struct ProcessorRealtimeSafetySnapshot
     bool available = false;
     std::size_t processBlockCount = 0;
     std::size_t preparedBlockSize = 0;
-    std::size_t referenceSampleCountLoaded = 0;
-    std::size_t referenceWarmupCount = 0;
     std::size_t samplePathResolutionsOnAudioThread = 0;
     std::size_t sampleDecodeEntriesOnAudioThread = 0;
-    std::size_t referenceSampleLoadsOnAudioThread = 0;
     std::size_t authoringSampleLoadsOnAudioThread = 0;
     std::size_t performanceActiveVoiceCount = 0;
     std::size_t authoringPreviewActiveVoiceCount = 0;
     std::size_t activeVoiceCapacity = 0;
     std::size_t activeVoiceCapacityLimit = 0;
-    std::size_t activeVoiceCapacityGrowthCount = 0;
+    std::uint32_t performanceContextIdentity = 0;
+    std::uint32_t authoringPreviewContextIdentity = 0;
+    std::uint64_t lastPerformanceRenderMicros = 0;
+    std::uint64_t maxPerformanceRenderMicros = 0;
+    std::uint64_t lastAuthoringPreviewRenderMicros = 0;
+    std::uint64_t maxAuthoringPreviewRenderMicros = 0;
+    std::size_t performancePeakActiveVoiceCount = 0;
+    std::size_t performancePeakReleasingVoiceCount = 0;
+    std::size_t authoringPreviewPeakActiveVoiceCount = 0;
+    std::size_t authoringPreviewPeakReleasingVoiceCount = 0;
+    std::uint64_t performanceVoiceStealCount = 0;
+    std::uint64_t authoringPreviewVoiceStealCount = 0;
+    std::uint64_t performanceDroppedEventCount = 0;
+    std::uint64_t authoringPreviewDroppedEventCount = 0;
+    std::uint64_t performanceDroppedNoteCount = 0;
+    std::uint64_t authoringPreviewDroppedNoteCount = 0;
     std::size_t authoringPreviewActivationCount = 0;
     std::size_t performanceActivationCount = 0;
     std::size_t retiredActivationCount = 0;
@@ -82,11 +94,9 @@ struct ProcessorRealtimeSafetySnapshot
             + samplePathResolutionsOnAudioThread
             + sampleDecodeEntriesOnAudioThread
             + streamDecodeEntriesOnAudioThread
-            + referenceSampleLoadsOnAudioThread
             + authoringSampleLoadsOnAudioThread
             + largeResourceDestructionsOnAudioThread
-            + finalSharedOwnershipReleasesOnAudioThread
-            + activeVoiceCapacityGrowthCount;
+            + finalSharedOwnershipReleasesOnAudioThread;
     }
 
     std::size_t getRealtimeGuardFailureCount() const
@@ -207,6 +217,22 @@ private:
         std::size_t performanceActiveVoiceCount = 0;
         std::size_t authoringPreviewActiveVoiceCount = 0;
         std::size_t activeVoiceCapacity = 0;
+        std::uint32_t performanceContextIdentity = 0;
+        std::uint32_t authoringPreviewContextIdentity = 0;
+        std::uint64_t lastPerformanceRenderMicros = 0;
+        std::uint64_t maxPerformanceRenderMicros = 0;
+        std::uint64_t lastAuthoringPreviewRenderMicros = 0;
+        std::uint64_t maxAuthoringPreviewRenderMicros = 0;
+        std::size_t performancePeakActiveVoiceCount = 0;
+        std::size_t performancePeakReleasingVoiceCount = 0;
+        std::size_t authoringPreviewPeakActiveVoiceCount = 0;
+        std::size_t authoringPreviewPeakReleasingVoiceCount = 0;
+        std::uint64_t performanceVoiceStealCount = 0;
+        std::uint64_t authoringPreviewVoiceStealCount = 0;
+        std::uint64_t performanceDroppedEventCount = 0;
+        std::uint64_t authoringPreviewDroppedEventCount = 0;
+        std::uint64_t performanceDroppedNoteCount = 0;
+        std::uint64_t authoringPreviewDroppedNoteCount = 0;
         std::size_t activeAuthoringPreviewRevision = 0;
         std::size_t pendingAuthoringPreviewRevision = 0;
         std::size_t activePublishedRevision = 0;
@@ -229,6 +255,22 @@ private:
         std::atomic<std::size_t> performanceActiveVoiceCount { 0 };
         std::atomic<std::size_t> authoringPreviewActiveVoiceCount { 0 };
         std::atomic<std::size_t> activeVoiceCapacity { 0 };
+        std::atomic<std::uint32_t> performanceContextIdentity { 0 };
+        std::atomic<std::uint32_t> authoringPreviewContextIdentity { 0 };
+        std::atomic<std::uint64_t> lastPerformanceRenderMicros { 0 };
+        std::atomic<std::uint64_t> maxPerformanceRenderMicros { 0 };
+        std::atomic<std::uint64_t> lastAuthoringPreviewRenderMicros { 0 };
+        std::atomic<std::uint64_t> maxAuthoringPreviewRenderMicros { 0 };
+        std::atomic<std::size_t> performancePeakActiveVoiceCount { 0 };
+        std::atomic<std::size_t> performancePeakReleasingVoiceCount { 0 };
+        std::atomic<std::size_t> authoringPreviewPeakActiveVoiceCount { 0 };
+        std::atomic<std::size_t> authoringPreviewPeakReleasingVoiceCount { 0 };
+        std::atomic<std::uint64_t> performanceVoiceStealCount { 0 };
+        std::atomic<std::uint64_t> authoringPreviewVoiceStealCount { 0 };
+        std::atomic<std::uint64_t> performanceDroppedEventCount { 0 };
+        std::atomic<std::uint64_t> authoringPreviewDroppedEventCount { 0 };
+        std::atomic<std::uint64_t> performanceDroppedNoteCount { 0 };
+        std::atomic<std::uint64_t> authoringPreviewDroppedNoteCount { 0 };
         std::atomic<std::size_t> activeAuthoringPreviewRevision { 0 };
         std::atomic<std::size_t> pendingAuthoringPreviewRevision { 0 };
         std::atomic<std::size_t> activePublishedRevision { 0 };
@@ -270,13 +312,13 @@ private:
     AudioDiagnosticsPublication audioDiagnosticsPublication;
     std::atomic<std::size_t> diagnosticsProcessBlockCount { 0 };
     std::atomic<std::size_t> diagnosticsPreparedBlockSize { 0 };
-    std::atomic<std::size_t> diagnosticsReferenceSampleCountLoaded { 0 };
-    std::atomic<std::size_t> diagnosticsReferenceWarmupCount { 0 };
-    std::atomic<std::size_t> diagnosticsReferenceSampleLoadsOnAudioThread { 0 };
     std::atomic<std::size_t> diagnosticsAuthoringSampleLoadsOnAudioThread { 0 };
     std::atomic<std::size_t> diagnosticsActiveVoiceCapacityLimit { 0 };
     std::atomic<std::size_t> diagnosticsPrimedActiveVoiceCapacity { 0 };
-    std::atomic<std::size_t> diagnosticsActiveVoiceCapacityGrowthCount { 0 };
+    std::atomic<std::uint64_t> diagnosticsPerformanceDroppedNoteCount { 0 };
+    std::atomic<std::uint64_t> diagnosticsAuthoringPreviewDroppedNoteCount { 0 };
+    std::atomic<std::uint64_t> diagnosticsPerformanceDroppedEventCount { 0 };
+    std::atomic<std::uint64_t> diagnosticsAuthoringPreviewDroppedEventCount { 0 };
     std::atomic<std::size_t> diagnosticsAuthoringPreviewActivationCount { 0 };
     std::atomic<std::size_t> diagnosticsPerformanceActivationCount { 0 };
     std::atomic<std::size_t> diagnosticsRetiredActivationCount { 0 };
@@ -286,6 +328,14 @@ private:
     std::atomic<std::uint64_t> diagnosticsMaxProcessBlockMicros { 0 };
     std::atomic<std::size_t> diagnosticsOverBudgetCallbackCount { 0 };
     std::atomic<std::size_t> diagnosticsCurrentAuthoringPreviewDraftRevision { 0 };
+    std::uint64_t lastPerformanceRenderMicros = 0;
+    std::uint64_t maxPerformanceRenderMicros = 0;
+    std::uint64_t lastAuthoringPreviewRenderMicros = 0;
+    std::uint64_t maxAuthoringPreviewRenderMicros = 0;
+    std::size_t performancePeakActiveVoiceCount = 0;
+    std::size_t performancePeakReleasingVoiceCount = 0;
+    std::size_t authoringPreviewPeakActiveVoiceCount = 0;
+    std::size_t authoringPreviewPeakReleasingVoiceCount = 0;
     std::size_t failedAuthoringPreviewRevision = std::numeric_limits<std::size_t>::max();
     std::string failedAuthoringPreviewState;
     std::string lastAuthoringSampleLoadFailureState;

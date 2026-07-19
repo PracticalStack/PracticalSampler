@@ -5,6 +5,7 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 
 #include <cstdlib>
+#include <array>
 #include <iostream>
 #include <new>
 #include <stdexcept>
@@ -145,8 +146,14 @@ void runCleanMaximumLoadCase()
     require(Profile::deadlineMicros(48000.0, 1024) == 21333,
             "48 kHz / 1024 callback deadline should remain deterministic.");
 
+    constexpr std::array<std::size_t, 6> supportedBlockMatrix { 32, 64, 128, 256, 512, 1024 };
+    for (const auto sampleRate : Profile::supportedSampleRates)
+    for (const auto blockSize : supportedBlockMatrix)
+    {
+    require(Profile::supports(static_cast<double>(sampleRate), blockSize),
+            "Declared clean-load matrix point must be supported.");
     drs::plugin::Processor processor;
-    processor.prepareToPlay(48000.0, static_cast<int>(Profile::maximumBlockSize));
+    processor.prepareToPlay(static_cast<double>(sampleRate), static_cast<int>(blockSize));
     const auto authoringProject = drs::engine::loadPhase2ReferenceProjectManifest();
     require(authoringProject.loaded, "Maximum-load case should load the authoring preview fixture.");
     processor.replaceAuthoringProject(authoringProject.project);
@@ -173,14 +180,13 @@ void runCleanMaximumLoadCase()
     const auto queuedNoteEvents = Profile::targetPolyphonyPerContext * Profile::playbackContextCount;
     for (std::size_t index = queuedNoteEvents; index < Profile::maximumEventsPerBlock; ++index)
     {
-        hostMidi.addEvent(juce::MidiMessage::controllerEvent(
+        hostMidi.addEvent(juce::MidiMessage::noteOff(
                               1,
-                              20 + static_cast<int>(index % 80),
-                              static_cast<int>(index % 128)),
-                          static_cast<int>(index % Profile::maximumBlockSize));
+                              72 + static_cast<int>(index % 24)),
+                          static_cast<int>(index % blockSize));
     }
 
-    juce::AudioBuffer<float> buffer(2, static_cast<int>(Profile::maximumBlockSize));
+    juce::AudioBuffer<float> buffer(2, static_cast<int>(blockSize));
     processor.processBlock(buffer, hostMidi);
     const auto snapshot = processor.getRealtimeSafetySnapshot();
     require(snapshot.getRealtimeGuardFailureCount() == 0,
@@ -195,10 +201,9 @@ void runCleanMaximumLoadCase()
                 + ", decode=" + std::to_string(snapshot.sampleDecodeEntriesOnAudioThread
                                                   + snapshot.streamDecodeEntriesOnAudioThread)
                 + ", release=" + std::to_string(snapshot.largeResourceReleasesOnAudioThread)
-                + ", growth=" + std::to_string(snapshot.activeVoiceCapacityGrowthCount)
                 + ", budget=" + std::to_string(snapshot.overBudgetCallbackCount));
     require(snapshot.processBlockCount == 1, "Clean maximum-load case should execute exactly one callback.");
-    require(snapshot.callbackBudgetMicros == Profile::deadlineMicros(48000.0, Profile::maximumBlockSize),
+    require(snapshot.callbackBudgetMicros == Profile::deadlineMicros(static_cast<double>(sampleRate), blockSize),
             "Clean maximum-load case should report the declared callback deadline.");
     require(snapshot.activeVoiceCapacityLimit
                 == Profile::targetPolyphonyPerContext * Profile::playbackContextCount,
@@ -210,6 +215,34 @@ void runCleanMaximumLoadCase()
                 + ", preview=" + std::to_string(snapshot.authoringPreviewActiveVoiceCount));
     require(buffer.getMagnitude(0, buffer.getNumSamples()) > 0.0001f,
             "Clean maximum-load case should render audible output.");
+    require(snapshot.performanceContextIdentity != snapshot.authoringPreviewContextIdentity,
+            "Diagnostics must distinguish the Performance and Preview contexts.");
+    require(snapshot.performancePeakActiveVoiceCount == Profile::targetPolyphonyPerContext
+                && snapshot.authoringPreviewPeakActiveVoiceCount == Profile::targetPolyphonyPerContext,
+            "Peak-voice diagnostics should capture the clean 48-voice load.");
+    require(snapshot.performanceDroppedEventCount == 0
+                && snapshot.authoringPreviewDroppedEventCount == 0
+                && snapshot.performanceDroppedNoteCount == 0
+                && snapshot.authoringPreviewDroppedNoteCount == 0,
+            "Clean matrix playback must not drop events or queued notes.");
+
+    if (sampleRate == 48000u && blockSize == Profile::maximumBlockSize)
+    {
+        for (int event = 0; event < 300; ++event)
+            processor.queuePerformanceSurfaceNoteOn(60 + (event % 24), 0.75f);
+
+        buffer.clear();
+        hostMidi.clear();
+        processor.processBlock(buffer, hostMidi);
+        const auto pressureSnapshot = processor.getRealtimeSafetySnapshot();
+        require(pressureSnapshot.performanceVoiceStealCount > 0,
+                "Pressure diagnostics should count fixed-pool voice steals.");
+        require(pressureSnapshot.performanceDroppedEventCount > 0,
+                "Pressure diagnostics should count event-block overflow.");
+        require(pressureSnapshot.performanceDroppedNoteCount > 0,
+                "Pressure diagnostics should count producer queue overflow.");
+    }
+    }
 }
 } // namespace
 

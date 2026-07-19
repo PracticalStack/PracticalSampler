@@ -58,6 +58,11 @@ Reset, restart, close, note events, and retirement in one context cannot inspect
 context. Counters remain lane-local and cumulative so diagnostics do not become a shared mutable
 renderer dependency.
 
+The processor copies lane identity, current/peak active and releasing voice counts, cumulative
+steals and dropped events, and per-render timing into its odd/even-sequenced primitive diagnostic
+frame. Producer note-queue and shell event-block overflows are counted separately from rejections
+inside the core, so pressure can be attributed without exposing context storage to UI readers.
+
 ## Real-time limits
 
 Audio-owned context operations are fixed-array scans and primitive atomic/index operations. They do
