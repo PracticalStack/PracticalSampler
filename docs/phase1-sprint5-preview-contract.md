@@ -17,13 +17,13 @@ must not publish, replace, reset, release, steal, or otherwise mutate Performanc
 | `Processor::serviceMessageThreadWork()` observes authoring revision and selected-zone changes. | Processor message path | Replace with the Sprint 5 Preview controller in 5.2. Selection identity must remain independent from document revision. |
 | `Processor::stageAuthoringPreviewActivation()` formerly built an immediate selected-zone payload when worker state was stale. | Resolved in 5.4 | General authored worker payloads now cross one validating scope-preparation boundary. |
 | `ensureSelectedAuthoringSampleLoaded(false)` formerly imported and cached the selected playback sample. | Resolved in 5.4 | Removed; worker-owned general authored preparation is the only playback decode path. |
-| `queueAuthoringPreviewNoteOn()` calls `serviceMessageThreadWork()` implicitly. | UI-to-processor adapter | Remove implicit lifecycle work from note dispatch in 5.2/5.5. Audition commands may request preparation explicitly. |
+| `queueAuthoringPreviewNoteOn()` formerly called `serviceMessageThreadWork()` implicitly. | Resolved in 5.5 | Typed audition commands request preparation explicitly; plain note dispatch is lifecycle-free. |
 | Preview state is derived as `Idle / Preparing / Ready / Stale / Failed` strings from processor diagnostics. | Processor/message snapshot | Replace with typed request, activation, and presentation state in 5.2/5.7. Strings become presentation-only. |
-| Summary Preview uses a delayed note-off callback; authoring note callbacks enter the processor queue directly. | Authoring UI | Unify behind typed Preview audition commands and note ownership in 5.5. |
+| Summary Preview formerly used a detached delayed note-off while other authoring sources entered the processor queue directly. | Resolved in 5.5 | All creator sources use one typed adapter, per-source note ownership, and component-owned release timers. |
 | Sprint 4 context activation, old-model voice leases, and message-owned retirement. | `SamplerPlaybackContext` | Retain unchanged. This is the approved activation/lifetime mechanism. |
 
 The unresolved source seams remain executable in `drs_sprint5_preview_contract_red_tests`. After
-5.4, the target reports exactly two later-sprint gaps and remains intentionally direct-only.
+5.5, the target reports exactly one later-sprint gap and remains intentionally direct-only.
 
 ## Preview scopes
 

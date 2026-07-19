@@ -371,6 +371,7 @@ void Processor::prepareToPlay(double sampleRate, int samplesPerBlock)
     currentSampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;
     performanceSurfaceNoteQueue.reset();
     authoringPreviewNoteQueue.reset();
+    authoringPreviewCommandAdapter.clearOwnership();
     performancePlaybackContext.prepare(currentSampleRate);
     authoringPreviewPlaybackContext.prepare(currentSampleRate);
     primeRealtimeSafetyState(samplesPerBlock > 0 ? samplesPerBlock : 512);
@@ -380,6 +381,7 @@ void Processor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
 void Processor::releaseResources()
 {
+    authoringPreviewCommandAdapter.clearOwnership();
     performancePlaybackContext.resetAtBlockBoundary();
     authoringPreviewPlaybackContext.resetAtBlockBoundary();
     updateRealtimeSafetyState();
@@ -403,10 +405,12 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
 
     drs::engine::SamplerEventBlock performanceEvents;
     drs::engine::SamplerEventBlock authoringPreviewEvents;
-    drainRealtimeNoteEvents(performanceSurfaceNoteQueue, performanceEvents);
-    drainRealtimeNoteEvents(authoringPreviewNoteQueue, authoringPreviewEvents);
-
     const auto frameCount = buffer.getNumSamples();
+    drainRealtimeNoteEvents(performanceSurfaceNoteQueue, performanceEvents,
+                            static_cast<std::uint32_t>(std::max(frameCount, 0)));
+    drainRealtimeNoteEvents(authoringPreviewNoteQueue, authoringPreviewEvents,
+                            static_cast<std::uint32_t>(std::max(frameCount, 0)));
+
     for (const auto metadata : midiMessages)
     {
         const auto* eventData = metadata.data;
@@ -543,25 +547,84 @@ void Processor::setMacroValueFromShell(const std::string& macroId, double value)
 
 void Processor::queueAuthoringPreviewNoteOn(int midiNoteNumber, float velocity)
 {
-    authoringPreviewRequestedScope = drs::engine::AuthoringPreviewScope::selectedZone;
-    authoringPreviewDirectAuditionRequested = true;
-    serviceMessageThreadWork();
-    if (!authoringPreviewNoteQueue.push(
-            { clampMidiValue(midiNoteNumber), std::clamp(velocity, 0.0f, 1.0f), true }))
-        diagnosticsAuthoringPreviewDroppedNoteCount.fetch_add(1, std::memory_order_relaxed);
+    drs::engine::AuthoringPreviewCommand command;
+    command.type = drs::engine::AuthoringPreviewCommandType::noteOn;
+    command.source = drs::engine::AuthoringPreviewAuditionSource::authoringKeyboard;
+    command.midiNote = midiNoteNumber;
+    command.velocity = velocity;
+    submitAuthoringPreviewCommand(command);
 }
 
 void Processor::requestAuthoringPreview(drs::engine::AuthoringPreviewScope scope)
 {
-    authoringPreviewRequestedScope = scope;
-    authoringPreviewDirectAuditionRequested = true;
-    serviceMessageThreadWork();
+    drs::engine::AuthoringPreviewCommand command;
+    command.type = scope == drs::engine::AuthoringPreviewScope::currentDraft
+        ? drs::engine::AuthoringPreviewCommandType::auditionCurrentDraft
+        : drs::engine::AuthoringPreviewCommandType::auditionSelectedZone;
+    command.emitNote = false;
+    submitAuthoringPreviewCommand(command);
 }
 
 void Processor::queueAuthoringPreviewNoteOff(int midiNoteNumber)
 {
-    if (!authoringPreviewNoteQueue.push({ clampMidiValue(midiNoteNumber), 0.0f, false }))
-        diagnosticsAuthoringPreviewDroppedNoteCount.fetch_add(1, std::memory_order_relaxed);
+    drs::engine::AuthoringPreviewCommand command;
+    command.type = drs::engine::AuthoringPreviewCommandType::noteOff;
+    command.source = drs::engine::AuthoringPreviewAuditionSource::authoringKeyboard;
+    command.midiNote = midiNoteNumber;
+    submitAuthoringPreviewCommand(command);
+}
+
+bool Processor::submitAuthoringPreviewCommand(
+    const drs::engine::AuthoringPreviewCommand& submittedCommand)
+{
+    auto command = submittedCommand;
+    if (command.type == drs::engine::AuthoringPreviewCommandType::auditionSelectedZone
+        && command.selectedZoneId.empty())
+    {
+        const auto selectedZone = authoringSession.getSelectedZone();
+        if (selectedZone.has_value())
+            command.selectedZoneId = selectedZone->id;
+    }
+
+    const auto dispatch = authoringPreviewCommandAdapter.dispatch(command);
+    if (!dispatch.accepted)
+        return false;
+
+    if (dispatch.preparationRequested)
+    {
+        authoringPreviewRequestedScope = dispatch.requestedScope;
+        authoringPreviewDirectAuditionRequested = true;
+        serviceMessageThreadWork();
+    }
+
+    if (!dispatch.hasEvent)
+        return true;
+
+    drs::engine::SamplerRenderEventType eventType;
+    switch (dispatch.event.type)
+    {
+        case drs::engine::AuthoringPreviewEventType::noteOn:
+            eventType = drs::engine::SamplerRenderEventType::noteOn;
+            break;
+        case drs::engine::AuthoringPreviewEventType::noteOff:
+            eventType = drs::engine::SamplerRenderEventType::noteOff;
+            break;
+        case drs::engine::AuthoringPreviewEventType::allNotesOff:
+            eventType = drs::engine::SamplerRenderEventType::allNotesOff;
+            break;
+        case drs::engine::AuthoringPreviewEventType::reset:
+            eventType = drs::engine::SamplerRenderEventType::reset;
+            break;
+    }
+
+    if (authoringPreviewNoteQueue.push({ eventType,
+                                         clampMidiValue(dispatch.event.midiNote),
+                                         std::clamp(dispatch.event.velocity, 0.0f, 1.0f),
+                                         dispatch.event.sampleOffset }))
+        return true;
+
+    diagnosticsAuthoringPreviewDroppedNoteCount.fetch_add(1, std::memory_order_relaxed);
+    return false;
 }
 
 drs::app::AuthoringWaveformPreview Processor::getAuthoringWaveformPreview()
@@ -647,13 +710,15 @@ void Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
 void Processor::queuePerformanceSurfaceNoteOn(int midiNoteNumber, float velocity)
 {
     if (!performanceSurfaceNoteQueue.push(
-            { clampMidiValue(midiNoteNumber), std::clamp(velocity, 0.0f, 1.0f), true }))
+            { drs::engine::SamplerRenderEventType::noteOn,
+              clampMidiValue(midiNoteNumber), std::clamp(velocity, 0.0f, 1.0f), 0 }))
         diagnosticsPerformanceDroppedNoteCount.fetch_add(1, std::memory_order_relaxed);
 }
 
 void Processor::queuePerformanceSurfaceNoteOff(int midiNoteNumber)
 {
-    if (!performanceSurfaceNoteQueue.push({ clampMidiValue(midiNoteNumber), 0.0f, false }))
+    if (!performanceSurfaceNoteQueue.push({ drs::engine::SamplerRenderEventType::noteOff,
+                                            clampMidiValue(midiNoteNumber), 0.0f, 0 }))
         diagnosticsPerformanceDroppedNoteCount.fetch_add(1, std::memory_order_relaxed);
 }
 
@@ -1110,17 +1175,21 @@ bool Processor::stagePerformanceActivation(const drs::engine::EnginePerformanceS
 }
 
 void Processor::drainRealtimeNoteEvents(RealtimeNoteEventQueue& queue,
-                                        drs::engine::SamplerEventBlock& destination) noexcept
+                                        drs::engine::SamplerEventBlock& destination,
+                                        std::uint32_t frameCount) noexcept
 {
     QueuedRealtimeNoteEvent event;
     while (queue.pop(event))
     {
-        destination.push({ event.noteOn
-                               ? drs::engine::SamplerRenderEventType::noteOn
-                               : drs::engine::SamplerRenderEventType::noteOff,
-                           0,
+        const auto sampleOffset = frameCount == 0
+            ? 0u
+            : std::min(event.sampleOffset, frameCount - 1u);
+        destination.push({ event.type,
+                           sampleOffset,
                            static_cast<std::uint8_t>(clampMidiValue(event.midiNoteNumber)),
-                           event.noteOn ? std::max(event.velocity, 1.0f / 127.0f) : 0.0f });
+                           event.type == drs::engine::SamplerRenderEventType::noteOn
+                               ? std::max(event.velocity, 1.0f / 127.0f)
+                               : 0.0f });
     }
 }
 

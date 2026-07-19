@@ -9,17 +9,20 @@
 #include "shared/AuthoringPreviewModel.h"
 #include "shared/PerformanceBankImport.h"
 #include "drs/engine/AuthoringSession.h"
+#include "drs/engine/AuthoringPreviewCommandAdapter.h"
 #include "drs/engine/DraftPlaybackContract.h"
 
 #include <juce_gui_extra/juce_gui_extra.h>
 
+#include <array>
 #include <functional>
+#include <string>
 #include <vector>
 
 namespace drs::app
 {
 class AuthoringPanel final : public juce::Component,
-                             private juce::Timer
+                             private juce::MultiTimer
 {
 public:
     enum class LayoutMode
@@ -36,6 +39,7 @@ public:
     using RestoreRootKeyCallback = std::function<void()>;
     using DraftPlaybackStatusProvider = std::function<drs::engine::DraftPlaybackStatus()>;
     using DraftPlaybackActionCallback = std::function<void()>;
+    using PreviewCommandCallback = std::function<void(const drs::engine::AuthoringPreviewCommand&)>;
 
     explicit AuthoringPanel(drs::engine::AuthoringSession& authoringSession,
                             WaveformPreviewProvider waveformPreviewProvider = {},
@@ -47,7 +51,8 @@ public:
                             RestoreRootKeyCallback onRestoreRootKeyRequested = {},
                             DraftPlaybackStatusProvider draftPlaybackStatusProvider = {},
                             DraftPlaybackActionCallback onPrepareDraftPlaybackRequested = {},
-                            DraftPlaybackActionCallback onPublishDraftPlaybackRequested = {});
+                            DraftPlaybackActionCallback onPublishDraftPlaybackRequested = {},
+                            PreviewCommandCallback previewCommandCallback = {});
     ~AuthoringPanel() override;
 
     void paint(juce::Graphics& g) override;
@@ -107,7 +112,13 @@ private:
     void applySelectedRoutingBusEdit(const juce::String& label);
     void applySelectedTriggerSlotEdit(const juce::String& label);
     void importPhraseForSelectedBank();
-    void previewSelectedZone();
+    void previewSelectedZone(
+        drs::engine::AuthoringPreviewAuditionSource source
+            = drs::engine::AuthoringPreviewAuditionSource::summaryPreview,
+        int explicitMidiNote = -1,
+        int explicitVelocity = 0,
+        std::string explicitZoneId = {});
+    void releaseTimedPreview(std::size_t sourceIndex);
     void prepareDraftPlaybackPreview();
     void publishDraftPlayback();
     void undoLastEdit();
@@ -117,7 +128,7 @@ private:
     void setActiveDrawerTab(authoring::DrawerTab nextTab);
     void configureAccessibilityAndFocus();
     void refreshDrawerVisibility();
-    void timerCallback() override;
+    void timerCallback(int timerId) override;
     authoring::SelectionSummaryViewModel buildSelectionSummaryViewModel() const;
     authoring::ZoneFieldValuesViewModel buildZoneFieldValuesViewModel() const;
 
@@ -132,6 +143,14 @@ private:
     DraftPlaybackStatusProvider draftPlaybackStatusProvider;
     DraftPlaybackActionCallback onPrepareDraftPlaybackRequested;
     DraftPlaybackActionCallback onPublishDraftPlaybackRequested;
+    PreviewCommandCallback previewCommandCallback;
+    struct TimedPreviewNote
+    {
+        bool active = false;
+        int midiNote = 60;
+        double releaseAtMillis = 0.0;
+    };
+    std::array<TimedPreviewNote, 4> timedPreviewNotes {};
     bool isRefreshing = false;
     int selectedMacroIndex = 0;
     int selectedFxSlotIndex = 0;

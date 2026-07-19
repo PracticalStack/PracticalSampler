@@ -438,6 +438,10 @@ MainComponent::MainComponent(bool enableAudioOutput)
                      [this]()
                      {
                          processor.getEngineFacade().publishCurrentDraft();
+                     },
+                     [this](const drs::engine::AuthoringPreviewCommand& command)
+                     {
+                         processor.submitAuthoringPreviewCommand(command);
                      })
 {
     juce::PropertiesFile::Options appSettingsOptions;

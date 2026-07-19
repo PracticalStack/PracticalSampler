@@ -54,6 +54,12 @@ void ZoneMapCanvas::setOnZoneRangeCommitRequested(
     onZoneRangeCommitRequested = std::move(nextCallback);
 }
 
+void ZoneMapCanvas::setOnZoneAuditionRequested(
+    std::function<void(const std::string& zoneId, int midiNote, int velocity)> nextCallback)
+{
+    onZoneAuditionRequested = std::move(nextCallback);
+}
+
 bool ZoneMapCanvas::requestSelectionAt(juce::Point<float> position)
 {
     if (activeGesture.has_value())
@@ -85,6 +91,34 @@ bool ZoneMapCanvas::requestSelectionAt(juce::Point<float> position)
               });
 
     return requestSelectionByIndex(hits.front().index);
+}
+
+bool ZoneMapCanvas::requestAuditionAt(juce::Point<float> position)
+{
+    if (activeGesture.has_value() || !onZoneAuditionRequested)
+        return false;
+
+    const auto layouts = buildZoneLayouts();
+    std::vector<ZoneLayout> hits;
+    for (const auto& layout : layouts)
+        if (layout.bounds.contains(position))
+            hits.push_back(layout);
+    if (hits.empty())
+        return false;
+
+    std::sort(hits.begin(), hits.end(), [](const ZoneLayout& left, const ZoneLayout& right)
+    {
+        return left.bounds.getWidth() * left.bounds.getHeight()
+            < right.bounds.getWidth() * right.bounds.getHeight();
+    });
+    // Selection refreshes the authoring view model synchronously, so retain a
+    // value copy across that callback instead of a reference into zoneSummaries.
+    const auto zone = zoneSummaries[hits.front().index];
+    if (!zone.selected && onZoneSelectionRequested)
+        onZoneSelectionRequested(zone.id);
+    onZoneAuditionRequested(zone.id, zone.rootKey,
+                            std::clamp((zone.velocityLow + zone.velocityHigh) / 2, 1, 127));
+    return true;
 }
 
 bool ZoneMapCanvas::moveSelection(int direction)
@@ -188,6 +222,12 @@ void ZoneMapCanvas::mouseDown(const juce::MouseEvent& event)
     grabKeyboardFocus();
     if (!beginRangeGestureAt(event.position))
         requestSelectionAt(event.position);
+}
+
+void ZoneMapCanvas::mouseDoubleClick(const juce::MouseEvent& event)
+{
+    grabKeyboardFocus();
+    requestAuditionAt(event.position);
 }
 
 void ZoneMapCanvas::mouseDrag(const juce::MouseEvent& event)

@@ -9,6 +9,8 @@ namespace drs::app
 {
 namespace
 {
+constexpr int statusTimerId = 1;
+constexpr int previewReleaseTimerId = 2;
 const auto authoringPanelBackground = juce::Colour::fromRGB(18, 24, 29);
 const auto authoringPanelCard = juce::Colour::fromRGB(250, 247, 240);
 const auto authoringPanelAccent = juce::Colour::fromRGB(181, 96, 21);
@@ -516,7 +518,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
                                RestoreRootKeyCallback restoreRootKeyRequested,
                                DraftPlaybackStatusProvider nextDraftPlaybackStatusProvider,
                                DraftPlaybackActionCallback prepareDraftPlaybackRequested,
-                               DraftPlaybackActionCallback publishDraftPlaybackRequested)
+                               DraftPlaybackActionCallback publishDraftPlaybackRequested,
+                               PreviewCommandCallback nextPreviewCommandCallback)
     : authoringSession(session),
       waveformPreviewProvider(std::move(previewProvider)),
       authoringPreviewStatusProvider(std::move(nextAuthoringPreviewStatusProvider)),
@@ -528,6 +531,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
       draftPlaybackStatusProvider(std::move(nextDraftPlaybackStatusProvider)),
       onPrepareDraftPlaybackRequested(std::move(prepareDraftPlaybackRequested)),
       onPublishDraftPlaybackRequested(std::move(publishDraftPlaybackRequested)),
+      previewCommandCallback(std::move(nextPreviewCommandCallback)),
       macroList("authoringMacroList",
                 "authoringMacroListBox",
                 "authoringMacroListEmptyState")
@@ -664,6 +668,10 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         if (onRestoreRootKeyRequested)
             onRestoreRootKeyRequested();
     };
+    zoneCallbacks.onPreviewRequested = [this]
+    {
+        previewSelectedZone(drs::engine::AuthoringPreviewAuditionSource::inspector);
+    };
     zoneMappingEditor.setCallbacks(std::move(zoneCallbacks));
     zoneMap.setOnZoneSelectionRequested([this](const std::string& zoneId)
     {
@@ -676,6 +684,13 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
 
         authoringSession.selectZone(zoneId);
         refreshFromSession();
+    });
+    zoneMap.setOnZoneAuditionRequested([this](const std::string& zoneId,
+                                               int midiNote,
+                                               int velocity)
+    {
+        previewSelectedZone(drs::engine::AuthoringPreviewAuditionSource::zoneMap,
+                            midiNote, velocity, zoneId);
     });
     zoneMap.setOnZoneRangeCommitRequested([this](const drs::engine::AuthoringZoneSummary& zone,
                                                  const std::string& label)
@@ -951,12 +966,15 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
 
     refreshFromSession();
     if (waveformPreviewProvider || authoringPreviewStatusProvider || importResponsivenessProvider || draftPlaybackStatusProvider)
-        startTimerHz(4);
+        startTimer(statusTimerId, 250);
 }
 
 AuthoringPanel::~AuthoringPanel()
 {
-    stopTimer();
+    for (std::size_t source = 0; source < timedPreviewNotes.size(); ++source)
+        releaseTimedPreview(source);
+    stopTimer(statusTimerId);
+    stopTimer(previewReleaseTimerId);
     setLookAndFeel(nullptr);
 }
 
@@ -1846,9 +1864,27 @@ void AuthoringPanel::setActiveDrawerTab(authoring::DrawerTab nextTab)
     resized();
 }
 
-void AuthoringPanel::timerCallback()
+void AuthoringPanel::timerCallback(int timerId)
 {
-    refreshNow();
+    if (timerId == statusTimerId)
+    {
+        refreshNow();
+        return;
+    }
+    if (timerId != previewReleaseTimerId)
+        return;
+
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    auto anyPending = false;
+    for (std::size_t source = 0; source < timedPreviewNotes.size(); ++source)
+    {
+        if (timedPreviewNotes[source].active
+            && now >= timedPreviewNotes[source].releaseAtMillis)
+            releaseTimedPreview(source);
+        anyPending = anyPending || timedPreviewNotes[source].active;
+    }
+    if (!anyPending)
+        stopTimer(previewReleaseTimerId);
 }
 
 void AuthoringPanel::refreshDrawerVisibility()
@@ -2751,23 +2787,61 @@ void AuthoringPanel::applySelectedZoneEdit(const authoring::ZoneFieldValuesViewM
     refreshFromSession();
 }
 
-void AuthoringPanel::previewSelectedZone()
+void AuthoringPanel::previewSelectedZone(
+    drs::engine::AuthoringPreviewAuditionSource source,
+    int explicitMidiNote,
+    int explicitVelocity,
+    std::string explicitZoneId)
 {
     const auto request = authoringSession.buildSelectedZonePreviewRequest();
     if (!request.available)
         return;
 
-    if (onNotePreviewStarted)
-        onNotePreviewStarted(request.midiNote, static_cast<float>(request.velocity) / 127.0f);
+    const auto midiNote = explicitMidiNote >= 0 ? explicitMidiNote : request.midiNote;
+    const auto velocity = explicitVelocity > 0 ? explicitVelocity : request.velocity;
+    const auto sourceIndex = std::min<std::size_t>(static_cast<std::size_t>(source),
+                                                   timedPreviewNotes.size() - 1);
+    releaseTimedPreview(sourceIndex);
 
-    if (onNotePreviewEnded)
+    if (previewCommandCallback)
     {
-        juce::Timer::callAfterDelay(180,
-                                    [callback = onNotePreviewEnded, midiNote = request.midiNote]()
-                                    {
-                                        callback(midiNote);
-                                    });
+        drs::engine::AuthoringPreviewCommand command;
+        command.type = drs::engine::AuthoringPreviewCommandType::auditionSelectedZone;
+        command.source = source;
+        command.midiNote = midiNote;
+        command.velocity = static_cast<float>(velocity) / 127.0f;
+        command.selectedZoneId = explicitZoneId.empty()
+            ? authoringSession.getSelectedZone()->id
+            : std::move(explicitZoneId);
+        previewCommandCallback(command);
     }
+    else if (onNotePreviewStarted)
+    {
+        onNotePreviewStarted(midiNote, static_cast<float>(velocity) / 127.0f);
+    }
+
+    timedPreviewNotes[sourceIndex] = { true, midiNote,
+                                       juce::Time::getMillisecondCounterHiRes() + 180.0 };
+    startTimer(previewReleaseTimerId, 10);
+}
+
+void AuthoringPanel::releaseTimedPreview(std::size_t sourceIndex)
+{
+    if (sourceIndex >= timedPreviewNotes.size() || !timedPreviewNotes[sourceIndex].active)
+        return;
+
+    const auto note = timedPreviewNotes[sourceIndex].midiNote;
+    timedPreviewNotes[sourceIndex] = {};
+    if (previewCommandCallback)
+    {
+        drs::engine::AuthoringPreviewCommand command;
+        command.type = drs::engine::AuthoringPreviewCommandType::noteOff;
+        command.source = static_cast<drs::engine::AuthoringPreviewAuditionSource>(sourceIndex);
+        command.midiNote = note;
+        previewCommandCallback(command);
+    }
+    else if (onNotePreviewEnded)
+        onNotePreviewEnded(note);
 }
 
 void AuthoringPanel::prepareDraftPlaybackPreview()

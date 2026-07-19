@@ -107,6 +107,7 @@ struct ZoneFieldCallbacks
 {
     std::function<void(const ZoneFieldValuesViewModel&, const std::string&)> onCommitRequested;
     std::function<void()> onRestoreRootKeyRequested;
+    std::function<void()> onPreviewRequested;
 };
 
 using RefreshEditIntent = std::function<void(const std::string&)>;

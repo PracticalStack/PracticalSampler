@@ -1,6 +1,7 @@
 #pragma once
 
 #include "drs/engine/AuthoringSession.h"
+#include "drs/engine/AuthoringPreviewCommandAdapter.h"
 #include "drs/engine/AuthoringPreviewController.h"
 #include "drs/engine/EngineFacade.h"
 #include "drs/engine/SampleImport.h"
@@ -154,6 +155,11 @@ public:
     void setAuthoringProjectFile(juce::File file) { authoringProjectFile = std::move(file); }
     void setMacroValueFromShell(const std::string& macroId, double value);
     void requestAuthoringPreview(drs::engine::AuthoringPreviewScope scope);
+    bool submitAuthoringPreviewCommand(const drs::engine::AuthoringPreviewCommand& command);
+    drs::engine::AuthoringPreviewCommandAdapterSnapshot getAuthoringPreviewCommandSnapshot() const
+    {
+        return authoringPreviewCommandAdapter.getSnapshot();
+    }
     void queueAuthoringPreviewNoteOn(int midiNoteNumber, float velocity);
     void queueAuthoringPreviewNoteOff(int midiNoteNumber);
     void queuePerformanceSurfaceNoteOn(int midiNoteNumber, float velocity);
@@ -168,9 +174,10 @@ private:
 
     struct QueuedRealtimeNoteEvent
     {
+        drs::engine::SamplerRenderEventType type = drs::engine::SamplerRenderEventType::noteOn;
         int midiNoteNumber = 0;
         float velocity = 0.0f;
-        bool noteOn = false;
+        std::uint32_t sampleOffset = 0;
     };
 
     class RealtimeNoteEventQueue
@@ -191,7 +198,8 @@ private:
     static juce::AudioProcessorValueTreeState::ParameterLayout buildParameterLayout(
         const drs::engine::EngineFacade& engineFacade);
     void drainRealtimeNoteEvents(RealtimeNoteEventQueue& queue,
-                                 drs::engine::SamplerEventBlock& destination) noexcept;
+                                 drs::engine::SamplerEventBlock& destination,
+                                 std::uint32_t frameCount) noexcept;
     bool stageAuthoringPreviewActivation(const drs::engine::AuthoringPreviewRequest& request,
                                          bool installImmediately);
     bool synchronizePerformanceActivation(bool installImmediately);
@@ -294,6 +302,7 @@ private:
     void applyRealtimeGuardDiagnostics(ProcessorRealtimeSafetySnapshot& snapshot) const;
 
     drs::engine::AuthoringSession authoringSession;
+    drs::engine::AuthoringPreviewCommandAdapter authoringPreviewCommandAdapter;
     drs::engine::AuthoringPreviewController authoringPreviewController;
     drs::engine::EngineFacade engineFacade;
     std::unordered_map<std::string, drs::app::AuthoringWaveformPreview> authoringWaveformPreviewCache;

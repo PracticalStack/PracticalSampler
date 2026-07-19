@@ -38,6 +38,7 @@ ZoneMappingEditor::ZoneMappingEditor()
       gainRow("Gain (dB)", "authoringGainRow", -24.0, 12.0, 0.1),
       panRow("Pan", "authoringPanRow", -1.0, 1.0, 0.01),
       loopToggleRow("Loop", "authoringLoopRow", "Enabled"),
+      previewZoneRow("Audition", "authoringInspectorPreviewRow", "Preview Zone"),
       restoreRootKeyRow("Reference", "authoringRestoreRootKeyRow", "Restore Root Key"),
       validationMessage("authoringZoneValidationMessage", juce::Justification::centredLeft)
 {
@@ -56,6 +57,7 @@ ZoneMappingEditor::ZoneMappingEditor()
     gainRow.getSlider().setComponentID("authoringGainSlider");
     panRow.getSlider().setComponentID("authoringPanSlider");
     loopToggleRow.getToggle().setComponentID("authoringLoopEnabledToggle");
+    previewZoneRow.getButton().setComponentID("authoringInspectorPreviewButton");
     restoreRootKeyRow.getButton().setComponentID("authoringRestoreRootKeyButton");
     mapSection.getDisclosureButton().setExplicitFocusOrder(40);
     rootKeyRow.getSlider().setExplicitFocusOrder(41);
@@ -69,7 +71,9 @@ ZoneMappingEditor::ZoneMappingEditor()
     panRow.getSlider().setExplicitFocusOrder(49);
     advancedSection.getDisclosureButton().setExplicitFocusOrder(50);
     loopToggleRow.getToggle().setExplicitFocusOrder(51);
-    restoreRootKeyRow.getButton().setExplicitFocusOrder(52);
+    previewZoneRow.getButton().setExplicitFocusOrder(52);
+    restoreRootKeyRow.getButton().setExplicitFocusOrder(53);
+    previewZoneRow.getButton().setHelpText("Auditions the selected zone from the mapping inspector.");
     restoreRootKeyRow.getButton().setHelpText(
         "Restores the selected zone root key from the imported sample reference pitch.");
 
@@ -85,9 +89,11 @@ ZoneMappingEditor::ZoneMappingEditor()
     mixSectionContent.setSize(0, sliderRowHeight + 6 + sliderRowHeight);
 
     addOwnedRow(advancedSectionContent, loopToggleRow, toggleRowHeight);
+    addOwnedRow(advancedSectionContent, previewZoneRow, actionRowHeight);
     addOwnedRow(advancedSectionContent, restoreRootKeyRow, actionRowHeight);
     addOwnedRow(advancedSectionContent, validationMessage, messageRowHeight);
-    advancedSectionContent.setSize(0, toggleRowHeight + 6 + actionRowHeight + 6 + messageRowHeight);
+    advancedSectionContent.setSize(0, toggleRowHeight + 6 + actionRowHeight + 6
+                                      + actionRowHeight + 6 + messageRowHeight);
 
     mapSection.setContent(&mapSectionContent);
     sampleSection.setContent(&sampleSectionContent);
@@ -123,6 +129,11 @@ ZoneMappingEditor::ZoneMappingEditor()
     {
         if (callbacks.onRestoreRootKeyRequested)
             callbacks.onRestoreRootKeyRequested();
+    };
+    previewZoneRow.getButton().onClick = [this]
+    {
+        if (callbacks.onPreviewRequested)
+            callbacks.onPreviewRequested();
     };
 
     for (auto* component : {
@@ -176,6 +187,8 @@ void ZoneMappingEditor::resized()
     auto advancedArea = advancedSectionContent.getLocalBounds();
     loopToggleRow.setBounds(advancedArea.removeFromTop(toggleRowHeight));
     advancedArea.removeFromTop(6);
+    previewZoneRow.setBounds(advancedArea.removeFromTop(actionRowHeight));
+    advancedArea.removeFromTop(6);
     restoreRootKeyRow.setBounds(advancedArea.removeFromTop(actionRowHeight));
     advancedArea.removeFromTop(6);
     validationMessage.setBounds(advancedArea.removeFromTop(messageRowHeight));
@@ -206,6 +219,7 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
              static_cast<juce::Component*>(&gainRow),
              static_cast<juce::Component*>(&panRow),
              static_cast<juce::Component*>(&loopToggleRow),
+             static_cast<juce::Component*>(&previewZoneRow),
              static_cast<juce::Component*>(&restoreRootKeyRow),
              static_cast<juce::Component*>(&validationMessage),
              static_cast<juce::Component*>(&rootKeyRow.getSlider()),
@@ -216,6 +230,7 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
              static_cast<juce::Component*>(&gainRow.getSlider()),
              static_cast<juce::Component*>(&panRow.getSlider()),
              static_cast<juce::Component*>(&loopToggleRow.getToggle()),
+             static_cast<juce::Component*>(&previewZoneRow.getButton()),
              static_cast<juce::Component*>(&restoreRootKeyRow.getButton())
          })
     {
@@ -223,6 +238,7 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
     }
 
     restoreRootKeyRow.getButton().setEnabled(viewModel.hasSelection);
+    previewZoneRow.getButton().setEnabled(viewModel.hasSelection);
     refreshValidationMessage({});
     resized();
 }

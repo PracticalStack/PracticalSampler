@@ -447,6 +447,10 @@ Editor::Editor(Processor& owner)
                      [&owner]()
                      {
                          owner.getEngineFacade().publishCurrentDraft();
+                     },
+                     [&owner](const drs::engine::AuthoringPreviewCommand& command)
+                     {
+                         owner.submitAuthoringPreviewCommand(command);
                      })
 {
     juce::PropertiesFile::Options appSettingsOptions;

@@ -128,6 +128,24 @@ bool waitForWorkerToSettle(drs::engine::EngineFacade& engineFacade,
     return workerStatus.pendingWorkCount == 0 && workerStatus.inFlightWorkCount == 0;
 }
 
+bool waitForAutomaticPreview(drs::plugin::Processor& processor,
+                             std::size_t expectedRevision,
+                             std::chrono::milliseconds timeout = std::chrono::milliseconds(3000))
+{
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    while (std::chrono::steady_clock::now() <= deadline)
+    {
+        processor.serviceMessageThreadWork();
+        const auto& status = processor.getEngineFacade().getDraftPlaybackStatus();
+        if (!status.pendingPreview.active
+            && status.preview.revision == expectedRevision
+            && status.preview.state == "Ready")
+            return true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    return false;
+}
+
 bool waitForLabelContains(juce::Component& root,
                           const juce::String& componentId,
                           const std::string& expectedFragment,
@@ -235,21 +253,10 @@ void exerciseHostedAuthoringPlaybackIntegration(juce::Component& root,
     require(processor.serviceMessageThreadWork(),
             shellName + " should sync imported authoring content into the draft-playback facade.");
     refreshAuthoringWorkspace(root);
-    require(requireButton(root, "authoringPlaybackBannerPrepareButton").isVisible()
-                && requireButton(root, "authoringPlaybackBannerPrepareButton").isEnabled(),
-            shellName + " should enable prepare-draft banner actions after imported content creates a playable zone.");
-    require(!requireButton(root, "authoringPlaybackBannerPublishButton").isVisible(),
-            shellName + " should keep publish-draft banner actions hidden until the latest draft is prepared.");
-    require(waitForLabelContains(root,
-                                 "authoringPlaybackBannerLabel",
-                                 "playback action: Prepare the latest draft for preview."),
-            shellName + " should guide the user to prepare the imported migrated draft before publishing from the workspace banner.");
-    require(static_cast<bool>(requireButton(root, "authoringPlaybackBannerPrepareButton").onClick),
-            shellName + " should expose a workspace banner prepare-draft action.");
-    requireButton(root, "authoringPlaybackBannerPrepareButton").onClick();
-    require(waitForWorkerToSettle(processor.getEngineFacade(), std::chrono::milliseconds(1500)),
-            shellName + " should let imported migrated preview settle through the prepared-playback worker.");
-    processor.serviceMessageThreadWork();
+    require(!requireButton(root, "authoringPlaybackBannerPrepareButton").isVisible(),
+            shellName + " must not offer a duplicate manual prepare while the Sprint 5 Preview controller owns the build.");
+    require(waitForAutomaticPreview(processor, 1),
+            shellName + " should automatically prepare imported authored content through the Preview controller.");
     refreshAuthoringWorkspace(root);
     require(waitForLabelContains(root,
                                  "authoringSummaryPlaybackLabel",
@@ -293,15 +300,8 @@ void exerciseHostedAuthoringPlaybackIntegration(juce::Component& root,
                                  "Draft playback: draft r2 | preview r1 (Stale) | published r1 (Active)"),
             shellName + " should surface the stale-preview edited-draft state in the authoring summary strip. Text: "
                 + getLabelText(root, "authoringSummaryPlaybackLabel"));
-    require(waitForLabelContains(root,
-                                 "authoringPlaybackBannerLabel",
-                                 "playback action: Prepare the latest draft for preview."),
-            shellName + " should guide the user to rebuild playback after an edited migrated draft from the workspace banner.");
-
-    requireButton(root, "authoringPlaybackBannerPrepareButton").onClick();
-    require(waitForWorkerToSettle(processor.getEngineFacade(), std::chrono::milliseconds(1500)),
-            shellName + " should let edited migrated preview settle through the prepared-playback worker.");
-    processor.serviceMessageThreadWork();
+    require(waitForAutomaticPreview(processor, 2),
+            shellName + " should automatically prepare the edited authored revision through Preview.");
     refreshAuthoringWorkspace(root);
     require(waitForLabelContains(root,
                                  "authoringSummaryPlaybackLabel",

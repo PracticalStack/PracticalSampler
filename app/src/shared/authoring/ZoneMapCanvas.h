@@ -28,7 +28,10 @@ public:
     void setOnZoneSelectionRequested(std::function<void(const std::string& zoneId)> nextCallback);
     void setOnZoneRangeCommitRequested(
         std::function<void(const drs::engine::AuthoringZoneSummary& zone, const std::string& label)> nextCallback);
+    void setOnZoneAuditionRequested(
+        std::function<void(const std::string& zoneId, int midiNote, int velocity)> nextCallback);
     bool requestSelectionAt(juce::Point<float> position);
+    bool requestAuditionAt(juce::Point<float> position);
     bool moveSelection(int direction);
     bool beginRangeGestureAt(juce::Point<float> position);
     bool updateActiveRangeGesture(juce::Point<float> position);
@@ -37,6 +40,7 @@ public:
     bool isRangeGestureActive() const { return activeGesture.has_value(); }
     void paint(juce::Graphics& g) override;
     void mouseDown(const juce::MouseEvent& event) override;
+    void mouseDoubleClick(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
     void mouseUp(const juce::MouseEvent& event) override;
     bool keyPressed(const juce::KeyPress& key) override;
@@ -74,6 +78,7 @@ private:
     std::vector<drs::engine::AuthoringZoneSummary> zoneSummaries;
     std::function<void(const std::string& zoneId)> onZoneSelectionRequested;
     std::function<void(const drs::engine::AuthoringZoneSummary& zone, const std::string& label)> onZoneRangeCommitRequested;
+    std::function<void(const std::string& zoneId, int midiNote, int velocity)> onZoneAuditionRequested;
     std::optional<RangeGesture> activeGesture;
 };
 } // namespace drs::app::authoring

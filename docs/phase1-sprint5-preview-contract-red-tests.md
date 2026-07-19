@@ -50,6 +50,13 @@ The processor-owned immediate payload construction and synchronous selected-samp
 were removed. The direct audit now reports exactly two remaining seams: implicit note-on message
 servicing and string-only public presentation state. Their owners remain Mini Sprints 5.5 and 5.7.
 
+## Mini Sprint 5.5 update
+
+Plain Preview note-on no longer services controller or worker work. Selected-zone and current-draft
+audition commands request preparation explicitly, while every note source enters the typed command
+adapter. The direct audit now reports exactly one remaining seam: string-only public presentation
+state, owned by Mini Sprint 5.7.
+
 The green `drs.sprint5.preview_contract` target is registered immediately. It freezes request scope,
 request identity, legal preparation transitions, and active-note policy while the red implementation
 gaps are resolved incrementally.
