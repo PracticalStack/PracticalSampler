@@ -1,0 +1,417 @@
+#include "drs/engine/SamplerRenderModel.h"
+#include "drs/engine/SamplerVoice.h"
+#include "drs/engine/SamplerVoicePool.h"
+
+#include <array>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <iostream>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+namespace
+{
+constexpr float tolerance = 1.0e-6f;
+
+void require(bool condition, const std::string& message)
+{
+    if (!condition)
+        throw std::runtime_error(message);
+}
+
+void requireNear(float actual, float expected, const std::string& message)
+{
+    if (std::abs(actual - expected) > tolerance)
+        throw std::runtime_error(message + " (actual=" + std::to_string(actual)
+                                 + ", expected=" + std::to_string(expected) + ")");
+}
+
+void requireVector(const std::vector<float>& actual,
+                   const std::vector<float>& expected,
+                   const std::string& message)
+{
+    require(actual.size() == expected.size(), message + " size mismatch.");
+    for (std::size_t index = 0; index < actual.size(); ++index)
+        requireNear(actual[index], expected[index], message + " at frame " + std::to_string(index));
+}
+
+struct ModelOptions
+{
+    double sourceSampleRate = 48000.0;
+    int rootKey = 60;
+    std::uint64_t sampleStartFrame = 0;
+    bool loopEnabled = false;
+    std::uint64_t loopStartFrame = 0;
+    std::uint64_t loopEndFrame = 0;
+};
+
+drs::engine::SamplerRenderModelPtr buildModel(std::vector<float> source,
+                                              const ModelOptions& options = {})
+{
+    require(!source.empty(), "Lifecycle fixture requires source PCM.");
+    const auto frameCount = source.size();
+
+    drs::engine::ImmutablePlaybackSnapshot snapshot;
+    snapshot.draftRevision = 44;
+    snapshot.contentDigest = "sprint4-lifecycle-snapshot";
+    snapshot.zones.push_back({ "lifecycle-zone",
+                               "lifecycle-sample",
+                               "Lifecycle Zone",
+                               "lifecycle-group",
+                               "sustain",
+                               options.rootKey,
+                               0,
+                               127,
+                               1,
+                               127,
+                               0.0,
+                               0.0,
+                               options.sampleStartFrame,
+                               options.loopEnabled,
+                               options.loopStartFrame,
+                               options.loopEndFrame });
+
+    auto decoded = std::make_shared<drs::engine::PreparedPlaybackDecodedSampleData>();
+    decoded->normalizedChannels = { std::move(source) };
+    drs::engine::PreparedPlaybackSampleHandle sample;
+    sample.sampleSourceId = "lifecycle-sample";
+    sample.streamSampleId = "lifecycle-stream";
+    sample.sampleRate = options.sourceSampleRate;
+    sample.frameCount = frameCount;
+    sample.channelCount = 1;
+    sample.decodedSampleData = std::move(decoded);
+
+    drs::engine::ImmutablePreparedPlayback prepared;
+    prepared.snapshotBuildId = 4401;
+    prepared.snapshotContentDigest = snapshot.contentDigest;
+    prepared.draftRevision = snapshot.draftRevision;
+    prepared.preparedContentDigest = "sprint4-lifecycle-prepared";
+    prepared.samples.push_back(std::move(sample));
+    prepared.zones.push_back({ "lifecycle-zone",
+                               "lifecycle-sample",
+                               "lifecycle-stream",
+                               0,
+                               0,
+                               options.rootKey,
+                               0,
+                               127,
+                               1,
+                               127,
+                               0.0,
+                               0.0,
+                               options.sampleStartFrame,
+                               options.loopEnabled,
+                               options.loopStartFrame,
+                               options.loopEndFrame });
+
+    auto payload = std::make_shared<drs::engine::PlaybackActivationPayload>();
+    payload->lane = drs::engine::PlaybackActivationLane::preview;
+    payload->revision = snapshot.draftRevision;
+    payload->snapshotBuildId = prepared.snapshotBuildId;
+    payload->preparedBuildId = 4402;
+    payload->lifecycleState = drs::engine::PlaybackSnapshotLifecycleState::ready;
+    payload->activationEligible = true;
+    payload->snapshotContentDigest = snapshot.contentDigest;
+    payload->preparedContentDigest = prepared.preparedContentDigest;
+    payload->snapshot = std::make_shared<const drs::engine::ImmutablePlaybackSnapshot>(std::move(snapshot));
+    payload->prepared = std::make_shared<const drs::engine::ImmutablePreparedPlayback>(std::move(prepared));
+    const auto result = drs::engine::buildSamplerRenderModel(payload);
+    require(result.built && result.model != nullptr, "Lifecycle fixture model should validate.");
+    return result.model;
+}
+
+drs::engine::SamplerVoiceStartRequest startRequest(int note = 60,
+                                                   double outputSampleRate = 48000.0,
+                                                   std::uint64_t voiceId = 1)
+{
+    return { voiceId, 0, note, note, 127, outputSampleRate };
+}
+
+struct StereoOutput
+{
+    std::vector<float> left;
+    std::vector<float> right;
+    std::array<float*, 2> pointers;
+
+    explicit StereoOutput(std::size_t frames)
+        : left(frames, 0.0f), right(frames, 0.0f), pointers { left.data(), right.data() }
+    {
+    }
+
+    drs::engine::SamplerAudioBufferView view()
+    {
+        return { pointers.data(), 2, static_cast<std::uint32_t>(left.size()) };
+    }
+};
+
+drs::engine::SamplerRenderEvent noteOn(std::uint32_t offset, int note = 60)
+{
+    return { drs::engine::SamplerRenderEventType::noteOn,
+             offset,
+             static_cast<std::uint8_t>(note),
+             1.0f };
+}
+
+drs::engine::SamplerRenderEvent noteOff(std::uint32_t offset, int note = 60)
+{
+    return { drs::engine::SamplerRenderEventType::noteOff,
+             offset,
+             static_cast<std::uint8_t>(note),
+             0.0f };
+}
+
+drs::engine::SamplerRenderEvent resetEvent(std::uint32_t offset)
+{
+    return { drs::engine::SamplerRenderEventType::reset, offset, 0, 0.0f };
+}
+
+void runLoopBoundaryMatrix()
+{
+    ModelOptions loop;
+    loop.loopEnabled = true;
+    loop.loopStartFrame = 2;
+    loop.loopEndFrame = 5;
+    const auto model = buildModel({ 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f }, loop);
+    drs::engine::SamplerVoice voice;
+    require(voice.start(*model, startRequest()), "Unity loop voice should start.");
+    StereoOutput output(10);
+    const auto result = voice.render(output.view(), 0, 10);
+    require(result.mixedFrameCount == 10 && !result.voiceFinished && voice.isActive(),
+            "Enabled loop must remain active after repeated wraps.");
+    requireVector(output.left,
+                  { 0.0f, 0.25f, 0.5f, 0.75f, 1.0f, 0.5f, 0.75f, 1.0f, 0.5f, 0.75f },
+                  "Unity loop sequence changed");
+
+    loop.sampleStartFrame = 4;
+    const auto fractionalModel = buildModel({ 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f }, loop);
+    drs::engine::SamplerVoice fractional;
+    require(fractional.start(*fractionalModel, startRequest(60, 96000.0)),
+            "Fractional loop voice should start inside the loop.");
+    StereoOutput fractionalOutput(6);
+    fractional.render(fractionalOutput.view(), 0, 6);
+    requireVector(fractionalOutput.left,
+                  { 1.0f, 0.75f, 0.5f, 0.625f, 0.75f, 0.875f },
+                  "Fractional loop-boundary interpolation changed");
+
+    ModelOptions multipleWraps;
+    multipleWraps.sampleStartFrame = 1;
+    multipleWraps.loopEnabled = true;
+    multipleWraps.loopStartFrame = 1;
+    multipleWraps.loopEndFrame = 3;
+    const auto multipleModel = buildModel({ 0.0f, 1.0f, 2.0f, 3.0f }, multipleWraps);
+    drs::engine::SamplerVoice multiple;
+    require(multiple.start(*multipleModel, startRequest(84)), "Multiple-wrap voice should start.");
+    StereoOutput multipleOutput(4);
+    multiple.render(multipleOutput.view(), 0, 4);
+    requireVector(multipleOutput.left, { 0.25f, 0.25f, 0.25f, 0.25f },
+                  "Multiple wraps in one increment changed");
+
+    ModelOptions shortLoop;
+    shortLoop.sampleStartFrame = 2;
+    shortLoop.loopEnabled = true;
+    shortLoop.loopStartFrame = 2;
+    shortLoop.loopEndFrame = 3;
+    const auto shortModel = buildModel({ 0.0f, 1.0f, 2.0f, 3.0f }, shortLoop);
+    drs::engine::SamplerVoice shortVoice;
+    require(shortVoice.start(*shortModel, startRequest()), "One-frame loop should start.");
+    StereoOutput shortOutput(4);
+    shortVoice.render(shortOutput.view(), 0, 4);
+    requireVector(shortOutput.left, { 0.5f, 0.5f, 0.5f, 0.5f },
+                  "One-frame loop traversal changed");
+
+    ModelOptions afterLoop;
+    afterLoop.sampleStartFrame = 5;
+    afterLoop.loopEnabled = true;
+    afterLoop.loopStartFrame = 1;
+    afterLoop.loopEndFrame = 4;
+    const auto afterModel = buildModel({ 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f }, afterLoop);
+    drs::engine::SamplerVoice afterVoice;
+    require(afterVoice.start(*afterModel, startRequest()), "Post-loop start voice should start.");
+    StereoOutput afterOutput(4);
+    const auto afterResult = afterVoice.render(afterOutput.view(), 0, 4);
+    require(afterResult.mixedFrameCount == 3 && afterResult.voiceFinished,
+            "A start at/after loop end must play the natural tail without wrapping.");
+    requireVector(afterOutput.left, { 1.25f, 1.5f, 1.75f, 0.0f },
+                  "Post-loop natural tail changed");
+}
+
+void runReleaseLawMatrix()
+{
+    ModelOptions loop;
+    loop.loopEnabled = true;
+    loop.loopStartFrame = 0;
+    loop.loopEndFrame = 16;
+    const auto model = buildModel(std::vector<float>(16, 1.0f), loop);
+    drs::engine::SamplerVoice voice;
+    require(voice.start(*model, startRequest()) && voice.beginRelease(),
+            "Looping voice should enter compatibility release.");
+    require(voice.isReleasing()
+                && voice.getReleaseSamplesTotal() == 2048
+                && voice.getReleaseSamplesRemaining() == 2048,
+            "Compatibility release length changed.");
+    StereoOutput output(drs::engine::SamplerVoice::compatibilityReleaseSampleCount);
+    const auto result = voice.render(output.view(), 0,
+                                     drs::engine::SamplerVoice::compatibilityReleaseSampleCount);
+    require(result.mixedFrameCount == 2048 && result.voiceFinished
+                && voice.getReleaseSamplesRemaining() == 0,
+            "Release must finish after exactly 2,048 rendered samples.");
+    requireNear(output.left.front(), 0.25f, "First release sample must remain unity.");
+    requireNear(output.left[1], 0.25f * 2047.0f / 2048.0f,
+                "Second release sample changed.");
+    requireNear(output.left.back(), 0.25f / 2048.0f,
+                "Final release sample changed.");
+
+    drs::engine::SamplerVoice idempotent;
+    require(idempotent.start(*model, startRequest()) && idempotent.beginRelease(),
+            "Idempotent release voice should start.");
+    StereoOutput prefix(10);
+    idempotent.render(prefix.view(), 0, 10);
+    require(idempotent.getReleaseSamplesRemaining() == 2038 && !idempotent.beginRelease()
+                && idempotent.getReleaseSamplesRemaining() == 2038,
+            "Repeated note-off must not restart the release envelope.");
+}
+
+void runReleasePartitionInvariance()
+{
+    ModelOptions loop;
+    loop.loopEnabled = true;
+    loop.loopStartFrame = 1;
+    loop.loopEndFrame = 5;
+    const auto model = buildModel({ 0.0f, 0.25f, 0.5f, 0.75f, 1.0f }, loop);
+    drs::engine::SamplerVoice contiguous;
+    drs::engine::SamplerVoice partitioned;
+    require(contiguous.start(*model, startRequest(61))
+                && partitioned.start(*model, startRequest(61))
+                && contiguous.beginRelease() && partitioned.beginRelease(),
+            "Partition release voices should start.");
+
+    StereoOutput contiguousOutput(2048);
+    StereoOutput partitionedOutput(2048);
+    contiguous.render(contiguousOutput.view(), 0, 2048);
+    partitioned.render(partitionedOutput.view(), 0, 1);
+    partitioned.render(partitionedOutput.view(), 1, 31);
+    partitioned.render(partitionedOutput.view(), 32, 256);
+    partitioned.render(partitionedOutput.view(), 288, 512);
+    partitioned.render(partitionedOutput.view(), 800, 1248);
+
+    requireVector(partitionedOutput.left, contiguousOutput.left,
+                  "Release/loop output changed across block partitions");
+    require(partitioned.getLifecycleState() == contiguous.getLifecycleState()
+                && partitioned.getReleaseSamplesRemaining() == 0
+                && contiguous.getReleaseSamplesRemaining() == 0,
+            "Release lifecycle changed across block partitions.");
+}
+
+void runPoolLifecycleMatrix()
+{
+    ModelOptions loop;
+    loop.loopEnabled = true;
+    loop.loopStartFrame = 0;
+    loop.loopEndFrame = 8;
+    const auto loopModel = buildModel(std::vector<float>(8, 1.0f), loop);
+    drs::engine::SamplerVoicePool pool;
+    require(pool.prepare(*loopModel, 48000.0), "Lifecycle pool should prepare.");
+    drs::engine::SamplerEventBlock events;
+    events.push(noteOn(1));
+    events.push(noteOff(3));
+    StereoOutput output(6);
+    auto result = pool.renderBlock(output.view(), events.view());
+    require(result.render.releasedVoiceCount == 1 && result.releasingVoiceCount == 1,
+            "Note-off must enter release at its exact event boundary.");
+    requireVector(output.left,
+                  { 0.0f, 0.25f, 0.25f, 0.25f,
+                    0.25f * 2047.0f / 2048.0f,
+                    0.25f * 2046.0f / 2048.0f },
+                  "Pool release boundary changed");
+
+    events.clear();
+    StereoOutput tail(2045);
+    result = pool.renderBlock(tail.view(), events.view());
+    require(result.render.completedVoiceCount == 1
+                && result.finishedVoiceCount == 1
+                && result.releasingVoiceCount == 0,
+            "Release completion must reclaim the slot into explicit finished state.");
+
+    const auto naturalModel = buildModel({ 1.0f, 1.0f, 1.0f });
+    drs::engine::SamplerVoicePool naturalPool;
+    require(naturalPool.prepare(*naturalModel, 48000.0), "Natural-end pool should prepare.");
+    events.push(noteOn(0));
+    StereoOutput naturalOutput(4);
+    result = naturalPool.renderBlock(naturalOutput.view(), events.view());
+    require(result.render.completedVoiceCount == 1 && result.finishedVoiceCount == 1,
+            "Natural sample end must produce one completed finished slot.");
+    requireVector(naturalOutput.left, { 0.25f, 0.25f, 0.25f, 0.0f },
+                  "Natural sample completion changed");
+}
+
+void runStealAndRepeatedResetMatrix()
+{
+    ModelOptions loop;
+    loop.loopEnabled = true;
+    loop.loopStartFrame = 0;
+    loop.loopEndFrame = 32;
+    const auto model = buildModel(std::vector<float>(32, 1.0f), loop);
+    const auto modelUseCount = model.use_count();
+    drs::engine::SamplerVoicePool pool;
+    require(pool.prepare(*model, 48000.0), "Steal/reset pool should prepare.");
+    drs::engine::SamplerEventBlock events;
+    for (std::size_t index = 0; index < drs::engine::SamplerVoicePool::capacity; ++index)
+        events.push(noteOn(0, 60));
+    StereoOutput fillOutput(1);
+    pool.renderBlock(fillOutput.view(), events.view());
+
+    events.clear();
+    events.push(noteOff(0, 60));
+    events.push(noteOn(0, 62));
+    StereoOutput stealOutput(1);
+    auto result = pool.renderBlock(stealOutput.view(), events.view());
+    require(result.render.releasedVoiceCount == 24
+                && result.render.stolenVoiceCount == 1
+                && result.activeVoiceCount == 1
+                && result.releasingVoiceCount == 23,
+            "Stealing during release must choose one oldest releasing voice.");
+
+    events.clear();
+    events.push(resetEvent(2));
+    events.push(resetEvent(2));
+    StereoOutput resetOutput(5);
+    result = pool.renderBlock(resetOutput.view(), events.view());
+    require(result.resetVoiceCount == 24
+                && result.activeVoiceCount == 0
+                && result.releasingVoiceCount == 0
+                && pool.finishedVoiceCount() == 0,
+            "Repeated emergency reset must be idempotent after the first clear.");
+    require(model.use_count() == modelUseCount,
+            "Steal/reset must not copy or release immutable model ownership on audio.");
+
+    events.clear();
+    StereoOutput silentOutput(4);
+    result = pool.renderBlock(silentOutput.view(), events.view());
+    require(result.accepted && result.render.completedVoiceCount == 0,
+            "Post-reset empty render should remain stable.");
+    requireVector(silentOutput.left, { 0.0f, 0.0f, 0.0f, 0.0f },
+                  "Post-reset output must remain silent");
+}
+} // namespace
+
+int main()
+{
+    try
+    {
+        runLoopBoundaryMatrix();
+        runReleaseLawMatrix();
+        runReleasePartitionInvariance();
+        runPoolLifecycleMatrix();
+        runStealAndRepeatedResetMatrix();
+        std::cout << "Sprint 4.4 loop, release, and voice-lifecycle matrix passed." << std::endl;
+        return 0;
+    }
+    catch (const std::exception& exception)
+    {
+        std::cerr << exception.what() << std::endl;
+        return 1;
+    }
+}

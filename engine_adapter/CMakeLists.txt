@@ -148,6 +148,24 @@ target_compile_definitions(drs_sample_import
 
 target_compile_features(drs_sample_import PUBLIC cxx_std_17)
 
+add_library(drs_sampler_core STATIC
+    src/SamplerPlaybackContext.cpp
+    src/SamplerRenderModel.cpp
+    src/SamplerVoice.cpp
+    src/SamplerVoicePool.cpp
+    include/drs/engine/SamplerPlaybackContext.h
+    include/drs/engine/SamplerRenderModel.h
+    include/drs/engine/SamplerVoice.h
+    include/drs/engine/SamplerVoicePool.h
+)
+
+target_include_directories(drs_sampler_core
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_compile_features(drs_sampler_core PUBLIC cxx_std_17)
+
 add_library(drs_engine_adapter STATIC
     src/AuthoringSession.cpp
     src/DraftPlaybackContract.cpp
@@ -221,6 +239,10 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     src/RuntimeStreamingService.cpp
     src/RuntimeStream.cpp
     src/RuntimeVoice.cpp
+    src/SamplerPlaybackContext.cpp
+    src/SamplerRenderModel.cpp
+    src/SamplerVoice.cpp
+    src/SamplerVoicePool.cpp
     src/SampleImport.cpp
     include/drs/engine/AuthoringSession.h
     include/drs/engine/DraftPlaybackContract.h
@@ -239,7 +261,11 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     include/drs/engine/RuntimeStreamingService.h
     include/drs/engine/RuntimeStream.h
     include/drs/engine/RuntimeVoice.h
+    include/drs/engine/SamplerPlaybackContext.h
     include/drs/engine/SampleImport.h
+    include/drs/engine/SamplerRenderModel.h
+    include/drs/engine/SamplerVoice.h
+    include/drs/engine/SamplerVoicePool.h
 )
 
 set_target_properties(drs_hise_frontend_bridge PROPERTIES
@@ -247,6 +273,10 @@ set_target_properties(drs_hise_frontend_bridge PROPERTIES
 )
 
 set_target_properties(drs_sample_import PROPERTIES
+    FOLDER "Product"
+)
+
+set_target_properties(drs_sampler_core PROPERTIES
     FOLDER "Product"
 )
 

@@ -333,6 +333,91 @@ add_test(
     COMMAND drs_sprint4_entry_shell_parity_tests
 )
 
+# Sprint 4.1 renderer boundary and immutable render-model matrix.
+add_executable(drs_sprint4_render_model_tests
+    src/Sprint4RenderModelTests.cpp
+)
+
+target_link_libraries(drs_sprint4_render_model_tests
+    PRIVATE
+        drs_sampler_core
+)
+
+target_compile_features(drs_sprint4_render_model_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint4.render_model
+    COMMAND drs_sprint4_render_model_tests
+)
+
+# Sprint 4.2 deterministic single-voice DSP and compatibility-vector matrix.
+add_executable(drs_sprint4_voice_kernel_tests
+    src/Sprint4VoiceKernelTests.cpp
+)
+
+target_link_libraries(drs_sprint4_voice_kernel_tests
+    PRIVATE
+        drs_sampler_core
+)
+
+target_compile_features(drs_sprint4_voice_kernel_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint4.voice_kernel
+    COMMAND drs_sprint4_voice_kernel_tests
+)
+
+# Sprint 4.3 fixed voice-pool, bounded event scratch, and sample-accurate scheduling matrix.
+add_executable(drs_sprint4_scheduler_tests
+    src/Sprint4VoicePoolTests.cpp
+)
+
+target_link_libraries(drs_sprint4_scheduler_tests
+    PRIVATE
+        drs_sampler_core
+)
+
+target_compile_features(drs_sprint4_scheduler_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint4.scheduler
+    COMMAND drs_sprint4_scheduler_tests
+)
+
+# Sprint 4.4 loop traversal, release envelope, and voice-lifecycle matrix.
+add_executable(drs_sprint4_voice_lifecycle_tests
+    src/Sprint4VoiceLifecycleTests.cpp
+)
+
+target_link_libraries(drs_sprint4_voice_lifecycle_tests
+    PRIVATE
+        drs_sampler_core
+)
+
+target_compile_features(drs_sprint4_voice_lifecycle_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint4.voice_lifecycle
+    COMMAND drs_sprint4_voice_lifecycle_tests
+)
+
+# Sprint 4.5 isolated Preview/Performance contexts and activation-lifetime matrix.
+add_executable(drs_sprint4_playback_context_tests
+    src/Sprint4PlaybackContextTests.cpp
+)
+
+target_link_libraries(drs_sprint4_playback_context_tests
+    PRIVATE
+        drs_sampler_core
+)
+
+target_compile_features(drs_sprint4_playback_context_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint4.playback_context
+    COMMAND drs_sprint4_playback_context_tests
+)
+
 juce_add_console_app(drs_phase1_realtime_safety_tests
     PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Realtime Safety Tests"
 )
@@ -1181,6 +1266,11 @@ add_dependencies(drs_all_tests
     drs_sprint4_entry_diagnostics_concurrency_tests
     drs_sprint4_entry_realtime_guard_tests
     drs_sprint4_entry_shell_parity_tests
+    drs_sprint4_render_model_tests
+    drs_sprint4_voice_kernel_tests
+    drs_sprint4_scheduler_tests
+    drs_sprint4_voice_lifecycle_tests
+    drs_sprint4_playback_context_tests
     drs_phase0_smoke_tests
     drs_phase1_runtime_contract_tests
     drs_phase1_draft_playback_contract_tests
