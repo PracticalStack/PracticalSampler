@@ -57,6 +57,12 @@ audition commands request preparation explicitly, while every note source enters
 adapter. The direct audit now reports exactly one remaining seam: string-only public presentation
 state, owned by Mini Sprint 5.7.
 
+## Mini Sprint 5.6 update
+
+Last-known-good identity, structured failure families, repair, resource pressure, and project
+lifetime are implemented without replacing the presentation-state seam assigned to 5.7. The direct
+audit therefore remains intentionally red at exactly one finding.
+
 The green `drs.sprint5.preview_contract` target is registered immediately. It freezes request scope,
 request identity, legal preparation transitions, and active-note policy while the red implementation
 gaps are resolved incrementally.

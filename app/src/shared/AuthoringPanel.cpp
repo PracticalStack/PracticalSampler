@@ -133,6 +133,12 @@ juce::String formatAuthoringPreviewStatus(const drs::app::AuthoringPreviewStatus
     if (status.activeRevision > 0)
         text += " | active r" + juce::String(static_cast<int>(status.activeRevision));
 
+    if (status.usingLastKnownGood)
+        text += " | auditioning last good r" + juce::String(static_cast<int>(status.audibleRevision));
+
+    if (status.failedRevision > 0 && status.failedRevision != status.activeRevision)
+        text += " | failed r" + juce::String(static_cast<int>(status.failedRevision));
+
     if (status.pendingRevision > 0 && status.pendingRevision != status.activeRevision)
         text += " | pending r" + juce::String(static_cast<int>(status.pendingRevision));
 

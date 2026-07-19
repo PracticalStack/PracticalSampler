@@ -645,6 +645,32 @@ add_test(
     COMMAND drs_sprint5_preview_audition_tests
 )
 
+juce_add_console_app(drs_sprint5_preview_recovery_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Sprint 5 Preview Recovery Tests"
+)
+
+target_sources(drs_sprint5_preview_recovery_tests
+    PRIVATE
+        src/Sprint5PreviewRecoveryTests.cpp
+)
+
+target_link_libraries(drs_sprint5_preview_recovery_tests
+    PRIVATE
+        drs_plugin_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_sprint5_preview_recovery_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint5.preview_recovery
+    COMMAND drs_sprint5_preview_recovery_tests
+)
+
 # Direct-only expected-red audit. Later Sprint 5 slices retire each detected seam;
 # do not register this target with CTest or drs_all_tests while it is intentionally red.
 add_executable(drs_sprint5_preview_contract_red_tests
@@ -1520,6 +1546,7 @@ add_dependencies(drs_all_tests
     drs_sprint5_preview_coalescing_tests
     drs_sprint5_preview_preparation_tests
     drs_sprint5_preview_audition_tests
+    drs_sprint5_preview_recovery_tests
     drs_phase0_smoke_tests
     drs_phase1_runtime_contract_tests
     drs_phase1_draft_playback_contract_tests

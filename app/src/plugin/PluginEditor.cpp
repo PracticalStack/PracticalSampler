@@ -629,7 +629,7 @@ void Editor::closeProject()
                                         return;
 
                                     safeThis->processor.setAuthoringProjectFile({});
-                                    safeThis->processor.replaceAuthoringProject(safeThis->buildUnloadedProjectState());
+                                    safeThis->processor.closeAuthoringProject(safeThis->buildUnloadedProjectState());
                                     safeThis->refreshProjectViews();
                                 });
 }

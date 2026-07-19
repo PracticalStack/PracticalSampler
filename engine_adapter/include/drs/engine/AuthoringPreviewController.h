@@ -1,6 +1,7 @@
 #pragma once
 
 #include "drs/engine/AuthoringPreviewContract.h"
+#include "drs/engine/AuthoringPreviewRecovery.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -29,6 +30,12 @@ struct AuthoringPreviewControllerSnapshot
 {
     bool hasRequest = false;
     AuthoringPreviewRequest currentRequest;
+    bool hasActiveRequest = false;
+    AuthoringPreviewRequestIdentity activeRequestIdentity;
+    std::uint64_t activePreparedBuildId = 0;
+    bool hasFailedRequest = false;
+    AuthoringPreviewRequestIdentity failedRequestIdentity;
+    AuthoringPreviewFailureFinding failureFinding;
     AuthoringPreviewPreparationState preparationState = AuthoringPreviewPreparationState::idle;
     AuthoringPreviewActivationState activationState = AuthoringPreviewActivationState::noActivation;
     std::uint64_t acceptedPreparedBuildId = 0;
@@ -90,6 +97,8 @@ public:
     bool markActivationPending(const AuthoringPreviewRequestIdentity& identity);
     bool markActive(const AuthoringPreviewRequestIdentity& identity);
     bool fail(const AuthoringPreviewRequestIdentity& identity, std::string failureState);
+    bool fail(const AuthoringPreviewRequestIdentity& identity,
+              AuthoringPreviewFailureFinding finding);
     bool cancelCurrent();
     void recordWorkerCancellation();
     void reset(bool advanceCancellationGeneration = true);

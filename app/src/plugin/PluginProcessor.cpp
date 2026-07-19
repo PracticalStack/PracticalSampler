@@ -12,6 +12,7 @@
 #include <limits>
 #include <optional>
 #include <string_view>
+#include <utility>
 
 namespace drs::plugin
 {
@@ -67,6 +68,14 @@ std::uint64_t monotonicMicros()
 {
     return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
         std::chrono::steady_clock::now().time_since_epoch()).count());
+}
+
+template <typename Finding>
+drs::engine::AuthoringPreviewFailureFinding makePreviewFailureFinding(
+    const Finding& finding)
+{
+    return drs::engine::classifyAuthoringPreviewFailure(
+        finding.code, finding.path, finding.message);
 }
 
 drs::engine::AuthoringPreviewInvalidationCategory classifyPreviewInvalidation(
@@ -406,6 +415,8 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
     drs::engine::SamplerEventBlock performanceEvents;
     drs::engine::SamplerEventBlock authoringPreviewEvents;
     const auto frameCount = buffer.getNumSamples();
+    if (authoringPreviewCloseRequested.exchange(false, std::memory_order_acq_rel))
+        authoringPreviewPlaybackContext.closeAtBlockBoundary();
     drainRealtimeNoteEvents(performanceSurfaceNoteQueue, performanceEvents,
                             static_cast<std::uint32_t>(std::max(frameCount, 0)));
     drainRealtimeNoteEvents(authoringPreviewNoteQueue, authoringPreviewEvents,
@@ -668,13 +679,25 @@ drs::app::AuthoringWaveformPreview Processor::getAuthoringWaveformPreview()
 drs::app::AuthoringPreviewStatusSnapshot Processor::getAuthoringPreviewStatusSnapshot() const
 {
     const auto diagnostics = getRealtimeSafetySnapshot();
+    const auto controller = authoringPreviewController.getSnapshot();
     drs::app::AuthoringPreviewStatusSnapshot status;
     status.available = diagnostics.available;
     status.draftRevision = diagnostics.currentAuthoringPreviewDraftRevision;
     status.activeRevision = diagnostics.activeAuthoringPreviewRevision;
     status.pendingRevision = diagnostics.pendingAuthoringPreviewRevision;
+    status.requestedRevision = controller.hasRequest
+        ? controller.currentRequest.identity.draftRevision : 0;
+    status.failedRevision = controller.hasFailedRequest
+        ? controller.failedRequestIdentity.draftRevision : 0;
+    status.audibleRevision = status.activeRevision;
+    status.auditionAvailable = status.activeRevision != 0;
+    status.usingLastKnownGood = status.activeRevision != 0
+        && status.activeRevision != status.draftRevision;
     status.revisionState = diagnostics.authoringPreviewRevisionState;
     status.failureState = diagnostics.authoringPreviewFailureState;
+    status.failureFamily = drs::engine::toString(controller.failureFinding.family);
+    status.failureCode = controller.failureFinding.code;
+    status.failurePath = controller.failureFinding.path;
     const auto blockingHint = buildAuthoringPreviewBlockingHint(authoringSession, status.failureState);
     status.blockingPrerequisite = blockingHint.prerequisite;
     status.blockingGuidance = blockingHint.guidance;
@@ -688,6 +711,10 @@ drs::app::AuthoringImportResponsivenessSnapshot Processor::getAuthoringImportRes
 
 void Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project)
 {
+    const auto& previousProject = authoringSession.getProject();
+    const auto replacingDifferentProject = !previousProject.projectId.empty()
+        && !project.projectId.empty()
+        && previousProject.projectId != project.projectId;
     auto draftPlaybackProject = project;
     if (!engineFacade.replaceDraftPlaybackAuthoringProject(std::move(draftPlaybackProject)))
         return;
@@ -698,12 +725,35 @@ void Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
     authoringWaveformPreviewCache.clear();
     failedAuthoringPreviewRevision = std::numeric_limits<std::size_t>::max();
     failedAuthoringPreviewState.clear();
-    authoringPreviewController.reset();
+    if (replacingDifferentProject)
+    {
+        authoringPreviewController.reset();
+        authoringPreviewCommandAdapter.clearOwnership();
+        authoringPreviewCloseRequested.store(true, std::memory_order_release);
+    }
     authoringPreviewDirectAuditionRequested = false;
     authoringPreviewRequestedScope = drs::engine::AuthoringPreviewScope::selectedZone;
     observedDraftPlaybackProjectRevision = authoringSession.getDocumentState().revision;
     initializeAuthoringImportMetrics();
     serviceMessageThreadWork();
+    updateRealtimeSafetyState();
+}
+
+void Processor::closeAuthoringProject(drs::engine::RuntimeProjectModel unloadedProject)
+{
+    engineFacade.cancelPreviewPreparation("Authoring project closed");
+    engineFacade.closeDraftPlaybackProject();
+    authoringSession.replaceProject(std::move(unloadedProject));
+    authoringWaveformPreviewCache.clear();
+    authoringPreviewController.reset();
+    authoringPreviewCommandAdapter.clearOwnership();
+    authoringPreviewCloseRequested.store(true, std::memory_order_release);
+    failedAuthoringPreviewRevision = std::numeric_limits<std::size_t>::max();
+    failedAuthoringPreviewState.clear();
+    authoringPreviewDirectAuditionRequested = false;
+    authoringPreviewRequestedScope = drs::engine::AuthoringPreviewScope::selectedZone;
+    observedDraftPlaybackProjectRevision = authoringSession.getDocumentState().revision;
+    initializeAuthoringImportMetrics();
     updateRealtimeSafetyState();
 }
 
@@ -885,16 +935,22 @@ bool Processor::serviceMessageThreadWork()
             if (!draftStatus.preview.findings.empty())
             {
                 const auto& finding = draftStatus.preview.findings.front();
-                failedAuthoringPreviewState = "[" + finding.code + "] " + finding.message;
+                const auto previewFinding = makePreviewFailureFinding(finding);
+                failedAuthoringPreviewState
+                    = drs::engine::formatAuthoringPreviewFailure(previewFinding);
+                authoringPreviewController.fail(launch.request.identity, previewFinding);
             }
             else
             {
-                failedAuthoringPreviewState = "[preview-worker-request-rejected] "
-                    + (draftStatus.lastEvent.empty()
-                           ? std::string("Preview worker request was rejected.")
-                           : draftStatus.lastEvent);
+                const auto previewFinding = drs::engine::classifyAuthoringPreviewFailure(
+                    "preview-worker-request-rejected", "worker",
+                    draftStatus.lastEvent.empty()
+                        ? std::string("Preview worker request was rejected.")
+                        : draftStatus.lastEvent);
+                failedAuthoringPreviewState
+                    = drs::engine::formatAuthoringPreviewFailure(previewFinding);
+                authoringPreviewController.fail(launch.request.identity, previewFinding);
             }
-            authoringPreviewController.fail(launch.request.identity, failedAuthoringPreviewState);
             synchronizedAuthoringPreview = true;
         }
         controllerSnapshot = authoringPreviewController.getSnapshot();
@@ -920,9 +976,11 @@ bool Processor::serviceMessageThreadWork()
         {
             const auto& finding = draftStatus.preview.findings.front();
             failedAuthoringPreviewRevision = authoringRevision;
-            failedAuthoringPreviewState = "[" + finding.code + "] " + finding.message;
+            const auto previewFinding = makePreviewFailureFinding(finding);
+            failedAuthoringPreviewState
+                = drs::engine::formatAuthoringPreviewFailure(previewFinding);
             authoringPreviewController.fail(controllerSnapshot.currentRequest.identity,
-                                             failedAuthoringPreviewState);
+                                             previewFinding);
             synchronizedAuthoringPreview = true;
         }
     }
@@ -1082,11 +1140,11 @@ bool Processor::stageAuthoringPreviewActivation(const drs::engine::AuthoringPrev
     diagnosticsRetiredActivationCount.fetch_add(reclaimed, std::memory_order_relaxed);
     diagnosticsReclaimedActivationPayloadCount.fetch_add(reclaimed, std::memory_order_relaxed);
     const auto currentRevision = authoringSession.getDocumentState().revision;
-    const auto failPreviewActivation = [&](const std::string& state)
+    const auto failPreviewActivation = [&](drs::engine::AuthoringPreviewFailureFinding finding)
     {
         failedAuthoringPreviewRevision = currentRevision;
-        failedAuthoringPreviewState = state.empty() ? "Authoring preview preparation failed." : state;
-        authoringPreviewController.fail(request.identity, failedAuthoringPreviewState);
+        failedAuthoringPreviewState = drs::engine::formatAuthoringPreviewFailure(finding);
+        authoringPreviewController.fail(request.identity, std::move(finding));
         return false;
     };
 
@@ -1099,17 +1157,18 @@ bool Processor::stageAuthoringPreviewActivation(const drs::engine::AuthoringPrev
     if (!preparation.prepared || preparation.model == nullptr)
     {
         if (preparation.findings.empty())
-            return failPreviewActivation("Authoring preview preparation failed without a finding.");
-        const auto& finding = preparation.findings.front();
-        return failPreviewActivation("[" + finding.code + "] " + finding.message
-                                     + (finding.path.empty() ? std::string {}
-                                                             : " (" + finding.path + ")"));
+            return failPreviewActivation(drs::engine::classifyAuthoringPreviewFailure(
+                "preview-preparation-finding-missing", "preparation",
+                "Authoring Preview preparation failed without a finding."));
+        return failPreviewActivation(makePreviewFailureFinding(preparation.findings.front()));
     }
     if (!authoringPreviewController.acceptPrepared(request.identity,
                                                     preparation.scopedPayload->preparedBuildId))
         return false;
     if (!authoringPreviewPlaybackContext.stageActivation(preparation.model))
-        return failPreviewActivation("Authoring preview activation slots are exhausted.");
+        return failPreviewActivation(drs::engine::classifyAuthoringPreviewFailure(
+            "preview-activation-slot-exhausted", "preview.activationSlots",
+            "Authoring Preview activation slots are exhausted."));
     if (!authoringPreviewController.markActivationPending(request.identity))
         return false;
 

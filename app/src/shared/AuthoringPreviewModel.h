@@ -34,8 +34,16 @@ struct AuthoringPreviewStatusSnapshot
     std::size_t draftRevision = 0;
     std::size_t activeRevision = 0;
     std::size_t pendingRevision = 0;
+    std::size_t requestedRevision = 0;
+    std::size_t failedRevision = 0;
+    std::size_t audibleRevision = 0;
+    bool auditionAvailable = false;
+    bool usingLastKnownGood = false;
     std::string revisionState;
     std::string failureState;
+    std::string failureFamily;
+    std::string failureCode;
+    std::string failurePath;
     std::string blockingPrerequisite;
     std::string blockingGuidance;
 };

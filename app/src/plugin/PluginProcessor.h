@@ -151,6 +151,7 @@ public:
     }
     drs::app::AuthoringImportResponsivenessSnapshot getAuthoringImportResponsivenessSnapshot() const;
     void replaceAuthoringProject(drs::engine::RuntimeProjectModel project);
+    void closeAuthoringProject(drs::engine::RuntimeProjectModel unloadedProject);
     const juce::File& getAuthoringProjectFile() const { return authoringProjectFile; }
     void setAuthoringProjectFile(juce::File file) { authoringProjectFile = std::move(file); }
     void setMacroValueFromShell(const std::string& macroId, double value);
@@ -337,6 +338,7 @@ private:
     std::atomic<std::uint64_t> diagnosticsMaxProcessBlockMicros { 0 };
     std::atomic<std::size_t> diagnosticsOverBudgetCallbackCount { 0 };
     std::atomic<std::size_t> diagnosticsCurrentAuthoringPreviewDraftRevision { 0 };
+    std::atomic<bool> authoringPreviewCloseRequested { false };
     std::uint64_t lastPerformanceRenderMicros = 0;
     std::uint64_t maxPerformanceRenderMicros = 0;
     std::uint64_t lastAuthoringPreviewRenderMicros = 0;

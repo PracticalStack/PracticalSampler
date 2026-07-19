@@ -99,6 +99,9 @@ AuthoringPreviewRequestResult AuthoringPreviewController::request(
     snapshot.coalescingBurstStartedAtMicros = burstStartedAt;
     snapshot.launchEligibleAtMicros = std::min(windowDeadline, maximumDeadline);
     snapshot.failureState.clear();
+    snapshot.hasFailedRequest = false;
+    snapshot.failedRequestIdentity = {};
+    snapshot.failureFinding = {};
     snapshot.pendingDepth = 1;
     snapshot.maximumPendingDepth = std::max(snapshot.maximumPendingDepth, snapshot.pendingDepth);
     ++snapshot.requestedCount;
@@ -167,6 +170,9 @@ bool AuthoringPreviewController::acceptPrepared(const AuthoringPreviewRequestIde
 
     snapshot.acceptedPreparedBuildId = preparedBuildId;
     snapshot.failureState.clear();
+    snapshot.hasFailedRequest = false;
+    snapshot.failedRequestIdentity = {};
+    snapshot.failureFinding = {};
     snapshot.pendingDepth = 0;
     ++snapshot.acceptedCount;
     if (snapshot.reusablePreparedBuildId == preparedBuildId)
@@ -192,12 +198,25 @@ bool AuthoringPreviewController::markActive(const AuthoringPreviewRequestIdentit
         || snapshot.activationState != AuthoringPreviewActivationState::pending)
         return false;
     snapshot.activationState = AuthoringPreviewActivationState::active;
+    snapshot.hasActiveRequest = true;
+    snapshot.activeRequestIdentity = identity;
+    snapshot.activePreparedBuildId = snapshot.acceptedPreparedBuildId;
     ++snapshot.activationCount;
     return true;
 }
 
 bool AuthoringPreviewController::fail(const AuthoringPreviewRequestIdentity& identity,
                                       std::string failureState)
+{
+    auto finding = classifyAuthoringPreviewFailure("preview-preparation-failed", {}, failureState);
+    if (!fail(identity, std::move(finding)))
+        return false;
+    snapshot.failureState = std::move(failureState);
+    return true;
+}
+
+bool AuthoringPreviewController::fail(const AuthoringPreviewRequestIdentity& identity,
+                                      AuthoringPreviewFailureFinding finding)
 {
     if (!isCurrent(identity))
     {
@@ -212,7 +231,10 @@ bool AuthoringPreviewController::fail(const AuthoringPreviewRequestIdentity& ide
     }
     if (!transitionTo(AuthoringPreviewPreparationState::failed))
         return false;
-    snapshot.failureState = std::move(failureState);
+    snapshot.failureFinding = std::move(finding);
+    snapshot.failureState = formatAuthoringPreviewFailure(snapshot.failureFinding);
+    snapshot.hasFailedRequest = true;
+    snapshot.failedRequestIdentity = identity;
     snapshot.activationState = AuthoringPreviewActivationState::noActivation;
     snapshot.pendingDepth = 0;
     recordCompletion(identity, AuthoringPreviewPreparationState::failed, 0, false);

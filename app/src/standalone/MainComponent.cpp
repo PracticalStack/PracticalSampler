@@ -689,7 +689,7 @@ void MainComponent::closeProject()
             return;
 
         safeThis->currentProjectFile = {};
-        safeThis->processor.replaceAuthoringProject(safeThis->buildUnloadedProjectState());
+        safeThis->processor.closeAuthoringProject(safeThis->buildUnloadedProjectState());
         safeThis->refreshProjectViews();
     });
 }
