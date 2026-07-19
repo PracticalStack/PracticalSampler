@@ -205,6 +205,10 @@ void runProcessorHandoffMatrix()
 {
     drs::plugin::Processor processor;
     processor.prepareToPlay(48000.0, 128);
+    processor.getEngineFacade().resetSessionStateToDefault();
+    require(processor.getEngineFacade().waitForPreparedPlaybackIdle()
+                && processor.serviceMessageThreadWork(),
+            "EG2 old-voice matrix should explicitly install the revision 0 Performance payload.");
     juce::AudioBuffer<float> buffer(2, 128);
     juce::MidiBuffer midi;
 

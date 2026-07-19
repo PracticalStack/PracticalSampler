@@ -340,6 +340,51 @@ void runRouteTopologyFailures()
         value.prepared.zones.push_back(value.prepared.zones[0]);
     });
 }
+
+void runRouteNormalizationOptions()
+{
+    RenderModelFixture fixture;
+    drs::engine::SamplerRenderModelBuildOptions options;
+    options.selectedZoneId = "zone-a";
+    options.selectedArticulationId = "sustain";
+    options.auditionSelectedZone = true;
+    options.midiNoteOffset = -7;
+    options.fixedVelocity = 96;
+    const auto normalized = drs::engine::buildSamplerRenderModel(fixture.makePayload(), options);
+    require(normalized.built && normalized.model != nullptr
+                && normalized.model->getRoutes().size() == 1
+                && normalized.model->getRoutes().front().keyLow == 0
+                && normalized.model->getRoutes().front().keyHigh == 127
+                && normalized.model->getRoutes().front().velocityLow == 1
+                && normalized.model->getRoutes().front().velocityHigh == 127
+                && normalized.model->getMidiNoteOffset() == -7
+                && normalized.model->getFixedVelocity() == 96,
+            "Message-owned route normalization should preserve routing vocabulary and expand selected-zone audition only.");
+
+    options.auditionSelectedZone = false;
+    const auto routed = drs::engine::buildSamplerRenderModel(fixture.makePayload(), options);
+    require(routed.built
+                && routed.model->getRoutes().front().keyLow == 36
+                && routed.model->getRoutes().front().keyHigh == 84,
+            "Performance normalization should preserve authored trigger ranges.");
+
+    options.selectedArticulationId = "missing-articulation";
+    const auto emptySelection = drs::engine::buildSamplerRenderModel(fixture.makePayload(), options);
+    require(!emptySelection.built && hasFinding(emptySelection, "render-model-route-selection-empty"),
+            "Unknown runtime route selection should be rejected before callback activation.");
+
+    options = {};
+    options.midiNoteOffset = 128;
+    const auto invalidOffset = drs::engine::buildSamplerRenderModel(fixture.makePayload(), options);
+    require(!invalidOffset.built && hasFinding(invalidOffset, "render-model-note-offset-invalid"),
+            "Out-of-range runtime note offsets should be rejected during model construction.");
+
+    options = {};
+    options.fixedVelocity = 128;
+    const auto invalidVelocity = drs::engine::buildSamplerRenderModel(fixture.makePayload(), options);
+    require(!invalidVelocity.built && hasFinding(invalidVelocity, "render-model-fixed-velocity-invalid"),
+            "Out-of-range fixed velocities should be rejected during model construction.");
+}
 } // namespace
 
 int main()
@@ -351,6 +396,7 @@ int main()
         runPayloadIdentityFailures();
         runSampleTopologyFailures();
         runRouteTopologyFailures();
+        runRouteNormalizationOptions();
         std::cout << "Sprint 4.1 immutable render-model boundary matrix passed." << std::endl;
         return 0;
     }

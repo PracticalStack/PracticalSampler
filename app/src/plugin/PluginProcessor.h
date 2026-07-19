@@ -2,8 +2,8 @@
 
 #include "drs/engine/AuthoringSession.h"
 #include "drs/engine/EngineFacade.h"
-#include "drs/engine/RuntimeStream.h"
 #include "drs/engine/SampleImport.h"
+#include "drs/engine/SamplerPlaybackContext.h"
 #include "plugin/RealtimeGuard.h"
 #include "shared/AuthoringPreviewModel.h"
 
@@ -144,20 +144,11 @@ public:
     void queuePerformanceSurfaceNoteOff(int midiNoteNumber);
     bool serviceMessageThreadWork();
     ProcessorRealtimeSafetySnapshot getRealtimeSafetySnapshot() const;
-    void clearReferencePlaybackCacheForTests();
     void setRealtimeGuardTestInjection(RealtimeGuardOperation operation);
     static constexpr RealtimeCallbackBudgetProfile getRealtimeCallbackBudgetProfile() { return {}; }
 
 private:
-    static constexpr std::size_t maxRealtimeActiveVoices = 24;
-    static constexpr std::size_t performanceActivationSlotCount = 4;
-    static constexpr std::size_t retiredActivationQueueCapacity = 8;
-
-    enum class VoiceSource
-    {
-        performance,
-        authoringPreview
-    };
+    static constexpr std::size_t maxRealtimeActiveVoices = drs::engine::SamplerVoicePool::capacity;
 
     struct QueuedRealtimeNoteEvent
     {
@@ -180,92 +171,23 @@ private:
         std::atomic<std::uint32_t> readIndex { 0 };
     };
 
-    struct LoadedReferenceSample
+    struct LoadedAuthoringSample
     {
         drs::engine::ImportedSampleData sample;
-    };
-
-    struct ActiveRenderVoice
-    {
-        std::uint64_t renderVoiceId = 0;
-        int sourceMidiNote = 0;
-        int effectiveMidiNote = 0;
-        int effectiveVelocity = 0;
-        int rootKey = 60;
-        VoiceSource source = VoiceSource::performance;
-        const LoadedReferenceSample* loadedSample = nullptr;
-        std::shared_ptr<const LoadedReferenceSample> retainedLoadedSample;
-        double positionFrames = 0.0;
-        double incrementFrames = 1.0;
-        float baseGain = 0.0f;
-        bool releasing = false;
-        int releaseSamplesRemaining = 0;
-        int releaseSamplesTotal = 0;
-        int retainedPerformanceActivationSlotIndex = -1;
-    };
-
-    struct PerformanceRenderActivation
-    {
-        bool ready = false;
-        std::uint64_t activationSerial = 0;
-        std::size_t publishedRevision = 0;
-        std::uint64_t publishedBuildId = 0;
-        std::uint64_t preparedBuildId = 0;
-        std::string publishedContentDigest;
-        std::string preparedContentDigest;
-        drs::engine::PlaybackActivationPayloadPtr payload;
-        std::uint64_t payloadRetainedBytes = 0;
-        drs::engine::RuntimeSessionStateSnapshot sessionState;
-    };
-
-    struct AuthoringPreviewRenderActivation
-    {
-        bool ready = false;
-        std::uint64_t activationSerial = 0;
-        std::size_t projectRevision = 0;
-        std::string zoneId;
-        std::string sampleId;
-        int rootKey = 60;
-        double gainDb = 0.0;
-        std::shared_ptr<const LoadedReferenceSample> preparedSample;
-        drs::engine::PlaybackActivationPayloadPtr payload;
-        std::uint64_t payloadRetainedBytes = 0;
     };
 
     static juce::String buildMacroParameterId(const std::string& macroId);
     static juce::AudioProcessorValueTreeState::ParameterLayout buildParameterLayout(
         const drs::engine::EngineFacade& engineFacade);
-    bool ensureReferencePlaybackAssetsLoaded(bool invokedFromAudioThread = false);
-    void initializeReferencePlaybackAssets(bool invokedFromAudioThread);
     bool ensureSelectedAuthoringSampleLoaded(bool invokedFromAudioThread);
-    bool startAuthoringVoiceForMidiMessage(int midiNoteNumber, float velocity);
-    void startVoiceForMidiMessage(int midiNoteNumber);
-    std::vector<ActiveRenderVoice>& getVoicePool(VoiceSource source);
-    const std::vector<ActiveRenderVoice>& getVoicePool(VoiceSource source) const;
-    void releaseVoicesForMidiNote(int midiNoteNumber, VoiceSource source);
-    void clearVoices(VoiceSource source);
-    void clearVoices(VoiceSource source, bool updateState);
-    void releasePerformanceActivationLease(ActiveRenderVoice& voice);
-    void renderBlockRange(juce::AudioBuffer<float>& buffer, int startSample, int sampleCount);
-    void drainRealtimeNoteEvents(RealtimeNoteEventQueue& queue, VoiceSource source);
+    void drainRealtimeNoteEvents(RealtimeNoteEventQueue& queue,
+                                 drs::engine::SamplerEventBlock& destination) noexcept;
     bool synchronizeAuthoringPreviewActivation(bool installImmediately);
     bool stageAuthoringPreviewActivation(bool installImmediately);
-    const AuthoringPreviewRenderActivation* applyPendingAuthoringPreviewActivationAtBlockBoundary();
-    const AuthoringPreviewRenderActivation* getActiveAuthoringPreviewActivation() const;
-    bool enqueueRetiredAuthoringPreviewActivationSlot(int slotIndex);
-    void drainRetiredAuthoringPreviewActivationSlots();
-    int acquireAuthoringPreviewActivationSlot();
-    void releaseAuthoringPreviewActivationSlot(int slotIndex);
     bool synchronizePerformanceActivation(bool installImmediately);
     bool stagePerformanceActivation(const drs::engine::EnginePerformanceSnapshot& performanceSnapshot,
                                     const drs::engine::RuntimeSessionStateSnapshot& sessionState,
                                     bool installImmediately);
-    const PerformanceRenderActivation* applyPendingPerformanceActivationAtBlockBoundary();
-    const PerformanceRenderActivation* getActivePerformanceActivation() const;
-    bool enqueueRetiredPerformanceActivationSlot(int slotIndex);
-    void drainRetiredPerformanceActivationSlots();
-    int acquirePerformanceActivationSlot();
-    void releasePerformanceActivationSlot(int slotIndex);
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     void syncEngineFromParameters();
     void syncParametersFromEngine();
@@ -331,17 +253,16 @@ private:
 
     drs::engine::AuthoringSession authoringSession;
     drs::engine::EngineFacade engineFacade;
-    drs::engine::RuntimeManifestLoadResult referenceManifest;
-    drs::engine::RuntimeStreamLoadResult referenceStream;
-    std::unordered_map<std::string, LoadedReferenceSample> loadedSamples;
-    std::unordered_map<std::string, LoadedReferenceSample> authoringLoadedSamples;
+    std::unordered_map<std::string, LoadedAuthoringSample> authoringLoadedSamples;
     std::unordered_map<std::string, drs::app::AuthoringWaveformPreview> authoringWaveformPreviewCache;
-    std::vector<ActiveRenderVoice> performanceActiveVoices;
-    std::vector<ActiveRenderVoice> authoringPreviewActiveVoices;
+    drs::engine::SamplerPlaybackContext performancePlaybackContext {
+        drs::engine::PlaybackActivationLane::performance
+    };
+    drs::engine::SamplerPlaybackContext authoringPreviewPlaybackContext {
+        drs::engine::PlaybackActivationLane::preview
+    };
     RealtimeNoteEventQueue authoringPreviewNoteQueue;
     RealtimeNoteEventQueue performanceSurfaceNoteQueue;
-    juce::MidiBuffer performanceMidiScratchBuffer;
-    juce::MidiBuffer authoringPreviewMidiScratchBuffer;
     juce::AudioProcessorValueTreeState parameterState;
     drs::app::AuthoringImportResponsivenessSnapshot authoringImportResponsivenessSnapshot;
     juce::File authoringProjectFile;
@@ -365,44 +286,15 @@ private:
     std::atomic<std::uint64_t> diagnosticsMaxProcessBlockMicros { 0 };
     std::atomic<std::size_t> diagnosticsOverBudgetCallbackCount { 0 };
     std::atomic<std::size_t> diagnosticsCurrentAuthoringPreviewDraftRevision { 0 };
-    std::array<AuthoringPreviewRenderActivation, performanceActivationSlotCount> authoringPreviewActivationSlots {};
-    std::array<std::atomic<std::size_t>, performanceActivationSlotCount> authoringPreviewDiagnosticRevisions {};
-    std::array<std::atomic<std::uint64_t>, performanceActivationSlotCount> authoringPreviewDiagnosticPayloadBytes {};
-    std::array<int, performanceActivationSlotCount> freeAuthoringPreviewActivationSlots { 0, 1, 2, 3 };
-    std::size_t freeAuthoringPreviewActivationSlotCount = performanceActivationSlotCount;
-    std::array<int, retiredActivationQueueCapacity> retiredAuthoringPreviewActivationSlots {};
-    std::atomic<std::uint32_t> retiredAuthoringPreviewActivationWriteIndex { 0 };
-    std::atomic<std::uint32_t> retiredAuthoringPreviewActivationReadIndex { 0 };
-    std::atomic<int> pendingAuthoringPreviewActivationSlotIndex { -1 };
-    std::atomic<int> activeAuthoringPreviewActivationSlotIndex { -1 };
-    std::uint64_t nextAuthoringPreviewActivationSerial = 1;
-    std::array<PerformanceRenderActivation, performanceActivationSlotCount> performanceActivationSlots {};
-    std::array<std::atomic<std::size_t>, performanceActivationSlotCount> performanceDiagnosticRevisions {};
-    std::array<std::atomic<std::uint64_t>, performanceActivationSlotCount> performanceDiagnosticPreparedBuildIds {};
-    std::array<std::atomic<std::uint64_t>, performanceActivationSlotCount> performanceDiagnosticPayloadBytes {};
-    std::array<std::atomic<std::uint32_t>, performanceActivationSlotCount> performanceActivationVoiceLeaseCounts {};
-    std::array<int, performanceActivationSlotCount> freePerformanceActivationSlots { 0, 1, 2, 3 };
-    std::size_t freePerformanceActivationSlotCount = performanceActivationSlotCount;
-    std::array<int, retiredActivationQueueCapacity> retiredPerformanceActivationSlots {};
-    std::atomic<std::uint32_t> retiredPerformanceActivationWriteIndex { 0 };
-    std::atomic<std::uint32_t> retiredPerformanceActivationReadIndex { 0 };
-    std::array<int, performanceActivationSlotCount> deferredPerformanceRetirementSlots {};
-    std::size_t deferredPerformanceRetirementSlotCount = 0;
-    std::atomic<std::size_t> deferredPerformanceRetirementBacklog { 0 };
-    std::atomic<std::uint64_t> deferredPerformanceRetirementBytes { 0 };
-    std::atomic<std::uint64_t> queuedAuthoringPreviewRetirementBytes { 0 };
-    std::atomic<std::uint64_t> queuedPerformanceRetirementBytes { 0 };
-    std::atomic<int> pendingPerformanceActivationSlotIndex { -1 };
-    std::atomic<int> activePerformanceActivationSlotIndex { -1 };
-    std::uint64_t nextPerformanceActivationSerial = 1;
     std::size_t failedAuthoringPreviewRevision = std::numeric_limits<std::size_t>::max();
     std::string failedAuthoringPreviewState;
     std::string lastAuthoringSampleLoadFailureState;
     std::size_t observedAuthoringPreviewRevision = std::numeric_limits<std::size_t>::max();
+    std::string observedAuthoringPreviewZoneId;
     std::size_t observedDraftPlaybackProjectRevision = std::numeric_limits<std::size_t>::max();
     std::uint64_t observedEngineStateRevision = 0;
+    std::uint64_t observedPreviewPreparedBuildId = 0;
     double currentSampleRate = 44100.0;
-    std::uint64_t nextRenderVoiceId = 1;
     bool isSynchronizingParameterState = false;
     RealtimeGuardState realtimeGuardState;
     std::atomic<RealtimeGuardOperation> realtimeGuardTestInjection { RealtimeGuardOperation::none };

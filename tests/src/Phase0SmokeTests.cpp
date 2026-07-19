@@ -201,6 +201,10 @@ int main()
         require(!mainComponent.isAudioOutputEnabled(),
                 "Headless standalone smoke validation should keep the real audio device disabled.");
         mainComponent.getProcessor().prepareToPlay(44100.0, 512);
+        mainComponent.getProcessor().getEngineFacade().resetSessionStateToDefault();
+        require(mainComponent.getProcessor().getEngineFacade().waitForPreparedPlaybackIdle()
+                    && mainComponent.getProcessor().serviceMessageThreadWork(),
+                "Standalone smoke validation should explicitly install the default Performance activation.");
         require(renderQueuedPerformanceSurfaceMagnitude(mainComponent.getProcessor(), 57, 0.8f) > 0.0001f,
                 "Standalone performance surface should render audible output through the shared processor path.");
 
@@ -232,6 +236,10 @@ int main()
                 "Plugin editor should expose the Sprint 3 mapping workspace zone selector.");
 
         processor.prepareToPlay(44100.0, 512);
+        processor.getEngineFacade().resetSessionStateToDefault();
+        require(processor.getEngineFacade().waitForPreparedPlaybackIdle()
+                    && processor.serviceMessageThreadWork(),
+                "Plugin smoke validation should explicitly install the default Performance activation.");
         juce::AudioBuffer<float> pluginBuffer(2, 512);
         pluginBuffer.clear();
         juce::MidiBuffer midiBuffer;

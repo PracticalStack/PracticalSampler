@@ -45,8 +45,10 @@ std::vector<float> renderSelectedZonePreview(const std::string& zoneId)
 
     const auto zone = processor.getAuthoringSession().getSelectedZone();
     require(zone.has_value(), "Selected zone should remain available during playback validation.");
+    require(processor.serviceMessageThreadWork(),
+            "Selected-zone playback should normalize the new Preview route off the audio thread.");
 
-    processor.queuePerformanceSurfaceNoteOn(zone->rootKey, 0.8f);
+    processor.queueAuthoringPreviewNoteOn(zone->rootKey, 0.8f);
 
     juce::AudioBuffer<float> buffer(2, 512);
     juce::MidiBuffer midiBuffer;

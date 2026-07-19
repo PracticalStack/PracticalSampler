@@ -25,6 +25,7 @@ bool SamplerPlaybackContext::prepare(double outputSampleRate) noexcept
         voicePool.clearRenderModel();
     eventScratch.clear();
     collectFinishedRetirements();
+    publishRealtimeDiagnostics();
     return true;
 }
 
@@ -35,6 +36,9 @@ bool SamplerPlaybackContext::stageActivation(SamplerRenderModelPtr model)
 
     serviceRetirements();
     const auto superseded = pendingActivationSlot.exchange(-1, std::memory_order_acq_rel);
+    diagnosticPendingRevision.store(0, std::memory_order_release);
+    diagnosticPendingPreparedBuildId.store(0, std::memory_order_release);
+    diagnosticPendingPayloadBytes.store(0, std::memory_order_release);
     if (superseded >= 0)
     {
         const auto& slot = activationSlots[static_cast<std::size_t>(superseded)];
@@ -50,8 +54,22 @@ bool SamplerPlaybackContext::stageActivation(SamplerRenderModelPtr model)
     slot.serial = nextActivationSerial++;
     if (nextActivationSerial == 0)
         nextActivationSerial = 1;
+    const auto payload = slot.model->getRetainedActivationPayload();
+    diagnosticPendingRevision.store(slot.model->getRevision(), std::memory_order_relaxed);
+    diagnosticPendingPreparedBuildId.store(slot.model->getPreparedBuildId(), std::memory_order_relaxed);
+    diagnosticPendingPayloadBytes.store(payload != nullptr ? payload->retainedPreparedBytes : 0,
+                                        std::memory_order_relaxed);
     pendingActivationSlot.store(slotIndex, std::memory_order_release);
     return true;
+}
+
+bool SamplerPlaybackContext::activatePendingForPreparation() noexcept
+{
+    if (!isPrepared || activeActivationSlot >= 0)
+        return false;
+    const auto activated = applyPendingActivationAtBlockBoundary();
+    publishRealtimeDiagnostics();
+    return activated;
 }
 
 std::size_t SamplerPlaybackContext::serviceRetirements()
@@ -60,7 +78,14 @@ std::size_t SamplerPlaybackContext::serviceRetirements()
     RetirementToken token;
     while (dequeueRetirement(token))
     {
+        const auto& slot = activationSlots[static_cast<std::size_t>(token.slotIndex)];
+        const auto& payload = slot.model != nullptr
+            ? slot.model->getRetainedActivationPayload()
+            : PlaybackActivationPayloadPtr {};
+        const auto payloadBytes = payload != nullptr ? payload->retainedPreparedBytes : 0;
         releaseSlotOnMessageThread(token);
+        diagnosticRetiredBacklog.fetch_sub(1, std::memory_order_relaxed);
+        diagnosticRetiredPayloadBytes.fetch_sub(payloadBytes, std::memory_order_relaxed);
         ++reclaimed;
     }
     reclaimedActivationCount.fetch_add(reclaimed, std::memory_order_relaxed);
@@ -86,6 +111,7 @@ SamplerPlaybackContextRenderResult SamplerPlaybackContext::renderBlock(
     if (activeRenderModel == nullptr)
     {
         collectFinishedRetirements();
+        publishRealtimeDiagnostics();
         return result;
     }
 
@@ -97,6 +123,7 @@ SamplerPlaybackContextRenderResult SamplerPlaybackContext::renderBlock(
         accumulate(result.voicePool);
     }
     collectFinishedRetirements();
+    publishRealtimeDiagnostics();
     return result;
 }
 
@@ -107,12 +134,16 @@ void SamplerPlaybackContext::resetAtBlockBoundary() noexcept
     voicePool.resetVoices();
     eventScratch.clear();
     collectFinishedRetirements();
+    publishRealtimeDiagnostics();
 }
 
 void SamplerPlaybackContext::closeAtBlockBoundary() noexcept
 {
     resetAtBlockBoundary();
     const auto pending = pendingActivationSlot.exchange(-1, std::memory_order_acq_rel);
+    diagnosticPendingRevision.store(0, std::memory_order_release);
+    diagnosticPendingPreparedBuildId.store(0, std::memory_order_release);
+    diagnosticPendingPayloadBytes.store(0, std::memory_order_release);
     if (pending >= 0)
         addRetiredActivation(pending);
     if (activeActivationSlot >= 0)
@@ -124,26 +155,60 @@ void SamplerPlaybackContext::closeAtBlockBoundary() noexcept
     activePreparedBuildId = 0;
     voicePool.clearRenderModel();
     collectFinishedRetirements();
+    publishRealtimeDiagnostics();
 }
 
 SamplerPlaybackContextSnapshot SamplerPlaybackContext::getSnapshot() const noexcept
 {
     SamplerPlaybackContextSnapshot snapshot;
     snapshot.lane = contextLane;
-    snapshot.prepared = isPrepared;
-    snapshot.hasActiveActivation = activeActivationSlot >= 0;
-    snapshot.hasPendingActivation = pendingActivationSlot.load(std::memory_order_acquire) >= 0;
-    snapshot.activeRevision = activeRevision;
-    snapshot.activePreparedBuildId = activePreparedBuildId;
-    snapshot.activeVoiceCount = static_cast<std::uint32_t>(voicePool.activeVoiceCount());
-    snapshot.releasingVoiceCount = static_cast<std::uint32_t>(voicePool.releasingVoiceCount());
-    snapshot.finishedVoiceCount = static_cast<std::uint32_t>(voicePool.finishedVoiceCount());
-    snapshot.retiredActivationBacklog = retiredActivationCount;
-    const auto read = retirementReadIndex.load(std::memory_order_acquire);
-    const auto write = retirementWriteIndex.load(std::memory_order_acquire);
-    const auto queueSize = static_cast<std::uint32_t>(retirementQueue.size());
-    snapshot.retiredActivationBacklog += (write + queueSize - read) % queueSize;
-    snapshot.counters = counters;
+    for (;;)
+    {
+        const auto before = diagnosticRealtimeSequence.load(std::memory_order_acquire);
+        if ((before & 1u) != 0)
+            continue;
+        snapshot.prepared = diagnosticPrepared.load(std::memory_order_relaxed);
+        snapshot.hasActiveActivation = diagnosticHasActiveActivation.load(std::memory_order_relaxed);
+        snapshot.activeRevision = diagnosticActiveRevision.load(std::memory_order_relaxed);
+        snapshot.activePreparedBuildId = diagnosticActivePreparedBuildId.load(std::memory_order_relaxed);
+        snapshot.activeActivationPayloadBytes = diagnosticActivePayloadBytes.load(std::memory_order_relaxed);
+        snapshot.activeVoiceCount = diagnosticActiveVoiceCount.load(std::memory_order_relaxed);
+        snapshot.releasingVoiceCount = diagnosticReleasingVoiceCount.load(std::memory_order_relaxed);
+        snapshot.finishedVoiceCount = diagnosticFinishedVoiceCount.load(std::memory_order_relaxed);
+        snapshot.counters.renderedBlockCount = diagnosticRenderedBlockCount.load(std::memory_order_relaxed);
+        snapshot.counters.startedVoiceCount = diagnosticStartedVoiceCount.load(std::memory_order_relaxed);
+        snapshot.counters.releasedVoiceCount = diagnosticReleasedVoiceCount.load(std::memory_order_relaxed);
+        snapshot.counters.completedVoiceCount = diagnosticCompletedVoiceCount.load(std::memory_order_relaxed);
+        snapshot.counters.stolenVoiceCount = diagnosticStolenVoiceCount.load(std::memory_order_relaxed);
+        snapshot.counters.droppedEventCount = diagnosticDroppedEventCount.load(std::memory_order_relaxed);
+        snapshot.counters.resetVoiceCount = diagnosticResetVoiceCount.load(std::memory_order_relaxed);
+        snapshot.counters.appliedActivationCount = diagnosticAppliedActivationCount.load(std::memory_order_relaxed);
+        snapshot.counters.enqueuedRetirementCount = diagnosticEnqueuedRetirementCount.load(std::memory_order_relaxed);
+        if (before == diagnosticRealtimeSequence.load(std::memory_order_acquire))
+            break;
+    }
+    for (;;)
+    {
+        const auto pending = pendingActivationSlot.load(std::memory_order_acquire);
+        if (pending < 0)
+        {
+            snapshot.hasPendingActivation = false;
+            snapshot.pendingRevision = 0;
+            snapshot.pendingPreparedBuildId = 0;
+            snapshot.pendingActivationPayloadBytes = 0;
+            break;
+        }
+        snapshot.hasPendingActivation = true;
+        snapshot.pendingRevision = diagnosticPendingRevision.load(std::memory_order_relaxed);
+        snapshot.pendingPreparedBuildId = diagnosticPendingPreparedBuildId.load(std::memory_order_relaxed);
+        snapshot.pendingActivationPayloadBytes = diagnosticPendingPayloadBytes.load(std::memory_order_relaxed);
+        if (pending == pendingActivationSlot.load(std::memory_order_acquire))
+            break;
+    }
+    snapshot.retiredActivationPayloadBytes
+        = diagnosticRetiredPayloadBytes.load(std::memory_order_acquire);
+    snapshot.retiredActivationBacklog
+        = diagnosticRetiredBacklog.load(std::memory_order_acquire);
     snapshot.counters.reclaimedActivationCount
         = reclaimedActivationCount.load(std::memory_order_relaxed);
     return snapshot;
@@ -154,6 +219,9 @@ bool SamplerPlaybackContext::applyPendingActivationAtBlockBoundary() noexcept
     const auto pending = pendingActivationSlot.exchange(-1, std::memory_order_acq_rel);
     if (pending < 0)
         return false;
+    diagnosticPendingRevision.store(0, std::memory_order_release);
+    diagnosticPendingPreparedBuildId.store(0, std::memory_order_release);
+    diagnosticPendingPayloadBytes.store(0, std::memory_order_release);
 
     auto& slot = activationSlots[static_cast<std::size_t>(pending)];
     const auto* model = slot.model.get();
@@ -179,6 +247,10 @@ void SamplerPlaybackContext::addRetiredActivation(int slotIndex) noexcept
         return;
     const auto& slot = activationSlots[static_cast<std::size_t>(slotIndex)];
     retiredActivations[retiredActivationCount++] = { slotIndex, slot.serial };
+    const auto& payload = slot.model->getRetainedActivationPayload();
+    diagnosticRetiredBacklog.fetch_add(1, std::memory_order_relaxed);
+    diagnosticRetiredPayloadBytes.fetch_add(payload != nullptr ? payload->retainedPreparedBytes : 0,
+                                            std::memory_order_relaxed);
 }
 
 void SamplerPlaybackContext::collectFinishedRetirements() noexcept
@@ -255,5 +327,35 @@ void SamplerPlaybackContext::accumulate(const SamplerVoicePoolRenderResult& resu
     counters.stolenVoiceCount += result.render.stolenVoiceCount;
     counters.droppedEventCount += result.render.droppedEventCount;
     counters.resetVoiceCount += result.resetVoiceCount;
+}
+
+void SamplerPlaybackContext::publishRealtimeDiagnostics() noexcept
+{
+    diagnosticRealtimeSequence.fetch_add(1, std::memory_order_acq_rel);
+    diagnosticPrepared.store(isPrepared, std::memory_order_relaxed);
+    diagnosticHasActiveActivation.store(activeActivationSlot >= 0, std::memory_order_relaxed);
+    diagnosticActiveRevision.store(activeRevision, std::memory_order_relaxed);
+    diagnosticActivePreparedBuildId.store(activePreparedBuildId, std::memory_order_relaxed);
+    const auto* payload = activeRenderModel != nullptr
+        ? activeRenderModel->getRetainedActivationPayload().get()
+        : nullptr;
+    diagnosticActivePayloadBytes.store(payload != nullptr ? payload->retainedPreparedBytes : 0,
+                                       std::memory_order_relaxed);
+    diagnosticActiveVoiceCount.store(static_cast<std::uint32_t>(voicePool.activeVoiceCount()),
+                                     std::memory_order_release);
+    diagnosticReleasingVoiceCount.store(static_cast<std::uint32_t>(voicePool.releasingVoiceCount()),
+                                        std::memory_order_release);
+    diagnosticFinishedVoiceCount.store(static_cast<std::uint32_t>(voicePool.finishedVoiceCount()),
+                                       std::memory_order_release);
+    diagnosticRenderedBlockCount.store(counters.renderedBlockCount, std::memory_order_release);
+    diagnosticStartedVoiceCount.store(counters.startedVoiceCount, std::memory_order_release);
+    diagnosticReleasedVoiceCount.store(counters.releasedVoiceCount, std::memory_order_release);
+    diagnosticCompletedVoiceCount.store(counters.completedVoiceCount, std::memory_order_release);
+    diagnosticStolenVoiceCount.store(counters.stolenVoiceCount, std::memory_order_release);
+    diagnosticDroppedEventCount.store(counters.droppedEventCount, std::memory_order_release);
+    diagnosticResetVoiceCount.store(counters.resetVoiceCount, std::memory_order_release);
+    diagnosticAppliedActivationCount.store(counters.appliedActivationCount, std::memory_order_release);
+    diagnosticEnqueuedRetirementCount.store(counters.enqueuedRetirementCount, std::memory_order_release);
+    diagnosticRealtimeSequence.fetch_add(1, std::memory_order_release);
 }
 } // namespace drs::engine

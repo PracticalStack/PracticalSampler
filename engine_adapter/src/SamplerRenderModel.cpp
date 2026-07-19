@@ -78,7 +78,9 @@ bool SamplerAudioBufferView::isValid() const noexcept
     return true;
 }
 
-SamplerRenderModelBuildResult buildSamplerRenderModel(const PlaybackActivationPayloadPtr& payload)
+SamplerRenderModelBuildResult buildSamplerRenderModel(
+    const PlaybackActivationPayloadPtr& payload,
+    const SamplerRenderModelBuildOptions& options)
 {
     SamplerRenderModelBuildResult result;
     if (payload == nullptr)
@@ -109,6 +111,13 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(const PlaybackActivationPa
 
     const auto& snapshot = *payload->snapshot;
     const auto& prepared = *payload->prepared;
+
+    if (options.midiNoteOffset < -127 || options.midiNoteOffset > 127)
+        addError(result, "render-model-note-offset-invalid", "options.midiNoteOffset",
+                 "MIDI note offset must remain inside -127 through 127 semitones.");
+    if (options.fixedVelocity < 0 || options.fixedVelocity > 127)
+        addError(result, "render-model-fixed-velocity-invalid", "options.fixedVelocity",
+                 "Fixed velocity must be zero (use event velocity) or 1 through 127.");
 
     if (payload->snapshotBuildId == 0 || payload->preparedBuildId == 0)
         addError(result, "render-model-build-identity-missing", "payload",
@@ -243,6 +252,20 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(const PlaybackActivationPa
                      "Snapshot and prepared route topology must agree before rendering.");
     }
 
+    const auto routeSelected = [&](const PreparedPlaybackZoneHandle& zone)
+    {
+        const auto* snapshotZone = findSnapshotZone(snapshot, zone.zoneId);
+        return snapshotZone != nullptr
+            && (options.selectedZoneId.empty() || snapshotZone->id == options.selectedZoneId)
+            && (options.selectedArticulationId.empty()
+                || snapshotZone->articulationId == options.selectedArticulationId);
+    };
+    const auto selectedRouteCount = static_cast<std::size_t>(std::count_if(
+        prepared.zones.begin(), prepared.zones.end(), routeSelected));
+    if (selectedRouteCount == 0 && !prepared.zones.empty())
+        addError(result, "render-model-route-selection-empty", "options",
+                 "The normalized zone/articulation selection contains no prepared routes.");
+
     const auto errorCount = std::count_if(result.findings.begin(),
                                           result.findings.end(),
                                           [](const SamplerRenderModelFinding& finding)
@@ -259,6 +282,8 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(const PlaybackActivationPa
     model->preparedBuildId = payload->preparedBuildId;
     model->snapshotContentDigest = payload->snapshotContentDigest;
     model->preparedContentDigest = payload->preparedContentDigest;
+    model->midiNoteOffset = options.midiNoteOffset;
+    model->fixedVelocity = options.fixedVelocity;
     model->retainedActivationPayload = payload;
     model->samples.reserve(prepared.samples.size());
     for (std::size_t index = 0; index < prepared.samples.size(); ++index)
@@ -273,19 +298,21 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(const PlaybackActivationPa
                                    sample.decodedSampleData });
     }
 
-    model->routes.reserve(prepared.zones.size());
+    model->routes.reserve(selectedRouteCount);
     for (std::size_t index = 0; index < prepared.zones.size(); ++index)
     {
         const auto& zone = prepared.zones[index];
+        if (!routeSelected(zone))
+            continue;
         model->routes.push_back({ index,
                                   zone.preparedSampleIndex,
                                   zone.zoneId,
                                   zone.sampleSourceId,
                                   zone.rootKey,
-                                  zone.keyLow,
-                                  zone.keyHigh,
-                                  zone.velocityLow,
-                                  zone.velocityHigh,
+                                  options.auditionSelectedZone ? 0 : zone.keyLow,
+                                  options.auditionSelectedZone ? 127 : zone.keyHigh,
+                                  options.auditionSelectedZone ? 1 : zone.velocityLow,
+                                  options.auditionSelectedZone ? 127 : zone.velocityHigh,
                                   zone.gainDb,
                                   zone.pan,
                                   zone.sampleStartFrame,

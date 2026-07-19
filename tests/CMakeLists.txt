@@ -418,6 +418,34 @@ add_test(
     COMMAND drs_sprint4_playback_context_tests
 )
 
+# Sprint 4.6 normalized shell routes, host MIDI cutover, and shell parity matrix.
+juce_add_console_app(drs_sprint4_shell_cutover_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Sprint 4 Shell Cutover Tests"
+)
+
+target_sources(drs_sprint4_shell_cutover_tests
+    PRIVATE
+        src/Sprint4ShellCutoverTests.cpp
+)
+
+target_link_libraries(drs_sprint4_shell_cutover_tests
+    PRIVATE
+        drs_plugin_shell
+        drs_standalone_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_sprint4_shell_cutover_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint4.shell_cutover
+    COMMAND drs_sprint4_shell_cutover_tests
+)
+
 juce_add_console_app(drs_phase1_realtime_safety_tests
     PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Realtime Safety Tests"
 )
@@ -1271,6 +1299,7 @@ add_dependencies(drs_all_tests
     drs_sprint4_scheduler_tests
     drs_sprint4_voice_lifecycle_tests
     drs_sprint4_playback_context_tests
+    drs_sprint4_shell_cutover_tests
     drs_phase0_smoke_tests
     drs_phase1_runtime_contract_tests
     drs_phase1_draft_playback_contract_tests

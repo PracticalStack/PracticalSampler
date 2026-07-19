@@ -154,6 +154,14 @@ void runCleanMaximumLoadCase()
             "Maximum-load case should select an authoring preview zone.");
     require(processor.serviceMessageThreadWork(),
             "Maximum-load case should install the selected preview activation off audio.");
+    require(processor.getEngineFacade().refreshPreviewToCurrentDraft()
+                && processor.getEngineFacade().waitForPreparedPlaybackIdle()
+                && processor.serviceMessageThreadWork(),
+            "Maximum-load case should prepare the normalized Preview payload off audio.");
+    require(processor.getEngineFacade().publishCurrentDraft()
+                && processor.getEngineFacade().waitForPreparedPlaybackIdle()
+                && processor.serviceMessageThreadWork(),
+            "Maximum-load case should install the normalized Performance payload off audio.");
 
     for (std::size_t index = 0; index < Profile::targetPolyphonyPerContext; ++index)
     {

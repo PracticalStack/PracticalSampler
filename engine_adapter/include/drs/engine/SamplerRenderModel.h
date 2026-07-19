@@ -109,6 +109,15 @@ struct SamplerRenderRoute
 
 struct SamplerRenderModelBuildResult;
 
+struct SamplerRenderModelBuildOptions
+{
+    std::string selectedZoneId;
+    std::string selectedArticulationId;
+    bool auditionSelectedZone = false;
+    int midiNoteOffset = 0;
+    int fixedVelocity = 0;
+};
+
 class SamplerRenderModel final
 {
 public:
@@ -120,6 +129,8 @@ public:
     const std::string& getPreparedContentDigest() const noexcept { return preparedContentDigest; }
     const std::vector<SamplerRenderSample>& getSamples() const noexcept { return samples; }
     const std::vector<SamplerRenderRoute>& getRoutes() const noexcept { return routes; }
+    int getMidiNoteOffset() const noexcept { return midiNoteOffset; }
+    int getFixedVelocity() const noexcept { return fixedVelocity; }
     const PlaybackActivationPayloadPtr& getRetainedActivationPayload() const noexcept
     {
         return retainedActivationPayload;
@@ -127,7 +138,9 @@ public:
 
 private:
     SamplerRenderModel() = default;
-    friend SamplerRenderModelBuildResult buildSamplerRenderModel(const PlaybackActivationPayloadPtr& payload);
+    friend SamplerRenderModelBuildResult buildSamplerRenderModel(
+        const PlaybackActivationPayloadPtr& payload,
+        const SamplerRenderModelBuildOptions& options);
 
     PlaybackActivationLane lane = PlaybackActivationLane::preview;
     std::size_t revision = 0;
@@ -137,6 +150,8 @@ private:
     std::string preparedContentDigest;
     std::vector<SamplerRenderSample> samples;
     std::vector<SamplerRenderRoute> routes;
+    int midiNoteOffset = 0;
+    int fixedVelocity = 0;
     PlaybackActivationPayloadPtr retainedActivationPayload;
 };
 
@@ -150,5 +165,7 @@ struct SamplerRenderModelBuildResult
 };
 
 // Message/worker-owned construction seam. Validation and model allocation must never run in audio.
-SamplerRenderModelBuildResult buildSamplerRenderModel(const PlaybackActivationPayloadPtr& payload);
+SamplerRenderModelBuildResult buildSamplerRenderModel(
+    const PlaybackActivationPayloadPtr& payload,
+    const SamplerRenderModelBuildOptions& options = {});
 } // namespace drs::engine

@@ -93,6 +93,7 @@ target_link_libraries(drs_plugin_shell
     PUBLIC
         drs_app_shared
         drs_sample_import
+        drs_sampler_core
         juce::juce_audio_formats
         juce::juce_audio_utils
 )

@@ -196,9 +196,15 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 return;
             }
 
-            const auto effectiveVelocity = std::clamp(
+            const auto sourceMidiNote = static_cast<int>(event.midiNote);
+            const auto effectiveMidiNote = std::clamp(
+                sourceMidiNote + renderModel->getMidiNoteOffset(), 0, 127);
+            const auto eventVelocity = std::clamp(
                 static_cast<int>(std::lround(event.velocity * 127.0f)), 1, 127);
-            const auto routeIndex = selectRouteIndex(static_cast<int>(event.midiNote), effectiveVelocity);
+            const auto effectiveVelocity = renderModel->getFixedVelocity() > 0
+                ? renderModel->getFixedVelocity()
+                : eventVelocity;
+            const auto routeIndex = selectRouteIndex(effectiveMidiNote, effectiveVelocity);
             if (routeIndex == std::numeric_limits<std::size_t>::max())
             {
                 ++result.render.droppedEventCount;
@@ -212,8 +218,8 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
             SamplerVoiceStartRequest request;
             request.voiceId = voiceId;
             request.routeIndex = routeIndex;
-            request.sourceMidiNote = static_cast<int>(event.midiNote);
-            request.effectiveMidiNote = static_cast<int>(event.midiNote);
+            request.sourceMidiNote = sourceMidiNote;
+            request.effectiveMidiNote = effectiveMidiNote;
             request.effectiveVelocity = effectiveVelocity;
             request.outputSampleRate = sampleRate;
             if (!slot.voice.start(*renderModel, request))

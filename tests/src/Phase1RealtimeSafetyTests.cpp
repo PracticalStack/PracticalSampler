@@ -99,14 +99,17 @@ int main()
     {
         drs::plugin::Processor processor;
         processor.prepareToPlay(44100.0, 512);
+        processor.getEngineFacade().resetSessionStateToDefault();
+        require(processor.getEngineFacade().waitForPreparedPlaybackIdle(),
+                "Default Performance activation should finish preparing off the audio thread.");
+        require(processor.serviceMessageThreadWork(),
+                "Default Performance activation should be installed before host MIDI playback.");
 
         const auto primedSnapshot = processor.getRealtimeSafetySnapshot();
         require(primedSnapshot.available, "Realtime safety snapshot must be available.");
         require(primedSnapshot.preparedBlockSize == 512, "Realtime safety snapshot should remember the prepared block size.");
-        require(primedSnapshot.referenceSampleCountLoaded >= 1,
-                "Performance playback samples should be preloaded before the callback runs.");
-        require(primedSnapshot.referenceWarmupCount >= 1,
-                "Realtime safety snapshot should record an off-audio-thread warmup pass.");
+        require(primedSnapshot.activeActivationPayloadBytes > 0,
+                "Performance playback should retain a normalized immutable activation before the callback runs.");
         require(primedSnapshot.samplePathResolutionsOnAudioThread == 0,
                 "Preparing the processor should keep sample-path resolution off the audio thread.");
         require(primedSnapshot.sampleDecodeEntriesOnAudioThread == 0,
@@ -179,7 +182,6 @@ int main()
 
         drs::plugin::Processor fallbackProcessor;
         fallbackProcessor.prepareToPlay(44100.0, 512);
-        fallbackProcessor.clearReferencePlaybackCacheForTests();
 
         juce::AudioBuffer<float> fallbackBuffer(2, 512);
         fallbackBuffer.clear();
@@ -188,18 +190,18 @@ int main()
         fallbackProcessor.processBlock(fallbackBuffer, fallbackMidi);
 
         const auto fallbackSnapshot = fallbackProcessor.getRealtimeSafetySnapshot();
-        require(fallbackBuffer.getMagnitude(0, fallbackBuffer.getNumSamples()) > 0.0001f,
-                "Forced callback fallback should still render audible output.");
-        require(fallbackSnapshot.samplePathResolutionsOnAudioThread >= fallbackSnapshot.referenceSampleCountLoaded,
-                "Forced callback fallback should record audio-thread sample-path resolution for reference assets.");
-        require(fallbackSnapshot.sampleDecodeEntriesOnAudioThread >= fallbackSnapshot.referenceSampleCountLoaded,
-                "Forced callback fallback should record audio-thread decode entry for reference assets.");
-        require(fallbackSnapshot.referenceSampleLoadsOnAudioThread >= fallbackSnapshot.referenceSampleCountLoaded,
-                "Forced callback fallback should record reference sample loading on the audio thread.");
+        require(fallbackBuffer.getMagnitude(0, fallbackBuffer.getNumSamples()) <= 0.0001f,
+                "Host MIDI without a Performance activation should render deterministic silence.");
+        require(fallbackSnapshot.samplePathResolutionsOnAudioThread == 0,
+                "No-route playback must not resolve fixture paths on the audio thread.");
+        require(fallbackSnapshot.sampleDecodeEntriesOnAudioThread == 0,
+                "No-route playback must not decode fixture samples on the audio thread.");
+        require(fallbackSnapshot.referenceSampleLoadsOnAudioThread == 0,
+                "No-route playback must not load reference samples on the audio thread.");
         require(fallbackSnapshot.largeResourceReleasesOnAudioThread == 0,
                 "Forced callback fallback should not need large resource release when the cache was cleared beforehand.");
-        require(fallbackSnapshot.getAudioThreadViolationCount() > 0,
-                "Forced callback fallback should trip the realtime-safety counter seam.");
+        require(fallbackSnapshot.getAudioThreadViolationCount() == 0,
+                "No-route silence should remain free of realtime-safety violations.");
 
         const auto projectLoad = drs::engine::loadPhase2ReferenceProjectManifest();
         require(projectLoad.loaded, "Authoring preview isolation test should load the Phase 2 reference project.");
@@ -685,6 +687,9 @@ int main()
         processor.queuePerformanceSurfaceNoteOff(57);
         processor.queuePerformanceSurfaceNoteOff(58);
         processor.queuePerformanceSurfaceNoteOff(59);
+        processor.queueAuthoringPreviewNoteOff(57);
+        processor.queueAuthoringPreviewNoteOff(58);
+        processor.queueAuthoringPreviewNoteOff(59);
         for (int releaseBlock = 0; releaseBlock < 20; ++releaseBlock)
             processor.processBlock(activationBuffer, emptyMidi);
         require(processor.serviceMessageThreadWork(),

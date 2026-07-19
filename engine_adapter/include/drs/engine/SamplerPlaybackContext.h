@@ -30,7 +30,12 @@ struct SamplerPlaybackContextSnapshot
     bool hasActiveActivation = false;
     bool hasPendingActivation = false;
     std::size_t activeRevision = 0;
+    std::size_t pendingRevision = 0;
     std::uint64_t activePreparedBuildId = 0;
+    std::uint64_t pendingPreparedBuildId = 0;
+    std::uint64_t activeActivationPayloadBytes = 0;
+    std::uint64_t pendingActivationPayloadBytes = 0;
+    std::uint64_t retiredActivationPayloadBytes = 0;
     std::uint32_t activeVoiceCount = 0;
     std::uint32_t releasingVoiceCount = 0;
     std::uint32_t finishedVoiceCount = 0;
@@ -66,6 +71,7 @@ public:
 
     // Message-owned activation/reclamation API. Model ownership never moves on the audio thread.
     bool stageActivation(SamplerRenderModelPtr model);
+    bool activatePendingForPreparation() noexcept;
     std::size_t serviceRetirements();
 
     // Audio-owned callback API. Pending activation is consumed before the first rendered frame.
@@ -99,6 +105,7 @@ private:
     int acquireFreeSlot() noexcept;
     void releaseSlotOnMessageThread(RetirementToken token);
     void accumulate(const SamplerVoicePoolRenderResult& result) noexcept;
+    void publishRealtimeDiagnostics() noexcept;
 
     PlaybackActivationLane contextLane;
     SamplerVoicePool voicePool;
@@ -113,6 +120,29 @@ private:
     std::array<int, activationSlotCapacity> freeActivationSlots { 0, 1, 2, 3 };
     std::size_t freeActivationSlotCount = activationSlotCapacity;
     std::atomic<int> pendingActivationSlot { -1 };
+    std::atomic<std::size_t> diagnosticPendingRevision { 0 };
+    std::atomic<std::uint64_t> diagnosticPendingPreparedBuildId { 0 };
+    std::atomic<std::uint64_t> diagnosticPendingPayloadBytes { 0 };
+    std::atomic<std::uint64_t> diagnosticRealtimeSequence { 0 };
+    std::atomic<bool> diagnosticPrepared { false };
+    std::atomic<bool> diagnosticHasActiveActivation { false };
+    std::atomic<std::size_t> diagnosticActiveRevision { 0 };
+    std::atomic<std::uint64_t> diagnosticActivePreparedBuildId { 0 };
+    std::atomic<std::uint64_t> diagnosticActivePayloadBytes { 0 };
+    std::atomic<std::size_t> diagnosticRetiredBacklog { 0 };
+    std::atomic<std::uint64_t> diagnosticRetiredPayloadBytes { 0 };
+    std::atomic<std::uint32_t> diagnosticActiveVoiceCount { 0 };
+    std::atomic<std::uint32_t> diagnosticReleasingVoiceCount { 0 };
+    std::atomic<std::uint32_t> diagnosticFinishedVoiceCount { 0 };
+    std::atomic<std::uint64_t> diagnosticRenderedBlockCount { 0 };
+    std::atomic<std::uint64_t> diagnosticStartedVoiceCount { 0 };
+    std::atomic<std::uint64_t> diagnosticReleasedVoiceCount { 0 };
+    std::atomic<std::uint64_t> diagnosticCompletedVoiceCount { 0 };
+    std::atomic<std::uint64_t> diagnosticStolenVoiceCount { 0 };
+    std::atomic<std::uint64_t> diagnosticDroppedEventCount { 0 };
+    std::atomic<std::uint64_t> diagnosticResetVoiceCount { 0 };
+    std::atomic<std::uint64_t> diagnosticAppliedActivationCount { 0 };
+    std::atomic<std::uint64_t> diagnosticEnqueuedRetirementCount { 0 };
     std::uint64_t nextActivationSerial = 1;
     std::array<RetirementToken, activationSlotCapacity> retiredActivations {};
     std::size_t retiredActivationCount = 0;
