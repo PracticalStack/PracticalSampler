@@ -2,6 +2,7 @@
 #include "plugin/PluginEditor.h"
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <filesystem>
@@ -57,6 +58,63 @@ std::optional<double> findMacroValue(const drs::engine::RuntimeSessionStateSnaps
 int clampMidiValue(int value)
 {
     return std::clamp(value, 0, 127);
+}
+
+std::uint64_t monotonicMicros()
+{
+    return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count());
+}
+
+drs::engine::AuthoringPreviewInvalidationCategory classifyPreviewInvalidation(
+    const std::string& changeLabel,
+    bool selectionChanged)
+{
+    using Category = drs::engine::AuthoringPreviewInvalidationCategory;
+    if (selectionChanged)
+        return Category::selection;
+
+    auto normalized = changeLabel;
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                   [](unsigned char character) { return static_cast<char>(std::tolower(character)); });
+    if (normalized.find("gain") != std::string::npos)
+        return Category::gain;
+    if (normalized.find("pan") != std::string::npos)
+        return Category::pan;
+    if (normalized.find("root") != std::string::npos)
+        return Category::rootKey;
+    if (normalized.find("velocity") != std::string::npos)
+        return Category::velocityRange;
+    if (normalized.find("start") != std::string::npos)
+        return Category::sampleStartOffset;
+    if (normalized.find("loop") != std::string::npos)
+        return Category::loop;
+    if (normalized.find("source") != std::string::npos
+        || normalized.find("sample") != std::string::npos)
+        return Category::sourceAssignment;
+    if (normalized.find("bound") != std::string::npos
+        || normalized.find("key range") != std::string::npos)
+        return Category::keyBounds;
+    if (normalized.find("map") != std::string::npos
+        || normalized.find("zone") != std::string::npos)
+        return Category::mapping;
+    return Category::authoredTopology;
+}
+
+std::string buildSelectedZonePreviewFingerprint(
+    const std::optional<drs::engine::RuntimeProjectZoneDefinition>& selectedZone)
+{
+    if (!selectedZone.has_value())
+        return "no-selection";
+    const auto& zone = *selectedZone;
+    return zone.sampleSourceId + "|" + std::to_string(zone.rootKey)
+        + "|" + std::to_string(zone.keyLow) + "|" + std::to_string(zone.keyHigh)
+        + "|" + std::to_string(zone.velocityLow) + "|" + std::to_string(zone.velocityHigh)
+        + "|" + std::to_string(zone.gainDb) + "|" + std::to_string(zone.pan)
+        + "|" + std::to_string(zone.sampleStartFrame)
+        + "|" + std::to_string(zone.loopEnabled)
+        + "|" + std::to_string(zone.loopStartFrame)
+        + "|" + std::to_string(zone.loopEndFrame);
 }
 
 int computeToneRenderVelocity(const drs::engine::RuntimeSessionStateSnapshot& sessionState)
@@ -451,6 +509,7 @@ void Processor::setMacroValueFromShell(const std::string& macroId, double value)
 
 void Processor::queueAuthoringPreviewNoteOn(int midiNoteNumber, float velocity)
 {
+    authoringPreviewDirectAuditionRequested = true;
     serviceMessageThreadWork();
     if (!authoringPreviewNoteQueue.push(
             { clampMidiValue(midiNoteNumber), std::clamp(velocity, 0.0f, 1.0f), true }))
@@ -536,8 +595,8 @@ void Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
     lastAuthoringSampleLoadFailureState.clear();
     failedAuthoringPreviewRevision = std::numeric_limits<std::size_t>::max();
     failedAuthoringPreviewState.clear();
-    observedAuthoringPreviewRevision = std::numeric_limits<std::size_t>::max();
-    observedAuthoringPreviewZoneId.clear();
+    authoringPreviewController.reset();
+    authoringPreviewDirectAuditionRequested = false;
     observedDraftPlaybackProjectRevision = authoringSession.getDocumentState().revision;
     initializeAuthoringImportMetrics();
     ensureSelectedAuthoringSampleLoaded(false);
@@ -607,6 +666,7 @@ void Processor::runRealtimeGuardTestInjection()
 
 bool Processor::serviceMessageThreadWork()
 {
+    const auto serviceTimeMicros = monotonicMicros();
     const auto authoringRevision = authoringSession.getDocumentState().revision;
     auto synchronizedDraftPlaybackProject = false;
     if (authoringRevision != observedDraftPlaybackProjectRevision)
@@ -637,31 +697,78 @@ bool Processor::serviceMessageThreadWork()
             !performanceSnapshot.hasActiveActivation);
     }
 
-    auto synchronizedAuthoringPreview = false;
-    const auto previewPayload = engineFacade.getPreviewActivationPayload();
-    const auto previewPreparedBuildId = previewPayload != nullptr
-            && previewPayload->revision == authoringRevision
-        ? previewPayload->preparedBuildId
-        : 0;
     const auto previewContextSnapshot = authoringPreviewPlaybackContext.getSnapshot();
     const auto selectedZone = authoringSession.getSelectedZone();
     const auto selectedZoneId = selectedZone.has_value() ? selectedZone->id : std::string {};
-    if (authoringRevision != observedAuthoringPreviewRevision
-        || selectedZoneId != observedAuthoringPreviewZoneId
-        || !previewContextSnapshot.hasActiveActivation
-        || (previewPreparedBuildId != 0 && previewPreparedBuildId != observedPreviewPreparedBuildId))
+    const auto controllerBeforeRequest = authoringPreviewController.getSnapshot();
+    const auto selectionChanged = controllerBeforeRequest.hasRequest
+        && controllerBeforeRequest.currentRequest.identity.selectedZoneId != selectedZoneId;
+    const auto requestReason = authoringPreviewDirectAuditionRequested
+        ? drs::engine::AuthoringPreviewRequestReason::explicitSelectedZoneAudition
+        : (!controllerBeforeRequest.hasRequest
+        ? drs::engine::AuthoringPreviewRequestReason::projectOpened
+        : (selectionChanged
+               ? drs::engine::AuthoringPreviewRequestReason::selectionChanged
+               : drs::engine::AuthoringPreviewRequestReason::authoringChanged));
+    const auto observesNewRevision = !controllerBeforeRequest.hasRequest
+        || controllerBeforeRequest.currentRequest.identity.draftRevision != authoringRevision;
+    const auto invalidationCategory = observesNewRevision
+        ? classifyPreviewInvalidation(authoringSession.getDocumentState().lastChangeLabel,
+                                      selectionChanged)
+        : controllerBeforeRequest.currentRequest.invalidationCategory;
+    const auto requestSignature = drs::engine::buildAuthoringPreviewRequestSignature(
+        drs::engine::AuthoringPreviewScope::selectedZone,
+        selectedZoneId,
+        invalidationCategory,
+        buildSelectedZonePreviewFingerprint(selectedZone));
+    const auto requestResult = authoringPreviewController.request(
+        drs::engine::AuthoringPreviewScope::selectedZone,
+        authoringRevision,
+        selectedZoneId,
+        requestReason,
+        invalidationCategory,
+        requestSignature,
+        serviceTimeMicros);
+    authoringPreviewDirectAuditionRequested = false;
+    const auto canceledSupersededWork = requestResult.supersededPrevious
+        && engineFacade.cancelPreviewPreparation();
+    if (canceledSupersededWork && !requestResult.cancellationRequested)
+        authoringPreviewController.recordWorkerCancellation();
+
+    auto synchronizedAuthoringPreview = false;
+    auto controllerSnapshot = authoringPreviewController.getSnapshot();
+    if (controllerSnapshot.hasRequest
+        && controllerSnapshot.activationState == drs::engine::AuthoringPreviewActivationState::pending
+        && previewContextSnapshot.hasActiveActivation
+        && !previewContextSnapshot.hasPendingActivation
+        && previewContextSnapshot.activeRevision
+            == controllerSnapshot.currentRequest.identity.draftRevision)
     {
-        synchronizedAuthoringPreview = synchronizeAuthoringPreviewActivation(
-            !previewContextSnapshot.hasActiveActivation);
-        observedAuthoringPreviewRevision = authoringRevision;
-        observedAuthoringPreviewZoneId = selectedZoneId;
-        if (synchronizedAuthoringPreview && previewPreparedBuildId != 0)
-            observedPreviewPreparedBuildId = previewPreparedBuildId;
+        synchronizedAuthoringPreview = authoringPreviewController.markActive(
+            controllerSnapshot.currentRequest.identity);
+        controllerSnapshot = authoringPreviewController.getSnapshot();
+    }
+    const auto preparedPayload = engineFacade.getPreviewActivationPayload();
+    const auto directAuditionContentPrepared = preparedPayload != nullptr
+        && preparedPayload->revision == authoringRevision
+        && preparedPayload->preparedBuildId != 0;
+    const auto launch = authoringPreviewController.launchIfEligible(
+        serviceTimeMicros, directAuditionContentPrepared);
+    if (launch.launched)
+    {
+        if (!directAuditionContentPrepared)
+            engineFacade.refreshPreviewToCurrentDraft();
+        synchronizedAuthoringPreview = stageAuthoringPreviewActivation(
+            launch.request,
+            !previewContextSnapshot.hasActiveActivation) || synchronizedAuthoringPreview;
     }
 
     updateRealtimeSafetyState();
     return servicedBackgroundWork
         || synchronizedDraftPlaybackProject
+        || requestResult.accepted
+        || requestResult.expeditedCurrent
+        || canceledSupersededWork
         || synchronizedAuthoringPreview
         || synchronizedActivation
         || diagnosticsRetiredActivationCount.load(std::memory_order_acquire) != retiredCountBefore;
@@ -854,12 +961,8 @@ bool Processor::ensureSelectedAuthoringSampleLoaded(bool invokedFromAudioThread)
     return true;
 }
 
-bool Processor::synchronizeAuthoringPreviewActivation(bool installImmediately)
-{
-    return stageAuthoringPreviewActivation(installImmediately);
-}
-
-bool Processor::stageAuthoringPreviewActivation(bool installImmediately)
+bool Processor::stageAuthoringPreviewActivation(const drs::engine::AuthoringPreviewRequest& request,
+                                                bool installImmediately)
 {
     const auto reclaimed = authoringPreviewPlaybackContext.serviceRetirements();
     diagnosticsRetiredActivationCount.fetch_add(reclaimed, std::memory_order_relaxed);
@@ -869,8 +972,13 @@ bool Processor::stageAuthoringPreviewActivation(bool installImmediately)
     {
         failedAuthoringPreviewRevision = currentRevision;
         failedAuthoringPreviewState = state.empty() ? "Authoring preview preparation failed." : state;
+        authoringPreviewController.fail(request.identity, failedAuthoringPreviewState);
         return false;
     };
+
+    if (!authoringPreviewController.isCurrent(request.identity)
+        || request.identity.draftRevision != currentRevision)
+        return false;
 
     const auto selectedZone = authoringSession.getSelectedZone();
     if (!selectedZone.has_value())
@@ -879,6 +987,8 @@ bool Processor::stageAuthoringPreviewActivation(bool installImmediately)
         failedAuthoringPreviewState.clear();
         return false;
     }
+    if (selectedZone->id != request.identity.selectedZoneId)
+        return false;
 
     auto payload = engineFacade.getPreviewActivationPayload();
     if (payload == nullptr || payload->revision != currentRevision)
@@ -973,6 +1083,9 @@ bool Processor::stageAuthoringPreviewActivation(bool installImmediately)
         payload = std::move(immediatePayload);
     }
 
+    if (!authoringPreviewController.acceptPrepared(request.identity, payload->preparedBuildId))
+        return false;
+
     drs::engine::SamplerRenderModelBuildOptions options;
     options.selectedZoneId = selectedZone->id;
     options.auditionSelectedZone = true;
@@ -983,12 +1096,15 @@ bool Processor::stageAuthoringPreviewActivation(bool installImmediately)
                                          : modelResult.findings.front().message);
     if (!authoringPreviewPlaybackContext.stageActivation(modelResult.model))
         return failPreviewActivation("Authoring preview activation slots are exhausted.");
+    if (!authoringPreviewController.markActivationPending(request.identity))
+        return false;
 
     failedAuthoringPreviewRevision = std::numeric_limits<std::size_t>::max();
     failedAuthoringPreviewState.clear();
     if (installImmediately && authoringPreviewPlaybackContext.activatePendingForPreparation())
     {
         diagnosticsAuthoringPreviewActivationCount.fetch_add(1, std::memory_order_relaxed);
+        authoringPreviewController.markActive(request.identity);
     }
     return true;
 }

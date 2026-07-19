@@ -5,11 +5,13 @@
 #include <juce_audio_processors_headless/juce_audio_processors_headless.h>
 
 #include <algorithm>
+#include <chrono>
 #include <iostream>
 #include <filesystem>
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <thread>
 
 namespace
 {
@@ -215,7 +217,10 @@ int main()
             require(selection.applied, failureMessagePrefix + " should select the looping pad zone.");
             const auto readyRevision = previewProcessor.getAuthoringSession().getDocumentState().revision;
             require(previewProcessor.serviceMessageThreadWork(),
-                    failureMessagePrefix + " should stage the selected-zone preview revision.");
+                    failureMessagePrefix + " should queue the selected-zone preview revision.");
+            std::this_thread::sleep_for(std::chrono::milliseconds(15));
+            require(previewProcessor.serviceMessageThreadWork(),
+                    failureMessagePrefix + " should stage the selected-zone revision after coalescing.");
 
             juce::AudioBuffer<float> previewBuffer(2, 512);
             previewBuffer.clear();
@@ -285,7 +290,10 @@ int main()
                 "Authoring preview isolation test should select the looping pad zone.");
         const auto selectedPreviewRevision = processor.getAuthoringSession().getDocumentState().revision;
         require(processor.serviceMessageThreadWork(),
-                "Message-thread servicing should stage the selected authoring preview revision.");
+                "Message-thread servicing should queue the selected authoring preview revision.");
+        std::this_thread::sleep_for(std::chrono::milliseconds(15));
+        require(processor.serviceMessageThreadWork(),
+                "Message-thread servicing should launch the revision after its bounded coalescing window.");
 
         const auto selectedZone = processor.getAuthoringSession().getSelectedZone();
         require(selectedZone.has_value(),
@@ -348,7 +356,10 @@ int main()
                 "Failed-preview regression test should select the looping pad zone.");
         const auto readyPreviewRevision = failedPreviewProcessor.getAuthoringSession().getDocumentState().revision;
         require(failedPreviewProcessor.serviceMessageThreadWork(),
-                "Failed-preview regression test should stage the selected-zone preview revision.");
+                "Failed-preview regression test should queue the selected-zone preview revision.");
+        std::this_thread::sleep_for(std::chrono::milliseconds(15));
+        require(failedPreviewProcessor.serviceMessageThreadWork(),
+                "Failed-preview regression test should stage the selected-zone revision after coalescing.");
 
         juce::AudioBuffer<float> failedPreviewBuffer(2, 512);
         failedPreviewBuffer.clear();
@@ -453,9 +464,11 @@ int main()
                 "Prepared-retirement realtime coverage should settle the invalidating preview.");
         auto preparedRetirementPerformanceSnapshot = preparedRetirementProcessor.getEngineFacade().getPerformanceSnapshot();
         require(preparedRetirementPerformanceSnapshot.previewPreparationCacheHits == 1,
-                "Invalidating the Phase 2 preview should preserve one warm prepared handle.");
+                "Invalidating the Phase 2 preview should preserve one warm prepared handle (observed "
+                    + std::to_string(preparedRetirementPerformanceSnapshot.previewPreparationCacheHits) + ").");
         require(preparedRetirementPerformanceSnapshot.previewPreparationCacheMisses == 1,
-                "Invalidating the Phase 2 preview should rebuild one prepared handle.");
+                "Invalidating the Phase 2 preview should rebuild one prepared handle (observed "
+                    + std::to_string(preparedRetirementPerformanceSnapshot.previewPreparationCacheMisses) + ").");
         auto preparedRetirementSnapshot = preparedRetirementProcessor.getRealtimeSafetySnapshot();
         require(preparedRetirementSnapshot.largeResourceReleasesOnAudioThread == 0,
                 "Prepared cache invalidation should not release heavy resources on the audio thread.");
@@ -542,8 +555,8 @@ int main()
                 "Imported processor authoring content should prepare preview successfully.");
         require(migratedProcessor.getEngineFacade().waitForPreparedPlaybackIdle(),
                 "Imported processor preview should settle through the prepared-playback worker.");
-        require(migratedProcessor.serviceMessageThreadWork(),
-                "Message-thread servicing should apply the imported processor preview build.");
+        std::this_thread::sleep_for(std::chrono::milliseconds(15));
+        migratedProcessor.serviceMessageThreadWork();
         migratedPerformanceSnapshot = migratedProcessor.getEngineFacade().getPerformanceSnapshot();
         require(migratedPerformanceSnapshot.previewRevision == migratedImport.documentState.revision
                     && migratedPerformanceSnapshot.previewRevisionState == "Ready",

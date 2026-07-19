@@ -506,6 +506,105 @@ add_test(
     COMMAND drs_sprint4_offline_renderer_tests
 )
 
+# Sprint 5.1 frozen Preview scope/lifecycle/note-policy contract.
+add_executable(drs_sprint5_preview_contract_tests
+    src/Sprint5PreviewContractTests.cpp
+)
+
+target_link_libraries(drs_sprint5_preview_contract_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_features(drs_sprint5_preview_contract_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint5.preview_contract
+    COMMAND drs_sprint5_preview_contract_tests
+)
+
+add_executable(drs_sprint5_preview_controller_tests
+    src/Sprint5PreviewControllerTests.cpp
+)
+
+target_link_libraries(drs_sprint5_preview_controller_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_features(drs_sprint5_preview_controller_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint5.preview_controller
+    COMMAND drs_sprint5_preview_controller_tests
+)
+
+juce_add_console_app(drs_sprint5_preview_controller_integration_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Sprint 5 Preview Controller Integration Tests"
+)
+
+target_sources(drs_sprint5_preview_controller_integration_tests
+    PRIVATE
+        src/Sprint5PreviewControllerIntegrationTests.cpp
+)
+
+target_link_libraries(drs_sprint5_preview_controller_integration_tests
+    PRIVATE
+        drs_plugin_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_sprint5_preview_controller_integration_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint5.preview_controller_integration
+    COMMAND drs_sprint5_preview_controller_integration_tests
+)
+
+juce_add_console_app(drs_sprint5_preview_coalescing_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Sprint 5 Preview Coalescing Tests"
+)
+
+target_sources(drs_sprint5_preview_coalescing_tests
+    PRIVATE
+        src/Sprint5PreviewCoalescingTests.cpp
+)
+
+target_link_libraries(drs_sprint5_preview_coalescing_tests
+    PRIVATE
+        drs_engine_adapter
+        drs_sample_import
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_sprint5_preview_coalescing_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint5.preview_coalescing
+    COMMAND drs_sprint5_preview_coalescing_tests
+)
+
+# Direct-only expected-red audit. Later Sprint 5 slices retire each detected seam;
+# do not register this target with CTest or drs_all_tests while it is intentionally red.
+add_executable(drs_sprint5_preview_contract_red_tests
+    src/Sprint5PreviewContractRedTests.cpp
+)
+
+target_compile_definitions(drs_sprint5_preview_contract_red_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_sprint5_preview_contract_red_tests PRIVATE cxx_std_17)
+
 juce_add_console_app(drs_phase1_realtime_safety_tests
     PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Realtime Safety Tests"
 )
@@ -1362,6 +1461,10 @@ add_dependencies(drs_all_tests
     drs_sprint4_playback_context_tests
     drs_sprint4_shell_cutover_tests
     drs_sprint4_offline_renderer_tests
+    drs_sprint5_preview_contract_tests
+    drs_sprint5_preview_controller_tests
+    drs_sprint5_preview_controller_integration_tests
+    drs_sprint5_preview_coalescing_tests
     drs_phase0_smoke_tests
     drs_phase1_runtime_contract_tests
     drs_phase1_draft_playback_contract_tests

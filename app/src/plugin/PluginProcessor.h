@@ -1,6 +1,7 @@
 #pragma once
 
 #include "drs/engine/AuthoringSession.h"
+#include "drs/engine/AuthoringPreviewController.h"
 #include "drs/engine/EngineFacade.h"
 #include "drs/engine/SampleImport.h"
 #include "drs/engine/SamplerPlaybackContext.h"
@@ -143,6 +144,10 @@ public:
     const juce::AudioProcessorValueTreeState& getParameterState() const { return parameterState; }
     drs::app::AuthoringWaveformPreview getAuthoringWaveformPreview();
     drs::app::AuthoringPreviewStatusSnapshot getAuthoringPreviewStatusSnapshot() const;
+    drs::engine::AuthoringPreviewControllerSnapshot getAuthoringPreviewControllerSnapshot() const
+    {
+        return authoringPreviewController.getSnapshot();
+    }
     drs::app::AuthoringImportResponsivenessSnapshot getAuthoringImportResponsivenessSnapshot() const;
     void replaceAuthoringProject(drs::engine::RuntimeProjectModel project);
     const juce::File& getAuthoringProjectFile() const { return authoringProjectFile; }
@@ -192,8 +197,8 @@ private:
     bool ensureSelectedAuthoringSampleLoaded(bool invokedFromAudioThread);
     void drainRealtimeNoteEvents(RealtimeNoteEventQueue& queue,
                                  drs::engine::SamplerEventBlock& destination) noexcept;
-    bool synchronizeAuthoringPreviewActivation(bool installImmediately);
-    bool stageAuthoringPreviewActivation(bool installImmediately);
+    bool stageAuthoringPreviewActivation(const drs::engine::AuthoringPreviewRequest& request,
+                                         bool installImmediately);
     bool synchronizePerformanceActivation(bool installImmediately);
     bool stagePerformanceActivation(const drs::engine::EnginePerformanceSnapshot& performanceSnapshot,
                                     const drs::engine::RuntimeSessionStateSnapshot& sessionState,
@@ -294,6 +299,7 @@ private:
     void applyRealtimeGuardDiagnostics(ProcessorRealtimeSafetySnapshot& snapshot) const;
 
     drs::engine::AuthoringSession authoringSession;
+    drs::engine::AuthoringPreviewController authoringPreviewController;
     drs::engine::EngineFacade engineFacade;
     std::unordered_map<std::string, LoadedAuthoringSample> authoringLoadedSamples;
     std::unordered_map<std::string, drs::app::AuthoringWaveformPreview> authoringWaveformPreviewCache;
@@ -339,11 +345,9 @@ private:
     std::size_t failedAuthoringPreviewRevision = std::numeric_limits<std::size_t>::max();
     std::string failedAuthoringPreviewState;
     std::string lastAuthoringSampleLoadFailureState;
-    std::size_t observedAuthoringPreviewRevision = std::numeric_limits<std::size_t>::max();
-    std::string observedAuthoringPreviewZoneId;
     std::size_t observedDraftPlaybackProjectRevision = std::numeric_limits<std::size_t>::max();
     std::uint64_t observedEngineStateRevision = 0;
-    std::uint64_t observedPreviewPreparedBuildId = 0;
+    bool authoringPreviewDirectAuditionRequested = false;
     double currentSampleRate = 44100.0;
     bool isSynchronizingParameterState = false;
     RealtimeGuardState realtimeGuardState;

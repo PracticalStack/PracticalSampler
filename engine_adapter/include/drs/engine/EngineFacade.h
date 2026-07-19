@@ -337,6 +337,8 @@ public:
     bool setMacroValue(const std::string& macroId, double value);
     bool stageDraftRevision(std::size_t revision);
     bool refreshPreviewToCurrentDraft();
+    bool cancelPreviewPreparation(
+        const std::string& reason = "Preview preparation superseded by a newer request");
     bool publishCurrentDraft();
     void closeDraftPlaybackProject();
     bool reopenDraftPlaybackProject(std::size_t revision);

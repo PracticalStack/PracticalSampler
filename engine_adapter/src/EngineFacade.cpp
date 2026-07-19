@@ -1194,6 +1194,15 @@ bool EngineFacade::refreshPreviewToCurrentDraft()
     if (!referenceInstrumentActive || !referenceManifest.loaded || !referenceStream.loaded || !authoringProject.loaded)
         return false;
 
+    const auto& currentStatus = draftPlaybackContract.getStatus();
+    if ((currentStatus.pendingPreview.active
+         && currentStatus.pendingPreview.requestedRevision == currentStatus.draftRevision)
+        || (currentStatus.preview.revision == currentStatus.draftRevision
+            && currentStatus.preview.activationPayload != nullptr))
+    {
+        return true;
+    }
+
     const auto request = draftPlaybackContract.requestPreviewBuild();
     if (!request.accepted)
         return false;
@@ -1247,6 +1256,37 @@ bool EngineFacade::refreshPreviewToCurrentDraft()
     refreshDiagnosticsSnapshot();
     markStateChanged();
     return true;
+}
+
+bool EngineFacade::cancelPreviewPreparation(const std::string& reason)
+{
+    const auto pending = draftPlaybackContract.getStatus().pendingPreview;
+    const auto canceledQueued = preparedPlaybackService.cancelQueuedPreviewBuilds(reason);
+    for (const auto& result : canceledQueued)
+        pendingPreparedCompletions.erase(result.buildId);
+
+    auto canceledContract = false;
+    if (pending.active)
+        canceledContract = draftPlaybackContract.cancelPreviewBuild(pending.requestId);
+
+    for (auto iterator = pendingPreparedCompletions.begin(); iterator != pendingPreparedCompletions.end();)
+    {
+        if (iterator->second.lane == PreparedPlaybackWorkLane::preview)
+            iterator = pendingPreparedCompletions.erase(iterator);
+        else
+            ++iterator;
+    }
+
+    if (!canceledQueued.empty() || canceledContract)
+    {
+        currentSessionState.transientMetrics.integrationState = "Preview preparation canceled";
+        previewPlaybackSnapshot = {};
+        syncPreviewSnapshotFromDraftPlayback();
+        refreshDiagnosticsSnapshot();
+        markStateChanged();
+        return true;
+    }
+    return false;
 }
 
 bool EngineFacade::publishCurrentDraft()
