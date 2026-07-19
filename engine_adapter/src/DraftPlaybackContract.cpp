@@ -75,12 +75,18 @@ bool DraftPlaybackContract::setDraftRevision(std::size_t revision)
 
 DraftPlaybackBuildRequest DraftPlaybackContract::requestPreviewBuild()
 {
-    return requestBuild(status.pendingPreview, "Preview", "Preview build queued");
+    return requestBuild(status.pendingPreview,
+                        "Preview",
+                        "Preview build queued",
+                        PlaybackSnapshotLifecycleState::preparing);
 }
 
 DraftPlaybackBuildRequest DraftPlaybackContract::requestPerformanceBuild()
 {
-    return requestBuild(status.pendingPerformance, "Publish", "Publish build queued");
+    return requestBuild(status.pendingPerformance,
+                        "Publish",
+                        "Publish build queued",
+                        PlaybackSnapshotLifecycleState::activating);
 }
 
 bool DraftPlaybackContract::completePreviewBuild(std::uint64_t requestId)
@@ -226,7 +232,8 @@ bool DraftPlaybackContract::completeDeviceRestart(bool restored)
 
 DraftPlaybackBuildRequest DraftPlaybackContract::requestBuild(DraftPlaybackPendingRequest& pending,
                                                               const std::string& kind,
-                                                              const std::string& state)
+                                                              const std::string& state,
+                                                              PlaybackSnapshotLifecycleState pendingLifecycleState)
 {
     DraftPlaybackBuildRequest request;
     request.requestedRevision = status.draftRevision;
@@ -247,8 +254,8 @@ DraftPlaybackBuildRequest DraftPlaybackContract::requestBuild(DraftPlaybackPendi
     pending.requestId = nextRequestId++;
     pending.cancellationId = pending.requestId;
     pending.requestedRevision = status.draftRevision;
-    pending.lifecycleState = PlaybackSnapshotLifecycleState::preparing;
-    pending.state = "Preparing";
+    pending.lifecycleState = pendingLifecycleState;
+    pending.state = toString(pendingLifecycleState);
 
     request.accepted = true;
     request.requestId = pending.requestId;
@@ -392,39 +399,68 @@ void DraftPlaybackContract::refreshPreparedStates()
     if (!status.projectOpen)
         return;
 
+    status.pendingPreview.lifecycleState = status.pendingPreview.active
+        ? PlaybackSnapshotLifecycleState::preparing
+        : PlaybackSnapshotLifecycleState::idle;
+    status.pendingPerformance.lifecycleState = status.pendingPerformance.active
+        ? PlaybackSnapshotLifecycleState::activating
+        : PlaybackSnapshotLifecycleState::idle;
+
     if (status.deviceRestartInProgress)
     {
         status.preview.state = "Restarting";
         status.performance.state = "Restarting";
+        status.preview.lifecycleState = status.preview.available
+            ? PlaybackSnapshotLifecycleState::ready
+            : PlaybackSnapshotLifecycleState::idle;
+        status.performance.lifecycleState = status.performance.available
+            ? PlaybackSnapshotLifecycleState::active
+            : PlaybackSnapshotLifecycleState::idle;
         return;
     }
 
     if (status.pendingPreview.active)
     {
         status.preview.state = status.preview.available ? "Stale" : "Preparing";
+        status.preview.lifecycleState = status.preview.available
+            ? PlaybackSnapshotLifecycleState::ready
+            : PlaybackSnapshotLifecycleState::preparing;
     }
     else if (!status.preview.available)
     {
         if (status.preview.findings.empty())
             status.preview.state = "Idle";
+
+        status.preview.lifecycleState = status.preview.findings.empty()
+            ? PlaybackSnapshotLifecycleState::idle
+            : PlaybackSnapshotLifecycleState::failed;
     }
     else
     {
         status.preview.state = status.preview.revision == status.draftRevision ? "Ready" : "Stale";
+        status.preview.lifecycleState = PlaybackSnapshotLifecycleState::ready;
     }
 
     if (status.pendingPerformance.active)
     {
         status.performance.state = status.performance.available ? "Active" : "Preparing";
+        status.performance.lifecycleState = status.performance.available
+            ? PlaybackSnapshotLifecycleState::active
+            : PlaybackSnapshotLifecycleState::activating;
     }
     else if (!status.performance.available)
     {
         if (status.performance.findings.empty())
             status.performance.state = "Idle";
+
+        status.performance.lifecycleState = status.performance.findings.empty()
+            ? PlaybackSnapshotLifecycleState::idle
+            : PlaybackSnapshotLifecycleState::failed;
     }
     else
     {
         status.performance.state = "Active";
+        status.performance.lifecycleState = PlaybackSnapshotLifecycleState::active;
     }
 }
 

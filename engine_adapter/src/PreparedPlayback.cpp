@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
+#include <memory>
 #include <numeric>
 #include <sstream>
 #include <unordered_map>
@@ -330,18 +331,45 @@ std::string describePreparedSampleImportFailure(const SampleImportResult& result
     return result.state + " - " + summarizeIssues(result.issues);
 }
 
+std::uint64_t computeNormalizedChannelBytes(const std::vector<std::vector<float>>& normalizedChannels)
+{
+    return std::accumulate(
+        normalizedChannels.begin(),
+        normalizedChannels.end(),
+        std::uint64_t{0},
+        [](std::uint64_t total, const std::vector<float>& channel)
+        {
+            return total + (static_cast<std::uint64_t>(channel.size()) * static_cast<std::uint64_t>(sizeof(float)));
+        });
+}
+
 std::uint64_t computeDecodedSampleBytes(const ImportedSampleData& sample)
 {
-    return static_cast<std::uint64_t>(sample.metadata.channelCount)
-        * sample.metadata.frameCount
-        * static_cast<std::uint64_t>(sizeof(float));
+    return computeNormalizedChannelBytes(sample.normalizedChannels);
 }
 
 std::uint64_t computePreparedSampleDataBytes(const PreparedPlaybackSampleHandle& sample)
 {
-    return static_cast<std::uint64_t>(sample.channelCount)
-        * sample.frameCount
-        * static_cast<std::uint64_t>(sizeof(float));
+    return sample.decodedSampleData != nullptr
+        ? computeNormalizedChannelBytes(sample.decodedSampleData->normalizedChannels)
+        : 0;
+}
+
+std::uint64_t computePreparedRetainedBytes(const PreparedPlaybackSampleHandle& sample)
+{
+    return computePreparedSampleDataBytes(sample);
+}
+
+bool equalDecodedSampleData(const std::shared_ptr<const PreparedPlaybackDecodedSampleData>& left,
+                            const std::shared_ptr<const PreparedPlaybackDecodedSampleData>& right)
+{
+    if (left == right)
+        return true;
+
+    if (left == nullptr || right == nullptr)
+        return false;
+
+    return left->normalizedChannels == right->normalizedChannels;
 }
 
 std::vector<std::string> collectDecodeMismatches(const ImportedSampleMetadata& decoded,
@@ -679,6 +707,9 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             sampleHandle.loopRangePresent = decodedSample.sample.metadata.loopRangePresent;
             sampleHandle.loopStartFrame = decodedSample.sample.metadata.loopStartFrame;
             sampleHandle.loopEndFrame = decodedSample.sample.metadata.loopEndFrame;
+            auto decodedSampleData = std::make_shared<PreparedPlaybackDecodedSampleData>();
+            decodedSampleData->normalizedChannels = decodedSample.sample.normalizedChannels;
+            sampleHandle.decodedSampleData = std::move(decodedSampleData);
             sampleHandle.ownershipToken = "cache:" + cacheKey;
             sampleHandle.cacheKey = cacheKey;
 
@@ -700,17 +731,18 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
 
             retireSupersededCacheEntries(sampleResolution.sampleSourceId, cacheKey, request.buildId);
 
+            const auto retainedSampleBytes = computePreparedRetainedBytes(sampleHandle);
             CacheEntry entry;
             entry.ownership.ownershipToken = sampleHandle.ownershipToken;
             entry.ownership.cacheKey = cacheKey;
             entry.ownership.sampleSourceId = sampleResolution.sampleSourceId;
             entry.ownership.streamSampleId = streamSample->sampleId;
             entry.ownership.lifetimeState = "active-cache-entry";
-            entry.ownership.retainedBytes = streamSample->payloadSizeBytes;
+            entry.ownership.retainedBytes = retainedSampleBytes;
             entry.ownership.preparedBuildId = request.buildId;
             entry.sample = sampleHandle;
             entry.stream = streamHandle;
-            entry.retainedBytes = streamSample->payloadSizeBytes;
+            entry.retainedBytes = retainedSampleBytes;
             cacheEntries.push_back({ cacheKey, std::move(entry) });
             ++result.metrics.cacheMissCount;
             result.metrics.decodedBytes += computeDecodedSampleBytes(decodedSample.sample);
@@ -732,7 +764,8 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
         result.prepared.streams.push_back(streamHandle);
         streamIndices.emplace(sampleResolution.sampleSourceId, streamIndex);
 
-        result.metrics.preparedBytes += streamHandle.payloadSizeBytes;
+        const auto retainedSampleBytes = computePreparedRetainedBytes(sampleHandle);
+        result.metrics.preparedBytes += retainedSampleBytes;
         result.metrics.preparedSampleDataBytes += computePreparedSampleDataBytes(sampleHandle);
     }
 
@@ -1104,6 +1137,18 @@ std::vector<PreparedPlaybackOwnershipRecord> PreparedPlaybackService::snapshotRe
     return records;
 }
 
+PreparedPlaybackWorkerStatus PreparedPlaybackService::getWorkerStatus() const
+{
+    std::lock_guard<std::mutex> lock(workerMutex);
+    return workerStatus;
+}
+
+bool PreparedPlaybackService::hasPendingQueuedBuilds() const
+{
+    std::lock_guard<std::mutex> lock(workerMutex);
+    return !queuedJobs.empty();
+}
+
 bool PreparedPlaybackService::waitForWorkerIdle(std::uint64_t timeoutMillis)
 {
     std::unique_lock<std::mutex> lock(workerMutex);
@@ -1278,6 +1323,7 @@ bool operator==(const PreparedPlaybackSampleHandle& left, const PreparedPlayback
         && left.loopRangePresent == right.loopRangePresent
         && left.loopStartFrame == right.loopStartFrame
         && left.loopEndFrame == right.loopEndFrame
+        && equalDecodedSampleData(left.decodedSampleData, right.decodedSampleData)
         && left.ownershipToken == right.ownershipToken
         && left.cacheKey == right.cacheKey
         && left.ownershipRecordIndex == right.ownershipRecordIndex;

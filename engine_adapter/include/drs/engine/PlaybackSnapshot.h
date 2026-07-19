@@ -100,6 +100,10 @@ struct PlaybackSnapshotZone
     std::uint64_t loopEndFrame = 0;
 };
 
+// S3.7-T5 deferral note: this remains a public aggregate for current builder, facade, and
+// regression-test plumbing. Treat it as a write-once build product after snapshot creation;
+// a dedicated encapsulation pass should replace direct field access with const views once
+// Sprint 4's shared-renderer read API stabilizes.
 struct ImmutablePlaybackSnapshot
 {
     std::string schemaName;

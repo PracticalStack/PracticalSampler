@@ -109,6 +109,10 @@ void requireFacadeSnapshotConsistency(drs::engine::EngineFacade& engineFacade, c
             context + " should mirror preview prepared ownership bytes.");
     require(performanceSnapshot.publishedPreparedOwnershipBytes == draftStatus.performance.preparedOwnershipBytes,
             context + " should mirror published prepared ownership bytes.");
+    require(performanceSnapshot.previewPreparedBytes == draftStatus.preview.preparedBytes,
+            context + " should mirror preview prepared residency bytes.");
+    require(performanceSnapshot.publishedPreparedBytes == draftStatus.performance.preparedBytes,
+            context + " should mirror published prepared residency bytes.");
     require(performanceSnapshot.previewPreparedBuildMicros == draftStatus.preview.preparedBuildDurationMicros,
             context + " should mirror preview prepared build duration.");
     require(performanceSnapshot.publishedPreparedBuildMicros == draftStatus.performance.preparedBuildDurationMicros,
@@ -241,6 +245,10 @@ void requireFacadeSnapshotConsistency(drs::engine::EngineFacade& engineFacade, c
             context + " should keep diagnostics and performance snapshots aligned on preview ownership bytes.");
     require(diagnosticsSnapshot.publishedPreparedOwnershipBytes == performanceSnapshot.publishedPreparedOwnershipBytes,
             context + " should keep diagnostics and performance snapshots aligned on published ownership bytes.");
+    require(diagnosticsSnapshot.previewPreparedBytes == performanceSnapshot.previewPreparedBytes,
+            context + " should keep diagnostics and performance snapshots aligned on preview residency bytes.");
+    require(diagnosticsSnapshot.publishedPreparedBytes == performanceSnapshot.publishedPreparedBytes,
+            context + " should keep diagnostics and performance snapshots aligned on published residency bytes.");
     require(diagnosticsSnapshot.previewPreparedBuildMicros == performanceSnapshot.previewPreparedBuildMicros,
             context + " should keep diagnostics and performance snapshots aligned on preview prepared build duration.");
     require(diagnosticsSnapshot.publishedPreparedBuildMicros == performanceSnapshot.publishedPreparedBuildMicros,
@@ -270,6 +278,18 @@ void requireFacadeSnapshotConsistency(drs::engine::EngineFacade& engineFacade, c
             context + " should keep diagnostics and performance snapshots aligned on prepared cache headroom bytes.");
     require(diagnosticsSnapshot.preparedCachePressureState == performanceSnapshot.preparedCachePressureState,
             context + " should keep diagnostics and performance snapshots aligned on prepared cache pressure state.");
+    require(performanceSnapshot.previewPreparedBytes == performanceSnapshot.previewPreparedOwnershipBytes
+                && performanceSnapshot.previewPreparedBytes == performanceSnapshot.previewPreparedSampleDataBytes,
+            context + " should report preview prepared residency bytes consistently across residency, ownership, and sample-data counters.");
+    require(performanceSnapshot.publishedPreparedBytes == performanceSnapshot.publishedPreparedOwnershipBytes
+                && performanceSnapshot.publishedPreparedBytes == performanceSnapshot.publishedPreparedSampleDataBytes,
+            context + " should report published prepared residency bytes consistently across residency, ownership, and sample-data counters.");
+    require(diagnosticsSnapshot.previewPreparedBytes == diagnosticsSnapshot.previewPreparedOwnershipBytes
+                && diagnosticsSnapshot.previewPreparedBytes == diagnosticsSnapshot.previewPreparedSampleDataBytes,
+            context + " should keep diagnostics preview prepared residency bytes aligned with ownership and sample-data counters.");
+    require(diagnosticsSnapshot.publishedPreparedBytes == diagnosticsSnapshot.publishedPreparedOwnershipBytes
+                && diagnosticsSnapshot.publishedPreparedBytes == diagnosticsSnapshot.publishedPreparedSampleDataBytes,
+            context + " should keep diagnostics published prepared residency bytes aligned with ownership and sample-data counters.");
     require(statusSnapshot.detail.find("Snapshot ids:") != std::string::npos,
             context + " should keep the shell-facing contract line for snapshot ids.");
     require(statusSnapshot.detail.find("Snapshot digests:") != std::string::npos,
@@ -288,6 +308,12 @@ void requireFacadeSnapshotConsistency(drs::engine::EngineFacade& engineFacade, c
             context + " should keep the shell-facing contract line for prepared cache pressure policy.");
     require(statusSnapshot.detail.find("budgetBytes=") != std::string::npos,
             context + " should keep the shell-facing contract line for prepared cache byte budget.");
+    require(statusSnapshot.detail.find("Prepared playback residency:") != std::string::npos,
+            context + " should keep the shell-facing contract line for prepared residency bytes.");
+    require(statusSnapshot.detail.find("previewResidentBytes=") != std::string::npos,
+            context + " should keep the shell-facing contract label for preview retained residency bytes.");
+    require(statusSnapshot.detail.find("previewResidentMatchesOwnership=yes") != std::string::npos,
+            context + " should report that preview residency bytes align with ownership accounting.");
     require(statusSnapshot.detail.find("Prepared build metrics:") != std::string::npos,
             context + " should keep the shell-facing contract line for prepared build metrics.");
     require(statusSnapshot.detail.find("previewBuildMicros=") != std::string::npos,

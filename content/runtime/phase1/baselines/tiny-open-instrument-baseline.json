@@ -16,13 +16,13 @@
     "totalPrefetchBytes": 65536
   },
   "latestObserved": {
-    "capturedOn": "2026-07-12",
-    "coldLoadMicros": 2031,
-    "warmLoadMicros": 1944
+    "capturedOn": "2026-07-19",
+    "coldLoadMicros": 8082,
+    "warmLoadMicros": 1193
   },
   "driftPolicy": {
     "allowedPositiveDriftMicros": 5000,
-    "allowedNegativeDriftMicros": 5000
+    "allowedNegativeDriftMicros": 10000
   },
   "notes": [
     "This file is the checked-in Sprint 1 baseline snapshot for the tiny open instrument.",

@@ -126,6 +126,28 @@ target_include_directories(drs_hise_frontend_bridge
 
 target_compile_features(drs_hise_frontend_bridge PUBLIC cxx_std_17)
 
+add_library(drs_sample_import STATIC
+    src/SampleImport.cpp
+    include/drs/engine/SampleImport.h
+)
+
+target_include_directories(drs_sample_import
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/third_party/juce/modules
+)
+
+target_compile_definitions(drs_sample_import
+    PRIVATE
+        JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1
+        JUCE_MODULE_AVAILABLE_juce_audio_basics=1
+        JUCE_MODULE_AVAILABLE_juce_audio_formats=1
+        JUCE_MODULE_AVAILABLE_juce_core=1
+)
+
+target_compile_features(drs_sample_import PUBLIC cxx_std_17)
+
 add_library(drs_engine_adapter STATIC
     src/AuthoringSession.cpp
     src/DraftPlaybackContract.cpp
@@ -221,6 +243,10 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
 )
 
 set_target_properties(drs_hise_frontend_bridge PROPERTIES
+    FOLDER "Product"
+)
+
+set_target_properties(drs_sample_import PROPERTIES
     FOLDER "Product"
 )
 

@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <condition_variable>
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -33,6 +34,11 @@ struct PreparedPlaybackOwnershipRecord
     std::uint64_t retiredByBuildId = 0;
 };
 
+struct PreparedPlaybackDecodedSampleData
+{
+    std::vector<std::vector<float>> normalizedChannels;
+};
+
 struct PreparedPlaybackSampleHandle
 {
     std::string sampleSourceId;
@@ -52,6 +58,7 @@ struct PreparedPlaybackSampleHandle
     bool loopRangePresent = false;
     std::uint64_t loopStartFrame = 0;
     std::uint64_t loopEndFrame = 0;
+    std::shared_ptr<const PreparedPlaybackDecodedSampleData> decodedSampleData;
     std::string ownershipToken;
     std::string cacheKey;
     std::size_t ownershipRecordIndex = 0;
@@ -104,6 +111,10 @@ struct PreparedPlaybackZoneHandle
     std::uint64_t loopEndFrame = 0;
 };
 
+// S3.7-T5 deferral note: this remains a public aggregate for current prepared-cache plumbing,
+// facade wiring, and regression tests. Treat it as a write-once build product after preparation
+// completes; a dedicated encapsulation pass should hide mutable storage behind const views once
+// Sprint 4's shared-renderer consumption API is settled.
 struct ImmutablePreparedPlayback
 {
     std::uint64_t snapshotBuildId = 0;
@@ -128,8 +139,11 @@ struct PreparedPlaybackMetrics
     std::size_t preparedStreamCount = 0;
     std::size_t preparedZoneCount = 0;
     std::size_t preparedOwnershipRecordCount = 0;
+    // Total retained residency exposed by the prepared result.
     std::uint64_t preparedBytes = 0;
+    // Cache-ownership accounting for the retained prepared residency.
     std::uint64_t preparedOwnershipBytes = 0;
+    // Decoded PCM retained by prepared sample handles.
     std::uint64_t preparedSampleDataBytes = 0;
     std::uint64_t decodedBytes = 0;
     std::size_t cacheHitCount = 0;
@@ -275,8 +289,8 @@ public:
     std::size_t serviceRetiredCacheCleanup(std::size_t maxEntries = static_cast<std::size_t>(-1));
     std::size_t retireStaleCacheEntries(std::size_t maxEntries = static_cast<std::size_t>(-1));
     std::vector<PreparedPlaybackOwnershipRecord> snapshotRetiredOwnershipRecords() const;
-    const PreparedPlaybackWorkerStatus& getWorkerStatus() const { return workerStatus; }
-    bool hasPendingQueuedBuilds() const { return !queuedJobs.empty(); }
+    PreparedPlaybackWorkerStatus getWorkerStatus() const;
+    bool hasPendingQueuedBuilds() const;
     bool waitForWorkerIdle(std::uint64_t timeoutMillis);
     bool isBackgroundWorkerEnabled() const { return backgroundWorkerEnabled; }
 

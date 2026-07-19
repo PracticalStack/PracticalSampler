@@ -68,12 +68,12 @@ juce_add_console_app(drs_phase1_draft_playback_contract_tests
 target_sources(drs_phase1_draft_playback_contract_tests
     PRIVATE
         src/Phase1DraftPlaybackContractTests.cpp
-        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
 )
 
 target_link_libraries(drs_phase1_draft_playback_contract_tests
     PRIVATE
         drs_engine_adapter
+        drs_sample_import
         juce::juce_audio_formats
     PUBLIC
         juce::juce_recommended_config_flags
@@ -95,12 +95,12 @@ juce_add_console_app(drs_phase1_draft_playback_facade_tests
 target_sources(drs_phase1_draft_playback_facade_tests
     PRIVATE
         src/Phase1DraftPlaybackFacadeTests.cpp
-        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
 )
 
 target_link_libraries(drs_phase1_draft_playback_facade_tests
     PRIVATE
         drs_engine_adapter
+        drs_sample_import
         juce::juce_audio_formats
     PUBLIC
         juce::juce_recommended_config_flags
@@ -147,12 +147,12 @@ juce_add_console_app(drs_phase1_prepared_playback_tests
 target_sources(drs_phase1_prepared_playback_tests
     PRIVATE
         src/Phase1PreparedPlaybackTests.cpp
-        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
 )
 
 target_link_libraries(drs_phase1_prepared_playback_tests
     PRIVATE
         drs_engine_adapter
+        drs_sample_import
         juce::juce_audio_formats
     PUBLIC
         juce::juce_recommended_config_flags
@@ -174,12 +174,12 @@ juce_add_console_app(drs_phase1_prepared_playback_worker_tests
 target_sources(drs_phase1_prepared_playback_worker_tests
     PRIVATE
         src/Phase1PreparedPlaybackWorkerTests.cpp
-        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
 )
 
 target_link_libraries(drs_phase1_prepared_playback_worker_tests
     PRIVATE
         drs_engine_adapter
+        drs_sample_import
         juce::juce_audio_formats
     PUBLIC
         juce::juce_recommended_config_flags
@@ -314,6 +314,7 @@ target_sources(drs_phase2_authoring_import_tests
 target_link_libraries(drs_phase2_authoring_import_tests
     PRIVATE
         drs_engine_adapter
+        drs_sample_import
         juce::juce_audio_formats
     PUBLIC
         juce::juce_recommended_config_flags
@@ -445,13 +446,13 @@ juce_add_console_app(drs_phase2_performance_ui_tests
 target_sources(drs_phase2_performance_ui_tests
     PRIVATE
         src/Phase2PerformanceUiTests.cpp
-        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
 )
 
 target_link_libraries(drs_phase2_performance_ui_tests
     PRIVATE
         drs_app_shared
         drs_engine_adapter
+        drs_sample_import
         juce::juce_audio_formats
         juce::juce_gui_extra
     PUBLIC
@@ -553,12 +554,12 @@ juce_add_console_app(drs_phase1_diagnostics_tests
 target_sources(drs_phase1_diagnostics_tests
     PRIVATE
         src/Phase1DiagnosticsTests.cpp
-        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
 )
 
 target_link_libraries(drs_phase1_diagnostics_tests
     PRIVATE
         drs_engine_adapter
+        drs_sample_import
         juce::juce_audio_formats
     PUBLIC
         juce::juce_recommended_config_flags
@@ -580,12 +581,12 @@ juce_add_console_app(drs_phase1_failure_handling_tests
 target_sources(drs_phase1_failure_handling_tests
     PRIVATE
         src/Phase1FailureHandlingTests.cpp
-        ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
 )
 
 target_link_libraries(drs_phase1_failure_handling_tests
     PRIVATE
         drs_engine_adapter
+        drs_sample_import
         juce::juce_audio_formats
     PUBLIC
         juce::juce_recommended_config_flags
@@ -664,6 +665,7 @@ target_sources(drs_phase1_sample_import_tests
 target_link_libraries(drs_phase1_sample_import_tests
     PRIVATE
         drs_engine_adapter
+        drs_sample_import
         juce::juce_audio_formats
     PUBLIC
         juce::juce_recommended_config_flags
@@ -695,6 +697,7 @@ target_sources(drs_phase1_compile_path_tests
 target_link_libraries(drs_phase1_compile_path_tests
     PRIVATE
         drs_engine_adapter
+        drs_sample_import
         juce::juce_audio_formats
     PUBLIC
         juce::juce_recommended_config_flags
@@ -727,6 +730,7 @@ target_sources(drs_phase1_pipeline_report
 target_link_libraries(drs_phase1_pipeline_report
     PRIVATE
         drs_engine_adapter
+        drs_sample_import
         drs_plugin_shell
         drs_standalone_shell
         juce::juce_audio_formats
@@ -1027,6 +1031,51 @@ target_include_directories(drs_phase1_runtime_fixture_tool
 add_test(
     NAME drs.phase1.fixture_tool_verify
     COMMAND drs_phase1_runtime_fixture_tool --verify
+)
+
+add_custom_target(drs_all_tests)
+
+add_dependencies(drs_all_tests
+    drs_phase0_smoke_tests
+    drs_phase1_runtime_contract_tests
+    drs_phase1_draft_playback_contract_tests
+    drs_phase1_draft_playback_facade_tests
+    drs_phase1_playback_snapshot_tests
+    drs_phase1_prepared_playback_tests
+    drs_phase1_prepared_playback_worker_tests
+    drs_phase1_realtime_safety_tests
+    drs_phase1_preset_state_tests
+    drs_phase1_state_recall_tests
+    drs_phase2_authoring_foundation_tests
+    drs_phase2_authoring_import_tests
+    drs_phase2_mapping_workspace_tests
+    drs_phase2_waveform_preview_tests
+    drs_phase2_macro_routing_tests
+    drs_phase2_performance_bank_tests
+    drs_phase2_performance_ui_tests
+    drs_phase2_authoring_playback_integration_tests
+    drs_phase2_authoring_ui_tests
+    drs_phase2_repeated_structure_density_tests
+    drs_phase1_diagnostics_tests
+    drs_phase1_failure_handling_tests
+    drs_phase1_macro_bridge_tests
+    drs_phase1_runtime_baseline_report
+    drs_phase1_sample_import_tests
+    drs_phase1_compile_path_tests
+    drs_phase1_pipeline_report
+    drs_phase1_benchmark_scene
+    drs_phase1_stream_reader_tests
+    drs_phase1_streaming_service_tests
+    drs_phase1_voice_runtime_tests
+    drs_phase1_note_routing_tests
+    drs_phase1_load_profile_tests
+    drs_phase1_runtime_counters_tests
+    drs_phase1_runtime_baseline_guard
+    drs_phase1_runtime_fixture_tool
+)
+
+set_target_properties(drs_all_tests PROPERTIES
+    FOLDER "Tests"
 )
 
 set_target_properties(drs_phase0_smoke_tests PROPERTIES

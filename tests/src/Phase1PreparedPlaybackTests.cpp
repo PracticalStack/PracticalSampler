@@ -176,9 +176,14 @@ std::uint64_t computeExpectedPreparedSampleDataBytes(const drs::engine::Immutabl
 
     for (const auto& sample : prepared.samples)
     {
-        sampleDataBytes += static_cast<std::uint64_t>(sample.channelCount)
-            * sample.frameCount
-            * static_cast<std::uint64_t>(sizeof(float));
+        require(sample.decodedSampleData != nullptr,
+                "Prepared sample handles should retain decoded sample data for playback reuse.");
+
+        for (const auto& channel : sample.decodedSampleData->normalizedChannels)
+        {
+            sampleDataBytes += static_cast<std::uint64_t>(channel.size())
+                * static_cast<std::uint64_t>(sizeof(float));
+        }
     }
 
     return sampleDataBytes;
@@ -294,6 +299,8 @@ int main()
                 "Prepared playback metrics should expose ownership-record counts.");
         require(firstPrepared.metrics.preparedOwnershipBytes == firstPrepared.metrics.preparedBytes,
                 "Prepared playback metrics should expose ownership-safe retained-byte totals.");
+        require(firstPrepared.metrics.preparedBytes == firstPrepared.metrics.preparedSampleDataBytes,
+                "Prepared playback residency bytes should match the retained decoded sample-data footprint.");
         require(firstPrepared.metrics.activeCachedOwnershipRecordCount == firstPrepared.prepared.ownershipRecords.size(),
                 "Prepared playback metrics should expose active cached ownership-record counts.");
         require(firstPrepared.metrics.retiredOwnershipRecordCount == 0,
@@ -361,6 +368,17 @@ int main()
                     "Prepared sample handles should preserve runtime stream source fingerprint metadata.");
             require(preparedSample.loopRangePresent == streamSample->loopRangePresent,
                     "Prepared sample handles should preserve loop-range presence metadata.");
+            require(preparedSample.decodedSampleData != nullptr,
+                    "Prepared sample handles should retain immutable decoded sample data.");
+            require(preparedSample.decodedSampleData->normalizedChannels.size() == preparedSample.channelCount,
+                    "Prepared sample handles should retain one normalized channel per decoded channel.");
+
+            const auto importedPreparedSample = drs::engine::importSampleFile(preparedSample.sourcePath);
+            require(importedPreparedSample.imported,
+                    "Prepared sample data retention checks must be able to re-import the source sample.");
+            require(importedPreparedSample.sample.normalizedChannels
+                        == preparedSample.decodedSampleData->normalizedChannels,
+                    "Prepared sample handles should retain the decoded normalized channel buffers, not just metadata.");
 
             if (streamSample->loopRangePresent)
             {

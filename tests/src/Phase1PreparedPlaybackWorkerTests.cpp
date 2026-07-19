@@ -26,9 +26,14 @@ std::uint64_t computePreparedSampleDataBytes(const drs::engine::ImmutablePrepare
 
     for (const auto& sample : prepared.samples)
     {
-        sampleDataBytes += static_cast<std::uint64_t>(sample.channelCount)
-            * sample.frameCount
-            * static_cast<std::uint64_t>(sizeof(float));
+        require(sample.decodedSampleData != nullptr,
+                "Prepared worker results should retain decoded sample data for playback reuse.");
+
+        for (const auto& channel : sample.decodedSampleData->normalizedChannels)
+        {
+            sampleDataBytes += static_cast<std::uint64_t>(channel.size())
+                * static_cast<std::uint64_t>(sizeof(float));
+        }
     }
 
     return sampleDataBytes;
@@ -102,6 +107,9 @@ int main()
         require(processedColdPreview.result.metrics.preparedSampleDataBytes
                     == computePreparedSampleDataBytes(processedColdPreview.result.prepared),
                 "Cold preview preparation should expose deterministic prepared sample-data bytes.");
+        require(!processedColdPreview.result.prepared.samples.empty()
+                    && processedColdPreview.result.prepared.samples.front().decodedSampleData != nullptr,
+                "Cold preview preparation should retain decoded sample buffers in the prepared handles.");
         require(processedColdPreview.result.metrics.decodedBytes > 0,
                 "Cold preview preparation should decode source samples through the worker-owned preparation seam.");
         const auto queuedWarmPreviewRevision0 = previewDecodeService.enqueuePreviewBuild(coldPreviewRevision0);

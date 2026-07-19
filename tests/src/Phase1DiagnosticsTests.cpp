@@ -48,6 +48,8 @@ int main()
                 "Default diagnostics snapshot should expose prepared ownership-record counts.");
         require(defaultDiagnostics.previewPreparedOwnershipBytes == defaultDiagnostics.previewPreparedBytes,
                 "Default diagnostics snapshot should expose ownership-safe prepared byte totals.");
+        require(defaultDiagnostics.previewPreparedBytes == defaultDiagnostics.previewPreparedSampleDataBytes,
+                "Default diagnostics snapshot should expose prepared residency bytes that match retained decoded sample data.");
         require(defaultDiagnostics.previewPreparedBuildMicros > 0,
                 "Default diagnostics snapshot should expose prepared build duration.");
         require(defaultDiagnostics.previewPreparedSampleDataBytes > 0,
@@ -130,6 +132,11 @@ int main()
         require(leadDiagnostics.previewPreparedSampleDataBytes > 0
                     && leadDiagnostics.publishedPreparedSampleDataBytes > 0,
                 "Lead diagnostics snapshot should preserve prepared sample-data byte counts.");
+        require(leadDiagnostics.previewPreparedBytes == leadDiagnostics.previewPreparedOwnershipBytes
+                    && leadDiagnostics.previewPreparedBytes == leadDiagnostics.previewPreparedSampleDataBytes
+                    && leadDiagnostics.publishedPreparedBytes == leadDiagnostics.publishedPreparedOwnershipBytes
+                    && leadDiagnostics.publishedPreparedBytes == leadDiagnostics.publishedPreparedSampleDataBytes,
+                "Lead diagnostics snapshot should keep prepared residency, ownership, and retained sample-data bytes aligned.");
         require(leadDiagnostics.previewPreparationCacheHitRate >= 0.0
                     && leadDiagnostics.previewPreparationCacheHitRate <= 1.0
                     && leadDiagnostics.publishedPreparationCacheHitRate >= 0.0

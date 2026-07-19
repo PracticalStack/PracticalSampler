@@ -31,7 +31,6 @@ set(DRS_STANDALONE_SOURCES
 )
 
 set(DRS_PLUGIN_SOURCES
-    ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
     src/plugin/PluginEditor.cpp
     src/plugin/PluginEditor.h
     src/plugin/PluginProcessor.cpp
@@ -91,6 +90,7 @@ target_include_directories(drs_plugin_shell
 target_link_libraries(drs_plugin_shell
     PUBLIC
         drs_app_shared
+        drs_sample_import
         juce::juce_audio_formats
         juce::juce_audio_utils
 )
@@ -184,10 +184,6 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     src/plugin/PluginEditor.h
     src/plugin/PluginProcessor.cpp
     src/plugin/PluginProcessor.h
-)
-
-source_group("External Sources" FILES
-    ${CMAKE_SOURCE_DIR}/engine_adapter/src/SampleImport.cpp
 )
 
 set_target_properties(drs_app_shared PROPERTIES FOLDER "Product")

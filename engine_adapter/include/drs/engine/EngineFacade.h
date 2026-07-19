@@ -313,7 +313,7 @@ public:
     EngineDiagnosticsSnapshot getDiagnosticsSnapshot() const;
     EnginePerformanceSnapshot getPerformanceSnapshot() const;
     const DraftPlaybackStatus& getDraftPlaybackStatus() const { return draftPlaybackContract.getStatus(); }
-    const PreparedPlaybackWorkerStatus& getPreparedPlaybackWorkerStatus() const
+    PreparedPlaybackWorkerStatus getPreparedPlaybackWorkerStatus() const
     {
         return preparedPlaybackService.getWorkerStatus();
     }

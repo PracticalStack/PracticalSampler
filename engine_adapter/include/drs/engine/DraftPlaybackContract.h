@@ -26,10 +26,13 @@ struct DraftPlaybackPreparedRevision
     std::size_t preparedStreamCount = 0;
     std::size_t preparedZoneCount = 0;
     std::size_t preparedOwnershipRecordCount = 0;
+    // Retained prepared residency surfaced to shell and diagnostics consumers.
     std::uint64_t preparedBytes = 0;
+    // Ownership-safe accounting view of the retained prepared residency.
     std::uint64_t preparedOwnershipBytes = 0;
     std::uint64_t preparedBuildDurationMicros = 0;
     std::uint64_t preparedDecodedBytes = 0;
+    // Decoded PCM retained by prepared sample handles.
     std::uint64_t preparedSampleDataBytes = 0;
     bool playableRangeAvailable = false;
     int lowestPlayableNote = 0;
@@ -112,7 +115,8 @@ public:
 private:
     DraftPlaybackBuildRequest requestBuild(DraftPlaybackPendingRequest& pending,
                                            const std::string& kind,
-                                           const std::string& state);
+                                           const std::string& state,
+                                           PlaybackSnapshotLifecycleState pendingLifecycleState);
     bool completeBuild(DraftPlaybackPendingRequest& pending,
                        DraftPlaybackPreparedRevision& prepared,
                        const PlaybackSnapshotBuildResult* buildResult,

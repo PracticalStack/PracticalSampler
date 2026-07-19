@@ -131,6 +131,8 @@ int main()
                 "Engine snapshot detail must describe prepared-playback worker activity.");
         require(statusSnapshot.detail.find("Prepared cache policy:") != std::string::npos,
                 "Engine snapshot detail must describe the prepared cache pressure policy.");
+        require(statusSnapshot.detail.find("Prepared playback residency:") != std::string::npos,
+                "Engine snapshot detail must describe retained prepared residency bytes.");
         require(statusSnapshot.detail.find("Prepared build metrics:") != std::string::npos,
                 "Engine snapshot detail must describe prepared build metrics.");
         require(!statusSnapshot.nextSteps.empty(), "Engine snapshot must expose at least one Phase 0 next step.");

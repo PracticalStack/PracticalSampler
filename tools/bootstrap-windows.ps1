@@ -28,15 +28,17 @@ Write-Host "Developer shell: $vsDevCmd"
 Push-Location $root
 try {
     $configureCommand = "cmake --preset $configurePreset"
-    $buildCommand = "cmake --build --preset $buildPreset --target drs_hise_frontend_plugin_probe DecentRhapsodyStudioApp DecentRhapsodyStudioPlugin drs_phase0_smoke_tests"
+    $bootstrapTargets = "drs_hise_frontend_plugin_probe DecentRhapsodyStudioApp DecentRhapsodyStudioPlugin"
+    $smokeBuildCommand = "cmake --build --preset $buildPreset --target $bootstrapTargets drs_phase0_smoke_tests"
+    $fullTestBuildCommand = "cmake --build --preset $buildPreset --target $bootstrapTargets drs_all_tests"
     $testCommand = "ctest --preset $testPreset"
 
     $fullCommand = if ($SkipBuild) {
         "call `"$vsDevCmd`" -arch=amd64 && $configureCommand"
     } elseif ($RunTests) {
-        "call `"$vsDevCmd`" -arch=amd64 && $configureCommand && $buildCommand && $testCommand"
+        "call `"$vsDevCmd`" -arch=amd64 && $configureCommand && $fullTestBuildCommand && $testCommand"
     } else {
-        "call `"$vsDevCmd`" -arch=amd64 && $configureCommand && $buildCommand"
+        "call `"$vsDevCmd`" -arch=amd64 && $configureCommand && $smokeBuildCommand"
     }
 
     cmd /c $fullCommand

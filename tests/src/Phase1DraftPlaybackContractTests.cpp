@@ -83,6 +83,8 @@ int main()
 
         const auto initialPreview = contract.requestPreviewBuild();
         require(initialPreview.accepted, "Initial preview build should be accepted.");
+        require(initialPreview.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::preparing,
+                "Initial preview request should report the preparing lifecycle state.");
         const auto initialPreviewBuild = buildPrepared(snapshotBuilder,
                                                        preparedService,
                                                        referenceStream,
@@ -108,8 +110,14 @@ int main()
                 "Initial publish build should complete successfully.");
         require(contract.getStatus().preview.available && contract.getStatus().preview.revision == 0,
                 "Initial preview build should track draft revision 0.");
+        require(contract.getStatus().preview.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::ready,
+                "Initial preview build should surface the ready lifecycle state.");
         require(contract.getStatus().performance.available && contract.getStatus().performance.revision == 0,
                 "Initial publish build should track revision 0.");
+        require(initialPublish.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::activating,
+                "Initial publish request should report the activating lifecycle state.");
+        require(contract.getStatus().performance.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::active,
+                "Initial publish build should surface the active lifecycle state.");
         require(!contract.getStatus().preview.contentDigest.empty(),
                 "Initial preview build should carry a playback snapshot digest.");
         require(contract.getStatus().preview.preparedAssetsAvailable,
@@ -158,8 +166,15 @@ int main()
 
         const auto publishRevision1 = contract.requestPerformanceBuild();
         require(publishRevision1.accepted, "Revision 1 publish build should be accepted.");
+        require(publishRevision1.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::activating,
+                "Revision 1 publish request should report the activating lifecycle state.");
         require(contract.getStatus().performance.revision == 0,
                 "Published revision must not change before Apply finishes.");
+        require(contract.getStatus().pendingPerformance.lifecycleState
+                    == drs::engine::PlaybackSnapshotLifecycleState::activating,
+                "Pending publish work should surface the activating lifecycle state.");
+        require(contract.getStatus().performance.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::active,
+                "While publish is pending, the last good published revision should remain active.");
         const auto publishRevision1Build = buildPrepared(snapshotBuilder,
                                                          preparedService,
                                                          referenceStream,
@@ -172,6 +187,8 @@ int main()
                 "Revision 1 publish build should complete successfully.");
         require(contract.getStatus().performance.revision == 1,
                 "Published performance revision should change only after a successful Apply.");
+        require(contract.getStatus().performance.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::active,
+                "Successful publish should leave the published revision active.");
 
         auto secondEdit = controller.getProject();
         secondEdit.authoring.zones[1].pan = -0.2;
@@ -244,6 +261,8 @@ int main()
                 "Preview failure should retain the last good preview revision.");
         require(contract.getStatus().preview.state == "Stale",
                 "Preview failure against a newer draft should mark preview stale.");
+        require(contract.getStatus().preview.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::ready,
+                "Preview failure against a newer draft should preserve the last good preview lifecycle state.");
         require(!contract.getStatus().preview.findings.empty(),
                 "Preview failure should surface actionable findings.");
 
@@ -263,6 +282,8 @@ int main()
                 "Invalid publish snapshot result should still be recorded against the contract.");
         require(contract.getStatus().performance.available && contract.getStatus().performance.revision == 4,
                 "Failed publish should preserve the last known-good performance revision.");
+        require(contract.getStatus().performance.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::active,
+                "Failed publish should preserve the last known-good active lifecycle state.");
         require(!contract.getStatus().performance.findings.empty(),
                 "Failed publish should surface actionable findings.");
 
@@ -353,9 +374,13 @@ int main()
         require(contract.getStatus().performance.available && contract.getStatus().performance.revision == 5
                     && contract.getStatus().performance.state == "Active",
                 "Successful device restart should restore the published revision as the active context.");
+        require(contract.getStatus().performance.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::active,
+                "Successful device restart should restore the active lifecycle state.");
         require(contract.getStatus().preview.available && contract.getStatus().preview.revision == 5
                     && contract.getStatus().preview.state == "Stale",
                 "Successful device restart should preserve preview identity while acknowledging the newer draft revision.");
+        require(contract.getStatus().preview.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::ready,
+                "Successful device restart should preserve the last good preview lifecycle state.");
 
         const auto phase1Project = drs::engine::loadPhase1ReferenceProjectManifest();
         require(phase1Project.loaded, "Phase 1 reference project must load before migrated contract coverage runs.");
@@ -385,6 +410,8 @@ int main()
         require(migratedContract.getStatus().preview.state
                     == "Prepared playback build rejected because the immutable snapshot is unavailable",
                 "Migrated project should preserve the rejected preview state before imported zones exist.");
+        require(migratedContract.getStatus().preview.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::failed,
+                "Migrated project without imported zones should surface a failed preview lifecycle state.");
         require(containsFinding(migratedContract.getStatus().preview.findings,
                                 drs::engine::PlaybackSnapshotFindingSeverity::error,
                                 "no-playable-zones",
@@ -409,6 +436,9 @@ int main()
         require(migratedContract.getStatus().performance.state
                     == "Prepared playback build rejected because the immutable snapshot is unavailable",
                 "Migrated project should preserve the rejected publish state before imported zones exist.");
+        require(migratedContract.getStatus().performance.lifecycleState
+                    == drs::engine::PlaybackSnapshotLifecycleState::failed,
+                "Migrated project without imported zones should surface a failed published lifecycle state.");
         require(containsFinding(migratedContract.getStatus().performance.findings,
                                 drs::engine::PlaybackSnapshotFindingSeverity::error,
                                 "no-playable-zones",
@@ -456,6 +486,8 @@ int main()
                     && migratedContract.getStatus().preview.revision == migratedImport.documentState.revision
                     && migratedContract.getStatus().preview.state == "Ready",
                 "Imported migrated project should expose a ready preview revision.");
+        require(migratedContract.getStatus().preview.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::ready,
+                "Imported migrated project should surface a ready preview lifecycle state.");
         require(migratedContract.getStatus().preview.preparedAssetsAvailable,
                 "Imported migrated project preview should expose prepared playback assets.");
         require(migratedContract.getStatus().preview.preparedZoneCount == 1,
@@ -490,6 +522,9 @@ int main()
                     && migratedContract.getStatus().performance.revision == migratedImport.documentState.revision
                     && migratedContract.getStatus().performance.state == "Active",
                 "Imported migrated project should expose an active published revision.");
+        require(migratedContract.getStatus().performance.lifecycleState
+                    == drs::engine::PlaybackSnapshotLifecycleState::active,
+                "Imported migrated project should surface an active published lifecycle state.");
         require(migratedContract.getStatus().performance.preparedAssetsAvailable,
                 "Imported migrated project publish should expose prepared playback assets.");
         require(migratedContract.getStatus().performance.preparationCacheHitCount

@@ -193,8 +193,8 @@ void applyPreparedCachePressurePolicy(Snapshot& snapshot)
 {
     snapshot.preparedCacheRetentionWorkingSetCount = preparedCacheRetentionWorkingSetCount;
     snapshot.preparedCacheWorkingSetBytes =
-        std::max({snapshot.previewPreparedOwnershipBytes,
-                  snapshot.publishedPreparedOwnershipBytes,
+        std::max({snapshot.previewPreparedBytes,
+                  snapshot.publishedPreparedBytes,
                   snapshot.preparedWorkerActiveOwnershipBytes});
     snapshot.preparedCacheByteBudget = saturatingMultiply(snapshot.preparedCacheWorkingSetBytes,
                                                           snapshot.preparedCacheRetentionWorkingSetCount);
@@ -711,8 +711,8 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
            << ", high=" << diagnostics.highestPlayableNote << "\n";
     detail << "Surface provenance: source=" << (diagnostics.surfaceStateSource.empty() ? "unavailable" : diagnostics.surfaceStateSource)
            << ", renderer=" << (diagnostics.rendererMode.empty() ? "unavailable" : diagnostics.rendererMode) << "\n";
-    detail << "Prepared playback bytes: preview=" << diagnostics.previewPreparedBytes
-           << ", publish=" << diagnostics.publishedPreparedBytes
+    detail << "Prepared playback residency: previewResidentBytes=" << diagnostics.previewPreparedBytes
+           << ", publishResidentBytes=" << diagnostics.publishedPreparedBytes
            << ", previewOwnership=" << diagnostics.previewPreparedOwnershipBytes
            << ", publishOwnership=" << diagnostics.publishedPreparedOwnershipBytes << "\n";
     detail << "Prepared build metrics: previewBuildMicros=" << diagnostics.previewPreparedBuildMicros
@@ -721,6 +721,10 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
            << ", publishDecodedBytes=" << diagnostics.publishedPreparedDecodedBytes
            << ", previewSampleDataBytes=" << diagnostics.previewPreparedSampleDataBytes
            << ", publishSampleDataBytes=" << diagnostics.publishedPreparedSampleDataBytes
+           << ", previewResidentMatchesOwnership="
+           << (diagnostics.previewPreparedBytes == diagnostics.previewPreparedOwnershipBytes ? "yes" : "no")
+           << ", publishResidentMatchesOwnership="
+           << (diagnostics.publishedPreparedBytes == diagnostics.publishedPreparedOwnershipBytes ? "yes" : "no")
            << ", previewHitRate=" << diagnostics.previewPreparationCacheHitRate
            << ", publishHitRate=" << diagnostics.publishedPreparationCacheHitRate << "\n";
     detail << "Prepared worker: pending=" << diagnostics.preparedWorkerPendingCount
@@ -976,7 +980,7 @@ EnginePerformanceSnapshot EngineFacade::getPerformanceSnapshot() const
     snapshot.loadIndicator = referenceInstrumentActive
         ? buildLoadIndicator(referenceManifest, referenceStream, currentSessionState)
         : "Click Load Default or Load Lead Demo";
-    const auto& workerStatus = preparedPlaybackService.getWorkerStatus();
+    const auto workerStatus = preparedPlaybackService.getWorkerStatus();
     snapshot.preparedWorkerPendingCount = workerStatus.pendingWorkCount;
     snapshot.preparedWorkerConfiguredMaxPendingCount = workerStatus.configuredMaxPendingWorkCount;
     snapshot.preparedWorkerConfiguredMaxInFlightCount = workerStatus.configuredMaxInFlightWorkCount;
@@ -1554,11 +1558,12 @@ bool EngineFacade::waitForPreparedPlaybackIdle(std::chrono::milliseconds timeout
     while (Clock::now() <= deadline)
     {
         serviceBackgroundWork();
+        const auto workerStatus = preparedPlaybackService.getWorkerStatus();
         if (pendingPreparedCompletions.empty()
             && !draftPlaybackContract.getStatus().pendingPreview.active
             && !draftPlaybackContract.getStatus().pendingPerformance.active
-            && preparedPlaybackService.getWorkerStatus().pendingWorkCount == 0
-            && preparedPlaybackService.getWorkerStatus().inFlightWorkCount == 0)
+            && workerStatus.pendingWorkCount == 0
+            && workerStatus.inFlightWorkCount == 0)
         {
             return true;
         }
@@ -1570,11 +1575,12 @@ bool EngineFacade::waitForPreparedPlaybackIdle(std::chrono::milliseconds timeout
     }
 
     serviceBackgroundWork();
+    const auto workerStatus = preparedPlaybackService.getWorkerStatus();
     return pendingPreparedCompletions.empty()
         && !draftPlaybackContract.getStatus().pendingPreview.active
         && !draftPlaybackContract.getStatus().pendingPerformance.active
-        && preparedPlaybackService.getWorkerStatus().pendingWorkCount == 0
-        && preparedPlaybackService.getWorkerStatus().inFlightWorkCount == 0;
+        && workerStatus.pendingWorkCount == 0
+        && workerStatus.inFlightWorkCount == 0;
 }
 
 EnginePreviewPlaybackSnapshot EngineFacade::auditionPreviewNote(int midiNote, int velocity)
