@@ -52,6 +52,42 @@ PlayableRangeSummary summarizePlayableRange(const PlaybackSnapshotBuildResult* s
     summary.highestNote = std::clamp(highestNote, summary.lowestNote, 127);
     return summary;
 }
+
+PlaybackActivationPayloadPtr buildActivationPayload(
+    PlaybackActivationLane lane,
+    std::size_t requestedRevision,
+    const PlaybackSnapshotBuildResult* snapshotResult,
+    const PreparedPlaybackBuildResult* preparedResult)
+{
+    if (snapshotResult == nullptr || preparedResult == nullptr
+        || !snapshotResult->built || !snapshotResult->activationEligible
+        || !preparedResult->built || !preparedResult->activationEligible
+        || snapshotResult->snapshot.draftRevision != requestedRevision
+        || preparedResult->requestedDraftRevision != requestedRevision
+        || preparedResult->snapshotBuildId != snapshotResult->buildId
+        || snapshotResult->snapshot.contentDigest.empty()
+        || preparedResult->prepared.preparedContentDigest.empty()
+        || preparedResult->prepared.snapshotContentDigest != snapshotResult->snapshot.contentDigest)
+    {
+        return {};
+    }
+
+    auto payload = std::make_shared<PlaybackActivationPayload>();
+    payload->lane = lane;
+    payload->revision = requestedRevision;
+    payload->snapshotBuildId = snapshotResult->buildId;
+    payload->preparedBuildId = preparedResult->buildId;
+    payload->lifecycleState = lane == PlaybackActivationLane::performance
+        ? PlaybackSnapshotLifecycleState::active
+        : PlaybackSnapshotLifecycleState::ready;
+    payload->activationEligible = true;
+    payload->snapshotContentDigest = snapshotResult->snapshot.contentDigest;
+    payload->preparedContentDigest = preparedResult->prepared.preparedContentDigest;
+    payload->retainedPreparedBytes = preparedResult->metrics.preparedBytes;
+    payload->snapshot = std::make_shared<const ImmutablePlaybackSnapshot>(snapshotResult->snapshot);
+    payload->prepared = std::make_shared<const ImmutablePreparedPlayback>(preparedResult->prepared);
+    return payload;
+}
 } // namespace
 
 DraftPlaybackContract::DraftPlaybackContract(std::size_t initialDraftRevision)
@@ -94,7 +130,8 @@ bool DraftPlaybackContract::completePreviewBuild(std::uint64_t requestId)
     if (!status.pendingPreview.active || status.pendingPreview.requestId != requestId)
         return false;
 
-    return completeBuild(status.pendingPreview, status.preview, nullptr, nullptr, "Ready");
+    return completeBuild(status.pendingPreview, status.preview, nullptr, nullptr,
+                         PlaybackActivationLane::preview, "Ready");
 }
 
 bool DraftPlaybackContract::completePerformanceBuild(std::uint64_t requestId)
@@ -102,7 +139,8 @@ bool DraftPlaybackContract::completePerformanceBuild(std::uint64_t requestId)
     if (!status.pendingPerformance.active || status.pendingPerformance.requestId != requestId)
         return false;
 
-    return completeBuild(status.pendingPerformance, status.performance, nullptr, nullptr, "Active");
+    return completeBuild(status.pendingPerformance, status.performance, nullptr, nullptr,
+                         PlaybackActivationLane::performance, "Active");
 }
 
 bool DraftPlaybackContract::completePreviewBuild(std::uint64_t requestId, const PlaybackSnapshotBuildResult& buildResult)
@@ -110,7 +148,8 @@ bool DraftPlaybackContract::completePreviewBuild(std::uint64_t requestId, const 
     if (!status.pendingPreview.active || status.pendingPreview.requestId != requestId)
         return false;
 
-    return completeBuild(status.pendingPreview, status.preview, &buildResult, nullptr, "Ready");
+    return completeBuild(status.pendingPreview, status.preview, &buildResult, nullptr,
+                         PlaybackActivationLane::preview, "Ready");
 }
 
 bool DraftPlaybackContract::completePerformanceBuild(std::uint64_t requestId, const PlaybackSnapshotBuildResult& buildResult)
@@ -118,7 +157,8 @@ bool DraftPlaybackContract::completePerformanceBuild(std::uint64_t requestId, co
     if (!status.pendingPerformance.active || status.pendingPerformance.requestId != requestId)
         return false;
 
-    return completeBuild(status.pendingPerformance, status.performance, &buildResult, nullptr, "Active");
+    return completeBuild(status.pendingPerformance, status.performance, &buildResult, nullptr,
+                         PlaybackActivationLane::performance, "Active");
 }
 
 bool DraftPlaybackContract::completePreviewBuild(std::uint64_t requestId,
@@ -128,7 +168,8 @@ bool DraftPlaybackContract::completePreviewBuild(std::uint64_t requestId,
     if (!status.pendingPreview.active || status.pendingPreview.requestId != requestId)
         return false;
 
-    return completeBuild(status.pendingPreview, status.preview, &snapshotResult, &preparedResult, "Ready");
+    return completeBuild(status.pendingPreview, status.preview, &snapshotResult, &preparedResult,
+                         PlaybackActivationLane::preview, "Ready");
 }
 
 bool DraftPlaybackContract::completePerformanceBuild(std::uint64_t requestId,
@@ -138,7 +179,8 @@ bool DraftPlaybackContract::completePerformanceBuild(std::uint64_t requestId,
     if (!status.pendingPerformance.active || status.pendingPerformance.requestId != requestId)
         return false;
 
-    return completeBuild(status.pendingPerformance, status.performance, &snapshotResult, &preparedResult, "Active");
+    return completeBuild(status.pendingPerformance, status.performance, &snapshotResult, &preparedResult,
+                         PlaybackActivationLane::performance, "Active");
 }
 
 bool DraftPlaybackContract::failPreviewBuild(std::uint64_t requestId,
@@ -273,48 +315,65 @@ bool DraftPlaybackContract::completeBuild(DraftPlaybackPendingRequest& pending,
                                           DraftPlaybackPreparedRevision& prepared,
                                           const PlaybackSnapshotBuildResult* buildResult,
                                           const PreparedPlaybackBuildResult* preparedBuildResult,
+                                          PlaybackActivationLane lane,
                                           const std::string& completedState)
 {
     const auto snapshotFailed = buildResult != nullptr && (!buildResult->built || !buildResult->activationEligible);
     const auto preparedFailed = preparedBuildResult != nullptr
         && (!preparedBuildResult->built || !preparedBuildResult->activationEligible);
-    if (snapshotFailed || preparedFailed)
+    const auto activationPayload = buildActivationPayload(lane,
+                                                          pending.requestedRevision,
+                                                          buildResult,
+                                                          preparedBuildResult);
+    const auto payloadRequired = buildResult != nullptr && preparedBuildResult != nullptr;
+    const auto payloadInvalid = payloadRequired && activationPayload == nullptr && !snapshotFailed && !preparedFailed;
+    if (snapshotFailed || preparedFailed || payloadInvalid)
     {
-        const auto failedState = preparedFailed
-            ? (preparedBuildResult->state.empty() ? completedState + " failed" : preparedBuildResult->state)
-            : (buildResult->state.empty() ? completedState + " failed" : buildResult->state);
+        const auto failedState = payloadInvalid
+            ? std::string("Activation payload identity mismatch")
+            : (preparedFailed
+                   ? (preparedBuildResult->state.empty() ? completedState + " failed" : preparedBuildResult->state)
+                   : (buildResult->state.empty() ? completedState + " failed" : buildResult->state));
         pending = {};
-        prepared.buildId = buildResult != nullptr ? buildResult->buildId : 0;
-        prepared.preparedBuildId = preparedBuildResult != nullptr ? preparedBuildResult->buildId : 0;
-        prepared.preparedAssetsAvailable = false;
-        prepared.preparationCacheHitCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.cacheHitCount : 0;
-        prepared.preparationCacheMissCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.cacheMissCount : 0;
-        prepared.preparedSampleCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedSampleCount : 0;
-        prepared.preparedStreamCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedStreamCount : 0;
-        prepared.preparedZoneCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedZoneCount : 0;
-        prepared.preparedOwnershipRecordCount = preparedBuildResult != nullptr
-            ? preparedBuildResult->metrics.preparedOwnershipRecordCount
-            : 0;
-        prepared.preparedBytes = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedBytes : 0;
-        prepared.preparedOwnershipBytes = preparedBuildResult != nullptr
-            ? preparedBuildResult->metrics.preparedOwnershipBytes
-            : 0;
-        prepared.preparedBuildDurationMicros = preparedBuildResult != nullptr ? preparedBuildResult->buildDurationMicros : 0;
-        prepared.preparedDecodedBytes = preparedBuildResult != nullptr ? preparedBuildResult->metrics.decodedBytes : 0;
-        prepared.preparedSampleDataBytes = preparedBuildResult != nullptr
-            ? preparedBuildResult->metrics.preparedSampleDataBytes
-            : 0;
-        prepared.playableRangeAvailable = false;
-        prepared.lowestPlayableNote = 0;
-        prepared.highestPlayableNote = 127;
         prepared.findings = mergeFindings(buildResult, preparedBuildResult);
-        prepared.activationEligible = false;
-        prepared.lifecycleState = preparedBuildResult != nullptr
-            ? preparedBuildResult->lifecycleState
-            : buildResult->lifecycleState;
-
+        if (payloadInvalid)
+        {
+            prepared.findings.push_back({ PlaybackSnapshotFindingSeverity::error,
+                                          "activation-payload-identity-mismatch",
+                                          "activationPayload",
+                                          "Snapshot and prepared identities do not form one immutable activation payload." });
+        }
         if (!prepared.available)
+        {
+            prepared.buildId = buildResult != nullptr ? buildResult->buildId : 0;
+            prepared.preparedBuildId = preparedBuildResult != nullptr ? preparedBuildResult->buildId : 0;
+            prepared.preparedAssetsAvailable = false;
+            prepared.preparationCacheHitCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.cacheHitCount : 0;
+            prepared.preparationCacheMissCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.cacheMissCount : 0;
+            prepared.preparedSampleCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedSampleCount : 0;
+            prepared.preparedStreamCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedStreamCount : 0;
+            prepared.preparedZoneCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedZoneCount : 0;
+            prepared.preparedOwnershipRecordCount = preparedBuildResult != nullptr
+                ? preparedBuildResult->metrics.preparedOwnershipRecordCount
+                : 0;
+            prepared.preparedBytes = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedBytes : 0;
+            prepared.preparedOwnershipBytes = preparedBuildResult != nullptr
+                ? preparedBuildResult->metrics.preparedOwnershipBytes
+                : 0;
+            prepared.preparedBuildDurationMicros = preparedBuildResult != nullptr ? preparedBuildResult->buildDurationMicros : 0;
+            prepared.preparedDecodedBytes = preparedBuildResult != nullptr ? preparedBuildResult->metrics.decodedBytes : 0;
+            prepared.preparedSampleDataBytes = preparedBuildResult != nullptr
+                ? preparedBuildResult->metrics.preparedSampleDataBytes
+                : 0;
+            prepared.playableRangeAvailable = false;
+            prepared.lowestPlayableNote = 0;
+            prepared.highestPlayableNote = 127;
+            prepared.activationEligible = false;
+            prepared.lifecycleState = preparedBuildResult != nullptr
+                ? preparedBuildResult->lifecycleState
+                : buildResult->lifecycleState;
             prepared.state = failedState;
+        }
 
         status.lastEvent = failedState;
         refreshPreparedStates();
@@ -352,6 +411,10 @@ bool DraftPlaybackContract::completeBuild(DraftPlaybackPendingRequest& pending,
     prepared.preparedSampleDataBytes = preparedBuildResult != nullptr
         ? preparedBuildResult->metrics.preparedSampleDataBytes
         : 0;
+    prepared.activationPayload = activationPayload;
+    prepared.activationPayloadRetainedBytes = activationPayload != nullptr
+        ? activationPayload->retainedPreparedBytes
+        : 0;
     const auto playableRange = summarizePlayableRange(buildResult);
     prepared.playableRangeAvailable = playableRange.available;
     prepared.lowestPlayableNote = playableRange.lowestNote;
@@ -375,11 +438,12 @@ bool DraftPlaybackContract::failBuild(DraftPlaybackPendingRequest& pending,
     prepared.findings.reserve(issues.size());
     for (const auto& issue : issues)
         prepared.findings.push_back({ PlaybackSnapshotFindingSeverity::error, "contract-failure", "", issue });
-    prepared.activationEligible = false;
-    prepared.lifecycleState = PlaybackSnapshotLifecycleState::failed;
-
     if (!prepared.available)
+    {
+        prepared.activationEligible = false;
+        prepared.lifecycleState = PlaybackSnapshotLifecycleState::failed;
         prepared.state = failedState;
+    }
 
     status.lastEvent = failedState;
     refreshPreparedStates();
@@ -485,11 +549,13 @@ void DraftPlaybackContract::resetPreparedRevision(DraftPlaybackPreparedRevision&
     prepared.preparedBuildDurationMicros = 0;
     prepared.preparedDecodedBytes = 0;
     prepared.preparedSampleDataBytes = 0;
+    prepared.activationPayloadRetainedBytes = 0;
     prepared.playableRangeAvailable = false;
     prepared.lowestPlayableNote = 0;
     prepared.highestPlayableNote = 127;
     prepared.preparationCacheHitCount = 0;
     prepared.preparationCacheMissCount = 0;
     prepared.findings.clear();
+    prepared.activationPayload.reset();
 }
 } // namespace drs::engine

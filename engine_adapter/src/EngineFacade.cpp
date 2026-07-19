@@ -261,6 +261,10 @@ void syncDraftPlaybackIntoDiagnostics(const DraftPlaybackStatus& status,
     diagnosticsSnapshot.publishedPreparedDecodedBytes = status.performance.preparedDecodedBytes;
     diagnosticsSnapshot.previewPreparedSampleDataBytes = status.preview.preparedSampleDataBytes;
     diagnosticsSnapshot.publishedPreparedSampleDataBytes = status.performance.preparedSampleDataBytes;
+    diagnosticsSnapshot.previewActivationPayloadBytes = status.preview.activationPayloadRetainedBytes;
+    diagnosticsSnapshot.publishedActivationPayloadBytes = status.performance.activationPayloadRetainedBytes;
+    diagnosticsSnapshot.retainedActivationPayloadBytes = status.preview.activationPayloadRetainedBytes
+        + status.performance.activationPayloadRetainedBytes;
     diagnosticsSnapshot.previewPreparationCacheHits = status.preview.preparationCacheHitCount;
     diagnosticsSnapshot.previewPreparationCacheMisses = status.preview.preparationCacheMissCount;
     diagnosticsSnapshot.publishedPreparationCacheHits = status.performance.preparationCacheHitCount;
@@ -1012,6 +1016,10 @@ EnginePerformanceSnapshot EngineFacade::getPerformanceSnapshot() const
     snapshot.publishedPreparedDecodedBytes = draftStatus.performance.preparedDecodedBytes;
     snapshot.previewPreparedSampleDataBytes = draftStatus.preview.preparedSampleDataBytes;
     snapshot.publishedPreparedSampleDataBytes = draftStatus.performance.preparedSampleDataBytes;
+    snapshot.previewActivationPayloadBytes = draftStatus.preview.activationPayloadRetainedBytes;
+    snapshot.publishedActivationPayloadBytes = draftStatus.performance.activationPayloadRetainedBytes;
+    snapshot.retainedActivationPayloadBytes = draftStatus.preview.activationPayloadRetainedBytes
+        + draftStatus.performance.activationPayloadRetainedBytes;
     snapshot.previewPreparationCacheHits = draftStatus.preview.preparationCacheHitCount;
     snapshot.previewPreparationCacheMisses = draftStatus.preview.preparationCacheMissCount;
     snapshot.publishedPreparationCacheHits = draftStatus.performance.preparationCacheHitCount;

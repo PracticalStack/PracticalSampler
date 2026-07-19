@@ -11,6 +11,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(DRS_ENABLE_HISE_INTEGRATION "Enable experimental HISE-backed integration work" OFF)
+option(DRS_ENABLE_THREAD_SANITIZER "Instrument supported builds with ThreadSanitizer" OFF)
+
+if(DRS_ENABLE_THREAD_SANITIZER)
+    if(MSVC OR NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        message(FATAL_ERROR "DRS_ENABLE_THREAD_SANITIZER requires Clang or GCC on a non-MSVC build.")
+    endif()
+
+    add_compile_options(-fsanitize=thread -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=thread)
+endif()
 
 set(JUCE_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(JUCE_BUILD_EXTRAS OFF CACHE BOOL "" FORCE)

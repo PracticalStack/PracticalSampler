@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <limits>
 #include <optional>
+#include <string_view>
 
 namespace drs::plugin
 {
@@ -17,14 +18,38 @@ namespace
 {
 namespace fs = std::filesystem;
 
+static_assert(std::atomic<std::uint64_t>::is_always_lock_free,
+              "Realtime diagnostics require lock-free 64-bit atomics.");
+static_assert(std::atomic<std::size_t>::is_always_lock_free,
+              "Realtime diagnostics require lock-free size atomics.");
+static_assert(std::atomic<int>::is_always_lock_free,
+              "Realtime activation handoff requires lock-free index atomics.");
+static_assert(std::atomic<std::uint32_t>::is_always_lock_free,
+              "Realtime event queues require lock-free 32-bit atomics.");
+static_assert(std::atomic<RealtimeGuardOperation>::is_always_lock_free,
+              "Realtime test injection requires a lock-free operation atomic.");
+
+void updateAtomicMaximum(std::atomic<std::uint64_t>& destination, std::uint64_t value)
+{
+    auto current = destination.load(std::memory_order_relaxed);
+    while (current < value
+           && !destination.compare_exchange_weak(current,
+                                                 value,
+                                                 std::memory_order_release,
+                                                 std::memory_order_relaxed))
+    {
+    }
+}
+
 std::optional<double> findMacroValue(const drs::engine::RuntimeSessionStateSnapshot& sessionState,
-                                     const std::string& macroId)
+                                     std::string_view macroId)
 {
     const auto iterator = std::find_if(sessionState.macroValues.begin(),
                                        sessionState.macroValues.end(),
                                        [&](const auto& macroValue)
                                        {
-                                           return macroValue.id == macroId;
+                                           return macroValue.id.size() == macroId.size()
+                                               && std::equal(macroValue.id.begin(), macroValue.id.end(), macroId.begin());
                                        });
     if (iterator == sessionState.macroValues.end())
         return std::nullopt;
@@ -51,17 +76,76 @@ int computeMotionRenderNote(const drs::engine::RuntimeSessionStateSnapshot& sess
     return clampMidiValue(playedNote + semitoneOffset);
 }
 
-const drs::engine::RuntimeZoneDefinition* findZone(const drs::engine::RuntimeInstrumentModel& instrument,
-                                                   const std::string& zoneId)
+struct RealtimeRenderRoute
 {
-    const auto iterator = std::find_if(instrument.zones.begin(),
-                                       instrument.zones.end(),
-                                       [&](const auto& zone)
-                                       {
-                                           return zone.id == zoneId;
-                                       });
+    const drs::engine::RuntimeZoneDefinition* zone = nullptr;
+    const drs::engine::RuntimeStreamSampleDefinition* sample = nullptr;
+};
 
-    return iterator != instrument.zones.end() ? &(*iterator) : nullptr;
+RealtimeRenderRoute resolveRealtimeRenderRoute(
+    const drs::engine::RuntimeInstrumentModel& instrument,
+    const drs::engine::RuntimeStreamContainerModel& stream,
+    const std::string& selectedArticulationId,
+    int midiNote,
+    int velocity) noexcept
+{
+    const std::string* articulationId = &selectedArticulationId;
+    if (articulationId->empty())
+    {
+        const auto articulation = std::find_if(instrument.articulations.begin(),
+                                               instrument.articulations.end(),
+                                               [](const auto& candidate) { return candidate.isDefault; });
+        if (articulation == instrument.articulations.end())
+            return {};
+        articulationId = &articulation->id;
+    }
+
+    const drs::engine::RuntimeZoneDefinition* selectedZone = nullptr;
+    for (const auto& zone : instrument.zones)
+    {
+        if (zone.articulationId != *articulationId
+            || midiNote < zone.keyLow || midiNote > zone.keyHigh
+            || velocity < zone.velocityLow || velocity > zone.velocityHigh)
+        {
+            continue;
+        }
+
+        if (selectedZone == nullptr)
+        {
+            selectedZone = &zone;
+            continue;
+        }
+
+        const auto candidateRootDistance = std::abs(zone.rootKey - midiNote);
+        const auto selectedRootDistance = std::abs(selectedZone->rootKey - midiNote);
+        const auto candidateKeySpan = zone.keyHigh - zone.keyLow;
+        const auto selectedKeySpan = selectedZone->keyHigh - selectedZone->keyLow;
+        const auto candidateVelocitySpan = zone.velocityHigh - zone.velocityLow;
+        const auto selectedVelocitySpan = selectedZone->velocityHigh - selectedZone->velocityLow;
+        if (candidateRootDistance < selectedRootDistance
+            || (candidateRootDistance == selectedRootDistance && candidateKeySpan < selectedKeySpan)
+            || (candidateRootDistance == selectedRootDistance && candidateKeySpan == selectedKeySpan
+                && candidateVelocitySpan < selectedVelocitySpan)
+            || (candidateRootDistance == selectedRootDistance && candidateKeySpan == selectedKeySpan
+                && candidateVelocitySpan == selectedVelocitySpan && zone.id < selectedZone->id))
+        {
+            selectedZone = &zone;
+        }
+    }
+
+    if (selectedZone == nullptr)
+        return {};
+
+    const auto sample = std::find_if(stream.samples.begin(),
+                                     stream.samples.end(),
+                                     [&](const auto& candidate)
+                                     {
+                                         return candidate.sourcePath == selectedZone->samplePath
+                                             || candidate.payloadOffsetBytes == selectedZone->streamOffsetBytes;
+                                     });
+    return sample != stream.samples.end()
+        ? RealtimeRenderRoute { selectedZone, &(*sample) }
+        : RealtimeRenderRoute {};
 }
 
 fs::path resolveSamplePath(const std::string& streamContainerPath, const std::string& samplePath)
@@ -219,14 +303,40 @@ const std::vector<float>* selectWaveformPreviewChannel(const drs::engine::Import
 }
 } // namespace
 
+bool Processor::RealtimeNoteEventQueue::push(QueuedRealtimeNoteEvent event) noexcept
+{
+    const auto write = writeIndex.load(std::memory_order_relaxed);
+    const auto next = (write + 1u) % storageCapacity;
+    if (next == readIndex.load(std::memory_order_acquire))
+        return false;
+
+    events[write] = event;
+    writeIndex.store(next, std::memory_order_release);
+    return true;
+}
+
+bool Processor::RealtimeNoteEventQueue::pop(QueuedRealtimeNoteEvent& event) noexcept
+{
+    const auto read = readIndex.load(std::memory_order_relaxed);
+    if (read == writeIndex.load(std::memory_order_acquire))
+        return false;
+
+    event = events[read];
+    readIndex.store((read + 1u) % storageCapacity, std::memory_order_release);
+    return true;
+}
+
+void Processor::RealtimeNoteEventQueue::reset() noexcept
+{
+    readIndex.store(0, std::memory_order_release);
+    writeIndex.store(0, std::memory_order_release);
+}
+
 Processor::Processor()
     : juce::AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       authoringSession(buildInitialAuthoringProject()),
       parameterState(*this, nullptr, "macroParameters", buildParameterLayout(engineFacade))
 {
-    realtimeSafetySnapshot.available = true;
-    performanceSurfaceMidiCollector.reset(currentSampleRate);
-    authoringPreviewMidiCollector.reset(currentSampleRate);
     primeRealtimeSafetyState(512);
     initializeAuthoringImportMetrics();
 
@@ -243,15 +353,21 @@ Processor::~Processor()
 {
     for (const auto& macro : engineFacade.getMacroDescriptors())
         parameterState.removeParameterListener(buildMacroParameterId(macro.id), this);
+
+    clearVoices(VoiceSource::performance, false);
+    clearVoices(VoiceSource::authoringPreview, false);
+    drainRetiredPerformanceActivationSlots();
+    drainRetiredAuthoringPreviewActivationSlots();
+    delete[] realtimeGuardTestAllocation;
 }
 
 void Processor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     currentSampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;
-    performanceSurfaceMidiCollector.reset(currentSampleRate);
-    authoringPreviewMidiCollector.reset(currentSampleRate);
-    performanceActiveVoices.clear();
-    authoringPreviewActiveVoices.clear();
+    performanceSurfaceNoteQueue.reset();
+    authoringPreviewNoteQueue.reset();
+    clearVoices(VoiceSource::performance, false);
+    clearVoices(VoiceSource::authoringPreview, false);
     primeRealtimeSafetyState(samplesPerBlock > 0 ? samplesPerBlock : 512);
     ensureReferencePlaybackAssetsLoaded(false);
     serviceMessageThreadWork();
@@ -260,8 +376,8 @@ void Processor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
 void Processor::releaseResources()
 {
-    performanceActiveVoices.clear();
-    authoringPreviewActiveVoices.clear();
+    clearVoices(VoiceSource::performance, false);
+    clearVoices(VoiceSource::authoringPreview, false);
     updateRealtimeSafetyState();
 }
 
@@ -275,35 +391,41 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
 {
     const auto blockStartTime = std::chrono::steady_clock::now();
     juce::ScopedNoDenormals noDenormals;
-    const juce::ScopedValueSetter<bool> audioCallbackScope(processingAudioCallback, true);
+    const ScopedRealtimeAudioThread audioCallbackScope(realtimeGuardState);
+    runRealtimeGuardTestInjection();
 
     for (auto channel = 0; channel < buffer.getNumChannels(); ++channel)
         buffer.clear(channel, 0, buffer.getNumSamples());
 
     performanceMidiScratchBuffer.clear();
     performanceMidiScratchBuffer.addEvents(midiMessages, 0, buffer.getNumSamples(), 0);
-    performanceSurfaceMidiCollector.removeNextBlockOfMessages(performanceMidiScratchBuffer, buffer.getNumSamples());
 
     authoringPreviewMidiScratchBuffer.clear();
-    authoringPreviewMidiCollector.removeNextBlockOfMessages(authoringPreviewMidiScratchBuffer, buffer.getNumSamples());
 
     applyPendingPerformanceActivationAtBlockBoundary();
     applyPendingAuthoringPreviewActivationAtBlockBoundary();
+    drainRealtimeNoteEvents(performanceSurfaceNoteQueue, VoiceSource::performance);
+    drainRealtimeNoteEvents(authoringPreviewNoteQueue, VoiceSource::authoringPreview);
 
     if (performanceMidiScratchBuffer.isEmpty()
         && authoringPreviewMidiScratchBuffer.isEmpty()
         && performanceActiveVoices.empty()
         && authoringPreviewActiveVoices.empty())
     {
-        ++realtimeSafetySnapshot.processBlockCount;
-        realtimeSafetySnapshot.callbackBudgetMicros = static_cast<std::uint64_t>(
-            std::llround(static_cast<double>(buffer.getNumSamples()) * 1000000.0 / std::max(currentSampleRate, 1.0)));
+        diagnosticsProcessBlockCount.fetch_add(1, std::memory_order_relaxed);
+        const auto callbackBudgetMicros = RealtimeCallbackBudgetProfile::deadlineMicros(
+            currentSampleRate,
+            static_cast<std::size_t>(buffer.getNumSamples()));
+        diagnosticsCallbackBudgetMicros.store(callbackBudgetMicros, std::memory_order_relaxed);
         const auto elapsedMicros = static_cast<std::uint64_t>(
             std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - blockStartTime).count());
-        realtimeSafetySnapshot.lastProcessBlockMicros = elapsedMicros;
-        realtimeSafetySnapshot.maxProcessBlockMicros = std::max(realtimeSafetySnapshot.maxProcessBlockMicros, elapsedMicros);
-        if (elapsedMicros > realtimeSafetySnapshot.callbackBudgetMicros)
-            ++realtimeSafetySnapshot.overBudgetCallbackCount;
+        diagnosticsLastProcessBlockMicros.store(elapsedMicros, std::memory_order_relaxed);
+        updateAtomicMaximum(diagnosticsMaxProcessBlockMicros, elapsedMicros);
+        if (elapsedMicros > callbackBudgetMicros)
+        {
+            diagnosticsOverBudgetCallbackCount.fetch_add(1, std::memory_order_relaxed);
+            recordRealtimeGuardOperation(RealtimeGuardOperation::overBudget);
+        }
         updateRealtimeSafetyState();
         return;
     }
@@ -328,20 +450,24 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
         const auto eventSample = std::clamp(metadata.samplePosition, 0, buffer.getNumSamples());
         renderBlockRange(buffer, renderedSamples, eventSample - renderedSamples);
 
-        const auto message = metadata.getMessage();
         const auto voiceSource = useAuthoringMessage ? VoiceSource::authoringPreview : VoiceSource::performance;
-        if (message.isNoteOn())
+        const auto* eventData = metadata.data;
+        const auto command = metadata.numBytes > 0 ? static_cast<int>(eventData[0] & 0xf0u) : 0;
+        const auto noteNumber = metadata.numBytes > 1 ? static_cast<int>(eventData[1] & 0x7fu) : 0;
+        const auto velocity = metadata.numBytes > 2 ? static_cast<int>(eventData[2] & 0x7fu) : 0;
+        if (command == 0x90 && velocity > 0)
         {
             if (useAuthoringMessage)
-                startAuthoringVoiceForMidiMessage(message);
+                startAuthoringVoiceForMidiMessage(noteNumber, static_cast<float>(velocity) / 127.0f);
             else
-                startVoiceForMidiMessage(message);
+                startVoiceForMidiMessage(noteNumber);
         }
-        else if (message.isNoteOff())
+        else if (command == 0x80 || (command == 0x90 && velocity == 0))
         {
-            releaseVoicesForMidiNote(message.getNoteNumber(), voiceSource);
+            releaseVoicesForMidiNote(noteNumber, voiceSource);
         }
-        else if (message.isAllNotesOff() || message.isAllSoundOff())
+        else if (command == 0xb0 && metadata.numBytes > 1
+                 && (eventData[1] == 120u || eventData[1] == 123u))
         {
             clearVoices(voiceSource);
         }
@@ -351,15 +477,20 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
 
     renderBlockRange(buffer, renderedSamples, buffer.getNumSamples() - renderedSamples);
 
-    ++realtimeSafetySnapshot.processBlockCount;
-    realtimeSafetySnapshot.callbackBudgetMicros = static_cast<std::uint64_t>(
-        std::llround(static_cast<double>(buffer.getNumSamples()) * 1000000.0 / std::max(currentSampleRate, 1.0)));
+    diagnosticsProcessBlockCount.fetch_add(1, std::memory_order_relaxed);
+    const auto callbackBudgetMicros = RealtimeCallbackBudgetProfile::deadlineMicros(
+        currentSampleRate,
+        static_cast<std::size_t>(buffer.getNumSamples()));
+    diagnosticsCallbackBudgetMicros.store(callbackBudgetMicros, std::memory_order_relaxed);
     const auto elapsedMicros = static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - blockStartTime).count());
-    realtimeSafetySnapshot.lastProcessBlockMicros = elapsedMicros;
-    realtimeSafetySnapshot.maxProcessBlockMicros = std::max(realtimeSafetySnapshot.maxProcessBlockMicros, elapsedMicros);
-    if (elapsedMicros > realtimeSafetySnapshot.callbackBudgetMicros)
-        ++realtimeSafetySnapshot.overBudgetCallbackCount;
+    diagnosticsLastProcessBlockMicros.store(elapsedMicros, std::memory_order_relaxed);
+    updateAtomicMaximum(diagnosticsMaxProcessBlockMicros, elapsedMicros);
+    if (elapsedMicros > callbackBudgetMicros)
+    {
+        diagnosticsOverBudgetCallbackCount.fetch_add(1, std::memory_order_relaxed);
+        recordRealtimeGuardOperation(RealtimeGuardOperation::overBudget);
+    }
     updateRealtimeSafetyState();
 }
 
@@ -405,19 +536,13 @@ void Processor::setMacroValueFromShell(const std::string& macroId, double value)
 void Processor::queueAuthoringPreviewNoteOn(int midiNoteNumber, float velocity)
 {
     serviceMessageThreadWork();
-
-    auto message = juce::MidiMessage::noteOn(1,
-                                             clampMidiValue(midiNoteNumber),
-                                             std::clamp(velocity, 0.0f, 1.0f));
-    message.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001);
-    authoringPreviewMidiCollector.addMessageToQueue(message);
+    authoringPreviewNoteQueue.push(
+        { clampMidiValue(midiNoteNumber), std::clamp(velocity, 0.0f, 1.0f), true });
 }
 
 void Processor::queueAuthoringPreviewNoteOff(int midiNoteNumber)
 {
-    auto message = juce::MidiMessage::noteOff(1, clampMidiValue(midiNoteNumber));
-    message.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001);
-    authoringPreviewMidiCollector.addMessageToQueue(message);
+    authoringPreviewNoteQueue.push({ clampMidiValue(midiNoteNumber), 0.0f, false });
 }
 
 drs::app::AuthoringWaveformPreview Processor::getAuthoringWaveformPreview()
@@ -460,13 +585,14 @@ drs::app::AuthoringWaveformPreview Processor::getAuthoringWaveformPreview()
 
 drs::app::AuthoringPreviewStatusSnapshot Processor::getAuthoringPreviewStatusSnapshot() const
 {
+    const auto diagnostics = getRealtimeSafetySnapshot();
     drs::app::AuthoringPreviewStatusSnapshot status;
-    status.available = realtimeSafetySnapshot.available;
-    status.draftRevision = realtimeSafetySnapshot.currentAuthoringPreviewDraftRevision;
-    status.activeRevision = realtimeSafetySnapshot.activeAuthoringPreviewRevision;
-    status.pendingRevision = realtimeSafetySnapshot.pendingAuthoringPreviewRevision;
-    status.revisionState = realtimeSafetySnapshot.authoringPreviewRevisionState;
-    status.failureState = realtimeSafetySnapshot.authoringPreviewFailureState;
+    status.available = diagnostics.available;
+    status.draftRevision = diagnostics.currentAuthoringPreviewDraftRevision;
+    status.activeRevision = diagnostics.activeAuthoringPreviewRevision;
+    status.pendingRevision = diagnostics.pendingAuthoringPreviewRevision;
+    status.revisionState = diagnostics.authoringPreviewRevisionState;
+    status.failureState = diagnostics.authoringPreviewFailureState;
     const auto blockingHint = buildAuthoringPreviewBlockingHint(authoringSession, status.failureState);
     status.blockingPrerequisite = blockingHint.prerequisite;
     status.blockingGuidance = blockingHint.guidance;
@@ -502,24 +628,66 @@ void Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
 
 void Processor::queuePerformanceSurfaceNoteOn(int midiNoteNumber, float velocity)
 {
-    auto message = juce::MidiMessage::noteOn(1,
-                                             clampMidiValue(midiNoteNumber),
-                                             std::clamp(velocity, 0.0f, 1.0f));
-    message.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001);
-    performanceSurfaceMidiCollector.addMessageToQueue(message);
+    performanceSurfaceNoteQueue.push(
+        { clampMidiValue(midiNoteNumber), std::clamp(velocity, 0.0f, 1.0f), true });
 }
 
 void Processor::queuePerformanceSurfaceNoteOff(int midiNoteNumber)
 {
-    auto message = juce::MidiMessage::noteOff(1, clampMidiValue(midiNoteNumber));
-    message.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001);
-    performanceSurfaceMidiCollector.addMessageToQueue(message);
+    performanceSurfaceNoteQueue.push({ clampMidiValue(midiNoteNumber), 0.0f, false });
 }
 
 void Processor::clearReferencePlaybackCacheForTests()
 {
     loadedSamples.clear();
     updateRealtimeSafetyState();
+}
+
+void Processor::setRealtimeGuardTestInjection(RealtimeGuardOperation operation)
+{
+    if (realtimeGuardTestAllocation != nullptr)
+    {
+        delete[] realtimeGuardTestAllocation;
+        realtimeGuardTestAllocation = nullptr;
+    }
+
+    if (operation == RealtimeGuardOperation::deallocation)
+        realtimeGuardTestAllocation = new std::byte[64];
+
+    realtimeGuardTestInjection.store(operation, std::memory_order_release);
+}
+
+void Processor::runRealtimeGuardTestInjection()
+{
+    const auto operation = realtimeGuardTestInjection.exchange(RealtimeGuardOperation::none,
+                                                               std::memory_order_acq_rel);
+    switch (operation)
+    {
+        case RealtimeGuardOperation::none:
+            return;
+        case RealtimeGuardOperation::allocation:
+            realtimeGuardTestAllocation = new std::byte[64];
+            return;
+        case RealtimeGuardOperation::deallocation:
+            delete[] realtimeGuardTestAllocation;
+            realtimeGuardTestAllocation = nullptr;
+            return;
+        case RealtimeGuardOperation::blockingLock:
+        {
+            recordRealtimeGuardOperation(operation);
+            const std::lock_guard<std::mutex> lock(realtimeGuardTestMutex);
+            return;
+        }
+        case RealtimeGuardOperation::overBudget:
+            recordRealtimeGuardOperation(operation);
+            diagnosticsOverBudgetCallbackCount.fetch_add(1, std::memory_order_relaxed);
+            return;
+        case RealtimeGuardOperation::count:
+            return;
+        default:
+            recordRealtimeGuardOperation(operation);
+            return;
+    }
 }
 
 bool Processor::serviceMessageThreadWork()
@@ -537,7 +705,7 @@ bool Processor::serviceMessageThreadWork()
     }
 
     const auto servicedBackgroundWork = engineFacade.serviceBackgroundWork();
-    const auto retiredCountBefore = realtimeSafetySnapshot.retiredActivationCount;
+    const auto retiredCountBefore = diagnosticsRetiredActivationCount.load(std::memory_order_acquire);
     drainRetiredAuthoringPreviewActivationSlots();
     drainRetiredPerformanceActivationSlots();
 
@@ -564,7 +732,7 @@ bool Processor::serviceMessageThreadWork()
         || synchronizedDraftPlaybackProject
         || synchronizedAuthoringPreview
         || synchronizedActivation
-        || realtimeSafetySnapshot.retiredActivationCount != retiredCountBefore;
+        || diagnosticsRetiredActivationCount.load(std::memory_order_acquire) != retiredCountBefore;
 }
 
 juce::String Processor::buildMacroParameterId(const std::string& macroId)
@@ -713,7 +881,11 @@ bool Processor::ensureReferencePlaybackAssetsLoaded(bool invokedFromAudioThread)
         referenceManifest = engineFacade.loadPhase1ReferenceInstrument();
 
     if (!referenceStream.loaded)
+    {
+        if (invokedFromAudioThread)
+            recordRealtimeGuardOperation(RealtimeGuardOperation::streamDecode);
         referenceStream = engineFacade.loadPhase1ReferenceStream();
+    }
 
     initializeReferencePlaybackAssets(invokedFromAudioThread);
     updateRealtimeSafetyState();
@@ -726,13 +898,13 @@ void Processor::initializeReferencePlaybackAssets(bool invokedFromAudioThread)
     // preparation service. Preview/Publish preparation belongs behind PreparedPlaybackService, and audio-thread
     // fallback here is tracked only so regressions stay visible until the reference-backed renderer is retired.
     if (invokedFromAudioThread && !loadedSamples.empty())
-        ++realtimeSafetySnapshot.largeResourceReleasesOnAudioThread;
+        recordRealtimeGuardOperation(RealtimeGuardOperation::largeResourceDestruction);
 
     loadedSamples.clear();
 
     if (!referenceManifest.loaded || !referenceStream.loaded)
     {
-        realtimeSafetySnapshot.referenceSampleCountLoaded = 0;
+        diagnosticsReferenceSampleCountLoaded.store(0, std::memory_order_release);
         return;
     }
 
@@ -741,10 +913,14 @@ void Processor::initializeReferencePlaybackAssets(bool invokedFromAudioThread)
     for (const auto& sample : referenceStream.container.samples)
     {
         if (invokedFromAudioThread)
-            ++realtimeSafetySnapshot.samplePathResolutionsOnAudioThread;
+            recordRealtimeGuardOperation(RealtimeGuardOperation::pathResolution);
         const auto samplePath = resolveSamplePath(referenceStream.containerPath, sample.sourcePath);
         if (invokedFromAudioThread)
-            ++realtimeSafetySnapshot.sampleDecodeEntriesOnAudioThread;
+        {
+            recordRealtimeGuardOperation(RealtimeGuardOperation::fileOpen);
+            recordRealtimeGuardOperation(RealtimeGuardOperation::fileRead);
+            recordRealtimeGuardOperation(RealtimeGuardOperation::sampleDecode);
+        }
         const auto importResult = drs::engine::importSampleFile(samplePath.generic_string());
         if (!importResult.imported)
             continue;
@@ -752,13 +928,13 @@ void Processor::initializeReferencePlaybackAssets(bool invokedFromAudioThread)
         loadedSamples.emplace(sample.sampleId, LoadedReferenceSample { importResult.sample });
     }
 
-    realtimeSafetySnapshot.referenceSampleCountLoaded = loadedSamples.size();
+    diagnosticsReferenceSampleCountLoaded.store(loadedSamples.size(), std::memory_order_release);
     if (!loadedSamples.empty())
     {
         if (invokedFromAudioThread)
-            realtimeSafetySnapshot.referenceSampleLoadsOnAudioThread += loadedSamples.size();
+            diagnosticsReferenceSampleLoadsOnAudioThread.fetch_add(loadedSamples.size(), std::memory_order_relaxed);
         else
-            ++realtimeSafetySnapshot.referenceWarmupCount;
+            diagnosticsReferenceWarmupCount.fetch_add(1, std::memory_order_relaxed);
     }
 }
 
@@ -787,7 +963,12 @@ bool Processor::ensureSelectedAuthoringSampleLoaded(bool invokedFromAudioThread)
     // Sprint 3 boundary note: selected-zone preview loading is still a shell-side helper seam.
     // It must not be expanded into the product-owned Preview/Publish preparation boundary.
     if (invokedFromAudioThread)
-        ++realtimeSafetySnapshot.sampleDecodeEntriesOnAudioThread;
+    {
+        recordRealtimeGuardOperation(RealtimeGuardOperation::pathResolution);
+        recordRealtimeGuardOperation(RealtimeGuardOperation::fileOpen);
+        recordRealtimeGuardOperation(RealtimeGuardOperation::fileRead);
+        recordRealtimeGuardOperation(RealtimeGuardOperation::sampleDecode);
+    }
 
     const auto importResult = drs::engine::importSampleFile(projectSampleSource->path);
     if (!importResult.imported)
@@ -802,7 +983,7 @@ bool Processor::ensureSelectedAuthoringSampleLoaded(bool invokedFromAudioThread)
     authoringLoadedSamples.emplace(projectSampleSource->id, LoadedReferenceSample { importResult.sample });
     lastAuthoringSampleLoadFailureState.clear();
     if (invokedFromAudioThread)
-        ++realtimeSafetySnapshot.authoringSampleLoadsOnAudioThread;
+        diagnosticsAuthoringSampleLoadsOnAudioThread.fetch_add(1, std::memory_order_relaxed);
     updateRealtimeSafetyState();
     return true;
 }
@@ -817,7 +998,7 @@ const std::vector<Processor::ActiveRenderVoice>& Processor::getVoicePool(VoiceSo
     return source == VoiceSource::performance ? performanceActiveVoices : authoringPreviewActiveVoices;
 }
 
-bool Processor::startAuthoringVoiceForMidiMessage(const juce::MidiMessage& message)
+bool Processor::startAuthoringVoiceForMidiMessage(int midiNoteNumber, float velocity)
 {
     const auto* activation = getActiveAuthoringPreviewActivation();
     if (activation == nullptr || !activation->ready || !activation->preparedSample)
@@ -829,13 +1010,11 @@ bool Processor::startAuthoringVoiceForMidiMessage(const juce::MidiMessage& messa
 
     ActiveRenderVoice voice;
     voice.renderVoiceId = nextRenderVoiceId++;
-    voice.sourceMidiNote = message.getNoteNumber();
-    voice.effectiveMidiNote = message.getNoteNumber();
-    voice.effectiveVelocity = std::clamp(static_cast<int>(std::round(message.getFloatVelocity() * 127.0f)), 1, 127);
+    voice.sourceMidiNote = midiNoteNumber;
+    voice.effectiveMidiNote = midiNoteNumber;
+    voice.effectiveVelocity = std::clamp(static_cast<int>(std::round(velocity * 127.0f)), 1, 127);
     voice.rootKey = activation->rootKey;
     voice.source = VoiceSource::authoringPreview;
-    voice.zoneId = activation->zoneId;
-    voice.sampleId = activation->sampleId;
     voice.retainedLoadedSample = activation->preparedSample;
     voice.loadedSample = voice.retainedLoadedSample.get();
     voice.incrementFrames = std::pow(2.0, (voice.effectiveMidiNote - activation->rootKey) / 12.0)
@@ -849,14 +1028,12 @@ bool Processor::startAuthoringVoiceForMidiMessage(const juce::MidiMessage& messa
         activeVoices.erase(activeVoices.begin());
     }
     else if (activeVoices.size() >= activeVoices.capacity())
-        ++realtimeSafetySnapshot.activeVoiceCapacityGrowthCount;
+        diagnosticsActiveVoiceCapacityGrowthCount.fetch_add(1, std::memory_order_relaxed);
     activeVoices.push_back(std::move(voice));
-
-    updateRealtimeSafetyState();
     return true;
 }
 
-void Processor::startVoiceForMidiMessage(const juce::MidiMessage& message)
+void Processor::startVoiceForMidiMessage(int midiNoteNumber)
 {
     const auto* activation = getActivePerformanceActivation();
     if (activation == nullptr || !activation->ready)
@@ -866,26 +1043,18 @@ void Processor::startVoiceForMidiMessage(const juce::MidiMessage& message)
         return;
 
     const auto& sessionState = activation->sessionState;
-    const auto effectiveMidiNote = computeMotionRenderNote(sessionState, message.getNoteNumber());
+    const auto effectiveMidiNote = computeMotionRenderNote(sessionState, midiNoteNumber);
     const auto effectiveVelocity = computeToneRenderVelocity(sessionState);
 
-    drs::engine::RuntimeVoiceAllocationRequest request;
-    request.voiceId = nextRenderVoiceId++;
-    request.midiNote = effectiveMidiNote;
-    request.velocity = effectiveVelocity;
-    request.articulationId = sessionState.selectedArticulationId;
-
-    const auto route = drs::engine::resolveRuntimeVoiceRoute(referenceManifest.instrument,
-                                                             referenceStream.container,
-                                                             request);
-    if (!route.resolved)
+    const auto route = resolveRealtimeRenderRoute(referenceManifest.instrument,
+                                                  referenceStream.container,
+                                                  sessionState.selectedArticulationId,
+                                                  effectiveMidiNote,
+                                                  effectiveVelocity);
+    if (route.zone == nullptr || route.sample == nullptr)
         return;
 
-    const auto* zone = findZone(referenceManifest.instrument, route.zoneId);
-    if (zone == nullptr)
-        return;
-
-    const auto sampleIterator = loadedSamples.find(route.sampleId);
+    const auto sampleIterator = loadedSamples.find(route.sample->sampleId);
     if (sampleIterator == loadedSamples.end())
         return;
 
@@ -894,29 +1063,34 @@ void Processor::startVoiceForMidiMessage(const juce::MidiMessage& message)
         return;
 
     ActiveRenderVoice voice;
-    voice.renderVoiceId = request.voiceId;
-    voice.sourceMidiNote = message.getNoteNumber();
+    voice.renderVoiceId = nextRenderVoiceId++;
+    voice.sourceMidiNote = midiNoteNumber;
     voice.effectiveMidiNote = effectiveMidiNote;
     voice.effectiveVelocity = effectiveVelocity;
-    voice.rootKey = zone->rootKey;
+    voice.rootKey = route.zone->rootKey;
     voice.source = VoiceSource::performance;
-    voice.zoneId = route.zoneId;
-    voice.sampleId = route.sampleId;
     voice.loadedSample = &sampleIterator->second;
-    voice.incrementFrames = std::pow(2.0, (effectiveMidiNote - zone->rootKey) / 12.0)
+    voice.incrementFrames = std::pow(2.0, (effectiveMidiNote - route.zone->rootKey) / 12.0)
         * (sample.metadata.sampleRate / std::max(currentSampleRate, 1.0));
     voice.baseGain = 0.25f * (static_cast<float>(effectiveVelocity) / 127.0f);
+
+    const auto retainedActivationSlotIndex = activePerformanceActivationSlotIndex.load(std::memory_order_acquire);
+    if (retainedActivationSlotIndex >= 0)
+    {
+        performanceActivationVoiceLeaseCounts[static_cast<std::size_t>(retainedActivationSlotIndex)]
+            .fetch_add(1, std::memory_order_acq_rel);
+        voice.retainedPerformanceActivationSlotIndex = retainedActivationSlotIndex;
+    }
 
     auto& activeVoices = performanceActiveVoices;
     if (activeVoices.size() >= maxRealtimeActiveVoices)
     {
+        releasePerformanceActivationLease(activeVoices.front());
         activeVoices.erase(activeVoices.begin());
     }
     else if (activeVoices.size() >= activeVoices.capacity())
-        ++realtimeSafetySnapshot.activeVoiceCapacityGrowthCount;
+        diagnosticsActiveVoiceCapacityGrowthCount.fetch_add(1, std::memory_order_relaxed);
     activeVoices.push_back(std::move(voice));
-
-    updateRealtimeSafetyState();
 }
 
 void Processor::releaseVoicesForMidiNote(int midiNoteNumber, VoiceSource source)
@@ -942,6 +1116,12 @@ void Processor::clearVoices(VoiceSource source)
 void Processor::clearVoices(VoiceSource source, bool updateState)
 {
     auto& activeVoices = getVoicePool(source);
+    if (source == VoiceSource::performance)
+    {
+        for (auto& voice : activeVoices)
+            if (voice.source == source)
+                releasePerformanceActivationLease(voice);
+    }
     activeVoices.erase(std::remove_if(activeVoices.begin(),
                                       activeVoices.end(),
                                       [source](const ActiveRenderVoice& voice)
@@ -951,6 +1131,17 @@ void Processor::clearVoices(VoiceSource source, bool updateState)
                        activeVoices.end());
     if (updateState)
         updateRealtimeSafetyState();
+}
+
+void Processor::releasePerformanceActivationLease(ActiveRenderVoice& voice)
+{
+    if (voice.retainedPerformanceActivationSlotIndex < 0)
+        return;
+
+    performanceActivationVoiceLeaseCounts[
+        static_cast<std::size_t>(voice.retainedPerformanceActivationSlotIndex)]
+        .fetch_sub(1, std::memory_order_acq_rel);
+    voice.retainedPerformanceActivationSlotIndex = -1;
 }
 
 bool Processor::synchronizeAuthoringPreviewActivation(bool installImmediately)
@@ -1006,13 +1197,23 @@ bool Processor::stageAuthoringPreviewActivation(bool installImmediately)
     activation.rootKey = selectedZone->rootKey;
     activation.gainDb = selectedZone->gainDb;
     activation.preparedSample = std::make_shared<LoadedReferenceSample>(sampleIterator->second);
+    activation.payload = engineFacade.getPreviewActivationPayload();
+    if (activation.payload != nullptr && activation.payload->revision != currentRevision)
+        activation.payload.reset();
+    activation.payloadRetainedBytes = activation.payload != nullptr
+        ? activation.payload->retainedPreparedBytes
+        : 0;
+    authoringPreviewDiagnosticRevisions[static_cast<std::size_t>(slotIndex)]
+        .store(activation.projectRevision, std::memory_order_release);
+    authoringPreviewDiagnosticPayloadBytes[static_cast<std::size_t>(slotIndex)]
+        .store(activation.payloadRetainedBytes, std::memory_order_release);
     failedAuthoringPreviewRevision = std::numeric_limits<std::size_t>::max();
     failedAuthoringPreviewState.clear();
 
     if (installImmediately && activeAuthoringPreviewActivationSlotIndex.load(std::memory_order_acquire) < 0)
     {
         activeAuthoringPreviewActivationSlotIndex.store(slotIndex, std::memory_order_release);
-        ++realtimeSafetySnapshot.authoringPreviewActivationCount;
+        diagnosticsAuthoringPreviewActivationCount.fetch_add(1, std::memory_order_relaxed);
         return true;
     }
 
@@ -1029,7 +1230,7 @@ const Processor::AuthoringPreviewRenderActivation* Processor::applyPendingAuthor
         const auto retiredSlotIndex = activeAuthoringPreviewActivationSlotIndex.exchange(
             pendingSlotIndex,
             std::memory_order_acq_rel);
-        ++realtimeSafetySnapshot.authoringPreviewActivationCount;
+        diagnosticsAuthoringPreviewActivationCount.fetch_add(1, std::memory_order_relaxed);
 
         if (retiredSlotIndex >= 0 && retiredSlotIndex != pendingSlotIndex)
             enqueueRetiredAuthoringPreviewActivationSlot(retiredSlotIndex);
@@ -1056,6 +1257,9 @@ bool Processor::enqueueRetiredAuthoringPreviewActivationSlot(int slotIndex)
         return false;
 
     retiredAuthoringPreviewActivationSlots[writeIndex] = slotIndex;
+    queuedAuthoringPreviewRetirementBytes.fetch_add(
+        authoringPreviewDiagnosticPayloadBytes[static_cast<std::size_t>(slotIndex)].load(std::memory_order_acquire),
+        std::memory_order_relaxed);
     retiredAuthoringPreviewActivationWriteIndex.store(nextWriteIndex, std::memory_order_release);
     return true;
 }
@@ -1066,7 +1270,13 @@ void Processor::drainRetiredAuthoringPreviewActivationSlots()
     const auto writeIndex = retiredAuthoringPreviewActivationWriteIndex.load(std::memory_order_acquire);
     while (readIndex != writeIndex)
     {
-        releaseAuthoringPreviewActivationSlot(retiredAuthoringPreviewActivationSlots[readIndex]);
+        const auto slotIndex = retiredAuthoringPreviewActivationSlots[readIndex];
+        queuedAuthoringPreviewRetirementBytes.fetch_sub(
+            authoringPreviewDiagnosticPayloadBytes[static_cast<std::size_t>(slotIndex)].load(std::memory_order_acquire),
+            std::memory_order_relaxed);
+        if (authoringPreviewActivationSlots[static_cast<std::size_t>(slotIndex)].payload != nullptr)
+            diagnosticsReclaimedActivationPayloadCount.fetch_add(1, std::memory_order_relaxed);
+        releaseAuthoringPreviewActivationSlot(slotIndex);
         readIndex = (readIndex + 1u) % static_cast<std::uint32_t>(retiredActivationQueueCapacity);
     }
 
@@ -1086,10 +1296,12 @@ void Processor::releaseAuthoringPreviewActivationSlot(int slotIndex)
     if (slotIndex < 0)
         return;
 
-    if (processingAudioCallback)
-        ++realtimeSafetySnapshot.largeResourceReleasesOnAudioThread;
+    if (isCurrentThreadRealtimeAudio())
+        recordRealtimeGuardOperation(RealtimeGuardOperation::finalSharedOwnershipRelease);
 
     authoringPreviewActivationSlots[static_cast<std::size_t>(slotIndex)] = {};
+    authoringPreviewDiagnosticRevisions[static_cast<std::size_t>(slotIndex)].store(0, std::memory_order_release);
+    authoringPreviewDiagnosticPayloadBytes[static_cast<std::size_t>(slotIndex)].store(0, std::memory_order_release);
     if (freeAuthoringPreviewActivationSlotCount < freeAuthoringPreviewActivationSlots.size())
         freeAuthoringPreviewActivationSlots[freeAuthoringPreviewActivationSlotCount++] = slotIndex;
 }
@@ -1137,12 +1349,24 @@ bool Processor::stagePerformanceActivation(const drs::engine::EnginePerformanceS
     activation.preparedContentDigest = publishedReady
         ? performanceSnapshot.publishedPreparedContentDigest
         : performanceSnapshot.previewPreparedContentDigest;
+    activation.payload = publishedReady
+        ? engineFacade.getPerformanceActivationPayload()
+        : engineFacade.getPreviewActivationPayload();
+    activation.payloadRetainedBytes = activation.payload != nullptr
+        ? activation.payload->retainedPreparedBytes
+        : 0;
     activation.sessionState = sessionState;
+    performanceDiagnosticRevisions[static_cast<std::size_t>(slotIndex)]
+        .store(activation.publishedRevision, std::memory_order_release);
+    performanceDiagnosticPreparedBuildIds[static_cast<std::size_t>(slotIndex)]
+        .store(activation.preparedBuildId, std::memory_order_release);
+    performanceDiagnosticPayloadBytes[static_cast<std::size_t>(slotIndex)]
+        .store(activation.payloadRetainedBytes, std::memory_order_release);
 
     if (installImmediately && activePerformanceActivationSlotIndex.load(std::memory_order_acquire) < 0)
     {
         activePerformanceActivationSlotIndex.store(slotIndex, std::memory_order_release);
-        ++realtimeSafetySnapshot.performanceActivationCount;
+        diagnosticsPerformanceActivationCount.fetch_add(1, std::memory_order_relaxed);
         return true;
     }
 
@@ -1155,11 +1379,10 @@ const Processor::PerformanceRenderActivation* Processor::applyPendingPerformance
     const auto pendingSlotIndex = pendingPerformanceActivationSlotIndex.exchange(-1, std::memory_order_acq_rel);
     if (pendingSlotIndex >= 0)
     {
-        clearVoices(VoiceSource::performance, false);
         const auto retiredSlotIndex = activePerformanceActivationSlotIndex.exchange(
             pendingSlotIndex,
             std::memory_order_acq_rel);
-        ++realtimeSafetySnapshot.performanceActivationCount;
+        diagnosticsPerformanceActivationCount.fetch_add(1, std::memory_order_relaxed);
 
         if (retiredSlotIndex >= 0 && retiredSlotIndex != pendingSlotIndex)
             enqueueRetiredPerformanceActivationSlot(retiredSlotIndex);
@@ -1186,22 +1409,67 @@ bool Processor::enqueueRetiredPerformanceActivationSlot(int slotIndex)
         return false;
 
     retiredPerformanceActivationSlots[writeIndex] = slotIndex;
+    queuedPerformanceRetirementBytes.fetch_add(
+        performanceDiagnosticPayloadBytes[static_cast<std::size_t>(slotIndex)].load(std::memory_order_acquire),
+        std::memory_order_relaxed);
     retiredPerformanceActivationWriteIndex.store(nextWriteIndex, std::memory_order_release);
     return true;
 }
 
 void Processor::drainRetiredPerformanceActivationSlots()
 {
+    std::size_t retainedDeferredCount = 0;
+    std::uint64_t retainedDeferredBytes = 0;
+    for (std::size_t index = 0; index < deferredPerformanceRetirementSlotCount; ++index)
+    {
+        const auto slotIndex = deferredPerformanceRetirementSlots[index];
+        if (performanceActivationVoiceLeaseCounts[static_cast<std::size_t>(slotIndex)]
+                .load(std::memory_order_acquire) != 0)
+        {
+            deferredPerformanceRetirementSlots[retainedDeferredCount++] = slotIndex;
+            retainedDeferredBytes += performanceDiagnosticPayloadBytes[static_cast<std::size_t>(slotIndex)]
+                .load(std::memory_order_acquire);
+            continue;
+        }
+
+        if (performanceActivationSlots[static_cast<std::size_t>(slotIndex)].payload != nullptr)
+            diagnosticsReclaimedActivationPayloadCount.fetch_add(1, std::memory_order_relaxed);
+        releasePerformanceActivationSlot(slotIndex);
+        diagnosticsRetiredActivationCount.fetch_add(1, std::memory_order_relaxed);
+    }
+    deferredPerformanceRetirementSlotCount = retainedDeferredCount;
+
     auto readIndex = retiredPerformanceActivationReadIndex.load(std::memory_order_relaxed);
     const auto writeIndex = retiredPerformanceActivationWriteIndex.load(std::memory_order_acquire);
     while (readIndex != writeIndex)
     {
-        releasePerformanceActivationSlot(retiredPerformanceActivationSlots[readIndex]);
-        ++realtimeSafetySnapshot.retiredActivationCount;
+        const auto slotIndex = retiredPerformanceActivationSlots[readIndex];
+        queuedPerformanceRetirementBytes.fetch_sub(
+            performanceDiagnosticPayloadBytes[static_cast<std::size_t>(slotIndex)].load(std::memory_order_acquire),
+            std::memory_order_relaxed);
+        if (performanceActivationVoiceLeaseCounts[static_cast<std::size_t>(slotIndex)]
+                .load(std::memory_order_acquire) != 0)
+        {
+            if (deferredPerformanceRetirementSlotCount < deferredPerformanceRetirementSlots.size())
+            {
+                deferredPerformanceRetirementSlots[deferredPerformanceRetirementSlotCount++] = slotIndex;
+                retainedDeferredBytes += performanceDiagnosticPayloadBytes[static_cast<std::size_t>(slotIndex)]
+                    .load(std::memory_order_acquire);
+            }
+        }
+        else
+        {
+            if (performanceActivationSlots[static_cast<std::size_t>(slotIndex)].payload != nullptr)
+                diagnosticsReclaimedActivationPayloadCount.fetch_add(1, std::memory_order_relaxed);
+            releasePerformanceActivationSlot(slotIndex);
+            diagnosticsRetiredActivationCount.fetch_add(1, std::memory_order_relaxed);
+        }
         readIndex = (readIndex + 1u) % static_cast<std::uint32_t>(retiredActivationQueueCapacity);
     }
 
     retiredPerformanceActivationReadIndex.store(readIndex, std::memory_order_release);
+    deferredPerformanceRetirementBacklog.store(deferredPerformanceRetirementSlotCount, std::memory_order_release);
+    deferredPerformanceRetirementBytes.store(retainedDeferredBytes, std::memory_order_release);
 }
 
 int Processor::acquirePerformanceActivationSlot()
@@ -1217,10 +1485,19 @@ void Processor::releasePerformanceActivationSlot(int slotIndex)
     if (slotIndex < 0)
         return;
 
-    if (processingAudioCallback)
-        ++realtimeSafetySnapshot.largeResourceReleasesOnAudioThread;
+    if (isCurrentThreadRealtimeAudio())
+        recordRealtimeGuardOperation(RealtimeGuardOperation::finalSharedOwnershipRelease);
+
+    if (performanceActivationVoiceLeaseCounts[static_cast<std::size_t>(slotIndex)]
+            .load(std::memory_order_acquire) != 0)
+    {
+        return;
+    }
 
     performanceActivationSlots[static_cast<std::size_t>(slotIndex)] = {};
+    performanceDiagnosticRevisions[static_cast<std::size_t>(slotIndex)].store(0, std::memory_order_release);
+    performanceDiagnosticPreparedBuildIds[static_cast<std::size_t>(slotIndex)].store(0, std::memory_order_release);
+    performanceDiagnosticPayloadBytes[static_cast<std::size_t>(slotIndex)].store(0, std::memory_order_release);
     if (freePerformanceActivationSlotCount < freePerformanceActivationSlots.size())
         freePerformanceActivationSlots[freePerformanceActivationSlotCount++] = slotIndex;
 }
@@ -1284,20 +1561,25 @@ void Processor::renderBlockRange(juce::AudioBuffer<float>& buffer, int startSamp
         }
     };
 
-    auto trimFinishedVoices = [](std::vector<ActiveRenderVoice>& activeVoices)
+    auto trimFinishedVoices = [this](std::vector<ActiveRenderVoice>& activeVoices)
     {
-        activeVoices.erase(std::remove_if(activeVoices.begin(),
-                                          activeVoices.end(),
-                                          [](const auto& voice)
-                                          {
-                                              if (voice.loadedSample == nullptr)
-                                                  return true;
-
-                                              const auto finishedRelease = voice.releasing && voice.releaseSamplesRemaining <= 0;
-                                              const auto frameCount = static_cast<double>(voice.loadedSample->sample.metadata.frameCount);
-                                              return finishedRelease || voice.positionFrames >= frameCount;
-                                          }),
-                          activeVoices.end());
+        for (auto iterator = activeVoices.begin(); iterator != activeVoices.end();)
+        {
+            const auto missingSample = iterator->loadedSample == nullptr;
+            const auto finishedRelease = iterator->releasing && iterator->releaseSamplesRemaining <= 0;
+            const auto frameCount = missingSample
+                ? 0.0
+                : static_cast<double>(iterator->loadedSample->sample.metadata.frameCount);
+            if (missingSample || finishedRelease || iterator->positionFrames >= frameCount)
+            {
+                releasePerformanceActivationLease(*iterator);
+                iterator = activeVoices.erase(iterator);
+            }
+            else
+            {
+                ++iterator;
+            }
+        }
     };
 
     for (int sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
@@ -1319,55 +1601,81 @@ void Processor::renderBlockRange(juce::AudioBuffer<float>& buffer, int startSamp
     updateRealtimeSafetyState();
 }
 
+void Processor::drainRealtimeNoteEvents(RealtimeNoteEventQueue& queue, VoiceSource source)
+{
+    QueuedRealtimeNoteEvent event;
+    while (queue.pop(event))
+    {
+        if (!event.noteOn)
+        {
+            releaseVoicesForMidiNote(event.midiNoteNumber, source);
+            continue;
+        }
+
+        if (source == VoiceSource::authoringPreview)
+            startAuthoringVoiceForMidiMessage(event.midiNoteNumber, event.velocity);
+        else
+            startVoiceForMidiMessage(event.midiNoteNumber);
+    }
+}
+
 void Processor::primeRealtimeSafetyState(int samplesPerBlock)
 {
     performanceActiveVoices.reserve(maxRealtimeActiveVoices);
     authoringPreviewActiveVoices.reserve(maxRealtimeActiveVoices);
     performanceMidiScratchBuffer.ensureSize(std::max<std::size_t>(1024, static_cast<std::size_t>(samplesPerBlock) * 16));
     authoringPreviewMidiScratchBuffer.ensureSize(std::max<std::size_t>(1024, static_cast<std::size_t>(samplesPerBlock) * 16));
-    realtimeSafetySnapshot.preparedBlockSize = static_cast<std::size_t>(samplesPerBlock);
-    realtimeSafetySnapshot.activeVoiceCapacityLimit = maxRealtimeActiveVoices * 2;
+    diagnosticsPreparedBlockSize.store(static_cast<std::size_t>(samplesPerBlock), std::memory_order_release);
+    diagnosticsActiveVoiceCapacityLimit.store(maxRealtimeActiveVoices * 2, std::memory_order_release);
+    diagnosticsPrimedActiveVoiceCapacity.store(performanceActiveVoices.capacity()
+                                                    + authoringPreviewActiveVoices.capacity(),
+                                                std::memory_order_release);
     updateRealtimeSafetyState();
 }
 
 void Processor::updateRealtimeSafetyState()
 {
-    realtimeSafetySnapshot.available = true;
-    realtimeSafetySnapshot.performanceActiveVoiceCount = performanceActiveVoices.size();
-    realtimeSafetySnapshot.authoringPreviewActiveVoiceCount = authoringPreviewActiveVoices.size();
-    realtimeSafetySnapshot.activeVoiceCapacity =
-        performanceActiveVoices.capacity() + authoringPreviewActiveVoices.capacity();
-    realtimeSafetySnapshot.referenceSampleCountLoaded = loadedSamples.size();
-    realtimeSafetySnapshot.currentAuthoringPreviewDraftRevision = authoringSession.getDocumentState().revision;
+    if (isCurrentThreadRealtimeAudio())
+    {
+        publishAudioDiagnostics();
+        return;
+    }
+
+    publishMessageDiagnostics();
+}
+
+Processor::AudioDiagnosticsValues Processor::captureActivationDiagnostics() const
+{
+    AudioDiagnosticsValues values;
     const auto activeAuthoringPreviewSlotIndex = activeAuthoringPreviewActivationSlotIndex.load(std::memory_order_acquire);
     const auto pendingAuthoringPreviewSlotIndex = pendingAuthoringPreviewActivationSlotIndex.load(std::memory_order_acquire);
     const auto activeSlotIndex = activePerformanceActivationSlotIndex.load(std::memory_order_acquire);
     const auto pendingSlotIndex = pendingPerformanceActivationSlotIndex.load(std::memory_order_acquire);
-    const auto hasActiveAuthoringPreviewActivation = activeAuthoringPreviewSlotIndex >= 0
-        && authoringPreviewActivationSlots[static_cast<std::size_t>(activeAuthoringPreviewSlotIndex)].ready;
-    const auto hasPendingAuthoringPreviewActivation = pendingAuthoringPreviewSlotIndex >= 0
-        && authoringPreviewActivationSlots[static_cast<std::size_t>(pendingAuthoringPreviewSlotIndex)].ready;
-    const auto hasActiveActivation = activeSlotIndex >= 0
-        && performanceActivationSlots[static_cast<std::size_t>(activeSlotIndex)].ready;
-    const auto hasPendingActivation = pendingSlotIndex >= 0
-        && performanceActivationSlots[static_cast<std::size_t>(pendingSlotIndex)].ready;
-    realtimeSafetySnapshot.activeAuthoringPreviewRevision = activeAuthoringPreviewSlotIndex >= 0
-        ? authoringPreviewActivationSlots[static_cast<std::size_t>(activeAuthoringPreviewSlotIndex)].projectRevision
+    values.hasActiveAuthoringPreviewActivation = activeAuthoringPreviewSlotIndex >= 0;
+    values.hasPendingAuthoringPreviewActivation = pendingAuthoringPreviewSlotIndex >= 0;
+    values.hasActivePerformanceActivation = activeSlotIndex >= 0;
+    values.hasPendingPerformanceActivation = pendingSlotIndex >= 0;
+    values.activeAuthoringPreviewRevision = activeAuthoringPreviewSlotIndex >= 0
+        ? authoringPreviewDiagnosticRevisions[static_cast<std::size_t>(activeAuthoringPreviewSlotIndex)]
+              .load(std::memory_order_acquire)
         : 0;
-    realtimeSafetySnapshot.pendingAuthoringPreviewRevision = pendingAuthoringPreviewSlotIndex >= 0
-        ? authoringPreviewActivationSlots[static_cast<std::size_t>(pendingAuthoringPreviewSlotIndex)].projectRevision
+    values.pendingAuthoringPreviewRevision = pendingAuthoringPreviewSlotIndex >= 0
+        ? authoringPreviewDiagnosticRevisions[static_cast<std::size_t>(pendingAuthoringPreviewSlotIndex)]
+              .load(std::memory_order_acquire)
         : 0;
-    realtimeSafetySnapshot.activePublishedRevision = activeSlotIndex >= 0
-        ? performanceActivationSlots[static_cast<std::size_t>(activeSlotIndex)].publishedRevision
+    values.activePublishedRevision = activeSlotIndex >= 0
+        ? performanceDiagnosticRevisions[static_cast<std::size_t>(activeSlotIndex)].load(std::memory_order_acquire)
         : 0;
-    realtimeSafetySnapshot.pendingPublishedRevision = pendingSlotIndex >= 0
-        ? performanceActivationSlots[static_cast<std::size_t>(pendingSlotIndex)].publishedRevision
+    values.pendingPublishedRevision = pendingSlotIndex >= 0
+        ? performanceDiagnosticRevisions[static_cast<std::size_t>(pendingSlotIndex)].load(std::memory_order_acquire)
         : 0;
-    realtimeSafetySnapshot.activePreparedBuildId = activeSlotIndex >= 0
-        ? performanceActivationSlots[static_cast<std::size_t>(activeSlotIndex)].preparedBuildId
+    values.activePreparedBuildId = activeSlotIndex >= 0
+        ? performanceDiagnosticPreparedBuildIds[static_cast<std::size_t>(activeSlotIndex)]
+              .load(std::memory_order_acquire)
         : 0;
-    realtimeSafetySnapshot.pendingPreparedBuildId = pendingSlotIndex >= 0
-        ? performanceActivationSlots[static_cast<std::size_t>(pendingSlotIndex)].preparedBuildId
+    values.pendingPreparedBuildId = pendingSlotIndex >= 0
+        ? performanceDiagnosticPreparedBuildIds[static_cast<std::size_t>(pendingSlotIndex)]
+              .load(std::memory_order_acquire)
         : 0;
     const auto retiredWriteIndex = retiredPerformanceActivationWriteIndex.load(std::memory_order_acquire);
     const auto retiredReadIndex = retiredPerformanceActivationReadIndex.load(std::memory_order_acquire);
@@ -1381,66 +1689,282 @@ void Processor::updateRealtimeSafetyState()
         retiredPreviewWriteIndex >= retiredPreviewReadIndex
             ? static_cast<std::size_t>(retiredPreviewWriteIndex - retiredPreviewReadIndex)
             : static_cast<std::size_t>(retiredActivationQueueCapacity - (retiredPreviewReadIndex - retiredPreviewWriteIndex));
-    realtimeSafetySnapshot.retiredActivationBacklog = retiredPerformanceBacklog + retiredPreviewBacklog;
-    realtimeSafetySnapshot.authoringPreviewFailureState =
-        failedAuthoringPreviewRevision == realtimeSafetySnapshot.currentAuthoringPreviewDraftRevision
+    values.retiredActivationBacklog = retiredPerformanceBacklog + retiredPreviewBacklog
+        + deferredPerformanceRetirementBacklog.load(std::memory_order_acquire);
+    values.retiredActivationPayloadBytes = deferredPerformanceRetirementBytes.load(std::memory_order_acquire)
+        + queuedAuthoringPreviewRetirementBytes.load(std::memory_order_acquire)
+        + queuedPerformanceRetirementBytes.load(std::memory_order_acquire);
+
+    if (activeSlotIndex >= 0)
+        values.activeActivationPayloadBytes +=
+            performanceDiagnosticPayloadBytes[static_cast<std::size_t>(activeSlotIndex)].load(std::memory_order_acquire);
+    if (activeAuthoringPreviewSlotIndex >= 0)
+        values.activeActivationPayloadBytes +=
+            authoringPreviewDiagnosticPayloadBytes[static_cast<std::size_t>(activeAuthoringPreviewSlotIndex)]
+                .load(std::memory_order_acquire);
+    if (pendingSlotIndex >= 0)
+        values.pendingActivationPayloadBytes +=
+            performanceDiagnosticPayloadBytes[static_cast<std::size_t>(pendingSlotIndex)].load(std::memory_order_acquire);
+    if (pendingAuthoringPreviewSlotIndex >= 0)
+        values.pendingActivationPayloadBytes +=
+            authoringPreviewDiagnosticPayloadBytes[static_cast<std::size_t>(pendingAuthoringPreviewSlotIndex)]
+                .load(std::memory_order_acquire);
+
+    return values;
+}
+
+void Processor::publishAudioDiagnostics()
+{
+    auto values = captureActivationDiagnostics();
+    values.performanceActiveVoiceCount = performanceActiveVoices.size();
+    values.authoringPreviewActiveVoiceCount = authoringPreviewActiveVoices.size();
+    values.activeVoiceCapacity = performanceActiveVoices.capacity() + authoringPreviewActiveVoices.capacity();
+
+    auto sequence = audioDiagnosticsPublication.sequence.fetch_add(1, std::memory_order_acq_rel) + 1;
+    audioDiagnosticsPublication.performanceActiveVoiceCount.store(values.performanceActiveVoiceCount, std::memory_order_relaxed);
+    audioDiagnosticsPublication.authoringPreviewActiveVoiceCount.store(values.authoringPreviewActiveVoiceCount, std::memory_order_relaxed);
+    audioDiagnosticsPublication.activeVoiceCapacity.store(values.activeVoiceCapacity, std::memory_order_relaxed);
+    audioDiagnosticsPublication.activeAuthoringPreviewRevision.store(values.activeAuthoringPreviewRevision, std::memory_order_relaxed);
+    audioDiagnosticsPublication.pendingAuthoringPreviewRevision.store(values.pendingAuthoringPreviewRevision, std::memory_order_relaxed);
+    audioDiagnosticsPublication.activePublishedRevision.store(values.activePublishedRevision, std::memory_order_relaxed);
+    audioDiagnosticsPublication.pendingPublishedRevision.store(values.pendingPublishedRevision, std::memory_order_relaxed);
+    audioDiagnosticsPublication.activePreparedBuildId.store(values.activePreparedBuildId, std::memory_order_relaxed);
+    audioDiagnosticsPublication.pendingPreparedBuildId.store(values.pendingPreparedBuildId, std::memory_order_relaxed);
+    audioDiagnosticsPublication.retiredActivationBacklog.store(values.retiredActivationBacklog, std::memory_order_relaxed);
+    audioDiagnosticsPublication.activeActivationPayloadBytes.store(values.activeActivationPayloadBytes, std::memory_order_relaxed);
+    audioDiagnosticsPublication.pendingActivationPayloadBytes.store(values.pendingActivationPayloadBytes, std::memory_order_relaxed);
+    audioDiagnosticsPublication.retiredActivationPayloadBytes.store(values.retiredActivationPayloadBytes, std::memory_order_relaxed);
+    audioDiagnosticsPublication.hasActiveAuthoringPreviewActivation.store(values.hasActiveAuthoringPreviewActivation, std::memory_order_relaxed);
+    audioDiagnosticsPublication.hasPendingAuthoringPreviewActivation.store(values.hasPendingAuthoringPreviewActivation, std::memory_order_relaxed);
+    audioDiagnosticsPublication.hasActivePerformanceActivation.store(values.hasActivePerformanceActivation, std::memory_order_relaxed);
+    audioDiagnosticsPublication.hasPendingPerformanceActivation.store(values.hasPendingPerformanceActivation, std::memory_order_relaxed);
+    audioDiagnosticsPublication.sequence.store(sequence + 1, std::memory_order_release);
+}
+
+Processor::AudioDiagnosticsValues Processor::readAudioDiagnostics(std::uint64_t& sequence) const
+{
+    AudioDiagnosticsValues values;
+    for (;;)
+    {
+        const auto before = audioDiagnosticsPublication.sequence.load(std::memory_order_acquire);
+        if ((before & 1u) != 0)
+            continue;
+
+        values.performanceActiveVoiceCount = audioDiagnosticsPublication.performanceActiveVoiceCount.load(std::memory_order_relaxed);
+        values.authoringPreviewActiveVoiceCount = audioDiagnosticsPublication.authoringPreviewActiveVoiceCount.load(std::memory_order_relaxed);
+        values.activeVoiceCapacity = audioDiagnosticsPublication.activeVoiceCapacity.load(std::memory_order_relaxed);
+        values.activeAuthoringPreviewRevision = audioDiagnosticsPublication.activeAuthoringPreviewRevision.load(std::memory_order_relaxed);
+        values.pendingAuthoringPreviewRevision = audioDiagnosticsPublication.pendingAuthoringPreviewRevision.load(std::memory_order_relaxed);
+        values.activePublishedRevision = audioDiagnosticsPublication.activePublishedRevision.load(std::memory_order_relaxed);
+        values.pendingPublishedRevision = audioDiagnosticsPublication.pendingPublishedRevision.load(std::memory_order_relaxed);
+        values.activePreparedBuildId = audioDiagnosticsPublication.activePreparedBuildId.load(std::memory_order_relaxed);
+        values.pendingPreparedBuildId = audioDiagnosticsPublication.pendingPreparedBuildId.load(std::memory_order_relaxed);
+        values.retiredActivationBacklog = audioDiagnosticsPublication.retiredActivationBacklog.load(std::memory_order_relaxed);
+        values.activeActivationPayloadBytes = audioDiagnosticsPublication.activeActivationPayloadBytes.load(std::memory_order_relaxed);
+        values.pendingActivationPayloadBytes = audioDiagnosticsPublication.pendingActivationPayloadBytes.load(std::memory_order_relaxed);
+        values.retiredActivationPayloadBytes = audioDiagnosticsPublication.retiredActivationPayloadBytes.load(std::memory_order_relaxed);
+        values.hasActiveAuthoringPreviewActivation = audioDiagnosticsPublication.hasActiveAuthoringPreviewActivation.load(std::memory_order_relaxed);
+        values.hasPendingAuthoringPreviewActivation = audioDiagnosticsPublication.hasPendingAuthoringPreviewActivation.load(std::memory_order_relaxed);
+        values.hasActivePerformanceActivation = audioDiagnosticsPublication.hasActivePerformanceActivation.load(std::memory_order_relaxed);
+        values.hasPendingPerformanceActivation = audioDiagnosticsPublication.hasPendingPerformanceActivation.load(std::memory_order_relaxed);
+
+        const auto after = audioDiagnosticsPublication.sequence.load(std::memory_order_acquire);
+        if (before == after)
+        {
+            sequence = after;
+            return values;
+        }
+    }
+}
+
+ProcessorRealtimeSafetySnapshot Processor::composeDiagnosticsSnapshot(
+    const AudioDiagnosticsValues& audioValues,
+    std::uint64_t publicationSequence) const
+{
+    ProcessorRealtimeSafetySnapshot snapshot;
+    snapshot.available = true;
+    snapshot.publicationSequence = publicationSequence;
+    snapshot.processBlockCount = diagnosticsProcessBlockCount.load(std::memory_order_acquire);
+    snapshot.preparedBlockSize = diagnosticsPreparedBlockSize.load(std::memory_order_acquire);
+    snapshot.referenceSampleCountLoaded = diagnosticsReferenceSampleCountLoaded.load(std::memory_order_acquire);
+    snapshot.referenceWarmupCount = diagnosticsReferenceWarmupCount.load(std::memory_order_acquire);
+    snapshot.referenceSampleLoadsOnAudioThread = diagnosticsReferenceSampleLoadsOnAudioThread.load(std::memory_order_acquire);
+    snapshot.authoringSampleLoadsOnAudioThread = diagnosticsAuthoringSampleLoadsOnAudioThread.load(std::memory_order_acquire);
+    snapshot.performanceActiveVoiceCount = audioValues.performanceActiveVoiceCount;
+    snapshot.authoringPreviewActiveVoiceCount = audioValues.authoringPreviewActiveVoiceCount;
+    snapshot.activeVoiceCapacity = std::max(audioValues.activeVoiceCapacity,
+                                            diagnosticsPrimedActiveVoiceCapacity.load(std::memory_order_acquire));
+    snapshot.activeVoiceCapacityLimit = diagnosticsActiveVoiceCapacityLimit.load(std::memory_order_acquire);
+    snapshot.activeVoiceCapacityGrowthCount = diagnosticsActiveVoiceCapacityGrowthCount.load(std::memory_order_acquire);
+    snapshot.authoringPreviewActivationCount = diagnosticsAuthoringPreviewActivationCount.load(std::memory_order_acquire);
+    snapshot.performanceActivationCount = diagnosticsPerformanceActivationCount.load(std::memory_order_acquire);
+    snapshot.retiredActivationCount = diagnosticsRetiredActivationCount.load(std::memory_order_acquire);
+    snapshot.retiredActivationBacklog = audioValues.retiredActivationBacklog;
+    snapshot.reclaimedActivationPayloadCount = diagnosticsReclaimedActivationPayloadCount.load(std::memory_order_acquire);
+    snapshot.activeActivationPayloadBytes = audioValues.activeActivationPayloadBytes;
+    snapshot.pendingActivationPayloadBytes = audioValues.pendingActivationPayloadBytes;
+    snapshot.retiredActivationPayloadBytes = audioValues.retiredActivationPayloadBytes;
+    applyRealtimeGuardDiagnostics(snapshot);
+    snapshot.callbackBudgetMicros = diagnosticsCallbackBudgetMicros.load(std::memory_order_acquire);
+    snapshot.lastProcessBlockMicros = diagnosticsLastProcessBlockMicros.load(std::memory_order_acquire);
+    snapshot.maxProcessBlockMicros = diagnosticsMaxProcessBlockMicros.load(std::memory_order_acquire);
+    snapshot.overBudgetCallbackCount = diagnosticsOverBudgetCallbackCount.load(std::memory_order_acquire);
+    snapshot.currentAuthoringPreviewDraftRevision = diagnosticsCurrentAuthoringPreviewDraftRevision.load(std::memory_order_acquire);
+    snapshot.activeAuthoringPreviewRevision = audioValues.activeAuthoringPreviewRevision;
+    snapshot.pendingAuthoringPreviewRevision = audioValues.pendingAuthoringPreviewRevision;
+    snapshot.activePublishedRevision = audioValues.activePublishedRevision;
+    snapshot.pendingPublishedRevision = audioValues.pendingPublishedRevision;
+    snapshot.activePreparedBuildId = audioValues.activePreparedBuildId;
+    snapshot.pendingPreparedBuildId = audioValues.pendingPreparedBuildId;
+    snapshot.authoringPreviewFailureState =
+        failedAuthoringPreviewRevision == snapshot.currentAuthoringPreviewDraftRevision
             ? failedAuthoringPreviewState
             : std::string {};
 
-    if (pendingAuthoringPreviewSlotIndex >= 0
-        && realtimeSafetySnapshot.pendingAuthoringPreviewRevision == realtimeSafetySnapshot.currentAuthoringPreviewDraftRevision)
-    {
-        realtimeSafetySnapshot.authoringPreviewRevisionState = "Preparing";
-    }
-    else if (failedAuthoringPreviewRevision == realtimeSafetySnapshot.currentAuthoringPreviewDraftRevision)
-    {
-        realtimeSafetySnapshot.authoringPreviewRevisionState = "Failed";
-    }
-    else if (hasActiveAuthoringPreviewActivation
-             && realtimeSafetySnapshot.activeAuthoringPreviewRevision == realtimeSafetySnapshot.currentAuthoringPreviewDraftRevision)
-    {
-        realtimeSafetySnapshot.authoringPreviewRevisionState = "Ready";
-    }
-    else if (hasActiveAuthoringPreviewActivation)
-    {
-        realtimeSafetySnapshot.authoringPreviewRevisionState = "Stale";
-    }
+    if (audioValues.hasPendingAuthoringPreviewActivation
+        && snapshot.pendingAuthoringPreviewRevision == snapshot.currentAuthoringPreviewDraftRevision)
+        snapshot.authoringPreviewRevisionState = "Preparing";
+    else if (!snapshot.authoringPreviewFailureState.empty())
+        snapshot.authoringPreviewRevisionState = "Failed";
+    else if (audioValues.hasActiveAuthoringPreviewActivation
+             && snapshot.activeAuthoringPreviewRevision == snapshot.currentAuthoringPreviewDraftRevision)
+        snapshot.authoringPreviewRevisionState = "Ready";
+    else if (audioValues.hasActiveAuthoringPreviewActivation)
+        snapshot.authoringPreviewRevisionState = "Stale";
     else
-    {
-        realtimeSafetySnapshot.authoringPreviewRevisionState = "Idle";
-    }
+        snapshot.authoringPreviewRevisionState = "Idle";
 
-    if (realtimeSafetySnapshot.getAudioThreadViolationCount() > 0)
-    {
-        realtimeSafetySnapshot.state = "Realtime callback violations recorded";
-        return;
-    }
+    if (snapshot.getAudioThreadViolationCount() > 0)
+        snapshot.state = "Realtime callback violations recorded";
+    else if (snapshot.referenceSampleCountLoaded == 0)
+        snapshot.state = "Reference playback cache unavailable";
+    else if (!audioValues.hasActivePerformanceActivation && audioValues.hasPendingPerformanceActivation)
+        snapshot.state = "Published activation pending";
+    else if (!audioValues.hasActiveAuthoringPreviewActivation && audioValues.hasPendingAuthoringPreviewActivation)
+        snapshot.state = "Authoring preview activation pending";
+    else if (!audioValues.hasActivePerformanceActivation)
+        snapshot.state = "Published activation unavailable";
+    else
+        snapshot.state = "Realtime callback primed";
+    return snapshot;
+}
 
-    if (realtimeSafetySnapshot.referenceSampleCountLoaded == 0)
-    {
-        realtimeSafetySnapshot.state = "Reference playback cache unavailable";
-        return;
-    }
+void Processor::applyRealtimeGuardDiagnostics(ProcessorRealtimeSafetySnapshot& snapshot) const
+{
+    const auto guard = realtimeGuardState.snapshot();
+    snapshot.allocationsOnAudioThread = guard.allocationCount;
+    snapshot.deallocationsOnAudioThread = guard.deallocationCount;
+    snapshot.blockingLockAttemptsOnAudioThread = guard.blockingLockCount;
+    snapshot.waitsOnAudioThread = guard.waitCount;
+    snapshot.fileOpenEntriesOnAudioThread = guard.fileOpenCount;
+    snapshot.fileReadEntriesOnAudioThread = guard.fileReadCount;
+    snapshot.samplePathResolutionsOnAudioThread = guard.pathResolutionCount;
+    snapshot.sampleDecodeEntriesOnAudioThread = guard.sampleDecodeCount;
+    snapshot.streamDecodeEntriesOnAudioThread = guard.streamDecodeCount;
+    snapshot.largeResourceDestructionsOnAudioThread = guard.largeResourceDestructionCount;
+    snapshot.finalSharedOwnershipReleasesOnAudioThread = guard.finalSharedOwnershipReleaseCount;
+    snapshot.largeResourceReleasesOnAudioThread = guard.largeResourceDestructionCount
+        + guard.finalSharedOwnershipReleaseCount;
+}
 
-    if (!hasActiveActivation && hasPendingActivation)
-    {
-        realtimeSafetySnapshot.state = "Published activation pending";
-        return;
-    }
+void Processor::publishMessageDiagnostics()
+{
+    diagnosticsReferenceSampleCountLoaded.store(loadedSamples.size(), std::memory_order_release);
+    diagnosticsCurrentAuthoringPreviewDraftRevision.store(authoringSession.getDocumentState().revision,
+                                                          std::memory_order_release);
+    std::uint64_t audioSequence = 0;
+    auto audioValues = readAudioDiagnostics(audioSequence);
+    const auto activationValues = captureActivationDiagnostics();
+    audioValues.activeAuthoringPreviewRevision = activationValues.activeAuthoringPreviewRevision;
+    audioValues.pendingAuthoringPreviewRevision = activationValues.pendingAuthoringPreviewRevision;
+    audioValues.activePublishedRevision = activationValues.activePublishedRevision;
+    audioValues.pendingPublishedRevision = activationValues.pendingPublishedRevision;
+    audioValues.activePreparedBuildId = activationValues.activePreparedBuildId;
+    audioValues.pendingPreparedBuildId = activationValues.pendingPreparedBuildId;
+    audioValues.retiredActivationBacklog = activationValues.retiredActivationBacklog;
+    audioValues.activeActivationPayloadBytes = activationValues.activeActivationPayloadBytes;
+    audioValues.pendingActivationPayloadBytes = activationValues.pendingActivationPayloadBytes;
+    audioValues.retiredActivationPayloadBytes = activationValues.retiredActivationPayloadBytes;
+    audioValues.hasActiveAuthoringPreviewActivation = activationValues.hasActiveAuthoringPreviewActivation;
+    audioValues.hasPendingAuthoringPreviewActivation = activationValues.hasPendingAuthoringPreviewActivation;
+    audioValues.hasActivePerformanceActivation = activationValues.hasActivePerformanceActivation;
+    audioValues.hasPendingPerformanceActivation = activationValues.hasPendingPerformanceActivation;
+    auto snapshot = std::make_shared<const ProcessorRealtimeSafetySnapshot>(
+        composeDiagnosticsSnapshot(audioValues, audioSequence));
+    std::atomic_store_explicit(&publishedRealtimeSafetySnapshot, std::move(snapshot), std::memory_order_release);
+}
 
-    if (!hasActiveAuthoringPreviewActivation && hasPendingAuthoringPreviewActivation)
-    {
-        realtimeSafetySnapshot.state = "Authoring preview activation pending";
-        return;
-    }
+ProcessorRealtimeSafetySnapshot Processor::getRealtimeSafetySnapshot() const
+{
+    auto published = std::atomic_load_explicit(&publishedRealtimeSafetySnapshot, std::memory_order_acquire);
+    auto snapshot = published != nullptr ? *published : ProcessorRealtimeSafetySnapshot {};
 
-    if (!hasActiveActivation)
-    {
-        realtimeSafetySnapshot.state = "Published activation unavailable";
-        return;
-    }
+    std::uint64_t audioSequence = 0;
+    const auto audioValues = readAudioDiagnostics(audioSequence);
+    if (audioSequence <= snapshot.publicationSequence)
+        return snapshot;
 
-    realtimeSafetySnapshot.state = "Realtime callback primed";
+    // Readers may need callback counters before the next message-service tick. Overlay only
+    // primitives onto this private value copy; formatted strings remain message-owned.
+    snapshot.publicationSequence = audioSequence;
+    snapshot.processBlockCount = diagnosticsProcessBlockCount.load(std::memory_order_acquire);
+    snapshot.referenceSampleCountLoaded = diagnosticsReferenceSampleCountLoaded.load(std::memory_order_acquire);
+    snapshot.referenceWarmupCount = diagnosticsReferenceWarmupCount.load(std::memory_order_acquire);
+    snapshot.referenceSampleLoadsOnAudioThread = diagnosticsReferenceSampleLoadsOnAudioThread.load(std::memory_order_acquire);
+    snapshot.authoringSampleLoadsOnAudioThread = diagnosticsAuthoringSampleLoadsOnAudioThread.load(std::memory_order_acquire);
+    snapshot.performanceActiveVoiceCount = audioValues.performanceActiveVoiceCount;
+    snapshot.authoringPreviewActiveVoiceCount = audioValues.authoringPreviewActiveVoiceCount;
+    snapshot.activeVoiceCapacity = std::max(audioValues.activeVoiceCapacity,
+                                            diagnosticsPrimedActiveVoiceCapacity.load(std::memory_order_acquire));
+    snapshot.activeVoiceCapacityGrowthCount = diagnosticsActiveVoiceCapacityGrowthCount.load(std::memory_order_acquire);
+    snapshot.authoringPreviewActivationCount = diagnosticsAuthoringPreviewActivationCount.load(std::memory_order_acquire);
+    snapshot.performanceActivationCount = diagnosticsPerformanceActivationCount.load(std::memory_order_acquire);
+    snapshot.retiredActivationCount = diagnosticsRetiredActivationCount.load(std::memory_order_acquire);
+    snapshot.retiredActivationBacklog = audioValues.retiredActivationBacklog;
+    snapshot.reclaimedActivationPayloadCount = diagnosticsReclaimedActivationPayloadCount.load(std::memory_order_acquire);
+    snapshot.activeActivationPayloadBytes = audioValues.activeActivationPayloadBytes;
+    snapshot.pendingActivationPayloadBytes = audioValues.pendingActivationPayloadBytes;
+    snapshot.retiredActivationPayloadBytes = audioValues.retiredActivationPayloadBytes;
+    applyRealtimeGuardDiagnostics(snapshot);
+    snapshot.callbackBudgetMicros = diagnosticsCallbackBudgetMicros.load(std::memory_order_acquire);
+    snapshot.lastProcessBlockMicros = diagnosticsLastProcessBlockMicros.load(std::memory_order_acquire);
+    snapshot.maxProcessBlockMicros = diagnosticsMaxProcessBlockMicros.load(std::memory_order_acquire);
+    snapshot.overBudgetCallbackCount = diagnosticsOverBudgetCallbackCount.load(std::memory_order_acquire);
+    snapshot.activeAuthoringPreviewRevision = audioValues.activeAuthoringPreviewRevision;
+    snapshot.pendingAuthoringPreviewRevision = audioValues.pendingAuthoringPreviewRevision;
+    snapshot.activePublishedRevision = audioValues.activePublishedRevision;
+    snapshot.pendingPublishedRevision = audioValues.pendingPublishedRevision;
+    snapshot.activePreparedBuildId = audioValues.activePreparedBuildId;
+    snapshot.pendingPreparedBuildId = audioValues.pendingPreparedBuildId;
+
+    // These strings belong only to the returned copy. Re-evaluate them off audio so the
+    // public snapshot remains behaviorally current after a block-boundary activation.
+    if (audioValues.hasPendingAuthoringPreviewActivation
+        && snapshot.pendingAuthoringPreviewRevision == snapshot.currentAuthoringPreviewDraftRevision)
+        snapshot.authoringPreviewRevisionState = "Preparing";
+    else if (!snapshot.authoringPreviewFailureState.empty())
+        snapshot.authoringPreviewRevisionState = "Failed";
+    else if (audioValues.hasActiveAuthoringPreviewActivation
+             && snapshot.activeAuthoringPreviewRevision == snapshot.currentAuthoringPreviewDraftRevision)
+        snapshot.authoringPreviewRevisionState = "Ready";
+    else if (audioValues.hasActiveAuthoringPreviewActivation)
+        snapshot.authoringPreviewRevisionState = "Stale";
+    else
+        snapshot.authoringPreviewRevisionState = "Idle";
+
+    if (snapshot.getAudioThreadViolationCount() > 0)
+        snapshot.state = "Realtime callback violations recorded";
+    else if (snapshot.referenceSampleCountLoaded == 0)
+        snapshot.state = "Reference playback cache unavailable";
+    else if (!audioValues.hasActivePerformanceActivation && audioValues.hasPendingPerformanceActivation)
+        snapshot.state = "Published activation pending";
+    else if (!audioValues.hasActiveAuthoringPreviewActivation && audioValues.hasPendingAuthoringPreviewActivation)
+        snapshot.state = "Authoring preview activation pending";
+    else if (!audioValues.hasActivePerformanceActivation)
+        snapshot.state = "Published activation unavailable";
+    else
+        snapshot.state = "Realtime callback primed";
+    return snapshot;
 }
 } // namespace drs::plugin
 

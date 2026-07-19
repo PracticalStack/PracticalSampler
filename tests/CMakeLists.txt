@@ -194,6 +194,145 @@ add_test(
     COMMAND drs_phase1_prepared_playback_worker_tests
 )
 
+# Sprint 4 Entry Gate EG1 focused regression matrix.
+juce_add_console_app(drs_sprint4_entry_authored_input_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Sprint 4 Entry Authored Input Tests"
+)
+
+target_sources(drs_sprint4_entry_authored_input_tests
+    PRIVATE
+        src/Phase1Sprint4EntryAuthoredInputTests.cpp
+)
+
+target_link_libraries(drs_sprint4_entry_authored_input_tests
+    PRIVATE
+        drs_engine_adapter
+        drs_sample_import
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_sprint4_entry_authored_input_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint4_entry.authored_input
+    COMMAND drs_sprint4_entry_authored_input_tests
+)
+
+# Sprint 4 Entry Gate EG2 focused lifetime and handoff matrix.
+juce_add_console_app(drs_sprint4_entry_activation_payload_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Sprint 4 Entry Activation Payload Tests"
+)
+
+target_sources(drs_sprint4_entry_activation_payload_tests
+    PRIVATE
+        src/Phase1Sprint4EntryActivationPayloadTests.cpp
+)
+
+target_link_libraries(drs_sprint4_entry_activation_payload_tests
+    PRIVATE
+        drs_engine_adapter
+        drs_sample_import
+        drs_plugin_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_sprint4_entry_activation_payload_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint4_entry.activation_payload
+    COMMAND drs_sprint4_entry_activation_payload_tests
+)
+
+# Sprint 4 Entry Gate EG3 deterministic concurrency regression.
+juce_add_console_app(drs_sprint4_entry_diagnostics_concurrency_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Sprint 4 Entry Diagnostics Concurrency Tests"
+)
+
+target_sources(drs_sprint4_entry_diagnostics_concurrency_tests
+    PRIVATE
+        src/Phase1Sprint4EntryDiagnosticsConcurrencyTests.cpp
+)
+
+target_link_libraries(drs_sprint4_entry_diagnostics_concurrency_tests
+    PRIVATE
+        drs_plugin_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_sprint4_entry_diagnostics_concurrency_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint4_entry.diagnostics_concurrency
+    COMMAND drs_sprint4_entry_diagnostics_concurrency_tests
+)
+
+# Sprint 4 Entry Gate EG4 focused real-time guard and negative-injection matrix.
+juce_add_console_app(drs_sprint4_entry_realtime_guard_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Sprint 4 Entry Realtime Guard Tests"
+)
+
+target_sources(drs_sprint4_entry_realtime_guard_tests
+    PRIVATE
+        src/Phase1Sprint4EntryRealtimeGuardTests.cpp
+)
+
+target_link_libraries(drs_sprint4_entry_realtime_guard_tests
+    PRIVATE
+        drs_plugin_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_sprint4_entry_realtime_guard_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint4_entry.realtime_guard
+    COMMAND drs_sprint4_entry_realtime_guard_tests
+)
+
+# Sprint 4 Entry Gate EG5 Preview/Publish parity through standalone and editor-closed plugin shells.
+juce_add_console_app(drs_sprint4_entry_shell_parity_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Sprint 4 Entry Shell Parity Tests"
+)
+
+target_sources(drs_sprint4_entry_shell_parity_tests
+    PRIVATE
+        src/Phase1Sprint4EntryShellParityTests.cpp
+)
+
+target_link_libraries(drs_sprint4_entry_shell_parity_tests
+    PRIVATE
+        drs_plugin_shell
+        drs_standalone_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_sprint4_entry_shell_parity_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint4_entry.shell_parity
+    COMMAND drs_sprint4_entry_shell_parity_tests
+)
+
 juce_add_console_app(drs_phase1_realtime_safety_tests
     PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Realtime Safety Tests"
 )
@@ -1036,6 +1175,12 @@ add_test(
 add_custom_target(drs_all_tests)
 
 add_dependencies(drs_all_tests
+    DecentRhapsodyStudioPlugin
+    drs_sprint4_entry_authored_input_tests
+    drs_sprint4_entry_activation_payload_tests
+    drs_sprint4_entry_diagnostics_concurrency_tests
+    drs_sprint4_entry_realtime_guard_tests
+    drs_sprint4_entry_shell_parity_tests
     drs_phase0_smoke_tests
     drs_phase1_runtime_contract_tests
     drs_phase1_draft_playback_contract_tests

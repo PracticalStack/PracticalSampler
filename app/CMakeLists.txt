@@ -35,6 +35,8 @@ set(DRS_PLUGIN_SOURCES
     src/plugin/PluginEditor.h
     src/plugin/PluginProcessor.cpp
     src/plugin/PluginProcessor.h
+    src/plugin/RealtimeGuard.cpp
+    src/plugin/RealtimeGuard.h
 )
 
 add_library(drs_app_shared STATIC
@@ -184,6 +186,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     src/plugin/PluginEditor.h
     src/plugin/PluginProcessor.cpp
     src/plugin/PluginProcessor.h
+    src/plugin/RealtimeGuard.cpp
+    src/plugin/RealtimeGuard.h
 )
 
 set_target_properties(drs_app_shared PROPERTIES FOLDER "Product")

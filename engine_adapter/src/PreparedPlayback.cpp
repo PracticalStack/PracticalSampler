@@ -117,6 +117,7 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
         streamObject["containerPath"] = streamHandle.containerPath;
         streamObject["payloadEncoding"] = streamHandle.payloadEncoding;
         streamObject["topologyKind"] = streamHandle.topologyKind;
+        streamObject["compiledStreamTopologyAvailable"] = streamHandle.compiledStreamTopologyAvailable;
         streamObject["pageSizeBytes"] = streamHandle.pageSizeBytes;
         streamObject["payloadOffsetBytes"] = streamHandle.payloadOffsetBytes;
         streamObject["payloadSizeBytes"] = streamHandle.payloadSizeBytes;
@@ -206,6 +207,11 @@ std::string buildPreparedDecodePolicyFingerprint(const RuntimeStreamSampleDefini
     return stream.str();
 }
 
+std::string buildAuthoredDecodePolicyFingerprint()
+{
+    return "format=auto|normalization=float32-normalized-v1|payloadEncoding=decoded-float32|topology=decoded-memory";
+}
+
 std::string buildRetirementToken(std::uint64_t retirementOrdinal,
                                  const std::string& sampleSourceId,
                                  std::uint64_t retiredByBuildId)
@@ -263,18 +269,17 @@ void populateStreamTopologyMetadata(PreparedPlaybackStreamHandle& streamHandle,
 
 std::string buildCacheKey(const std::string& compilerVersion,
                           const PreparedPlaybackSampleResolution& sampleResolution,
-                          const RuntimeStreamSampleDefinition& streamSample,
-                          const RuntimeStreamContainerModel& container)
+                          const std::string& sourceFingerprint,
+                          const std::string& decodePolicyFingerprint)
 {
     // Cache identity intentionally excludes zone-only authoring fields such as gain, pan, and key mapping.
     // Those edits should change prepared zone content, but they must not invalidate source-backed prepared assets.
     const auto canonicalSourceIdentity = buildCanonicalSourceIdentity(sampleResolution.sampleSourceId,
                                                                       sampleResolution.normalizedSourcePath);
-    const auto decodePolicyFingerprint = buildPreparedDecodePolicyFingerprint(streamSample, container);
     std::ostringstream stream;
     stream << "compilerVersion=" << compilerVersion
            << "|canonicalSourceIdentity=" << canonicalSourceIdentity
-           << "|sourceFingerprint=" << streamSample.sourceChecksumHex
+           << "|sourceFingerprint=" << sourceFingerprint
            << "|decodePolicy=" << decodePolicyFingerprint;
     return "fnv1a64:" + computeFnv1a64Hex(stream.str());
 }
@@ -499,7 +504,7 @@ PreparedPlaybackBuildRequest PreparedPlaybackService::resolveBuildRequest(
     resolvedRequest.sampleResolutions.clear();
     resolvedRequest.sampleResolutionReady = false;
 
-    if (!resolvedRequest.accepted || !streamResult.loaded)
+    if (!resolvedRequest.accepted)
         return resolvedRequest;
 
     resolvedRequest.sampleResolutions.reserve(snapshotResult.snapshot.sampleIdentities.size());
@@ -517,6 +522,8 @@ PreparedPlaybackBuildRequest PreparedPlaybackService::resolveBuildRequest(
             resolution.selectedStreamSampleId = streamSample->sampleId;
             resolution.selectedFormatName = streamSample->formatName;
             resolution.matchedBySourcePath = true;
+            resolution.resolutionKind = "compiled-stream-path";
+            resolution.compiledStreamTopologyAvailable = true;
         }
         else if (!sampleIdentity.sampleSourceId.empty())
         {
@@ -525,6 +532,8 @@ PreparedPlaybackBuildRequest PreparedPlaybackService::resolveBuildRequest(
                 resolution.selectedStreamSampleId = streamSampleById->sampleId;
                 resolution.selectedFormatName = streamSampleById->formatName;
                 resolution.matchedBySampleSourceId = true;
+                resolution.resolutionKind = "compiled-stream-id";
+                resolution.compiledStreamTopologyAvailable = true;
             }
         }
 
@@ -589,21 +598,6 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
         return result;
     }
 
-    if (!streamResult.loaded)
-    {
-        result.lifecycleState = PlaybackSnapshotLifecycleState::failed;
-        result.state = "Prepared playback build failed";
-        result.metrics.failureCount = 1;
-        addFinding(result,
-                   PlaybackSnapshotFindingSeverity::error,
-                   "missing-stream-container",
-                   "streamContainer",
-                   "Prepared playback requires a loaded stream container.");
-        result.buildDurationMicros = static_cast<std::uint64_t>(
-            std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - startTime).count());
-        return result;
-    }
-
     const auto resolvedRequest = request.sampleResolutionReady
         ? request
         : resolveBuildRequest(request, snapshotResult, streamResult);
@@ -628,21 +622,43 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     for (const auto& sampleResolution : resolvedRequest.sampleResolutions)
     {
         const auto path = "sampleIdentities[" + std::to_string(sampleResolution.snapshotSampleIndex) + "]";
-        const auto* streamSample = sampleResolution.selectedStreamSampleId.empty()
+        const auto* candidateStreamSample = !streamResult.loaded || sampleResolution.selectedStreamSampleId.empty()
             ? nullptr
             : findStreamSampleById(streamResult.container, sampleResolution.selectedStreamSampleId);
 
-        if (streamSample == nullptr)
+        const auto fingerprint = fingerprintSampleSourceFile(sampleResolution.normalizedSourcePath);
+        if (!fingerprint.fingerprinted)
         {
+            SampleImportResult fingerprintFailure;
+            fingerprintFailure.fileFound = fingerprint.fileFound;
+            fingerprintFailure.sourcePath = fingerprint.sourcePath;
+            fingerprintFailure.state = fingerprint.state;
+            fingerprintFailure.issues = fingerprint.issues;
+            const auto failure = classifyPreparedSampleImportFailure(fingerprintFailure);
             addFinding(result,
                        PlaybackSnapshotFindingSeverity::error,
-                       "missing-prepared-stream-sample",
+                       failure.code,
                        path + ".sourcePath",
-                       "No compiled stream sample matches snapshot sample source '" + sampleResolution.sampleSourceId + "'.");
+                       failure.summary + " '" + sampleResolution.normalizedSourcePath + "': "
+                           + describePreparedSampleImportFailure(fingerprintFailure));
             continue;
         }
 
-        const auto cacheKey = buildCacheKey(compilerVersion, sampleResolution, *streamSample, streamResult.container);
+        // A compiled stream sample is optional. Reuse it only when it describes the bytes that
+        // were actually fingerprinted by this worker; stale or absent topology falls back to a
+        // decoded-memory handle without making the authored source ineligible.
+        const auto* streamSample = candidateStreamSample != nullptr
+                && candidateStreamSample->sourceChecksumHex == fingerprint.fingerprintHex
+            ? candidateStreamSample
+            : nullptr;
+        const auto decodePolicyFingerprint = streamSample != nullptr
+            ? buildPreparedDecodePolicyFingerprint(*streamSample, streamResult.container)
+            : buildAuthoredDecodePolicyFingerprint();
+
+        const auto cacheKey = buildCacheKey(compilerVersion,
+                                            sampleResolution,
+                                            fingerprint.fingerprintHex,
+                                            decodePolicyFingerprint);
         const auto cacheIterator = std::find_if(cacheEntries.begin(),
                                                 cacheEntries.end(),
                                                 [&](const auto& entry)
@@ -662,7 +678,8 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
         }
         else
         {
-            const auto decodedSample = importSampleFile(sampleResolution.normalizedSourcePath);
+            const auto decodedSample = importSampleFile(sampleResolution.normalizedSourcePath,
+                                                        fingerprint.fingerprintHex);
             if (!decodedSample.imported)
             {
                 const auto failure = classifyPreparedSampleImportFailure(decodedSample);
@@ -675,7 +692,9 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
                 continue;
             }
 
-            const auto decodeMismatches = collectDecodeMismatches(decodedSample.sample.metadata, *streamSample);
+            const auto decodeMismatches = streamSample != nullptr
+                ? collectDecodeMismatches(decodedSample.sample.metadata, *streamSample)
+                : std::vector<std::string> {};
             if (!decodeMismatches.empty())
             {
                 addFinding(result,
@@ -689,7 +708,9 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             }
 
             sampleHandle.sampleSourceId = sampleResolution.sampleSourceId;
-            sampleHandle.streamSampleId = streamSample->sampleId;
+            sampleHandle.streamSampleId = streamSample != nullptr
+                ? streamSample->sampleId
+                : sampleResolution.sampleSourceId;
             sampleHandle.sourcePath = sampleResolution.normalizedSourcePath;
             sampleHandle.canonicalSourcePath = sampleResolution.normalizedSourcePath;
             sampleHandle.canonicalSourceIdentity = buildCanonicalSourceIdentity(sampleResolution.sampleSourceId,
@@ -697,8 +718,10 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             sampleHandle.sourceFingerprintHex = decodedSample.sample.metadata.sourceChecksumHex;
             sampleHandle.formatName = decodedSample.sample.metadata.formatName;
             const auto& snapshotRole = snapshotResult.snapshot.sampleIdentities[sampleResolution.snapshotSampleIndex].role;
-            sampleHandle.role = snapshotRole.empty() ? streamSample->role : snapshotRole;
-            sampleHandle.channelLayout = streamSample->channelLayout;
+            sampleHandle.role = snapshotRole.empty() && streamSample != nullptr ? streamSample->role : snapshotRole;
+            sampleHandle.channelLayout = streamSample != nullptr
+                ? streamSample->channelLayout
+                : decodedSample.sample.metadata.channelLayout;
             sampleHandle.sampleRate = decodedSample.sample.metadata.sampleRate;
             sampleHandle.frameCount = decodedSample.sample.metadata.frameCount;
             sampleHandle.channelCount = decodedSample.sample.metadata.channelCount;
@@ -714,20 +737,32 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             sampleHandle.cacheKey = cacheKey;
 
             streamHandle.sampleSourceId = sampleResolution.sampleSourceId;
-            streamHandle.streamSampleId = streamSample->sampleId;
-            streamHandle.containerId = streamResult.container.containerId;
-            streamHandle.containerPath = streamResult.containerPath;
-            streamHandle.payloadEncoding = streamResult.container.payloadEncoding;
-            streamHandle.pageSizeBytes = streamResult.container.pageSizeBytes;
-            streamHandle.payloadOffsetBytes = streamSample->payloadOffsetBytes;
-            streamHandle.payloadSizeBytes = streamSample->payloadSizeBytes;
-            streamHandle.prefetchBytes = streamSample->prefetchBytes;
-            populateStreamTopologyMetadata(streamHandle, *streamSample, streamResult.container.pageSizeBytes);
+            streamHandle.streamSampleId = sampleHandle.streamSampleId;
+            streamHandle.compiledStreamTopologyAvailable = streamSample != nullptr;
+            if (streamSample != nullptr)
+            {
+                streamHandle.containerId = streamResult.container.containerId;
+                streamHandle.containerPath = streamResult.containerPath;
+                streamHandle.payloadEncoding = streamResult.container.payloadEncoding;
+                streamHandle.pageSizeBytes = streamResult.container.pageSizeBytes;
+                streamHandle.payloadOffsetBytes = streamSample->payloadOffsetBytes;
+                streamHandle.payloadSizeBytes = streamSample->payloadSizeBytes;
+                streamHandle.prefetchBytes = streamSample->prefetchBytes;
+                populateStreamTopologyMetadata(streamHandle, *streamSample, streamResult.container.pageSizeBytes);
+            }
+            else
+            {
+                streamHandle.payloadEncoding = "decoded-float32";
+                streamHandle.topologyKind = "decoded-memory";
+            }
             streamHandle.ownershipToken = "cache:" + cacheKey;
             streamHandle.cacheKey = cacheKey;
-            streamHandle.pages.reserve(streamSample->pages.size());
-            for (const auto& page : streamSample->pages)
-                streamHandle.pages.push_back({ page.pageIndex, page.offsetBytes, page.sizeBytes });
+            if (streamSample != nullptr)
+            {
+                streamHandle.pages.reserve(streamSample->pages.size());
+                for (const auto& page : streamSample->pages)
+                    streamHandle.pages.push_back({ page.pageIndex, page.offsetBytes, page.sizeBytes });
+            }
 
             retireSupersededCacheEntries(sampleResolution.sampleSourceId, cacheKey, request.buildId);
 
@@ -736,7 +771,7 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             entry.ownership.ownershipToken = sampleHandle.ownershipToken;
             entry.ownership.cacheKey = cacheKey;
             entry.ownership.sampleSourceId = sampleResolution.sampleSourceId;
-            entry.ownership.streamSampleId = streamSample->sampleId;
+            entry.ownership.streamSampleId = sampleHandle.streamSampleId;
             entry.ownership.lifetimeState = "active-cache-entry";
             entry.ownership.retainedBytes = retainedSampleBytes;
             entry.ownership.preparedBuildId = request.buildId;
@@ -825,6 +860,8 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     result.prepared.notes.push_back("Compiler version: " + compilerVersion);
     result.prepared.notes.push_back(
         "Prepared cache key contract: canonical-source-identity + source-fingerprint + decode-policy + compiler-version");
+    result.prepared.notes.push_back(
+        "Compiled stream topology is optional; unmatched authored sources retain decoded-memory handles");
 
     const auto errorCount = static_cast<std::size_t>(std::count_if(result.findings.begin(),
                                                                    result.findings.end(),
@@ -885,6 +922,7 @@ void PreparedPlaybackService::setBackgroundWorkerStream(const RuntimeStreamLoadR
     {
         std::lock_guard<std::mutex> lock(workerMutex);
         workerStreamResult = streamResult;
+        workerStreamConfigured = true;
     }
 
     workerCondition.notify_all();
@@ -1188,7 +1226,7 @@ void PreparedPlaybackService::runBackgroundWorker()
                 [this]
                 {
                     return stopWorkerRequested
-                        || (!queuedJobs.empty() && workerStreamResult.loaded);
+                        || (!queuedJobs.empty() && workerStreamConfigured);
                 });
 
             if (stopWorkerRequested)
@@ -1337,6 +1375,7 @@ bool operator==(const PreparedPlaybackStreamHandle& left, const PreparedPlayback
         && left.containerPath == right.containerPath
         && left.payloadEncoding == right.payloadEncoding
         && left.topologyKind == right.topologyKind
+        && left.compiledStreamTopologyAvailable == right.compiledStreamTopologyAvailable
         && left.pageSizeBytes == right.pageSizeBytes
         && left.payloadOffsetBytes == right.payloadOffsetBytes
         && left.payloadSizeBytes == right.payloadSizeBytes

@@ -140,6 +140,9 @@ struct EnginePerformanceSnapshot
     std::uint64_t publishedPreparedDecodedBytes = 0;
     std::uint64_t previewPreparedSampleDataBytes = 0;
     std::uint64_t publishedPreparedSampleDataBytes = 0;
+    std::uint64_t previewActivationPayloadBytes = 0;
+    std::uint64_t publishedActivationPayloadBytes = 0;
+    std::uint64_t retainedActivationPayloadBytes = 0;
     std::size_t previewPreparationCacheHits = 0;
     std::size_t previewPreparationCacheMisses = 0;
     std::size_t publishedPreparationCacheHits = 0;
@@ -223,6 +226,9 @@ struct EngineDiagnosticsSnapshot
     std::uint64_t publishedPreparedDecodedBytes = 0;
     std::uint64_t previewPreparedSampleDataBytes = 0;
     std::uint64_t publishedPreparedSampleDataBytes = 0;
+    std::uint64_t previewActivationPayloadBytes = 0;
+    std::uint64_t publishedActivationPayloadBytes = 0;
+    std::uint64_t retainedActivationPayloadBytes = 0;
     std::size_t previewPreparationCacheHits = 0;
     std::size_t previewPreparationCacheMisses = 0;
     std::size_t publishedPreparationCacheHits = 0;
@@ -313,6 +319,14 @@ public:
     EngineDiagnosticsSnapshot getDiagnosticsSnapshot() const;
     EnginePerformanceSnapshot getPerformanceSnapshot() const;
     const DraftPlaybackStatus& getDraftPlaybackStatus() const { return draftPlaybackContract.getStatus(); }
+    PlaybackActivationPayloadPtr getPreviewActivationPayload() const
+    {
+        return draftPlaybackContract.getStatus().preview.activationPayload;
+    }
+    PlaybackActivationPayloadPtr getPerformanceActivationPayload() const
+    {
+        return draftPlaybackContract.getStatus().performance.activationPayload;
+    }
     PreparedPlaybackWorkerStatus getPreparedPlaybackWorkerStatus() const
     {
         return preparedPlaybackService.getWorkerStatus();

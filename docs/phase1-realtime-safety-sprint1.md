@@ -35,6 +35,9 @@ This keeps the first realtime harness product-owned and testable without dependi
 - renders the first host note without tracked audio-thread violations
 - survives a burst of queued performance-surface notes without growing active-voice storage
 
-## Known limits
+## Sprint 4 extension
 
-Sprint 1 does not yet provide a universal detector for every possible heap allocation, lock wait, or host-side stall inside the callback. This harness is intentionally narrower: it hardens the known first-note hazards in the shared processor path and makes future regressions visible in CI.
+The original Sprint 1 harness was intentionally limited to known first-note hazards. Sprint 4 Entry
+Gate EG4 now adds test-scoped allocation/deallocation detection and explicit guards for locks, waits,
+file access, path resolution, sample/stream decode, large-resource destruction, final ownership release,
+and callback deadlines. See `phase1-sprint4-entry-realtime-guard-contract.md` for the current contract.

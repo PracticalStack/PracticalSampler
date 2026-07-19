@@ -593,7 +593,37 @@ SampleImportPolicyReport evaluatePhase1SamplePolicy(const ImportedSampleMetadata
     return report;
 }
 
-SampleImportResult importSampleFile(const std::string& samplePath)
+SampleSourceFingerprintResult fingerprintSampleSourceFile(const std::string& samplePath)
+{
+    SampleSourceFingerprintResult result;
+    result.sourcePath = samplePath;
+    result.state = "Source fingerprint not attempted";
+
+    const fs::path sampleFsPath(samplePath);
+    if (!fs::exists(sampleFsPath))
+    {
+        result.state = "Sample missing";
+        result.issues.push_back("Sample file was not found at " + samplePath + ".");
+        return result;
+    }
+
+    result.fileFound = true;
+    result.fingerprintHex = computeFnv1aChecksumHex(sampleFsPath);
+    if (result.fingerprintHex.empty())
+    {
+        result.state = "Sample fingerprint failed";
+        result.issues.push_back("Sample file could not be read while computing its source fingerprint: "
+                                + toDisplayPath(sampleFsPath));
+        return result;
+    }
+
+    result.fingerprinted = true;
+    result.state = "Source fingerprint ready";
+    return result;
+}
+
+SampleImportResult importSampleFile(const std::string& samplePath,
+                                    const std::string& knownFingerprintHex)
 {
     SampleImportResult result;
     result.sourcePath = samplePath;
@@ -642,7 +672,9 @@ SampleImportResult importSampleFile(const std::string& samplePath)
     auto& metadata = result.sample.metadata;
     metadata.sourcePath = toDisplayPath(sampleFsPath);
     metadata.formatName = reader->getFormatName().toStdString();
-    metadata.sourceChecksumHex = computeFnv1aChecksumHex(sampleFsPath);
+    metadata.sourceChecksumHex = knownFingerprintHex.empty()
+        ? computeFnv1aChecksumHex(sampleFsPath)
+        : knownFingerprintHex;
     metadata.channelLayout = reader->getChannelLayout().getDescription().toStdString();
     metadata.sampleRate = reader->sampleRate;
     metadata.frameCount = static_cast<std::uint64_t>(reader->lengthInSamples);

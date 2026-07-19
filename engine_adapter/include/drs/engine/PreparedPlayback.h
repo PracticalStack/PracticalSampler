@@ -72,6 +72,7 @@ struct PreparedPlaybackStreamHandle
     std::string containerPath;
     std::string payloadEncoding;
     std::string topologyKind;
+    bool compiledStreamTopologyAvailable = false;
     std::uint64_t pageSizeBytes = 0;
     std::uint64_t payloadOffsetBytes = 0;
     std::uint64_t payloadSizeBytes = 0;
@@ -163,6 +164,8 @@ struct PreparedPlaybackSampleResolution
     std::string normalizedSourcePath;
     std::string selectedStreamSampleId;
     std::string selectedFormatName;
+    std::string resolutionKind = "authored-source";
+    bool compiledStreamTopologyAvailable = false;
     bool matchedBySourcePath = false;
     bool matchedBySampleSourceId = false;
 };
@@ -337,6 +340,7 @@ private:
     std::uint64_t nextRetirementToken = 1;
     std::size_t maxPendingJobs = 2;
     bool backgroundWorkerEnabled = false;
+    bool workerStreamConfigured = false;
     bool stopWorkerRequested = false;
     std::vector<std::pair<std::string, CacheEntry>> cacheEntries;
     std::vector<std::pair<std::string, CacheEntry>> retiredCacheEntries;

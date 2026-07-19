@@ -4,6 +4,7 @@
 #include "drs/engine/EngineFacade.h"
 #include "drs/engine/RuntimeStream.h"
 #include "drs/engine/SampleImport.h"
+#include "plugin/RealtimeGuard.h"
 #include "shared/AuthoringPreviewModel.h"
 
 #include <juce_audio_devices/juce_audio_devices.h>
@@ -11,8 +12,10 @@
 
 #include <array>
 #include <atomic>
+#include <cstddef>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <unordered_map>
 #include <vector>
 
@@ -38,7 +41,20 @@ struct ProcessorRealtimeSafetySnapshot
     std::size_t performanceActivationCount = 0;
     std::size_t retiredActivationCount = 0;
     std::size_t retiredActivationBacklog = 0;
+    std::size_t reclaimedActivationPayloadCount = 0;
+    std::uint64_t activeActivationPayloadBytes = 0;
+    std::uint64_t pendingActivationPayloadBytes = 0;
+    std::uint64_t retiredActivationPayloadBytes = 0;
     std::size_t largeResourceReleasesOnAudioThread = 0;
+    std::size_t allocationsOnAudioThread = 0;
+    std::size_t deallocationsOnAudioThread = 0;
+    std::size_t blockingLockAttemptsOnAudioThread = 0;
+    std::size_t waitsOnAudioThread = 0;
+    std::size_t fileOpenEntriesOnAudioThread = 0;
+    std::size_t fileReadEntriesOnAudioThread = 0;
+    std::size_t streamDecodeEntriesOnAudioThread = 0;
+    std::size_t largeResourceDestructionsOnAudioThread = 0;
+    std::size_t finalSharedOwnershipReleasesOnAudioThread = 0;
     std::uint64_t callbackBudgetMicros = 0;
     std::uint64_t lastProcessBlockMicros = 0;
     std::uint64_t maxProcessBlockMicros = 0;
@@ -53,15 +69,29 @@ struct ProcessorRealtimeSafetySnapshot
     std::string authoringPreviewRevisionState;
     std::string authoringPreviewFailureState;
     std::string state;
+    std::uint64_t publicationSequence = 0;
 
     std::size_t getAudioThreadViolationCount() const
     {
-        return samplePathResolutionsOnAudioThread
+        return allocationsOnAudioThread
+            + deallocationsOnAudioThread
+            + blockingLockAttemptsOnAudioThread
+            + waitsOnAudioThread
+            + fileOpenEntriesOnAudioThread
+            + fileReadEntriesOnAudioThread
+            + samplePathResolutionsOnAudioThread
             + sampleDecodeEntriesOnAudioThread
+            + streamDecodeEntriesOnAudioThread
             + referenceSampleLoadsOnAudioThread
             + authoringSampleLoadsOnAudioThread
-            + largeResourceReleasesOnAudioThread
+            + largeResourceDestructionsOnAudioThread
+            + finalSharedOwnershipReleasesOnAudioThread
             + activeVoiceCapacityGrowthCount;
+    }
+
+    std::size_t getRealtimeGuardFailureCount() const
+    {
+        return getAudioThreadViolationCount() + overBudgetCallbackCount;
     }
 };
 
@@ -113,8 +143,10 @@ public:
     void queuePerformanceSurfaceNoteOn(int midiNoteNumber, float velocity);
     void queuePerformanceSurfaceNoteOff(int midiNoteNumber);
     bool serviceMessageThreadWork();
-    ProcessorRealtimeSafetySnapshot getRealtimeSafetySnapshot() const { return realtimeSafetySnapshot; }
+    ProcessorRealtimeSafetySnapshot getRealtimeSafetySnapshot() const;
     void clearReferencePlaybackCacheForTests();
+    void setRealtimeGuardTestInjection(RealtimeGuardOperation operation);
+    static constexpr RealtimeCallbackBudgetProfile getRealtimeCallbackBudgetProfile() { return {}; }
 
 private:
     static constexpr std::size_t maxRealtimeActiveVoices = 24;
@@ -125,6 +157,27 @@ private:
     {
         performance,
         authoringPreview
+    };
+
+    struct QueuedRealtimeNoteEvent
+    {
+        int midiNoteNumber = 0;
+        float velocity = 0.0f;
+        bool noteOn = false;
+    };
+
+    class RealtimeNoteEventQueue
+    {
+    public:
+        bool push(QueuedRealtimeNoteEvent event) noexcept;
+        bool pop(QueuedRealtimeNoteEvent& event) noexcept;
+        void reset() noexcept;
+
+    private:
+        static constexpr std::uint32_t storageCapacity = 257;
+        std::array<QueuedRealtimeNoteEvent, storageCapacity> events {};
+        std::atomic<std::uint32_t> writeIndex { 0 };
+        std::atomic<std::uint32_t> readIndex { 0 };
     };
 
     struct LoadedReferenceSample
@@ -140,8 +193,6 @@ private:
         int effectiveVelocity = 0;
         int rootKey = 60;
         VoiceSource source = VoiceSource::performance;
-        std::string zoneId;
-        std::string sampleId;
         const LoadedReferenceSample* loadedSample = nullptr;
         std::shared_ptr<const LoadedReferenceSample> retainedLoadedSample;
         double positionFrames = 0.0;
@@ -150,6 +201,7 @@ private:
         bool releasing = false;
         int releaseSamplesRemaining = 0;
         int releaseSamplesTotal = 0;
+        int retainedPerformanceActivationSlotIndex = -1;
     };
 
     struct PerformanceRenderActivation
@@ -161,6 +213,8 @@ private:
         std::uint64_t preparedBuildId = 0;
         std::string publishedContentDigest;
         std::string preparedContentDigest;
+        drs::engine::PlaybackActivationPayloadPtr payload;
+        std::uint64_t payloadRetainedBytes = 0;
         drs::engine::RuntimeSessionStateSnapshot sessionState;
     };
 
@@ -174,6 +228,8 @@ private:
         int rootKey = 60;
         double gainDb = 0.0;
         std::shared_ptr<const LoadedReferenceSample> preparedSample;
+        drs::engine::PlaybackActivationPayloadPtr payload;
+        std::uint64_t payloadRetainedBytes = 0;
     };
 
     static juce::String buildMacroParameterId(const std::string& macroId);
@@ -182,14 +238,16 @@ private:
     bool ensureReferencePlaybackAssetsLoaded(bool invokedFromAudioThread = false);
     void initializeReferencePlaybackAssets(bool invokedFromAudioThread);
     bool ensureSelectedAuthoringSampleLoaded(bool invokedFromAudioThread);
-    bool startAuthoringVoiceForMidiMessage(const juce::MidiMessage& message);
-    void startVoiceForMidiMessage(const juce::MidiMessage& message);
+    bool startAuthoringVoiceForMidiMessage(int midiNoteNumber, float velocity);
+    void startVoiceForMidiMessage(int midiNoteNumber);
     std::vector<ActiveRenderVoice>& getVoicePool(VoiceSource source);
     const std::vector<ActiveRenderVoice>& getVoicePool(VoiceSource source) const;
     void releaseVoicesForMidiNote(int midiNoteNumber, VoiceSource source);
     void clearVoices(VoiceSource source);
     void clearVoices(VoiceSource source, bool updateState);
+    void releasePerformanceActivationLease(ActiveRenderVoice& voice);
     void renderBlockRange(juce::AudioBuffer<float>& buffer, int startSample, int sampleCount);
+    void drainRealtimeNoteEvents(RealtimeNoteEventQueue& queue, VoiceSource source);
     bool synchronizeAuthoringPreviewActivation(bool installImmediately);
     bool stageAuthoringPreviewActivation(bool installImmediately);
     const AuthoringPreviewRenderActivation* applyPendingAuthoringPreviewActivationAtBlockBoundary();
@@ -218,6 +276,58 @@ private:
     void initializeAuthoringImportMetrics();
     void primeRealtimeSafetyState(int samplesPerBlock);
     void updateRealtimeSafetyState();
+    void publishAudioDiagnostics();
+    void publishMessageDiagnostics();
+    void runRealtimeGuardTestInjection();
+
+    struct AudioDiagnosticsValues
+    {
+        std::size_t performanceActiveVoiceCount = 0;
+        std::size_t authoringPreviewActiveVoiceCount = 0;
+        std::size_t activeVoiceCapacity = 0;
+        std::size_t activeAuthoringPreviewRevision = 0;
+        std::size_t pendingAuthoringPreviewRevision = 0;
+        std::size_t activePublishedRevision = 0;
+        std::size_t pendingPublishedRevision = 0;
+        std::uint64_t activePreparedBuildId = 0;
+        std::uint64_t pendingPreparedBuildId = 0;
+        std::size_t retiredActivationBacklog = 0;
+        std::uint64_t activeActivationPayloadBytes = 0;
+        std::uint64_t pendingActivationPayloadBytes = 0;
+        std::uint64_t retiredActivationPayloadBytes = 0;
+        bool hasActiveAuthoringPreviewActivation = false;
+        bool hasPendingAuthoringPreviewActivation = false;
+        bool hasActivePerformanceActivation = false;
+        bool hasPendingPerformanceActivation = false;
+    };
+
+    struct AudioDiagnosticsPublication
+    {
+        std::atomic<std::uint64_t> sequence { 0 };
+        std::atomic<std::size_t> performanceActiveVoiceCount { 0 };
+        std::atomic<std::size_t> authoringPreviewActiveVoiceCount { 0 };
+        std::atomic<std::size_t> activeVoiceCapacity { 0 };
+        std::atomic<std::size_t> activeAuthoringPreviewRevision { 0 };
+        std::atomic<std::size_t> pendingAuthoringPreviewRevision { 0 };
+        std::atomic<std::size_t> activePublishedRevision { 0 };
+        std::atomic<std::size_t> pendingPublishedRevision { 0 };
+        std::atomic<std::uint64_t> activePreparedBuildId { 0 };
+        std::atomic<std::uint64_t> pendingPreparedBuildId { 0 };
+        std::atomic<std::size_t> retiredActivationBacklog { 0 };
+        std::atomic<std::uint64_t> activeActivationPayloadBytes { 0 };
+        std::atomic<std::uint64_t> pendingActivationPayloadBytes { 0 };
+        std::atomic<std::uint64_t> retiredActivationPayloadBytes { 0 };
+        std::atomic<bool> hasActiveAuthoringPreviewActivation { false };
+        std::atomic<bool> hasPendingAuthoringPreviewActivation { false };
+        std::atomic<bool> hasActivePerformanceActivation { false };
+        std::atomic<bool> hasPendingPerformanceActivation { false };
+    };
+
+    AudioDiagnosticsValues captureActivationDiagnostics() const;
+    AudioDiagnosticsValues readAudioDiagnostics(std::uint64_t& sequence) const;
+    ProcessorRealtimeSafetySnapshot composeDiagnosticsSnapshot(const AudioDiagnosticsValues& audioValues,
+                                                               std::uint64_t publicationSequence) const;
+    void applyRealtimeGuardDiagnostics(ProcessorRealtimeSafetySnapshot& snapshot) const;
 
     drs::engine::AuthoringSession authoringSession;
     drs::engine::EngineFacade engineFacade;
@@ -228,15 +338,36 @@ private:
     std::unordered_map<std::string, drs::app::AuthoringWaveformPreview> authoringWaveformPreviewCache;
     std::vector<ActiveRenderVoice> performanceActiveVoices;
     std::vector<ActiveRenderVoice> authoringPreviewActiveVoices;
-    juce::MidiMessageCollector authoringPreviewMidiCollector;
-    juce::MidiMessageCollector performanceSurfaceMidiCollector;
+    RealtimeNoteEventQueue authoringPreviewNoteQueue;
+    RealtimeNoteEventQueue performanceSurfaceNoteQueue;
     juce::MidiBuffer performanceMidiScratchBuffer;
     juce::MidiBuffer authoringPreviewMidiScratchBuffer;
     juce::AudioProcessorValueTreeState parameterState;
     drs::app::AuthoringImportResponsivenessSnapshot authoringImportResponsivenessSnapshot;
     juce::File authoringProjectFile;
-    ProcessorRealtimeSafetySnapshot realtimeSafetySnapshot;
+    std::shared_ptr<const ProcessorRealtimeSafetySnapshot> publishedRealtimeSafetySnapshot;
+    AudioDiagnosticsPublication audioDiagnosticsPublication;
+    std::atomic<std::size_t> diagnosticsProcessBlockCount { 0 };
+    std::atomic<std::size_t> diagnosticsPreparedBlockSize { 0 };
+    std::atomic<std::size_t> diagnosticsReferenceSampleCountLoaded { 0 };
+    std::atomic<std::size_t> diagnosticsReferenceWarmupCount { 0 };
+    std::atomic<std::size_t> diagnosticsReferenceSampleLoadsOnAudioThread { 0 };
+    std::atomic<std::size_t> diagnosticsAuthoringSampleLoadsOnAudioThread { 0 };
+    std::atomic<std::size_t> diagnosticsActiveVoiceCapacityLimit { 0 };
+    std::atomic<std::size_t> diagnosticsPrimedActiveVoiceCapacity { 0 };
+    std::atomic<std::size_t> diagnosticsActiveVoiceCapacityGrowthCount { 0 };
+    std::atomic<std::size_t> diagnosticsAuthoringPreviewActivationCount { 0 };
+    std::atomic<std::size_t> diagnosticsPerformanceActivationCount { 0 };
+    std::atomic<std::size_t> diagnosticsRetiredActivationCount { 0 };
+    std::atomic<std::size_t> diagnosticsReclaimedActivationPayloadCount { 0 };
+    std::atomic<std::uint64_t> diagnosticsCallbackBudgetMicros { 0 };
+    std::atomic<std::uint64_t> diagnosticsLastProcessBlockMicros { 0 };
+    std::atomic<std::uint64_t> diagnosticsMaxProcessBlockMicros { 0 };
+    std::atomic<std::size_t> diagnosticsOverBudgetCallbackCount { 0 };
+    std::atomic<std::size_t> diagnosticsCurrentAuthoringPreviewDraftRevision { 0 };
     std::array<AuthoringPreviewRenderActivation, performanceActivationSlotCount> authoringPreviewActivationSlots {};
+    std::array<std::atomic<std::size_t>, performanceActivationSlotCount> authoringPreviewDiagnosticRevisions {};
+    std::array<std::atomic<std::uint64_t>, performanceActivationSlotCount> authoringPreviewDiagnosticPayloadBytes {};
     std::array<int, performanceActivationSlotCount> freeAuthoringPreviewActivationSlots { 0, 1, 2, 3 };
     std::size_t freeAuthoringPreviewActivationSlotCount = performanceActivationSlotCount;
     std::array<int, retiredActivationQueueCapacity> retiredAuthoringPreviewActivationSlots {};
@@ -246,11 +377,21 @@ private:
     std::atomic<int> activeAuthoringPreviewActivationSlotIndex { -1 };
     std::uint64_t nextAuthoringPreviewActivationSerial = 1;
     std::array<PerformanceRenderActivation, performanceActivationSlotCount> performanceActivationSlots {};
+    std::array<std::atomic<std::size_t>, performanceActivationSlotCount> performanceDiagnosticRevisions {};
+    std::array<std::atomic<std::uint64_t>, performanceActivationSlotCount> performanceDiagnosticPreparedBuildIds {};
+    std::array<std::atomic<std::uint64_t>, performanceActivationSlotCount> performanceDiagnosticPayloadBytes {};
+    std::array<std::atomic<std::uint32_t>, performanceActivationSlotCount> performanceActivationVoiceLeaseCounts {};
     std::array<int, performanceActivationSlotCount> freePerformanceActivationSlots { 0, 1, 2, 3 };
     std::size_t freePerformanceActivationSlotCount = performanceActivationSlotCount;
     std::array<int, retiredActivationQueueCapacity> retiredPerformanceActivationSlots {};
     std::atomic<std::uint32_t> retiredPerformanceActivationWriteIndex { 0 };
     std::atomic<std::uint32_t> retiredPerformanceActivationReadIndex { 0 };
+    std::array<int, performanceActivationSlotCount> deferredPerformanceRetirementSlots {};
+    std::size_t deferredPerformanceRetirementSlotCount = 0;
+    std::atomic<std::size_t> deferredPerformanceRetirementBacklog { 0 };
+    std::atomic<std::uint64_t> deferredPerformanceRetirementBytes { 0 };
+    std::atomic<std::uint64_t> queuedAuthoringPreviewRetirementBytes { 0 };
+    std::atomic<std::uint64_t> queuedPerformanceRetirementBytes { 0 };
     std::atomic<int> pendingPerformanceActivationSlotIndex { -1 };
     std::atomic<int> activePerformanceActivationSlotIndex { -1 };
     std::uint64_t nextPerformanceActivationSerial = 1;
@@ -263,6 +404,9 @@ private:
     double currentSampleRate = 44100.0;
     std::uint64_t nextRenderVoiceId = 1;
     bool isSynchronizingParameterState = false;
-    bool processingAudioCallback = false;
+    RealtimeGuardState realtimeGuardState;
+    std::atomic<RealtimeGuardOperation> realtimeGuardTestInjection { RealtimeGuardOperation::none };
+    std::byte* realtimeGuardTestAllocation = nullptr;
+    std::mutex realtimeGuardTestMutex;
 };
 } // namespace drs::plugin

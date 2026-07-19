@@ -52,6 +52,16 @@ struct SampleImportResult
     ImportedSampleData sample;
 };
 
+struct SampleSourceFingerprintResult
+{
+    bool fileFound = false;
+    bool fingerprinted = false;
+    std::string sourcePath;
+    std::string fingerprintHex;
+    std::string state;
+    std::vector<std::string> issues;
+};
+
 enum class SampleFilenameTokenKind
 {
     unknown,
@@ -170,7 +180,9 @@ struct SampleRootKeyInferenceResult
 
 SampleImportPolicyReport evaluatePhase1SamplePolicy(const ImportedSampleMetadata& metadata,
                                                     const std::string& contentRootPath = {});
-SampleImportResult importSampleFile(const std::string& samplePath);
+SampleSourceFingerprintResult fingerprintSampleSourceFile(const std::string& samplePath);
+SampleImportResult importSampleFile(const std::string& samplePath,
+                                    const std::string& knownFingerprintHex = {});
 SampleRootKeyInferenceResult inferSampleRootKey(const std::string& samplePath,
                                                 const ImportedSampleMetadata* metadata = nullptr);
 ParsedSampleFilenameHeuristics parseSampleFilenameHeuristics(const std::string& samplePath,

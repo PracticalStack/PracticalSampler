@@ -16,3 +16,9 @@ jobs:
       - name: Bootstrap and run smoke tests
         shell: pwsh
         run: powershell -ExecutionPolicy Bypass -File .\tools\bootstrap-windows.ps1 -RunTests
+
+      - name: Run deterministic diagnostics concurrency regression
+        shell: pwsh
+        run: |
+          $vsDevCmd = "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"
+          cmd /c "call `"$vsDevCmd`" -arch=amd64 && cmake --build build/vs2022-debug --target drs_sprint4_entry_diagnostics_concurrency_tests && build\vs2022-debug\tests\drs_sprint4_entry_diagnostics_concurrency_tests_artefacts\Debug\drs_sprint4_entry_diagnostics_concurrency_tests.exe"

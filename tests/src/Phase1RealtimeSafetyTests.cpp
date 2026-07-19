@@ -676,13 +676,27 @@ int main()
         require(activationSnapshot.retiredActivationBacklog >= 1,
                 "Superseded published activations should be retired away from the audio thread.");
 
-        require(processor.serviceMessageThreadWork(),
-                "Message-thread servicing should drain retired published activations after the callback handoff.");
+        require(activationSnapshot.retiredActivationPayloadBytes > 0,
+                "Retired published activation should retain its immutable prepared payload.");
+        processor.serviceMessageThreadWork();
         activationSnapshot = processor.getRealtimeSafetySnapshot();
-        require(activationSnapshot.retiredActivationBacklog == 0,
-                "Retired published activations should drain after message-thread servicing.");
+        require(activationSnapshot.retiredActivationBacklog >= 1,
+                "An old performance voice should keep its retired activation payload readable.");
+        processor.queuePerformanceSurfaceNoteOff(57);
+        processor.queuePerformanceSurfaceNoteOff(58);
+        processor.queuePerformanceSurfaceNoteOff(59);
+        for (int releaseBlock = 0; releaseBlock < 20; ++releaseBlock)
+            processor.processBlock(activationBuffer, emptyMidi);
+        require(processor.serviceMessageThreadWork(),
+                "Message-thread servicing should reclaim retired payloads after old voices release their leases.");
+        activationSnapshot = processor.getRealtimeSafetySnapshot();
+        require(activationSnapshot.retiredActivationBacklog == 0
+                    && activationSnapshot.retiredActivationPayloadBytes == 0,
+                "Retired published activations should drain after the final old-voice lease is released.");
         require(activationSnapshot.retiredActivationCount >= 1,
                 "Realtime safety snapshot should count retired published activations.");
+        require(activationSnapshot.reclaimedActivationPayloadCount >= 1,
+                "Realtime safety snapshot should count payload reclamation on the message thread.");
         require(activationSnapshot.largeResourceReleasesOnAudioThread == 0,
                 "Published activation retirement should remain off the audio thread.");
 

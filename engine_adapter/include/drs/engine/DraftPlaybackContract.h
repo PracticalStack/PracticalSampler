@@ -5,11 +5,35 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
 namespace drs::engine
 {
+enum class PlaybackActivationLane
+{
+    preview,
+    performance
+};
+
+struct PlaybackActivationPayload final
+{
+    PlaybackActivationLane lane = PlaybackActivationLane::preview;
+    std::size_t revision = 0;
+    std::uint64_t snapshotBuildId = 0;
+    std::uint64_t preparedBuildId = 0;
+    PlaybackSnapshotLifecycleState lifecycleState = PlaybackSnapshotLifecycleState::idle;
+    bool activationEligible = false;
+    std::string snapshotContentDigest;
+    std::string preparedContentDigest;
+    std::uint64_t retainedPreparedBytes = 0;
+    std::shared_ptr<const ImmutablePlaybackSnapshot> snapshot;
+    std::shared_ptr<const ImmutablePreparedPlayback> prepared;
+};
+
+using PlaybackActivationPayloadPtr = std::shared_ptr<const PlaybackActivationPayload>;
+
 struct DraftPlaybackPreparedRevision
 {
     bool available = false;
@@ -34,12 +58,14 @@ struct DraftPlaybackPreparedRevision
     std::uint64_t preparedDecodedBytes = 0;
     // Decoded PCM retained by prepared sample handles.
     std::uint64_t preparedSampleDataBytes = 0;
+    std::uint64_t activationPayloadRetainedBytes = 0;
     bool playableRangeAvailable = false;
     int lowestPlayableNote = 0;
     int highestPlayableNote = 127;
     std::size_t preparationCacheHitCount = 0;
     std::size_t preparationCacheMissCount = 0;
     std::vector<PlaybackSnapshotFinding> findings;
+    PlaybackActivationPayloadPtr activationPayload;
 };
 
 struct DraftPlaybackPendingRequest
@@ -121,6 +147,7 @@ private:
                        DraftPlaybackPreparedRevision& prepared,
                        const PlaybackSnapshotBuildResult* buildResult,
                        const PreparedPlaybackBuildResult* preparedBuildResult,
+                       PlaybackActivationLane lane,
                        const std::string& completedState);
     bool failBuild(DraftPlaybackPendingRequest& pending,
                    DraftPlaybackPreparedRevision& prepared,
