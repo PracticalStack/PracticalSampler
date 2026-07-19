@@ -109,6 +109,18 @@ void requireFacadeSnapshotConsistency(drs::engine::EngineFacade& engineFacade, c
             context + " should mirror preview prepared ownership bytes.");
     require(performanceSnapshot.publishedPreparedOwnershipBytes == draftStatus.performance.preparedOwnershipBytes,
             context + " should mirror published prepared ownership bytes.");
+    require(performanceSnapshot.previewPreparedBuildMicros == draftStatus.preview.preparedBuildDurationMicros,
+            context + " should mirror preview prepared build duration.");
+    require(performanceSnapshot.publishedPreparedBuildMicros == draftStatus.performance.preparedBuildDurationMicros,
+            context + " should mirror published prepared build duration.");
+    require(performanceSnapshot.previewPreparedDecodedBytes == draftStatus.preview.preparedDecodedBytes,
+            context + " should mirror preview prepared decoded bytes.");
+    require(performanceSnapshot.publishedPreparedDecodedBytes == draftStatus.performance.preparedDecodedBytes,
+            context + " should mirror published prepared decoded bytes.");
+    require(performanceSnapshot.previewPreparedSampleDataBytes == draftStatus.preview.preparedSampleDataBytes,
+            context + " should mirror preview prepared sample-data bytes.");
+    require(performanceSnapshot.publishedPreparedSampleDataBytes == draftStatus.performance.preparedSampleDataBytes,
+            context + " should mirror published prepared sample-data bytes.");
     const auto expectedPlayableRangeAvailable = draftStatus.performance.playableRangeAvailable || draftStatus.preview.playableRangeAvailable;
     require(performanceSnapshot.playableRangeAvailable == expectedPlayableRangeAvailable,
             context + " should mirror whether a prepared draft-playback range is available.");
@@ -197,6 +209,9 @@ void requireFacadeSnapshotConsistency(drs::engine::EngineFacade& engineFacade, c
     require(diagnosticsSnapshot.preparedWorkerActiveOwnershipRecordCount
                 == performanceSnapshot.preparedWorkerActiveOwnershipRecordCount,
             context + " should keep diagnostics and performance snapshots aligned on active ownership-record count.");
+    require(diagnosticsSnapshot.preparedWorkerActiveOwnershipBytes
+                == performanceSnapshot.preparedWorkerActiveOwnershipBytes,
+            context + " should keep diagnostics and performance snapshots aligned on active ownership bytes.");
     require(diagnosticsSnapshot.preparedWorkerRetiredOwnershipRecordCount
                 == performanceSnapshot.preparedWorkerRetiredOwnershipRecordCount,
             context + " should keep diagnostics and performance snapshots aligned on retired ownership-record count.");
@@ -226,6 +241,35 @@ void requireFacadeSnapshotConsistency(drs::engine::EngineFacade& engineFacade, c
             context + " should keep diagnostics and performance snapshots aligned on preview ownership bytes.");
     require(diagnosticsSnapshot.publishedPreparedOwnershipBytes == performanceSnapshot.publishedPreparedOwnershipBytes,
             context + " should keep diagnostics and performance snapshots aligned on published ownership bytes.");
+    require(diagnosticsSnapshot.previewPreparedBuildMicros == performanceSnapshot.previewPreparedBuildMicros,
+            context + " should keep diagnostics and performance snapshots aligned on preview prepared build duration.");
+    require(diagnosticsSnapshot.publishedPreparedBuildMicros == performanceSnapshot.publishedPreparedBuildMicros,
+            context + " should keep diagnostics and performance snapshots aligned on published prepared build duration.");
+    require(diagnosticsSnapshot.previewPreparedDecodedBytes == performanceSnapshot.previewPreparedDecodedBytes,
+            context + " should keep diagnostics and performance snapshots aligned on preview prepared decoded bytes.");
+    require(diagnosticsSnapshot.publishedPreparedDecodedBytes == performanceSnapshot.publishedPreparedDecodedBytes,
+            context + " should keep diagnostics and performance snapshots aligned on published prepared decoded bytes.");
+    require(diagnosticsSnapshot.previewPreparedSampleDataBytes == performanceSnapshot.previewPreparedSampleDataBytes,
+            context + " should keep diagnostics and performance snapshots aligned on preview prepared sample-data bytes.");
+    require(diagnosticsSnapshot.publishedPreparedSampleDataBytes == performanceSnapshot.publishedPreparedSampleDataBytes,
+            context + " should keep diagnostics and performance snapshots aligned on published prepared sample-data bytes.");
+    require(diagnosticsSnapshot.previewPreparationCacheHitRate == performanceSnapshot.previewPreparationCacheHitRate,
+            context + " should keep diagnostics and performance snapshots aligned on preview prepared cache hit rate.");
+    require(diagnosticsSnapshot.publishedPreparationCacheHitRate == performanceSnapshot.publishedPreparationCacheHitRate,
+            context + " should keep diagnostics and performance snapshots aligned on published prepared cache hit rate.");
+    require(diagnosticsSnapshot.preparedCacheRetentionWorkingSetCount
+                == performanceSnapshot.preparedCacheRetentionWorkingSetCount,
+            context + " should keep diagnostics and performance snapshots aligned on prepared cache retention working-set count.");
+    require(diagnosticsSnapshot.preparedCacheWorkingSetBytes == performanceSnapshot.preparedCacheWorkingSetBytes,
+            context + " should keep diagnostics and performance snapshots aligned on prepared cache working-set bytes.");
+    require(diagnosticsSnapshot.preparedCacheByteBudget == performanceSnapshot.preparedCacheByteBudget,
+            context + " should keep diagnostics and performance snapshots aligned on prepared cache byte budget.");
+    require(diagnosticsSnapshot.preparedCacheResidentBytes == performanceSnapshot.preparedCacheResidentBytes,
+            context + " should keep diagnostics and performance snapshots aligned on prepared cache resident bytes.");
+    require(diagnosticsSnapshot.preparedCacheHeadroomBytes == performanceSnapshot.preparedCacheHeadroomBytes,
+            context + " should keep diagnostics and performance snapshots aligned on prepared cache headroom bytes.");
+    require(diagnosticsSnapshot.preparedCachePressureState == performanceSnapshot.preparedCachePressureState,
+            context + " should keep diagnostics and performance snapshots aligned on prepared cache pressure state.");
     require(statusSnapshot.detail.find("Snapshot ids:") != std::string::npos,
             context + " should keep the shell-facing contract line for snapshot ids.");
     require(statusSnapshot.detail.find("Snapshot digests:") != std::string::npos,
@@ -236,8 +280,22 @@ void requireFacadeSnapshotConsistency(drs::engine::EngineFacade& engineFacade, c
             context + " should keep the shell-facing contract line for prepared ownership counts.");
     require(statusSnapshot.detail.find("activeOwnership=") != std::string::npos,
             context + " should keep the shell-facing contract line for worker ownership backlog.");
+    require(statusSnapshot.detail.find("activeBytes=") != std::string::npos,
+            context + " should keep the shell-facing contract line for worker ownership bytes.");
     require(statusSnapshot.detail.find("queueLimit=") != std::string::npos,
             context + " should keep the shell-facing contract line for worker queue limits.");
+    require(statusSnapshot.detail.find("Prepared cache policy:") != std::string::npos,
+            context + " should keep the shell-facing contract line for prepared cache pressure policy.");
+    require(statusSnapshot.detail.find("budgetBytes=") != std::string::npos,
+            context + " should keep the shell-facing contract line for prepared cache byte budget.");
+    require(statusSnapshot.detail.find("Prepared build metrics:") != std::string::npos,
+            context + " should keep the shell-facing contract line for prepared build metrics.");
+    require(statusSnapshot.detail.find("previewBuildMicros=") != std::string::npos,
+            context + " should keep the shell-facing contract line for prepared build duration.");
+    require(statusSnapshot.detail.find("previewDecodedBytes=") != std::string::npos,
+            context + " should keep the shell-facing contract line for prepared decoded bytes.");
+    require(statusSnapshot.detail.find("previewHitRate=") != std::string::npos,
+            context + " should keep the shell-facing contract line for prepared cache hit rate.");
     require(statusSnapshot.detail.find("inFlightLimit=") != std::string::npos,
             context + " should keep the shell-facing contract line for worker concurrency limits.");
     require(statusSnapshot.detail.find("Prepared worker queue reasons:") != std::string::npos,
@@ -449,6 +507,7 @@ int main()
                 "Mixed facade churn coverage should replace the old published prepared-playback build identity.");
         requireFacadeSnapshotConsistency(engineFacade, "Facade state after mixed preview publish churn coverage");
 
+        const auto preRestartSnapshot = snapshot;
         require(engineFacade.beginDraftPlaybackDeviceRestart(),
                 "Device restart should begin while the project is open.");
         snapshot = engineFacade.getPerformanceSnapshot();
@@ -459,9 +518,11 @@ int main()
         require(engineFacade.completeDraftPlaybackDeviceRestart(true),
                 "Successful device restart should complete.");
         snapshot = engineFacade.getPerformanceSnapshot();
-        require(snapshot.publishedRevision == 1 && snapshot.publishedRevisionState == "Active",
+        require(snapshot.publishedRevision == preRestartSnapshot.publishedRevision
+                    && snapshot.publishedRevisionState == "Active",
                 "Successful device restart should preserve the last published revision.");
-        require(snapshot.previewRevision == 4 && snapshot.previewRevisionState == "Ready",
+        require(snapshot.previewRevision == preRestartSnapshot.previewRevision
+                    && snapshot.previewRevisionState == "Ready",
                 "Successful device restart should preserve the latest prepared preview identity for the current draft.");
         requireFacadeSnapshotConsistency(engineFacade, "Facade state after device restart");
 
@@ -712,6 +773,48 @@ int main()
                     && snapshot.publishedPreparedContentDigest == stableSnapshot.publishedPreparedContentDigest,
                 "Rejected authoring project replacements must preserve prepared-playback digests.");
         requireFacadeSnapshotConsistency(engineFacade, "Migrated facade state after rejected replacement");
+
+        const auto phase2Project = drs::engine::loadPhase2ReferenceProjectManifest();
+        require(phase2Project.loaded, "Phase 2 reference project must load before prepared-retirement facade coverage runs.");
+        auto retirementProject = phase2Project.project;
+        require(retirementProject.sampleSources.size() >= 2,
+                "Prepared-retirement facade coverage needs at least two sample sources.");
+
+        drs::engine::EngineFacade retirementFacade;
+        require(retirementFacade.replaceDraftPlaybackAuthoringProject(phase2Project.project),
+                "Prepared-retirement facade coverage should accept the baseline Phase 2 authoring project.");
+        require(retirementFacade.stageDraftRevision(1),
+                "Prepared-retirement facade coverage should stage a baseline Phase 2 draft revision.");
+        require(retirementFacade.refreshPreviewToCurrentDraft(),
+                "Prepared-retirement facade coverage should prepare the baseline Phase 2 preview.");
+        require(waitForWorkerToSettle(retirementFacade),
+                "Prepared-retirement facade coverage should let the baseline worker request settle.");
+        require(retirementFacade.serviceBackgroundWork(),
+                "Prepared-retirement facade coverage should apply the baseline preview build.");
+
+        retirementProject.sampleSources[1].path = retirementProject.sampleSources[0].path;
+
+        require(retirementFacade.replaceDraftPlaybackAuthoringProject(retirementProject),
+                "Prepared-retirement facade coverage should accept the invalidating Phase 2 authoring project update.");
+        require(retirementFacade.stageDraftRevision(2),
+                "Prepared-retirement facade coverage should stage the invalidating Phase 2 draft revision.");
+        require(retirementFacade.refreshPreviewToCurrentDraft(),
+                "Prepared-retirement facade coverage should prepare the invalidating Phase 2 preview.");
+        require(waitForWorkerToSettle(retirementFacade),
+                "Prepared-retirement facade coverage should let the invalidating worker request settle.");
+        require(retirementFacade.serviceBackgroundWork(),
+                "Prepared-retirement facade coverage should apply the invalidating preview build.");
+        auto retirementSnapshot = retirementFacade.getPerformanceSnapshot();
+        require(retirementSnapshot.previewRevision == 2 && retirementSnapshot.previewRevisionState == "Ready",
+                "Invalidating the Phase 2 preview should advance the facade preview revision.");
+        require(retirementSnapshot.previewPreparationCacheHits == 1,
+                "Invalidating the Phase 2 preview should preserve one warm prepared handle through the facade.");
+        require(retirementSnapshot.previewPreparationCacheMisses == 1,
+                "Invalidating the Phase 2 preview should rebuild one prepared handle through the facade.");
+        requireFacadeSnapshotConsistency(retirementFacade, "Phase 2 facade state after invalidating preview apply");
+
+        retirementFacade.serviceBackgroundWork();
+        requireFacadeSnapshotConsistency(retirementFacade, "Phase 2 facade state after follow-up background servicing");
 
         std::cout << "Phase 1 draft playback facade tests passed." << std::endl;
         return 0;

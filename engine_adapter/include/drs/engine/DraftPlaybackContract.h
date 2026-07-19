@@ -28,6 +28,9 @@ struct DraftPlaybackPreparedRevision
     std::size_t preparedOwnershipRecordCount = 0;
     std::uint64_t preparedBytes = 0;
     std::uint64_t preparedOwnershipBytes = 0;
+    std::uint64_t preparedBuildDurationMicros = 0;
+    std::uint64_t preparedDecodedBytes = 0;
+    std::uint64_t preparedSampleDataBytes = 0;
     bool playableRangeAvailable = false;
     int lowestPlayableNote = 0;
     int highestPlayableNote = 127;

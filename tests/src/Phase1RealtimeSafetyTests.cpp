@@ -444,6 +444,39 @@ int main()
                                  "mono and stereo",
                                  "Channel-policy preview failure");
 
+        auto preparedRetirementProject = projectLoad.project;
+        require(preparedRetirementProject.sampleSources.size() >= 2,
+                "Prepared-retirement realtime coverage needs at least two sample sources.");
+
+        drs::plugin::Processor preparedRetirementProcessor;
+        preparedRetirementProcessor.prepareToPlay(44100.0, 512);
+        preparedRetirementProcessor.replaceAuthoringProject(projectLoad.project);
+        require(preparedRetirementProcessor.getEngineFacade().refreshPreviewToCurrentDraft(),
+                "Prepared-retirement realtime coverage should prepare the baseline Phase 2 preview.");
+        require(preparedRetirementProcessor.getEngineFacade().waitForPreparedPlaybackIdle(),
+                "Prepared-retirement realtime coverage should settle the baseline preview first.");
+
+        preparedRetirementProject.sampleSources[1].path = preparedRetirementProject.sampleSources[0].path;
+
+        preparedRetirementProcessor.replaceAuthoringProject(preparedRetirementProject);
+        require(preparedRetirementProcessor.getEngineFacade().refreshPreviewToCurrentDraft(),
+                "Prepared-retirement realtime coverage should prepare the invalidating Phase 2 preview.");
+        require(preparedRetirementProcessor.getEngineFacade().waitForPreparedPlaybackIdle(),
+                "Prepared-retirement realtime coverage should settle the invalidating preview.");
+        auto preparedRetirementPerformanceSnapshot = preparedRetirementProcessor.getEngineFacade().getPerformanceSnapshot();
+        require(preparedRetirementPerformanceSnapshot.previewPreparationCacheHits == 1,
+                "Invalidating the Phase 2 preview should preserve one warm prepared handle.");
+        require(preparedRetirementPerformanceSnapshot.previewPreparationCacheMisses == 1,
+                "Invalidating the Phase 2 preview should rebuild one prepared handle.");
+        auto preparedRetirementSnapshot = preparedRetirementProcessor.getRealtimeSafetySnapshot();
+        require(preparedRetirementSnapshot.largeResourceReleasesOnAudioThread == 0,
+                "Prepared cache invalidation should not release heavy resources on the audio thread.");
+
+        preparedRetirementProcessor.serviceMessageThreadWork();
+        preparedRetirementSnapshot = preparedRetirementProcessor.getRealtimeSafetySnapshot();
+        require(preparedRetirementSnapshot.largeResourceReleasesOnAudioThread == 0,
+                "Prepared invalidation follow-up servicing should remain off the audio thread.");
+
         const auto phase1Project = drs::engine::loadPhase1ReferenceProjectManifest();
         require(phase1Project.loaded,
                 "Processor integration coverage should load the Phase 1 reference project before migration.");

@@ -48,6 +48,15 @@ int main()
                 "Default diagnostics snapshot should expose prepared ownership-record counts.");
         require(defaultDiagnostics.previewPreparedOwnershipBytes == defaultDiagnostics.previewPreparedBytes,
                 "Default diagnostics snapshot should expose ownership-safe prepared byte totals.");
+        require(defaultDiagnostics.previewPreparedBuildMicros > 0,
+                "Default diagnostics snapshot should expose prepared build duration.");
+        require(defaultDiagnostics.previewPreparedSampleDataBytes > 0,
+                "Default diagnostics snapshot should expose prepared sample-data bytes.");
+        require(defaultDiagnostics.previewPreparedDecodedBytes > 0,
+                "Default diagnostics snapshot should expose prepared decoded bytes for the cold bootstrap build.");
+        require(defaultDiagnostics.previewPreparationCacheHitRate >= 0.0
+                    && defaultDiagnostics.previewPreparationCacheHitRate <= 1.0,
+                "Default diagnostics snapshot should expose a normalized preview prepared cache hit rate.");
         require(defaultDiagnostics.preparedWorkerPendingCount == 0,
                 "Default diagnostics snapshot should not leave prepared worker jobs pending.");
         require(defaultDiagnostics.preparedWorkerConfiguredMaxPendingCount == 2,
@@ -56,8 +65,23 @@ int main()
                 "Default diagnostics snapshot should expose the single-worker in-flight budget.");
         require(defaultDiagnostics.preparedWorkerActiveOwnershipRecordCount > 0,
                 "Default diagnostics snapshot should expose active worker ownership-record counts.");
+        require(defaultDiagnostics.preparedWorkerActiveOwnershipBytes > 0,
+                "Default diagnostics snapshot should expose active worker ownership bytes.");
         require(defaultDiagnostics.preparedWorkerRetiredOwnershipRecordCount == 0,
                 "Default diagnostics snapshot should not expose retired worker ownership backlog by default.");
+        require(defaultDiagnostics.preparedCacheRetentionWorkingSetCount == 2,
+                "Default diagnostics snapshot should expose the two-working-set prepared cache policy.");
+        require(defaultDiagnostics.preparedCacheByteBudget
+                    == defaultDiagnostics.preparedCacheWorkingSetBytes
+                        * defaultDiagnostics.preparedCacheRetentionWorkingSetCount,
+                "Default diagnostics snapshot should expose a prepared cache budget derived from the working-set target.");
+        require(defaultDiagnostics.preparedCacheResidentBytes
+                    == defaultDiagnostics.preparedWorkerActiveOwnershipBytes + defaultDiagnostics.preparedWorkerRetiredBytes,
+                "Default diagnostics snapshot should expose prepared cache resident bytes as active plus retired ownership bytes.");
+        require(defaultDiagnostics.preparedCacheResidentBytes <= defaultDiagnostics.preparedCacheByteBudget,
+                "Default diagnostics snapshot should keep prepared cache residency within the configured budget.");
+        require(defaultDiagnostics.preparedCachePressureState == "Nominal",
+                "Default diagnostics snapshot should report nominal prepared cache pressure.");
         require(defaultDiagnostics.preparedWorkerLastCancellationLane.empty()
                     && defaultDiagnostics.preparedWorkerLastCancellationReason.empty(),
                 "Default diagnostics snapshot should not expose queue-cancellation reasons before any cancellation occurs.");
@@ -101,6 +125,29 @@ int main()
         require(leadDiagnostics.previewPreparedOwnershipRecordCount > 0
                     && leadDiagnostics.publishedPreparedOwnershipRecordCount > 0,
                 "Lead diagnostics snapshot should preserve prepared ownership-record counts.");
+        require(leadDiagnostics.previewPreparedBuildMicros > 0 && leadDiagnostics.publishedPreparedBuildMicros > 0,
+                "Lead diagnostics snapshot should preserve prepared build durations.");
+        require(leadDiagnostics.previewPreparedSampleDataBytes > 0
+                    && leadDiagnostics.publishedPreparedSampleDataBytes > 0,
+                "Lead diagnostics snapshot should preserve prepared sample-data byte counts.");
+        require(leadDiagnostics.previewPreparationCacheHitRate >= 0.0
+                    && leadDiagnostics.previewPreparationCacheHitRate <= 1.0
+                    && leadDiagnostics.publishedPreparationCacheHitRate >= 0.0
+                    && leadDiagnostics.publishedPreparationCacheHitRate <= 1.0,
+                "Lead diagnostics snapshot should preserve normalized prepared cache hit rates.");
+        require(leadDiagnostics.preparedCacheRetentionWorkingSetCount == 2,
+                "Lead diagnostics snapshot should preserve the two-working-set prepared cache policy.");
+        require(leadDiagnostics.preparedCacheByteBudget
+                    == leadDiagnostics.preparedCacheWorkingSetBytes
+                        * leadDiagnostics.preparedCacheRetentionWorkingSetCount,
+                "Lead diagnostics snapshot should preserve a prepared cache budget derived from the working-set target.");
+        require(leadDiagnostics.preparedCacheResidentBytes
+                    == leadDiagnostics.preparedWorkerActiveOwnershipBytes + leadDiagnostics.preparedWorkerRetiredBytes,
+                "Lead diagnostics snapshot should preserve prepared cache resident bytes.");
+        require(leadDiagnostics.preparedCacheResidentBytes <= leadDiagnostics.preparedCacheByteBudget,
+                "Lead diagnostics snapshot should remain within the configured prepared cache budget.");
+        require(leadDiagnostics.preparedCachePressureState == "Nominal",
+                "Lead diagnostics snapshot should report nominal prepared cache pressure.");
         require(leadDiagnostics.configuredMaxCachedPages == 8,
                 "Performance diagnostics snapshot should expose the performance cache budget.");
         require(leadDiagnostics.selectedArticulationId == "lead",

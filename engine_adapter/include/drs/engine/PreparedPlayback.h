@@ -224,6 +224,7 @@ struct PreparedPlaybackWorkerStatus
     std::size_t failureCount = 0;
     std::size_t maxPendingWorkCount = 0;
     std::size_t activeOwnershipRecordCount = 0;
+    std::uint64_t activeOwnershipBytes = 0;
     std::size_t retiredOwnershipRecordCount = 0;
     std::uint64_t retiredBytesAwaitingCleanup = 0;
     std::string lastEvent;
@@ -271,6 +272,7 @@ public:
         const std::string& state = "Prepared playback build canceled before worker execution");
     std::vector<PreparedPlaybackBuildResult> cancelQueuedPublishBuilds(
         const std::string& state = "Prepared playback build canceled before worker execution");
+    std::size_t serviceRetiredCacheCleanup(std::size_t maxEntries = static_cast<std::size_t>(-1));
     std::size_t retireStaleCacheEntries(std::size_t maxEntries = static_cast<std::size_t>(-1));
     std::vector<PreparedPlaybackOwnershipRecord> snapshotRetiredOwnershipRecords() const;
     const PreparedPlaybackWorkerStatus& getWorkerStatus() const { return workerStatus; }

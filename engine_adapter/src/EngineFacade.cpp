@@ -16,6 +16,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <thread>
@@ -100,6 +101,15 @@ double normalizeMacroValue(double value)
     return std::round(value * precisionScale) / precisionScale;
 }
 
+double computePreparationCacheHitRate(const std::size_t hits, const std::size_t misses)
+{
+    const auto total = hits + misses;
+    if (total == 0)
+        return 0.0;
+
+    return static_cast<double>(hits) / static_cast<double>(total);
+}
+
 int clampMidiValue(int value)
 {
     return std::clamp(value, 0, 127);
@@ -161,6 +171,58 @@ std::string resolveRendererMode(bool referenceInstrumentActive)
     return referenceInstrumentActive ? "reference-backed" : "inactive";
 }
 
+constexpr std::size_t preparedCacheRetentionWorkingSetCount = 2;
+
+std::uint64_t saturatingAdd(const std::uint64_t left, const std::uint64_t right)
+{
+    const auto maxValue = std::numeric_limits<std::uint64_t>::max();
+    return right > maxValue - left ? maxValue : left + right;
+}
+
+std::uint64_t saturatingMultiply(const std::uint64_t value, const std::size_t multiplier)
+{
+    if (value == 0 || multiplier == 0)
+        return 0;
+
+    const auto maxValue = std::numeric_limits<std::uint64_t>::max();
+    return value > maxValue / multiplier ? maxValue : value * multiplier;
+}
+
+template <typename Snapshot>
+void applyPreparedCachePressurePolicy(Snapshot& snapshot)
+{
+    snapshot.preparedCacheRetentionWorkingSetCount = preparedCacheRetentionWorkingSetCount;
+    snapshot.preparedCacheWorkingSetBytes =
+        std::max({snapshot.previewPreparedOwnershipBytes,
+                  snapshot.publishedPreparedOwnershipBytes,
+                  snapshot.preparedWorkerActiveOwnershipBytes});
+    snapshot.preparedCacheByteBudget = saturatingMultiply(snapshot.preparedCacheWorkingSetBytes,
+                                                          snapshot.preparedCacheRetentionWorkingSetCount);
+    snapshot.preparedCacheResidentBytes = saturatingAdd(snapshot.preparedWorkerActiveOwnershipBytes,
+                                                        snapshot.preparedWorkerRetiredBytes);
+    snapshot.preparedCacheHeadroomBytes =
+        snapshot.preparedCacheByteBudget > snapshot.preparedCacheResidentBytes
+            ? snapshot.preparedCacheByteBudget - snapshot.preparedCacheResidentBytes
+            : 0;
+
+    if (snapshot.preparedCacheResidentBytes == 0 && snapshot.preparedCacheWorkingSetBytes == 0)
+    {
+        snapshot.preparedCachePressureState = "Idle";
+    }
+    else if (snapshot.preparedCacheResidentBytes > snapshot.preparedCacheByteBudget)
+    {
+        snapshot.preparedCachePressureState = "Over budget";
+    }
+    else if (snapshot.preparedCacheResidentBytes > snapshot.preparedCacheWorkingSetBytes)
+    {
+        snapshot.preparedCachePressureState = "Replacement set retained";
+    }
+    else
+    {
+        snapshot.preparedCachePressureState = "Nominal";
+    }
+}
+
 void syncDraftPlaybackIntoDiagnostics(const DraftPlaybackStatus& status,
                                       EngineDiagnosticsSnapshot& diagnosticsSnapshot)
 {
@@ -193,10 +255,22 @@ void syncDraftPlaybackIntoDiagnostics(const DraftPlaybackStatus& status,
     diagnosticsSnapshot.publishedPreparedBytes = status.performance.preparedBytes;
     diagnosticsSnapshot.previewPreparedOwnershipBytes = status.preview.preparedOwnershipBytes;
     diagnosticsSnapshot.publishedPreparedOwnershipBytes = status.performance.preparedOwnershipBytes;
+    diagnosticsSnapshot.previewPreparedBuildMicros = status.preview.preparedBuildDurationMicros;
+    diagnosticsSnapshot.publishedPreparedBuildMicros = status.performance.preparedBuildDurationMicros;
+    diagnosticsSnapshot.previewPreparedDecodedBytes = status.preview.preparedDecodedBytes;
+    diagnosticsSnapshot.publishedPreparedDecodedBytes = status.performance.preparedDecodedBytes;
+    diagnosticsSnapshot.previewPreparedSampleDataBytes = status.preview.preparedSampleDataBytes;
+    diagnosticsSnapshot.publishedPreparedSampleDataBytes = status.performance.preparedSampleDataBytes;
     diagnosticsSnapshot.previewPreparationCacheHits = status.preview.preparationCacheHitCount;
     diagnosticsSnapshot.previewPreparationCacheMisses = status.preview.preparationCacheMissCount;
     diagnosticsSnapshot.publishedPreparationCacheHits = status.performance.preparationCacheHitCount;
     diagnosticsSnapshot.publishedPreparationCacheMisses = status.performance.preparationCacheMissCount;
+    diagnosticsSnapshot.previewPreparationCacheHitRate = computePreparationCacheHitRate(
+        diagnosticsSnapshot.previewPreparationCacheHits,
+        diagnosticsSnapshot.previewPreparationCacheMisses);
+    diagnosticsSnapshot.publishedPreparationCacheHitRate = computePreparationCacheHitRate(
+        diagnosticsSnapshot.publishedPreparationCacheHits,
+        diagnosticsSnapshot.publishedPreparationCacheMisses);
     diagnosticsSnapshot.previewFindings = status.preview.findings;
     diagnosticsSnapshot.publishedFindings = status.performance.findings;
     if (status.performance.playableRangeAvailable && status.performance.available)
@@ -232,6 +306,7 @@ void syncPreparedPlaybackWorkerIntoDiagnostics(const PreparedPlaybackWorkerStatu
     diagnosticsSnapshot.preparedWorkerFailureCount = workerStatus.failureCount;
     diagnosticsSnapshot.preparedWorkerMaxPendingCount = workerStatus.maxPendingWorkCount;
     diagnosticsSnapshot.preparedWorkerActiveOwnershipRecordCount = workerStatus.activeOwnershipRecordCount;
+    diagnosticsSnapshot.preparedWorkerActiveOwnershipBytes = workerStatus.activeOwnershipBytes;
     diagnosticsSnapshot.preparedWorkerRetiredOwnershipRecordCount = workerStatus.retiredOwnershipRecordCount;
     diagnosticsSnapshot.preparedWorkerRetiredBytes = workerStatus.retiredBytesAwaitingCleanup;
     diagnosticsSnapshot.preparedWorkerEvent = workerStatus.lastEvent;
@@ -458,7 +533,13 @@ std::vector<HiseFrontendExportProfile> EngineFacade::getFrontendExportProfiles()
 
 bool EngineFacade::serviceBackgroundWork()
 {
-    return pumpPreparedPlaybackWorkerCompletions();
+    const auto retiredCacheEntries = preparedPlaybackService.serviceRetiredCacheCleanup(1);
+    const auto appliedCompletions = pumpPreparedPlaybackWorkerCompletions();
+
+    if (retiredCacheEntries != 0)
+        refreshDiagnosticsSnapshot();
+
+    return retiredCacheEntries != 0 || appliedCompletions;
 }
 
 EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
@@ -634,6 +715,14 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
            << ", publish=" << diagnostics.publishedPreparedBytes
            << ", previewOwnership=" << diagnostics.previewPreparedOwnershipBytes
            << ", publishOwnership=" << diagnostics.publishedPreparedOwnershipBytes << "\n";
+    detail << "Prepared build metrics: previewBuildMicros=" << diagnostics.previewPreparedBuildMicros
+           << ", publishBuildMicros=" << diagnostics.publishedPreparedBuildMicros
+           << ", previewDecodedBytes=" << diagnostics.previewPreparedDecodedBytes
+           << ", publishDecodedBytes=" << diagnostics.publishedPreparedDecodedBytes
+           << ", previewSampleDataBytes=" << diagnostics.previewPreparedSampleDataBytes
+           << ", publishSampleDataBytes=" << diagnostics.publishedPreparedSampleDataBytes
+           << ", previewHitRate=" << diagnostics.previewPreparationCacheHitRate
+           << ", publishHitRate=" << diagnostics.publishedPreparationCacheHitRate << "\n";
     detail << "Prepared worker: pending=" << diagnostics.preparedWorkerPendingCount
            << ", queueLimit=" << diagnostics.preparedWorkerConfiguredMaxPendingCount
            << ", inFlightLimit=" << diagnostics.preparedWorkerConfiguredMaxInFlightCount
@@ -642,8 +731,17 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
            << ", failures=" << diagnostics.preparedWorkerFailureCount
            << ", maxPending=" << diagnostics.preparedWorkerMaxPendingCount
            << ", activeOwnership=" << diagnostics.preparedWorkerActiveOwnershipRecordCount
+           << ", activeBytes=" << diagnostics.preparedWorkerActiveOwnershipBytes
            << ", retiredOwnership=" << diagnostics.preparedWorkerRetiredOwnershipRecordCount
            << ", retiredBytes=" << diagnostics.preparedWorkerRetiredBytes << "\n";
+    detail << "Prepared cache policy: workingSets=" << diagnostics.preparedCacheRetentionWorkingSetCount
+           << ", workingSetBytes=" << diagnostics.preparedCacheWorkingSetBytes
+           << ", budgetBytes=" << diagnostics.preparedCacheByteBudget
+           << ", residentBytes=" << diagnostics.preparedCacheResidentBytes
+           << ", headroomBytes=" << diagnostics.preparedCacheHeadroomBytes
+           << ", state="
+           << (diagnostics.preparedCachePressureState.empty() ? "not reported" : diagnostics.preparedCachePressureState)
+           << "\n";
     detail << "Prepared worker event: "
            << (diagnostics.preparedWorkerEvent.empty() ? "not reported" : diagnostics.preparedWorkerEvent) << "\n";
     detail << "Prepared worker queue reasons: cancel["
@@ -886,6 +984,7 @@ EnginePerformanceSnapshot EngineFacade::getPerformanceSnapshot() const
     snapshot.preparedWorkerSupersededCount = workerStatus.supersededCount;
     snapshot.preparedWorkerFailureCount = workerStatus.failureCount;
     snapshot.preparedWorkerActiveOwnershipRecordCount = workerStatus.activeOwnershipRecordCount;
+    snapshot.preparedWorkerActiveOwnershipBytes = workerStatus.activeOwnershipBytes;
     snapshot.preparedWorkerRetiredOwnershipRecordCount = workerStatus.retiredOwnershipRecordCount;
     snapshot.preparedWorkerRetiredBytes = workerStatus.retiredBytesAwaitingCleanup;
     snapshot.preparedWorkerEvent = workerStatus.lastEvent;
@@ -903,10 +1002,21 @@ EnginePerformanceSnapshot EngineFacade::getPerformanceSnapshot() const
     snapshot.publishedPreparedBytes = draftStatus.performance.preparedBytes;
     snapshot.previewPreparedOwnershipBytes = draftStatus.preview.preparedOwnershipBytes;
     snapshot.publishedPreparedOwnershipBytes = draftStatus.performance.preparedOwnershipBytes;
+    snapshot.previewPreparedBuildMicros = draftStatus.preview.preparedBuildDurationMicros;
+    snapshot.publishedPreparedBuildMicros = draftStatus.performance.preparedBuildDurationMicros;
+    snapshot.previewPreparedDecodedBytes = draftStatus.preview.preparedDecodedBytes;
+    snapshot.publishedPreparedDecodedBytes = draftStatus.performance.preparedDecodedBytes;
+    snapshot.previewPreparedSampleDataBytes = draftStatus.preview.preparedSampleDataBytes;
+    snapshot.publishedPreparedSampleDataBytes = draftStatus.performance.preparedSampleDataBytes;
     snapshot.previewPreparationCacheHits = draftStatus.preview.preparationCacheHitCount;
     snapshot.previewPreparationCacheMisses = draftStatus.preview.preparationCacheMissCount;
     snapshot.publishedPreparationCacheHits = draftStatus.performance.preparationCacheHitCount;
     snapshot.publishedPreparationCacheMisses = draftStatus.performance.preparationCacheMissCount;
+    snapshot.previewPreparationCacheHitRate = computePreparationCacheHitRate(snapshot.previewPreparationCacheHits,
+                                                                             snapshot.previewPreparationCacheMisses);
+    snapshot.publishedPreparationCacheHitRate = computePreparationCacheHitRate(snapshot.publishedPreparationCacheHits,
+                                                                               snapshot.publishedPreparationCacheMisses);
+    applyPreparedCachePressurePolicy(snapshot);
     snapshot.previewFindings = draftStatus.preview.findings;
     snapshot.publishedFindings = draftStatus.performance.findings;
 
@@ -1854,6 +1964,7 @@ void EngineFacade::refreshDiagnosticsSnapshot()
     syncSessionSelectionsIntoDiagnostics(currentSessionState, diagnosticsSnapshot);
     syncDraftPlaybackIntoDiagnostics(draftPlaybackContract.getStatus(), diagnosticsSnapshot);
     syncPreparedPlaybackWorkerIntoDiagnostics(preparedPlaybackService.getWorkerStatus(), diagnosticsSnapshot);
+    applyPreparedCachePressurePolicy(diagnosticsSnapshot);
     diagnosticsSnapshot.rendererMode = resolveRendererMode(referenceInstrumentActive);
 
     if (!referenceInstrumentActive)

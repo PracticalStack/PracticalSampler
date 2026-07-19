@@ -198,6 +198,47 @@ int main()
                     == "Preview preparation canceled during worker test",
                 "Worker status should surface the cancellation reason for queued preview cancellation.");
 
+        drs::engine::PreparedPlaybackService queuedCancellationCleanupService(
+            "phase1-prepared-playback-v2",
+            2,
+            true);
+        require(queuedCancellationCleanupService.isBackgroundWorkerEnabled(),
+                "Cancellation cleanup coverage should exercise the background-worker queue.");
+        require(queuedCancellationCleanupService.enqueuePreviewBuild(previewRevision0).accepted,
+                "Cancellation cleanup coverage should queue preview work before cancellation.");
+        require(queuedCancellationCleanupService.enqueuePublishBuild(publishRevision1).accepted,
+                "Cancellation cleanup coverage should queue publish work before cancellation.");
+        const auto canceledQueuedPublish = queuedCancellationCleanupService.cancelQueuedPublishBuilds(
+            "Publish preparation canceled during cleanup coverage");
+        require(canceledQueuedPublish.size() == 1,
+                "Canceling queued publish work should return the displaced publish build.");
+        require(canceledQueuedPublish.front().lifecycleState
+                    == drs::engine::PlaybackSnapshotLifecycleState::canceled,
+                "Canceled queued publish work should report the canceled lifecycle state.");
+        const auto canceledQueuedPreview = queuedCancellationCleanupService.cancelQueuedPreviewBuilds(
+            "Preview preparation canceled during cleanup coverage");
+        require(canceledQueuedPreview.size() == 1,
+                "Canceling queued preview work should return the displaced preview build.");
+        require(canceledQueuedPreview.front().lifecycleState
+                    == drs::engine::PlaybackSnapshotLifecycleState::canceled,
+                "Canceled queued preview work should report the canceled lifecycle state.");
+        require(queuedCancellationCleanupService.waitForWorkerIdle(100),
+                "Canceling every queued background-worker job should leave the worker idle immediately.");
+        require(!queuedCancellationCleanupService.hasPendingQueuedBuilds(),
+                "Canceling every queued background-worker job should leave no pending jobs behind.");
+        require(queuedCancellationCleanupService.drainCompletedBuilds().empty(),
+                "Canceling queued background-worker jobs should not leave orphaned completed results behind.");
+        require(queuedCancellationCleanupService.getWorkerStatus().cancellationCount == 2,
+                "Cancellation cleanup coverage should record both queued lane cancellations.");
+        require(queuedCancellationCleanupService.getWorkerStatus().activeOwnershipRecordCount == 0,
+                "Canceling queued background-worker jobs should not materialize active ownership records.");
+        require(queuedCancellationCleanupService.getWorkerStatus().activeOwnershipBytes == 0,
+                "Canceling queued background-worker jobs should not materialize active ownership bytes.");
+        require(queuedCancellationCleanupService.getWorkerStatus().retiredOwnershipRecordCount == 0,
+                "Canceling queued background-worker jobs should not create a retired ownership backlog.");
+        require(queuedCancellationCleanupService.getWorkerStatus().retiredBytesAwaitingCleanup == 0,
+                "Canceling queued background-worker jobs should not create retired ownership bytes.");
+
         drs::engine::PreparedPlaybackService publishAdmissionPriorityService("phase1-prepared-playback-v2", 1, false);
         const auto maxBudgetPreview = buildSnapshot(snapshotBuilder, controller.getProject(), 0, false);
         const auto queuedMaxBudgetPreview = publishAdmissionPriorityService.enqueuePreviewBuild(maxBudgetPreview);
@@ -507,6 +548,9 @@ int main()
                 "Replacing a prepared cache key should leave retired bytes awaiting cleanup.");
         require(preparedService.getWorkerStatus().activeOwnershipRecordCount == 2,
                 "Worker status should expose the active ownership-record backlog.");
+        require(preparedService.getWorkerStatus().activeOwnershipBytes
+                    == processedInvalidatingPreview.result.metrics.preparedOwnershipBytes,
+                "Worker status should expose active ownership bytes for the surviving prepared cache set.");
         require(preparedService.getWorkerStatus().retiredOwnershipRecordCount == 1,
                 "Worker status should expose the retired ownership-record backlog.");
         const auto retiredOwnershipRecords = preparedService.snapshotRetiredOwnershipRecords();
@@ -518,14 +562,85 @@ int main()
                 "Retired ownership records should carry a retirement token that survives worker completion.");
         require(retiredOwnershipRecords.front().retiredByBuildId == processedInvalidatingPreview.result.buildId,
                 "Retired ownership records should track the build that superseded the stale cache entry.");
-        require(preparedService.retireStaleCacheEntries() > 0,
-                "Worker should retire stale prepared cache entries on request.");
+        const auto originalInvalidatedSourcePath = phase2Project.project.sampleSources[1].path;
+        auto restoredInvalidatedProject = controller.getProject();
+        restoredInvalidatedProject.sampleSources[1].path = originalInvalidatedSourcePath;
+        const auto thirdCommit = controller.commitSnapshot(restoredInvalidatedProject,
+                                                           "Restore the invalidated prepared cache key",
+                                                           {"sampleSources[1].path"});
+        require(thirdCommit.applied, "Restoring the invalidated worker cache key should commit successfully.");
+
+        const auto restoredInvalidatingSnapshot = buildSnapshot(snapshotBuilder,
+                                                                controller.getProject(),
+                                                                thirdCommit.documentState.revision,
+                                                                false);
+        const auto queuedRestoredInvalidatingPreview = preparedService.enqueuePreviewBuild(restoredInvalidatingSnapshot);
+        require(queuedRestoredInvalidatingPreview.accepted,
+                "Restoring the invalidated worker cache key should queue successfully.");
+        const auto processedRestoredInvalidatingPreview = preparedService.processNextQueuedBuild(referenceStream);
+        require(processedRestoredInvalidatingPreview.processed && processedRestoredInvalidatingPreview.result.built,
+                "Restoring the invalidated worker cache key should still prepare successfully.");
+        require(processedRestoredInvalidatingPreview.result.metrics.cacheHitCount == 1,
+                "Restoring one invalidated source before cleanup should preserve the one still-active warm handle.");
+        require(processedRestoredInvalidatingPreview.result.metrics.cacheMissCount == 1,
+                "Restoring one invalidated source before cleanup should rebuild the stale retired handle.");
+        require(processedRestoredInvalidatingPreview.result.metrics.retiredOwnershipRecordCount == 2,
+                "Repeated invalidating edits before cleanup should accumulate two retired ownership records.");
+        require(processedRestoredInvalidatingPreview.result.metrics.retiredBytesAwaitingCleanup
+                    > processedInvalidatingPreview.result.metrics.retiredBytesAwaitingCleanup,
+                "Repeated invalidating edits before cleanup should grow the retained-byte backlog.");
+        const auto accumulatedRetiredOwnershipRecords = preparedService.snapshotRetiredOwnershipRecords();
+        require(accumulatedRetiredOwnershipRecords.size() == 2,
+                "Repeated invalidating edits before cleanup should expose both retired ownership records.");
+        require(preparedService.serviceRetiredCacheCleanup(1) == 1,
+                "Partial stale-cache cleanup should retire only one accumulated record at a time.");
+        require(preparedService.getWorkerStatus().retiredOwnershipRecordCount == 1,
+                "Partial stale-cache cleanup should leave one retired ownership record behind.");
+        const auto retiredBytesAfterPartialCleanup = preparedService.getWorkerStatus().retiredBytesAwaitingCleanup;
+        require(retiredBytesAfterPartialCleanup > 0,
+                "Partial stale-cache cleanup should leave retained bytes awaiting the remaining cleanup pass.");
+        require(preparedService.serviceRetiredCacheCleanup() == 1,
+                "A second stale-cache cleanup pass should drain the final accumulated retirement record.");
         require(preparedService.getWorkerStatus().retiredOwnershipRecordCount == 0,
                 "Draining stale prepared cache entries should clear the retired ownership-record count.");
         require(preparedService.getWorkerStatus().retiredBytesAwaitingCleanup == 0,
                 "Retiring stale prepared cache entries should clear the retained-byte backlog.");
+        require(preparedService.getWorkerStatus().activeOwnershipBytes
+                    == processedRestoredInvalidatingPreview.result.metrics.preparedOwnershipBytes,
+                "Retiring stale prepared cache entries should not disturb the surviving active ownership bytes.");
         require(preparedService.snapshotRetiredOwnershipRecords().empty(),
                 "Draining stale prepared cache entries should clear the retired ownership backlog.");
+
+        auto postCleanupInvalidatingProject = controller.getProject();
+        postCleanupInvalidatingProject.sampleSources[1].path = postCleanupInvalidatingProject.sampleSources[0].path;
+        const auto fourthCommit = controller.commitSnapshot(postCleanupInvalidatingProject,
+                                                            "Rebuild a cleaned retired prepared cache key",
+                                                            {"sampleSources[1].path"});
+        require(fourthCommit.applied,
+                "Post-cleanup invalidation coverage should commit successfully.");
+
+        const auto postCleanupInvalidatingSnapshot = buildSnapshot(snapshotBuilder,
+                                                                   controller.getProject(),
+                                                                   fourthCommit.documentState.revision,
+                                                                   false);
+        const auto queuedPostCleanupInvalidatingPreview
+            = preparedService.enqueuePreviewBuild(postCleanupInvalidatingSnapshot);
+        require(queuedPostCleanupInvalidatingPreview.accepted,
+                "Post-cleanup invalidation coverage should queue successfully.");
+        const auto processedPostCleanupInvalidatingPreview = preparedService.processNextQueuedBuild(referenceStream);
+        require(processedPostCleanupInvalidatingPreview.processed
+                    && processedPostCleanupInvalidatingPreview.result.built,
+                "Post-cleanup invalidation coverage should still prepare successfully.");
+        require(processedPostCleanupInvalidatingPreview.result.metrics.cacheHitCount == 1,
+                "After cleanup, only the still-active prepared handle should remain warm.");
+        require(processedPostCleanupInvalidatingPreview.result.metrics.cacheMissCount == 1,
+                "After cleanup, rebuilding a once-retired cache key should cold-miss instead of reusing retired state.");
+        require(processedPostCleanupInvalidatingPreview.result.metrics.retiredOwnershipRecordCount == 1,
+                "Post-cleanup invalidation coverage should begin a fresh retirement backlog for the newly replaced key.");
+        require(preparedService.serviceRetiredCacheCleanup() == 1,
+                "Post-cleanup invalidation coverage should drain the new retirement backlog cleanly.");
+        require(preparedService.getWorkerStatus().retiredOwnershipRecordCount == 0,
+                "Post-cleanup invalidation coverage should leave no retired backlog after servicing cleanup.");
 
         const auto phase1Project = drs::engine::loadPhase1ReferenceProjectManifest();
         require(phase1Project.loaded, "Phase 1 reference project must load before migrated worker coverage runs.");

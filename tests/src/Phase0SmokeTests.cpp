@@ -77,6 +77,28 @@ juce::Component* findDescendantById(juce::Component& root, const juce::String& c
 
     return nullptr;
 }
+
+float renderQueuedPerformanceSurfaceMagnitude(drs::plugin::Processor& processor,
+                                              int midiNoteNumber,
+                                              float velocity,
+                                              int blockCount = 4)
+{
+    processor.queuePerformanceSurfaceNoteOn(midiNoteNumber, velocity);
+
+    float maxMagnitude = 0.0f;
+    juce::MidiBuffer emptyMidiBuffer;
+
+    for (int blockIndex = 0; blockIndex < blockCount; ++blockIndex)
+    {
+        juce::AudioBuffer<float> buffer(2, 512);
+        buffer.clear();
+        processor.processBlock(buffer, emptyMidiBuffer);
+        maxMagnitude = std::max(maxMagnitude, buffer.getMagnitude(0, buffer.getNumSamples()));
+    }
+
+    processor.queuePerformanceSurfaceNoteOff(midiNoteNumber);
+    return maxMagnitude;
+}
 } // namespace
 
 int main()
@@ -107,6 +129,10 @@ int main()
                 "Engine snapshot detail must describe playback snapshot digests.");
         require(statusSnapshot.detail.find("Prepared worker:") != std::string::npos,
                 "Engine snapshot detail must describe prepared-playback worker activity.");
+        require(statusSnapshot.detail.find("Prepared cache policy:") != std::string::npos,
+                "Engine snapshot detail must describe the prepared cache pressure policy.");
+        require(statusSnapshot.detail.find("Prepared build metrics:") != std::string::npos,
+                "Engine snapshot detail must describe prepared build metrics.");
         require(!statusSnapshot.nextSteps.empty(), "Engine snapshot must expose at least one Phase 0 next step.");
         require(engineFacade.getArticulationDescriptors().size() == 2,
                 "Engine facade should expose both reference articulations to the Sprint 5 performance surface.");
@@ -173,14 +199,8 @@ int main()
         require(!mainComponent.isAudioOutputEnabled(),
                 "Headless standalone smoke validation should keep the real audio device disabled.");
         mainComponent.getProcessor().prepareToPlay(44100.0, 512);
-        juce::AudioBuffer<float> standaloneSurfaceBuffer(2, 512);
-        standaloneSurfaceBuffer.clear();
-        juce::MidiBuffer standaloneEmptyMidiBuffer;
-        mainComponent.getProcessor().queuePerformanceSurfaceNoteOn(57, 0.8f);
-        mainComponent.getProcessor().processBlock(standaloneSurfaceBuffer, standaloneEmptyMidiBuffer);
-        require(standaloneSurfaceBuffer.getMagnitude(0, standaloneSurfaceBuffer.getNumSamples()) > 0.0001f,
+        require(renderQueuedPerformanceSurfaceMagnitude(mainComponent.getProcessor(), 57, 0.8f) > 0.0001f,
                 "Standalone performance surface should render audible output through the shared processor path.");
-        mainComponent.getProcessor().queuePerformanceSurfaceNoteOff(57);
 
         drs::plugin::Processor processor;
         require(processor.acceptsMidi(), "Plugin shell must remain configured as a MIDI-driven synth.");
@@ -218,14 +238,8 @@ int main()
         require(pluginBuffer.getMagnitude(0, pluginBuffer.getNumSamples()) > 0.0001f,
                 "Plugin processor should produce audible output for the reference sustain trigger.");
 
-        juce::AudioBuffer<float> performanceSurfaceBuffer(2, 512);
-        performanceSurfaceBuffer.clear();
-        juce::MidiBuffer emptyMidiBuffer;
-        processor.queuePerformanceSurfaceNoteOn(57, 0.8f);
-        processor.processBlock(performanceSurfaceBuffer, emptyMidiBuffer);
-        require(performanceSurfaceBuffer.getMagnitude(0, performanceSurfaceBuffer.getNumSamples()) > 0.0001f,
+        require(renderQueuedPerformanceSurfaceMagnitude(processor, 57, 0.8f) > 0.0001f,
                 "Plugin performance surface keyboard should produce audible output without host MIDI input.");
-        processor.queuePerformanceSurfaceNoteOff(57);
 
         juce::AudioPluginFormatManager formatManager;
         juce::addHeadlessDefaultFormatsToManager(formatManager);

@@ -292,6 +292,11 @@ bool DraftPlaybackContract::completeBuild(DraftPlaybackPendingRequest& pending,
         prepared.preparedOwnershipBytes = preparedBuildResult != nullptr
             ? preparedBuildResult->metrics.preparedOwnershipBytes
             : 0;
+        prepared.preparedBuildDurationMicros = preparedBuildResult != nullptr ? preparedBuildResult->buildDurationMicros : 0;
+        prepared.preparedDecodedBytes = preparedBuildResult != nullptr ? preparedBuildResult->metrics.decodedBytes : 0;
+        prepared.preparedSampleDataBytes = preparedBuildResult != nullptr
+            ? preparedBuildResult->metrics.preparedSampleDataBytes
+            : 0;
         prepared.playableRangeAvailable = false;
         prepared.lowestPlayableNote = 0;
         prepared.highestPlayableNote = 127;
@@ -334,6 +339,11 @@ bool DraftPlaybackContract::completeBuild(DraftPlaybackPendingRequest& pending,
     prepared.preparedBytes = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedBytes : 0;
     prepared.preparedOwnershipBytes = preparedBuildResult != nullptr
         ? preparedBuildResult->metrics.preparedOwnershipBytes
+        : 0;
+    prepared.preparedBuildDurationMicros = preparedBuildResult != nullptr ? preparedBuildResult->buildDurationMicros : 0;
+    prepared.preparedDecodedBytes = preparedBuildResult != nullptr ? preparedBuildResult->metrics.decodedBytes : 0;
+    prepared.preparedSampleDataBytes = preparedBuildResult != nullptr
+        ? preparedBuildResult->metrics.preparedSampleDataBytes
         : 0;
     const auto playableRange = summarizePlayableRange(buildResult);
     prepared.playableRangeAvailable = playableRange.available;
@@ -436,6 +446,9 @@ void DraftPlaybackContract::resetPreparedRevision(DraftPlaybackPreparedRevision&
     prepared.preparedOwnershipRecordCount = 0;
     prepared.preparedBytes = 0;
     prepared.preparedOwnershipBytes = 0;
+    prepared.preparedBuildDurationMicros = 0;
+    prepared.preparedDecodedBytes = 0;
+    prepared.preparedSampleDataBytes = 0;
     prepared.playableRangeAvailable = false;
     prepared.lowestPlayableNote = 0;
     prepared.highestPlayableNote = 127;

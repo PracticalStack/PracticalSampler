@@ -1063,7 +1063,7 @@ std::vector<PreparedPlaybackBuildResult> PreparedPlaybackService::cancelQueuedBu
     return results;
 }
 
-std::size_t PreparedPlaybackService::retireStaleCacheEntries(std::size_t maxEntries)
+std::size_t PreparedPlaybackService::serviceRetiredCacheCleanup(std::size_t maxEntries)
 {
     std::size_t retiredCount = 0;
     std::lock_guard<std::mutex> lock(workerMutex);
@@ -1085,6 +1085,11 @@ std::size_t PreparedPlaybackService::retireStaleCacheEntries(std::size_t maxEntr
 
     refreshWorkerStatus();
     return retiredCount;
+}
+
+std::size_t PreparedPlaybackService::retireStaleCacheEntries(std::size_t maxEntries)
+{
+    return serviceRetiredCacheCleanup(maxEntries);
 }
 
 std::vector<PreparedPlaybackOwnershipRecord> PreparedPlaybackService::snapshotRetiredOwnershipRecords() const
@@ -1186,6 +1191,14 @@ void PreparedPlaybackService::refreshWorkerStatus()
     workerStatus.configuredMaxInFlightWorkCount = 1;
     workerStatus.maxPendingWorkCount = std::max(workerStatus.maxPendingWorkCount, workerStatus.pendingWorkCount);
     workerStatus.activeOwnershipRecordCount = cacheEntries.size();
+    workerStatus.activeOwnershipBytes = std::accumulate(
+        cacheEntries.begin(),
+        cacheEntries.end(),
+        std::uint64_t {0},
+        [](std::uint64_t total, const auto& entry)
+        {
+            return total + entry.second.retainedBytes;
+        });
     workerStatus.retiredOwnershipRecordCount = retiredCacheEntries.size();
 }
 
