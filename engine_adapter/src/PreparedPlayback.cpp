@@ -877,16 +877,38 @@ PreparedPlaybackQueueSubmitResult PreparedPlaybackService::enqueueBuildForLane(
     {
         if (iterator->lane == lane)
         {
+            const auto supersedeReason =
+                "Prepared playback build superseded by a newer " + toString(lane) + " request";
             submitResult.displacedResults.push_back(
                 supersedeBuild(iterator->request,
                                submitResult.request.buildId,
-                               "Prepared playback build superseded by a newer " + toString(lane) + " request"));
+                               supersedeReason));
             iterator = queuedJobs.erase(iterator);
             ++workerStatus.supersededCount;
+            workerStatus.lastSupersededLane = toString(lane);
+            workerStatus.lastSupersededReason = supersedeReason;
             continue;
         }
 
         ++iterator;
+    }
+
+    if (queuedJobs.size() >= maxPendingJobs)
+    {
+        const auto displacedIterator = selectQueuedJobToDisplaceForPriority(priority);
+        if (displacedIterator != queuedJobs.end())
+        {
+            const auto supersedeReason =
+                "Prepared playback build superseded by higher-priority " + toString(priority) + " request";
+            submitResult.displacedResults.push_back(
+                supersedeBuild(displacedIterator->request,
+                               submitResult.request.buildId,
+                               supersedeReason));
+            workerStatus.lastSupersededLane = toString(displacedIterator->lane);
+            workerStatus.lastSupersededReason = supersedeReason;
+            queuedJobs.erase(displacedIterator);
+            ++workerStatus.supersededCount;
+        }
     }
 
     if (queuedJobs.size() >= maxPendingJobs)
@@ -912,6 +934,37 @@ PreparedPlaybackQueueSubmitResult PreparedPlaybackService::enqueueBuildForLane(
     refreshWorkerStatus();
     workerCondition.notify_all();
     return submitResult;
+}
+
+std::vector<PreparedPlaybackService::QueuedJob>::iterator
+PreparedPlaybackService::selectQueuedJobToDisplaceForPriority(const PreparedPlaybackJobPriority incomingPriority)
+{
+    auto selectedIterator = queuedJobs.end();
+
+    for (auto iterator = queuedJobs.begin(); iterator != queuedJobs.end(); ++iterator)
+    {
+        if (static_cast<int>(iterator->priority) >= static_cast<int>(incomingPriority))
+            continue;
+
+        if (selectedIterator == queuedJobs.end())
+        {
+            selectedIterator = iterator;
+            continue;
+        }
+
+        if (iterator->priority != selectedIterator->priority)
+        {
+            if (static_cast<int>(iterator->priority) < static_cast<int>(selectedIterator->priority))
+                selectedIterator = iterator;
+
+            continue;
+        }
+
+        if (iterator->enqueueOrdinal < selectedIterator->enqueueOrdinal)
+            selectedIterator = iterator;
+    }
+
+    return selectedIterator;
 }
 
 PreparedPlaybackWorkerStepResult PreparedPlaybackService::processNextQueuedBuild(const RuntimeStreamLoadResult& streamResult)
@@ -994,6 +1047,8 @@ std::vector<PreparedPlaybackBuildResult> PreparedPlaybackService::cancelQueuedBu
             results.push_back(cancelBuild(iterator->request, state));
             iterator = queuedJobs.erase(iterator);
             ++workerStatus.cancellationCount;
+            workerStatus.lastCancellationLane = toString(lane);
+            workerStatus.lastCancellationReason = state;
             continue;
         }
 
@@ -1127,6 +1182,8 @@ void PreparedPlaybackService::runBackgroundWorker()
 void PreparedPlaybackService::refreshWorkerStatus()
 {
     workerStatus.pendingWorkCount = queuedJobs.size();
+    workerStatus.configuredMaxPendingWorkCount = maxPendingJobs;
+    workerStatus.configuredMaxInFlightWorkCount = 1;
     workerStatus.maxPendingWorkCount = std::max(workerStatus.maxPendingWorkCount, workerStatus.pendingWorkCount);
     workerStatus.activeOwnershipRecordCount = cacheEntries.size();
     workerStatus.retiredOwnershipRecordCount = retiredCacheEntries.size();

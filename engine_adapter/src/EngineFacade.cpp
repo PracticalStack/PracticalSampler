@@ -225,6 +225,8 @@ void syncPreparedPlaybackWorkerIntoDiagnostics(const PreparedPlaybackWorkerStatu
                                                EngineDiagnosticsSnapshot& diagnosticsSnapshot)
 {
     diagnosticsSnapshot.preparedWorkerPendingCount = workerStatus.pendingWorkCount;
+    diagnosticsSnapshot.preparedWorkerConfiguredMaxPendingCount = workerStatus.configuredMaxPendingWorkCount;
+    diagnosticsSnapshot.preparedWorkerConfiguredMaxInFlightCount = workerStatus.configuredMaxInFlightWorkCount;
     diagnosticsSnapshot.preparedWorkerCancellationCount = workerStatus.cancellationCount;
     diagnosticsSnapshot.preparedWorkerSupersededCount = workerStatus.supersededCount;
     diagnosticsSnapshot.preparedWorkerFailureCount = workerStatus.failureCount;
@@ -233,6 +235,10 @@ void syncPreparedPlaybackWorkerIntoDiagnostics(const PreparedPlaybackWorkerStatu
     diagnosticsSnapshot.preparedWorkerRetiredOwnershipRecordCount = workerStatus.retiredOwnershipRecordCount;
     diagnosticsSnapshot.preparedWorkerRetiredBytes = workerStatus.retiredBytesAwaitingCleanup;
     diagnosticsSnapshot.preparedWorkerEvent = workerStatus.lastEvent;
+    diagnosticsSnapshot.preparedWorkerLastCancellationLane = workerStatus.lastCancellationLane;
+    diagnosticsSnapshot.preparedWorkerLastCancellationReason = workerStatus.lastCancellationReason;
+    diagnosticsSnapshot.preparedWorkerLastSupersededLane = workerStatus.lastSupersededLane;
+    diagnosticsSnapshot.preparedWorkerLastSupersededReason = workerStatus.lastSupersededReason;
 }
 
 void syncSessionSelectionsIntoDiagnostics(const RuntimeSessionStateSnapshot& sessionState,
@@ -629,6 +635,8 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
            << ", previewOwnership=" << diagnostics.previewPreparedOwnershipBytes
            << ", publishOwnership=" << diagnostics.publishedPreparedOwnershipBytes << "\n";
     detail << "Prepared worker: pending=" << diagnostics.preparedWorkerPendingCount
+           << ", queueLimit=" << diagnostics.preparedWorkerConfiguredMaxPendingCount
+           << ", inFlightLimit=" << diagnostics.preparedWorkerConfiguredMaxInFlightCount
            << ", canceled=" << diagnostics.preparedWorkerCancellationCount
            << ", superseded=" << diagnostics.preparedWorkerSupersededCount
            << ", failures=" << diagnostics.preparedWorkerFailureCount
@@ -638,6 +646,23 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
            << ", retiredBytes=" << diagnostics.preparedWorkerRetiredBytes << "\n";
     detail << "Prepared worker event: "
            << (diagnostics.preparedWorkerEvent.empty() ? "not reported" : diagnostics.preparedWorkerEvent) << "\n";
+    detail << "Prepared worker queue reasons: cancel["
+           << (diagnostics.preparedWorkerLastCancellationLane.empty()
+                   ? "not reported"
+                   : diagnostics.preparedWorkerLastCancellationLane)
+           << "]="
+           << (diagnostics.preparedWorkerLastCancellationReason.empty()
+                   ? "not reported"
+                   : diagnostics.preparedWorkerLastCancellationReason)
+           << ", supersede["
+           << (diagnostics.preparedWorkerLastSupersededLane.empty()
+                   ? "not reported"
+                   : diagnostics.preparedWorkerLastSupersededLane)
+           << "]="
+           << (diagnostics.preparedWorkerLastSupersededReason.empty()
+                   ? "not reported"
+                   : diagnostics.preparedWorkerLastSupersededReason)
+           << "\n";
     detail << "State recall status: "
            << (currentSessionState.transientMetrics.integrationState.empty()
                    ? "not reported"
@@ -855,6 +880,8 @@ EnginePerformanceSnapshot EngineFacade::getPerformanceSnapshot() const
         : "Click Load Default or Load Lead Demo";
     const auto& workerStatus = preparedPlaybackService.getWorkerStatus();
     snapshot.preparedWorkerPendingCount = workerStatus.pendingWorkCount;
+    snapshot.preparedWorkerConfiguredMaxPendingCount = workerStatus.configuredMaxPendingWorkCount;
+    snapshot.preparedWorkerConfiguredMaxInFlightCount = workerStatus.configuredMaxInFlightWorkCount;
     snapshot.preparedWorkerCancellationCount = workerStatus.cancellationCount;
     snapshot.preparedWorkerSupersededCount = workerStatus.supersededCount;
     snapshot.preparedWorkerFailureCount = workerStatus.failureCount;
@@ -862,6 +889,10 @@ EnginePerformanceSnapshot EngineFacade::getPerformanceSnapshot() const
     snapshot.preparedWorkerRetiredOwnershipRecordCount = workerStatus.retiredOwnershipRecordCount;
     snapshot.preparedWorkerRetiredBytes = workerStatus.retiredBytesAwaitingCleanup;
     snapshot.preparedWorkerEvent = workerStatus.lastEvent;
+    snapshot.preparedWorkerLastCancellationLane = workerStatus.lastCancellationLane;
+    snapshot.preparedWorkerLastCancellationReason = workerStatus.lastCancellationReason;
+    snapshot.preparedWorkerLastSupersededLane = workerStatus.lastSupersededLane;
+    snapshot.preparedWorkerLastSupersededReason = workerStatus.lastSupersededReason;
     snapshot.previewPreparedSampleCount = draftStatus.preview.preparedSampleCount;
     snapshot.previewPreparedStreamCount = draftStatus.preview.preparedStreamCount;
     snapshot.previewPreparedOwnershipRecordCount = draftStatus.preview.preparedOwnershipRecordCount;
@@ -1250,6 +1281,9 @@ bool EngineFacade::enqueuePreparedPlaybackBuild(std::uint64_t contractRequestId,
     if (!submitResult.accepted)
         return false;
 
+    if (lane == PreparedPlaybackWorkLane::preview)
+        discardSupersededPreviewPendingPreparedCompletions(submitResult.request.buildId);
+
     pendingPreparedCompletions[submitResult.request.buildId] = {
         lane,
         contractRequestId,
@@ -1352,6 +1386,21 @@ void EngineFacade::clearPendingPreparedCompletions()
 
     pendingPreparedCompletions.clear();
     preparedPlaybackService.drainCompletedBuilds();
+}
+
+void EngineFacade::discardSupersededPreviewPendingPreparedCompletions(const std::uint64_t newestBuildId)
+{
+    for (auto iterator = pendingPreparedCompletions.begin(); iterator != pendingPreparedCompletions.end();)
+    {
+        if (iterator->second.lane == PreparedPlaybackWorkLane::preview
+            && iterator->first != newestBuildId)
+        {
+            iterator = pendingPreparedCompletions.erase(iterator);
+            continue;
+        }
+
+        ++iterator;
+    }
 }
 
 bool EngineFacade::beginDraftPlaybackDeviceRestart()

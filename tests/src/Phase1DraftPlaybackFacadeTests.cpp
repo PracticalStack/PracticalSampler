@@ -182,6 +182,12 @@ void requireFacadeSnapshotConsistency(drs::engine::EngineFacade& engineFacade, c
             context + " should keep diagnostics and performance snapshots aligned on published prepared digest.");
     require(diagnosticsSnapshot.preparedWorkerPendingCount == performanceSnapshot.preparedWorkerPendingCount,
             context + " should keep diagnostics and performance snapshots aligned on pending worker count.");
+    require(diagnosticsSnapshot.preparedWorkerConfiguredMaxPendingCount
+                == performanceSnapshot.preparedWorkerConfiguredMaxPendingCount,
+            context + " should keep diagnostics and performance snapshots aligned on queued-work budget.");
+    require(diagnosticsSnapshot.preparedWorkerConfiguredMaxInFlightCount
+                == performanceSnapshot.preparedWorkerConfiguredMaxInFlightCount,
+            context + " should keep diagnostics and performance snapshots aligned on in-flight worker budget.");
     require(diagnosticsSnapshot.preparedWorkerCancellationCount == performanceSnapshot.preparedWorkerCancellationCount,
             context + " should keep diagnostics and performance snapshots aligned on worker cancellation count.");
     require(diagnosticsSnapshot.preparedWorkerSupersededCount == performanceSnapshot.preparedWorkerSupersededCount,
@@ -198,6 +204,18 @@ void requireFacadeSnapshotConsistency(drs::engine::EngineFacade& engineFacade, c
             context + " should keep diagnostics and performance snapshots aligned on retired prepared bytes.");
     require(diagnosticsSnapshot.preparedWorkerEvent == performanceSnapshot.preparedWorkerEvent,
             context + " should keep diagnostics and performance snapshots aligned on the latest worker event.");
+    require(diagnosticsSnapshot.preparedWorkerLastCancellationLane
+                == performanceSnapshot.preparedWorkerLastCancellationLane,
+            context + " should keep diagnostics and performance snapshots aligned on the last canceled lane.");
+    require(diagnosticsSnapshot.preparedWorkerLastCancellationReason
+                == performanceSnapshot.preparedWorkerLastCancellationReason,
+            context + " should keep diagnostics and performance snapshots aligned on the last cancellation reason.");
+    require(diagnosticsSnapshot.preparedWorkerLastSupersededLane
+                == performanceSnapshot.preparedWorkerLastSupersededLane,
+            context + " should keep diagnostics and performance snapshots aligned on the last superseded lane.");
+    require(diagnosticsSnapshot.preparedWorkerLastSupersededReason
+                == performanceSnapshot.preparedWorkerLastSupersededReason,
+            context + " should keep diagnostics and performance snapshots aligned on the last superseded reason.");
     require(diagnosticsSnapshot.previewPreparedOwnershipRecordCount
                 == performanceSnapshot.previewPreparedOwnershipRecordCount,
             context + " should keep diagnostics and performance snapshots aligned on preview ownership-record counts.");
@@ -218,6 +236,12 @@ void requireFacadeSnapshotConsistency(drs::engine::EngineFacade& engineFacade, c
             context + " should keep the shell-facing contract line for prepared ownership counts.");
     require(statusSnapshot.detail.find("activeOwnership=") != std::string::npos,
             context + " should keep the shell-facing contract line for worker ownership backlog.");
+    require(statusSnapshot.detail.find("queueLimit=") != std::string::npos,
+            context + " should keep the shell-facing contract line for worker queue limits.");
+    require(statusSnapshot.detail.find("inFlightLimit=") != std::string::npos,
+            context + " should keep the shell-facing contract line for worker concurrency limits.");
+    require(statusSnapshot.detail.find("Prepared worker queue reasons:") != std::string::npos,
+            context + " should keep the shell-facing contract line for queue cancellation and supersede reasons.");
     require(statusSnapshot.detail.find("Playable range:") != std::string::npos,
             context + " should keep the shell-facing contract line for playable-range summaries.");
     require(statusSnapshot.detail.find("Surface provenance:") != std::string::npos,
@@ -369,6 +393,12 @@ int main()
                 "Rapid preview refreshes should leave the newest preview revision ready.");
         require(snapshot.publishedRevision == 1 && snapshot.publishedRevisionState == "Active",
                 "Rapid preview refreshes should not change the last published revision.");
+        require(!snapshot.previewPending,
+                "Rapid preview refreshes should settle with no pending preview completion left behind.");
+        require(!draftStatus.pendingPreview.active,
+                "Rapid preview refreshes should leave the contract with no pending preview request.");
+        require(snapshot.preparedWorkerPendingCount == 0,
+                "Rapid preview refreshes should settle with no queued prepared worker jobs left behind.");
         require(snapshot.previewBuildId != initialPreviewBuildId,
                 "Rapid preview refreshes should keep advancing the preview snapshot build identity.");
         require(snapshot.previewPreparedBuildId != initialPreviewPreparedBuildId,
@@ -380,6 +410,44 @@ int main()
         require(snapshot.previewActivationEligible && snapshot.publishedActivationEligible,
                 "Rapid preview refreshes should preserve activation eligibility for both facade paths.");
         requireFacadeSnapshotConsistency(engineFacade, "Facade state after rapid preview supersede coverage");
+
+        require(engineFacade.stageDraftRevision(5),
+                "A fifth draft revision should stage successfully for mixed facade churn coverage.");
+        require(engineFacade.refreshPreviewToCurrentDraft(),
+                "Mixed facade churn coverage should accept preview refresh for revision 5.");
+        require(engineFacade.publishCurrentDraft(),
+                "Mixed facade churn coverage should accept publish for revision 5.");
+        require(engineFacade.stageDraftRevision(6),
+                "A sixth draft revision should stage successfully for mixed facade churn coverage.");
+        require(engineFacade.refreshPreviewToCurrentDraft(),
+                "Mixed facade churn coverage should accept preview refresh for revision 6.");
+        require(engineFacade.publishCurrentDraft(),
+                "Mixed facade churn coverage should accept publish for revision 6.");
+        require(engineFacade.waitForPreparedPlaybackIdle(std::chrono::milliseconds(1500)),
+                "Mixed facade churn coverage should settle with no orphaned worker or completion state.");
+        snapshot = engineFacade.getPerformanceSnapshot();
+        draftStatus = engineFacade.getDraftPlaybackStatus();
+        require(snapshot.draftRevision == 6,
+                "Mixed facade churn coverage should leave the newest staged draft revision visible.");
+        require(snapshot.previewRevision == 6 && snapshot.previewRevisionState == "Ready",
+                "Mixed facade churn coverage should leave the newest preview revision ready.");
+        require(snapshot.publishedRevision == 6 && snapshot.publishedRevisionState == "Active",
+                "Mixed facade churn coverage should leave the newest published revision active.");
+        require(!snapshot.previewPending && !snapshot.publishedPending,
+                "Mixed facade churn coverage should settle with no pending preview or publish work.");
+        require(!draftStatus.pendingPreview.active && !draftStatus.pendingPerformance.active,
+                "Mixed facade churn coverage should settle with no pending contract requests.");
+        require(snapshot.preparedWorkerPendingCount == 0,
+                "Mixed facade churn coverage should settle with no queued worker jobs.");
+        require(snapshot.previewContentDigest == snapshot.publishedContentDigest,
+                "Mixed facade churn coverage should not let stale completions leave preview and publish on different digests.");
+        require(snapshot.previewPreparedContentDigest == snapshot.publishedPreparedContentDigest,
+                "Mixed facade churn coverage should not let stale completions leave preview and publish on different prepared digests.");
+        require(snapshot.publishedBuildId != revision1PublishedBuildId,
+                "Mixed facade churn coverage should replace the old published snapshot build identity.");
+        require(snapshot.publishedPreparedBuildId != revision1PublishedPreparedBuildId,
+                "Mixed facade churn coverage should replace the old published prepared-playback build identity.");
+        requireFacadeSnapshotConsistency(engineFacade, "Facade state after mixed preview publish churn coverage");
 
         require(engineFacade.beginDraftPlaybackDeviceRestart(),
                 "Device restart should begin while the project is open.");

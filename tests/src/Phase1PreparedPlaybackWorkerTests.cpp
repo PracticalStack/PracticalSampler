@@ -5,9 +5,12 @@
 #include "drs/engine/RuntimeLoader.h"
 
 #include <algorithm>
+#include <chrono>
+#include <functional>
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 
 namespace
 {
@@ -50,6 +53,22 @@ drs::engine::PlaybackSnapshotBuildResult buildSnapshot(drs::engine::PlaybackSnap
     const auto request = builder.requestBuild(revision, activationRequested);
     require(request.accepted, "Playback snapshot request should be accepted during worker tests.");
     return builder.buildSnapshot(request, project);
+}
+
+bool waitForCondition(const std::function<bool()>& condition,
+                      std::chrono::milliseconds timeout = std::chrono::milliseconds(500))
+{
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+
+    while (std::chrono::steady_clock::now() <= deadline)
+    {
+        if (condition())
+            return true;
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+
+    return condition();
 }
 } // namespace
 
@@ -104,6 +123,10 @@ int main()
         require(queuedPreviewRevision0.accepted, "Initial preview preparation should queue successfully.");
         require(preparedService.getWorkerStatus().pendingWorkCount == 1,
                 "Worker status should expose the queued preview request.");
+        require(preparedService.getWorkerStatus().configuredMaxPendingWorkCount == 2,
+                "Worker status should expose the configured queued-work budget.");
+        require(preparedService.getWorkerStatus().configuredMaxInFlightWorkCount == 1,
+                "Worker status should expose the single-worker in-flight budget.");
 
         auto editedProject = controller.getProject();
         editedProject.authoring.zones[0].gainDb += 1.0;
@@ -127,6 +150,11 @@ int main()
                 "Preview supersede should keep only one preview job queued.");
         require(preparedService.getWorkerStatus().supersededCount == 1,
                 "Worker status should track superseded preparation jobs.");
+        require(preparedService.getWorkerStatus().lastSupersededLane == "preview",
+                "Worker status should surface the superseded lane for same-lane preview replacement.");
+        require(preparedService.getWorkerStatus().lastSupersededReason
+                    == "Prepared playback build superseded by a newer preview request",
+                "Worker status should surface the supersede reason for same-lane preview replacement.");
 
         const auto publishRevision1 = buildSnapshot(snapshotBuilder,
                                                     controller.getProject(),
@@ -164,6 +192,213 @@ int main()
                 "Canceling the last queued preview job should leave no pending worker jobs.");
         require(preparedService.getWorkerStatus().cancellationCount == 1,
                 "Worker status should track canceled preparation jobs.");
+        require(preparedService.getWorkerStatus().lastCancellationLane == "preview",
+                "Worker status should surface the canceled lane for queued preview cancellation.");
+        require(preparedService.getWorkerStatus().lastCancellationReason
+                    == "Preview preparation canceled during worker test",
+                "Worker status should surface the cancellation reason for queued preview cancellation.");
+
+        drs::engine::PreparedPlaybackService publishAdmissionPriorityService("phase1-prepared-playback-v2", 1, false);
+        const auto maxBudgetPreview = buildSnapshot(snapshotBuilder, controller.getProject(), 0, false);
+        const auto queuedMaxBudgetPreview = publishAdmissionPriorityService.enqueuePreviewBuild(maxBudgetPreview);
+        require(queuedMaxBudgetPreview.accepted,
+                "Preview preparation should queue successfully before publish-priority admission coverage.");
+        require(publishAdmissionPriorityService.getWorkerStatus().pendingWorkCount == 1,
+                "Publish-priority admission coverage should begin with the queue budget occupied by preview work.");
+
+        const auto maxBudgetPublish = buildSnapshot(snapshotBuilder, controller.getProject(), 0, true);
+        const auto queuedMaxBudgetPublish = publishAdmissionPriorityService.enqueuePublishBuild(maxBudgetPublish);
+        require(queuedMaxBudgetPublish.accepted,
+                "Publish preparation should still be admitted when preview already occupies the full queue budget.");
+        require(queuedMaxBudgetPublish.displacedResults.size() == 1,
+                "Higher-priority publish admission should displace one queued preview build when the queue budget is full.");
+        require(queuedMaxBudgetPublish.displacedResults.front().lifecycleState
+                    == drs::engine::PlaybackSnapshotLifecycleState::superseded,
+                "Preview work displaced by publish admission should report the superseded lifecycle state.");
+        require(queuedMaxBudgetPublish.displacedResults.front().state
+                    == "Prepared playback build superseded by higher-priority publish request",
+                "Publish-priority admission should expose a lane-aware supersede reason.");
+        require(publishAdmissionPriorityService.getWorkerStatus().lastSupersededLane == "preview",
+                "Publish-priority admission should preserve which queued lane was displaced.");
+        require(publishAdmissionPriorityService.getWorkerStatus().lastSupersededReason
+                    == "Prepared playback build superseded by higher-priority publish request",
+                "Publish-priority admission should surface the higher-priority supersede reason in worker status.");
+        require(publishAdmissionPriorityService.getWorkerStatus().pendingWorkCount == 1,
+                "Publish-priority admission should keep the queue bounded to the configured worker budget.");
+        const auto processedMaxBudgetPublish = publishAdmissionPriorityService.processNextQueuedBuild(referenceStream);
+        require(processedMaxBudgetPublish.processed,
+                "Publish-priority admission coverage should process the admitted publish build.");
+        require(processedMaxBudgetPublish.lane == drs::engine::PreparedPlaybackWorkLane::performance,
+                "When the queue budget is full, the surviving admitted work should be the publish lane.");
+        require(processedMaxBudgetPublish.result.built,
+                "The admitted publish build should still prepare successfully.");
+        require(!publishAdmissionPriorityService.hasPendingQueuedBuilds(),
+                "Processing the admitted publish build should leave no displaced preview work behind.");
+
+        drs::engine::PreparedPlaybackService previewAdmissionPriorityService("phase1-prepared-playback-v2", 1, false);
+        const auto queuedBudgetPublish = previewAdmissionPriorityService.enqueuePublishBuild(maxBudgetPublish);
+        require(queuedBudgetPublish.accepted,
+                "Publish preparation should queue successfully before lower-priority preview admission coverage.");
+        const auto queuedBudgetPreview = previewAdmissionPriorityService.enqueuePreviewBuild(maxBudgetPreview);
+        require(!queuedBudgetPreview.accepted,
+                "Lower-priority preview work should not displace queued publish work when the queue budget is full.");
+        require(queuedBudgetPreview.request.state == "Prepared playback queue is full",
+                "Rejected preview admission should continue surfacing the queue-full state.");
+        require(previewAdmissionPriorityService.getWorkerStatus().pendingWorkCount == 1,
+                "Rejected preview admission should preserve the queued publish budget occupant.");
+
+        drs::engine::PreparedPlaybackService boundedBackgroundWorkerService("phase1-prepared-playback-v2", 1, true);
+        require(boundedBackgroundWorkerService.isBackgroundWorkerEnabled(),
+                "Burst-bound coverage should use the real background worker path.");
+        const auto burstPreviewRevision0 = buildSnapshot(snapshotBuilder, controller.getProject(), 0, false);
+        const auto queuedBurstPreviewRevision0 = boundedBackgroundWorkerService.enqueuePreviewBuild(burstPreviewRevision0);
+        require(queuedBurstPreviewRevision0.accepted,
+                "Burst-bound coverage should admit the initial preview request.");
+        const auto burstPreviewRevision1 = buildSnapshot(snapshotBuilder,
+                                                         controller.getProject(),
+                                                         firstCommit.documentState.revision,
+                                                         false);
+        const auto queuedBurstPreviewRevision1 = boundedBackgroundWorkerService.enqueuePreviewBuild(burstPreviewRevision1);
+        require(queuedBurstPreviewRevision1.accepted,
+                "Burst-bound coverage should supersede older preview work while holding the queue bound.");
+        const auto burstPublishRevision = buildSnapshot(snapshotBuilder,
+                                                        controller.getProject(),
+                                                        firstCommit.documentState.revision,
+                                                        true);
+        const auto queuedBurstPublish = boundedBackgroundWorkerService.enqueuePublishBuild(burstPublishRevision);
+        require(queuedBurstPublish.accepted,
+                "Burst-bound coverage should still admit publish work within the bounded queue budget.");
+        const auto rejectedBurstPreview = boundedBackgroundWorkerService.enqueuePreviewBuild(burstPreviewRevision0);
+        require(!rejectedBurstPreview.accepted,
+                "Burst-bound coverage should reject lower-priority overflow once the bounded queue budget is saturated.");
+        auto boundedStatus = boundedBackgroundWorkerService.getWorkerStatus();
+        require(boundedStatus.pendingWorkCount <= boundedStatus.configuredMaxPendingWorkCount,
+                "Queued worker backlog must never exceed the configured queue budget before the background worker starts.");
+        require(boundedStatus.inFlightWorkCount <= boundedStatus.configuredMaxInFlightWorkCount,
+                "In-flight worker activity must never exceed the configured concurrency budget before the background worker starts.");
+        require(boundedStatus.configuredMaxPendingWorkCount == 1,
+                "Burst-bound coverage should surface the configured one-slot queue budget.");
+        require(boundedStatus.configuredMaxInFlightWorkCount == 1,
+                "Burst-bound coverage should surface the configured single-worker concurrency budget.");
+        boundedBackgroundWorkerService.setBackgroundWorkerStream(referenceStream);
+        require(waitForCondition(
+                    [&]
+                    {
+                        const auto status = boundedBackgroundWorkerService.getWorkerStatus();
+                        return status.inFlightWorkCount == 1 || status.completedWorkCount > 0;
+                    }),
+                "Burst-bound coverage should observe the background worker begin bounded processing after the stream becomes available.");
+        require(boundedBackgroundWorkerService.waitForWorkerIdle(1500),
+                "Burst-bound coverage should settle through the background worker.");
+        boundedStatus = boundedBackgroundWorkerService.getWorkerStatus();
+        require(boundedStatus.pendingWorkCount == 0,
+                "Burst-bound coverage should leave no queued work after the bounded worker drains.");
+        require(boundedStatus.inFlightWorkCount == 0,
+                "Burst-bound coverage should leave no in-flight work after the bounded worker drains.");
+        require(boundedStatus.maxPendingWorkCount <= boundedStatus.configuredMaxPendingWorkCount,
+                "Observed queued backlog must never exceed the configured queue bound during burst processing.");
+        require(boundedStatus.completedWorkCount == 1,
+                "Burst-bound coverage should process only the single surviving bounded work item.");
+        const auto boundedResults = boundedBackgroundWorkerService.drainCompletedBuilds();
+        require(boundedResults.size() == 1,
+                "Burst-bound coverage should leave exactly one completed background-worker result to drain.");
+        require(boundedResults.front().lane == drs::engine::PreparedPlaybackWorkLane::performance,
+                "Burst-bound coverage should preserve publish as the surviving bounded work item.");
+        require(boundedResults.front().result.built,
+                "The surviving bounded background-worker item should still prepare successfully.");
+        require(boundedBackgroundWorkerService.drainCompletedBuilds().empty(),
+                "Burst-bound coverage should not leave orphaned completed results after the first drain.");
+
+        drs::engine::PreparedPlaybackService mixedChurnBackgroundWorkerService("phase1-prepared-playback-v2", 2, true);
+        auto mixedChurnProject = controller.getProject();
+        mixedChurnProject.authoring.zones[0].pan = 0.2;
+        const auto mixedChurnCommit1 = controller.commitSnapshot(mixedChurnProject,
+                                                                 "Advance draft revision for mixed worker churn coverage",
+                                                                 {"authoring.zones[0].pan"});
+        require(mixedChurnCommit1.applied,
+                "Mixed worker churn coverage should commit the first churn revision successfully.");
+        mixedChurnProject = controller.getProject();
+        mixedChurnProject.authoring.zones[0].gainDb += 0.75;
+        const auto mixedChurnCommit2 = controller.commitSnapshot(mixedChurnProject,
+                                                                 "Advance draft revision for mixed worker churn coverage again",
+                                                                 {"authoring.zones[0].gainDb"});
+        require(mixedChurnCommit2.applied,
+                "Mixed worker churn coverage should commit the second churn revision successfully.");
+
+        const auto mixedPreviewRevision0 = buildSnapshot(snapshotBuilder, phase2Project.project, 0, false);
+        const auto mixedPublishRevision0 = buildSnapshot(snapshotBuilder, phase2Project.project, 0, true);
+        const auto mixedPreviewRevision1 = buildSnapshot(snapshotBuilder,
+                                                         controller.getProject(),
+                                                         mixedChurnCommit1.documentState.revision,
+                                                         false);
+        const auto mixedPublishRevision1 = buildSnapshot(snapshotBuilder,
+                                                         controller.getProject(),
+                                                         mixedChurnCommit1.documentState.revision,
+                                                         true);
+        const auto mixedPreviewRevision2 = buildSnapshot(snapshotBuilder,
+                                                         controller.getProject(),
+                                                         mixedChurnCommit2.documentState.revision,
+                                                         false);
+        const auto mixedPublishRevision2 = buildSnapshot(snapshotBuilder,
+                                                         controller.getProject(),
+                                                         mixedChurnCommit2.documentState.revision,
+                                                         true);
+
+        require(mixedChurnBackgroundWorkerService.enqueuePreviewBuild(mixedPreviewRevision0).accepted,
+                "Mixed worker churn coverage should queue the initial preview request.");
+        require(mixedChurnBackgroundWorkerService.enqueuePublishBuild(mixedPublishRevision0).accepted,
+                "Mixed worker churn coverage should queue the initial publish request.");
+        const auto supersededMixedPreview1 = mixedChurnBackgroundWorkerService.enqueuePreviewBuild(mixedPreviewRevision1);
+        require(supersededMixedPreview1.accepted && supersededMixedPreview1.displacedResults.size() == 1,
+                "Mixed worker churn coverage should supersede the older queued preview request.");
+        const auto supersededMixedPublish1 = mixedChurnBackgroundWorkerService.enqueuePublishBuild(mixedPublishRevision1);
+        require(supersededMixedPublish1.accepted && supersededMixedPublish1.displacedResults.size() == 1,
+                "Mixed worker churn coverage should supersede the older queued publish request.");
+        const auto supersededMixedPreview2 = mixedChurnBackgroundWorkerService.enqueuePreviewBuild(mixedPreviewRevision2);
+        require(supersededMixedPreview2.accepted && supersededMixedPreview2.displacedResults.size() == 1,
+                "Mixed worker churn coverage should supersede the intermediate queued preview request.");
+        const auto supersededMixedPublish2 = mixedChurnBackgroundWorkerService.enqueuePublishBuild(mixedPublishRevision2);
+        require(supersededMixedPublish2.accepted && supersededMixedPublish2.displacedResults.size() == 1,
+                "Mixed worker churn coverage should supersede the intermediate queued publish request.");
+        auto mixedChurnStatus = mixedChurnBackgroundWorkerService.getWorkerStatus();
+        require(mixedChurnStatus.pendingWorkCount == 2,
+                "Mixed worker churn coverage should leave only one preview and one publish request queued before worker start.");
+        require(mixedChurnStatus.supersededCount >= 4,
+                "Mixed worker churn coverage should record every queued supersede across both lanes.");
+
+        mixedChurnBackgroundWorkerService.setBackgroundWorkerStream(referenceStream);
+        require(mixedChurnBackgroundWorkerService.waitForWorkerIdle(1500),
+                "Mixed worker churn coverage should settle through the background worker.");
+        mixedChurnStatus = mixedChurnBackgroundWorkerService.getWorkerStatus();
+        require(mixedChurnStatus.pendingWorkCount == 0 && mixedChurnStatus.inFlightWorkCount == 0,
+                "Mixed worker churn coverage should leave no pending or in-flight work after settling.");
+        const auto mixedChurnResults = mixedChurnBackgroundWorkerService.drainCompletedBuilds();
+        require(mixedChurnResults.size() == 2,
+                "Mixed worker churn coverage should complete only the latest preview and publish requests.");
+        require(mixedChurnBackgroundWorkerService.drainCompletedBuilds().empty(),
+                "Mixed worker churn coverage should not leave orphaned completed results after the first drain.");
+        require(std::count_if(mixedChurnResults.begin(),
+                              mixedChurnResults.end(),
+                              [](const drs::engine::PreparedPlaybackWorkerStepResult& result)
+                              {
+                                  return result.lane == drs::engine::PreparedPlaybackWorkLane::preview;
+                              }) == 1,
+                "Mixed worker churn coverage should complete exactly one preview result.");
+        require(std::count_if(mixedChurnResults.begin(),
+                              mixedChurnResults.end(),
+                              [](const drs::engine::PreparedPlaybackWorkerStepResult& result)
+                              {
+                                  return result.lane == drs::engine::PreparedPlaybackWorkLane::performance;
+                              }) == 1,
+                "Mixed worker churn coverage should complete exactly one publish result.");
+        require(std::all_of(mixedChurnResults.begin(),
+                            mixedChurnResults.end(),
+                            [&](const drs::engine::PreparedPlaybackWorkerStepResult& result)
+                            {
+                                return result.result.requestedDraftRevision == mixedChurnCommit2.documentState.revision
+                                    && result.result.built;
+                            }),
+                "Mixed worker churn coverage should complete only the latest draft revision after queued supersedes.");
 
         auto zoneOnlyEditedProject = controller.getProject();
         zoneOnlyEditedProject.authoring.zones[0].rootKey += 2;

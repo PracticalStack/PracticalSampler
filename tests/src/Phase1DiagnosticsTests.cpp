@@ -50,10 +50,20 @@ int main()
                 "Default diagnostics snapshot should expose ownership-safe prepared byte totals.");
         require(defaultDiagnostics.preparedWorkerPendingCount == 0,
                 "Default diagnostics snapshot should not leave prepared worker jobs pending.");
+        require(defaultDiagnostics.preparedWorkerConfiguredMaxPendingCount == 2,
+                "Default diagnostics snapshot should expose the configured queued-work budget.");
+        require(defaultDiagnostics.preparedWorkerConfiguredMaxInFlightCount == 1,
+                "Default diagnostics snapshot should expose the single-worker in-flight budget.");
         require(defaultDiagnostics.preparedWorkerActiveOwnershipRecordCount > 0,
                 "Default diagnostics snapshot should expose active worker ownership-record counts.");
         require(defaultDiagnostics.preparedWorkerRetiredOwnershipRecordCount == 0,
                 "Default diagnostics snapshot should not expose retired worker ownership backlog by default.");
+        require(defaultDiagnostics.preparedWorkerLastCancellationLane.empty()
+                    && defaultDiagnostics.preparedWorkerLastCancellationReason.empty(),
+                "Default diagnostics snapshot should not expose queue-cancellation reasons before any cancellation occurs.");
+        require(defaultDiagnostics.preparedWorkerLastSupersededLane.empty()
+                    && defaultDiagnostics.preparedWorkerLastSupersededReason.empty(),
+                "Default diagnostics snapshot should not expose queue-supersede reasons before any supersede occurs.");
         require(defaultDiagnostics.previewFindings.empty() && defaultDiagnostics.publishedFindings.empty(),
                 "Default diagnostics snapshot should not surface snapshot findings for the reference project.");
         require(defaultDiagnostics.configuredMaxCachedPages == 4,

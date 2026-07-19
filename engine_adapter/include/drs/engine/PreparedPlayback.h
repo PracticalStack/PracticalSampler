@@ -216,6 +216,8 @@ struct PreparedPlaybackWorkerStatus
 {
     std::size_t pendingWorkCount = 0;
     std::size_t inFlightWorkCount = 0;
+    std::size_t configuredMaxPendingWorkCount = 0;
+    std::size_t configuredMaxInFlightWorkCount = 0;
     std::size_t completedWorkCount = 0;
     std::size_t cancellationCount = 0;
     std::size_t supersededCount = 0;
@@ -225,6 +227,10 @@ struct PreparedPlaybackWorkerStatus
     std::size_t retiredOwnershipRecordCount = 0;
     std::uint64_t retiredBytesAwaitingCleanup = 0;
     std::string lastEvent;
+    std::string lastCancellationLane;
+    std::string lastCancellationReason;
+    std::string lastSupersededLane;
+    std::string lastSupersededReason;
 };
 
 bool operator==(const PreparedPlaybackPageHandle& left, const PreparedPlaybackPageHandle& right);
@@ -295,6 +301,8 @@ private:
     PreparedPlaybackBuildRequest resolveBuildRequest(const PreparedPlaybackBuildRequest& request,
                                                      const PlaybackSnapshotBuildResult& snapshotResult,
                                                      const RuntimeStreamLoadResult& streamResult) const;
+    std::vector<QueuedJob>::iterator selectQueuedJobToDisplaceForPriority(
+        PreparedPlaybackJobPriority incomingPriority);
     PreparedPlaybackQueueSubmitResult enqueueBuildForLane(const PlaybackSnapshotBuildResult& snapshotResult,
                                                           PreparedPlaybackWorkLane lane,
                                                           PreparedPlaybackJobPriority priority);
