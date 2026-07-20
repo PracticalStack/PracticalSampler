@@ -38,6 +38,7 @@ public:
     using DraftPlaybackStatusProvider = std::function<drs::engine::DraftPlaybackStatus()>;
     using DraftPlaybackActionCallback = std::function<void()>;
     using PreviewCommandCallback = std::function<void(const drs::engine::AuthoringPreviewCommand&)>;
+    using SampleFilesDroppedCallback = std::function<void(std::vector<juce::File>)>;
 
     explicit AuthoringPanel(drs::engine::AuthoringSession& authoringSession,
                             WaveformPreviewProvider waveformPreviewProvider = {},
@@ -48,7 +49,8 @@ public:
                             DraftPlaybackStatusProvider draftPlaybackStatusProvider = {},
                             DraftPlaybackActionCallback onPrepareDraftPlaybackRequested = {},
                             DraftPlaybackActionCallback onPublishDraftPlaybackRequested = {},
-                            PreviewCommandCallback previewCommandCallback = {});
+                            PreviewCommandCallback previewCommandCallback = {},
+                            SampleFilesDroppedCallback sampleFilesDroppedCallback = {});
     ~AuthoringPanel() override;
 
     void paint(juce::Graphics& g) override;
@@ -138,6 +140,7 @@ private:
     DraftPlaybackActionCallback onPrepareDraftPlaybackRequested;
     DraftPlaybackActionCallback onPublishDraftPlaybackRequested;
     PreviewCommandCallback previewCommandCallback;
+    SampleFilesDroppedCallback sampleFilesDroppedCallback;
     struct TimedPreviewNote
     {
         bool active = false;

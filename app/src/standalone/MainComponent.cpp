@@ -434,6 +434,10 @@ MainComponent::MainComponent(bool enableAudioOutput)
                      [this](const drs::engine::AuthoringPreviewCommand& command)
                      {
                          processor.submitAuthoringPreviewCommand(command);
+                     },
+                     [this](std::vector<juce::File> files)
+                     {
+                         importSampleFiles(std::move(files));
                      })
 {
     juce::PropertiesFile::Options appSettingsOptions;
@@ -735,16 +739,20 @@ void MainComponent::saveProjectAs(std::function<void(bool)> completion)
 void MainComponent::importWavFiles()
 {
     auto safeThis = juce::Component::SafePointer<MainComponent>(this);
-    auto beginImport = [safeThis](bool ready) mutable
+    launchImportWavChooser([safeThis](std::vector<juce::File> selectedFiles)
     {
-        if (!ready || safeThis == nullptr)
-            return;
+        if (safeThis != nullptr && !selectedFiles.empty())
+            safeThis->importSampleFiles(std::move(selectedFiles));
+    });
+}
 
-        safeThis->launchImportWavChooser(
-            [safeThis](std::vector<juce::File> selectedFiles)
-            {
-                if (safeThis == nullptr || selectedFiles.empty())
-                    return;
+void MainComponent::importSampleFiles(std::vector<juce::File> selectedFiles)
+{
+    auto safeThis = juce::Component::SafePointer<MainComponent>(this);
+    auto beginImport = [safeThis, selectedFiles = std::move(selectedFiles)](bool ready) mutable
+    {
+        if (!ready || safeThis == nullptr || selectedFiles.empty())
+            return;
 
                 const auto samplesDirectory = safeThis->currentProjectFile.getParentDirectory().getChildFile("Samples");
                 samplesDirectory.createDirectory();
@@ -941,7 +949,6 @@ void MainComponent::importWavFiles()
                 };
 
                 (*processNextItem)();
-            });
     };
 
     if (currentProjectFile == juce::File())

@@ -64,6 +64,7 @@ private:
     void saveProject(std::function<void(bool)> completion = {});
     void saveProjectAs(std::function<void(bool)> completion = {});
     void importWavFiles();
+    void importSampleFiles(std::vector<juce::File> selectedFiles);
     void showAudioDeviceSettingsDialog();
     void showPreferencesDialog();
     void restoreSelectedZoneRootKey();

@@ -17,6 +17,12 @@ const auto zoneMapFocusHalo = juce::Colour::fromRGBA(255, 255, 255, 232);
 constexpr float rangeHandleRadius = 6.0f;
 constexpr float rangeHandleHitRadius = 12.0f;
 
+bool isSupportedSampleFile(const juce::String& path)
+{
+    const auto extension = juce::File(path).getFileExtension().toLowerCase();
+    return extension == ".wav" || extension == ".flac";
+}
+
 void drawFocusRing(juce::Graphics& g,
                    juce::Rectangle<float> bounds,
                    float cornerSize,
@@ -58,6 +64,47 @@ void ZoneMapCanvas::setOnZoneAuditionRequested(
     std::function<void(const std::string& zoneId, int midiNote, int velocity)> nextCallback)
 {
     onZoneAuditionRequested = std::move(nextCallback);
+}
+
+void ZoneMapCanvas::setOnSampleFilesDropped(std::function<void(std::vector<juce::File>)> nextCallback)
+{
+    onSampleFilesDropped = std::move(nextCallback);
+}
+
+bool ZoneMapCanvas::isInterestedInFileDrag(const juce::StringArray& files)
+{
+    return onSampleFilesDropped
+        && std::any_of(files.begin(), files.end(), isSupportedSampleFile);
+}
+
+void ZoneMapCanvas::fileDragEnter(const juce::StringArray& files, int, int)
+{
+    sampleFileDragActive = isInterestedInFileDrag(files);
+    repaint();
+}
+
+void ZoneMapCanvas::fileDragExit(const juce::StringArray&)
+{
+    sampleFileDragActive = false;
+    repaint();
+}
+
+void ZoneMapCanvas::filesDropped(const juce::StringArray& files, int, int)
+{
+    sampleFileDragActive = false;
+    repaint();
+
+    if (!onSampleFilesDropped)
+        return;
+
+    std::vector<juce::File> sampleFiles;
+    sampleFiles.reserve(static_cast<std::size_t>(files.size()));
+    for (const auto& path : files)
+        if (isSupportedSampleFile(path))
+            sampleFiles.emplace_back(path);
+
+    if (!sampleFiles.empty())
+        onSampleFilesDropped(std::move(sampleFiles));
 }
 
 bool ZoneMapCanvas::requestSelectionAt(juce::Point<float> position)
@@ -214,6 +261,20 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
                               activeHandle ? 2.0f : 1.0f);
             }
         }
+    }
+
+    if (sampleFileDragActive)
+    {
+        const auto dropBounds = getLocalBounds().toFloat().reduced(4.0f);
+        g.setColour(zoneMapSelected.withAlpha(0.16f));
+        g.fillRoundedRectangle(dropBounds, 12.0f);
+        g.setColour(zoneMapSelected);
+        g.drawRoundedRectangle(dropBounds, 12.0f, 3.0f);
+        g.setFont(juce::FontOptions(15.0f, juce::Font::bold));
+        g.drawFittedText("Drop WAV or FLAC files to import",
+                         dropBounds.toNearestInt().reduced(16),
+                         juce::Justification::centred,
+                         1);
     }
 }
 

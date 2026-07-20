@@ -10,7 +10,8 @@
 
 namespace drs::app::authoring
 {
-class ZoneMapCanvas final : public juce::Component
+class ZoneMapCanvas final : public juce::Component,
+                            public juce::FileDragAndDropTarget
 {
 public:
     enum class RangeHandle
@@ -30,6 +31,11 @@ public:
         std::function<void(const drs::engine::AuthoringZoneSummary& zone, const std::string& label)> nextCallback);
     void setOnZoneAuditionRequested(
         std::function<void(const std::string& zoneId, int midiNote, int velocity)> nextCallback);
+    void setOnSampleFilesDropped(std::function<void(std::vector<juce::File>)> nextCallback);
+    bool isInterestedInFileDrag(const juce::StringArray& files) override;
+    void fileDragEnter(const juce::StringArray& files, int x, int y) override;
+    void fileDragExit(const juce::StringArray& files) override;
+    void filesDropped(const juce::StringArray& files, int x, int y) override;
     bool requestSelectionAt(juce::Point<float> position);
     bool requestAuditionAt(juce::Point<float> position);
     bool moveSelection(int direction);
@@ -79,6 +85,8 @@ private:
     std::function<void(const std::string& zoneId)> onZoneSelectionRequested;
     std::function<void(const drs::engine::AuthoringZoneSummary& zone, const std::string& label)> onZoneRangeCommitRequested;
     std::function<void(const std::string& zoneId, int midiNote, int velocity)> onZoneAuditionRequested;
+    std::function<void(std::vector<juce::File>)> onSampleFilesDropped;
     std::optional<RangeGesture> activeGesture;
+    bool sampleFileDragActive = false;
 };
 } // namespace drs::app::authoring

@@ -2379,6 +2379,28 @@ int main()
     {
         juce::ScopedJuceInitialiser_GUI gui;
 
+        drs::app::authoring::ZoneMapCanvas dropTargetZoneMap;
+        std::vector<juce::File> droppedSampleFiles;
+        dropTargetZoneMap.setOnSampleFilesDropped([&droppedSampleFiles](std::vector<juce::File> files)
+        {
+            droppedSampleFiles = std::move(files);
+        });
+        juce::StringArray unsupportedDrop { "C:\\samples\\notes.txt", "C:\\samples\\kick.mp3" };
+        require(!dropTargetZoneMap.isInterestedInFileDrag(unsupportedDrop),
+                "Zone Map should reject file drops that contain no WAV or FLAC samples.");
+        juce::StringArray mixedDrop {
+            "C:\\samples\\Piano_C3.WAV",
+            "C:\\samples\\Piano_E3.flac",
+            "C:\\samples\\readme.txt"
+        };
+        require(dropTargetZoneMap.isInterestedInFileDrag(mixedDrop),
+                "Zone Map should accept a drop containing WAV or FLAC samples.");
+        dropTargetZoneMap.filesDropped(mixedDrop, 0, 0);
+        require(droppedSampleFiles.size() == 2
+                    && droppedSampleFiles[0].hasFileExtension(".wav")
+                    && droppedSampleFiles[1].hasFileExtension(".flac"),
+                "Zone Map should forward only dropped WAV and FLAC files to the import callback.");
+
         const auto projectLoad = drs::engine::loadPhase2ReferenceProjectManifest();
         require(projectLoad.loaded, "Phase 2 reference project must load for authoring UI characterization.");
 

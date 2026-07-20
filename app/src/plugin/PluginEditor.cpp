@@ -442,6 +442,10 @@ Editor::Editor(Processor& owner)
                      [&owner](const drs::engine::AuthoringPreviewCommand& command)
                      {
                          owner.submitAuthoringPreviewCommand(command);
+                     },
+                     [this](std::vector<juce::File> files)
+                     {
+                         importSampleFiles(std::move(files));
                      })
 {
     juce::PropertiesFile::Options appSettingsOptions;
@@ -674,16 +678,20 @@ void Editor::saveProjectAs(std::function<void(bool)> completion)
 void Editor::importWavFiles()
 {
     auto safeThis = juce::Component::SafePointer<Editor>(this);
-    auto beginImport = [safeThis](bool ready) mutable
+    launchImportWavChooser([safeThis](std::vector<juce::File> selectedFiles)
     {
-        if (!ready || safeThis == nullptr)
-            return;
+        if (safeThis != nullptr && !selectedFiles.empty())
+            safeThis->importSampleFiles(std::move(selectedFiles));
+    });
+}
 
-        safeThis->launchImportWavChooser(
-            [safeThis](std::vector<juce::File> selectedFiles)
-            {
-                if (safeThis == nullptr || selectedFiles.empty())
-                    return;
+void Editor::importSampleFiles(std::vector<juce::File> selectedFiles)
+{
+    auto safeThis = juce::Component::SafePointer<Editor>(this);
+    auto beginImport = [safeThis, selectedFiles = std::move(selectedFiles)](bool ready) mutable
+    {
+        if (!ready || safeThis == nullptr || selectedFiles.empty())
+            return;
 
                 const auto samplesDirectory = safeThis->processor.getAuthoringProjectFile().getParentDirectory()
                                                   .getChildFile("Samples");
@@ -882,7 +890,6 @@ void Editor::importWavFiles()
                 };
 
                 (*processNextItem)();
-            });
     };
 
     if (processor.getAuthoringProjectFile() == juce::File())

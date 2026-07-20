@@ -40,6 +40,7 @@ private:
     void saveProject(std::function<void(bool)> completion = {});
     void saveProjectAs(std::function<void(bool)> completion = {});
     void importWavFiles();
+    void importSampleFiles(std::vector<juce::File> selectedFiles);
     void showPreferencesDialog();
     void restoreSelectedZoneRootKey();
     bool saveProjectToFile(const juce::File& file);

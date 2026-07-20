@@ -528,7 +528,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
                                DraftPlaybackStatusProvider nextDraftPlaybackStatusProvider,
                                DraftPlaybackActionCallback prepareDraftPlaybackRequested,
                                DraftPlaybackActionCallback publishDraftPlaybackRequested,
-                               PreviewCommandCallback nextPreviewCommandCallback)
+                               PreviewCommandCallback nextPreviewCommandCallback,
+                               SampleFilesDroppedCallback nextSampleFilesDroppedCallback)
     : authoringSession(session),
       waveformPreviewProvider(std::move(previewProvider)),
       authoringPreviewStatusProvider(std::move(nextAuthoringPreviewStatusProvider)),
@@ -539,6 +540,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
       onPrepareDraftPlaybackRequested(std::move(prepareDraftPlaybackRequested)),
       onPublishDraftPlaybackRequested(std::move(publishDraftPlaybackRequested)),
       previewCommandCallback(std::move(nextPreviewCommandCallback)),
+      sampleFilesDroppedCallback(std::move(nextSampleFilesDroppedCallback)),
       macroList("authoringMacroList",
                 "authoringMacroListBox",
                 "authoringMacroListEmptyState")
@@ -703,6 +705,11 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     {
         previewSelectedZone(drs::engine::AuthoringPreviewAuditionSource::zoneMap,
                             midiNote, velocity, zoneId);
+    });
+    zoneMap.setOnSampleFilesDropped([this](std::vector<juce::File> files)
+    {
+        if (sampleFilesDroppedCallback)
+            sampleFilesDroppedCallback(std::move(files));
     });
     zoneMap.setOnZoneRangeCommitRequested([this](const drs::engine::AuthoringZoneSummary& zone,
                                                  const std::string& label)
