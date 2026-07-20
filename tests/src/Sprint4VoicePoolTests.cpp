@@ -117,60 +117,68 @@ void requireVector(const std::vector<float>& actual,
 
 drs::engine::SamplerRenderModelPtr buildModel(std::size_t frameCount = 4096,
                                               int keyLow = 0,
-                                              int keyHigh = 127)
+                                              int keyHigh = 127,
+                                              std::size_t layerCount = 1)
 {
     drs::engine::ImmutablePlaybackSnapshot snapshot;
     snapshot.draftRevision = 43;
     snapshot.contentDigest = "sprint4-pool-snapshot";
-    snapshot.zones.push_back({ "pool-zone",
-                               "pool-sample",
-                               "Pool Zone",
-                               "pool-group",
-                               "sustain",
-                               60,
-                               keyLow,
-                               keyHigh,
-                               1,
-                               127,
-                               0.0,
-                               0.0,
-                               0,
-                               false,
-                               0,
-                               0 });
-
-    auto decoded = std::make_shared<drs::engine::PreparedPlaybackDecodedSampleData>();
-    decoded->normalizedChannels = { std::vector<float>(frameCount, 1.0f) };
-    drs::engine::PreparedPlaybackSampleHandle sample;
-    sample.sampleSourceId = "pool-sample";
-    sample.streamSampleId = "pool-stream";
-    sample.sampleRate = 48000.0;
-    sample.frameCount = frameCount;
-    sample.channelCount = 1;
-    sample.decodedSampleData = std::move(decoded);
 
     drs::engine::ImmutablePreparedPlayback prepared;
     prepared.snapshotBuildId = 4301;
     prepared.snapshotContentDigest = snapshot.contentDigest;
     prepared.draftRevision = snapshot.draftRevision;
     prepared.preparedContentDigest = "sprint4-pool-prepared";
-    prepared.samples.push_back(std::move(sample));
-    prepared.zones.push_back({ "pool-zone",
-                               "pool-sample",
-                               "pool-stream",
-                               0,
-                               0,
-                               60,
-                               keyLow,
-                               keyHigh,
-                               1,
-                               127,
-                               0.0,
-                               0.0,
-                               0,
-                               false,
-                               0,
-                               0 });
+    for (std::size_t layerIndex = 0; layerIndex < layerCount; ++layerIndex)
+    {
+        const auto suffix = std::to_string(layerIndex + 1);
+        const auto zoneId = "pool-zone-" + suffix;
+        const auto sampleId = "pool-sample-" + suffix;
+        const auto streamId = "pool-stream-" + suffix;
+        snapshot.zones.push_back({ zoneId,
+                                   sampleId,
+                                   "Pool Zone " + suffix,
+                                   "pool-group",
+                                   "sustain",
+                                   60,
+                                   keyLow,
+                                   keyHigh,
+                                   1,
+                                   127,
+                                   0.0,
+                                   0.0,
+                                   0,
+                                   false,
+                                   0,
+                                   0 });
+
+        auto decoded = std::make_shared<drs::engine::PreparedPlaybackDecodedSampleData>();
+        decoded->normalizedChannels = { std::vector<float>(frameCount, 1.0f) };
+        drs::engine::PreparedPlaybackSampleHandle sample;
+        sample.sampleSourceId = sampleId;
+        sample.streamSampleId = streamId;
+        sample.sampleRate = 48000.0;
+        sample.frameCount = frameCount;
+        sample.channelCount = 1;
+        sample.decodedSampleData = std::move(decoded);
+        prepared.samples.push_back(std::move(sample));
+        prepared.zones.push_back({ zoneId,
+                                   sampleId,
+                                   streamId,
+                                   layerIndex,
+                                   layerIndex,
+                                   60,
+                                   keyLow,
+                                   keyHigh,
+                                   1,
+                                   127,
+                                   0.0,
+                                   0.0,
+                                   0,
+                                   false,
+                                   0,
+                                   0 });
+    }
 
     auto payload = std::make_shared<drs::engine::PlaybackActivationPayload>();
     payload->lane = drs::engine::PlaybackActivationLane::preview;
@@ -365,6 +373,29 @@ void runNoteOwnershipAndCommandMatrix()
                   "Emergency reset sample boundary changed");
 }
 
+void runOverlappingLayerMatrix()
+{
+    const auto model = buildModel(4096, 48, 72, 2);
+    drs::engine::SamplerVoicePool pool;
+    require(pool.prepare(*model, 48000.0), "Overlapping-layer pool should prepare.");
+
+    drs::engine::SamplerEventBlock events;
+    events.push(noteOn(0, 60));
+    StereoOutput output(4);
+    auto result = pool.renderBlock(output.view(), events.view());
+    require(result.render.startedVoiceCount == 2 && result.activeVoiceCount == 2,
+            "One note must start every sample whose key and velocity ranges overlap the trigger.");
+    requireVector(output.left, { 0.5f, 0.5f, 0.5f, 0.5f },
+                  "Overlapping sample layers should be mixed together");
+
+    events.clear();
+    events.push(noteOff(0, 60));
+    StereoOutput releaseOutput(1);
+    result = pool.renderBlock(releaseOutput.view(), events.view());
+    require(result.render.releasedVoiceCount == 2 && result.releasingVoiceCount == 2,
+            "Note-off must release every voice started by an overlapping layered trigger.");
+}
+
 void runCapacityAndStealMatrix()
 {
     const auto model = buildModel();
@@ -469,6 +500,7 @@ int main()
         runEventBlockContract();
         runSampleAccurateTimingMatrix();
         runNoteOwnershipAndCommandMatrix();
+        runOverlappingLayerMatrix();
         runCapacityAndStealMatrix();
         runOverflowDropAndRealtimeMatrix();
         std::cout << "Sprint 4.3 fixed voice-pool and sample-accurate event matrix passed." << std::endl;

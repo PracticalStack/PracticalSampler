@@ -102,7 +102,6 @@ private:
     void applyEvent(const SamplerRenderEvent& event,
                     SamplerVoicePoolRenderResult& result,
                     const SamplerRenderControlValues& controls) noexcept;
-    std::size_t selectRouteIndex(int midiNote, int velocity) const noexcept;
     std::size_t acquireSlot(bool& stolen,
                             bool& generationStolen,
                             bool& releasingStolen) noexcept;

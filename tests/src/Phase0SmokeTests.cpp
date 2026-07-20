@@ -2,6 +2,7 @@
 #include "drs/engine/HiseProjectContent.h"
 #include "drs/engine/RuntimeLoader.h"
 #include "plugin/PluginProcessor.h"
+#include "shared/ProjectStorage.h"
 #include "shared/authoring/AuthoringWorkspaceLayout.h"
 #include "standalone/MainComponent.h"
 
@@ -150,6 +151,39 @@ int main()
 {
     try
     {
+        const auto storageTestRoot = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                                         .getNonexistentChildFile("drs-project-storage-test", {}, false);
+        const auto selectedProjectFile = storageTestRoot.getChildFile("Felt Piano.drsproj");
+        const auto selfContainedProjectFile = drs::app::makeSelfContainedProjectFile(selectedProjectFile);
+        require(selfContainedProjectFile
+                    == storageTestRoot.getChildFile("Felt Piano").getChildFile("Felt Piano.drsproj"),
+                "New project storage should place the manifest in a project-specific directory.");
+        drs::engine::RuntimeProjectModel storageTestProject;
+        storageTestProject.schemaName = "drs.project";
+        storageTestProject.schemaVersion = 2;
+        storageTestProject.projectId = "project-felt-piano";
+        storageTestProject.displayName = "Felt Piano";
+        storageTestProject.contentRootPath = selfContainedProjectFile.getParentDirectory().getFullPathName().toStdString();
+        storageTestProject.defaultInstrumentManifestPath
+            = selfContainedProjectFile.withFileExtension(".drinst").getFullPathName().toStdString();
+        storageTestProject.authoring.schemaName = "drs.authoring";
+        storageTestProject.authoring.schemaVersion = 1;
+        require(drs::app::saveProjectFiles(storageTestProject, selfContainedProjectFile).saved,
+                "Saving a project should write the complete project file set.");
+        require(selfContainedProjectFile.existsAsFile(),
+                "Saving a project should write its .drsproj manifest.");
+        require(selfContainedProjectFile.withFileExtension(".drinst").existsAsFile(),
+                "Saving a project should write its matching .drinst manifest.");
+        require(selfContainedProjectFile.loadFileAsString().contains("\"defaultInstrumentManifest\": \"Felt Piano.drinst\""),
+                "The saved project should reference its matching instrument manifest.");
+        require(selfContainedProjectFile.withFileExtension(".drinst").loadFileAsString().contains(
+                    "\"sourceProject\": \"Felt Piano.drsproj\""),
+                "The saved instrument should reference its source project manifest.");
+        require(selfContainedProjectFile.getParentDirectory().getChildFile("Samples").isDirectory(),
+                "New project storage should create a Samples directory beside the project manifest.");
+        require(storageTestRoot.deleteRecursively(),
+                "Project storage smoke-test cleanup failed.");
+
         juce::ScopedJuceInitialiser_GUI gui;
 
         drs::engine::EngineFacade engineFacade;

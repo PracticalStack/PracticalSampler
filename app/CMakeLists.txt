@@ -6,6 +6,8 @@ set(DRS_APP_SHARED_SOURCES
     src/shared/PerformanceBankImport.h
     src/shared/PerformancePanel.cpp
     src/shared/PerformancePanel.h
+    src/shared/ProjectStorage.cpp
+    src/shared/ProjectStorage.h
     src/shared/StatusPanel.cpp
     src/shared/StatusPanel.h
     src/shared/authoring/AuthoringViewModels.h

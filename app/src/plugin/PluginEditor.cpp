@@ -2,6 +2,7 @@
 
 #include "drs/engine/RuntimeLoader.h"
 #include "drs/engine/SampleImport.h"
+#include "shared/ProjectStorage.h"
 #include "shared/authoring/AuthoringWorkspaceLayout.h"
 
 #include <algorithm>
@@ -9,7 +10,6 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
-#include <system_error>
 #include <unordered_set>
 
 namespace drs::plugin
@@ -46,21 +46,6 @@ const drs::engine::RuntimeProjectSampleSource* findSampleSource(const drs::engin
                                            return sampleSource.id == sampleSourceId;
                                        });
     return iterator == project.sampleSources.end() ? nullptr : &*iterator;
-}
-
-juce::File ensureProjectExtension(juce::File file)
-{
-    if (file.hasFileExtension(".drsproj"))
-        return file;
-
-    return file.withFileExtension(".drsproj");
-}
-
-juce::File getDefaultProjectDirectory()
-{
-    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
-        .getChildFile("DecentRhapsodyStudio")
-        .getChildFile("Projects");
 }
 
 bool ensureDirectoryExists(const juce::File& directory)
@@ -181,7 +166,7 @@ public:
 
             auto chosenProjectDirectory = juce::File(projectDirectoryEditor.getText().trim());
             if (chosenProjectDirectory == juce::File())
-                chosenProjectDirectory = getDefaultProjectDirectory();
+                chosenProjectDirectory = drs::app::getDefaultStudioProjectDirectory();
 
             if (!ensureDirectoryExists(chosenProjectDirectory))
             {
@@ -599,9 +584,17 @@ void Editor::createNewProject()
                                     if (!shouldProceed || safeThis == nullptr)
                                         return;
 
-                                    safeThis->processor.setAuthoringProjectFile({});
-                                    safeThis->processor.replaceAuthoringProject(safeThis->buildEmptyProjectTemplate());
-                                    safeThis->refreshProjectViews();
+                                    safeThis->launchNewProjectChooser(
+                                        [safeThis](juce::File selectedFile)
+                                        {
+                                            if (safeThis == nullptr || selectedFile == juce::File())
+                                                return;
+
+                                            const auto projectFile = drs::app::makeSelfContainedProjectFile(selectedFile);
+                                            safeThis->processor.setAuthoringProjectFile({});
+                                            safeThis->processor.replaceAuthoringProject(safeThis->buildEmptyProjectTemplate());
+                                            safeThis->saveProjectToFile(projectFile);
+                                        });
                                 });
 }
 
@@ -669,7 +662,10 @@ void Editor::saveProjectAs(std::function<void(bool)> completion)
                 return;
             }
 
-            const auto saved = safeThis->saveProjectToFile(selectedFile);
+            const auto targetFile = safeThis->processor.getAuthoringProjectFile() == juce::File()
+                ? drs::app::makeSelfContainedProjectFile(selectedFile)
+                : selectedFile;
+            const auto saved = safeThis->saveProjectToFile(targetFile);
             if (completion)
                 completion(saved);
         });
@@ -990,7 +986,7 @@ void Editor::restoreSelectedZoneRootKey()
 
 bool Editor::saveProjectToFile(const juce::File& file)
 {
-    const auto targetFile = ensureProjectExtension(file);
+    const auto targetFile = drs::app::ensureProjectFileExtension(file);
     auto project = processor.getAuthoringSession().getProject();
     const auto savingUnsavedProject = processor.getAuthoringProjectFile() == juce::File();
     const auto targetDirectory = targetFile.getParentDirectory();
@@ -999,24 +995,18 @@ bool Editor::saveProjectToFile(const juce::File& file)
     if (savingUnsavedProject || project.contentRootPath.empty())
         project.contentRootPath = targetDirectory.getFullPathName().toStdString();
 
-    if (savingUnsavedProject || project.defaultInstrumentManifestPath.empty())
-        project.defaultInstrumentManifestPath = targetInstrumentFile.getFullPathName().toStdString();
+    project.defaultInstrumentManifestPath = targetInstrumentFile.getFullPathName().toStdString();
 
-    if (project.displayName.empty() || project.displayName == "No Project Loaded")
+    if (project.displayName.empty() || project.displayName == "No Project Loaded"
+        || (savingUnsavedProject && project.displayName == "Untitled Project"))
         project.displayName = targetFile.getFileNameWithoutExtension().toStdString();
 
-    const auto serializedProject = drs::engine::serializeRuntimeProjectManifest(project,
-                                                                                targetFile.getFullPathName().toStdString());
-
-    std::error_code errorCode;
-    fs::create_directories(fs::path(targetFile.getParentDirectory().getFullPathName().toStdString()), errorCode);
-
-    if (!targetFile.replaceWithText(juce::String::fromUTF8(serializedProject.c_str()), false, false, "\n"))
+    const auto saveResult = drs::app::saveProjectFiles(project, targetFile);
+    if (!saveResult.saved)
     {
         juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
                                                "Save Project Failed",
-                                               "The project could not be written to:\n"
-                                                   + targetFile.getFullPathName());
+                                               saveResult.errorMessage);
         return false;
     }
 
@@ -1031,7 +1021,7 @@ bool Editor::saveProjectToFile(const juce::File& file)
 
 bool Editor::loadProjectFromFile(const juce::File& file)
 {
-    const auto targetFile = ensureProjectExtension(file);
+    const auto targetFile = drs::app::ensureProjectFileExtension(file);
     const auto loadResult = drs::engine::loadRuntimeProjectManifest(targetFile.getFullPathName().toStdString());
     if (!loadResult.loaded)
     {
@@ -1221,7 +1211,7 @@ juce::File Editor::getProjectDirectory() const
             return juce::File(storedPath);
     }
 
-    return getDefaultProjectDirectory();
+    return drs::app::getDefaultStudioProjectDirectory();
 }
 
 void Editor::setProjectDirectory(const juce::File& folder)
@@ -1273,7 +1263,7 @@ juce::File Editor::buildChooserBaseDirectory() const
         return projectDirectory;
     }
 
-    return getDefaultProjectDirectory();
+    return drs::app::getDefaultStudioProjectDirectory();
 }
 
 juce::File Editor::buildDefaultSaveTarget() const
@@ -1307,6 +1297,32 @@ void Editor::launchOpenProjectChooser(std::function<void(juce::File)> completion
                                    });
 }
 
+void Editor::launchNewProjectChooser(std::function<void(juce::File)> completion)
+{
+    auto projectDirectory = getProjectDirectory();
+    ensureDirectoryExists(projectDirectory);
+    activeFileChooser = std::make_unique<juce::FileChooser>("Create Decent Rhapsody project",
+                                                            projectDirectory.getChildFile("Untitled Project.drsproj"),
+                                                            "*.drsproj",
+                                                            true,
+                                                            false,
+                                                            this);
+    auto safeThis = juce::Component::SafePointer<Editor>(this);
+    activeFileChooser->launchAsync(juce::FileBrowserComponent::saveMode
+                                       | juce::FileBrowserComponent::canSelectFiles
+                                       | juce::FileBrowserComponent::warnAboutOverwriting,
+                                   [safeThis, completion = std::move(completion)](const juce::FileChooser& chooser) mutable
+                                   {
+                                       if (safeThis == nullptr)
+                                           return;
+
+                                       const auto selectedFile = drs::app::ensureProjectFileExtension(chooser.getResult());
+                                       safeThis->activeFileChooser.reset();
+                                       if (completion)
+                                           completion(selectedFile);
+                                   });
+}
+
 void Editor::launchSaveProjectChooser(std::function<void(juce::File)> completion)
 {
     activeFileChooser = std::make_unique<juce::FileChooser>("Save Decent Rhapsody project",
@@ -1324,7 +1340,7 @@ void Editor::launchSaveProjectChooser(std::function<void(juce::File)> completion
                                        if (safeThis == nullptr)
                                            return;
 
-                                       const auto selectedFile = ensureProjectExtension(chooser.getResult());
+                                       const auto selectedFile = drs::app::ensureProjectFileExtension(chooser.getResult());
                                        safeThis->activeFileChooser.reset();
                                        if (completion)
                                            completion(selectedFile);

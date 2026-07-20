@@ -63,6 +63,7 @@ private:
     juce::File buildChooserBaseDirectory() const;
     juce::File buildDefaultSaveTarget() const;
     void launchOpenProjectChooser(std::function<void(juce::File)> completion);
+    void launchNewProjectChooser(std::function<void(juce::File)> completion);
     void launchSaveProjectChooser(std::function<void(juce::File)> completion);
     void launchImportWavChooser(std::function<void(std::vector<juce::File>)> completion);
     void promptForRootKeySelection(const juce::String& title,

@@ -6,6 +6,15 @@
 
 namespace drs::engine
 {
+namespace
+{
+bool routeMatches(const SamplerRenderRoute& route, int midiNote, int velocity) noexcept
+{
+    return midiNote >= route.keyLow && midiNote <= route.keyHigh
+        && velocity >= route.velocityLow && velocity <= route.velocityHigh;
+}
+} // namespace
+
 bool SamplerEventBlock::push(SamplerRenderEvent event) noexcept
 {
     if (eventCount >= events.size())
@@ -271,55 +280,66 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 ? fixedVelocity
                 : eventVelocity;
             // Route the physical gesture first. Published pitch/velocity modulation shapes the
-            // selected voice and must not make an otherwise playable authored zone disappear.
+            // started voices and must not make otherwise playable authored zones disappear.
             // The effective-velocity fallback preserves legacy fixed-layer presets when the
             // physical velocity has no route in the selected articulation.
-            auto routeIndex = selectRouteIndex(sourceMidiNote, eventVelocity);
-            if (routeIndex == std::numeric_limits<std::size_t>::max()
-                && effectiveVelocity != eventVelocity)
+            const auto& routes = renderModel->getRoutes();
+            const auto hasPhysicalVelocityRoute = std::any_of(routes.begin(), routes.end(), [&](const auto& route)
             {
-                routeIndex = selectRouteIndex(sourceMidiNote, effectiveVelocity);
-            }
-            if (routeIndex == std::numeric_limits<std::size_t>::max())
+                return routeMatches(route, sourceMidiNote, eventVelocity);
+            });
+            const auto routingVelocity = hasPhysicalVelocityRoute ? eventVelocity : effectiveVelocity;
+            const auto hasMatchingRoute = hasPhysicalVelocityRoute
+                || (effectiveVelocity != eventVelocity
+                    && std::any_of(routes.begin(), routes.end(), [&](const auto& route)
+                    {
+                        return routeMatches(route, sourceMidiNote, effectiveVelocity);
+                    }));
+            if (!hasMatchingRoute)
             {
                 ++result.render.droppedEventCount;
                 return;
             }
 
-            bool stolen = false;
-            bool generationStolen = false;
-            bool releasingStolen = false;
-            const auto slotIndex = acquireSlot(stolen, generationStolen, releasingStolen);
-            auto& slot = slots[slotIndex];
-            const auto voiceId = nextVoiceId;
-            SamplerVoiceStartRequest request;
-            request.voiceId = voiceId;
-            request.activationGeneration = activeGeneration;
-            request.routeIndex = routeIndex;
-            request.sourceMidiNote = sourceMidiNote;
-            request.effectiveMidiNote = effectiveMidiNote;
-            request.effectiveVelocity = effectiveVelocity;
-            request.outputSampleRate = sampleRate;
-            if (!slot.voice.start(*renderModel, request))
+            for (std::size_t routeIndex = 0; routeIndex < routes.size(); ++routeIndex)
             {
-                slot.state = SamplerVoiceSlotState::free;
+                if (!routeMatches(routes[routeIndex], sourceMidiNote, routingVelocity))
+                    continue;
+
+                bool stolen = false;
+                bool generationStolen = false;
+                bool releasingStolen = false;
+                const auto slotIndex = acquireSlot(stolen, generationStolen, releasingStolen);
+                auto& slot = slots[slotIndex];
+                SamplerVoiceStartRequest request;
+                request.voiceId = nextVoiceId;
+                request.activationGeneration = activeGeneration;
+                request.routeIndex = routeIndex;
+                request.sourceMidiNote = sourceMidiNote;
+                request.effectiveMidiNote = effectiveMidiNote;
+                request.effectiveVelocity = effectiveVelocity;
+                request.outputSampleRate = sampleRate;
+                if (!slot.voice.start(*renderModel, request))
+                {
+                    slot.state = SamplerVoiceSlotState::free;
+                    slot.sustainDeferred = false;
+                    ++result.render.droppedEventCount;
+                    continue;
+                }
+
+                slot.state = SamplerVoiceSlotState::active;
                 slot.sustainDeferred = false;
-                ++result.render.droppedEventCount;
-                return;
+                ++nextVoiceId;
+                if (nextVoiceId == 0)
+                    nextVoiceId = 1;
+                ++result.render.startedVoiceCount;
+                if (stolen)
+                    ++result.render.stolenVoiceCount;
+                if (generationStolen)
+                    ++result.render.generationStealCount;
+                if (releasingStolen)
+                    ++result.render.releasingVoiceStealCount;
             }
-
-            slot.state = SamplerVoiceSlotState::active;
-            slot.sustainDeferred = false;
-            ++nextVoiceId;
-            if (nextVoiceId == 0)
-                nextVoiceId = 1;
-            ++result.render.startedVoiceCount;
-            if (stolen)
-                ++result.render.stolenVoiceCount;
-            if (generationStolen)
-                ++result.render.generationStealCount;
-            if (releasingStolen)
-                ++result.render.releasingVoiceStealCount;
             return;
         }
 
@@ -402,45 +422,6 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
     }
 
     ++result.render.droppedEventCount;
-}
-
-std::size_t SamplerVoicePool::selectRouteIndex(int midiNote, int velocity) const noexcept
-{
-    auto selected = std::numeric_limits<std::size_t>::max();
-    const auto& routes = renderModel->getRoutes();
-    for (std::size_t index = 0; index < routes.size(); ++index)
-    {
-        const auto& candidate = routes[index];
-        if (midiNote < candidate.keyLow || midiNote > candidate.keyHigh
-            || velocity < candidate.velocityLow || velocity > candidate.velocityHigh)
-        {
-            continue;
-        }
-
-        if (selected == std::numeric_limits<std::size_t>::max())
-        {
-            selected = index;
-            continue;
-        }
-
-        const auto& current = routes[selected];
-        const auto candidateRootDistance = std::abs(candidate.rootKey - midiNote);
-        const auto currentRootDistance = std::abs(current.rootKey - midiNote);
-        const auto candidateKeySpan = candidate.keyHigh - candidate.keyLow;
-        const auto currentKeySpan = current.keyHigh - current.keyLow;
-        const auto candidateVelocitySpan = candidate.velocityHigh - candidate.velocityLow;
-        const auto currentVelocitySpan = current.velocityHigh - current.velocityLow;
-        if (candidateRootDistance < currentRootDistance
-            || (candidateRootDistance == currentRootDistance && candidateKeySpan < currentKeySpan)
-            || (candidateRootDistance == currentRootDistance && candidateKeySpan == currentKeySpan
-                && candidateVelocitySpan < currentVelocitySpan)
-            || (candidateRootDistance == currentRootDistance && candidateKeySpan == currentKeySpan
-                && candidateVelocitySpan == currentVelocitySpan && candidate.zoneId < current.zoneId))
-        {
-            selected = index;
-        }
-    }
-    return selected;
 }
 
 std::size_t SamplerVoicePool::acquireSlot(bool& stolen,
