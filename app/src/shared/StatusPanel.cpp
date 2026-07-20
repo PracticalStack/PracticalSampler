@@ -59,9 +59,13 @@ juce::String summarizeFindings(const std::vector<drs::engine::PlaybackSnapshotFi
 } // namespace
 
 StatusPanel::StatusPanel(drs::engine::EngineFacade& facade,
-                         MacroValueChangedCallback macroValueChanged)
+                         MacroValueChangedCallback macroValueChanged,
+                         PublishCommandCallback publishCommand,
+                         PublishPresentationProvider presentationProvider)
     : engineFacade(facade),
-      onMacroValueChanged(std::move(macroValueChanged))
+      onMacroValueChanged(std::move(macroValueChanged)),
+      onPublishCommand(std::move(publishCommand)),
+      publishPresentationProvider(std::move(presentationProvider))
 {
     titleLabel.setText("Engine Status", juce::dontSendNotification);
     titleLabel.setFont(juce::FontOptions(24.0f, juce::Font::bold));
@@ -105,7 +109,13 @@ StatusPanel::StatusPanel(drs::engine::EngineFacade& facade,
     injectInvalidStateButton.setButtonText("Inject Invalid State");
     stageDraftButton.setButtonText("Stage Draft");
     preparePreviewButton.setButtonText("Prepare Preview");
-    publishDraftButton.setButtonText("Publish Draft");
+    publishDraftButton.setButtonText("Apply / Publish");
+    publishDraftButton.setComponentID("statusPublishDraftButton");
+    publishDraftButton.setTitle("Apply or publish current draft");
+    publishDraftButton.setDescription(
+        "Publishes one complete immutable authoring revision to Performance.");
+    publishDraftButton.setHelpText(
+        "Available only when the current draft differs from active Performance and no Publish is running.");
     probeMissingContentButton.setButtonText("Probe Missing");
     probeBadChecksumButton.setButtonText("Probe Checksum");
     probeSchemaMismatchButton.setButtonText("Probe Schema");
@@ -155,7 +165,8 @@ StatusPanel::StatusPanel(drs::engine::EngineFacade& facade,
 
     publishDraftButton.onClick = [this]
     {
-        engineFacade.publishCurrentDraft();
+        if (onPublishCommand)
+            onPublishCommand({}, drs::engine::PerformancePublishCommandSource::statusPanel);
         refreshSnapshot();
     };
 
@@ -376,9 +387,27 @@ void StatusPanel::rebuildMacroControls()
 void StatusPanel::refreshSnapshot()
 {
     snapshot = engineFacade.getStatusSnapshot();
+    publishPresentation = publishPresentationProvider
+        ? publishPresentationProvider()
+        : engineFacade.getPerformancePublishPresentationSnapshot();
     lastObservedStateRevision = engineFacade.getStateRevision();
     const auto& diagnostics = snapshot.diagnostics;
     const auto macros = engineFacade.getMacroDescriptors();
+
+    if (publishPresentation != nullptr)
+    {
+        const auto& publish = *publishPresentation;
+        publishDraftButton.setEnabled(publish.canPublish && static_cast<bool>(onPublishCommand));
+        publishDraftButton.setDescription(
+            juce::String::fromUTF8((publish.stateLabel + ": " + publish.guidance).c_str()));
+        draftPlaybackLabel.setText(
+            "Publish " + juce::String::fromUTF8(publish.stateLabel.c_str())
+                + " | draft r" + juce::String(static_cast<juce::int64>(publish.draftRevision))
+                + " | requested r" + juce::String(static_cast<juce::int64>(publish.requestedPublishRevision))
+                + " | active r" + juce::String(static_cast<juce::int64>(publish.activePublishedRevision))
+                + (publish.dirty ? " | dirty" : " | current"),
+            juce::dontSendNotification);
+    }
 
     modeLabel.setText("Mode: " + juce::String::fromUTF8(snapshot.mode.c_str()), juce::dontSendNotification);
     stateLabel.setText("State: " + juce::String::fromUTF8(snapshot.integrationState.c_str()), juce::dontSendNotification);

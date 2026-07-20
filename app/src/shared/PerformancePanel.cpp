@@ -78,13 +78,17 @@ int computeMotionSemitoneOffset(const drs::engine::RuntimeSessionStateSnapshot& 
 PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
                                    MacroValueChangedCallback macroValueChanged,
                                    NotePreviewStartedCallback notePreviewStarted,
-                                   NotePreviewEndedCallback notePreviewEnded)
+                                   NotePreviewEndedCallback notePreviewEnded,
+                                   PublishCommandCallback publishCommand,
+                                   PublishPresentationProvider presentationProvider)
     : engineFacade(facade),
       onMacroValueChanged(std::move(macroValueChanged)),
       onNotePreviewStarted(std::move(notePreviewStarted)),
       onNotePreviewEnded(std::move(notePreviewEnded)),
+      publishPresentationProvider(std::move(presentationProvider)),
       keyboardComponent(keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard),
-      diagnosticsPanel(facade, onMacroValueChanged)
+      diagnosticsPanel(facade, onMacroValueChanged, std::move(publishCommand),
+                       publishPresentationProvider)
 {
     titleLabel.setText("Phase 1 Performance Surface", juce::dontSendNotification);
     titleLabel.setFont(juce::FontOptions(26.0f, juce::Font::bold));
@@ -345,6 +349,9 @@ void PerformancePanel::refreshSurface()
     lastObservedStateRevision = engineFacade.getStateRevision();
     const auto articulations = engineFacade.getArticulationDescriptors();
     const auto macros = engineFacade.getMacroDescriptors();
+    const auto publishPresentation = publishPresentationProvider
+        ? publishPresentationProvider()
+        : engineFacade.getPerformancePublishPresentationSnapshot();
 
     if (articulations.size() != articulationButtons.size())
     {
@@ -389,6 +396,14 @@ void PerformancePanel::refreshSurface()
     }
 
     juce::String loadIndicatorText = juce::String::fromUTF8(performanceSnapshot.loadIndicator.c_str());
+    if (publishPresentation != nullptr)
+    {
+        loadIndicatorText << " | Publish "
+                          << juce::String::fromUTF8(publishPresentation->stateLabel.c_str())
+                          << " r" << static_cast<juce::int64>(publishPresentation->activePublishedRevision)
+                          << (publishPresentation->dirty ? " dirty" : " current")
+                          << " | " << juce::String::fromUTF8(publishPresentation->guidance.c_str());
+    }
     if (!performanceSnapshot.draftPlaybackEvent.empty())
     {
         loadIndicatorText << " | " << juce::String::fromUTF8(performanceSnapshot.draftPlaybackEvent.c_str());

@@ -19,11 +19,15 @@ public:
     using MacroValueChangedCallback = std::function<void(const std::string&, double)>;
     using NotePreviewStartedCallback = std::function<void(int, float)>;
     using NotePreviewEndedCallback = std::function<void(int)>;
+    using PublishCommandCallback = StatusPanel::PublishCommandCallback;
+    using PublishPresentationProvider = StatusPanel::PublishPresentationProvider;
 
     explicit PerformancePanel(drs::engine::EngineFacade& engineFacade,
                               MacroValueChangedCallback onMacroValueChanged = {},
                               NotePreviewStartedCallback onNotePreviewStarted = {},
-                              NotePreviewEndedCallback onNotePreviewEnded = {});
+                              NotePreviewEndedCallback onNotePreviewEnded = {},
+                              PublishCommandCallback onPublishCommand = {},
+                              PublishPresentationProvider publishPresentationProvider = {});
     ~PerformancePanel() override;
 
     void paint(juce::Graphics& g) override;
@@ -51,6 +55,7 @@ private:
     MacroValueChangedCallback onMacroValueChanged;
     NotePreviewStartedCallback onNotePreviewStarted;
     NotePreviewEndedCallback onNotePreviewEnded;
+    PublishPresentationProvider publishPresentationProvider;
     drs::engine::EnginePerformanceSnapshot performanceSnapshot;
     std::uint64_t lastObservedStateRevision = 0;
     std::vector<std::unique_ptr<MacroControl>> macroControls;

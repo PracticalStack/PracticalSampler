@@ -408,6 +408,15 @@ Editor::Editor(Processor& owner)
                        [&owner](int midiNoteNumber)
                        {
                            owner.queuePerformanceSurfaceNoteOff(midiNoteNumber);
+                       },
+                       [&owner](const drs::engine::PerformancePublishCommand& command,
+                                drs::engine::PerformancePublishCommandSource source)
+                       {
+                           return owner.submitPerformancePublishCommand(command, source);
+                       },
+                       [&owner]()
+                       {
+                           return owner.getPerformancePublishPresentationSnapshot();
                        }),
       authoringPanel(owner.getAuthoringSession(),
                      [&owner]()
@@ -438,7 +447,8 @@ Editor::Editor(Processor& owner)
                      },
                      [&owner]()
                      {
-                         owner.getEngineFacade().publishCurrentDraft();
+                         owner.submitPerformancePublishCommand(
+                             {}, drs::engine::PerformancePublishCommandSource::authoringWorkspace);
                      },
                      [&owner](const drs::engine::AuthoringPreviewCommand& command)
                      {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "drs/engine/EngineFacade.h"
+#include "drs/engine/PerformancePublishCommandAdapter.h"
 
 #include <juce_gui_extra/juce_gui_extra.h>
 
@@ -15,9 +16,16 @@ class StatusPanel final : public juce::Component,
 {
 public:
     using MacroValueChangedCallback = std::function<void(const std::string&, double)>;
+    using PublishCommandCallback = std::function<bool(
+        const drs::engine::PerformancePublishCommand&,
+        drs::engine::PerformancePublishCommandSource)>;
+    using PublishPresentationProvider = std::function<
+        std::shared_ptr<const drs::engine::PerformancePublishPresentationSnapshot>()>;
 
     explicit StatusPanel(drs::engine::EngineFacade& engineFacade,
-                         MacroValueChangedCallback onMacroValueChanged = {});
+                         MacroValueChangedCallback onMacroValueChanged = {},
+                         PublishCommandCallback onPublishCommand = {},
+                         PublishPresentationProvider publishPresentationProvider = {});
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -41,6 +49,9 @@ private:
     drs::engine::EngineFacade& engineFacade;
     drs::engine::EngineStatusSnapshot snapshot;
     MacroValueChangedCallback onMacroValueChanged;
+    PublishCommandCallback onPublishCommand;
+    PublishPresentationProvider publishPresentationProvider;
+    std::shared_ptr<const drs::engine::PerformancePublishPresentationSnapshot> publishPresentation;
     std::vector<std::unique_ptr<MacroControl>> macroControls;
     std::uint64_t lastObservedStateRevision = 0;
 

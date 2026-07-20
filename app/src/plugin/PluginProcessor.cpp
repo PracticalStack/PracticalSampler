@@ -675,6 +675,20 @@ bool Processor::submitAuthoringPreviewCommand(
     return false;
 }
 
+bool Processor::submitPerformancePublishCommand(
+    const drs::engine::PerformancePublishCommand& command,
+    drs::engine::PerformancePublishCommandSource source)
+{
+    const auto dispatch = performancePublishCommandAdapter.dispatch(command, source);
+    if (!dispatch.accepted)
+        return false;
+
+    const auto accepted = engineFacade.publishCurrentDraft();
+    performancePublishCommandAdapter.recordExecutionResult(accepted);
+    publishMessageDiagnostics();
+    return accepted;
+}
+
 drs::app::AuthoringWaveformPreview Processor::getAuthoringWaveformPreview()
 {
     const auto selectedZone = authoringSession.getSelectedZone();

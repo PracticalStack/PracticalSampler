@@ -3,12 +3,15 @@
 #include "drs/engine/DraftPlaybackContract.h"
 #include "drs/engine/PlaybackSnapshot.h"
 #include "drs/engine/PerformancePublishController.h"
+#include "drs/engine/PerformancePublishPresentation.h"
 #include "drs/engine/PreparedPlayback.h"
 #include "drs/engine/RuntimePresetState.h"
 #include "drs/engine/RuntimeModel.h"
 
 #include <chrono>
+#include <atomic>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -101,6 +104,8 @@ struct EnginePerformanceSnapshot
     bool publishedActivationEligible = false;
     std::string previewRevisionState;
     std::string publishedRevisionState;
+    PerformancePublishPresentationState publishedPresentationState
+        = PerformancePublishPresentationState::idle;
     std::string previewContentDigest;
     std::string publishedContentDigest;
     std::string previewPreparedContentDigest;
@@ -189,6 +194,8 @@ struct EngineDiagnosticsSnapshot
     bool publishedActivationEligible = false;
     std::string previewRevisionState;
     std::string publishedRevisionState;
+    PerformancePublishPresentationState publishedPresentationState
+        = PerformancePublishPresentationState::idle;
     std::string previewContentDigest;
     std::string publishedContentDigest;
     std::string previewPreparedContentDigest;
@@ -353,6 +360,12 @@ public:
     {
         return performancePublishController.getSnapshot();
     }
+    std::shared_ptr<const PerformancePublishPresentationSnapshot>
+        getPerformancePublishPresentationSnapshot() const
+    {
+        return std::atomic_load_explicit(&performancePublishPresentation,
+                                         std::memory_order_acquire);
+    }
     ImmutablePublishedMacroBindingTablePtr getActivePublishedMacroBindings() const
     {
         return activePublishedMacroBindings;
@@ -423,5 +436,7 @@ private:
     std::uint64_t performancePublishProjectGeneration = 1;
     std::uint64_t nextPerformanceActivationToken = 1;
     ImmutablePublishedMacroBindingTablePtr activePublishedMacroBindings;
+    std::shared_ptr<const PerformancePublishPresentationSnapshot> performancePublishPresentation;
+    std::uint64_t nextPerformancePublishPresentationSequence = 1;
 };
 } // namespace drs::engine

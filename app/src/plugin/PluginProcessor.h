@@ -4,6 +4,7 @@
 #include "drs/engine/AuthoringPreviewCommandAdapter.h"
 #include "drs/engine/AuthoringPreviewController.h"
 #include "drs/engine/EngineFacade.h"
+#include "drs/engine/PerformancePublishCommandAdapter.h"
 #include "drs/engine/SampleImport.h"
 #include "drs/engine/SamplerPlaybackContext.h"
 #include "plugin/RealtimeGuard.h"
@@ -172,6 +173,20 @@ public:
     void setMacroValueFromShell(const std::string& macroId, double value);
     void requestAuthoringPreview(drs::engine::AuthoringPreviewScope scope);
     bool submitAuthoringPreviewCommand(const drs::engine::AuthoringPreviewCommand& command);
+    bool submitPerformancePublishCommand(
+        const drs::engine::PerformancePublishCommand& command = {},
+        drs::engine::PerformancePublishCommandSource source
+            = drs::engine::PerformancePublishCommandSource::externalApi);
+    drs::engine::PerformancePublishCommandAdapterSnapshot
+        getPerformancePublishCommandSnapshot() const noexcept
+    {
+        return performancePublishCommandAdapter.getSnapshot();
+    }
+    std::shared_ptr<const drs::engine::PerformancePublishPresentationSnapshot>
+        getPerformancePublishPresentationSnapshot() const
+    {
+        return engineFacade.getPerformancePublishPresentationSnapshot();
+    }
     drs::engine::AuthoringPreviewCommandAdapterSnapshot getAuthoringPreviewCommandSnapshot() const
     {
         return authoringPreviewCommandAdapter.getSnapshot();
@@ -339,6 +354,7 @@ private:
 
     drs::engine::AuthoringSession authoringSession;
     drs::engine::AuthoringPreviewCommandAdapter authoringPreviewCommandAdapter;
+    drs::engine::PerformancePublishCommandAdapter performancePublishCommandAdapter;
     drs::engine::AuthoringPreviewController authoringPreviewController;
     std::shared_ptr<const drs::app::AuthoringPreviewStatusSnapshot> authoringPreviewStatusPublication;
     drs::engine::EngineFacade engineFacade;

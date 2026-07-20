@@ -65,11 +65,19 @@ same block boundary. Compatible stable IDs preserve and clamp values; new, retir
 renamed, unassigned, and over-capacity controls have deterministic outcomes. The direct audit now
 reports exactly **four** remaining seams, all owned by Mini Sprint 6.8.
 
+## Mini Sprint 6.8 update
+
+All shell and `StatusPanel` Publish actions now submit one typed command through the processor-owned
+adapter. The facade publishes one immutable typed presentation snapshot covering Draft, Preview,
+requested, active, failed, and last-known-good identities, progress, findings, guidance, and
+responsiveness metrics. The direct audit now returns exit 0 with **zero** remaining replacement
+seams. Mini Sprint 6.9 owns renaming/registering this executable as a permanent green regression.
+
 ## Retirement ownership
 
 | Seam | Owning mini sprint |
 |---|---|
-| Three direct shell/UI calls and typed presentation | 6.8 |
+| No remaining seams | Retire/register in 6.9 |
 
 Mini Sprint 6.9 removes any remaining compatibility branches and converts the executable into a
 registered green `drs.sprint6.publish_contract_seams` regression target.

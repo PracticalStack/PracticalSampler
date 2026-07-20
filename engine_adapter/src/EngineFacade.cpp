@@ -1010,6 +1010,8 @@ EnginePerformanceSnapshot EngineFacade::getPerformanceSnapshot() const
     snapshot.publishedActivationEligible = draftStatus.performance.activationEligible;
     snapshot.previewRevisionState = draftStatus.preview.state;
     snapshot.publishedRevisionState = draftStatus.performance.state;
+    if (const auto presentation = getPerformancePublishPresentationSnapshot())
+        snapshot.publishedPresentationState = presentation->state;
     snapshot.previewContentDigest = draftStatus.preview.contentDigest;
     snapshot.publishedContentDigest = draftStatus.performance.contentDigest;
     snapshot.previewPreparedContentDigest = draftStatus.preview.preparedContentDigest;
@@ -2342,6 +2344,17 @@ void EngineFacade::refreshDiagnosticsSnapshot()
     syncSessionSelectionsIntoDiagnostics(currentSessionState, diagnosticsSnapshot);
     syncDraftPlaybackIntoDiagnostics(draftPlaybackContract.getStatus(), diagnosticsSnapshot);
     syncPreparedPlaybackWorkerIntoDiagnostics(preparedPlaybackService.getWorkerStatus(), diagnosticsSnapshot);
+    auto publishPresentation = std::make_shared<const PerformancePublishPresentationSnapshot>(
+        buildPerformancePublishPresentationSnapshot(
+            draftPlaybackContract.getStatus(),
+            performancePublishController.getSnapshot(),
+            preparedPlaybackService.getWorkerStatus(),
+            nextPerformancePublishPresentationSequence++));
+    std::atomic_store_explicit(&performancePublishPresentation,
+                               std::move(publishPresentation),
+                               std::memory_order_release);
+    if (const auto presentation = getPerformancePublishPresentationSnapshot())
+        diagnosticsSnapshot.publishedPresentationState = presentation->state;
     applyPreparedCachePressurePolicy(diagnosticsSnapshot);
     diagnosticsSnapshot.rendererMode = resolveRendererMode(referenceInstrumentActive);
 

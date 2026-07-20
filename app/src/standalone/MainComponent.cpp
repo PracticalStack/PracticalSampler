@@ -399,6 +399,15 @@ MainComponent::MainComponent(bool enableAudioOutput)
                        [this](int midiNoteNumber)
                        {
                            processor.queuePerformanceSurfaceNoteOff(midiNoteNumber);
+                       },
+                       [this](const drs::engine::PerformancePublishCommand& command,
+                              drs::engine::PerformancePublishCommandSource source)
+                       {
+                           return processor.submitPerformancePublishCommand(command, source);
+                       },
+                       [this]()
+                       {
+                           return processor.getPerformancePublishPresentationSnapshot();
                        }),
       authoringPanel(processor.getAuthoringSession(),
                      [this]()
@@ -429,7 +438,8 @@ MainComponent::MainComponent(bool enableAudioOutput)
                      },
                      [this]()
                      {
-                         processor.getEngineFacade().publishCurrentDraft();
+                         processor.submitPerformancePublishCommand(
+                             {}, drs::engine::PerformancePublishCommandSource::authoringWorkspace);
                      },
                      [this](const drs::engine::AuthoringPreviewCommand& command)
                      {

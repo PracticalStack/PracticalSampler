@@ -41,7 +41,8 @@ int main()
             { "processor owns Performance activation eligibility and staging",
               processorHeader.find("bool stagePerformanceActivation(") != std::string::npos },
             { "published lifecycle remains string-only in the public facade snapshot",
-              facadeHeader.find("std::string publishedRevisionState;") != std::string::npos },
+              facadeHeader.find("PerformancePublishPresentationState publishedPresentationState")
+                == std::string::npos },
             { "mutable facade macro values are not yet bound to an immutable published schema",
               facadeSource.find("buildPublishedMacroBindingTable(") == std::string::npos
                 || processorHeader.find("activePublishedMacroCallbackView") == std::string::npos }
