@@ -127,6 +127,12 @@ struct ImmutablePreparedPlayback
     std::string payloadEncoding;
     std::uint64_t pageSizeBytes = 0;
     std::string preparedContentDigest;
+    // Publish-conformance digests are computed by the preparation worker from
+    // immutable data. They deliberately exclude cache ownership tokens so a
+    // warm and cold preparation of the same authored project agree.
+    std::string routeDigest;
+    std::string sourceProvenanceDigest;
+    std::string macroSchemaDigest;
     std::vector<PreparedPlaybackOwnershipRecord> ownershipRecords;
     std::vector<PreparedPlaybackSampleHandle> samples;
     std::vector<PreparedPlaybackStreamHandle> streams;
@@ -355,6 +361,10 @@ private:
 };
 
 std::string computePreparedPlaybackContentDigest(const ImmutablePreparedPlayback& prepared);
+std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& snapshot,
+                                               const ImmutablePreparedPlayback& prepared);
+std::string computePreparedPlaybackSourceProvenanceDigest(const ImmutablePreparedPlayback& prepared);
+std::string computePlaybackSnapshotMacroSchemaDigest(const ImmutablePlaybackSnapshot& snapshot);
 std::string serializePreparedPlaybackContent(const ImmutablePreparedPlayback& prepared);
 std::string serializeImmutablePreparedPlayback(const ImmutablePreparedPlayback& prepared);
 std::string toString(PreparedPlaybackWorkLane lane);

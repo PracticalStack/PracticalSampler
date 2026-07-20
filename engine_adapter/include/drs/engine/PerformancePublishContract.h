@@ -101,6 +101,8 @@ struct PerformancePublishResult
     bool activationEligible = false;
     std::uint64_t preparedBuildId = 0;
     std::string preparedContentDigest;
+    std::string routeDigest;
+    std::string sourceProvenanceDigest;
     std::string preparedMacroSchemaDigest;
     std::vector<PerformancePublishFinding> findings;
 };
@@ -178,6 +180,8 @@ inline bool performancePublishResultIsEligible(
         && result.activationEligible
         && result.preparedBuildId != 0
         && !result.preparedContentDigest.empty()
+        && !result.routeDigest.empty()
+        && !result.sourceProvenanceDigest.empty()
         && !result.preparedMacroSchemaDigest.empty()
         && result.preparedMacroSchemaDigest == current.macroSchemaDigest;
 }

@@ -67,6 +67,8 @@ int main()
         eligible.activationEligible = true;
         eligible.preparedBuildId = 44;
         eligible.preparedContentDigest = "prepared-digest-108";
+        eligible.routeDigest = "route-digest-108";
+        eligible.sourceProvenanceDigest = "source-digest-108";
         eligible.preparedMacroSchemaDigest = identity.macroSchemaDigest;
         require(performancePublishResultIsEligible(identity, eligible)
                     && performancePublishCompletionDisposition(identity, eligible)

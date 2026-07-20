@@ -1,6 +1,7 @@
 #include "drs/engine/AuthoringSession.h"
 #include "drs/engine/DraftPlaybackContract.h"
 #include "drs/engine/PlaybackSnapshot.h"
+#include "drs/engine/PerformancePublishPreparation.h"
 #include "drs/engine/PreparedPlayback.h"
 #include "drs/engine/RuntimeLoader.h"
 
@@ -218,6 +219,10 @@ void runNewSourceScenario(FixtureFormat format, WorkLane lane,
     drs::engine::PreparedPlaybackService service;
     const auto cold = prepare(service, snapshot, lane, referenceStream);
     require(cold.built && cold.activationEligible, "New authored source should prepare successfully.");
+    require(!cold.prepared.routeDigest.empty()
+                && !cold.prepared.sourceProvenanceDigest.empty()
+                && !cold.prepared.macroSchemaDigest.empty(),
+            "Worker preparation must carry deterministic Publish topology, provenance, and macro digests.");
     require(findPreparedSample(cold, sourceId).decodedSampleData != nullptr,
             "New authored source must retain decoded PCM.");
     const auto& stream = findPreparedStream(cold, sourceId);
@@ -230,6 +235,24 @@ void runNewSourceScenario(FixtureFormat format, WorkLane lane,
     require(warm.built && warm.metrics.cacheHitCount == project.sampleSources.size()
                 && warm.metrics.cacheMissCount == 0,
             "Unchanged authored input should deterministically reuse the warm cache.");
+    require(warm.prepared.routeDigest == cold.prepared.routeDigest
+                && warm.prepared.sourceProvenanceDigest == cold.prepared.sourceProvenanceDigest
+                && warm.prepared.macroSchemaDigest == cold.prepared.macroSchemaDigest,
+            "Warm and cold authored WAV/FLAC preparation must produce identical conformance digests.");
+
+    if (lane == WorkLane::publish)
+    {
+        drs::engine::PerformancePublishRequestIdentity identity;
+        identity.requestId = 1;
+        identity.cancellationGeneration = 1;
+        identity.projectGeneration = 1;
+        identity.draftRevision = snapshot.snapshot.draftRevision;
+        identity.authoredContentDigest = snapshot.snapshot.contentDigest;
+        identity.macroSchemaDigest = drs::engine::computePlaybackSnapshotMacroSchemaDigest(snapshot.snapshot);
+        const auto conformance = drs::engine::validatePerformancePublishPreparation(identity, snapshot, cold);
+        require(conformance.completeProject && conformance.activationEligible,
+                "General authored WAV/FLAC Publish input must pass whole-project immutable conformance.");
+    }
 
     drs::engine::DraftPlaybackContract contract(1);
     const auto shellRequest = lane == WorkLane::preview

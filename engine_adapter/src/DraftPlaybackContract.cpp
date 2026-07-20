@@ -83,6 +83,9 @@ PlaybackActivationPayloadPtr buildActivationPayload(
     payload->activationEligible = true;
     payload->snapshotContentDigest = snapshotResult->snapshot.contentDigest;
     payload->preparedContentDigest = preparedResult->prepared.preparedContentDigest;
+    payload->routeDigest = preparedResult->prepared.routeDigest;
+    payload->sourceProvenanceDigest = preparedResult->prepared.sourceProvenanceDigest;
+    payload->macroSchemaDigest = preparedResult->prepared.macroSchemaDigest;
     payload->retainedPreparedBytes = preparedResult->metrics.preparedBytes;
     payload->snapshot = std::make_shared<const ImmutablePlaybackSnapshot>(snapshotResult->snapshot);
     payload->prepared = std::make_shared<const ImmutablePreparedPlayback>(preparedResult->prepared);
@@ -395,6 +398,11 @@ bool DraftPlaybackContract::completeBuild(DraftPlaybackPendingRequest& pending,
     prepared.preparedContentDigest = preparedBuildResult != nullptr
         ? preparedBuildResult->prepared.preparedContentDigest
         : std::string {};
+    prepared.routeDigest = preparedBuildResult != nullptr ? preparedBuildResult->prepared.routeDigest : std::string {};
+    prepared.sourceProvenanceDigest = preparedBuildResult != nullptr
+        ? preparedBuildResult->prepared.sourceProvenanceDigest : std::string {};
+    prepared.macroSchemaDigest = preparedBuildResult != nullptr
+        ? preparedBuildResult->prepared.macroSchemaDigest : std::string {};
     prepared.state = completedState;
     prepared.preparedSampleCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedSampleCount : 0;
     prepared.preparedStreamCount = preparedBuildResult != nullptr ? preparedBuildResult->metrics.preparedStreamCount : 0;
@@ -539,6 +547,9 @@ void DraftPlaybackContract::resetPreparedRevision(DraftPlaybackPreparedRevision&
     prepared.lifecycleState = PlaybackSnapshotLifecycleState::idle;
     prepared.contentDigest.clear();
     prepared.preparedContentDigest.clear();
+    prepared.routeDigest.clear();
+    prepared.sourceProvenanceDigest.clear();
+    prepared.macroSchemaDigest.clear();
     prepared.state = state;
     prepared.preparedSampleCount = 0;
     prepared.preparedStreamCount = 0;

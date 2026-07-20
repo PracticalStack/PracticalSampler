@@ -103,6 +103,8 @@ PerformancePublishRequestResult PerformancePublishController::request(
     snapshot.activationState = PerformancePublishActivationState::noActivation;
     snapshot.acceptedPreparedBuildId = 0;
     snapshot.acceptedPreparedDigest.clear();
+    snapshot.acceptedRouteDigest.clear();
+    snapshot.acceptedSourceProvenanceDigest.clear();
     snapshot.acceptedMacroSchemaDigest.clear();
     snapshot.requestReceivedAtMicros = nowMicros;
     snapshot.launchedAtMicros = 0;
@@ -151,6 +153,8 @@ bool PerformancePublishController::acceptPrepared(const PerformancePublishResult
 
     snapshot.acceptedPreparedBuildId = result.preparedBuildId;
     snapshot.acceptedPreparedDigest = result.preparedContentDigest;
+    snapshot.acceptedRouteDigest = result.routeDigest;
+    snapshot.acceptedSourceProvenanceDigest = result.sourceProvenanceDigest;
     snapshot.acceptedMacroSchemaDigest = result.preparedMacroSchemaDigest;
     snapshot.readyAtMicros = nowMicros;
     if (nowMicros != 0 && snapshot.launchedAtMicros != 0 && nowMicros >= snapshot.launchedAtMicros)
@@ -195,6 +199,8 @@ bool PerformancePublishController::markActive(
     snapshot.activeRequestIdentity = identity;
     snapshot.activePreparedBuildId = snapshot.acceptedPreparedBuildId;
     snapshot.activePreparedDigest = snapshot.acceptedPreparedDigest;
+    snapshot.activeRouteDigest = snapshot.acceptedRouteDigest;
+    snapshot.activeSourceProvenanceDigest = snapshot.acceptedSourceProvenanceDigest;
     snapshot.activeMacroSchemaDigest = snapshot.acceptedMacroSchemaDigest;
     snapshot.activeAtMicros = nowMicros;
     if (nowMicros != 0 && snapshot.requestReceivedAtMicros != 0

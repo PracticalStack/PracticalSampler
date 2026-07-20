@@ -27,6 +27,9 @@ struct PlaybackActivationPayload final
     bool activationEligible = false;
     std::string snapshotContentDigest;
     std::string preparedContentDigest;
+    std::string routeDigest;
+    std::string sourceProvenanceDigest;
+    std::string macroSchemaDigest;
     std::uint64_t retainedPreparedBytes = 0;
     std::shared_ptr<const ImmutablePlaybackSnapshot> snapshot;
     std::shared_ptr<const ImmutablePreparedPlayback> prepared;
@@ -45,6 +48,9 @@ struct DraftPlaybackPreparedRevision
     PlaybackSnapshotLifecycleState lifecycleState = PlaybackSnapshotLifecycleState::idle;
     std::string contentDigest;
     std::string preparedContentDigest;
+    std::string routeDigest;
+    std::string sourceProvenanceDigest;
+    std::string macroSchemaDigest;
     std::string state;
     std::size_t preparedSampleCount = 0;
     std::size_t preparedStreamCount = 0;

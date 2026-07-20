@@ -9,6 +9,7 @@
 #include <memory>
 #include <numeric>
 #include <sstream>
+#include <tuple>
 #include <unordered_map>
 
 namespace drs::engine
@@ -61,6 +62,13 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
 
     if (includeDigest)
         root["preparedContentDigest"] = prepared.preparedContentDigest;
+
+    if (includeDigest)
+    {
+        root["routeDigest"] = prepared.routeDigest;
+        root["sourceProvenanceDigest"] = prepared.sourceProvenanceDigest;
+        root["macroSchemaDigest"] = prepared.macroSchemaDigest;
+    }
 
     ordered_json ownershipRecords = ordered_json::array();
     for (const auto& ownership : prepared.ownershipRecords)
@@ -880,7 +888,12 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     result.metrics.failureCount = errorCount == 0 ? 0 : 1;
 
     if (result.built)
+    {
+        result.prepared.routeDigest = computePreparedPlaybackRouteDigest(snapshotResult.snapshot, result.prepared);
+        result.prepared.sourceProvenanceDigest = computePreparedPlaybackSourceProvenanceDigest(result.prepared);
+        result.prepared.macroSchemaDigest = computePlaybackSnapshotMacroSchemaDigest(snapshotResult.snapshot);
         result.prepared.preparedContentDigest = computePreparedPlaybackContentDigest(result.prepared);
+    }
 
     result.buildDurationMicros = static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - startTime).count());
@@ -1317,6 +1330,152 @@ std::string computePreparedPlaybackContentDigest(const ImmutablePreparedPlayback
     return "fnv1a64:" + computeFnv1a64Hex(serializePrepared(prepared, false).dump());
 }
 
+std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& snapshot,
+                                               const ImmutablePreparedPlayback& prepared)
+{
+    ordered_json root;
+    ordered_json zones = ordered_json::array();
+    auto authoredZones = snapshot.zones;
+    std::sort(authoredZones.begin(), authoredZones.end(), [](const auto& left, const auto& right)
+    {
+        return left.id < right.id;
+    });
+    for (const auto& zone : authoredZones)
+    {
+        ordered_json value;
+        value["id"] = zone.id;
+        value["sampleSourceId"] = zone.sampleSourceId;
+        value["groupId"] = zone.groupId;
+        value["articulationId"] = zone.articulationId;
+        value["rootKey"] = zone.rootKey;
+        value["keyLow"] = zone.keyLow;
+        value["keyHigh"] = zone.keyHigh;
+        value["velocityLow"] = zone.velocityLow;
+        value["velocityHigh"] = zone.velocityHigh;
+        value["gainDb"] = zone.gainDb;
+        value["pan"] = zone.pan;
+        value["sampleStartFrame"] = zone.sampleStartFrame;
+        value["loopEnabled"] = zone.loopEnabled;
+        value["loopStartFrame"] = zone.loopStartFrame;
+        value["loopEndFrame"] = zone.loopEndFrame;
+        zones.push_back(std::move(value));
+    }
+    root["zones"] = std::move(zones);
+
+    ordered_json preparedRoutes = ordered_json::array();
+    auto handles = prepared.zones;
+    std::sort(handles.begin(), handles.end(), [](const auto& left, const auto& right)
+    {
+        return left.zoneId < right.zoneId;
+    });
+    for (const auto& handle : handles)
+    {
+        ordered_json value;
+        value["zoneId"] = handle.zoneId;
+        value["sampleSourceId"] = handle.sampleSourceId;
+        value["streamSampleId"] = handle.streamSampleId;
+        value["rootKey"] = handle.rootKey;
+        value["keyLow"] = handle.keyLow;
+        value["keyHigh"] = handle.keyHigh;
+        value["velocityLow"] = handle.velocityLow;
+        value["velocityHigh"] = handle.velocityHigh;
+        value["gainDb"] = handle.gainDb;
+        value["pan"] = handle.pan;
+        value["sampleStartFrame"] = handle.sampleStartFrame;
+        value["loopEnabled"] = handle.loopEnabled;
+        value["loopStartFrame"] = handle.loopStartFrame;
+        value["loopEndFrame"] = handle.loopEndFrame;
+        preparedRoutes.push_back(std::move(value));
+    }
+    root["preparedRoutes"] = std::move(preparedRoutes);
+
+    auto articulationRoutes = snapshot.articulationRoutes;
+    std::sort(articulationRoutes.begin(), articulationRoutes.end(), [](const auto& left, const auto& right)
+    {
+        return left.articulationId < right.articulationId;
+    });
+    root["articulationRoutes"] = ordered_json::array();
+    for (auto& route : articulationRoutes)
+    {
+        std::sort(route.zoneIds.begin(), route.zoneIds.end());
+        root["articulationRoutes"].push_back({ { "id", route.articulationId }, { "zones", route.zoneIds } });
+    }
+
+    auto groupRoutes = snapshot.groupRoutes;
+    std::sort(groupRoutes.begin(), groupRoutes.end(), [](const auto& left, const auto& right)
+    {
+        return left.groupId < right.groupId;
+    });
+    root["groupRoutes"] = ordered_json::array();
+    for (auto& route : groupRoutes)
+    {
+        std::sort(route.articulationIds.begin(), route.articulationIds.end());
+        std::sort(route.zoneIds.begin(), route.zoneIds.end());
+        root["groupRoutes"].push_back({ { "id", route.groupId },
+                                         { "articulations", route.articulationIds },
+                                         { "zones", route.zoneIds } });
+    }
+
+    auto buses = snapshot.routingBuses;
+    std::sort(buses.begin(), buses.end(), [](const auto& left, const auto& right) { return left.id < right.id; });
+    root["routingBuses"] = ordered_json::array();
+    for (auto& bus : buses)
+    {
+        root["routingBuses"].push_back({ { "id", bus.id },
+                                          { "input", bus.inputSourceId },
+                                          { "fxSlots", bus.fxSlotIds } });
+    }
+
+    return "fnv1a64:" + computeFnv1a64Hex(root.dump());
+}
+
+std::string computePreparedPlaybackSourceProvenanceDigest(const ImmutablePreparedPlayback& prepared)
+{
+    auto samples = prepared.samples;
+    std::sort(samples.begin(), samples.end(), [](const auto& left, const auto& right)
+    {
+        return left.sampleSourceId < right.sampleSourceId;
+    });
+
+    ordered_json values = ordered_json::array();
+    for (const auto& sample : samples)
+    {
+        values.push_back({ { "sampleSourceId", sample.sampleSourceId },
+                           { "canonicalSourceIdentity", sample.canonicalSourceIdentity },
+                           { "sourceFingerprintHex", sample.sourceFingerprintHex },
+                           { "formatName", sample.formatName },
+                           { "sampleRate", sample.sampleRate },
+                           { "frameCount", sample.frameCount },
+                           { "channelCount", sample.channelCount } });
+    }
+    return "fnv1a64:" + computeFnv1a64Hex(values.dump());
+}
+
+std::string computePlaybackSnapshotMacroSchemaDigest(const ImmutablePlaybackSnapshot& snapshot)
+{
+    auto macros = snapshot.macroDefaults;
+    std::sort(macros.begin(), macros.end(), [](const auto& left, const auto& right) { return left.id < right.id; });
+    ordered_json values = ordered_json::array();
+    for (auto& macro : macros)
+    {
+        std::sort(macro.targets.begin(), macro.targets.end(), [](const auto& left, const auto& right)
+        {
+            return std::tie(left.parameterId, left.parameterPath, left.role)
+                < std::tie(right.parameterId, right.parameterPath, right.role);
+        });
+        ordered_json targets = ordered_json::array();
+        for (const auto& target : macro.targets)
+            targets.push_back({ { "parameterId", target.parameterId },
+                                { "parameterPath", target.parameterPath },
+                                { "role", target.role } });
+        values.push_back({ { "id", macro.id },
+                           { "minValue", macro.minValue },
+                           { "maxValue", macro.maxValue },
+                           { "targets", std::move(targets) } });
+    }
+    return "fnv1a64:" + computeFnv1a64Hex(values.dump());
+}
+
 std::string serializePreparedPlaybackContent(const ImmutablePreparedPlayback& prepared)
 {
     return serializePrepared(prepared, false).dump(2) + "\n";
@@ -1426,6 +1585,9 @@ bool operator==(const ImmutablePreparedPlayback& left, const ImmutablePreparedPl
         && left.payloadEncoding == right.payloadEncoding
         && left.pageSizeBytes == right.pageSizeBytes
         && left.preparedContentDigest == right.preparedContentDigest
+        && left.routeDigest == right.routeDigest
+        && left.sourceProvenanceDigest == right.sourceProvenanceDigest
+        && left.macroSchemaDigest == right.macroSchemaDigest
         && left.ownershipRecords == right.ownershipRecords
         && left.samples == right.samples
         && left.streams == right.streams

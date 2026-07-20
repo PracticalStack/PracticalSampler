@@ -104,6 +104,9 @@ struct EnginePerformanceSnapshot
     std::string publishedContentDigest;
     std::string previewPreparedContentDigest;
     std::string publishedPreparedContentDigest;
+    std::string publishedRouteDigest;
+    std::string publishedSourceProvenanceDigest;
+    std::string publishedMacroSchemaDigest;
     bool playableRangeAvailable = false;
     int lowestPlayableNote = 36;
     int highestPlayableNote = 96;
@@ -188,6 +191,9 @@ struct EngineDiagnosticsSnapshot
     std::string publishedContentDigest;
     std::string previewPreparedContentDigest;
     std::string publishedPreparedContentDigest;
+    std::string publishedRouteDigest;
+    std::string publishedSourceProvenanceDigest;
+    std::string publishedMacroSchemaDigest;
     bool playableRangeAvailable = false;
     int lowestPlayableNote = 36;
     int highestPlayableNote = 96;

@@ -24,6 +24,8 @@ drs::engine::PerformancePublishResult eligibleResult(
     result.activationEligible = true;
     result.preparedBuildId = preparedBuildId;
     result.preparedContentDigest = "prepared:" + std::to_string(preparedBuildId);
+    result.routeDigest = "routes:" + std::to_string(preparedBuildId);
+    result.sourceProvenanceDigest = "sources:" + std::to_string(preparedBuildId);
     result.preparedMacroSchemaDigest = identity.macroSchemaDigest;
     return result;
 }
@@ -74,6 +76,8 @@ int main()
                     && active.activeRequestIdentity == second.request.identity
                     && active.activePreparedBuildId == 702
                     && active.activePreparedDigest == "prepared:702"
+                    && active.activeRouteDigest == "routes:702"
+                    && active.activeSourceProvenanceDigest == "sources:702"
                     && active.activeMacroSchemaDigest == "macros:b",
                 "The immutable snapshot must retain the exact active identity and prepared truth.");
 
@@ -121,6 +125,8 @@ int main()
                     || (snapshot.hasActiveRequest
                         && (snapshot.activePreparedBuildId == 0
                             || snapshot.activePreparedDigest.empty()
+                            || snapshot.activeRouteDigest.empty()
+                            || snapshot.activeSourceProvenanceDigest.empty()
                             || snapshot.activeMacroSchemaDigest.empty()))
                     || (snapshot.hasFailedRequest && snapshot.failureFinding.code.empty())
                     || snapshot.pendingDepth > 1)

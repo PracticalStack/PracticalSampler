@@ -1,6 +1,7 @@
 #include "drs/engine/EngineFacade.h"
 #include "drs/engine/HiseFrontendBridge.h"
 #include "drs/engine/HiseProjectContent.h"
+#include "drs/engine/PerformancePublishPreparation.h"
 #include "drs/engine/RuntimeLoadProfile.h"
 #include "drs/engine/RuntimePresetState.h"
 #include "drs/engine/RuntimeLoader.h"
@@ -83,23 +84,6 @@ std::string computeFnv1a64Digest(const std::string& text)
     std::ostringstream stream;
     stream << "fnv1a64:" << std::hex << std::setw(16) << std::setfill('0') << hash;
     return stream.str();
-}
-
-std::string computePerformancePublishMacroSchemaDigest(
-    const ImmutablePlaybackSnapshot& snapshot)
-{
-    std::ostringstream schema;
-    schema << std::setprecision(17);
-    for (const auto& macro : snapshot.macroDefaults)
-    {
-        schema << macro.id << '\n' << macro.name << '\n'
-               << macro.defaultValue << '\n' << macro.minValue << '\n' << macro.maxValue << '\n';
-        for (const auto& target : macro.targets)
-            schema << target.parameterId << '\n' << target.parameterPath << '\n'
-                   << target.role << '\n';
-        schema << "--\n";
-    }
-    return computeFnv1a64Digest(schema.str());
 }
 
 PerformancePublishFinding makePerformancePublishFinding(
@@ -306,6 +290,9 @@ void syncDraftPlaybackIntoDiagnostics(const DraftPlaybackStatus& status,
     diagnosticsSnapshot.publishedContentDigest = status.performance.contentDigest;
     diagnosticsSnapshot.previewPreparedContentDigest = status.preview.preparedContentDigest;
     diagnosticsSnapshot.publishedPreparedContentDigest = status.performance.preparedContentDigest;
+    diagnosticsSnapshot.publishedRouteDigest = status.performance.routeDigest;
+    diagnosticsSnapshot.publishedSourceProvenanceDigest = status.performance.sourceProvenanceDigest;
+    diagnosticsSnapshot.publishedMacroSchemaDigest = status.performance.macroSchemaDigest;
     diagnosticsSnapshot.previewPreparedSampleCount = status.preview.preparedSampleCount;
     diagnosticsSnapshot.previewPreparedStreamCount = status.preview.preparedStreamCount;
     diagnosticsSnapshot.previewPreparedZoneCount = status.preview.preparedZoneCount;
@@ -1023,6 +1010,9 @@ EnginePerformanceSnapshot EngineFacade::getPerformanceSnapshot() const
     snapshot.publishedContentDigest = draftStatus.performance.contentDigest;
     snapshot.previewPreparedContentDigest = draftStatus.preview.preparedContentDigest;
     snapshot.publishedPreparedContentDigest = draftStatus.performance.preparedContentDigest;
+    snapshot.publishedRouteDigest = draftStatus.performance.routeDigest;
+    snapshot.publishedSourceProvenanceDigest = draftStatus.performance.sourceProvenanceDigest;
+    snapshot.publishedMacroSchemaDigest = draftStatus.performance.macroSchemaDigest;
     snapshot.surfaceStateSource = resolveDraftSurfaceSource(draftStatus);
     snapshot.rendererMode = resolveRendererMode(referenceInstrumentActive);
     if (draftStatus.performance.playableRangeAvailable && draftStatus.performance.available)
@@ -1364,7 +1354,7 @@ bool EngineFacade::publishCurrentDraft()
         ? buildResult.snapshot.contentDigest
         : computeFnv1a64Digest(authoringProject.project.projectId + ":"
                                + std::to_string(draftPlaybackContract.getStatus().draftRevision));
-    const auto macroSchemaDigest = computePerformancePublishMacroSchemaDigest(buildResult.snapshot);
+    const auto macroSchemaDigest = computePlaybackSnapshotMacroSchemaDigest(buildResult.snapshot);
     const auto controllerRequest = performancePublishController.request(
         performancePublishProjectGeneration,
         draftPlaybackContract.getStatus().draftRevision,
@@ -1560,6 +1550,35 @@ bool EngineFacade::enqueuePreparedPlaybackBuild(std::uint64_t contractRequestId,
                                                 const PlaybackSnapshotBuildResult& snapshotResult,
                                                 PreparedPlaybackWorkLane lane)
 {
+    auto publishIdentity = PerformancePublishRequestIdentity {};
+    if (lane == PreparedPlaybackWorkLane::performance)
+    {
+        auto controller = performancePublishController.getSnapshot();
+        const auto macroSchemaDigest = computePlaybackSnapshotMacroSchemaDigest(snapshotResult.snapshot);
+        const auto exactPreparingRequest = controller.hasRequest
+            && controller.preparationState == PerformancePublishPreparationState::preparing
+            && controller.currentRequest.identity.projectGeneration == performancePublishProjectGeneration
+            && controller.currentRequest.identity.draftRevision == snapshotResult.snapshot.draftRevision
+            && controller.currentRequest.identity.authoredContentDigest == snapshotResult.snapshot.contentDigest
+            && controller.currentRequest.identity.macroSchemaDigest == macroSchemaDigest;
+        if (!exactPreparingRequest)
+        {
+            const auto request = performancePublishController.request(
+                performancePublishProjectGeneration,
+                snapshotResult.snapshot.draftRevision,
+                snapshotResult.snapshot.contentDigest,
+                macroSchemaDigest,
+                monotonicMicros());
+            if (!request.accepted
+                || !performancePublishController.markPreparing(request.request.identity, monotonicMicros()))
+                return false;
+            controller = performancePublishController.getSnapshot();
+        }
+        if (!controller.hasRequest)
+            return false;
+        publishIdentity = controller.currentRequest.identity;
+    }
+
     auto submitResult = lane == PreparedPlaybackWorkLane::performance
         ? preparedPlaybackService.enqueuePublishBuild(snapshotResult)
         : preparedPlaybackService.enqueuePreviewBuild(snapshotResult);
@@ -1572,14 +1591,6 @@ bool EngineFacade::enqueuePreparedPlaybackBuild(std::uint64_t contractRequestId,
 
     if (lane == PreparedPlaybackWorkLane::preview)
         discardSupersededPreviewPendingPreparedCompletions(submitResult.request.buildId);
-
-    auto publishIdentity = PerformancePublishRequestIdentity {};
-    if (lane == PreparedPlaybackWorkLane::performance)
-    {
-        const auto controller = performancePublishController.getSnapshot();
-        if (controller.hasRequest)
-            publishIdentity = controller.currentRequest.identity;
-    }
 
     pendingPreparedCompletions[submitResult.request.buildId] = {
         lane,
@@ -1628,27 +1639,33 @@ bool EngineFacade::pumpPreparedPlaybackWorkerCompletions()
         }
         else
         {
+            const auto preparation = validatePerformancePublishPreparation(
+                pendingCompletion.publishIdentity,
+                pendingCompletion.snapshotResult,
+                stepResult.result);
+            auto contractResult = stepResult.result;
+            if (!preparation.activationEligible)
+            {
+                contractResult.built = false;
+                contractResult.activationEligible = false;
+                contractResult.lifecycleState = PlaybackSnapshotLifecycleState::failed;
+                contractResult.state = "Full-project Performance preparation failed conformance";
+                contractResult.findings = preparation.findings;
+                contractResult.metrics.failureCount = 1;
+            }
             applied = draftPlaybackContract.completePerformanceBuild(
                 pendingCompletion.contractRequestId,
                 pendingCompletion.snapshotResult,
-                stepResult.result);
+                contractResult);
 
-            PerformancePublishResult publishResult;
-            publishResult.identity = pendingCompletion.publishIdentity;
-            publishResult.completeProject = stepResult.result.built
-                && pendingCompletion.snapshotResult.built;
-            publishResult.activationEligible = stepResult.result.activationEligible
-                && pendingCompletion.snapshotResult.activationEligible;
-            publishResult.preparedBuildId = stepResult.result.buildId;
-            publishResult.preparedContentDigest = stepResult.result.prepared.preparedContentDigest;
-            publishResult.preparedMacroSchemaDigest = pendingCompletion.publishIdentity.macroSchemaDigest;
+            const auto& publishResult = preparation.publishResult;
 
             const auto preparedAccepted = applied && publishResult.activationEligible
                 && performancePublishController.acceptPrepared(publishResult, monotonicMicros());
             if (!preparedAccepted && performancePublishController.isCurrent(publishResult.identity))
             {
-                const auto finding = !stepResult.result.findings.empty()
-                    ? makePerformancePublishFinding(stepResult.result.findings.front())
+                const auto finding = !preparation.findings.empty()
+                    ? makePerformancePublishFinding(preparation.findings.front())
                     : makePerformancePublishFailure(
                         "publish-preparation-failed", "preparedWorker",
                         stepResult.result.state.empty()
@@ -1659,7 +1676,7 @@ bool EngineFacade::pumpPreparedPlaybackWorkerCompletions()
 
             if (applied)
             {
-                if (stepResult.result.built && stepResult.result.activationEligible)
+                if (preparation.completeProject && preparation.activationEligible)
                 {
                     currentSessionState.transientMetrics.integrationState = "Published revision activated";
                     currentSessionState.transientMetrics.lastFailure.clear();
@@ -2081,6 +2098,11 @@ void EngineFacade::syncPreviewSnapshotFromDraftPlayback()
 void EngineFacade::initializeDraftPlaybackContract(bool activatePerformanceRevision)
 {
     clearPendingPreparedCompletions();
+    if (activatePerformanceRevision)
+    {
+        ++performancePublishProjectGeneration;
+        performancePublishController.reset(true, true);
+    }
     preparedPlaybackService.setBackgroundWorkerStream(referenceStream);
     draftPlaybackContract.reopenProject(0);
 

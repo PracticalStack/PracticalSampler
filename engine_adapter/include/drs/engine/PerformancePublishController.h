@@ -31,6 +31,8 @@ struct PerformancePublishControllerSnapshot
     PerformancePublishRequestIdentity activeRequestIdentity;
     std::uint64_t activePreparedBuildId = 0;
     std::string activePreparedDigest;
+    std::string activeRouteDigest;
+    std::string activeSourceProvenanceDigest;
     std::string activeMacroSchemaDigest;
     bool hasFailedRequest = false;
     PerformancePublishRequestIdentity failedRequestIdentity;
@@ -39,6 +41,8 @@ struct PerformancePublishControllerSnapshot
     PerformancePublishActivationState activationState = PerformancePublishActivationState::noActivation;
     std::uint64_t acceptedPreparedBuildId = 0;
     std::string acceptedPreparedDigest;
+    std::string acceptedRouteDigest;
+    std::string acceptedSourceProvenanceDigest;
     std::string acceptedMacroSchemaDigest;
     std::size_t requestedCount = 0;
     std::size_t duplicateSuppressedCount = 0;

@@ -30,6 +30,13 @@ only through exact controller eligibility, and reconciles Pending/Active with th
 activation path. The facade wrapper remains temporarily callable by shells, but it no longer owns
 request/result lifecycle. The direct audit now reports exactly **six** remaining seams.
 
+## Mini Sprint 6.3 update
+
+Full-project immutable preparation now validates authored/prepared/route/source/macro digests and
+rejects partial or mixed-revision results before activation staging. This slice intentionally does
+not own any of the six remaining shell, processor-activation, presentation, or macro-value seams, so
+the direct audit remains stable at exactly **six**.
+
 ## Retirement ownership
 
 | Seam | Owning mini sprint |

@@ -39,7 +39,7 @@ completion it constructs a typed `PerformancePublishResult`; the controller acce
 
 - the full identity equals the current request;
 - both snapshot and prepared results cover the complete project and are activation eligible;
-- the prepared build ID and content digest are present; and
+- the prepared build ID, content, route, and source-provenance digests are present; and
 - the prepared macro schema digest equals the captured schema digest.
 
 Successful acceptance yields Ready. Processor staging uses the existing immutable render-model and
@@ -60,7 +60,7 @@ controller or worker storage, and concurrent reads cannot observe half-written i
 
 ## Deferred boundaries
 
-- Mini Sprint 6.3 owns full-project general-authored preparation completeness.
+- Mini Sprint 6.3 completed full-project general-authored preparation completeness and all-or-nothing conformance.
 - Mini Sprint 6.4 owns final Publish/Preview priority, cooperative worker cancellation, and budgets.
 - Mini Sprint 6.5 removes processor-owned activation eligibility/staging compatibility.
 - Mini Sprint 6.7 adds immutable stable-ID published macro bindings.
