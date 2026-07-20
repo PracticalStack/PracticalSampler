@@ -352,6 +352,7 @@ void syncDraftPlaybackIntoDiagnostics(const DraftPlaybackStatus& status,
 void syncPreparedPlaybackWorkerIntoDiagnostics(const PreparedPlaybackWorkerStatus& workerStatus,
                                                EngineDiagnosticsSnapshot& diagnosticsSnapshot)
 {
+    diagnosticsSnapshot.preparedScheduler = workerStatus;
     diagnosticsSnapshot.preparedWorkerPendingCount = workerStatus.pendingWorkCount;
     diagnosticsSnapshot.preparedWorkerConfiguredMaxPendingCount = workerStatus.configuredMaxPendingWorkCount;
     diagnosticsSnapshot.preparedWorkerConfiguredMaxInFlightCount = workerStatus.configuredMaxInFlightWorkCount;
@@ -587,8 +588,11 @@ std::vector<HiseFrontendExportProfile> EngineFacade::getFrontendExportProfiles()
 
 bool EngineFacade::serviceBackgroundWork()
 {
+    const auto serviceStartedAtMicros = monotonicMicros();
     const auto retiredCacheEntries = preparedPlaybackService.serviceRetiredCacheCleanup(1);
     const auto appliedCompletions = pumpPreparedPlaybackWorkerCompletions();
+    preparedPlaybackService.recordMessageThreadServiceDuration(
+        monotonicMicros() - serviceStartedAtMicros);
 
     if (retiredCacheEntries != 0)
         refreshDiagnosticsSnapshot();
@@ -1038,6 +1042,7 @@ EnginePerformanceSnapshot EngineFacade::getPerformanceSnapshot() const
         ? buildLoadIndicator(referenceManifest, referenceStream, currentSessionState)
         : "Click Load Default or Load Lead Demo";
     const auto workerStatus = preparedPlaybackService.getWorkerStatus();
+    snapshot.preparedScheduler = workerStatus;
     snapshot.preparedWorkerPendingCount = workerStatus.pendingWorkCount;
     snapshot.preparedWorkerConfiguredMaxPendingCount = workerStatus.configuredMaxPendingWorkCount;
     snapshot.preparedWorkerConfiguredMaxInFlightCount = workerStatus.configuredMaxInFlightWorkCount;
@@ -1344,6 +1349,7 @@ bool EngineFacade::cancelPreviewPreparation(const std::string& reason)
 
 bool EngineFacade::publishCurrentDraft()
 {
+    const auto commandReceivedAtMicros = monotonicMicros();
     pumpPreparedPlaybackWorkerCompletions();
 
     if (!referenceInstrumentActive || !referenceManifest.loaded || !referenceStream.loaded || !authoringProject.loaded)
@@ -1432,6 +1438,9 @@ bool EngineFacade::publishCurrentDraft()
         markStateChanged();
         return false;
     }
+
+    preparedPlaybackService.recordCommandToQueuedDuration(
+        monotonicMicros() - commandReceivedAtMicros);
 
     currentSessionState.transientMetrics.integrationState = "Publish preparation queued";
     currentSessionState.transientMetrics.lastFailure.clear();

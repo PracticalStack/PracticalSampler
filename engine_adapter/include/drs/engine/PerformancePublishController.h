@@ -64,6 +64,8 @@ struct PerformancePublishControllerSnapshot
     std::uint64_t activeAtMicros = 0;
     std::uint64_t lastPreparationMicros = 0;
     std::uint64_t maxPreparationMicros = 0;
+    std::uint64_t lastRequestToReadyMicros = 0;
+    std::uint64_t maxRequestToReadyMicros = 0;
     std::uint64_t lastRequestToActiveMicros = 0;
     std::uint64_t maxRequestToActiveMicros = 0;
 };

@@ -162,6 +162,13 @@ bool PerformancePublishController::acceptPrepared(const PerformancePublishResult
         snapshot.lastPreparationMicros = nowMicros - snapshot.launchedAtMicros;
         updateMaximum(snapshot.maxPreparationMicros, snapshot.lastPreparationMicros);
     }
+    if (nowMicros != 0
+        && snapshot.requestReceivedAtMicros != 0
+        && nowMicros >= snapshot.requestReceivedAtMicros)
+    {
+        snapshot.lastRequestToReadyMicros = nowMicros - snapshot.requestReceivedAtMicros;
+        updateMaximum(snapshot.maxRequestToReadyMicros, snapshot.lastRequestToReadyMicros);
+    }
     snapshot.pendingDepth = 0;
     ++snapshot.completedCount;
     ++snapshot.acceptedCount;

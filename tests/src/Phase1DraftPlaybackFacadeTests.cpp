@@ -235,6 +235,20 @@ void requireFacadeSnapshotConsistency(drs::engine::EngineFacade& engineFacade, c
     require(diagnosticsSnapshot.preparedWorkerLastSupersededReason
                 == performanceSnapshot.preparedWorkerLastSupersededReason,
             context + " should keep diagnostics and performance snapshots aligned on the last superseded reason.");
+    require(diagnosticsSnapshot.preparedScheduler.pendingWorkCount
+                == performanceSnapshot.preparedScheduler.pendingWorkCount
+                && diagnosticsSnapshot.preparedScheduler.inFlightWorkCount
+                    == performanceSnapshot.preparedScheduler.inFlightWorkCount
+                && diagnosticsSnapshot.preparedScheduler.completedResultCount
+                    == performanceSnapshot.preparedScheduler.completedResultCount,
+            context + " should mirror the typed prepared-scheduler queue depths.");
+    require(diagnosticsSnapshot.preparedScheduler.configuredMaxPendingWorkCount
+                == performanceSnapshot.preparedScheduler.configuredMaxPendingWorkCount
+                && diagnosticsSnapshot.preparedScheduler.configuredMaxInFlightWorkCount
+                    == performanceSnapshot.preparedScheduler.configuredMaxInFlightWorkCount
+                && diagnosticsSnapshot.preparedScheduler.configuredMaxCompletedResultCount
+                    == performanceSnapshot.preparedScheduler.configuredMaxCompletedResultCount,
+            context + " should mirror the prepared-scheduler bounded-work budgets.");
     require(diagnosticsSnapshot.previewPreparedOwnershipRecordCount
                 == performanceSnapshot.previewPreparedOwnershipRecordCount,
             context + " should keep diagnostics and performance snapshots aligned on preview ownership-record counts.");

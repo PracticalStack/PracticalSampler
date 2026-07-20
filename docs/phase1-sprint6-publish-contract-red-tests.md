@@ -37,6 +37,13 @@ rejects partial or mixed-revision results before activation staging. This slice 
 not own any of the six remaining shell, processor-activation, presentation, or macro-value seams, so
 the direct audit remains stable at exactly **six**.
 
+## Mini Sprint 6.4 update
+
+Bounded cross-lane scheduling now enforces newest-only candidates, Publish priority with Preview
+fairness, cooperative in-flight cancellation, completion backpressure, and explicit time/depth/memory
+budgets. This slice owns none of the six remaining shell, processor-activation, presentation, or
+macro-value seams, so the direct audit remains stable at exactly **six**.
+
 ## Retirement ownership
 
 | Seam | Owning mini sprint |

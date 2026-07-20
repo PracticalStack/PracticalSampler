@@ -4,6 +4,7 @@
 #include "drs/engine/RuntimeStream.h"
 
 #include <cstddef>
+#include <atomic>
 #include <condition_variable>
 #include <cstdint>
 #include <memory>
@@ -176,37 +177,6 @@ struct PreparedPlaybackSampleResolution
     bool matchedBySampleSourceId = false;
 };
 
-struct PreparedPlaybackBuildRequest
-{
-    bool accepted = false;
-    std::uint64_t buildId = 0;
-    std::uint64_t cancellationId = 0;
-    std::uint64_t snapshotBuildId = 0;
-    std::size_t requestedDraftRevision = 0;
-    bool activationRequested = false;
-    PlaybackSnapshotLifecycleState lifecycleState = PlaybackSnapshotLifecycleState::idle;
-    bool sampleResolutionReady = false;
-    std::vector<PreparedPlaybackSampleResolution> sampleResolutions;
-    std::string state;
-};
-
-struct PreparedPlaybackBuildResult
-{
-    bool built = false;
-    bool activationEligible = false;
-    std::uint64_t buildId = 0;
-    std::uint64_t cancellationId = 0;
-    std::uint64_t snapshotBuildId = 0;
-    std::size_t requestedDraftRevision = 0;
-    bool activationRequested = false;
-    PlaybackSnapshotLifecycleState lifecycleState = PlaybackSnapshotLifecycleState::idle;
-    std::uint64_t buildDurationMicros = 0;
-    std::string state;
-    std::vector<PlaybackSnapshotFinding> findings;
-    PreparedPlaybackMetrics metrics;
-    ImmutablePreparedPlayback prepared;
-};
-
 enum class PreparedPlaybackWorkLane
 {
     preview,
@@ -219,11 +189,80 @@ enum class PreparedPlaybackJobPriority
     performance = 1
 };
 
+enum class PreparedPlaybackCompletionDisposition
+{
+    none,
+    completed,
+    canceled,
+    superseded,
+    rejected,
+    failed
+};
+
+struct PreparedPlaybackSchedulerBudgets
+{
+    std::size_t maximumPendingJobs = 2;
+    std::size_t maximumInFlightJobs = 1;
+    std::size_t maximumCompletedResults = 4;
+    std::size_t maximumConsecutivePerformanceJobs = 3;
+    std::uint64_t maximumCommandToQueuedMicros = 100000;
+    std::uint64_t maximumRequestToReadyMicros = 5000000;
+    std::uint64_t maximumRetainedPreparedBytes = 512ull * 1024ull * 1024ull;
+    std::uint64_t maximumMessageThreadServiceMicros = 100000;
+};
+
+struct PreparedPlaybackBuildRequest
+{
+    bool accepted = false;
+    std::uint64_t buildId = 0;
+    std::uint64_t cancellationId = 0;
+    std::uint64_t cancellationGeneration = 0;
+    std::uint64_t snapshotBuildId = 0;
+    std::size_t requestedDraftRevision = 0;
+    bool activationRequested = false;
+    PreparedPlaybackWorkLane lane = PreparedPlaybackWorkLane::preview;
+    PreparedPlaybackJobPriority priority = PreparedPlaybackJobPriority::preview;
+    PlaybackSnapshotLifecycleState lifecycleState = PlaybackSnapshotLifecycleState::idle;
+    bool sampleResolutionReady = false;
+    std::uint64_t queuedAtMicros = 0;
+    std::uint64_t enqueueOrdinal = 0;
+    std::uint64_t commandToQueuedMicros = 0;
+    std::size_t pendingDepthAtSubmit = 0;
+    std::vector<PreparedPlaybackSampleResolution> sampleResolutions;
+    std::string state;
+};
+
+struct PreparedPlaybackBuildResult
+{
+    bool built = false;
+    bool activationEligible = false;
+    std::uint64_t buildId = 0;
+    std::uint64_t cancellationId = 0;
+    std::uint64_t cancellationGeneration = 0;
+    std::uint64_t snapshotBuildId = 0;
+    std::size_t requestedDraftRevision = 0;
+    bool activationRequested = false;
+    PreparedPlaybackWorkLane lane = PreparedPlaybackWorkLane::preview;
+    PreparedPlaybackJobPriority priority = PreparedPlaybackJobPriority::preview;
+    PreparedPlaybackCompletionDisposition completionDisposition = PreparedPlaybackCompletionDisposition::none;
+    PlaybackSnapshotLifecycleState lifecycleState = PlaybackSnapshotLifecycleState::idle;
+    std::uint64_t buildDurationMicros = 0;
+    std::uint64_t queueWaitMicros = 0;
+    std::uint64_t requestToReadyMicros = 0;
+    std::size_t pendingDepthAtSubmit = 0;
+    std::size_t runningDepthAtStart = 0;
+    std::string state;
+    std::vector<PlaybackSnapshotFinding> findings;
+    PreparedPlaybackMetrics metrics;
+    ImmutablePreparedPlayback prepared;
+};
+
 struct PreparedPlaybackQueueSubmitResult
 {
     bool accepted = false;
     PreparedPlaybackBuildRequest request;
     std::vector<PreparedPlaybackBuildResult> displacedResults;
+    std::uint64_t commandToQueuedMicros = 0;
     std::string state;
 };
 
@@ -241,11 +280,36 @@ struct PreparedPlaybackWorkerStatus
     std::size_t inFlightWorkCount = 0;
     std::size_t configuredMaxPendingWorkCount = 0;
     std::size_t configuredMaxInFlightWorkCount = 0;
+    std::size_t configuredMaxCompletedResultCount = 0;
+    std::size_t configuredMaxConsecutivePerformanceJobs = 0;
+    std::uint64_t configuredMaxCommandToQueuedMicros = 0;
+    std::uint64_t configuredMaxRequestToReadyMicros = 0;
+    std::uint64_t configuredMaxRetainedPreparedBytes = 0;
+    std::uint64_t configuredMaxMessageThreadServiceMicros = 0;
+    std::size_t completedResultCount = 0;
+    std::size_t maxCompletedResultCount = 0;
+    std::size_t completionBackpressureCount = 0;
     std::size_t completedWorkCount = 0;
     std::size_t cancellationCount = 0;
+    std::size_t cooperativeCancellationCount = 0;
     std::size_t supersededCount = 0;
     std::size_t failureCount = 0;
     std::size_t maxPendingWorkCount = 0;
+    std::size_t consecutivePerformanceDispatchCount = 0;
+    std::size_t maxConsecutivePerformanceDispatchCount = 0;
+    std::size_t previewDispatchCount = 0;
+    std::size_t performanceDispatchCount = 0;
+    std::uint64_t inFlightBuildId = 0;
+    PreparedPlaybackWorkLane inFlightLane = PreparedPlaybackWorkLane::preview;
+    std::uint64_t maxCommandToQueuedMicros = 0;
+    std::uint64_t maxQueueWaitMicros = 0;
+    std::uint64_t maxRequestToReadyMicros = 0;
+    std::uint64_t maxMessageThreadServiceMicros = 0;
+    std::uint64_t maxObservedRetainedPreparedBytes = 0;
+    std::size_t commandToQueuedBudgetViolationCount = 0;
+    std::size_t requestToReadyBudgetViolationCount = 0;
+    std::size_t retainedPreparedBytesBudgetViolationCount = 0;
+    std::size_t messageThreadServiceBudgetViolationCount = 0;
     std::size_t activeOwnershipRecordCount = 0;
     std::uint64_t activeOwnershipBytes = 0;
     std::size_t retiredOwnershipRecordCount = 0;
@@ -269,7 +333,8 @@ class PreparedPlaybackService
 public:
     explicit PreparedPlaybackService(std::string compilerVersion = "phase1-prepared-playback-v2",
                                      std::size_t maxPendingJobs = 2,
-                                     bool enableBackgroundWorker = false);
+                                     bool enableBackgroundWorker = false,
+                                     PreparedPlaybackSchedulerBudgets schedulerBudgets = {});
     ~PreparedPlaybackService();
 
     PreparedPlaybackBuildRequest requestBuild(const PlaybackSnapshotBuildResult& snapshotResult);
@@ -299,6 +364,8 @@ public:
     std::size_t retireStaleCacheEntries(std::size_t maxEntries = static_cast<std::size_t>(-1));
     std::vector<PreparedPlaybackOwnershipRecord> snapshotRetiredOwnershipRecords() const;
     PreparedPlaybackWorkerStatus getWorkerStatus() const;
+    void recordCommandToQueuedDuration(std::uint64_t durationMicros);
+    void recordMessageThreadServiceDuration(std::uint64_t durationMicros);
     bool hasPendingQueuedBuilds() const;
     bool waitForWorkerIdle(std::uint64_t timeoutMillis);
     bool isBackgroundWorkerEnabled() const { return backgroundWorkerEnabled; }
@@ -323,6 +390,7 @@ private:
 
     PreparedPlaybackWorkerStepResult processQueuedJob(const QueuedJob& job,
                                                       const RuntimeStreamLoadResult& streamResult);
+    std::vector<QueuedJob>::iterator selectNextQueuedJob();
     PreparedPlaybackBuildRequest resolveBuildRequest(const PreparedPlaybackBuildRequest& request,
                                                      const PlaybackSnapshotBuildResult& snapshotResult,
                                                      const RuntimeStreamLoadResult& streamResult) const;
@@ -336,15 +404,19 @@ private:
         const std::string& state);
     void runBackgroundWorker();
     void refreshWorkerStatus();
+    bool isCancellationRequested(const PreparedPlaybackBuildRequest& request) const noexcept;
     void retireSupersededCacheEntries(const std::string& sampleSourceId,
                                       const std::string& cacheKey,
                                       std::uint64_t retiredByBuildId);
 
     std::string compilerVersion;
-    std::uint64_t nextBuildId = 1;
+    std::atomic<std::uint64_t> nextBuildId {1};
     std::uint64_t nextQueueOrdinal = 1;
     std::uint64_t nextRetirementToken = 1;
     std::size_t maxPendingJobs = 2;
+    PreparedPlaybackSchedulerBudgets schedulerBudgets;
+    std::atomic<std::uint64_t> previewCancellationGeneration {0};
+    std::atomic<std::uint64_t> performanceCancellationGeneration {0};
     bool backgroundWorkerEnabled = false;
     bool workerStreamConfigured = false;
     bool stopWorkerRequested = false;
@@ -369,4 +441,5 @@ std::string serializePreparedPlaybackContent(const ImmutablePreparedPlayback& pr
 std::string serializeImmutablePreparedPlayback(const ImmutablePreparedPlayback& prepared);
 std::string toString(PreparedPlaybackWorkLane lane);
 std::string toString(PreparedPlaybackJobPriority priority);
+std::string toString(PreparedPlaybackCompletionDisposition disposition);
 } // namespace drs::engine

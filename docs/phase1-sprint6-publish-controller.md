@@ -61,7 +61,8 @@ controller or worker storage, and concurrent reads cannot observe half-written i
 ## Deferred boundaries
 
 - Mini Sprint 6.3 completed full-project general-authored preparation completeness and all-or-nothing conformance.
-- Mini Sprint 6.4 owns final Publish/Preview priority, cooperative worker cancellation, and budgets.
+- Mini Sprint 6.4 completed bounded Publish/Preview priority, fairness, cooperative cancellation,
+  completion backpressure, and scheduler budgets.
 - Mini Sprint 6.5 removes processor-owned activation eligibility/staging compatibility.
 - Mini Sprint 6.7 adds immutable stable-ID published macro bindings.
 - Mini Sprint 6.8 replaces direct shell/UI facade calls and string-only presentation.

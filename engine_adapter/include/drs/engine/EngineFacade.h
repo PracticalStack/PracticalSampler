@@ -81,6 +81,7 @@ struct EnginePreviewPlaybackSnapshot
 
 struct EnginePerformanceSnapshot
 {
+    PreparedPlaybackWorkerStatus preparedScheduler;
     bool loaded = false;
     std::size_t draftRevision = 0;
     std::size_t previewRevision = 0;
@@ -168,6 +169,7 @@ struct EnginePerformanceSnapshot
 
 struct EngineDiagnosticsSnapshot
 {
+    PreparedPlaybackWorkerStatus preparedScheduler;
     bool available = false;
     bool hasFailure = false;
     std::size_t draftRevision = 0;

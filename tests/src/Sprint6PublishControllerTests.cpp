@@ -80,6 +80,9 @@ int main()
                     && active.activeSourceProvenanceDigest == "sources:702"
                     && active.activeMacroSchemaDigest == "macros:b",
                 "The immutable snapshot must retain the exact active identity and prepared truth.");
+        require(active.lastRequestToReadyMicros == 90
+                    && active.maxRequestToReadyMicros >= active.lastRequestToReadyMicros,
+                "Publish diagnostics must measure the complete request-to-ready interval.");
 
         const auto third = controller.request(4, 19, "authored:19", "macros:c", 300);
         require(third.accepted && controller.markPreparing(third.request.identity, 310),

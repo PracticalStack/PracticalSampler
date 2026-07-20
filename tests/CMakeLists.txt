@@ -844,6 +844,33 @@ add_test(
     COMMAND drs_sprint6_performance_preparation_tests
 )
 
+juce_add_console_app(drs_sprint6_publish_scheduling_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Sprint 6 Publish Scheduling Tests"
+)
+
+target_sources(drs_sprint6_publish_scheduling_tests
+    PRIVATE
+        src/Sprint6PublishSchedulingTests.cpp
+)
+
+target_link_libraries(drs_sprint6_publish_scheduling_tests
+    PRIVATE
+        drs_engine_adapter
+        drs_sample_import
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_sprint6_publish_scheduling_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint6.publish_scheduling
+    COMMAND drs_sprint6_publish_scheduling_tests
+)
+
 juce_add_console_app(drs_phase1_realtime_safety_tests
     PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Realtime Safety Tests"
 )
@@ -1715,6 +1742,7 @@ add_dependencies(drs_all_tests
     drs_sprint6_publish_controller_tests
     drs_sprint6_publish_controller_integration_tests
     drs_sprint6_performance_preparation_tests
+    drs_sprint6_publish_scheduling_tests
     drs_phase0_smoke_tests
     drs_phase1_runtime_contract_tests
     drs_phase1_draft_playback_contract_tests

@@ -20,6 +20,12 @@ namespace fs = std::filesystem;
 using Clock = std::chrono::steady_clock;
 using ordered_json = nlohmann::ordered_json;
 
+std::uint64_t clockMicros() noexcept
+{
+    return static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::microseconds>(Clock::now().time_since_epoch()).count());
+}
+
 void addFinding(PreparedPlaybackBuildResult& result,
                 PlaybackSnapshotFindingSeverity severity,
                 const std::string& code,
@@ -447,11 +453,20 @@ const RuntimeStreamSampleDefinition* findStreamSampleById(const RuntimeStreamCon
 
 PreparedPlaybackService::PreparedPlaybackService(std::string compilerVersionIn,
                                                  std::size_t maxPendingJobsIn,
-                                                 bool enableBackgroundWorkerIn)
+                                                 bool enableBackgroundWorkerIn,
+                                                 PreparedPlaybackSchedulerBudgets schedulerBudgetsIn)
     : compilerVersion(std::move(compilerVersionIn)),
       maxPendingJobs(maxPendingJobsIn),
+      schedulerBudgets(std::move(schedulerBudgetsIn)),
       backgroundWorkerEnabled(enableBackgroundWorkerIn)
 {
+    maxPendingJobs = std::max<std::size_t>(
+        1, std::min(maxPendingJobs, std::max<std::size_t>(1, schedulerBudgets.maximumPendingJobs)));
+    schedulerBudgets.maximumPendingJobs = maxPendingJobs;
+    schedulerBudgets.maximumInFlightJobs = 1;
+    schedulerBudgets.maximumCompletedResults = std::max<std::size_t>(1, schedulerBudgets.maximumCompletedResults);
+    schedulerBudgets.maximumConsecutivePerformanceJobs =
+        std::max<std::size_t>(1, schedulerBudgets.maximumConsecutivePerformanceJobs);
     refreshWorkerStatus();
 
     if (backgroundWorkerEnabled)
@@ -487,10 +502,7 @@ PreparedPlaybackBuildRequest PreparedPlaybackService::requestBuild(const Playbac
     }
 
     request.accepted = true;
-    {
-        std::lock_guard<std::mutex> lock(workerMutex);
-        request.buildId = nextBuildId++;
-    }
+    request.buildId = nextBuildId.fetch_add(1, std::memory_order_relaxed);
     request.cancellationId = request.buildId;
     request.lifecycleState = PlaybackSnapshotLifecycleState::preparing;
     request.state = "Prepared playback build queued";
@@ -578,9 +590,17 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     PreparedPlaybackBuildResult result;
     result.buildId = request.buildId;
     result.cancellationId = request.cancellationId;
+    result.cancellationGeneration = request.cancellationGeneration;
     result.snapshotBuildId = request.snapshotBuildId;
     result.requestedDraftRevision = request.requestedDraftRevision;
     result.activationRequested = request.activationRequested;
+    result.lane = request.lane;
+    result.priority = request.priority;
+    result.pendingDepthAtSubmit = request.pendingDepthAtSubmit;
+    result.runningDepthAtStart = 1;
+    result.queueWaitMicros = request.queuedAtMicros == 0
+        ? 0
+        : clockMicros() - request.queuedAtMicros;
     result.lifecycleState = request.accepted
         ? PlaybackSnapshotLifecycleState::preparing
         : PlaybackSnapshotLifecycleState::failed;
@@ -591,8 +611,41 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     const auto startTime = Clock::now();
     std::lock_guard<std::mutex> lock(workerMutex);
 
+    const auto finishCanceled = [&]()
+    {
+        for (auto iterator = cacheEntries.begin(); iterator != cacheEntries.end();)
+        {
+            if (iterator->second.ownership.preparedBuildId == request.buildId)
+                iterator = cacheEntries.erase(iterator);
+            else
+                ++iterator;
+        }
+        result.built = false;
+        result.activationEligible = false;
+        result.lifecycleState = PlaybackSnapshotLifecycleState::canceled;
+        result.completionDisposition = PreparedPlaybackCompletionDisposition::canceled;
+        result.state = "Prepared playback build cooperatively canceled";
+        result.metrics.cancellationCount = 1;
+        result.prepared = {};
+        addFinding(result,
+                   PlaybackSnapshotFindingSeverity::error,
+                   "prepared-build-cooperatively-canceled",
+                   toString(request.lane),
+                   "A newer request or explicit cancellation invalidated this in-flight build.");
+        ++workerStatus.cooperativeCancellationCount;
+        ++workerStatus.cancellationCount;
+        result.buildDurationMicros = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - startTime).count());
+        result.requestToReadyMicros = request.queuedAtMicros == 0
+            ? result.buildDurationMicros
+            : clockMicros() - request.queuedAtMicros;
+        refreshWorkerStatus();
+        return result;
+    };
+
     if (!request.accepted)
     {
+        result.completionDisposition = PreparedPlaybackCompletionDisposition::rejected;
         result.metrics.failureCount = 1;
         result.findings = snapshotResult.findings;
         if (result.findings.empty())
@@ -605,6 +658,9 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - startTime).count());
         return result;
     }
+
+    if (isCancellationRequested(request))
+        return finishCanceled();
 
     const auto resolvedRequest = request.sampleResolutionReady
         ? request
@@ -629,12 +685,16 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
 
     for (const auto& sampleResolution : resolvedRequest.sampleResolutions)
     {
+        if (isCancellationRequested(request))
+            return finishCanceled();
         const auto path = "sampleIdentities[" + std::to_string(sampleResolution.snapshotSampleIndex) + "]";
         const auto* candidateStreamSample = !streamResult.loaded || sampleResolution.selectedStreamSampleId.empty()
             ? nullptr
             : findStreamSampleById(streamResult.container, sampleResolution.selectedStreamSampleId);
 
         const auto fingerprint = fingerprintSampleSourceFile(sampleResolution.normalizedSourcePath);
+        if (isCancellationRequested(request))
+            return finishCanceled();
         if (!fingerprint.fingerprinted)
         {
             SampleImportResult fingerprintFailure;
@@ -688,6 +748,8 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
         {
             const auto decodedSample = importSampleFile(sampleResolution.normalizedSourcePath,
                                                         fingerprint.fingerprintHex);
+            if (isCancellationRequested(request))
+                return finishCanceled();
             if (!decodedSample.imported)
             {
                 const auto failure = classifyPreparedSampleImportFailure(decodedSample);
@@ -814,6 +876,8 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
 
     for (std::size_t index = 0; index < snapshotResult.snapshot.zones.size(); ++index)
     {
+        if (isCancellationRequested(request))
+            return finishCanceled();
         const auto& zone = snapshotResult.snapshot.zones[index];
         const auto sampleIterator = sampleIndices.find(zone.sampleSourceId);
         const auto streamIterator = streamIndices.find(zone.sampleSourceId);
@@ -886,17 +950,27 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
         ? "Prepared playback ready"
         : "Prepared playback failed";
     result.metrics.failureCount = errorCount == 0 ? 0 : 1;
+    result.completionDisposition = errorCount == 0
+        ? PreparedPlaybackCompletionDisposition::completed
+        : PreparedPlaybackCompletionDisposition::failed;
 
     if (result.built)
     {
+        if (isCancellationRequested(request))
+            return finishCanceled();
         result.prepared.routeDigest = computePreparedPlaybackRouteDigest(snapshotResult.snapshot, result.prepared);
         result.prepared.sourceProvenanceDigest = computePreparedPlaybackSourceProvenanceDigest(result.prepared);
         result.prepared.macroSchemaDigest = computePlaybackSnapshotMacroSchemaDigest(snapshotResult.snapshot);
         result.prepared.preparedContentDigest = computePreparedPlaybackContentDigest(result.prepared);
+        if (isCancellationRequested(request))
+            return finishCanceled();
     }
 
     result.buildDurationMicros = static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - startTime).count());
+    result.requestToReadyMicros = request.queuedAtMicros == 0
+        ? result.buildDurationMicros
+        : clockMicros() - request.queuedAtMicros;
     return result;
 }
 
@@ -906,9 +980,13 @@ PreparedPlaybackBuildResult PreparedPlaybackService::cancelBuild(const PreparedP
     PreparedPlaybackBuildResult result;
     result.buildId = request.buildId;
     result.cancellationId = request.cancellationId;
+    result.cancellationGeneration = request.cancellationGeneration;
     result.snapshotBuildId = request.snapshotBuildId;
     result.requestedDraftRevision = request.requestedDraftRevision;
     result.activationRequested = request.activationRequested;
+    result.lane = request.lane;
+    result.priority = request.priority;
+    result.completionDisposition = PreparedPlaybackCompletionDisposition::canceled;
     result.lifecycleState = PlaybackSnapshotLifecycleState::canceled;
     result.state = state;
     result.metrics.cancellationCount = 1;
@@ -922,9 +1000,13 @@ PreparedPlaybackBuildResult PreparedPlaybackService::supersedeBuild(const Prepar
     PreparedPlaybackBuildResult result;
     result.buildId = request.buildId;
     result.cancellationId = replacementBuildId;
+    result.cancellationGeneration = request.cancellationGeneration;
     result.snapshotBuildId = request.snapshotBuildId;
     result.requestedDraftRevision = request.requestedDraftRevision;
     result.activationRequested = request.activationRequested;
+    result.lane = request.lane;
+    result.priority = request.priority;
+    result.completionDisposition = PreparedPlaybackCompletionDisposition::superseded;
     result.lifecycleState = PlaybackSnapshotLifecycleState::superseded;
     result.state = state;
     return result;
@@ -946,8 +1028,17 @@ PreparedPlaybackQueueSubmitResult PreparedPlaybackService::enqueueBuildForLane(
     PreparedPlaybackWorkLane lane,
     PreparedPlaybackJobPriority priority)
 {
+    const auto commandStartedAtMicros = clockMicros();
+    auto& cancellationGeneration = lane == PreparedPlaybackWorkLane::performance
+        ? performanceCancellationGeneration
+        : previewCancellationGeneration;
+    const auto nextCancellationGeneration =
+        cancellationGeneration.fetch_add(1, std::memory_order_acq_rel) + 1;
     PreparedPlaybackQueueSubmitResult submitResult;
     submitResult.request = requestBuild(snapshotResult);
+    submitResult.request.lane = lane;
+    submitResult.request.priority = priority;
+    submitResult.request.cancellationGeneration = nextCancellationGeneration;
     submitResult.state = submitResult.request.state;
     std::lock_guard<std::mutex> lock(workerMutex);
 
@@ -1005,19 +1096,56 @@ PreparedPlaybackQueueSubmitResult PreparedPlaybackService::enqueueBuildForLane(
         return submitResult;
     }
 
+    const auto enqueueOrdinal = nextQueueOrdinal++;
+    const auto queuedAtMicros = clockMicros();
+    submitResult.request.enqueueOrdinal = enqueueOrdinal;
+    submitResult.request.queuedAtMicros = queuedAtMicros;
+    submitResult.request.pendingDepthAtSubmit = queuedJobs.size() + 1;
+    submitResult.request.commandToQueuedMicros = queuedAtMicros - commandStartedAtMicros;
+    submitResult.commandToQueuedMicros = submitResult.request.commandToQueuedMicros;
     queuedJobs.push_back({
         lane,
         priority,
         submitResult.request,
         snapshotResult,
-        nextQueueOrdinal++
+        enqueueOrdinal
     });
     submitResult.accepted = true;
     submitResult.state = "Prepared playback build queued";
+    if (completedResults.size() >= schedulerBudgets.maximumCompletedResults)
+        ++workerStatus.completionBackpressureCount;
     workerStatus.lastEvent = submitResult.state;
+    workerStatus.maxCommandToQueuedMicros = std::max(workerStatus.maxCommandToQueuedMicros,
+                                                     submitResult.commandToQueuedMicros);
+    if (submitResult.commandToQueuedMicros > schedulerBudgets.maximumCommandToQueuedMicros)
+        ++workerStatus.commandToQueuedBudgetViolationCount;
     refreshWorkerStatus();
     workerCondition.notify_all();
     return submitResult;
+}
+
+std::vector<PreparedPlaybackService::QueuedJob>::iterator PreparedPlaybackService::selectNextQueuedJob()
+{
+    const auto previewIterator = std::find_if(
+        queuedJobs.begin(), queuedJobs.end(), [](const QueuedJob& job)
+        {
+            return job.lane == PreparedPlaybackWorkLane::preview;
+        });
+    const auto previewPending = previewIterator != queuedJobs.end();
+    if (previewPending
+        && workerStatus.consecutivePerformanceDispatchCount
+            >= schedulerBudgets.maximumConsecutivePerformanceJobs)
+    {
+        return previewIterator;
+    }
+
+    return std::min_element(
+        queuedJobs.begin(), queuedJobs.end(), [](const QueuedJob& left, const QueuedJob& right)
+        {
+            if (left.priority != right.priority)
+                return static_cast<int>(left.priority) > static_cast<int>(right.priority);
+            return left.enqueueOrdinal < right.enqueueOrdinal;
+        });
 }
 
 std::vector<PreparedPlaybackService::QueuedJob>::iterator
@@ -1067,20 +1195,26 @@ PreparedPlaybackWorkerStepResult PreparedPlaybackService::processNextQueuedBuild
             return stepResult;
         }
 
-        const auto selectedIterator = std::min_element(
-            queuedJobs.begin(),
-            queuedJobs.end(),
-            [](const QueuedJob& left, const QueuedJob& right)
-            {
-                if (left.priority != right.priority)
-                    return static_cast<int>(left.priority) > static_cast<int>(right.priority);
-
-                return left.enqueueOrdinal < right.enqueueOrdinal;
-            });
+        const auto selectedIterator = selectNextQueuedJob();
 
         job = *selectedIterator;
         queuedJobs.erase(selectedIterator);
         workerStatus.inFlightWorkCount = 1;
+        workerStatus.inFlightBuildId = job.request.buildId;
+        workerStatus.inFlightLane = job.lane;
+        if (job.lane == PreparedPlaybackWorkLane::performance)
+        {
+            ++workerStatus.performanceDispatchCount;
+            ++workerStatus.consecutivePerformanceDispatchCount;
+            workerStatus.maxConsecutivePerformanceDispatchCount = std::max(
+                workerStatus.maxConsecutivePerformanceDispatchCount,
+                workerStatus.consecutivePerformanceDispatchCount);
+        }
+        else
+        {
+            ++workerStatus.previewDispatchCount;
+            workerStatus.consecutivePerformanceDispatchCount = 0;
+        }
         refreshWorkerStatus();
     }
 
@@ -1090,8 +1224,15 @@ PreparedPlaybackWorkerStepResult PreparedPlaybackService::processNextQueuedBuild
         std::lock_guard<std::mutex> lock(workerMutex);
         ++workerStatus.completedWorkCount;
         workerStatus.failureCount += stepResult.result.metrics.failureCount;
+        workerStatus.maxQueueWaitMicros = std::max(workerStatus.maxQueueWaitMicros,
+                                                   stepResult.result.queueWaitMicros);
+        workerStatus.maxRequestToReadyMicros = std::max(workerStatus.maxRequestToReadyMicros,
+                                                        stepResult.result.requestToReadyMicros);
+        if (stepResult.result.requestToReadyMicros > schedulerBudgets.maximumRequestToReadyMicros)
+            ++workerStatus.requestToReadyBudgetViolationCount;
         workerStatus.lastEvent = stepResult.result.state;
         workerStatus.inFlightWorkCount = 0;
+        workerStatus.inFlightBuildId = 0;
         refreshWorkerStatus();
     }
 
@@ -1101,19 +1242,26 @@ PreparedPlaybackWorkerStepResult PreparedPlaybackService::processNextQueuedBuild
 
 std::vector<PreparedPlaybackWorkerStepResult> PreparedPlaybackService::drainCompletedBuilds()
 {
-    std::lock_guard<std::mutex> lock(workerMutex);
-    auto results = std::move(completedResults);
-    completedResults.clear();
+    std::vector<PreparedPlaybackWorkerStepResult> results;
+    {
+        std::lock_guard<std::mutex> lock(workerMutex);
+        results = std::move(completedResults);
+        completedResults.clear();
+        refreshWorkerStatus();
+    }
+    workerCondition.notify_all();
     return results;
 }
 
 std::vector<PreparedPlaybackBuildResult> PreparedPlaybackService::cancelQueuedPreviewBuilds(const std::string& state)
 {
+    previewCancellationGeneration.fetch_add(1, std::memory_order_acq_rel);
     return cancelQueuedBuildsForLane(PreparedPlaybackWorkLane::preview, state);
 }
 
 std::vector<PreparedPlaybackBuildResult> PreparedPlaybackService::cancelQueuedPublishBuilds(const std::string& state)
 {
+    performanceCancellationGeneration.fetch_add(1, std::memory_order_acq_rel);
     return cancelQueuedBuildsForLane(PreparedPlaybackWorkLane::performance, state);
 }
 
@@ -1194,6 +1342,26 @@ PreparedPlaybackWorkerStatus PreparedPlaybackService::getWorkerStatus() const
     return workerStatus;
 }
 
+void PreparedPlaybackService::recordCommandToQueuedDuration(std::uint64_t durationMicros)
+{
+    std::lock_guard<std::mutex> lock(workerMutex);
+    workerStatus.maxCommandToQueuedMicros = std::max(workerStatus.maxCommandToQueuedMicros,
+                                                     durationMicros);
+    if (durationMicros > schedulerBudgets.maximumCommandToQueuedMicros)
+        ++workerStatus.commandToQueuedBudgetViolationCount;
+    refreshWorkerStatus();
+}
+
+void PreparedPlaybackService::recordMessageThreadServiceDuration(std::uint64_t durationMicros)
+{
+    std::lock_guard<std::mutex> lock(workerMutex);
+    workerStatus.maxMessageThreadServiceMicros = std::max(workerStatus.maxMessageThreadServiceMicros,
+                                                          durationMicros);
+    if (durationMicros > schedulerBudgets.maximumMessageThreadServiceMicros)
+        ++workerStatus.messageThreadServiceBudgetViolationCount;
+    refreshWorkerStatus();
+}
+
 bool PreparedPlaybackService::hasPendingQueuedBuilds() const
 {
     std::lock_guard<std::mutex> lock(workerMutex);
@@ -1239,27 +1407,34 @@ void PreparedPlaybackService::runBackgroundWorker()
                 [this]
                 {
                     return stopWorkerRequested
-                        || (!queuedJobs.empty() && workerStreamConfigured);
+                        || (!queuedJobs.empty() && workerStreamConfigured
+                            && completedResults.size() < schedulerBudgets.maximumCompletedResults);
                 });
 
             if (stopWorkerRequested)
                 break;
 
-            const auto selectedIterator = std::min_element(
-                queuedJobs.begin(),
-                queuedJobs.end(),
-                [](const QueuedJob& left, const QueuedJob& right)
-                {
-                    if (left.priority != right.priority)
-                        return static_cast<int>(left.priority) > static_cast<int>(right.priority);
-
-                    return left.enqueueOrdinal < right.enqueueOrdinal;
-                });
+            const auto selectedIterator = selectNextQueuedJob();
 
             job = *selectedIterator;
             queuedJobs.erase(selectedIterator);
             streamResult = workerStreamResult;
             workerStatus.inFlightWorkCount = 1;
+            workerStatus.inFlightBuildId = job.request.buildId;
+            workerStatus.inFlightLane = job.lane;
+            if (job.lane == PreparedPlaybackWorkLane::performance)
+            {
+                ++workerStatus.performanceDispatchCount;
+                ++workerStatus.consecutivePerformanceDispatchCount;
+                workerStatus.maxConsecutivePerformanceDispatchCount = std::max(
+                    workerStatus.maxConsecutivePerformanceDispatchCount,
+                    workerStatus.consecutivePerformanceDispatchCount);
+            }
+            else
+            {
+                ++workerStatus.previewDispatchCount;
+                workerStatus.consecutivePerformanceDispatchCount = 0;
+            }
             workerStatus.lastEvent = "Prepared playback worker processing " + toString(job.lane) + " request";
             refreshWorkerStatus();
         }
@@ -1271,7 +1446,14 @@ void PreparedPlaybackService::runBackgroundWorker()
             completedResults.push_back(stepResult);
             ++workerStatus.completedWorkCount;
             workerStatus.failureCount += stepResult.result.metrics.failureCount;
+            workerStatus.maxQueueWaitMicros = std::max(workerStatus.maxQueueWaitMicros,
+                                                       stepResult.result.queueWaitMicros);
+            workerStatus.maxRequestToReadyMicros = std::max(workerStatus.maxRequestToReadyMicros,
+                                                            stepResult.result.requestToReadyMicros);
+            if (stepResult.result.requestToReadyMicros > schedulerBudgets.maximumRequestToReadyMicros)
+                ++workerStatus.requestToReadyBudgetViolationCount;
             workerStatus.inFlightWorkCount = 0;
+            workerStatus.inFlightBuildId = 0;
             workerStatus.lastEvent = stepResult.result.state;
             refreshWorkerStatus();
         }
@@ -1285,6 +1467,15 @@ void PreparedPlaybackService::refreshWorkerStatus()
     workerStatus.pendingWorkCount = queuedJobs.size();
     workerStatus.configuredMaxPendingWorkCount = maxPendingJobs;
     workerStatus.configuredMaxInFlightWorkCount = 1;
+    workerStatus.configuredMaxCompletedResultCount = schedulerBudgets.maximumCompletedResults;
+    workerStatus.configuredMaxConsecutivePerformanceJobs = schedulerBudgets.maximumConsecutivePerformanceJobs;
+    workerStatus.configuredMaxCommandToQueuedMicros = schedulerBudgets.maximumCommandToQueuedMicros;
+    workerStatus.configuredMaxRequestToReadyMicros = schedulerBudgets.maximumRequestToReadyMicros;
+    workerStatus.configuredMaxRetainedPreparedBytes = schedulerBudgets.maximumRetainedPreparedBytes;
+    workerStatus.configuredMaxMessageThreadServiceMicros = schedulerBudgets.maximumMessageThreadServiceMicros;
+    workerStatus.completedResultCount = completedResults.size();
+    workerStatus.maxCompletedResultCount = std::max(workerStatus.maxCompletedResultCount,
+                                                    workerStatus.completedResultCount);
     workerStatus.maxPendingWorkCount = std::max(workerStatus.maxPendingWorkCount, workerStatus.pendingWorkCount);
     workerStatus.activeOwnershipRecordCount = cacheEntries.size();
     workerStatus.activeOwnershipBytes = std::accumulate(
@@ -1296,6 +1487,22 @@ void PreparedPlaybackService::refreshWorkerStatus()
             return total + entry.second.retainedBytes;
         });
     workerStatus.retiredOwnershipRecordCount = retiredCacheEntries.size();
+    const auto retainedBytes = workerStatus.activeOwnershipBytes + workerStatus.retiredBytesAwaitingCleanup;
+    workerStatus.maxObservedRetainedPreparedBytes = std::max(workerStatus.maxObservedRetainedPreparedBytes,
+                                                             retainedBytes);
+    if (retainedBytes > schedulerBudgets.maximumRetainedPreparedBytes)
+        ++workerStatus.retainedPreparedBytesBudgetViolationCount;
+}
+
+bool PreparedPlaybackService::isCancellationRequested(
+    const PreparedPlaybackBuildRequest& request) const noexcept
+{
+    if (request.cancellationGeneration == 0)
+        return false;
+    const auto currentGeneration = request.lane == PreparedPlaybackWorkLane::performance
+        ? performanceCancellationGeneration.load(std::memory_order_acquire)
+        : previewCancellationGeneration.load(std::memory_order_acquire);
+    return currentGeneration != request.cancellationGeneration;
 }
 
 void PreparedPlaybackService::retireSupersededCacheEntries(const std::string& sampleSourceId,
@@ -1618,6 +1825,26 @@ std::string toString(PreparedPlaybackJobPriority priority)
         return "publish";
     }
 
+    return "unknown";
+}
+
+std::string toString(PreparedPlaybackCompletionDisposition disposition)
+{
+    switch (disposition)
+    {
+    case PreparedPlaybackCompletionDisposition::none:
+        return "none";
+    case PreparedPlaybackCompletionDisposition::completed:
+        return "completed";
+    case PreparedPlaybackCompletionDisposition::canceled:
+        return "canceled";
+    case PreparedPlaybackCompletionDisposition::superseded:
+        return "superseded";
+    case PreparedPlaybackCompletionDisposition::rejected:
+        return "rejected";
+    case PreparedPlaybackCompletionDisposition::failed:
+        return "failed";
+    }
     return "unknown";
 }
 } // namespace drs::engine
