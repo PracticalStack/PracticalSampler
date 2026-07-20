@@ -28,6 +28,7 @@ enum class SamplerRenderEventType : std::uint8_t
 {
     noteOn,
     noteOff,
+    sustainPedal,
     allNotesOff,
     reset
 };
@@ -74,6 +75,8 @@ struct SamplerRenderResult
     std::uint32_t releasedVoiceCount = 0;
     std::uint32_t completedVoiceCount = 0;
     std::uint32_t stolenVoiceCount = 0;
+    std::uint32_t generationStealCount = 0;
+    std::uint32_t releasingVoiceStealCount = 0;
     std::uint32_t droppedEventCount = 0;
 };
 

@@ -46,6 +46,12 @@ struct ProcessorRealtimeSafetySnapshot
     std::size_t authoringPreviewPeakActiveVoiceCount = 0;
     std::size_t authoringPreviewPeakReleasingVoiceCount = 0;
     std::uint64_t performanceVoiceStealCount = 0;
+    std::uint64_t performanceGenerationStealCount = 0;
+    std::uint64_t performanceReleasingVoiceStealCount = 0;
+    std::uint64_t performanceActiveGeneration = 0;
+    std::size_t performanceActiveGenerationVoiceCount = 0;
+    std::size_t performanceRetiredGenerationVoiceCount = 0;
+    std::size_t performanceSustainDeferredVoiceCount = 0;
     std::uint64_t authoringPreviewVoiceStealCount = 0;
     std::uint64_t performanceDroppedEventCount = 0;
     std::uint64_t authoringPreviewDroppedEventCount = 0;
@@ -241,6 +247,12 @@ private:
         std::size_t authoringPreviewPeakActiveVoiceCount = 0;
         std::size_t authoringPreviewPeakReleasingVoiceCount = 0;
         std::uint64_t performanceVoiceStealCount = 0;
+        std::uint64_t performanceGenerationStealCount = 0;
+        std::uint64_t performanceReleasingVoiceStealCount = 0;
+        std::uint64_t performanceActiveGeneration = 0;
+        std::size_t performanceActiveGenerationVoiceCount = 0;
+        std::size_t performanceRetiredGenerationVoiceCount = 0;
+        std::size_t performanceSustainDeferredVoiceCount = 0;
         std::uint64_t authoringPreviewVoiceStealCount = 0;
         std::uint64_t performanceDroppedEventCount = 0;
         std::uint64_t authoringPreviewDroppedEventCount = 0;
@@ -281,6 +293,12 @@ private:
         std::atomic<std::size_t> authoringPreviewPeakActiveVoiceCount { 0 };
         std::atomic<std::size_t> authoringPreviewPeakReleasingVoiceCount { 0 };
         std::atomic<std::uint64_t> performanceVoiceStealCount { 0 };
+        std::atomic<std::uint64_t> performanceGenerationStealCount { 0 };
+        std::atomic<std::uint64_t> performanceReleasingVoiceStealCount { 0 };
+        std::atomic<std::uint64_t> performanceActiveGeneration { 0 };
+        std::atomic<std::size_t> performanceActiveGenerationVoiceCount { 0 };
+        std::atomic<std::size_t> performanceRetiredGenerationVoiceCount { 0 };
+        std::atomic<std::size_t> performanceSustainDeferredVoiceCount { 0 };
         std::atomic<std::uint64_t> authoringPreviewVoiceStealCount { 0 };
         std::atomic<std::uint64_t> performanceDroppedEventCount { 0 };
         std::atomic<std::uint64_t> authoringPreviewDroppedEventCount { 0 };

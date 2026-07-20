@@ -37,8 +37,14 @@ struct SamplerVoiceSlotSnapshot
 {
     SamplerVoiceSlotState state = SamplerVoiceSlotState::free;
     std::uint64_t voiceId = 0;
+    std::uint64_t activationGeneration = 0;
+    std::size_t modelRevision = 0;
     int sourceMidiNote = 0;
     int effectiveMidiNote = 0;
+    double incrementFrames = 0.0;
+    float baseGain = 0.0f;
+    bool loopActive = false;
+    bool sustainDeferred = false;
 };
 
 struct SamplerVoicePoolRenderResult
@@ -48,6 +54,9 @@ struct SamplerVoicePoolRenderResult
     std::uint32_t activeVoiceCount = 0;
     std::uint32_t releasingVoiceCount = 0;
     std::uint32_t finishedVoiceCount = 0;
+    std::uint32_t activeGenerationVoiceCount = 0;
+    std::uint32_t retiredGenerationVoiceCount = 0;
+    std::uint32_t sustainDeferredVoiceCount = 0;
     std::uint32_t resetVoiceCount = 0;
 };
 
@@ -56,8 +65,12 @@ class SamplerVoicePool final
 public:
     static constexpr std::size_t capacity = 24;
 
-    bool prepare(const SamplerRenderModel& model, double outputSampleRate) noexcept;
-    bool activateModel(const SamplerRenderModel& model, double outputSampleRate) noexcept;
+    bool prepare(const SamplerRenderModel& model,
+                 double outputSampleRate,
+                 std::uint64_t activationGeneration = 0) noexcept;
+    bool activateModel(const SamplerRenderModel& model,
+                       double outputSampleRate,
+                       std::uint64_t activationGeneration = 0) noexcept;
     void clearRenderModel() noexcept;
     SamplerVoicePoolRenderResult renderBlock(SamplerAudioBufferView output,
                                              SamplerRenderEventView events) noexcept;
@@ -67,6 +80,10 @@ public:
     std::size_t releasingVoiceCount() const noexcept;
     std::size_t finishedVoiceCount() const noexcept;
     std::size_t voiceCountUsingModel(const SamplerRenderModel* model) const noexcept;
+    std::size_t voiceCountUsingGeneration(std::uint64_t activationGeneration) const noexcept;
+    std::size_t retiredGenerationVoiceCount() const noexcept;
+    std::size_t sustainDeferredVoiceCount() const noexcept;
+    std::uint64_t getActiveGeneration() const noexcept { return activeGeneration; }
     SamplerVoiceSlotSnapshot getSlotSnapshot(std::size_t index) const noexcept;
 
 private:
@@ -74,6 +91,7 @@ private:
     {
         SamplerVoice voice;
         SamplerVoiceSlotState state = SamplerVoiceSlotState::free;
+        bool sustainDeferred = false;
     };
 
     void renderRange(SamplerAudioBufferView output,
@@ -83,12 +101,17 @@ private:
     void applyEvent(const SamplerRenderEvent& event,
                     SamplerVoicePoolRenderResult& result) noexcept;
     std::size_t selectRouteIndex(int midiNote, int velocity) const noexcept;
-    std::size_t acquireSlot(bool& stolen) noexcept;
+    std::size_t acquireSlot(bool& stolen,
+                            bool& generationStolen,
+                            bool& releasingStolen) noexcept;
     void updateCounts(SamplerVoicePoolRenderResult& result) const noexcept;
 
     std::array<Slot, capacity> slots {};
     const SamplerRenderModel* renderModel = nullptr;
     double sampleRate = 0.0;
     std::uint64_t nextVoiceId = 1;
+    std::uint64_t activeGeneration = 0;
+    std::uint64_t nextGeneratedActivation = 1;
+    bool sustainPedalDown = false;
 };
 } // namespace drs::engine

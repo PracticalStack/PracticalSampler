@@ -17,6 +17,7 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
 {
     reset();
     if (request.voiceId == 0
+        || request.activationGeneration == 0
         || request.routeIndex >= model.getRoutes().size()
         || request.sourceMidiNote < 0 || request.sourceMidiNote > 127
         || request.effectiveMidiNote < 0 || request.effectiveMidiNote > 127
@@ -50,6 +51,7 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
 
     lifecycleState = SamplerVoiceLifecycleState::active;
     voiceId = request.voiceId;
+    activationGeneration = request.activationGeneration;
     routeIndex = request.routeIndex;
     sourceMidiNote = request.sourceMidiNote;
     effectiveMidiNote = request.effectiveMidiNote;
@@ -173,6 +175,7 @@ void SamplerVoice::reset() noexcept
 {
     lifecycleState = SamplerVoiceLifecycleState::idle;
     voiceId = 0;
+    activationGeneration = 0;
     routeIndex = 0;
     sourceMidiNote = 0;
     effectiveMidiNote = 0;

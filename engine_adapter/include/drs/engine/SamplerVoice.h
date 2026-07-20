@@ -23,6 +23,7 @@ struct SamplerVoiceStartRequest
     int effectiveMidiNote = 60;
     int effectiveVelocity = 127;
     double outputSampleRate = 48000.0;
+    std::uint64_t activationGeneration = 1;
 };
 
 struct SamplerVoiceRenderResult
@@ -59,6 +60,7 @@ public:
     bool isActive() const noexcept { return lifecycleState == SamplerVoiceLifecycleState::active; }
     bool isReleasing() const noexcept { return lifecycleState == SamplerVoiceLifecycleState::releasing; }
     std::uint64_t getVoiceId() const noexcept { return voiceId; }
+    std::uint64_t getActivationGeneration() const noexcept { return activationGeneration; }
     std::size_t getRouteIndex() const noexcept { return routeIndex; }
     int getSourceMidiNote() const noexcept { return sourceMidiNote; }
     int getEffectiveMidiNote() const noexcept { return effectiveMidiNote; }
@@ -66,6 +68,7 @@ public:
     double getPositionFrames() const noexcept { return positionFrames; }
     double getIncrementFrames() const noexcept { return incrementFrames; }
     float getBaseGain() const noexcept { return baseGain; }
+    bool isLoopActive() const noexcept { return loopActive; }
     SamplerPanGains getPanGains() const noexcept { return panGains; }
     std::uint32_t getReleaseSamplesRemaining() const noexcept { return releaseSamplesRemaining; }
     std::uint32_t getReleaseSamplesTotal() const noexcept { return releaseSamplesTotal; }
@@ -76,6 +79,7 @@ private:
 
     SamplerVoiceLifecycleState lifecycleState = SamplerVoiceLifecycleState::idle;
     std::uint64_t voiceId = 0;
+    std::uint64_t activationGeneration = 0;
     std::size_t routeIndex = 0;
     int sourceMidiNote = 0;
     int effectiveMidiNote = 0;

@@ -32,7 +32,8 @@ void SamplerEventBlock::clear() noexcept
 }
 
 bool SamplerVoicePool::prepare(const SamplerRenderModel& model,
-                               double outputSampleRate) noexcept
+                               double outputSampleRate,
+                               std::uint64_t activationGeneration) noexcept
 {
     if (!std::isfinite(outputSampleRate) || outputSampleRate <= 0.0
         || model.getRoutes().empty() || model.getSamples().empty())
@@ -42,11 +43,13 @@ bool SamplerVoicePool::prepare(const SamplerRenderModel& model,
 
     resetVoices();
     nextVoiceId = 1;
-    return activateModel(model, outputSampleRate);
+    nextGeneratedActivation = 1;
+    return activateModel(model, outputSampleRate, activationGeneration);
 }
 
 bool SamplerVoicePool::activateModel(const SamplerRenderModel& model,
-                                     double outputSampleRate) noexcept
+                                     double outputSampleRate,
+                                     std::uint64_t activationGeneration) noexcept
 {
     if (!std::isfinite(outputSampleRate) || outputSampleRate <= 0.0
         || model.getRoutes().empty() || model.getSamples().empty())
@@ -54,8 +57,22 @@ bool SamplerVoicePool::activateModel(const SamplerRenderModel& model,
         return false;
     }
 
+    if (activationGeneration == 0)
+    {
+        activationGeneration = nextGeneratedActivation++;
+        if (nextGeneratedActivation == 0)
+            nextGeneratedActivation = 1;
+    }
+    else if (activationGeneration >= nextGeneratedActivation)
+    {
+        nextGeneratedActivation = activationGeneration + 1;
+        if (nextGeneratedActivation == 0)
+            nextGeneratedActivation = 1;
+    }
+
     renderModel = &model;
     sampleRate = outputSampleRate;
+    activeGeneration = activationGeneration;
     return true;
 }
 
@@ -65,6 +82,8 @@ void SamplerVoicePool::clearRenderModel() noexcept
     renderModel = nullptr;
     sampleRate = 0.0;
     nextVoiceId = 1;
+    activeGeneration = 0;
+    nextGeneratedActivation = 1;
 }
 
 SamplerVoicePoolRenderResult SamplerVoicePool::renderBlock(SamplerAudioBufferView output,
@@ -107,7 +126,9 @@ void SamplerVoicePool::resetVoices() noexcept
     {
         slot.voice.reset();
         slot.state = SamplerVoiceSlotState::free;
+        slot.sustainDeferred = false;
     }
+    sustainPedalDown = false;
 }
 
 std::size_t SamplerVoicePool::activeVoiceCount() const noexcept
@@ -146,6 +167,38 @@ std::size_t SamplerVoicePool::voiceCountUsingModel(const SamplerRenderModel* mod
     }));
 }
 
+std::size_t SamplerVoicePool::voiceCountUsingGeneration(
+    std::uint64_t activationGeneration) const noexcept
+{
+    if (activationGeneration == 0)
+        return 0;
+    return static_cast<std::size_t>(std::count_if(slots.begin(), slots.end(),
+        [activationGeneration](const Slot& slot)
+        {
+            return (slot.state == SamplerVoiceSlotState::active
+                    || slot.state == SamplerVoiceSlotState::releasing)
+                && slot.voice.getActivationGeneration() == activationGeneration;
+        }));
+}
+
+std::size_t SamplerVoicePool::retiredGenerationVoiceCount() const noexcept
+{
+    return static_cast<std::size_t>(std::count_if(slots.begin(), slots.end(), [&](const Slot& slot)
+    {
+        return (slot.state == SamplerVoiceSlotState::active
+                || slot.state == SamplerVoiceSlotState::releasing)
+            && slot.voice.getActivationGeneration() != activeGeneration;
+    }));
+}
+
+std::size_t SamplerVoicePool::sustainDeferredVoiceCount() const noexcept
+{
+    return static_cast<std::size_t>(std::count_if(slots.begin(), slots.end(), [](const Slot& slot)
+    {
+        return slot.state == SamplerVoiceSlotState::active && slot.sustainDeferred;
+    }));
+}
+
 SamplerVoiceSlotSnapshot SamplerVoicePool::getSlotSnapshot(std::size_t index) const noexcept
 {
     if (index >= slots.size())
@@ -153,8 +206,15 @@ SamplerVoiceSlotSnapshot SamplerVoicePool::getSlotSnapshot(std::size_t index) co
     const auto& slot = slots[index];
     return { slot.state,
              slot.voice.getVoiceId(),
+             slot.voice.getActivationGeneration(),
+             slot.voice.getRenderModel() != nullptr
+                 ? slot.voice.getRenderModel()->getRevision() : 0,
              slot.voice.getSourceMidiNote(),
-             slot.voice.getEffectiveMidiNote() };
+             slot.voice.getEffectiveMidiNote(),
+             slot.voice.getIncrementFrames(),
+             slot.voice.getBaseGain(),
+             slot.voice.isLoopActive(),
+             slot.sustainDeferred };
 }
 
 void SamplerVoicePool::renderRange(SamplerAudioBufferView output,
@@ -177,6 +237,7 @@ void SamplerVoicePool::renderRange(SamplerAudioBufferView output,
         if (voiceResult.voiceFinished)
         {
             slot.state = SamplerVoiceSlotState::finished;
+            slot.sustainDeferred = false;
             ++result.render.completedVoiceCount;
         }
     }
@@ -212,11 +273,14 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
             }
 
             bool stolen = false;
-            const auto slotIndex = acquireSlot(stolen);
+            bool generationStolen = false;
+            bool releasingStolen = false;
+            const auto slotIndex = acquireSlot(stolen, generationStolen, releasingStolen);
             auto& slot = slots[slotIndex];
             const auto voiceId = nextVoiceId;
             SamplerVoiceStartRequest request;
             request.voiceId = voiceId;
+            request.activationGeneration = activeGeneration;
             request.routeIndex = routeIndex;
             request.sourceMidiNote = sourceMidiNote;
             request.effectiveMidiNote = effectiveMidiNote;
@@ -225,17 +289,23 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
             if (!slot.voice.start(*renderModel, request))
             {
                 slot.state = SamplerVoiceSlotState::free;
+                slot.sustainDeferred = false;
                 ++result.render.droppedEventCount;
                 return;
             }
 
             slot.state = SamplerVoiceSlotState::active;
+            slot.sustainDeferred = false;
             ++nextVoiceId;
             if (nextVoiceId == 0)
                 nextVoiceId = 1;
             ++result.render.startedVoiceCount;
             if (stolen)
                 ++result.render.stolenVoiceCount;
+            if (generationStolen)
+                ++result.render.generationStealCount;
+            if (releasingStolen)
+                ++result.render.releasingVoiceStealCount;
             return;
         }
 
@@ -250,14 +320,41 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 if (slot.state == SamplerVoiceSlotState::active
                     && slot.voice.getSourceMidiNote() == static_cast<int>(event.midiNote))
                 {
-                    if (slot.voice.beginRelease())
+                    if (sustainPedalDown)
+                    {
+                        slot.sustainDeferred = true;
+                    }
+                    else if (slot.voice.beginRelease())
                     {
                         slot.state = SamplerVoiceSlotState::releasing;
+                        slot.sustainDeferred = false;
                         ++result.render.releasedVoiceCount;
                     }
                 }
             }
             return;
+
+        case SamplerRenderEventType::sustainPedal:
+        {
+            const auto pressed = event.velocity >= 0.5f;
+            if (pressed == sustainPedalDown)
+                return;
+            sustainPedalDown = pressed;
+            if (sustainPedalDown)
+                return;
+            for (auto& slot : slots)
+            {
+                if (slot.state == SamplerVoiceSlotState::active
+                    && slot.sustainDeferred
+                    && slot.voice.beginRelease())
+                {
+                    slot.state = SamplerVoiceSlotState::releasing;
+                    slot.sustainDeferred = false;
+                    ++result.render.releasedVoiceCount;
+                }
+            }
+            return;
+        }
 
         case SamplerRenderEventType::allNotesOff:
             for (auto& slot : slots)
@@ -267,6 +364,7 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                     if (slot.voice.beginRelease())
                     {
                         slot.state = SamplerVoiceSlotState::releasing;
+                        slot.sustainDeferred = false;
                         ++result.render.releasedVoiceCount;
                     }
                 }
@@ -283,7 +381,9 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 }
                 slot.voice.reset();
                 slot.state = SamplerVoiceSlotState::free;
+                slot.sustainDeferred = false;
             }
+            sustainPedalDown = false;
             return;
     }
 
@@ -329,46 +429,63 @@ std::size_t SamplerVoicePool::selectRouteIndex(int midiNote, int velocity) const
     return selected;
 }
 
-std::size_t SamplerVoicePool::acquireSlot(bool& stolen) noexcept
+std::size_t SamplerVoicePool::acquireSlot(bool& stolen,
+                                          bool& generationStolen,
+                                          bool& releasingStolen) noexcept
 {
     stolen = false;
+    generationStolen = false;
+    releasingStolen = false;
     for (std::size_t index = 0; index < slots.size(); ++index)
     {
         if (slots[index].state == SamplerVoiceSlotState::free
             || slots[index].state == SamplerVoiceSlotState::finished)
         {
             slots[index].voice.reset();
+            slots[index].sustainDeferred = false;
             return index;
         }
     }
 
     auto selected = slots.size();
+    auto selectedRank = std::numeric_limits<int>::max();
+    auto selectedGeneration = std::numeric_limits<std::uint64_t>::max();
     auto selectedVoiceId = std::numeric_limits<std::uint64_t>::max();
+    const auto performancePolicy = renderModel != nullptr
+        && renderModel->getLane() == PlaybackActivationLane::performance;
     for (std::size_t index = 0; index < slots.size(); ++index)
     {
-        if (slots[index].state == SamplerVoiceSlotState::releasing
-            && slots[index].voice.getVoiceId() < selectedVoiceId)
+        const auto& slot = slots[index];
+        if (slot.state != SamplerVoiceSlotState::active
+            && slot.state != SamplerVoiceSlotState::releasing)
+            continue;
+        const auto retiredGeneration
+            = slot.voice.getActivationGeneration() != activeGeneration;
+        const auto rank = performancePolicy
+            ? (slot.state == SamplerVoiceSlotState::active
+                   ? (retiredGeneration ? 0 : 1)
+                   : (retiredGeneration ? 2 : 3))
+            : (slot.state == SamplerVoiceSlotState::releasing ? 0 : 1);
+        const auto generation = slot.voice.getActivationGeneration();
+        const auto voiceId = slot.voice.getVoiceId();
+        if (rank < selectedRank
+            || (rank == selectedRank && generation < selectedGeneration)
+            || (rank == selectedRank && generation == selectedGeneration
+                && voiceId < selectedVoiceId))
         {
             selected = index;
-            selectedVoiceId = slots[index].voice.getVoiceId();
-        }
-    }
-    if (selected == slots.size())
-    {
-        for (std::size_t index = 0; index < slots.size(); ++index)
-        {
-            if (slots[index].state == SamplerVoiceSlotState::active
-                && slots[index].voice.getVoiceId() < selectedVoiceId)
-            {
-                selected = index;
-                selectedVoiceId = slots[index].voice.getVoiceId();
-            }
+            selectedRank = rank;
+            selectedGeneration = generation;
+            selectedVoiceId = voiceId;
         }
     }
 
     if (selected == slots.size())
         selected = 0;
+    generationStolen = slots[selected].voice.getActivationGeneration() != activeGeneration;
+    releasingStolen = slots[selected].state == SamplerVoiceSlotState::releasing;
     slots[selected].voice.reset();
+    slots[selected].sustainDeferred = false;
     stolen = true;
     return selected;
 }
@@ -378,5 +495,11 @@ void SamplerVoicePool::updateCounts(SamplerVoicePoolRenderResult& result) const 
     result.activeVoiceCount = static_cast<std::uint32_t>(activeVoiceCount());
     result.releasingVoiceCount = static_cast<std::uint32_t>(releasingVoiceCount());
     result.finishedVoiceCount = static_cast<std::uint32_t>(finishedVoiceCount());
+    result.activeGenerationVoiceCount = static_cast<std::uint32_t>(
+        voiceCountUsingGeneration(activeGeneration));
+    result.retiredGenerationVoiceCount = static_cast<std::uint32_t>(
+        retiredGenerationVoiceCount());
+    result.sustainDeferredVoiceCount = static_cast<std::uint32_t>(
+        sustainDeferredVoiceCount());
 }
 } // namespace drs::engine

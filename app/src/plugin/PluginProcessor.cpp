@@ -445,8 +445,21 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
                                      static_cast<std::uint8_t>(noteNumber),
                                      0.0f });
         }
-        else if (command == 0xb0 && metadata.numBytes > 1
-                 && (eventData[1] == 120u || eventData[1] == 123u))
+        else if (command == 0xb0 && metadata.numBytes > 2 && eventData[1] == 64u)
+        {
+            performanceEvents.push({ drs::engine::SamplerRenderEventType::sustainPedal,
+                                     eventSample,
+                                     0,
+                                     static_cast<float>(eventData[2] & 0x7fu) / 127.0f });
+        }
+        else if (command == 0xb0 && metadata.numBytes > 1 && eventData[1] == 123u)
+        {
+            performanceEvents.push({ drs::engine::SamplerRenderEventType::allNotesOff,
+                                     eventSample,
+                                     0,
+                                     0.0f });
+        }
+        else if (command == 0xb0 && metadata.numBytes > 1 && eventData[1] == 120u)
         {
             performanceEvents.push({ drs::engine::SamplerRenderEventType::reset,
                                      eventSample,
@@ -1519,6 +1532,12 @@ Processor::AudioDiagnosticsValues Processor::captureActivationDiagnostics() cons
     values.performanceContextIdentity = static_cast<std::uint32_t>(performance.lane) + 1u;
     values.authoringPreviewContextIdentity = static_cast<std::uint32_t>(preview.lane) + 1u;
     values.performanceVoiceStealCount = performance.counters.stolenVoiceCount;
+    values.performanceGenerationStealCount = performance.counters.generationStealCount;
+    values.performanceReleasingVoiceStealCount = performance.counters.releasingVoiceStealCount;
+    values.performanceActiveGeneration = performance.activeActivationGeneration;
+    values.performanceActiveGenerationVoiceCount = performance.activeGenerationVoiceCount;
+    values.performanceRetiredGenerationVoiceCount = performance.retiredGenerationVoiceCount;
+    values.performanceSustainDeferredVoiceCount = performance.sustainDeferredVoiceCount;
     values.authoringPreviewVoiceStealCount = preview.counters.stolenVoiceCount;
     values.performanceDroppedEventCount = performance.counters.droppedEventCount
         + diagnosticsPerformanceDroppedEventCount.load(std::memory_order_relaxed);
@@ -1562,6 +1581,12 @@ void Processor::publishAudioDiagnostics()
     audioDiagnosticsPublication.authoringPreviewPeakActiveVoiceCount.store(values.authoringPreviewPeakActiveVoiceCount, std::memory_order_relaxed);
     audioDiagnosticsPublication.authoringPreviewPeakReleasingVoiceCount.store(values.authoringPreviewPeakReleasingVoiceCount, std::memory_order_relaxed);
     audioDiagnosticsPublication.performanceVoiceStealCount.store(values.performanceVoiceStealCount, std::memory_order_relaxed);
+    audioDiagnosticsPublication.performanceGenerationStealCount.store(values.performanceGenerationStealCount, std::memory_order_relaxed);
+    audioDiagnosticsPublication.performanceReleasingVoiceStealCount.store(values.performanceReleasingVoiceStealCount, std::memory_order_relaxed);
+    audioDiagnosticsPublication.performanceActiveGeneration.store(values.performanceActiveGeneration, std::memory_order_relaxed);
+    audioDiagnosticsPublication.performanceActiveGenerationVoiceCount.store(values.performanceActiveGenerationVoiceCount, std::memory_order_relaxed);
+    audioDiagnosticsPublication.performanceRetiredGenerationVoiceCount.store(values.performanceRetiredGenerationVoiceCount, std::memory_order_relaxed);
+    audioDiagnosticsPublication.performanceSustainDeferredVoiceCount.store(values.performanceSustainDeferredVoiceCount, std::memory_order_relaxed);
     audioDiagnosticsPublication.authoringPreviewVoiceStealCount.store(values.authoringPreviewVoiceStealCount, std::memory_order_relaxed);
     audioDiagnosticsPublication.performanceDroppedEventCount.store(values.performanceDroppedEventCount, std::memory_order_relaxed);
     audioDiagnosticsPublication.authoringPreviewDroppedEventCount.store(values.authoringPreviewDroppedEventCount, std::memory_order_relaxed);
@@ -1611,6 +1636,12 @@ Processor::AudioDiagnosticsValues Processor::readAudioDiagnostics(std::uint64_t&
         values.authoringPreviewPeakActiveVoiceCount = audioDiagnosticsPublication.authoringPreviewPeakActiveVoiceCount.load(std::memory_order_relaxed);
         values.authoringPreviewPeakReleasingVoiceCount = audioDiagnosticsPublication.authoringPreviewPeakReleasingVoiceCount.load(std::memory_order_relaxed);
         values.performanceVoiceStealCount = audioDiagnosticsPublication.performanceVoiceStealCount.load(std::memory_order_relaxed);
+        values.performanceGenerationStealCount = audioDiagnosticsPublication.performanceGenerationStealCount.load(std::memory_order_relaxed);
+        values.performanceReleasingVoiceStealCount = audioDiagnosticsPublication.performanceReleasingVoiceStealCount.load(std::memory_order_relaxed);
+        values.performanceActiveGeneration = audioDiagnosticsPublication.performanceActiveGeneration.load(std::memory_order_relaxed);
+        values.performanceActiveGenerationVoiceCount = audioDiagnosticsPublication.performanceActiveGenerationVoiceCount.load(std::memory_order_relaxed);
+        values.performanceRetiredGenerationVoiceCount = audioDiagnosticsPublication.performanceRetiredGenerationVoiceCount.load(std::memory_order_relaxed);
+        values.performanceSustainDeferredVoiceCount = audioDiagnosticsPublication.performanceSustainDeferredVoiceCount.load(std::memory_order_relaxed);
         values.authoringPreviewVoiceStealCount = audioDiagnosticsPublication.authoringPreviewVoiceStealCount.load(std::memory_order_relaxed);
         values.performanceDroppedEventCount = audioDiagnosticsPublication.performanceDroppedEventCount.load(std::memory_order_relaxed);
         values.authoringPreviewDroppedEventCount = audioDiagnosticsPublication.authoringPreviewDroppedEventCount.load(std::memory_order_relaxed);
@@ -1670,6 +1701,12 @@ ProcessorRealtimeSafetySnapshot Processor::composeDiagnosticsSnapshot(
     snapshot.authoringPreviewPeakActiveVoiceCount = audioValues.authoringPreviewPeakActiveVoiceCount;
     snapshot.authoringPreviewPeakReleasingVoiceCount = audioValues.authoringPreviewPeakReleasingVoiceCount;
     snapshot.performanceVoiceStealCount = audioValues.performanceVoiceStealCount;
+    snapshot.performanceGenerationStealCount = audioValues.performanceGenerationStealCount;
+    snapshot.performanceReleasingVoiceStealCount = audioValues.performanceReleasingVoiceStealCount;
+    snapshot.performanceActiveGeneration = audioValues.performanceActiveGeneration;
+    snapshot.performanceActiveGenerationVoiceCount = audioValues.performanceActiveGenerationVoiceCount;
+    snapshot.performanceRetiredGenerationVoiceCount = audioValues.performanceRetiredGenerationVoiceCount;
+    snapshot.performanceSustainDeferredVoiceCount = audioValues.performanceSustainDeferredVoiceCount;
     snapshot.authoringPreviewVoiceStealCount = audioValues.authoringPreviewVoiceStealCount;
     snapshot.performanceDroppedEventCount = audioValues.performanceDroppedEventCount;
     snapshot.authoringPreviewDroppedEventCount = audioValues.authoringPreviewDroppedEventCount;
@@ -1773,6 +1810,12 @@ void Processor::publishMessageDiagnostics()
     audioValues.performanceContextIdentity = activationValues.performanceContextIdentity;
     audioValues.authoringPreviewContextIdentity = activationValues.authoringPreviewContextIdentity;
     audioValues.performanceVoiceStealCount = activationValues.performanceVoiceStealCount;
+    audioValues.performanceGenerationStealCount = activationValues.performanceGenerationStealCount;
+    audioValues.performanceReleasingVoiceStealCount = activationValues.performanceReleasingVoiceStealCount;
+    audioValues.performanceActiveGeneration = activationValues.performanceActiveGeneration;
+    audioValues.performanceActiveGenerationVoiceCount = activationValues.performanceActiveGenerationVoiceCount;
+    audioValues.performanceRetiredGenerationVoiceCount = activationValues.performanceRetiredGenerationVoiceCount;
+    audioValues.performanceSustainDeferredVoiceCount = activationValues.performanceSustainDeferredVoiceCount;
     audioValues.authoringPreviewVoiceStealCount = activationValues.authoringPreviewVoiceStealCount;
     audioValues.performanceDroppedEventCount = activationValues.performanceDroppedEventCount;
     audioValues.authoringPreviewDroppedEventCount = activationValues.authoringPreviewDroppedEventCount;
@@ -1817,6 +1860,12 @@ ProcessorRealtimeSafetySnapshot Processor::getRealtimeSafetySnapshot() const
     snapshot.authoringPreviewPeakActiveVoiceCount = audioValues.authoringPreviewPeakActiveVoiceCount;
     snapshot.authoringPreviewPeakReleasingVoiceCount = audioValues.authoringPreviewPeakReleasingVoiceCount;
     snapshot.performanceVoiceStealCount = audioValues.performanceVoiceStealCount;
+    snapshot.performanceGenerationStealCount = audioValues.performanceGenerationStealCount;
+    snapshot.performanceReleasingVoiceStealCount = audioValues.performanceReleasingVoiceStealCount;
+    snapshot.performanceActiveGeneration = audioValues.performanceActiveGeneration;
+    snapshot.performanceActiveGenerationVoiceCount = audioValues.performanceActiveGenerationVoiceCount;
+    snapshot.performanceRetiredGenerationVoiceCount = audioValues.performanceRetiredGenerationVoiceCount;
+    snapshot.performanceSustainDeferredVoiceCount = audioValues.performanceSustainDeferredVoiceCount;
     snapshot.authoringPreviewVoiceStealCount = audioValues.authoringPreviewVoiceStealCount;
     snapshot.performanceDroppedEventCount = audioValues.performanceDroppedEventCount;
     snapshot.authoringPreviewDroppedEventCount = audioValues.authoringPreviewDroppedEventCount;

@@ -20,7 +20,9 @@ bool SamplerPlaybackContext::prepare(double outputSampleRate) noexcept
     sampleRate = outputSampleRate;
     isPrepared = true;
     if (activeRenderModel != nullptr)
-        voicePool.prepare(*activeRenderModel, sampleRate);
+        voicePool.prepare(*activeRenderModel,
+                          sampleRate,
+                          activationSlots[static_cast<std::size_t>(activeActivationSlot)].serial);
     else
         voicePool.clearRenderModel();
     eventScratch.clear();
@@ -195,15 +197,27 @@ SamplerPlaybackContextSnapshot SamplerPlaybackContext::getSnapshot() const noexc
         snapshot.hasActiveActivation = diagnosticHasActiveActivation.load(std::memory_order_relaxed);
         snapshot.activeRevision = diagnosticActiveRevision.load(std::memory_order_relaxed);
         snapshot.activePreparedBuildId = diagnosticActivePreparedBuildId.load(std::memory_order_relaxed);
+        snapshot.activeActivationGeneration
+            = diagnosticActiveActivationGeneration.load(std::memory_order_relaxed);
         snapshot.activeActivationPayloadBytes = diagnosticActivePayloadBytes.load(std::memory_order_relaxed);
         snapshot.activeVoiceCount = diagnosticActiveVoiceCount.load(std::memory_order_relaxed);
         snapshot.releasingVoiceCount = diagnosticReleasingVoiceCount.load(std::memory_order_relaxed);
         snapshot.finishedVoiceCount = diagnosticFinishedVoiceCount.load(std::memory_order_relaxed);
+        snapshot.activeGenerationVoiceCount
+            = diagnosticActiveGenerationVoiceCount.load(std::memory_order_relaxed);
+        snapshot.retiredGenerationVoiceCount
+            = diagnosticRetiredGenerationVoiceCount.load(std::memory_order_relaxed);
+        snapshot.sustainDeferredVoiceCount
+            = diagnosticSustainDeferredVoiceCount.load(std::memory_order_relaxed);
         snapshot.counters.renderedBlockCount = diagnosticRenderedBlockCount.load(std::memory_order_relaxed);
         snapshot.counters.startedVoiceCount = diagnosticStartedVoiceCount.load(std::memory_order_relaxed);
         snapshot.counters.releasedVoiceCount = diagnosticReleasedVoiceCount.load(std::memory_order_relaxed);
         snapshot.counters.completedVoiceCount = diagnosticCompletedVoiceCount.load(std::memory_order_relaxed);
         snapshot.counters.stolenVoiceCount = diagnosticStolenVoiceCount.load(std::memory_order_relaxed);
+        snapshot.counters.generationStealCount
+            = diagnosticGenerationStealCount.load(std::memory_order_relaxed);
+        snapshot.counters.releasingVoiceStealCount
+            = diagnosticReleasingVoiceStealCount.load(std::memory_order_relaxed);
         snapshot.counters.droppedEventCount = diagnosticDroppedEventCount.load(std::memory_order_relaxed);
         snapshot.counters.resetVoiceCount = diagnosticResetVoiceCount.load(std::memory_order_relaxed);
         snapshot.counters.appliedActivationCount = diagnosticAppliedActivationCount.load(std::memory_order_relaxed);
@@ -253,7 +267,7 @@ bool SamplerPlaybackContext::applyPendingActivationAtBlockBoundary() noexcept
 
     auto& slot = activationSlots[static_cast<std::size_t>(pending)];
     const auto* model = slot.model.get();
-    if (model == nullptr || !voicePool.activateModel(*model, sampleRate))
+    if (model == nullptr || !voicePool.activateModel(*model, sampleRate, slot.serial))
     {
         addRetiredActivation(pending);
         return false;
@@ -354,6 +368,8 @@ void SamplerPlaybackContext::accumulate(const SamplerVoicePoolRenderResult& resu
     counters.releasedVoiceCount += result.render.releasedVoiceCount;
     counters.completedVoiceCount += result.render.completedVoiceCount;
     counters.stolenVoiceCount += result.render.stolenVoiceCount;
+    counters.generationStealCount += result.render.generationStealCount;
+    counters.releasingVoiceStealCount += result.render.releasingVoiceStealCount;
     counters.droppedEventCount += result.render.droppedEventCount;
     counters.resetVoiceCount += result.resetVoiceCount;
 }
@@ -365,6 +381,9 @@ void SamplerPlaybackContext::publishRealtimeDiagnostics() noexcept
     diagnosticHasActiveActivation.store(activeActivationSlot >= 0, std::memory_order_relaxed);
     diagnosticActiveRevision.store(activeRevision, std::memory_order_relaxed);
     diagnosticActivePreparedBuildId.store(activePreparedBuildId, std::memory_order_relaxed);
+    const auto activeGeneration = activeActivationSlot >= 0
+        ? activationSlots[static_cast<std::size_t>(activeActivationSlot)].serial : 0;
+    diagnosticActiveActivationGeneration.store(activeGeneration, std::memory_order_relaxed);
     const auto* payload = activeRenderModel != nullptr
         ? activeRenderModel->getRetainedActivationPayload().get()
         : nullptr;
@@ -376,11 +395,23 @@ void SamplerPlaybackContext::publishRealtimeDiagnostics() noexcept
                                         std::memory_order_release);
     diagnosticFinishedVoiceCount.store(static_cast<std::uint32_t>(voicePool.finishedVoiceCount()),
                                        std::memory_order_release);
+    diagnosticActiveGenerationVoiceCount.store(
+        static_cast<std::uint32_t>(voicePool.voiceCountUsingGeneration(activeGeneration)),
+        std::memory_order_release);
+    diagnosticRetiredGenerationVoiceCount.store(
+        static_cast<std::uint32_t>(voicePool.retiredGenerationVoiceCount()),
+        std::memory_order_release);
+    diagnosticSustainDeferredVoiceCount.store(
+        static_cast<std::uint32_t>(voicePool.sustainDeferredVoiceCount()),
+        std::memory_order_release);
     diagnosticRenderedBlockCount.store(counters.renderedBlockCount, std::memory_order_release);
     diagnosticStartedVoiceCount.store(counters.startedVoiceCount, std::memory_order_release);
     diagnosticReleasedVoiceCount.store(counters.releasedVoiceCount, std::memory_order_release);
     diagnosticCompletedVoiceCount.store(counters.completedVoiceCount, std::memory_order_release);
     diagnosticStolenVoiceCount.store(counters.stolenVoiceCount, std::memory_order_release);
+    diagnosticGenerationStealCount.store(counters.generationStealCount, std::memory_order_release);
+    diagnosticReleasingVoiceStealCount.store(counters.releasingVoiceStealCount,
+                                             std::memory_order_release);
     diagnosticDroppedEventCount.store(counters.droppedEventCount, std::memory_order_release);
     diagnosticResetVoiceCount.store(counters.resetVoiceCount, std::memory_order_release);
     diagnosticAppliedActivationCount.store(counters.appliedActivationCount, std::memory_order_release);
