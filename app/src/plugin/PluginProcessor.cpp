@@ -609,7 +609,10 @@ bool Processor::submitAuthoringPreviewCommand(
     }
 
     if (!dispatch.hasEvent)
+    {
+        publishAuthoringPreviewStatus();
         return true;
+    }
 
     drs::engine::SamplerRenderEventType eventType;
     switch (dispatch.event.type)
@@ -632,7 +635,10 @@ bool Processor::submitAuthoringPreviewCommand(
                                          clampMidiValue(dispatch.event.midiNote),
                                          std::clamp(dispatch.event.velocity, 0.0f, 1.0f),
                                          dispatch.event.sampleOffset }))
+    {
+        publishAuthoringPreviewStatus();
         return true;
+    }
 
     diagnosticsAuthoringPreviewDroppedNoteCount.fetch_add(1, std::memory_order_relaxed);
     return false;
@@ -678,30 +684,171 @@ drs::app::AuthoringWaveformPreview Processor::getAuthoringWaveformPreview()
 
 drs::app::AuthoringPreviewStatusSnapshot Processor::getAuthoringPreviewStatusSnapshot() const
 {
+    const auto published = std::atomic_load_explicit(&authoringPreviewStatusPublication,
+                                                     std::memory_order_acquire);
+    return published != nullptr ? *published : drs::app::AuthoringPreviewStatusSnapshot {};
+}
+
+void Processor::publishAuthoringPreviewStatus()
+{
+    using Presentation = drs::engine::AuthoringPreviewPresentationState;
+    using Preparation = drs::engine::AuthoringPreviewPreparationState;
+    using Activation = drs::engine::AuthoringPreviewActivationState;
+
     const auto diagnostics = getRealtimeSafetySnapshot();
     const auto controller = authoringPreviewController.getSnapshot();
+    const auto command = authoringPreviewCommandAdapter.getSnapshot();
+    const auto selectedZone = authoringSession.getSelectedZone();
+
     drs::app::AuthoringPreviewStatusSnapshot status;
     status.available = diagnostics.available;
-    status.draftRevision = diagnostics.currentAuthoringPreviewDraftRevision;
-    status.activeRevision = diagnostics.activeAuthoringPreviewRevision;
-    status.pendingRevision = diagnostics.pendingAuthoringPreviewRevision;
+    status.preparationState = controller.preparationState;
+    status.activationState = controller.activationState;
+    status.scope = controller.hasRequest
+        ? controller.currentRequest.identity.scope : authoringPreviewRequestedScope;
+    status.requestId = controller.hasRequest
+        ? controller.currentRequest.identity.requestId : 0;
+    status.cancellationGeneration = controller.hasRequest
+        ? controller.currentRequest.identity.cancellationGeneration : 0;
+    status.draftRevision = authoringSession.getDocumentState().revision;
+    status.activeRevision = controller.hasActiveRequest
+        ? controller.activeRequestIdentity.draftRevision : 0;
+    status.pendingRevision = controller.activationState == Activation::pending
+        && controller.hasRequest ? controller.currentRequest.identity.draftRevision : 0;
     status.requestedRevision = controller.hasRequest
         ? controller.currentRequest.identity.draftRevision : 0;
     status.failedRevision = controller.hasFailedRequest
         ? controller.failedRequestIdentity.draftRevision : 0;
     status.audibleRevision = status.activeRevision;
-    status.auditionAvailable = status.activeRevision != 0;
-    status.usingLastKnownGood = status.activeRevision != 0
-        && status.activeRevision != status.draftRevision;
-    status.revisionState = diagnostics.authoringPreviewRevisionState;
-    status.failureState = diagnostics.authoringPreviewFailureState;
+    status.selectedZoneId = selectedZone.has_value() ? selectedZone->id : std::string {};
+    status.requestedPreparedBuildId = controller.acceptedPreparedBuildId;
+    status.activePreparedBuildId = controller.activePreparedBuildId;
+    status.requestedSnapshotDigest = controller.acceptedSnapshotDigest;
+    status.requestedPreparedDigest = controller.acceptedPreparedDigest;
+    status.activeSnapshotDigest = controller.activeSnapshotDigest;
+    status.activePreparedDigest = controller.activePreparedDigest;
+    status.auditionAvailable = engineFacade.getDraftPlaybackStatus().projectOpen
+        && (status.scope == drs::engine::AuthoringPreviewScope::currentDraft
+            || selectedZone.has_value());
+    status.stopAvailable = command.ownedNoteCount > 0
+        || diagnostics.authoringPreviewActiveVoiceCount > 0;
+    status.usingLastKnownGood = controller.hasActiveRequest
+        && (controller.hasFailedRequest
+            || controller.activeRequestIdentity.draftRevision != status.draftRevision
+            || (controller.hasRequest
+                && controller.activeRequestIdentity != controller.currentRequest.identity));
+
+    if (!controller.failureFinding.code.empty())
+        status.findings.push_back(controller.failureFinding);
+    status.failureState = controller.failureState;
     status.failureFamily = drs::engine::toString(controller.failureFinding.family);
     status.failureCode = controller.failureFinding.code;
     status.failurePath = controller.failureFinding.path;
-    const auto blockingHint = buildAuthoringPreviewBlockingHint(authoringSession, status.failureState);
+    const auto blockingHint = buildAuthoringPreviewBlockingHint(authoringSession,
+                                                                status.failureState);
     status.blockingPrerequisite = blockingHint.prerequisite;
     status.blockingGuidance = blockingHint.guidance;
-    return status;
+
+    if (controller.preparationState == Preparation::failed)
+        status.presentationState = Presentation::failed;
+    else if (controller.preparationState == Preparation::canceled)
+        status.presentationState = Presentation::canceled;
+    else if (controller.preparationState == Preparation::superseded)
+        status.presentationState = Presentation::superseded;
+    else if (controller.activationState == Activation::pending)
+        status.presentationState = Presentation::activating;
+    else if (controller.preparationState == Preparation::queued)
+        status.presentationState = Presentation::queued;
+    else if (controller.preparationState == Preparation::preparing)
+        status.presentationState = Presentation::preparing;
+    else if (controller.hasActiveRequest
+             && controller.activeRequestIdentity.draftRevision == status.draftRevision)
+        status.presentationState = Presentation::active;
+    else if (controller.hasActiveRequest)
+        status.presentationState = Presentation::stale;
+    else if (controller.preparationState == Preparation::ready)
+        status.presentationState = Presentation::ready;
+    else
+        status.presentationState = Presentation::idle;
+
+    if (status.scope == drs::engine::AuthoringPreviewScope::selectedZone
+        && !selectedZone.has_value())
+    {
+        status.stateLabel = status.usingLastKnownGood
+            ? "No Selection — Last Good Active" : "No Selection";
+        status.creatorGuidance = "Select a zone to enable selected-zone Preview.";
+    }
+    else
+    {
+        switch (status.presentationState)
+        {
+            case Presentation::queued:
+                status.stateLabel = "Preparing";
+                status.creatorGuidance = "Preview is coalescing recent authored changes.";
+                break;
+            case Presentation::preparing:
+                status.stateLabel = "Preparing";
+                status.creatorGuidance = "Preview is building the current authored content.";
+                break;
+            case Presentation::ready:
+                status.stateLabel = "Ready";
+                status.creatorGuidance = "Preview is prepared and ready to activate.";
+                break;
+            case Presentation::activating:
+                status.stateLabel = "Preparing";
+                status.creatorGuidance = "Preview is waiting for the next audio block boundary.";
+                break;
+            case Presentation::active:
+                status.stateLabel = "Ready";
+                status.creatorGuidance = "Preview matches the current authored revision.";
+                break;
+            case Presentation::stale:
+                status.stateLabel = "Stale — Last Good Active";
+                status.creatorGuidance = "The last known good Preview remains audible while the current draft is prepared.";
+                break;
+            case Presentation::failed:
+                status.stateLabel = status.usingLastKnownGood
+                    ? "Failed — Last Good Active" : "Failed";
+                status.creatorGuidance = status.blockingGuidance.empty()
+                    ? "Repair the reported Preview finding and audition again."
+                    : status.blockingGuidance;
+                break;
+            case Presentation::canceled:
+                status.stateLabel = "Canceled";
+                status.creatorGuidance = "The Preview request was canceled safely.";
+                break;
+            case Presentation::superseded:
+                status.stateLabel = "Superseded";
+                status.creatorGuidance = "A newer authored revision replaced this Preview request.";
+                break;
+            case Presentation::idle:
+            default:
+                status.stateLabel = "Ready";
+                status.creatorGuidance = "Preview is available for the current authored selection.";
+                break;
+        }
+    }
+
+    status.lastRequestToLaunchMicros = controller.lastRequestToLaunchMicros;
+    status.maxRequestToLaunchMicros = controller.maxRequestToLaunchMicros;
+    status.lastPreparationMicros = controller.lastPreparationMicros;
+    status.maxPreparationMicros = controller.maxPreparationMicros;
+    status.lastReadyToActivationMicros = controller.lastReadyToActivationMicros;
+    status.maxReadyToActivationMicros = controller.maxReadyToActivationMicros;
+    status.lastRequestToAudibleMicros = controller.lastRequestToAudibleMicros;
+    status.maxRequestToAudibleMicros = controller.maxRequestToAudibleMicros;
+    status.lastCancellationMicros = controller.lastCancellationMicros;
+    status.maxCancellationMicros = controller.maxCancellationMicros;
+    status.coalescedCount = controller.coalescedCount;
+    status.canceledCount = controller.canceledCount;
+    status.pendingDepth = controller.pendingDepth;
+    status.maximumPendingDepth = controller.maximumPendingDepth;
+
+    std::shared_ptr<const drs::app::AuthoringPreviewStatusSnapshot> immutable
+        = std::make_shared<const drs::app::AuthoringPreviewStatusSnapshot>(std::move(status));
+    std::atomic_store_explicit(&authoringPreviewStatusPublication,
+                               std::move(immutable),
+                               std::memory_order_release);
 }
 
 drs::app::AuthoringImportResponsivenessSnapshot Processor::getAuthoringImportResponsivenessSnapshot() const
@@ -755,6 +902,7 @@ void Processor::closeAuthoringProject(drs::engine::RuntimeProjectModel unloadedP
     observedDraftPlaybackProjectRevision = authoringSession.getDocumentState().revision;
     initializeAuthoringImportMetrics();
     updateRealtimeSafetyState();
+    publishAuthoringPreviewStatus();
 }
 
 void Processor::queuePerformanceSurfaceNoteOn(int midiNoteNumber, float velocity)
@@ -917,7 +1065,7 @@ bool Processor::serviceMessageThreadWork()
             == controllerSnapshot.currentRequest.identity.draftRevision)
     {
         synchronizedAuthoringPreview = authoringPreviewController.markActive(
-            controllerSnapshot.currentRequest.identity);
+            controllerSnapshot.currentRequest.identity, serviceTimeMicros);
         controllerSnapshot = authoringPreviewController.getSnapshot();
     }
     const auto preparedPayload = engineFacade.getPreviewActivationPayload();
@@ -986,6 +1134,7 @@ bool Processor::serviceMessageThreadWork()
     }
 
     updateRealtimeSafetyState();
+    publishAuthoringPreviewStatus();
     return servicedBackgroundWork
         || synchronizedDraftPlaybackProject
         || requestResult.accepted
@@ -1163,13 +1312,16 @@ bool Processor::stageAuthoringPreviewActivation(const drs::engine::AuthoringPrev
         return failPreviewActivation(makePreviewFailureFinding(preparation.findings.front()));
     }
     if (!authoringPreviewController.acceptPrepared(request.identity,
-                                                    preparation.scopedPayload->preparedBuildId))
+                                                    preparation.scopedPayload->preparedBuildId,
+                                                    monotonicMicros(),
+                                                    preparation.scopedPayload->snapshotContentDigest,
+                                                    preparation.scopedPayload->preparedContentDigest))
         return false;
     if (!authoringPreviewPlaybackContext.stageActivation(preparation.model))
         return failPreviewActivation(drs::engine::classifyAuthoringPreviewFailure(
             "preview-activation-slot-exhausted", "preview.activationSlots",
             "Authoring Preview activation slots are exhausted."));
-    if (!authoringPreviewController.markActivationPending(request.identity))
+    if (!authoringPreviewController.markActivationPending(request.identity, monotonicMicros()))
         return false;
 
     failedAuthoringPreviewRevision = std::numeric_limits<std::size_t>::max();
@@ -1177,7 +1329,7 @@ bool Processor::stageAuthoringPreviewActivation(const drs::engine::AuthoringPrev
     if (installImmediately && authoringPreviewPlaybackContext.activatePendingForPreparation())
     {
         diagnosticsAuthoringPreviewActivationCount.fetch_add(1, std::memory_order_relaxed);
-        authoringPreviewController.markActive(request.identity);
+        authoringPreviewController.markActive(request.identity, monotonicMicros());
     }
     return true;
 }

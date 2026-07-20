@@ -5,6 +5,14 @@
 
 namespace drs::engine
 {
+namespace
+{
+void updateMaximum(std::uint64_t& maximum, std::uint64_t value) noexcept
+{
+    maximum = std::max(maximum, value);
+}
+} // namespace
+
 AuthoringPreviewController::AuthoringPreviewController(AuthoringPreviewControllerConfig nextConfig)
     : config(nextConfig)
 {
@@ -68,6 +76,12 @@ AuthoringPreviewRequestResult AuthoringPreviewController::request(
         if (previousState == AuthoringPreviewPreparationState::preparing)
         {
             ++snapshot.canceledCount;
+            if (nowMicros != 0 && snapshot.requestReceivedAtMicros != 0
+                && nowMicros >= snapshot.requestReceivedAtMicros)
+            {
+                snapshot.lastCancellationMicros = nowMicros - snapshot.requestReceivedAtMicros;
+                updateMaximum(snapshot.maxCancellationMicros, snapshot.lastCancellationMicros);
+            }
             ++cancellationGeneration;
             result.cancellationRequested = true;
         }
@@ -94,6 +108,8 @@ AuthoringPreviewRequestResult AuthoringPreviewController::request(
     snapshot.preparationState = AuthoringPreviewPreparationState::queued;
     snapshot.activationState = AuthoringPreviewActivationState::noActivation;
     snapshot.acceptedPreparedBuildId = 0;
+    snapshot.acceptedSnapshotDigest.clear();
+    snapshot.acceptedPreparedDigest.clear();
     snapshot.reusablePreparedBuildId = findReusablePreparedBuildId(
         next.identity.scope, next.identity.selectedZoneId, next.requestSignature);
     snapshot.coalescingBurstStartedAtMicros = burstStartedAt;
@@ -102,6 +118,11 @@ AuthoringPreviewRequestResult AuthoringPreviewController::request(
     snapshot.hasFailedRequest = false;
     snapshot.failedRequestIdentity = {};
     snapshot.failureFinding = {};
+    snapshot.requestReceivedAtMicros = nowMicros;
+    snapshot.launchedAtMicros = 0;
+    snapshot.readyAtMicros = 0;
+    snapshot.activationPendingAtMicros = 0;
+    snapshot.activeAtMicros = 0;
     snapshot.pendingDepth = 1;
     snapshot.maximumPendingDepth = std::max(snapshot.maximumPendingDepth, snapshot.pendingDepth);
     ++snapshot.requestedCount;
@@ -136,6 +157,12 @@ AuthoringPreviewLaunchResult AuthoringPreviewController::launchIfEligible(
         return result;
 
     ++snapshot.launchedCount;
+    snapshot.launchedAtMicros = nowMicros;
+    if (nowMicros >= snapshot.requestReceivedAtMicros)
+    {
+        snapshot.lastRequestToLaunchMicros = nowMicros - snapshot.requestReceivedAtMicros;
+        updateMaximum(snapshot.maxRequestToLaunchMicros, snapshot.lastRequestToLaunchMicros);
+    }
     result.launched = true;
     result.deadlineForced = maximumDelayReached;
     result.warmPreparedResultAvailable = snapshot.reusablePreparedBuildId != 0;
@@ -145,7 +172,10 @@ AuthoringPreviewLaunchResult AuthoringPreviewController::launchIfEligible(
 }
 
 bool AuthoringPreviewController::acceptPrepared(const AuthoringPreviewRequestIdentity& identity,
-                                                std::uint64_t preparedBuildId)
+                                                std::uint64_t preparedBuildId,
+                                                std::uint64_t nowMicros,
+                                                std::string snapshotDigest,
+                                                std::string preparedDigest)
 {
     if (!isCurrent(identity) || preparedBuildId == 0)
     {
@@ -169,6 +199,15 @@ bool AuthoringPreviewController::acceptPrepared(const AuthoringPreviewRequestIde
     }
 
     snapshot.acceptedPreparedBuildId = preparedBuildId;
+    snapshot.acceptedSnapshotDigest = std::move(snapshotDigest);
+    snapshot.acceptedPreparedDigest = std::move(preparedDigest);
+    snapshot.readyAtMicros = nowMicros;
+    if (nowMicros != 0 && snapshot.launchedAtMicros != 0
+        && nowMicros >= snapshot.launchedAtMicros)
+    {
+        snapshot.lastPreparationMicros = nowMicros - snapshot.launchedAtMicros;
+        updateMaximum(snapshot.maxPreparationMicros, snapshot.lastPreparationMicros);
+    }
     snapshot.failureState.clear();
     snapshot.hasFailedRequest = false;
     snapshot.failedRequestIdentity = {};
@@ -183,16 +222,19 @@ bool AuthoringPreviewController::acceptPrepared(const AuthoringPreviewRequestIde
 }
 
 bool AuthoringPreviewController::markActivationPending(
-    const AuthoringPreviewRequestIdentity& identity)
+    const AuthoringPreviewRequestIdentity& identity,
+    std::uint64_t nowMicros)
 {
     if (!isCurrent(identity)
         || snapshot.preparationState != AuthoringPreviewPreparationState::ready)
         return false;
     snapshot.activationState = AuthoringPreviewActivationState::pending;
+    snapshot.activationPendingAtMicros = nowMicros;
     return true;
 }
 
-bool AuthoringPreviewController::markActive(const AuthoringPreviewRequestIdentity& identity)
+bool AuthoringPreviewController::markActive(const AuthoringPreviewRequestIdentity& identity,
+                                            std::uint64_t nowMicros)
 {
     if (!isCurrent(identity)
         || snapshot.activationState != AuthoringPreviewActivationState::pending)
@@ -201,6 +243,22 @@ bool AuthoringPreviewController::markActive(const AuthoringPreviewRequestIdentit
     snapshot.hasActiveRequest = true;
     snapshot.activeRequestIdentity = identity;
     snapshot.activePreparedBuildId = snapshot.acceptedPreparedBuildId;
+    snapshot.activeSnapshotDigest = snapshot.acceptedSnapshotDigest;
+    snapshot.activePreparedDigest = snapshot.acceptedPreparedDigest;
+    snapshot.activeAtMicros = nowMicros;
+    if (nowMicros != 0 && snapshot.readyAtMicros != 0 && nowMicros >= snapshot.readyAtMicros)
+    {
+        snapshot.lastReadyToActivationMicros = nowMicros - snapshot.readyAtMicros;
+        updateMaximum(snapshot.maxReadyToActivationMicros,
+                      snapshot.lastReadyToActivationMicros);
+    }
+    if (nowMicros != 0 && snapshot.requestReceivedAtMicros != 0
+        && nowMicros >= snapshot.requestReceivedAtMicros)
+    {
+        snapshot.lastRequestToAudibleMicros = nowMicros - snapshot.requestReceivedAtMicros;
+        updateMaximum(snapshot.maxRequestToAudibleMicros,
+                      snapshot.lastRequestToAudibleMicros);
+    }
     ++snapshot.activationCount;
     return true;
 }
@@ -241,7 +299,7 @@ bool AuthoringPreviewController::fail(const AuthoringPreviewRequestIdentity& ide
     return true;
 }
 
-bool AuthoringPreviewController::cancelCurrent()
+bool AuthoringPreviewController::cancelCurrent(std::uint64_t nowMicros)
 {
     if (!snapshot.hasRequest
         || (snapshot.preparationState != AuthoringPreviewPreparationState::queued
@@ -251,6 +309,12 @@ bool AuthoringPreviewController::cancelCurrent()
     snapshot.activationState = AuthoringPreviewActivationState::noActivation;
     snapshot.pendingDepth = 0;
     ++snapshot.canceledCount;
+    if (nowMicros != 0 && snapshot.requestReceivedAtMicros != 0
+        && nowMicros >= snapshot.requestReceivedAtMicros)
+    {
+        snapshot.lastCancellationMicros = nowMicros - snapshot.requestReceivedAtMicros;
+        updateMaximum(snapshot.maxCancellationMicros, snapshot.lastCancellationMicros);
+    }
     ++cancellationGeneration;
     recordCompletion(snapshot.currentRequest.identity,
                      AuthoringPreviewPreparationState::canceled, 0, false);
@@ -289,6 +353,16 @@ void AuthoringPreviewController::reset(bool advanceCancellationGeneration)
     snapshot.maximumPendingDepth = retainedMetrics.maximumPendingDepth;
     snapshot.retainedCompletionRecordCount = completionRecords.size();
     snapshot.activationCount = retainedMetrics.activationCount;
+    snapshot.lastRequestToLaunchMicros = retainedMetrics.lastRequestToLaunchMicros;
+    snapshot.maxRequestToLaunchMicros = retainedMetrics.maxRequestToLaunchMicros;
+    snapshot.lastPreparationMicros = retainedMetrics.lastPreparationMicros;
+    snapshot.maxPreparationMicros = retainedMetrics.maxPreparationMicros;
+    snapshot.lastReadyToActivationMicros = retainedMetrics.lastReadyToActivationMicros;
+    snapshot.maxReadyToActivationMicros = retainedMetrics.maxReadyToActivationMicros;
+    snapshot.lastRequestToAudibleMicros = retainedMetrics.lastRequestToAudibleMicros;
+    snapshot.maxRequestToAudibleMicros = retainedMetrics.maxRequestToAudibleMicros;
+    snapshot.lastCancellationMicros = retainedMetrics.lastCancellationMicros;
+    snapshot.maxCancellationMicros = retainedMetrics.maxCancellationMicros;
     snapshot.configuredCoalescingWindowMicros = config.coalescingWindowMicros;
     snapshot.configuredMaximumLaunchDelayMicros = config.maximumLaunchDelayMicros;
     warmPreparedRecords.clear();

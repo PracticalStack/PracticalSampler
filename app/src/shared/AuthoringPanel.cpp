@@ -121,13 +121,15 @@ juce::String formatZoneRange(const drs::engine::AuthoringZoneSummary& zone)
         + " | Vel " + juce::String(zone.velocityLow) + "-" + juce::String(zone.velocityHigh);
 }
 
+juce::String formatMicros(std::uint64_t micros);
+
 juce::String formatAuthoringPreviewStatus(const drs::app::AuthoringPreviewStatusSnapshot& status)
 {
     if (!status.available)
         return "Preview status unavailable";
 
-    auto text = "Preview " + juce::String::fromUTF8(status.revisionState.empty() ? "Unknown"
-                                                                                 : status.revisionState.c_str())
+    auto text = "Preview " + juce::String::fromUTF8(status.stateLabel.empty() ? "Unknown"
+                                                                              : status.stateLabel.c_str())
         + " | draft r" + juce::String(static_cast<int>(status.draftRevision));
 
     if (status.activeRevision > 0)
@@ -147,6 +149,9 @@ juce::String formatAuthoringPreviewStatus(const drs::app::AuthoringPreviewStatus
 
     if (!status.failureState.empty())
         text += " | " + juce::String::fromUTF8(status.failureState.c_str());
+
+    if (status.lastRequestToAudibleMicros > 0)
+        text += " | audible " + formatMicros(status.lastRequestToAudibleMicros);
 
     return text;
 }
@@ -591,6 +596,11 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     configureEditorSlider(macroMaxSlider, 0.0, 1.0, 0.01);
 
     zoneSelector.setComponentID("authoringZoneSelector");
+    previewEnabledToggle.setComponentID("authoringPreviewEnabledToggle");
+    previewStopButton.setComponentID("authoringPreviewStopButton");
+    previewEnabledToggle.setButtonText("Preview On");
+    previewEnabledToggle.setToggleState(true, juce::dontSendNotification);
+    previewStopButton.setButtonText("Stop");
     zoneMap.setComponentID("authoringZoneMap");
     drawerRegion.setComponentID("authoringDrawer");
     drawerTabStrip.setComponentID("authoringDrawerTabStrip");
@@ -726,6 +736,32 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
 
         authoringSession.selectZone(zones[static_cast<std::size_t>(zoneIndex)].id);
         refreshFromSession();
+    };
+
+    previewEnabledToggle.onClick = [this]
+    {
+        if (!previewEnabledToggle.getToggleState() && previewCommandCallback)
+        {
+            drs::engine::AuthoringPreviewCommand command;
+            command.type = drs::engine::AuthoringPreviewCommandType::stopAll;
+            command.source = drs::engine::AuthoringPreviewAuditionSource::summaryPreview;
+            previewCommandCallback(command);
+        }
+        refreshWaveformDrawerContent();
+    };
+    previewStopButton.onClick = [this]
+    {
+        for (auto& timedNote : timedPreviewNotes)
+            timedNote = {};
+        stopTimer(previewReleaseTimerId);
+        if (previewCommandCallback)
+        {
+            drs::engine::AuthoringPreviewCommand command;
+            command.type = drs::engine::AuthoringPreviewCommandType::stopAll;
+            command.source = drs::engine::AuthoringPreviewAuditionSource::summaryPreview;
+            previewCommandCallback(command);
+        }
+        refreshWaveformDrawerContent();
     };
 
     macroList.setOnSelectionChanged([this](int nextIndex)
@@ -918,6 +954,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&drawerPerformanceTabButton),
              static_cast<juce::Component*>(&zoneLabel),
              static_cast<juce::Component*>(&zoneSelector),
+             static_cast<juce::Component*>(&previewEnabledToggle),
+             static_cast<juce::Component*>(&previewStopButton),
              static_cast<juce::Component*>(&zoneMap),
              static_cast<juce::Component*>(&zoneMappingEditor),
              static_cast<juce::Component*>(&waveformPreview),
@@ -1013,6 +1051,16 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "Chooses the active zone for map and inspector editing.",
                                 "Open the list or use arrow keys to change the selected zone.");
     zoneSelector.setExplicitFocusOrder(24);
+    configureAccessibleMetadata(previewEnabledToggle,
+                                "Preview enabled",
+                                "Enables or disables authoring-only audition commands.",
+                                "Turn Preview off to release all authoring Preview notes without affecting performance playback.");
+    configureAccessibleMetadata(previewStopButton,
+                                "Stop Preview",
+                                "Releases all notes owned by the authoring Preview path.",
+                                "Press to stop authoring Preview audio without affecting performance playback.");
+    previewEnabledToggle.setExplicitFocusOrder(25);
+    previewStopButton.setExplicitFocusOrder(26);
 
     configureAccessibleMetadata(zoneMap,
                                 "Zone map",
@@ -1247,6 +1295,11 @@ void AuthoringPanel::resized()
     auto toolbarRow = area.removeFromTop(28);
     zoneLabel.setBounds(toolbarRow.removeFromLeft(96));
     toolbarRow.removeFromLeft(8);
+    auto previewControls = toolbarRow.removeFromRight(std::min(190, toolbarRow.getWidth()));
+    previewStopButton.setBounds(previewControls.removeFromRight(std::min(72, previewControls.getWidth())));
+    previewControls.removeFromRight(std::min(8, previewControls.getWidth()));
+    previewEnabledToggle.setBounds(previewControls);
+    toolbarRow.removeFromRight(std::min(8, toolbarRow.getWidth()));
     zoneSelector.setBounds(toolbarRow.removeFromLeft(std::min(360, toolbarRow.getWidth())));
 
     if (playbackBanner.isVisible())
@@ -1656,7 +1709,7 @@ authoring::SelectionSummaryViewModel AuthoringPanel::buildSelectionSummaryViewMo
         if (previewStatus.available)
         {
             viewModel.playbackText += " | authoring preview r" + std::to_string(previewStatus.draftRevision)
-                + " (" + previewStatus.revisionState + ")";
+                + " (" + previewStatus.stateLabel + ")";
 
             if (!previewStatus.failureState.empty())
             {
@@ -2410,6 +2463,17 @@ void AuthoringPanel::refreshWaveformDrawerContent()
 
     waveformPreview.setPreview(preview);
     waveformStatusLabel.setText(formatAuthoringPreviewStatus(previewStatus), juce::dontSendNotification);
+    previewStopButton.setEnabled(previewStatus.stopAvailable);
+    previewStopButton.setDescription(previewStatus.stopAvailable
+        ? "Releases all notes owned by the authoring Preview path."
+        : "No authoring Preview notes are currently active.");
+    previewStopButton.setHelpText(previewStatus.stopAvailable
+        ? "Press to stop authoring Preview audio without affecting performance playback."
+        : "Stop becomes available when authoring Preview owns an active note.");
+    const auto previewGuidance = juce::String::fromUTF8(previewStatus.creatorGuidance.c_str());
+    previewEnabledToggle.setDescription("Authoring Preview is "
+        + juce::String(previewEnabledToggle.getToggleState() ? "enabled. " : "disabled. ")
+        + previewGuidance);
 
     if (preview.available)
     {
@@ -2799,6 +2863,9 @@ void AuthoringPanel::previewSelectedZone(
     int explicitVelocity,
     std::string explicitZoneId)
 {
+    if (!previewEnabledToggle.getToggleState())
+        return;
+
     const auto request = authoringSession.buildSelectedZonePreviewRequest();
     if (!request.available)
         return;

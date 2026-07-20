@@ -215,6 +215,7 @@ private:
                                                                      std::uint64_t loopStartFrame,
                                                                      std::uint64_t loopEndFrame) const;
     void initializeAuthoringImportMetrics();
+    void publishAuthoringPreviewStatus();
     void primeRealtimeSafetyState(int samplesPerBlock);
     void updateRealtimeSafetyState();
     void publishAudioDiagnostics();
@@ -305,6 +306,7 @@ private:
     drs::engine::AuthoringSession authoringSession;
     drs::engine::AuthoringPreviewCommandAdapter authoringPreviewCommandAdapter;
     drs::engine::AuthoringPreviewController authoringPreviewController;
+    std::shared_ptr<const drs::app::AuthoringPreviewStatusSnapshot> authoringPreviewStatusPublication;
     drs::engine::EngineFacade engineFacade;
     std::unordered_map<std::string, drs::app::AuthoringWaveformPreview> authoringWaveformPreviewCache;
     drs::engine::SamplerPlaybackContext performancePlaybackContext {

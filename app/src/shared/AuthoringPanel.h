@@ -184,6 +184,8 @@ private:
     juce::TextButton drawerPerformanceTabButton;
     juce::Label zoneLabel;
     juce::ComboBox zoneSelector;
+    juce::ToggleButton previewEnabledToggle;
+    juce::TextButton previewStopButton;
     authoring::ZoneMapCanvas zoneMap;
     authoring::ZoneMappingEditor zoneMappingEditor;
     authoring::WaveformDetailView waveformPreview;

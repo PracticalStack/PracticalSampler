@@ -39,6 +39,10 @@ struct AuthoringPreviewControllerSnapshot
     AuthoringPreviewPreparationState preparationState = AuthoringPreviewPreparationState::idle;
     AuthoringPreviewActivationState activationState = AuthoringPreviewActivationState::noActivation;
     std::uint64_t acceptedPreparedBuildId = 0;
+    std::string acceptedSnapshotDigest;
+    std::string acceptedPreparedDigest;
+    std::string activeSnapshotDigest;
+    std::string activePreparedDigest;
     std::uint64_t reusablePreparedBuildId = 0;
     std::uint64_t coalescingBurstStartedAtMicros = 0;
     std::uint64_t launchEligibleAtMicros = 0;
@@ -58,6 +62,21 @@ struct AuthoringPreviewControllerSnapshot
     std::size_t maximumPendingDepth = 0;
     std::size_t retainedCompletionRecordCount = 0;
     std::size_t activationCount = 0;
+    std::uint64_t requestReceivedAtMicros = 0;
+    std::uint64_t launchedAtMicros = 0;
+    std::uint64_t readyAtMicros = 0;
+    std::uint64_t activationPendingAtMicros = 0;
+    std::uint64_t activeAtMicros = 0;
+    std::uint64_t lastRequestToLaunchMicros = 0;
+    std::uint64_t maxRequestToLaunchMicros = 0;
+    std::uint64_t lastPreparationMicros = 0;
+    std::uint64_t maxPreparationMicros = 0;
+    std::uint64_t lastReadyToActivationMicros = 0;
+    std::uint64_t maxReadyToActivationMicros = 0;
+    std::uint64_t lastRequestToAudibleMicros = 0;
+    std::uint64_t maxRequestToAudibleMicros = 0;
+    std::uint64_t lastCancellationMicros = 0;
+    std::uint64_t maxCancellationMicros = 0;
 };
 
 struct AuthoringPreviewRequestResult
@@ -93,13 +112,18 @@ public:
     AuthoringPreviewLaunchResult launchIfEligible(std::uint64_t nowMicros,
                                                   bool directAuditionContentPrepared = false);
     bool acceptPrepared(const AuthoringPreviewRequestIdentity& identity,
-                        std::uint64_t preparedBuildId);
-    bool markActivationPending(const AuthoringPreviewRequestIdentity& identity);
-    bool markActive(const AuthoringPreviewRequestIdentity& identity);
+                        std::uint64_t preparedBuildId,
+                        std::uint64_t nowMicros = 0,
+                        std::string snapshotDigest = {},
+                        std::string preparedDigest = {});
+    bool markActivationPending(const AuthoringPreviewRequestIdentity& identity,
+                               std::uint64_t nowMicros = 0);
+    bool markActive(const AuthoringPreviewRequestIdentity& identity,
+                    std::uint64_t nowMicros = 0);
     bool fail(const AuthoringPreviewRequestIdentity& identity, std::string failureState);
     bool fail(const AuthoringPreviewRequestIdentity& identity,
               AuthoringPreviewFailureFinding finding);
-    bool cancelCurrent();
+    bool cancelCurrent(std::uint64_t nowMicros = 0);
     void recordWorkerCancellation();
     void reset(bool advanceCancellationGeneration = true);
 

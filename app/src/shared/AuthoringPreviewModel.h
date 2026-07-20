@@ -1,5 +1,8 @@
 #pragma once
 
+#include "drs/engine/AuthoringPreviewContract.h"
+#include "drs/engine/AuthoringPreviewRecovery.h"
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -31,6 +34,16 @@ struct AuthoringWaveformPreview
 struct AuthoringPreviewStatusSnapshot
 {
     bool available = false;
+    drs::engine::AuthoringPreviewPresentationState presentationState
+        = drs::engine::AuthoringPreviewPresentationState::idle;
+    drs::engine::AuthoringPreviewPreparationState preparationState
+        = drs::engine::AuthoringPreviewPreparationState::idle;
+    drs::engine::AuthoringPreviewActivationState activationState
+        = drs::engine::AuthoringPreviewActivationState::noActivation;
+    drs::engine::AuthoringPreviewScope scope
+        = drs::engine::AuthoringPreviewScope::selectedZone;
+    std::uint64_t requestId = 0;
+    std::uint64_t cancellationGeneration = 0;
     std::size_t draftRevision = 0;
     std::size_t activeRevision = 0;
     std::size_t pendingRevision = 0;
@@ -38,14 +51,38 @@ struct AuthoringPreviewStatusSnapshot
     std::size_t failedRevision = 0;
     std::size_t audibleRevision = 0;
     bool auditionAvailable = false;
+    bool stopAvailable = false;
     bool usingLastKnownGood = false;
-    std::string revisionState;
+    std::string selectedZoneId;
+    std::uint64_t requestedPreparedBuildId = 0;
+    std::uint64_t activePreparedBuildId = 0;
+    std::string requestedSnapshotDigest;
+    std::string requestedPreparedDigest;
+    std::string activeSnapshotDigest;
+    std::string activePreparedDigest;
+    std::vector<drs::engine::AuthoringPreviewFailureFinding> findings;
+    std::string stateLabel;
+    std::string creatorGuidance;
     std::string failureState;
     std::string failureFamily;
     std::string failureCode;
     std::string failurePath;
     std::string blockingPrerequisite;
     std::string blockingGuidance;
+    std::uint64_t lastRequestToLaunchMicros = 0;
+    std::uint64_t maxRequestToLaunchMicros = 0;
+    std::uint64_t lastPreparationMicros = 0;
+    std::uint64_t maxPreparationMicros = 0;
+    std::uint64_t lastReadyToActivationMicros = 0;
+    std::uint64_t maxReadyToActivationMicros = 0;
+    std::uint64_t lastRequestToAudibleMicros = 0;
+    std::uint64_t maxRequestToAudibleMicros = 0;
+    std::uint64_t lastCancellationMicros = 0;
+    std::uint64_t maxCancellationMicros = 0;
+    std::size_t coalescedCount = 0;
+    std::size_t canceledCount = 0;
+    std::size_t pendingDepth = 0;
+    std::size_t maximumPendingDepth = 0;
 };
 
 struct AuthoringImportResponsivenessSnapshot

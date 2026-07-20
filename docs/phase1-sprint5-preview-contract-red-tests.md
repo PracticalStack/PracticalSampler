@@ -1,17 +1,17 @@
-# Mini Sprint 5.1 Expected-Red Preview Regressions
+# Sprint 5 Preview Replacement-Seam Regression Audit
 
 Recorded July 19, 2026.
 
 ## Purpose
 
-`drs_sprint5_preview_contract_red_tests` makes the temporary Preview orchestration gaps executable
-through the incremental controller implementation. It is intentionally not registered with CTest or
-`drs_all_tests`; a known failing target must not contaminate the green regression baseline.
+`drs_sprint5_preview_contract_red_tests` made the temporary Preview orchestration gaps executable
+through incremental implementation. Mini Sprint 5.7 removed the final gap and converted the target
+into the registered green `drs.sprint5.preview_contract_seams` negative source regression audit.
 
 ## Expected failures
 
-The direct executable inspects the current product sources and returns exit code 1 while any of
-these replacement seams remains:
+The executable inspects the current product sources and returns exit code 1 if any of these retired
+replacement seams returns:
 
 1. processor-owned immediate Preview payload construction;
 2. synchronous selected-sample warming during Preview staging;
@@ -19,9 +19,8 @@ these replacement seams remains:
 4. processor-owned Preview lifecycle synchronization (removed by Mini Sprint 5.2); and
 5. string-only public Preview lifecycle state.
 
-An unreadable source or audit failure returns exit code 2 so an infrastructure problem cannot be
-mistaken for expected red evidence. When all five seams are removed, the executable returns zero
-and should be retired or converted to a permanent negative source audit.
+An unreadable source or audit failure returns exit code 2. With all five seams absent, the executable
+returns zero as a permanent negative source audit.
 
 ## Resolution map
 
@@ -62,6 +61,13 @@ state, owned by Mini Sprint 5.7.
 Last-known-good identity, structured failure families, repair, resource pressure, and project
 lifetime are implemented without replacing the presentation-state seam assigned to 5.7. The direct
 audit therefore remains intentionally red at exactly one finding.
+
+## Mini Sprint 5.7 update
+
+The public Preview status now carries typed preparation, activation, and presentation states. The
+UI consumes one atomically published immutable snapshot and uses strings only for creator-facing
+labels and guidance. The final seam is removed; the audit is green and registered with CTest and
+`drs_all_tests` as `drs.sprint5.preview_contract_seams`.
 
 The green `drs.sprint5.preview_contract` target is registered immediately. It freezes request scope,
 request identity, legal preparation transitions, and active-note policy while the red implementation

@@ -542,7 +542,7 @@ drs::app::AuthoringPreviewStatusSnapshot makeAuthoringPreviewStatusFixture()
     status.available = true;
     status.draftRevision = 4;
     status.activeRevision = 3;
-    status.revisionState = "Failed";
+    status.stateLabel = "Failed";
     status.failureState = "Selected authoring sample could not be prepared.";
     status.blockingPrerequisite = "Relink or re-import the selected sample file.";
     status.blockingGuidance = "Restore the sample file for the selected zone, then prepare the authoring preview again.";

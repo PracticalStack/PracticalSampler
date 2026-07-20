@@ -52,24 +52,24 @@ int main()
             if (observed)
             {
                 ++observedGapCount;
-                std::cerr << "S5.1 RED: " << label << std::endl;
+                std::cerr << "Sprint 5 Preview seam regression: " << label << std::endl;
             }
         }
 
         if (observedGapCount == 0)
         {
-            std::cout << "Sprint 5 Preview replacement seams have all been removed; retire this red target."
+            std::cout << "Sprint 5 Preview replacement-seam regression audit passed."
                       << std::endl;
             return 0;
         }
 
-        std::cerr << "Mini Sprint 5.1 expected-red audit found " << observedGapCount
-                  << " deferred Preview controller seams." << std::endl;
+        std::cerr << "Sprint 5 Preview seam audit found " << observedGapCount
+                  << " regressed replacement seams." << std::endl;
         return 1;
     }
     catch (const std::exception& exception)
     {
-        std::cerr << "Mini Sprint 5.1 red audit failed unexpectedly: " << exception.what() << std::endl;
+        std::cerr << "Sprint 5 Preview seam audit failed unexpectedly: " << exception.what() << std::endl;
         return 2;
     }
 }
