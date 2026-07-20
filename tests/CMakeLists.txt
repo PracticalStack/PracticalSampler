@@ -715,6 +715,74 @@ add_test(
     COMMAND drs_sprint5_preview_contract_red_tests
 )
 
+juce_add_console_app(drs_sprint5_integration_hardening_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Sprint 5 Integration Hardening Tests"
+)
+
+target_sources(drs_sprint5_integration_hardening_tests
+    PRIVATE
+        src/Sprint5IntegrationHardeningTests.cpp
+        support/Sprint4OfflineRenderHarness.cpp
+        support/Sprint4OfflineRenderHarness.h
+)
+
+target_compile_definitions(drs_sprint5_integration_hardening_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_include_directories(drs_sprint5_integration_hardening_tests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/support
+)
+
+target_link_libraries(drs_sprint5_integration_hardening_tests
+    PRIVATE
+        drs_plugin_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_sprint5_integration_hardening_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint5.integration_hardening
+    COMMAND drs_sprint5_integration_hardening_tests
+)
+
+# Sprint 6.1 frozen Publish command/identity/lifecycle/voice/macro contract.
+add_executable(drs_sprint6_publish_contract_tests
+    src/Sprint6PublishContractTests.cpp
+)
+
+target_link_libraries(drs_sprint6_publish_contract_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_features(drs_sprint6_publish_contract_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint6.publish_contract
+    COMMAND drs_sprint6_publish_contract_tests
+)
+
+# Direct-only expected-red audit. Later Sprint 6 slices retire these seams and
+# convert this executable into a registered green regression target.
+add_executable(drs_sprint6_publish_contract_red_tests
+    src/Sprint6PublishContractRedTests.cpp
+)
+
+target_compile_definitions(drs_sprint6_publish_contract_red_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_sprint6_publish_contract_red_tests PRIVATE cxx_std_17)
+
 juce_add_console_app(drs_phase1_realtime_safety_tests
     PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Realtime Safety Tests"
 )
@@ -1580,6 +1648,9 @@ add_dependencies(drs_all_tests
     drs_sprint5_preview_recovery_tests
     drs_sprint5_preview_shell_parity_tests
     drs_sprint5_preview_contract_red_tests
+    drs_sprint5_integration_hardening_tests
+    drs_sprint6_publish_contract_tests
+    drs_sprint6_publish_contract_red_tests
     drs_phase0_smoke_tests
     drs_phase1_runtime_contract_tests
     drs_phase1_draft_playback_contract_tests

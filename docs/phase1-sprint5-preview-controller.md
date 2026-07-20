@@ -66,3 +66,10 @@ Exact duplicate suppression is implemented here. Timed coalescing, bounded churn
 cancellation are Mini Sprint 5.3 responsibilities. Audition-command unification is Mini Sprint 5.5,
 and typed presentation state is Mini Sprint 5.7.
 
+## Sprint 5 closure update
+
+Mini Sprints 5.3-5.8 completed every incremental responsibility above. The processor-local
+preparation/warming seams and duplicate UI audition routing are removed, typed presentation is the
+only public lifecycle truth, and `drs.sprint5.integration_hardening` enforces the final bounded-work,
+realtime, activation-lifetime, and Performance-isolation contract. See the
+[Sprint 5 GO report](phase1-sprint5-go-report-2026-07-19.md).

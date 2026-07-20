@@ -524,8 +524,6 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
                                AuthoringPreviewStatusProvider nextAuthoringPreviewStatusProvider,
                                ImportResponsivenessProvider responsivenessProvider,
                                LayoutMode nextLayoutMode,
-                               NotePreviewStartedCallback notePreviewStarted,
-                               NotePreviewEndedCallback notePreviewEnded,
                                RestoreRootKeyCallback restoreRootKeyRequested,
                                DraftPlaybackStatusProvider nextDraftPlaybackStatusProvider,
                                DraftPlaybackActionCallback prepareDraftPlaybackRequested,
@@ -536,8 +534,6 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
       authoringPreviewStatusProvider(std::move(nextAuthoringPreviewStatusProvider)),
       importResponsivenessProvider(std::move(responsivenessProvider)),
       layoutMode(nextLayoutMode),
-      onNotePreviewStarted(std::move(notePreviewStarted)),
-      onNotePreviewEnded(std::move(notePreviewEnded)),
       onRestoreRootKeyRequested(std::move(restoreRootKeyRequested)),
       draftPlaybackStatusProvider(std::move(nextDraftPlaybackStatusProvider)),
       onPrepareDraftPlaybackRequested(std::move(prepareDraftPlaybackRequested)),
@@ -2876,22 +2872,18 @@ void AuthoringPanel::previewSelectedZone(
                                                    timedPreviewNotes.size() - 1);
     releaseTimedPreview(sourceIndex);
 
-    if (previewCommandCallback)
-    {
-        drs::engine::AuthoringPreviewCommand command;
-        command.type = drs::engine::AuthoringPreviewCommandType::auditionSelectedZone;
-        command.source = source;
-        command.midiNote = midiNote;
-        command.velocity = static_cast<float>(velocity) / 127.0f;
-        command.selectedZoneId = explicitZoneId.empty()
-            ? authoringSession.getSelectedZone()->id
-            : std::move(explicitZoneId);
-        previewCommandCallback(command);
-    }
-    else if (onNotePreviewStarted)
-    {
-        onNotePreviewStarted(midiNote, static_cast<float>(velocity) / 127.0f);
-    }
+    if (!previewCommandCallback)
+        return;
+
+    drs::engine::AuthoringPreviewCommand command;
+    command.type = drs::engine::AuthoringPreviewCommandType::auditionSelectedZone;
+    command.source = source;
+    command.midiNote = midiNote;
+    command.velocity = static_cast<float>(velocity) / 127.0f;
+    command.selectedZoneId = explicitZoneId.empty()
+        ? authoringSession.getSelectedZone()->id
+        : std::move(explicitZoneId);
+    previewCommandCallback(command);
 
     timedPreviewNotes[sourceIndex] = { true, midiNote,
                                        juce::Time::getMillisecondCounterHiRes() + 180.0 };
@@ -2905,16 +2897,14 @@ void AuthoringPanel::releaseTimedPreview(std::size_t sourceIndex)
 
     const auto note = timedPreviewNotes[sourceIndex].midiNote;
     timedPreviewNotes[sourceIndex] = {};
-    if (previewCommandCallback)
-    {
-        drs::engine::AuthoringPreviewCommand command;
-        command.type = drs::engine::AuthoringPreviewCommandType::noteOff;
-        command.source = static_cast<drs::engine::AuthoringPreviewAuditionSource>(sourceIndex);
-        command.midiNote = note;
-        previewCommandCallback(command);
-    }
-    else if (onNotePreviewEnded)
-        onNotePreviewEnded(note);
+    if (!previewCommandCallback)
+        return;
+
+    drs::engine::AuthoringPreviewCommand command;
+    command.type = drs::engine::AuthoringPreviewCommandType::noteOff;
+    command.source = static_cast<drs::engine::AuthoringPreviewAuditionSource>(sourceIndex);
+    command.midiNote = note;
+    previewCommandCallback(command);
 }
 
 void AuthoringPanel::prepareDraftPlaybackPreview()

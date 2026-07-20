@@ -18,12 +18,12 @@ must not publish, replace, reset, release, steal, or otherwise mutate Performanc
 | `Processor::stageAuthoringPreviewActivation()` formerly built an immediate selected-zone payload when worker state was stale. | Resolved in 5.4 | General authored worker payloads now cross one validating scope-preparation boundary. |
 | `ensureSelectedAuthoringSampleLoaded(false)` formerly imported and cached the selected playback sample. | Resolved in 5.4 | Removed; worker-owned general authored preparation is the only playback decode path. |
 | `queueAuthoringPreviewNoteOn()` formerly called `serviceMessageThreadWork()` implicitly. | Resolved in 5.5 | Typed audition commands request preparation explicitly; plain note dispatch is lifecycle-free. |
-| Preview state is derived as `Idle / Preparing / Ready / Stale / Failed` strings from processor diagnostics. | Processor/message snapshot | Replace with typed request, activation, and presentation state in 5.2/5.7. Strings become presentation-only. |
+| Preview state formerly derived `Idle / Preparing / Ready / Stale / Failed` strings from processor diagnostics. | Resolved in 5.7 | UI and diagnostics now consume one typed immutable presentation snapshot; strings are presentation-only. |
 | Summary Preview formerly used a detached delayed note-off while other authoring sources entered the processor queue directly. | Resolved in 5.5 | All creator sources use one typed adapter, per-source note ownership, and component-owned release timers. |
 | Sprint 4 context activation, old-model voice leases, and message-owned retirement. | `SamplerPlaybackContext` | Retain unchanged. This is the approved activation/lifetime mechanism. |
 
-The unresolved source seams remain executable in `drs_sprint5_preview_contract_red_tests`. After
-5.5, the target reports exactly one later-sprint gap and remains intentionally direct-only.
+All replacement seams are now retired. The former expected-red audit is the permanent registered
+green `drs.sprint5.preview_contract_seams` regression target.
 
 ## Preview scopes
 

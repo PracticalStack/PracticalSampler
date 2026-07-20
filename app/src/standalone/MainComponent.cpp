@@ -414,14 +414,6 @@ MainComponent::MainComponent(bool enableAudioOutput)
                          return processor.getAuthoringImportResponsivenessSnapshot();
                      },
                      drs::app::AuthoringPanel::LayoutMode::expanded,
-                     [this](int midiNoteNumber, float velocity)
-                     {
-                         processor.queueAuthoringPreviewNoteOn(midiNoteNumber, velocity);
-                     },
-                     [this](int midiNoteNumber)
-                     {
-                         processor.queueAuthoringPreviewNoteOff(midiNoteNumber);
-                     },
                      [this]
                      {
                          restoreSelectedZoneRootKey();

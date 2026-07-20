@@ -21,11 +21,14 @@ jobs:
       - name: Configure ThreadSanitizer build
         run: cmake -S . -B build/tsan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DDRS_ENABLE_THREAD_SANITIZER=ON
 
-      - name: Build diagnostics and Sprint 4 concurrency regressions
-        run: cmake --build build/tsan --target drs_sprint4_entry_diagnostics_concurrency_tests drs_sprint4_concurrency_soak_tests
+      - name: Build diagnostics, Sprint 4, and Sprint 5 concurrency regressions
+        run: cmake --build build/tsan --target drs_sprint4_entry_diagnostics_concurrency_tests drs_sprint4_concurrency_soak_tests drs_sprint5_integration_hardening_tests
 
       - name: Run diagnostics concurrency regression under ThreadSanitizer
         run: ./build/tsan/tests/drs_sprint4_entry_diagnostics_concurrency_tests_artefacts/Debug/drs_sprint4_entry_diagnostics_concurrency_tests
 
       - name: Run Sprint 4 concurrency soak under ThreadSanitizer
         run: ./build/tsan/tests/drs_sprint4_concurrency_soak_tests_artefacts/Debug/drs_sprint4_concurrency_soak_tests
+
+      - name: Run Sprint 5 Preview integration soak under ThreadSanitizer
+        run: ./build/tsan/tests/drs_sprint5_integration_hardening_tests_artefacts/Debug/drs_sprint5_integration_hardening_tests

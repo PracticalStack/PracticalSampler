@@ -39,5 +39,6 @@ last-known-good behavior remain intact.
 
 Mini Sprint 5.7 exit criteria are met. Both shells present the same immutable Preview truth,
 responsiveness metrics, actionable state guidance, and accessible lane-local controls. The UI no
-longer polls mutable Preview internals, the final expected-red seam has been retired into a green
-regression audit, and Mini Sprint 5.8 may proceed.
+longer polls mutable Preview internals, and the final expected-red seam has been retired into a green
+regression audit. Mini Sprint 5.8 subsequently passed the full closure matrix; see the
+[Sprint 5 GO report](phase1-sprint5-go-report-2026-07-19.md).

@@ -423,14 +423,6 @@ Editor::Editor(Processor& owner)
                          return owner.getAuthoringImportResponsivenessSnapshot();
                      },
                      drs::app::AuthoringPanel::LayoutMode::compact,
-                     [&owner](int midiNoteNumber, float velocity)
-                     {
-                         owner.queueAuthoringPreviewNoteOn(midiNoteNumber, velocity);
-                     },
-                     [&owner](int midiNoteNumber)
-                     {
-                         owner.queueAuthoringPreviewNoteOff(midiNoteNumber);
-                     },
                      [this]
                      {
                          restoreSelectedZoneRootKey();

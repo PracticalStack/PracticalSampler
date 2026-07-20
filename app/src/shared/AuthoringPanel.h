@@ -31,8 +31,6 @@ public:
         expanded
     };
 
-    using NotePreviewStartedCallback = std::function<void(int, float)>;
-    using NotePreviewEndedCallback = std::function<void(int)>;
     using WaveformPreviewProvider = std::function<AuthoringWaveformPreview()>;
     using AuthoringPreviewStatusProvider = std::function<AuthoringPreviewStatusSnapshot()>;
     using ImportResponsivenessProvider = std::function<AuthoringImportResponsivenessSnapshot()>;
@@ -46,8 +44,6 @@ public:
                             AuthoringPreviewStatusProvider authoringPreviewStatusProvider = {},
                             ImportResponsivenessProvider importResponsivenessProvider = {},
                             LayoutMode layoutMode = LayoutMode::compact,
-                            NotePreviewStartedCallback onNotePreviewStarted = {},
-                            NotePreviewEndedCallback onNotePreviewEnded = {},
                             RestoreRootKeyCallback onRestoreRootKeyRequested = {},
                             DraftPlaybackStatusProvider draftPlaybackStatusProvider = {},
                             DraftPlaybackActionCallback onPrepareDraftPlaybackRequested = {},
@@ -137,8 +133,6 @@ private:
     AuthoringPreviewStatusProvider authoringPreviewStatusProvider;
     ImportResponsivenessProvider importResponsivenessProvider;
     LayoutMode layoutMode = LayoutMode::compact;
-    NotePreviewStartedCallback onNotePreviewStarted;
-    NotePreviewEndedCallback onNotePreviewEnded;
     RestoreRootKeyCallback onRestoreRootKeyRequested;
     DraftPlaybackStatusProvider draftPlaybackStatusProvider;
     DraftPlaybackActionCallback onPrepareDraftPlaybackRequested;

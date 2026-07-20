@@ -97,6 +97,21 @@ enum class AuthoringPreviewNotePolicyAction : std::uint8_t
     resetPreviewVoicesAndPreserveActivation
 };
 
+// Sprint 5 closure budgets. These are product support limits, not benchmark targets.
+// Changing one requires fresh integration, realtime, and shell-parity evidence.
+struct AuthoringPreviewIntegrationBudgets
+{
+    static constexpr std::uint64_t maximumCoalescingDelayMicros = 40000;
+    static constexpr std::uint64_t maximumRequestToAudibleMicros = 8000000;
+    static constexpr std::size_t maximumControllerPendingDepth = 1;
+    static constexpr std::size_t maximumWorkerPendingWorkCount = 2;
+    static constexpr std::size_t maximumWorkerInFlightWorkCount = 1;
+    static constexpr std::uint64_t maximumRetainedActivationBytes = 64ull * 1024ull * 1024ull;
+    static constexpr std::size_t maximumRetirementBacklog = 8;
+    static constexpr std::uint64_t maximumQueueDropCount = 0;
+    static constexpr std::size_t maximumCallbackOverrunCount = 0;
+};
+
 struct AuthoringPreviewRequestIdentity
 {
     std::uint64_t requestId = 0;

@@ -2419,16 +2419,6 @@ int main()
                                                return makeImportMetricsFixture();
                                            },
                                            layoutMode,
-                                           [&previewStartCount, &lastPreviewMidiNote, &lastPreviewVelocity](int midiNote, float velocity)
-                                           {
-                                               ++previewStartCount;
-                                               lastPreviewMidiNote = midiNote;
-                                               lastPreviewVelocity = velocity;
-                                           },
-                                           [&previewEndCount](int)
-                                           {
-                                               ++previewEndCount;
-                                           },
                                            [&session, &restoreRootKeyCount, &panelPtr]()
                                            {
                                                ++restoreRootKeyCount;
@@ -2447,6 +2437,24 @@ int main()
                                            []()
                                            {
                                                return makeDraftPlaybackStatusFixture();
+                                           },
+                                           {},
+                                           {},
+                                           [&previewStartCount,
+                                            &previewEndCount,
+                                            &lastPreviewMidiNote,
+                                            &lastPreviewVelocity](const drs::engine::AuthoringPreviewCommand& command)
+                                           {
+                                               if (command.type == drs::engine::AuthoringPreviewCommandType::auditionSelectedZone)
+                                               {
+                                                   ++previewStartCount;
+                                                   lastPreviewMidiNote = command.midiNote;
+                                                   lastPreviewVelocity = command.velocity;
+                                               }
+                                               else if (command.type == drs::engine::AuthoringPreviewCommandType::noteOff)
+                                               {
+                                                   ++previewEndCount;
+                                               }
                                            });
             panelPtr = &panel;
             panel.setTopLeftPosition(0, 0);

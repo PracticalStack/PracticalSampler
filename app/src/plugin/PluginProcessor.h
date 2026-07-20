@@ -349,8 +349,6 @@ private:
     std::size_t performancePeakReleasingVoiceCount = 0;
     std::size_t authoringPreviewPeakActiveVoiceCount = 0;
     std::size_t authoringPreviewPeakReleasingVoiceCount = 0;
-    std::size_t failedAuthoringPreviewRevision = std::numeric_limits<std::size_t>::max();
-    std::string failedAuthoringPreviewState;
     std::size_t observedDraftPlaybackProjectRevision = std::numeric_limits<std::size_t>::max();
     std::uint64_t observedEngineStateRevision = 0;
     bool authoringPreviewDirectAuditionRequested = false;
