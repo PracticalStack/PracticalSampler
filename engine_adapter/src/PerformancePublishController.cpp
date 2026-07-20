@@ -281,6 +281,10 @@ bool PerformancePublishController::acknowledgeActivation(
         updateMaximum(snapshot.maxRequestToActiveMicros, snapshot.lastRequestToActiveMicros);
     }
     ++snapshot.activationCount;
+    std::atomic_store_explicit(
+        &publishedActiveActivationPayload,
+        std::make_shared<const PerformancePublishActivationPayload>(payload),
+        std::memory_order_release);
     publishSnapshot();
     return true;
 }
@@ -428,6 +432,12 @@ void PerformancePublishController::reset(bool clearActive,
     snapshot.activationStagingRejectedCount = activationStagingRejectedCount;
     snapshot.activationAcknowledgementRejectedCount = activationAcknowledgementRejectedCount;
     snapshot.maximumPendingDepth = maximumPendingDepth;
+    if (clearActive)
+    {
+        std::atomic_store_explicit(&publishedActiveActivationPayload,
+                                   PerformancePublishActivationPayloadPtr {},
+                                   std::memory_order_release);
+    }
     if (!clearActive)
     {
         snapshot.hasActiveRequest = hasActiveRequest;

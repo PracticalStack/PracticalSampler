@@ -2,6 +2,7 @@
 
 #include "drs/engine/PerformancePublishContract.h"
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -118,6 +119,11 @@ public:
 
     bool isCurrent(const PerformancePublishRequestIdentity& identity) const noexcept;
     PerformancePublishControllerSnapshot getSnapshot() const;
+    PerformancePublishActivationPayloadPtr getActiveActivationPayload() const
+    {
+        return std::atomic_load_explicit(&publishedActiveActivationPayload,
+                                         std::memory_order_acquire);
+    }
     std::deque<PerformancePublishCompletionRecord> getCompletionRecords() const
     {
         return completionRecords;
@@ -134,6 +140,7 @@ private:
     PerformancePublishControllerConfig config;
     PerformancePublishControllerSnapshot snapshot;
     std::shared_ptr<const PerformancePublishControllerSnapshot> publishedSnapshot;
+    PerformancePublishActivationPayloadPtr publishedActiveActivationPayload;
     std::deque<PerformancePublishCompletionRecord> completionRecords;
     std::uint64_t nextRequestId = 1;
     std::uint64_t cancellationGeneration = 1;

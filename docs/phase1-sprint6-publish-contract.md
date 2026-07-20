@@ -19,14 +19,14 @@ the exact last-known-good Performance payload and output.
 | `StatusPanel` directly calls `EngineFacade::publishCurrentDraft()` | Shared diagnostic UI | Replace with the typed Publish command adapter in 6.8. |
 | Plug-in editor directly calls `EngineFacade::publishCurrentDraft()` | Plug-in shell | Replace with the shared typed adapter in 6.8. |
 | Standalone shell directly calls `EngineFacade::publishCurrentDraft()` | Standalone shell | Replace with the shared typed adapter in 6.8. |
-| Public `EngineFacade::publishCurrentDraft()` formerly owned request/result lifecycle | Resolved in 6.2 | It is now a compatibility wrapper over the typed controller; direct shell access retires in 6.8. |
+| Public `EngineFacade::publishCurrentDraft()` formerly owned request/result lifecycle | Resolved in 6.2/6.9 | It is an internal typed-adapter integration seam; direct shell access is retired and permanently audited. |
 | Processor `stagePerformanceActivation()` owns eligibility/staging branches | Plug-in processor | Controller authorizes one immutable eligible payload in 6.5. |
-| Public published lifecycle is exposed as `publishedRevisionState` text | Facade snapshots/UI | Replace lifecycle truth with typed immutable status in 6.2/6.8; text becomes presentation-only. |
-| Mutable facade macro values are not bound to an immutable published schema | Engine facade/session | Add stable-ID published bindings and atomic value/schema activation in 6.7. |
+| Public published lifecycle was exposed as `publishedRevisionState` text | Resolved in 6.8/6.9 | The compatibility string is deleted; UI text derives from typed immutable presentation state. |
+| Mutable facade macro values were not bound to an immutable published schema | Resolved in 6.7/6.9 | The controller-owned active authorization payload carries the revision-bound immutable macro table. |
 
-The remaining six seams are executable in `drs_sprint6_publish_contract_red_tests`. The executable
-is intentionally direct-only and expected to exit 1 until the responsible mini sprints retire each
-seam. At Sprint 6 closure it becomes a registered green regression target.
+All replacement seams are retired. `drs.sprint6.publish_contract_seams` is the registered permanent
+green regression target covering direct shell routing, typed lifecycle truth, controller payload
+ownership, macro binding ownership, and the processor's bounded callback view.
 
 ## Command semantics
 

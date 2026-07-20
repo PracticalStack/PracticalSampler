@@ -99,6 +99,51 @@ float renderQueuedPerformanceSurfaceMagnitude(drs::plugin::Processor& processor,
     processor.queuePerformanceSurfaceNoteOff(midiNoteNumber);
     return maxMagnitude;
 }
+
+float renderClickedPerformanceKeyboardMagnitude(drs::plugin::Processor& processor,
+                                                 juce::MidiKeyboardComponent& keyboard,
+                                                 int midiNoteNumber)
+{
+    auto position = keyboard.getRectangleForKey(midiNoteNumber).getCentre();
+    const auto keyBounds = keyboard.getRectangleForKey(midiNoteNumber);
+    for (auto y = keyBounds.getY(); y < keyBounds.getBottom(); y += 2.0f)
+    {
+        const juce::Point<float> candidate { keyBounds.getCentreX(), y };
+        if (keyboard.getNoteAndVelocityAtPosition(candidate).note == midiNoteNumber)
+        {
+            position = candidate;
+            break;
+        }
+    }
+    require(keyboard.getNoteAndVelocityAtPosition(position).note == midiNoteNumber,
+            "Could not locate the requested Perform keyboard key for UI input coverage.");
+
+    const auto eventTime = juce::Time::getCurrentTime();
+    const auto mouseSource = juce::Desktop::getInstance().getMainMouseSource();
+    const juce::MouseEvent mouseDown(
+        mouseSource, position, juce::ModifierKeys::leftButtonModifier,
+        1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+        &keyboard, &keyboard, eventTime, position, eventTime, 1, false);
+    keyboard.mouseDown(mouseDown);
+
+    auto maxMagnitude = 0.0f;
+    juce::MidiBuffer emptyMidiBuffer;
+    for (auto blockIndex = 0; blockIndex < 4; ++blockIndex)
+    {
+        juce::AudioBuffer<float> buffer(2, 512);
+        buffer.clear();
+        processor.processBlock(buffer, emptyMidiBuffer);
+        maxMagnitude = std::max(maxMagnitude,
+                                buffer.getMagnitude(0, buffer.getNumSamples()));
+    }
+
+    const juce::MouseEvent mouseUp(
+        mouseSource, position, juce::ModifierKeys {},
+        0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+        &keyboard, &keyboard, juce::Time::getCurrentTime(), position, eventTime, 1, false);
+    keyboard.mouseUp(mouseUp);
+    return maxMagnitude;
+}
 } // namespace
 
 int main()
@@ -181,6 +226,8 @@ int main()
                 "Expected authored HISE XML backup assets under XmlPresetBackups/.");
 
         drs::standalone::MainComponent mainComponent(false);
+        mainComponent.addToDesktop(0);
+        mainComponent.setVisible(true);
         require(mainComponent.getWidth() == drs::app::authoring::expandedTargetShellWidth,
                 "Standalone shell width changed unexpectedly.");
         require(mainComponent.getHeight() == drs::app::authoring::expandedTargetShellHeight,
@@ -207,12 +254,27 @@ int main()
                 "Standalone smoke validation should explicitly install the default Performance activation.");
         require(renderQueuedPerformanceSurfaceMagnitude(mainComponent.getProcessor(), 57, 0.8f) > 0.0001f,
                 "Standalone performance surface should render audible output through the shared processor path.");
+        standaloneTabs->setCurrentTabIndex(0);
+        auto* standaloneKeyboard = dynamic_cast<juce::MidiKeyboardComponent*>(
+            findDescendantById(mainComponent, "performanceKeyboard"));
+        auto* standalonePerformancePanel = standaloneKeyboard != nullptr
+            ? dynamic_cast<drs::app::PerformancePanel*>(standaloneKeyboard->getParentComponent())
+            : nullptr;
+        if (standalonePerformancePanel != nullptr)
+            standalonePerformancePanel->refreshNow();
+        require(standaloneKeyboard != nullptr
+                    && standaloneKeyboard->isEnabled()
+                    && renderClickedPerformanceKeyboardMagnitude(
+                        mainComponent.getProcessor(), *standaloneKeyboard, 57) > 0.0001f,
+                "A real Perform-tab keyboard mouse gesture must reach audible standalone audio.");
 
         drs::plugin::Processor processor;
         require(processor.acceptsMidi(), "Plugin shell must remain configured as a MIDI-driven synth.");
 
         std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
         require(editor != nullptr, "Plugin editor creation failed.");
+        editor->addToDesktop(0);
+        editor->setVisible(true);
         require(editor->getWidth() == drs::app::authoring::compactShellWidth,
                 "Plugin editor width changed unexpectedly.");
         require(editor->getHeight() == drs::app::authoring::compactShellHeight,
@@ -250,6 +312,19 @@ int main()
 
         require(renderQueuedPerformanceSurfaceMagnitude(processor, 57, 0.8f) > 0.0001f,
                 "Plugin performance surface keyboard should produce audible output without host MIDI input.");
+        pluginTabs->setCurrentTabIndex(0);
+        auto* pluginKeyboard = dynamic_cast<juce::MidiKeyboardComponent*>(
+            findDescendantById(*editor, "performanceKeyboard"));
+        auto* pluginPerformancePanel = pluginKeyboard != nullptr
+            ? dynamic_cast<drs::app::PerformancePanel*>(pluginKeyboard->getParentComponent())
+            : nullptr;
+        if (pluginPerformancePanel != nullptr)
+            pluginPerformancePanel->refreshNow();
+        require(pluginKeyboard != nullptr
+                    && pluginKeyboard->isEnabled()
+                    && renderClickedPerformanceKeyboardMagnitude(
+                        processor, *pluginKeyboard, 57) > 0.0001f,
+                "A real Perform-tab keyboard mouse gesture must reach audible plug-in audio.");
 
         juce::AudioPluginFormatManager formatManager;
         juce::addHeadlessDefaultFormatsToManager(formatManager);

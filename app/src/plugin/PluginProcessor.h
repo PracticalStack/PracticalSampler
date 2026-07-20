@@ -195,6 +195,7 @@ public:
     void queueAuthoringPreviewNoteOff(int midiNoteNumber);
     void queuePerformanceSurfaceNoteOn(int midiNoteNumber, float velocity);
     void queuePerformanceSurfaceNoteOff(int midiNoteNumber);
+    bool hasRecentAudioCallback(std::uint64_t maximumAgeMicros = 750000) const noexcept;
     bool serviceMessageThreadWork();
     ProcessorRealtimeSafetySnapshot getRealtimeSafetySnapshot() const;
     void setRealtimeGuardTestInjection(RealtimeGuardOperation operation);
@@ -383,6 +384,7 @@ private:
     std::shared_ptr<const ProcessorRealtimeSafetySnapshot> publishedRealtimeSafetySnapshot;
     AudioDiagnosticsPublication audioDiagnosticsPublication;
     std::atomic<std::size_t> diagnosticsProcessBlockCount { 0 };
+    std::atomic<std::uint64_t> diagnosticsLastProcessBlockAtMicros { 0 };
     std::atomic<std::size_t> diagnosticsPreparedBlockSize { 0 };
     std::atomic<std::size_t> diagnosticsAuthoringSampleLoadsOnAudioThread { 0 };
     std::atomic<std::size_t> diagnosticsActiveVoiceCapacityLimit { 0 };

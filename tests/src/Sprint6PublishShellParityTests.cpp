@@ -258,15 +258,22 @@ int main()
         const auto pluginSource = readText(root / "app/src/plugin/PluginEditor.cpp");
         const auto standaloneSource = readText(root / "app/src/standalone/MainComponent.cpp");
         const auto processorSource = readText(root / "app/src/plugin/PluginProcessor.cpp");
+        const auto performancePanelSource = readText(root / "app/src/shared/PerformancePanel.cpp");
+        const auto performancePanelHeader = readText(root / "app/src/shared/PerformancePanel.h");
         require(statusSource.find("engineFacade.publishCurrentDraft();") == std::string::npos
                     && pluginSource.find("owner.getEngineFacade().publishCurrentDraft();") == std::string::npos
                     && standaloneSource.find("processor.getEngineFacade().publishCurrentDraft();") == std::string::npos
+                    && pluginSource.find("owner.queuePerformanceSurfaceNoteOn(") != std::string::npos
+                    && standaloneSource.find("processor.queuePerformanceSurfaceNoteOn(") != std::string::npos
+                    && performancePanelHeader.find("PerformanceNoteOnCallback") != std::string::npos
+                    && performancePanelSource.find("onPerformanceNoteOn(") != std::string::npos
+                    && performancePanelSource.find("auditionPreviewNote(") == std::string::npos
                     && processorSource.find("submitPerformancePublishCommand(") != std::string::npos
                     && processorSource.find("performanceEvents.push(") != std::string::npos
                     && processorSource.find(
                         "drainRealtimeNoteEvents(authoringPreviewNoteQueue, authoringPreviewEvents")
                         != std::string::npos,
-                "Source audit must enforce one typed Publish adapter and distinct lane event buffers.");
+                "Source audit must enforce one typed Publish adapter, a Performance-only keyboard, and distinct lane event buffers.");
 
         std::cout << "Mini Sprint 6.8 Publish command, status, routing, and shell parity matrix passed."
                   << std::endl;

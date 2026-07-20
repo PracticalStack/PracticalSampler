@@ -141,11 +141,11 @@ int main()
 
         requireLabelContains(panel,
                              "performancePatchStatusLabel",
-                             "Draft r0 | Preview r0 (Ready) | Published r0 (Active)",
+                             "Draft r0 | Preview r0 (Ready) | Published r0 (Ready)",
                              "Performance panel should expose the seeded default draft-playback state.");
         requireLabelContains(panel,
                              "statusSessionLabel",
-                             "draft=0 | preview=0 (Ready) | published=0 (Active)",
+                             "draft=0 | preview=0 (Ready) | published=0 (Ready)",
                              "Diagnostics panel should expose the seeded default draft-playback state.");
         requireLabelContains(panel,
                              "performancePatchStatusLabel",
@@ -184,15 +184,29 @@ int main()
                              "Performance panel should surface the rejected migrated preview state.");
         requireLabelContains(panel,
                              "performancePatchStatusLabel",
-                             "Published r0 (Prepared playback build rejected because the immutable snapshot is unavailable)",
+                             "Published r0 (Failed)",
                              "Performance panel should surface the rejected migrated publish state.");
+        requireLabelContains(panel,
+                             "performanceLoadIndicatorLabel",
+                             "Publish Failed",
+                             "The compact Performance status chip should keep a failed Publish fully visible.");
+        require(requireLabel(panel, "performanceLoadIndicatorLabel").findColour(
+                    juce::Label::backgroundColourId) == juce::Colour::fromRGB(172, 41, 41),
+                "A failed Publish must use the danger colour even when a fallback instrument remains loaded.");
+        requireLabelContains(panel,
+                             "performanceKeyboardHintLabel",
+                             "Publish failed: Snapshot requires at least one playable zone",
+                             "The full actionable Publish failure must remain visible beside the disabled keyboard.");
+        require(requireLabel(panel, "performanceLoadIndicatorLabel").getDescription().contains(
+                    "no-playable-zones"),
+                "The compact failed Publish chip must retain the structured finding in its accessible description.");
         requireLabelContains(panel,
                              "performancePreviewStatusLabel",
                              "findings Snapshot requires at least one playable zone before it can become activation-eligible.",
                              "Performance panel should surface the migrated preview finding summary.");
         requireLabelContains(panel,
                              "statusSessionLabel",
-                             "draft=0 | preview=0 (Prepared playback build rejected because the immutable snapshot is unavailable) | published=0 (Prepared playback build rejected because the immutable snapshot is unavailable)",
+                             "draft=0 | preview=0 (Prepared playback build rejected because the immutable snapshot is unavailable) | published=0 (Failed)",
                              "Diagnostics panel should surface the rejected migrated draft-playback states.");
         requireLabelContains(panel,
                              "performancePatchStatusLabel",
@@ -256,11 +270,11 @@ int main()
 
         requireLabelContains(panel,
                              "performancePatchStatusLabel",
-                             "Draft r1 | Preview r1 (Ready) | Published r1 (Active)",
+                             "Draft r1 | Preview r1 (Ready) | Published r1 (Ready)",
                              "Performance panel should surface the recovered migrated preview/publish state.");
         requireLabelContains(panel,
                              "statusSessionLabel",
-                             "draft=1 | preview=1 (Ready) | published=1 (Active)",
+                             "draft=1 | preview=1 (Ready) | published=1 (Ready)",
                              "Diagnostics panel should surface the recovered migrated preview/publish state.");
         requireLabelContains(panel,
                              "performancePatchStatusLabel",
@@ -268,8 +282,8 @@ int main()
                              "Performance panel should expose published draft provenance once a migrated draft is published.");
         requireLabelContains(panel,
                              "performanceLoadIndicatorLabel",
-                             "surface=published draft | renderer=reference-backed",
-                             "Performance load indicator should expose published draft provenance once a migrated draft is published.");
+                             "Publish Ready r1",
+                             "The compact Performance status chip should expose the recovered published revision without clipping.");
         requireLabelContains(panel,
                              "statusFailureLabel",
                              "previewFindings=0 (none) | publishFindings=0 (none)",
@@ -296,11 +310,11 @@ int main()
 
         requireLabelContains(panel,
                              "performancePatchStatusLabel",
-                             "Draft r2 | Preview r1 (Stale) | Published r1 (Active)",
+                             "Draft r2 | Preview r1 (Stale) | Published r1 (Ready)",
                              "Performance panel should surface the stale-preview edited-draft state.");
         requireLabelContains(panel,
                              "statusSessionLabel",
-                             "draft=2 | preview=1 (Stale) | published=1 (Active)",
+                             "draft=2 | preview=1 (Stale) | published=1 (Ready)",
                              "Diagnostics panel should surface the stale-preview edited-draft state.");
         requireLabelContains(panel,
                              "performancePatchStatusLabel",
@@ -323,11 +337,11 @@ int main()
 
         requireLabelContains(panel,
                              "performancePatchStatusLabel",
-                             "Draft r2 | Preview r2 (Ready) | Published r2 (Active)",
+                             "Draft r2 | Preview r2 (Ready) | Published r2 (Ready)",
                              "Performance panel should surface the republished edited-draft state.");
         requireLabelContains(panel,
                              "statusSessionLabel",
-                             "draft=2 | preview=2 (Ready) | published=2 (Active)",
+                             "draft=2 | preview=2 (Ready) | published=2 (Ready)",
                              "Diagnostics panel should surface the republished edited-draft state.");
         requireLabelContains(panel,
                              "performancePatchStatusLabel",

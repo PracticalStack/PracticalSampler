@@ -77,15 +77,17 @@ int computeMotionSemitoneOffset(const drs::engine::RuntimeSessionStateSnapshot& 
 
 PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
                                    MacroValueChangedCallback macroValueChanged,
-                                   NotePreviewStartedCallback notePreviewStarted,
-                                   NotePreviewEndedCallback notePreviewEnded,
+                                   PerformanceNoteOnCallback performanceNoteOn,
+                                   PerformanceNoteOffCallback performanceNoteOff,
                                    PublishCommandCallback publishCommand,
-                                   PublishPresentationProvider presentationProvider)
+                                   PublishPresentationProvider presentationProvider,
+                                   AudioCallbackActiveProvider callbackActiveProvider)
     : engineFacade(facade),
       onMacroValueChanged(std::move(macroValueChanged)),
-      onNotePreviewStarted(std::move(notePreviewStarted)),
-      onNotePreviewEnded(std::move(notePreviewEnded)),
+      onPerformanceNoteOn(std::move(performanceNoteOn)),
+      onPerformanceNoteOff(std::move(performanceNoteOff)),
       publishPresentationProvider(std::move(presentationProvider)),
+      audioCallbackActiveProvider(std::move(callbackActiveProvider)),
       keyboardComponent(keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard),
       diagnosticsPanel(facade, onMacroValueChanged, std::move(publishCommand),
                        publishPresentationProvider)
@@ -280,17 +282,16 @@ void PerformancePanel::handleNoteOn(juce::MidiKeyboardState*, int, int midiNoteN
 {
     const auto clampedVelocity = std::clamp(static_cast<int>(std::round(velocity * 127.0f)), 1, 127);
 
-    if (onNotePreviewStarted)
-        onNotePreviewStarted(midiNoteNumber, velocity);
-
-    engineFacade.auditionPreviewNote(midiNoteNumber, clampedVelocity);
+    if (onPerformanceNoteOn)
+        onPerformanceNoteOn(midiNoteNumber,
+                            static_cast<float>(clampedVelocity) / 127.0f);
     refreshSurface();
 }
 
 void PerformancePanel::handleNoteOff(juce::MidiKeyboardState*, int, int midiNoteNumber, float)
 {
-    if (onNotePreviewEnded)
-        onNotePreviewEnded(midiNoteNumber);
+    if (onPerformanceNoteOff)
+        onPerformanceNoteOff(midiNoteNumber);
 }
 
 void PerformancePanel::rebuildMacroControls()
@@ -387,7 +388,8 @@ void PerformancePanel::refreshSurface()
                 + " | Preview r" + juce::String(static_cast<juce::int64>(performanceSnapshot.previewRevision))
                 + " (" + juce::String::fromUTF8(performanceSnapshot.previewRevisionState.c_str()) + ")"
                 + " | Published r" + juce::String(static_cast<juce::int64>(performanceSnapshot.publishedRevision))
-                + " (" + juce::String::fromUTF8(performanceSnapshot.publishedRevisionState.c_str()) + ")"
+                + " (" + juce::String::fromUTF8(drs::engine::toString(
+                    performanceSnapshot.publishedPresentationState)) + ")"
                 + " | Preview build #" + juce::String(static_cast<juce::int64>(performanceSnapshot.previewBuildId))
                 + " | Publish build #" + juce::String(static_cast<juce::int64>(performanceSnapshot.publishedBuildId))
                 + " | Surface " + juce::String::fromUTF8(performanceSnapshot.surfaceStateSource.c_str())
@@ -396,37 +398,39 @@ void PerformancePanel::refreshSurface()
     }
 
     juce::String loadIndicatorText = juce::String::fromUTF8(performanceSnapshot.loadIndicator.c_str());
+    auto publishFailed = false;
+    auto publishDiagnostic = juce::String();
     if (publishPresentation != nullptr)
     {
-        loadIndicatorText << " | Publish "
-                          << juce::String::fromUTF8(publishPresentation->stateLabel.c_str())
-                          << " r" << static_cast<juce::int64>(publishPresentation->activePublishedRevision)
-                          << (publishPresentation->dirty ? " dirty" : " current")
-                          << " | " << juce::String::fromUTF8(publishPresentation->guidance.c_str());
+        hasActivePublishedPerformance = publishPresentation->hasActivePublished;
+        publishedPerformanceStateLabel = juce::String::fromUTF8(
+            publishPresentation->stateLabel.c_str());
+        publishedPerformanceGuidance = juce::String::fromUTF8(
+            publishPresentation->guidance.c_str());
+        publishedPerformanceFindingCode = juce::String::fromUTF8(
+            publishPresentation->findingCode.c_str());
+        publishFailed = publishPresentation->state
+            == drs::engine::PerformancePublishPresentationState::failed;
+        loadIndicatorText = "Publish " + publishedPerformanceStateLabel;
+        if (publishPresentation->hasActivePublished)
+            loadIndicatorText << " r" << static_cast<juce::int64>(publishPresentation->activePublishedRevision);
+        publishDiagnostic = loadIndicatorText + ": " + publishedPerformanceGuidance;
+        if (publishedPerformanceFindingCode.isNotEmpty())
+            publishDiagnostic << " [" << publishedPerformanceFindingCode << "]";
     }
-    if (!performanceSnapshot.draftPlaybackEvent.empty())
-    {
-        loadIndicatorText << " | " << juce::String::fromUTF8(performanceSnapshot.draftPlaybackEvent.c_str());
-    }
-    if (performanceSnapshot.previewPending || performanceSnapshot.publishedPending)
-    {
-        loadIndicatorText << " | pending:";
-        if (performanceSnapshot.previewPending)
-            loadIndicatorText << " preview";
-        if (performanceSnapshot.publishedPending)
-            loadIndicatorText << " publish";
-    }
-    loadIndicatorText << " | digests p=" << summarizeDigest(performanceSnapshot.previewContentDigest)
-                      << " pub=" << summarizeDigest(performanceSnapshot.publishedContentDigest)
-                      << " | surface=" << juce::String::fromUTF8(performanceSnapshot.surfaceStateSource.c_str())
-                      << " | renderer=" << juce::String::fromUTF8(performanceSnapshot.rendererMode.c_str());
     loadIndicatorLabel.setText(loadIndicatorText,
                                juce::dontSendNotification);
+    loadIndicatorLabel.setTooltip(publishDiagnostic);
+    loadIndicatorLabel.setDescription(publishDiagnostic);
     const auto hasPreviewError = !performanceSnapshot.previewPlayback.errorMessage.empty();
     loadIndicatorLabel.setColour(juce::Label::backgroundColourId,
-                                 hasPreviewError
-                                     ? performancePanelWarning
-                                     : (performanceSnapshot.loaded ? performancePanelSuccess : performancePanelDanger));
+                                 publishFailed
+                                     ? performancePanelDanger
+                                     : (hasPreviewError
+                                            ? performancePanelWarning
+                                            : (performanceSnapshot.loaded
+                                                   ? performancePanelSuccess
+                                                   : performancePanelDanger)));
     loadIndicatorLabel.setColour(juce::Label::textColourId, juce::Colours::white);
 
     juce::String previewText = "Preview: draft r"
@@ -503,16 +507,49 @@ void PerformancePanel::syncKeyboardPlayableRange()
 
     keyboardComponent.setAvailableRange(lowestPlayableNote, highestPlayableNote);
 
+    const auto audioCallbackActive = !audioCallbackActiveProvider
+        || audioCallbackActiveProvider();
+    keyboardComponent.setEnabled(hasActivePublishedPerformance);
+
     const auto currentLowestVisibleKey = keyboardComponent.getLowestVisibleKey();
     if (currentLowestVisibleKey < lowestPlayableNote || currentLowestVisibleKey > highestPlayableNote)
         keyboardComponent.setLowestVisibleKey(lowestPlayableNote);
 
-    keyboardHintLabel.setText(
-        "Play the keyboard to audition the current performance path, routing, and macro state. Range "
+    auto keyboardHint = juce::String();
+    if (!audioCallbackActive)
+    {
+        keyboardHint = "Audio inactive - open Settings > Audio Device Settings, or enable host FX processing. ";
+    }
+    else if (!hasActivePublishedPerformance)
+    {
+        if (publishedPerformanceStateLabel == "Failed")
+        {
+            keyboardHint = "Publish failed: " + publishedPerformanceGuidance;
+            if (publishedPerformanceFindingCode.isNotEmpty())
+                keyboardHint << " [" << publishedPerformanceFindingCode << "] ";
+        }
+        else
+        {
+            keyboardHint = "Keyboard waiting for an active publication (Publish "
+                + publishedPerformanceStateLabel
+                + "). Keep audio processing running until Publish becomes Active. ";
+        }
+    }
+    else
+    {
+        keyboardHint = "Play the keyboard to audition the active Performance path, routing, and macro state. ";
+    }
+    keyboardHint << "Range "
             + juce::MidiMessage::getMidiNoteName(lowestPlayableNote, true, true, 3)
             + " - "
             + juce::MidiMessage::getMidiNoteName(highestPlayableNote, true, true, 3)
-            + " follows the current playable zone window.",
+            + " follows the current playable zone window.";
+    keyboardHintLabel.setText(
+        keyboardHint,
         juce::dontSendNotification);
+    keyboardHintLabel.setTooltip(keyboardHint);
+    keyboardHintLabel.setDescription(keyboardHint);
+    keyboardComponent.setTitle("Performance keyboard");
+    keyboardComponent.setDescription(keyboardHint);
 }
 } // namespace drs::app

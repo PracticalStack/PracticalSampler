@@ -270,7 +270,16 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
             const auto effectiveVelocity = fixedVelocity > 0
                 ? fixedVelocity
                 : eventVelocity;
-            const auto routeIndex = selectRouteIndex(effectiveMidiNote, effectiveVelocity);
+            // Route the physical gesture first. Published pitch/velocity modulation shapes the
+            // selected voice and must not make an otherwise playable authored zone disappear.
+            // The effective-velocity fallback preserves legacy fixed-layer presets when the
+            // physical velocity has no route in the selected articulation.
+            auto routeIndex = selectRouteIndex(sourceMidiNote, eventVelocity);
+            if (routeIndex == std::numeric_limits<std::size_t>::max()
+                && effectiveVelocity != eventVelocity)
+            {
+                routeIndex = selectRouteIndex(sourceMidiNote, effectiveVelocity);
+            }
             if (routeIndex == std::numeric_limits<std::size_t>::max())
             {
                 ++result.render.droppedEventCount;

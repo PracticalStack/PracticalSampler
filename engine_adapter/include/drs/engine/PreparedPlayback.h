@@ -208,7 +208,7 @@ struct PreparedPlaybackSchedulerBudgets
     std::uint64_t maximumCommandToQueuedMicros = 100000;
     std::uint64_t maximumRequestToReadyMicros = 5000000;
     std::uint64_t maximumRetainedPreparedBytes = 512ull * 1024ull * 1024ull;
-    std::uint64_t maximumMessageThreadServiceMicros = 100000;
+    std::uint64_t maximumMessageThreadServiceMicros = 250000;
 };
 
 struct PreparedPlaybackBuildRequest

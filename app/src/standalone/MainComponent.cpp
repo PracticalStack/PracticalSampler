@@ -408,6 +408,10 @@ MainComponent::MainComponent(bool enableAudioOutput)
                        [this]()
                        {
                            return processor.getPerformancePublishPresentationSnapshot();
+                       },
+                       [this]()
+                       {
+                           return processor.hasRecentAudioCallback();
                        }),
       authoringPanel(processor.getAuthoringSession(),
                      [this]()

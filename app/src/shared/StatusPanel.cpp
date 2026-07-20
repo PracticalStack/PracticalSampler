@@ -421,7 +421,8 @@ void StatusPanel::refreshSnapshot()
             + " | preview=" + juce::String(static_cast<juce::int64>(diagnostics.previewRevision))
             + " (" + juce::String::fromUTF8(diagnostics.previewRevisionState.c_str()) + ")"
             + " | published=" + juce::String(static_cast<juce::int64>(diagnostics.publishedRevision))
-            + " (" + juce::String::fromUTF8(diagnostics.publishedRevisionState.c_str()) + ")"
+            + " (" + juce::String::fromUTF8(drs::engine::toString(
+                diagnostics.publishedPresentationState)) + ")"
             + " | previewBuild=#" + juce::String(static_cast<juce::int64>(diagnostics.previewBuildId))
             + " | publishBuild=#" + juce::String(static_cast<juce::int64>(diagnostics.publishedBuildId))
             + " | surface=" + juce::String::fromUTF8(diagnostics.surfaceStateSource.c_str())

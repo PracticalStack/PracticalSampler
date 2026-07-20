@@ -17,17 +17,19 @@ class PerformancePanel final : public juce::Component,
 {
 public:
     using MacroValueChangedCallback = std::function<void(const std::string&, double)>;
-    using NotePreviewStartedCallback = std::function<void(int, float)>;
-    using NotePreviewEndedCallback = std::function<void(int)>;
+    using PerformanceNoteOnCallback = std::function<void(int, float)>;
+    using PerformanceNoteOffCallback = std::function<void(int)>;
     using PublishCommandCallback = StatusPanel::PublishCommandCallback;
     using PublishPresentationProvider = StatusPanel::PublishPresentationProvider;
+    using AudioCallbackActiveProvider = std::function<bool()>;
 
     explicit PerformancePanel(drs::engine::EngineFacade& engineFacade,
                               MacroValueChangedCallback onMacroValueChanged = {},
-                              NotePreviewStartedCallback onNotePreviewStarted = {},
-                              NotePreviewEndedCallback onNotePreviewEnded = {},
+                              PerformanceNoteOnCallback onPerformanceNoteOn = {},
+                              PerformanceNoteOffCallback onPerformanceNoteOff = {},
                               PublishCommandCallback onPublishCommand = {},
-                              PublishPresentationProvider publishPresentationProvider = {});
+                              PublishPresentationProvider publishPresentationProvider = {},
+                              AudioCallbackActiveProvider audioCallbackActiveProvider = {});
     ~PerformancePanel() override;
 
     void paint(juce::Graphics& g) override;
@@ -53,9 +55,14 @@ private:
 
     drs::engine::EngineFacade& engineFacade;
     MacroValueChangedCallback onMacroValueChanged;
-    NotePreviewStartedCallback onNotePreviewStarted;
-    NotePreviewEndedCallback onNotePreviewEnded;
+    PerformanceNoteOnCallback onPerformanceNoteOn;
+    PerformanceNoteOffCallback onPerformanceNoteOff;
     PublishPresentationProvider publishPresentationProvider;
+    AudioCallbackActiveProvider audioCallbackActiveProvider;
+    bool hasActivePublishedPerformance = false;
+    juce::String publishedPerformanceStateLabel { "Idle" };
+    juce::String publishedPerformanceGuidance;
+    juce::String publishedPerformanceFindingCode;
     drs::engine::EnginePerformanceSnapshot performanceSnapshot;
     std::uint64_t lastObservedStateRevision = 0;
     std::vector<std::unique_ptr<MacroControl>> macroControls;

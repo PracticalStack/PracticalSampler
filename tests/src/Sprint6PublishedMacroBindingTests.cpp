@@ -99,6 +99,25 @@ bool waitForActivePublish(drs::plugin::Processor& processor, std::size_t revisio
     }
     return false;
 }
+
+float renderPerformanceKeyboardNote(drs::plugin::Processor& processor,
+                                    int midiNote,
+                                    float velocity)
+{
+    processor.queuePerformanceSurfaceNoteOn(midiNote, velocity);
+    auto maximumMagnitude = 0.0f;
+    juce::MidiBuffer midi;
+    for (auto block = 0; block < 4; ++block)
+    {
+        juce::AudioBuffer<float> output(2, 256);
+        output.clear();
+        processor.processBlock(output, midi);
+        maximumMagnitude = std::max(maximumMagnitude,
+                                    output.getMagnitude(0, output.getNumSamples()));
+    }
+    processor.queuePerformanceSurfaceNoteOff(midiNote);
+    return maximumMagnitude;
+}
 } // namespace
 
 int main()
@@ -169,6 +188,33 @@ int main()
 
         const auto loadedProject = loadPhase2ReferenceProjectManifest();
         require(loadedProject.loaded, "Sprint 6.7 requires the authored reference project.");
+
+        auto narrowProject = loadedProject.project;
+        require(!narrowProject.authoring.zones.empty(),
+                "Perform keyboard regression requires one authored zone.");
+        narrowProject.projectId += "-perform-keyboard-regression";
+        narrowProject.authoring.zones.resize(1);
+        auto& narrowZone = narrowProject.authoring.zones.front();
+        narrowZone.keyLow = narrowZone.rootKey;
+        narrowZone.keyHigh = narrowZone.rootKey;
+        narrowZone.velocityLow = 101;
+        narrowZone.velocityHigh = 127;
+        narrowZone.articulationId = "default";
+        narrowProject.authoring.selectedZoneId = narrowZone.id;
+
+        drs::plugin::Processor narrowProcessor;
+        narrowProcessor.prepareToPlay(48000.0, 256);
+        narrowProcessor.replaceAuthoringProject(narrowProject);
+        const auto narrowRevision
+            = narrowProcessor.getAuthoringSession().getDocumentState().revision;
+        require(narrowProcessor.submitPerformancePublishCommand(
+                    {}, PerformancePublishCommandSource::externalApi)
+                    && waitForActivePublish(narrowProcessor, narrowRevision),
+                "A single-key imported project must publish when its authored articulation differs from the bootstrap selection.");
+        require(renderPerformanceKeyboardNote(narrowProcessor, narrowZone.rootKey, 0.8f)
+                    > 0.0001f,
+                "The Perform keyboard root key must remain audible when published macro modulation changes pitch or velocity.");
+
         drs::plugin::Processor processor;
         processor.prepareToPlay(48000.0, 256);
         processor.replaceAuthoringProject(loadedProject.project);

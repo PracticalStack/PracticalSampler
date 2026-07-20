@@ -532,6 +532,7 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
     }
 
     diagnosticsProcessBlockCount.fetch_add(1, std::memory_order_relaxed);
+    diagnosticsLastProcessBlockAtMicros.store(monotonicMicros(), std::memory_order_release);
     const auto callbackBudgetMicros = RealtimeCallbackBudgetProfile::deadlineMicros(
         currentSampleRate,
         static_cast<std::size_t>(buffer.getNumSamples()));
@@ -914,8 +915,8 @@ void Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
     authoringSession.replaceProject(std::move(project));
     performancePlaybackContext.cancelPendingActivation();
     pendingPerformanceActivation.reset();
-    engineFacade.closeDraftPlaybackProject();
-    engineFacade.reopenDraftPlaybackProject(authoringSession.getDocumentState().revision);
+    engineFacade.closeDraftPlaybackProject(true);
+    engineFacade.reopenDraftPlaybackProject(authoringSession.getDocumentState().revision, true);
     authoringWaveformPreviewCache.clear();
     if (replacingDifferentProject)
     {
@@ -963,6 +964,13 @@ void Processor::queuePerformanceSurfaceNoteOff(int midiNoteNumber)
     if (!performanceSurfaceNoteQueue.push({ drs::engine::SamplerRenderEventType::noteOff,
                                             clampMidiValue(midiNoteNumber), 0.0f, 0 }))
         diagnosticsPerformanceDroppedNoteCount.fetch_add(1, std::memory_order_relaxed);
+}
+
+bool Processor::hasRecentAudioCallback(std::uint64_t maximumAgeMicros) const noexcept
+{
+    const auto lastCallback = diagnosticsLastProcessBlockAtMicros.load(std::memory_order_acquire);
+    const auto now = monotonicMicros();
+    return lastCallback != 0 && now >= lastCallback && now - lastCallback <= maximumAgeMicros;
 }
 
 void Processor::setRealtimeGuardTestInjection(RealtimeGuardOperation operation)
@@ -1517,17 +1525,31 @@ bool Processor::synchronizePerformanceActivation(bool installImmediately)
 
     drs::engine::SamplerRenderModelBuildOptions options;
     options.selectedArticulationId = sessionState.selectedArticulationId;
-    if (options.selectedArticulationId.empty())
+    const auto& authoredRoutes = payload->snapshot->articulationRoutes;
+    const auto containsAuthoredArticulation = [&](const std::string& articulationId)
     {
-        const auto articulations = engineFacade.getArticulationDescriptors();
-        const auto defaultArticulation = std::find_if(articulations.begin(),
-                                                      articulations.end(),
-                                                      [](const auto& articulation)
-                                                      {
-                                                          return articulation.isDefault;
-                                                      });
-        if (defaultArticulation != articulations.end())
-            options.selectedArticulationId = defaultArticulation->id;
+        return !articulationId.empty()
+            && std::any_of(authoredRoutes.begin(), authoredRoutes.end(), [&](const auto& route)
+            {
+                return route.articulationId == articulationId && !route.zoneIds.empty();
+            });
+    };
+    if (!containsAuthoredArticulation(options.selectedArticulationId))
+    {
+        const auto authoredDefault = std::find_if(authoredRoutes.begin(), authoredRoutes.end(),
+                                                  [](const auto& route)
+                                                  {
+                                                      return route.articulationId == "default"
+                                                          && !route.zoneIds.empty();
+                                                  });
+        const auto authoredFallback = authoredDefault != authoredRoutes.end()
+            ? authoredDefault
+            : std::find_if(authoredRoutes.begin(), authoredRoutes.end(), [](const auto& route)
+            {
+                return !route.articulationId.empty() && !route.zoneIds.empty();
+            });
+        options.selectedArticulationId = authoredFallback != authoredRoutes.end()
+            ? authoredFallback->articulationId : std::string {};
     }
     if (authorized != nullptr && authorized->macroBindings != nullptr)
     {
@@ -1552,12 +1574,24 @@ bool Processor::synchronizePerformanceActivation(bool installImmediately)
     if (!modelResult.built || modelResult.model == nullptr)
     {
         if (authorized != nullptr)
+        {
+            auto finding = drs::engine::PerformancePublishFinding {
+                drs::engine::PerformancePublishFindingSeverity::error,
+                "performance-render-model-rejected",
+                "performance.renderModel",
+                "The controller-authorized Performance payload could not build a render model."
+            };
+            if (!modelResult.findings.empty())
+            {
+                const auto& modelFinding = modelResult.findings.front();
+                finding.code = modelFinding.code;
+                finding.path = modelFinding.path;
+                finding.message = modelFinding.message;
+            }
             engineFacade.rejectPerformanceActivationStaging(
                 authorized,
-                { drs::engine::PerformancePublishFindingSeverity::error,
-                  "performance-render-model-rejected",
-                  "performance.renderModel",
-                  "The controller-authorized Performance payload could not build a render model." });
+                std::move(finding));
+        }
         return false;
     }
     if (!performancePlaybackContext.stageActivation(modelResult.model))

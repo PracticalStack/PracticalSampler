@@ -67,6 +67,23 @@ enum class PerformancePublishRequestOrigin : std::uint8_t
     bootstrap
 };
 
+struct PerformancePublishIntegrationBudgets
+{
+    static constexpr std::uint64_t maximumRequestToActiveMicros = 8000000;
+    static constexpr std::size_t maximumControllerPendingDepth = 1;
+    static constexpr std::size_t maximumWorkerPendingWorkCount = 2;
+    static constexpr std::size_t maximumWorkerInFlightWorkCount = 1;
+    static constexpr std::size_t maximumCompletedResultCount = 4;
+    static constexpr std::uint64_t maximumMessageThreadServiceMicros = 250000;
+    static constexpr std::uint64_t maximumRetainedActivationBytes = 64ull * 1024ull * 1024ull;
+    static constexpr std::size_t maximumRetirementBacklog = 8;
+    static constexpr std::size_t maximumPerformanceVoiceCount = 24;
+    static constexpr std::size_t maximumPreviewVoiceCount = 24;
+    static constexpr std::uint64_t maximumQueueDropCount = 0;
+    static constexpr std::size_t maximumCallbackOverrunCount = 0;
+    static constexpr std::size_t maximumAudioThreadViolationCount = 0;
+};
+
 struct PerformancePublishFinding
 {
     PerformancePublishFindingSeverity severity = PerformancePublishFindingSeverity::information;

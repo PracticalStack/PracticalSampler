@@ -770,18 +770,22 @@ add_test(
     COMMAND drs_sprint6_publish_contract_tests
 )
 
-# Direct-only expected-red audit. Later Sprint 6 slices retire these seams and
-# convert this executable into a registered green regression target.
-add_executable(drs_sprint6_publish_contract_red_tests
-    src/Sprint6PublishContractRedTests.cpp
+# Permanent source-level regression audit for Publish replacement seams retired by Sprint 6.
+add_executable(drs_sprint6_publish_contract_seam_tests
+    src/Sprint6PublishContractSeamTests.cpp
 )
 
-target_compile_definitions(drs_sprint6_publish_contract_red_tests
+target_compile_definitions(drs_sprint6_publish_contract_seam_tests
     PRIVATE
         DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
 )
 
-target_compile_features(drs_sprint6_publish_contract_red_tests PRIVATE cxx_std_17)
+target_compile_features(drs_sprint6_publish_contract_seam_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint6.publish_contract_seams
+    COMMAND drs_sprint6_publish_contract_seam_tests
+)
 
 add_executable(drs_sprint6_publish_controller_tests
     src/Sprint6PublishControllerTests.cpp
@@ -981,6 +985,32 @@ target_compile_features(drs_sprint6_publish_shell_parity_tests PRIVATE cxx_std_1
 add_test(
     NAME drs.sprint6.publish_shell_parity
     COMMAND drs_sprint6_publish_shell_parity_tests
+)
+
+juce_add_console_app(drs_sprint6_integration_hardening_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Sprint 6 Integration Hardening Tests"
+)
+
+target_sources(drs_sprint6_integration_hardening_tests
+    PRIVATE
+        src/Sprint6IntegrationHardeningTests.cpp
+)
+
+target_link_libraries(drs_sprint6_integration_hardening_tests
+    PRIVATE
+        drs_plugin_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_sprint6_integration_hardening_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint6.integration_hardening
+    COMMAND drs_sprint6_integration_hardening_tests
 )
 
 juce_add_console_app(drs_phase1_realtime_safety_tests
@@ -1850,7 +1880,7 @@ add_dependencies(drs_all_tests
     drs_sprint5_preview_contract_red_tests
     drs_sprint5_integration_hardening_tests
     drs_sprint6_publish_contract_tests
-    drs_sprint6_publish_contract_red_tests
+    drs_sprint6_publish_contract_seam_tests
     drs_sprint6_publish_controller_tests
     drs_sprint6_publish_controller_integration_tests
     drs_sprint6_performance_preparation_tests
@@ -1859,6 +1889,7 @@ add_dependencies(drs_all_tests
     drs_sprint6_voice_generation_cutover_tests
     drs_sprint6_published_macro_binding_tests
     drs_sprint6_publish_shell_parity_tests
+    drs_sprint6_integration_hardening_tests
     drs_phase0_smoke_tests
     drs_phase1_runtime_contract_tests
     drs_phase1_draft_playback_contract_tests

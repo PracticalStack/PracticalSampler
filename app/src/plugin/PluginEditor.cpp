@@ -417,6 +417,10 @@ Editor::Editor(Processor& owner)
                        [&owner]()
                        {
                            return owner.getPerformancePublishPresentationSnapshot();
+                       },
+                       [&owner]()
+                       {
+                           return owner.hasRecentAudioCallback();
                        }),
       authoringPanel(owner.getAuthoringSession(),
                      [&owner]()

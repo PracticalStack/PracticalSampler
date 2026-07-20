@@ -369,7 +369,8 @@ int main()
         require(snapshot.publishedRevision == 0, "Default published revision should start at 0.");
         require(snapshot.previewRevisionState == "Ready",
                 "Default preview revision should be ready immediately after seeding the reference runtime.");
-        require(snapshot.publishedRevisionState == "Active",
+        require(snapshot.publishedPresentationState
+                    == drs::engine::PerformancePublishPresentationState::ready,
                 "Default published revision should be active immediately after seeding the reference runtime.");
         require(snapshot.previewBuildId != 0 && snapshot.publishedBuildId != 0,
                 "Default preview and publish revisions should expose non-zero snapshot build ids.");
@@ -404,7 +405,9 @@ int main()
         require(snapshot.draftRevision == 1, "Staged draft revision should become visible through the performance snapshot.");
         require(snapshot.previewRevision == 0 && snapshot.previewRevisionState == "Stale",
                 "Preview revision should become stale when the draft advances.");
-        require(snapshot.publishedRevision == 0 && snapshot.publishedRevisionState == "Active",
+        require(snapshot.publishedRevision == 0
+                    && snapshot.publishedPresentationState
+                        == drs::engine::PerformancePublishPresentationState::ready,
                 "Published revision should remain on the last applied version.");
         const auto revision0Digest = draftStatus.performance.contentDigest;
 
@@ -448,7 +451,9 @@ int main()
                 "Explicit background-work servicing should apply the completed publish build.");
         snapshot = engineFacade.getPerformanceSnapshot();
         draftStatus = engineFacade.getDraftPlaybackStatus();
-        require(snapshot.publishedRevision == 1 && snapshot.publishedRevisionState == "Active",
+        require(snapshot.publishedRevision == 1
+                    && snapshot.publishedPresentationState
+                        == drs::engine::PerformancePublishPresentationState::ready,
                 "Publishing should advance the published revision and mark it active.");
         require(snapshot.draftPlaybackEvent == "Build completed",
                 "Publishing should expose the latest contract event.");
@@ -489,7 +494,9 @@ int main()
                 "Rapid preview refreshes should leave the newest draft revision visible.");
         require(snapshot.previewRevision == 4 && snapshot.previewRevisionState == "Ready",
                 "Rapid preview refreshes should leave the newest preview revision ready.");
-        require(snapshot.publishedRevision == 1 && snapshot.publishedRevisionState == "Active",
+        require(snapshot.publishedRevision == 1
+                    && snapshot.publishedPresentationState
+                        == drs::engine::PerformancePublishPresentationState::ready,
                 "Rapid preview refreshes should not change the last published revision.");
         require(!snapshot.previewPending,
                 "Rapid preview refreshes should settle with no pending preview completion left behind.");
@@ -529,7 +536,9 @@ int main()
                 "Mixed facade churn coverage should leave the newest staged draft revision visible.");
         require(snapshot.previewRevision == 6 && snapshot.previewRevisionState == "Ready",
                 "Mixed facade churn coverage should leave the newest preview revision ready.");
-        require(snapshot.publishedRevision == 6 && snapshot.publishedRevisionState == "Active",
+        require(snapshot.publishedRevision == 6
+                    && snapshot.publishedPresentationState
+                        == drs::engine::PerformancePublishPresentationState::ready,
                 "Mixed facade churn coverage should leave the newest published revision active.");
         require(!snapshot.previewPending && !snapshot.publishedPending,
                 "Mixed facade churn coverage should settle with no pending preview or publish work.");
@@ -553,13 +562,16 @@ int main()
         snapshot = engineFacade.getPerformanceSnapshot();
         require(snapshot.previewRevisionState == "Restarting",
                 "Preview revision state should surface restarting during device restart.");
-        require(snapshot.publishedRevisionState == "Restarting",
-                "Published revision state should surface restarting during device restart.");
+        require(engineFacade.getDraftPlaybackStatus().performance.state == "Restarting"
+                    && snapshot.publishedPresentationState
+                        == drs::engine::PerformancePublishPresentationState::ready,
+                "Restart detail remains internal while public Publish truth retains active identity.");
         require(engineFacade.completeDraftPlaybackDeviceRestart(true),
                 "Successful device restart should complete.");
         snapshot = engineFacade.getPerformanceSnapshot();
         require(snapshot.publishedRevision == preRestartSnapshot.publishedRevision
-                    && snapshot.publishedRevisionState == "Active",
+                    && snapshot.publishedPresentationState
+                        == drs::engine::PerformancePublishPresentationState::ready,
                 "Successful device restart should preserve the last published revision.");
         require(snapshot.previewRevision == preRestartSnapshot.previewRevision
                     && snapshot.previewRevisionState == "Ready",
@@ -571,8 +583,10 @@ int main()
         require(!snapshot.loaded, "Closing the draft playback project should unload the published performance context.");
         require(snapshot.previewRevisionState == "Closed",
                 "Closing the project should surface the closed preview state.");
-        require(snapshot.publishedRevisionState == "Closed",
-                "Closing the project should surface the closed published state.");
+        require(engineFacade.getDraftPlaybackStatus().performance.state == "Closed"
+                    && snapshot.publishedPresentationState
+                        == drs::engine::PerformancePublishPresentationState::idle,
+                "Closing keeps internal lifecycle detail while public Publish truth becomes idle.");
 
         require(engineFacade.reopenDraftPlaybackProject(2),
                 "Reopening the draft playback project should reactivate the facade.");
@@ -580,7 +594,9 @@ int main()
         require(snapshot.draftRevision == 2, "Reopening should restore the provided draft revision.");
         require(snapshot.previewRevision == 0 && snapshot.previewRevisionState == "Idle",
                 "Reopening should require preview preparation again.");
-        require(snapshot.publishedRevision == 0 && snapshot.publishedRevisionState == "Idle",
+        require(snapshot.publishedRevision == 0
+                    && snapshot.publishedPresentationState
+                        == drs::engine::PerformancePublishPresentationState::idle,
                 "Reopening should require publish activation again.");
         requireFacadeSnapshotConsistency(engineFacade, "Facade state after reopen");
 
@@ -601,7 +617,9 @@ int main()
                 "Migrated facade coverage should reopen at draft revision 0.");
         require(snapshot.previewRevision == 0 && snapshot.previewRevisionState == "Idle",
                 "Migrated facade coverage should begin with an idle preview state.");
-        require(snapshot.publishedRevision == 0 && snapshot.publishedRevisionState == "Idle",
+        require(snapshot.publishedRevision == 0
+                    && snapshot.publishedPresentationState
+                        == drs::engine::PerformancePublishPresentationState::idle,
                 "Migrated facade coverage should begin with an idle published state.");
         requireFacadeSnapshotConsistency(engineFacade, "Migrated facade state after reopen");
 
@@ -631,8 +649,8 @@ int main()
                 "Failed migrated publish should not expose a loaded published performance context.");
         require(snapshot.publishedRevision == 0,
                 "Failed migrated publish should not advance the published revision.");
-        require(snapshot.publishedRevisionState
-                    == "Prepared playback build rejected because the immutable snapshot is unavailable",
+        require(snapshot.publishedPresentationState
+                    == drs::engine::PerformancePublishPresentationState::failed,
                 "Failed migrated publish should surface the rejected prepared-playback state.");
         require(!snapshot.publishedActivationEligible,
                 "Failed migrated publish should never become activation-eligible.");
@@ -713,7 +731,9 @@ int main()
         draftStatus = engineFacade.getDraftPlaybackStatus();
         require(snapshot.loaded,
                 "Imported migrated publish should expose a loaded performance context.");
-        require(snapshot.publishedRevision == 1 && snapshot.publishedRevisionState == "Active",
+        require(snapshot.publishedRevision == 1
+                    && snapshot.publishedPresentationState
+                        == drs::engine::PerformancePublishPresentationState::ready,
                 "Imported migrated project should expose an active published revision.");
         require(snapshot.previewContentDigest == snapshot.publishedContentDigest,
                 "Imported migrated preview and publish should share a snapshot digest.");
@@ -745,7 +765,9 @@ int main()
         draftStatus = engineFacade.getDraftPlaybackStatus();
         require(snapshot.previewRevision == 1 && snapshot.previewRevisionState == "Stale",
                 "Editing imported migrated content should leave preview stale on the prior prepared revision.");
-        require(snapshot.publishedRevision == 1 && snapshot.publishedRevisionState == "Active",
+        require(snapshot.publishedRevision == 1
+                    && snapshot.publishedPresentationState
+                        == drs::engine::PerformancePublishPresentationState::ready,
                 "Editing imported migrated content should preserve the prior active published revision.");
         requireFacadeSnapshotConsistency(engineFacade, "Migrated facade state after edited draft staging");
 
@@ -777,7 +799,9 @@ int main()
                 "Background work servicing should apply the edited migrated publish build.");
         snapshot = engineFacade.getPerformanceSnapshot();
         draftStatus = engineFacade.getDraftPlaybackStatus();
-        require(snapshot.publishedRevision == 2 && snapshot.publishedRevisionState == "Active",
+        require(snapshot.publishedRevision == 2
+                    && snapshot.publishedPresentationState
+                        == drs::engine::PerformancePublishPresentationState::ready,
                 "Edited migrated draft should advance the active published revision.");
         require(snapshot.publishedPreparationCacheHits == migratedSession.getProject().sampleSources.size(),
                 "Publishing the edited migrated draft should reuse every prepared sample handle.");
@@ -804,7 +828,8 @@ int main()
                     && snapshot.previewRevisionState == stableSnapshot.previewRevisionState,
                 "Rejected authoring project replacements must preserve preview state.");
         require(snapshot.publishedRevision == stableSnapshot.publishedRevision
-                    && snapshot.publishedRevisionState == stableSnapshot.publishedRevisionState,
+                    && snapshot.publishedPresentationState
+                        == stableSnapshot.publishedPresentationState,
                 "Rejected authoring project replacements must preserve published state.");
         require(snapshot.previewContentDigest == stableSnapshot.previewContentDigest
                     && snapshot.publishedContentDigest == stableSnapshot.publishedContentDigest,

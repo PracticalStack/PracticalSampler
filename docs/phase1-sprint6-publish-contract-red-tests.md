@@ -1,8 +1,11 @@
-# Sprint 6 Publish Expected-Red Seam Audit
+# Sprint 6 Publish Seam Audit - Historical Expected-Red Record
 
 Date established: July 19, 2026  
-Target: `drs_sprint6_publish_contract_red_tests`  
-CTest registration: intentionally absent during Mini Sprint 6.1
+Original target: `drs_sprint6_publish_contract_red_tests`
+
+Permanent target: `drs_sprint6_publish_contract_seam_tests`
+
+CTest registration: `drs.sprint6.publish_contract_seams`
 
 ## Purpose
 
@@ -79,5 +82,10 @@ seams. Mini Sprint 6.9 owns renaming/registering this executable as a permanent 
 |---|---|
 | No remaining seams | Retire/register in 6.9 |
 
-Mini Sprint 6.9 removes any remaining compatibility branches and converts the executable into a
-registered green `drs.sprint6.publish_contract_seams` regression target.
+## Mini Sprint 6.9 closure
+
+The expected-red source was retired and replaced by the permanent registered green seam audit. The
+closure audit also rejects the former `publishedRevisionState` compatibility string and duplicate
+facade macro publication state while requiring controller-owned activation payload, typed adapter,
+typed presentation, and bounded callback-view seams. It passes with zero remaining replacement
+seams.

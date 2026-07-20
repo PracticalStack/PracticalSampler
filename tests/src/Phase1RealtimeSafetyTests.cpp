@@ -527,7 +527,8 @@ int main()
                     && migratedPerformanceSnapshot.previewRevisionState == "Idle",
                 "Replacing the processor authoring project should reset facade preview state to idle.");
         require(migratedPerformanceSnapshot.publishedRevision == 0
-                    && migratedPerformanceSnapshot.publishedRevisionState == "Idle",
+                    && migratedPerformanceSnapshot.publishedPresentationState
+                        == drs::engine::PerformancePublishPresentationState::idle,
                 "Replacing the processor authoring project should reset facade published state to idle.");
 
         require(!migratedProcessor.getEngineFacade().refreshPreviewToCurrentDraft(),
@@ -545,8 +546,8 @@ int main()
         require(!migratedProcessor.getEngineFacade().publishCurrentDraft(),
                 "Migrated processor project without imported zones should fail publish preparation.");
         migratedPerformanceSnapshot = migratedProcessor.getEngineFacade().getPerformanceSnapshot();
-        require(migratedPerformanceSnapshot.publishedRevisionState
-                    == "Prepared playback build rejected because the immutable snapshot is unavailable",
+        require(migratedPerformanceSnapshot.publishedPresentationState
+                    == drs::engine::PerformancePublishPresentationState::failed,
                 "Migrated processor publish failure should surface the rejected prepared-playback state.");
         require(containsFinding(migratedPerformanceSnapshot.publishedFindings,
                                 drs::engine::PlaybackSnapshotFindingSeverity::error,
@@ -606,7 +607,8 @@ int main()
         require(migratedPerformanceSnapshot.loaded,
                 "Imported processor publish should expose a loaded performance context.");
         require(migratedPerformanceSnapshot.publishedRevision == migratedImport.documentState.revision
-                    && migratedPerformanceSnapshot.publishedRevisionState == "Active",
+                    && migratedPerformanceSnapshot.publishedPresentationState
+                        == drs::engine::PerformancePublishPresentationState::ready,
                 "Imported processor authoring content should expose an active facade published revision.");
 
         auto editedMigratedZone = *migratedProcessor.getAuthoringSession().getSelectedZone();
@@ -626,7 +628,8 @@ int main()
                     && migratedPerformanceSnapshot.previewRevisionState == "Stale",
                 "Edited processor authoring content should leave facade preview stale on the last prepared revision.");
         require(migratedPerformanceSnapshot.publishedRevision == migratedImport.documentState.revision
-                    && migratedPerformanceSnapshot.publishedRevisionState == "Active",
+                    && migratedPerformanceSnapshot.publishedPresentationState
+                        == drs::engine::PerformancePublishPresentationState::activating,
                 "Edited processor authoring content should preserve the last active published revision.");
 
         require(migratedProcessor.getEngineFacade().refreshPreviewToCurrentDraft(),
@@ -648,7 +651,8 @@ int main()
                 "Message-thread servicing should apply the edited processor publish build.");
         migratedPerformanceSnapshot = migratedProcessor.getEngineFacade().getPerformanceSnapshot();
         require(migratedPerformanceSnapshot.publishedRevision == migratedEdit.documentState.revision
-                    && migratedPerformanceSnapshot.publishedRevisionState == "Active",
+                    && migratedPerformanceSnapshot.publishedPresentationState
+                        == drs::engine::PerformancePublishPresentationState::ready,
                 "Edited processor authoring content should advance the active facade published revision.");
         require(migratedPerformanceSnapshot.previewContentDigest == migratedPerformanceSnapshot.publishedContentDigest,
                 "Edited processor publish should realign preview and publish snapshot digests.");
@@ -670,7 +674,8 @@ int main()
                     && migratedPerformanceSnapshot.previewRevisionState == stableProcessorSnapshot.previewRevisionState,
                 "Rejected processor authoring-project replacements must preserve preview state.");
         require(migratedPerformanceSnapshot.publishedRevision == stableProcessorSnapshot.publishedRevision
-                    && migratedPerformanceSnapshot.publishedRevisionState == stableProcessorSnapshot.publishedRevisionState,
+                    && migratedPerformanceSnapshot.publishedPresentationState
+                        == stableProcessorSnapshot.publishedPresentationState,
                 "Rejected processor authoring-project replacements must preserve published state.");
 
         require(processor.getEngineFacade().stageDraftRevision(1),

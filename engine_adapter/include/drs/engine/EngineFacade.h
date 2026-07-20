@@ -103,7 +103,6 @@ struct EnginePerformanceSnapshot
     bool previewActivationEligible = false;
     bool publishedActivationEligible = false;
     std::string previewRevisionState;
-    std::string publishedRevisionState;
     PerformancePublishPresentationState publishedPresentationState
         = PerformancePublishPresentationState::idle;
     std::string previewContentDigest;
@@ -193,7 +192,6 @@ struct EngineDiagnosticsSnapshot
     bool previewActivationEligible = false;
     bool publishedActivationEligible = false;
     std::string previewRevisionState;
-    std::string publishedRevisionState;
     PerformancePublishPresentationState publishedPresentationState
         = PerformancePublishPresentationState::idle;
     std::string previewContentDigest;
@@ -368,7 +366,9 @@ public:
     }
     ImmutablePublishedMacroBindingTablePtr getActivePublishedMacroBindings() const
     {
-        return activePublishedMacroBindings;
+        const auto payload = performancePublishController.getActiveActivationPayload();
+        return payload != nullptr ? payload->macroBindings
+                                  : ImmutablePublishedMacroBindingTablePtr {};
     }
     std::vector<EngineArticulationDescriptor> getArticulationDescriptors() const;
     std::vector<EngineMacroDescriptor> getMacroDescriptors() const;
@@ -379,8 +379,9 @@ public:
     bool cancelPreviewPreparation(
         const std::string& reason = "Preview preparation superseded by a newer request");
     bool publishCurrentDraft();
-    void closeDraftPlaybackProject();
-    bool reopenDraftPlaybackProject(std::size_t revision);
+    void closeDraftPlaybackProject(bool preservePublishedPerformance = false);
+    bool reopenDraftPlaybackProject(std::size_t revision,
+                                    bool preservePublishedPerformance = false);
     bool replaceDraftPlaybackAuthoringProject(RuntimeProjectModel project);
     bool beginDraftPlaybackDeviceRestart();
     bool completeDraftPlaybackDeviceRestart(bool restored);
@@ -435,7 +436,6 @@ private:
     std::uint64_t nextPreviewVoiceId = 4000;
     std::uint64_t performancePublishProjectGeneration = 1;
     std::uint64_t nextPerformanceActivationToken = 1;
-    ImmutablePublishedMacroBindingTablePtr activePublishedMacroBindings;
     std::shared_ptr<const PerformancePublishPresentationSnapshot> performancePublishPresentation;
     std::uint64_t nextPerformancePublishPresentationSequence = 1;
 };

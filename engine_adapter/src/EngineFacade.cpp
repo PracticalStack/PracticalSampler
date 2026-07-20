@@ -285,7 +285,6 @@ void syncDraftPlaybackIntoDiagnostics(const DraftPlaybackStatus& status,
     diagnosticsSnapshot.previewActivationEligible = status.preview.activationEligible;
     diagnosticsSnapshot.publishedActivationEligible = status.performance.activationEligible;
     diagnosticsSnapshot.previewRevisionState = status.preview.state;
-    diagnosticsSnapshot.publishedRevisionState = status.performance.state;
     diagnosticsSnapshot.previewContentDigest = status.preview.contentDigest;
     diagnosticsSnapshot.publishedContentDigest = status.performance.contentDigest;
     diagnosticsSnapshot.previewPreparedContentDigest = status.preview.preparedContentDigest;
@@ -744,7 +743,7 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
            << ", preview=" << diagnostics.previewRevision
            << " (" << (diagnostics.previewRevisionState.empty() ? "unavailable" : diagnostics.previewRevisionState) << ")"
            << ", published=" << diagnostics.publishedRevision
-           << " (" << (diagnostics.publishedRevisionState.empty() ? "unavailable" : diagnostics.publishedRevisionState) << ")\n";
+           << " (" << toString(diagnostics.publishedPresentationState) << ")\n";
     detail << "Draft playback event: "
            << (diagnostics.draftPlaybackEvent.empty() ? "not reported" : diagnostics.draftPlaybackEvent) << "\n";
     detail << "Snapshot ids: previewBuild=" << diagnostics.previewBuildId
@@ -1009,7 +1008,6 @@ EnginePerformanceSnapshot EngineFacade::getPerformanceSnapshot() const
     snapshot.previewActivationEligible = draftStatus.preview.activationEligible;
     snapshot.publishedActivationEligible = draftStatus.performance.activationEligible;
     snapshot.previewRevisionState = draftStatus.preview.state;
-    snapshot.publishedRevisionState = draftStatus.performance.state;
     if (const auto presentation = getPerformancePublishPresentationSnapshot())
         snapshot.publishedPresentationState = presentation->state;
     snapshot.previewContentDigest = draftStatus.preview.contentDigest;
@@ -1533,7 +1531,7 @@ PerformancePublishActivationPayloadPtr EngineFacade::authorizePerformanceActivat
     macroBindingRequest.revision = payload->revision;
     macroBindingRequest.macroSchemaDigest = payload->macroSchemaDigest;
     macroBindingRequest.authoredMacros = payload->snapshot->macroDefaults;
-    macroBindingRequest.previousActiveTable = activePublishedMacroBindings;
+    macroBindingRequest.previousActiveTable = getActivePublishedMacroBindings();
     macroBindingRequest.hostSlots.reserve(referenceManifest.instrument.macros.size());
     macroBindingRequest.currentValues.reserve(currentSessionState.macroValues.size());
     for (std::size_t index = 0; index < referenceManifest.instrument.macros.size(); ++index)
@@ -1590,17 +1588,16 @@ bool EngineFacade::acknowledgePerformanceActivation(
     }
     currentSessionState.transientMetrics.integrationState = "Published revision active";
     currentSessionState.transientMetrics.lastFailure.clear();
-    activePublishedMacroBindings = payload->macroBindings;
     refreshDiagnosticsSnapshot();
     markStateChanged();
     return true;
 }
 
-void EngineFacade::closeDraftPlaybackProject()
+void EngineFacade::closeDraftPlaybackProject(bool preservePublishedPerformance)
 {
     clearPendingPreparedCompletions();
     ++performancePublishProjectGeneration;
-    performancePublishController.reset(true, true);
+    performancePublishController.reset(!preservePublishedPerformance, true);
     draftPlaybackContract.closeProject();
     referenceInstrumentActive = false;
     currentSessionState.transientMetrics.integrationState = "Draft playback project closed";
@@ -1611,14 +1608,15 @@ void EngineFacade::closeDraftPlaybackProject()
     markStateChanged();
 }
 
-bool EngineFacade::reopenDraftPlaybackProject(std::size_t revision)
+bool EngineFacade::reopenDraftPlaybackProject(std::size_t revision,
+                                              bool preservePublishedPerformance)
 {
     clearPendingPreparedCompletions();
     if (!referenceManifest.loaded)
         return false;
 
     ++performancePublishProjectGeneration;
-    performancePublishController.reset(true, true);
+    performancePublishController.reset(!preservePublishedPerformance, true);
     draftPlaybackContract.reopenProject(revision);
     referenceInstrumentActive = true;
     currentSessionState.transientMetrics.integrationState = "Draft playback project reopened";
