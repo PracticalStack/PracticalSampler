@@ -19,13 +19,13 @@ the exact last-known-good Performance payload and output.
 | `StatusPanel` directly calls `EngineFacade::publishCurrentDraft()` | Shared diagnostic UI | Replace with the typed Publish command adapter in 6.8. |
 | Plug-in editor directly calls `EngineFacade::publishCurrentDraft()` | Plug-in shell | Replace with the shared typed adapter in 6.8. |
 | Standalone shell directly calls `EngineFacade::publishCurrentDraft()` | Standalone shell | Replace with the shared typed adapter in 6.8. |
-| Public `EngineFacade::publishCurrentDraft()` owns the untyped direct command | Engine facade | Route through the Publish controller and retire direct shell access in 6.2/6.8. |
+| Public `EngineFacade::publishCurrentDraft()` formerly owned request/result lifecycle | Resolved in 6.2 | It is now a compatibility wrapper over the typed controller; direct shell access retires in 6.8. |
 | Processor `stagePerformanceActivation()` owns eligibility/staging branches | Plug-in processor | Controller authorizes one immutable eligible payload in 6.5. |
 | Public published lifecycle is exposed as `publishedRevisionState` text | Facade snapshots/UI | Replace lifecycle truth with typed immutable status in 6.2/6.8; text becomes presentation-only. |
 | Mutable facade macro values are not bound to an immutable published schema | Engine facade/session | Add stable-ID published bindings and atomic value/schema activation in 6.7. |
 
-These seven seams are executable in `drs_sprint6_publish_contract_red_tests`. The executable is
-intentionally direct-only and expected to exit 1 until the responsible mini sprints retire each
+The remaining six seams are executable in `drs_sprint6_publish_contract_red_tests`. The executable
+is intentionally direct-only and expected to exit 1 until the responsible mini sprints retire each
 seam. At Sprint 6 closure it becomes a registered green regression target.
 
 ## Command semantics

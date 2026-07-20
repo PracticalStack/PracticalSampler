@@ -2,6 +2,7 @@
 
 #include "drs/engine/DraftPlaybackContract.h"
 #include "drs/engine/PlaybackSnapshot.h"
+#include "drs/engine/PerformancePublishController.h"
 #include "drs/engine/PreparedPlayback.h"
 #include "drs/engine/RuntimePresetState.h"
 #include "drs/engine/RuntimeModel.h"
@@ -331,6 +332,10 @@ public:
     {
         return preparedPlaybackService.getWorkerStatus();
     }
+    PerformancePublishControllerSnapshot getPerformancePublishControllerSnapshot() const
+    {
+        return performancePublishController.getSnapshot();
+    }
     std::vector<EngineArticulationDescriptor> getArticulationDescriptors() const;
     std::vector<EngineMacroDescriptor> getMacroDescriptors() const;
     bool setSelectedArticulation(const std::string& articulationId);
@@ -340,6 +345,8 @@ public:
     bool cancelPreviewPreparation(
         const std::string& reason = "Preview preparation superseded by a newer request");
     bool publishCurrentDraft();
+    bool markPerformancePublishActivationPending(std::uint64_t nowMicros = 0);
+    bool markPerformancePublishActive(std::uint64_t nowMicros = 0);
     void closeDraftPlaybackProject();
     bool reopenDraftPlaybackProject(std::size_t revision);
     bool replaceDraftPlaybackAuthoringProject(RuntimeProjectModel project);
@@ -362,6 +369,7 @@ private:
         PreparedPlaybackWorkLane lane = PreparedPlaybackWorkLane::preview;
         std::uint64_t contractRequestId = 0;
         PlaybackSnapshotBuildResult snapshotResult;
+        PerformancePublishRequestIdentity publishIdentity;
     };
 
     PlaybackSnapshotBuildResult buildCurrentPlaybackSnapshot(bool activationRequested);
@@ -386,10 +394,12 @@ private:
     EnginePreviewPlaybackSnapshot previewPlaybackSnapshot;
     EngineContentFailureProbeResult lastContentFailureProbe;
     DraftPlaybackContract draftPlaybackContract;
+    PerformancePublishController performancePublishController;
     PlaybackSnapshotBuilder playbackSnapshotBuilder;
     PreparedPlaybackService preparedPlaybackService;
     std::unordered_map<std::uint64_t, PendingPreparedCompletion> pendingPreparedCompletions;
     std::uint64_t stateRevision = 0;
     std::uint64_t nextPreviewVoiceId = 4000;
+    std::uint64_t performancePublishProjectGeneration = 1;
 };
 } // namespace drs::engine

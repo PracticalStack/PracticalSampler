@@ -986,6 +986,23 @@ bool Processor::serviceMessageThreadWork()
     diagnosticsRetiredActivationCount.fetch_add(reclaimed, std::memory_order_relaxed);
     diagnosticsReclaimedActivationPayloadCount.fetch_add(reclaimed, std::memory_order_relaxed);
 
+    auto synchronizedPerformancePublish = false;
+    const auto performanceContextBeforeSynchronization = performancePlaybackContext.getSnapshot();
+    const auto publishControllerBeforeSynchronization
+        = engineFacade.getPerformancePublishControllerSnapshot();
+    if (publishControllerBeforeSynchronization.hasRequest
+        && publishControllerBeforeSynchronization.activationState
+            == drs::engine::PerformancePublishActivationState::pending
+        && performanceContextBeforeSynchronization.hasActiveActivation
+        && !performanceContextBeforeSynchronization.hasPendingActivation
+        && performanceContextBeforeSynchronization.activeRevision
+            == publishControllerBeforeSynchronization.currentRequest.identity.draftRevision
+        && performanceContextBeforeSynchronization.activePreparedBuildId
+            == publishControllerBeforeSynchronization.acceptedPreparedBuildId)
+    {
+        synchronizedPerformancePublish = engineFacade.markPerformancePublishActive(serviceTimeMicros);
+    }
+
     auto synchronizedActivation = false;
     const auto stateRevision = engineFacade.getStateRevision();
     if (stateRevision != observedEngineStateRevision)
@@ -1128,6 +1145,7 @@ bool Processor::serviceMessageThreadWork()
         || requestResult.accepted
         || requestResult.expeditedCurrent
         || canceledSupersededWork
+        || synchronizedPerformancePublish
         || synchronizedAuthoringPreview
         || synchronizedActivation
         || diagnosticsRetiredActivationCount.load(std::memory_order_acquire) != retiredCountBefore;
@@ -1362,9 +1380,25 @@ bool Processor::stagePerformanceActivation(const drs::engine::EnginePerformanceS
         return false;
     }
 
+    const auto publishController = engineFacade.getPerformancePublishControllerSnapshot();
+    const auto controllerOwnsPayload = publishController.hasRequest
+        && publishController.preparationState
+            == drs::engine::PerformancePublishPreparationState::ready
+        && publishController.currentRequest.identity.draftRevision == payload->revision
+        && publishController.acceptedPreparedBuildId == payload->preparedBuildId;
+    if (controllerOwnsPayload
+        && publishController.activationState
+            == drs::engine::PerformancePublishActivationState::noActivation
+        && !engineFacade.markPerformancePublishActivationPending(monotonicMicros()))
+    {
+        return false;
+    }
+
     if (installImmediately && performancePlaybackContext.activatePendingForPreparation())
     {
         diagnosticsPerformanceActivationCount.fetch_add(1, std::memory_order_relaxed);
+        if (controllerOwnsPayload)
+            engineFacade.markPerformancePublishActive(monotonicMicros());
     }
     return true;
 }

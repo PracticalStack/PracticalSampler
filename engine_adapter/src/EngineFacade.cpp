@@ -16,6 +16,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
@@ -61,6 +62,68 @@ std::string summarizeDigest(const std::string& digest)
         return digest;
 
     return digest.substr(0, prefixLength) + "...";
+}
+
+std::uint64_t monotonicMicros() noexcept
+{
+    return static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            Clock::now().time_since_epoch()).count());
+}
+
+std::string computeFnv1a64Digest(const std::string& text)
+{
+    std::uint64_t hash = 14695981039346656037ull;
+    for (const auto character : text)
+    {
+        hash ^= static_cast<unsigned char>(character);
+        hash *= 1099511628211ull;
+    }
+
+    std::ostringstream stream;
+    stream << "fnv1a64:" << std::hex << std::setw(16) << std::setfill('0') << hash;
+    return stream.str();
+}
+
+std::string computePerformancePublishMacroSchemaDigest(
+    const ImmutablePlaybackSnapshot& snapshot)
+{
+    std::ostringstream schema;
+    schema << std::setprecision(17);
+    for (const auto& macro : snapshot.macroDefaults)
+    {
+        schema << macro.id << '\n' << macro.name << '\n'
+               << macro.defaultValue << '\n' << macro.minValue << '\n' << macro.maxValue << '\n';
+        for (const auto& target : macro.targets)
+            schema << target.parameterId << '\n' << target.parameterPath << '\n'
+                   << target.role << '\n';
+        schema << "--\n";
+    }
+    return computeFnv1a64Digest(schema.str());
+}
+
+PerformancePublishFinding makePerformancePublishFinding(
+    const PlaybackSnapshotFinding& finding)
+{
+    PerformancePublishFindingSeverity severity = PerformancePublishFindingSeverity::information;
+    switch (finding.severity)
+    {
+        case PlaybackSnapshotFindingSeverity::warning:
+            severity = PerformancePublishFindingSeverity::warning;
+            break;
+        case PlaybackSnapshotFindingSeverity::error:
+            severity = PerformancePublishFindingSeverity::error;
+            break;
+    }
+    return { severity, finding.code, finding.path, finding.message };
+}
+
+PerformancePublishFinding makePerformancePublishFailure(std::string code,
+                                                         std::string path,
+                                                         std::string message)
+{
+    return { PerformancePublishFindingSeverity::error,
+             std::move(code), std::move(path), std::move(message) };
 }
 
 std::string buildMacroSummary(const RuntimeSessionStateSnapshot& sessionState)
@@ -1296,17 +1359,51 @@ bool EngineFacade::publishCurrentDraft()
     if (!referenceInstrumentActive || !referenceManifest.loaded || !referenceStream.loaded || !authoringProject.loaded)
         return false;
 
-    const auto request = draftPlaybackContract.requestPerformanceBuild();
-    if (!request.accepted)
+    const auto buildResult = buildCurrentPlaybackSnapshot(true);
+    const auto authoredDigest = !buildResult.snapshot.contentDigest.empty()
+        ? buildResult.snapshot.contentDigest
+        : computeFnv1a64Digest(authoringProject.project.projectId + ":"
+                               + std::to_string(draftPlaybackContract.getStatus().draftRevision));
+    const auto macroSchemaDigest = computePerformancePublishMacroSchemaDigest(buildResult.snapshot);
+    const auto controllerRequest = performancePublishController.request(
+        performancePublishProjectGeneration,
+        draftPlaybackContract.getStatus().draftRevision,
+        authoredDigest,
+        macroSchemaDigest,
+        monotonicMicros());
+    if (controllerRequest.duplicateSuppressed)
+        return true;
+    if (!controllerRequest.accepted
+        || !performancePublishController.markPreparing(controllerRequest.request.identity,
+                                                        monotonicMicros()))
         return false;
 
-    const auto buildResult = buildCurrentPlaybackSnapshot(true);
+    const auto request = draftPlaybackContract.requestPerformanceBuild();
+    if (!request.accepted)
+    {
+        performancePublishController.fail(
+            controllerRequest.request.identity,
+            makePerformancePublishFailure("publish-request-rejected", "draftPlaybackContract",
+                                          request.state.empty()
+                                              ? std::string("Publish request was rejected.")
+                                              : request.state));
+        return false;
+    }
+
     if (!buildResult.built || !buildResult.activationEligible)
     {
         const auto preparedResult = buildRejectedPreparedPlayback(buildResult);
         const auto applied = draftPlaybackContract.completePerformanceBuild(request.requestId, buildResult, preparedResult);
         if (!applied)
             return false;
+
+        const auto finding = !buildResult.findings.empty()
+            ? makePerformancePublishFinding(buildResult.findings.front())
+            : makePerformancePublishFailure("publish-snapshot-failed", "snapshot",
+                                            buildResult.state.empty()
+                                                ? std::string("Publish snapshot construction failed.")
+                                                : buildResult.state);
+        performancePublishController.fail(controllerRequest.request.identity, finding);
 
         currentSessionState.transientMetrics.integrationState = "Publish preparation failed";
         currentSessionState.transientMetrics.lastFailure = summarizeSnapshotFindings(draftPlaybackContract.getStatus().performance.findings);
@@ -1333,6 +1430,10 @@ bool EngineFacade::publishCurrentDraft()
             "Prepared playback queue is full."
         });
         draftPlaybackContract.completePerformanceBuild(request.requestId, buildResult, queueRejected);
+        performancePublishController.fail(
+            controllerRequest.request.identity,
+            makePerformancePublishFailure("prepared-queue-full", "preparedWorker",
+                                          "Prepared playback queue is full."));
         currentSessionState.transientMetrics.integrationState = "Publish preparation failed";
         currentSessionState.transientMetrics.lastFailure = "Prepared playback queue is full.";
         previewPlaybackSnapshot = {};
@@ -1351,9 +1452,26 @@ bool EngineFacade::publishCurrentDraft()
     return true;
 }
 
+bool EngineFacade::markPerformancePublishActivationPending(std::uint64_t nowMicros)
+{
+    const auto controller = performancePublishController.getSnapshot();
+    return controller.hasRequest
+        && performancePublishController.markActivationPending(
+            controller.currentRequest.identity, nowMicros);
+}
+
+bool EngineFacade::markPerformancePublishActive(std::uint64_t nowMicros)
+{
+    const auto controller = performancePublishController.getSnapshot();
+    return controller.hasRequest
+        && performancePublishController.markActive(controller.currentRequest.identity, nowMicros);
+}
+
 void EngineFacade::closeDraftPlaybackProject()
 {
     clearPendingPreparedCompletions();
+    ++performancePublishProjectGeneration;
+    performancePublishController.reset(true, true);
     draftPlaybackContract.closeProject();
     referenceInstrumentActive = false;
     currentSessionState.transientMetrics.integrationState = "Draft playback project closed";
@@ -1370,6 +1488,8 @@ bool EngineFacade::reopenDraftPlaybackProject(std::size_t revision)
     if (!referenceManifest.loaded)
         return false;
 
+    ++performancePublishProjectGeneration;
+    performancePublishController.reset(true, true);
     draftPlaybackContract.reopenProject(revision);
     referenceInstrumentActive = true;
     currentSessionState.transientMetrics.integrationState = "Draft playback project reopened";
@@ -1387,7 +1507,14 @@ bool EngineFacade::replaceDraftPlaybackAuthoringProject(RuntimeProjectModel proj
     if (!validation.valid)
         return false;
 
+    const auto replacesProjectIdentity = authoringProject.loaded
+        && authoringProject.project.projectId != project.projectId;
     clearPendingPreparedCompletions();
+    if (replacesProjectIdentity)
+    {
+        ++performancePublishProjectGeneration;
+        performancePublishController.reset(true, true);
+    }
     authoringProject = {};
     authoringProject.manifestFound = true;
     authoringProject.loaded = true;
@@ -1446,10 +1573,19 @@ bool EngineFacade::enqueuePreparedPlaybackBuild(std::uint64_t contractRequestId,
     if (lane == PreparedPlaybackWorkLane::preview)
         discardSupersededPreviewPendingPreparedCompletions(submitResult.request.buildId);
 
+    auto publishIdentity = PerformancePublishRequestIdentity {};
+    if (lane == PreparedPlaybackWorkLane::performance)
+    {
+        const auto controller = performancePublishController.getSnapshot();
+        if (controller.hasRequest)
+            publishIdentity = controller.currentRequest.identity;
+    }
+
     pendingPreparedCompletions[submitResult.request.buildId] = {
         lane,
         contractRequestId,
-        snapshotResult
+        snapshotResult,
+        std::move(publishIdentity)
     };
     return true;
 }
@@ -1496,6 +1632,30 @@ bool EngineFacade::pumpPreparedPlaybackWorkerCompletions()
                 pendingCompletion.contractRequestId,
                 pendingCompletion.snapshotResult,
                 stepResult.result);
+
+            PerformancePublishResult publishResult;
+            publishResult.identity = pendingCompletion.publishIdentity;
+            publishResult.completeProject = stepResult.result.built
+                && pendingCompletion.snapshotResult.built;
+            publishResult.activationEligible = stepResult.result.activationEligible
+                && pendingCompletion.snapshotResult.activationEligible;
+            publishResult.preparedBuildId = stepResult.result.buildId;
+            publishResult.preparedContentDigest = stepResult.result.prepared.preparedContentDigest;
+            publishResult.preparedMacroSchemaDigest = pendingCompletion.publishIdentity.macroSchemaDigest;
+
+            const auto preparedAccepted = applied && publishResult.activationEligible
+                && performancePublishController.acceptPrepared(publishResult, monotonicMicros());
+            if (!preparedAccepted && performancePublishController.isCurrent(publishResult.identity))
+            {
+                const auto finding = !stepResult.result.findings.empty()
+                    ? makePerformancePublishFinding(stepResult.result.findings.front())
+                    : makePerformancePublishFailure(
+                        "publish-preparation-failed", "preparedWorker",
+                        stepResult.result.state.empty()
+                            ? std::string("Publish preparation did not produce an eligible result.")
+                            : stepResult.result.state);
+                performancePublishController.fail(publishResult.identity, finding);
+            }
 
             if (applied)
             {

@@ -177,6 +177,7 @@ add_library(drs_engine_adapter STATIC
     src/EngineFacade.cpp
     src/HiseProjectContent.cpp
     src/PlaybackSnapshot.cpp
+    src/PerformancePublishController.cpp
     src/PreparedPlayback.cpp
     src/Phase1Baseline.cpp
     src/ProjectDocument.cpp
@@ -194,6 +195,8 @@ add_library(drs_engine_adapter STATIC
     include/drs/engine/AuthoringSession.h
     include/drs/engine/DraftPlaybackContract.h
     include/drs/engine/PlaybackSnapshot.h
+    include/drs/engine/PerformancePublishContract.h
+    include/drs/engine/PerformancePublishController.h
     include/drs/engine/PreparedPlayback.h
     include/drs/engine/ProjectDocument.h
     include/drs/engine/RuntimePresetState.h
@@ -248,6 +251,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     src/HiseFrontendPluginProbe.cpp
     src/HiseProjectContent.cpp
     src/PlaybackSnapshot.cpp
+    src/PerformancePublishController.cpp
     src/PreparedPlayback.cpp
     src/Phase1Baseline.cpp
     src/ProjectDocument.cpp
@@ -274,6 +278,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     include/drs/engine/HiseFrontendBridge.h
     include/drs/engine/HiseProjectContent.h
     include/drs/engine/PlaybackSnapshot.h
+    include/drs/engine/PerformancePublishContract.h
+    include/drs/engine/PerformancePublishController.h
     include/drs/engine/PreparedPlayback.h
     include/drs/engine/ProjectDocument.h
     include/drs/engine/RuntimeCompiler.h

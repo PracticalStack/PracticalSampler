@@ -159,6 +159,8 @@ constexpr bool isPerformancePublishPreparationTransitionAllowed(
             return to == State::ready || to == State::failed
                 || to == State::canceled || to == State::superseded;
         case State::ready:
+            return to == State::idle || to == State::queued
+                || to == State::canceled || to == State::superseded;
         case State::failed:
         case State::canceled:
         case State::superseded:

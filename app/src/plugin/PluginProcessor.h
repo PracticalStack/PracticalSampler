@@ -149,6 +149,10 @@ public:
     {
         return authoringPreviewController.getSnapshot();
     }
+    drs::engine::PerformancePublishControllerSnapshot getPerformancePublishControllerSnapshot() const
+    {
+        return engineFacade.getPerformancePublishControllerSnapshot();
+    }
     drs::app::AuthoringImportResponsivenessSnapshot getAuthoringImportResponsivenessSnapshot() const;
     void replaceAuthoringProject(drs::engine::RuntimeProjectModel project);
     void closeAuthoringProject(drs::engine::RuntimeProjectModel unloadedProject);

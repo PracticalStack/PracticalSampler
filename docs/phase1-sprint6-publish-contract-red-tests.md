@@ -23,11 +23,17 @@ not a waived green test and not a product failure.
 The initial direct execution must report exactly seven seams and return exit 1. An unexpected exit 0,
 exit 2, or different count blocks Mini Sprint 6.1 because it means the baseline is stale or broken.
 
+## Mini Sprint 6.2 update
+
+The facade now captures typed identity through `PerformancePublishController`, accepts worker results
+only through exact controller eligibility, and reconciles Pending/Active with the existing processor
+activation path. The facade wrapper remains temporarily callable by shells, but it no longer owns
+request/result lifecycle. The direct audit now reports exactly **six** remaining seams.
+
 ## Retirement ownership
 
 | Seam | Owning mini sprint |
 |---|---|
-| Facade command/controller boundary | 6.2 |
 | Processor activation eligibility/staging | 6.5 |
 | Immutable published macro binding | 6.7 |
 | Three direct shell/UI calls and typed presentation | 6.8 |
