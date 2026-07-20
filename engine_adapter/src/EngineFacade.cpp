@@ -1526,6 +1526,35 @@ PerformancePublishActivationPayloadPtr EngineFacade::authorizePerformanceActivat
     authorization->macroSchemaDigest = payload->macroSchemaDigest;
     authorization->retainedPreparedBytes = payload->retainedPreparedBytes;
     authorization->playbackPayload = payload;
+
+    PublishedMacroBindingBuildRequest macroBindingRequest;
+    macroBindingRequest.revision = payload->revision;
+    macroBindingRequest.macroSchemaDigest = payload->macroSchemaDigest;
+    macroBindingRequest.authoredMacros = payload->snapshot->macroDefaults;
+    macroBindingRequest.previousActiveTable = activePublishedMacroBindings;
+    macroBindingRequest.hostSlots.reserve(referenceManifest.instrument.macros.size());
+    macroBindingRequest.currentValues.reserve(currentSessionState.macroValues.size());
+    for (std::size_t index = 0; index < referenceManifest.instrument.macros.size(); ++index)
+    {
+        const auto& macro = referenceManifest.instrument.macros[index];
+        macroBindingRequest.hostSlots.push_back(
+            { index, "macro." + macro.id, macro.id });
+    }
+    for (const auto& value : currentSessionState.macroValues)
+        macroBindingRequest.currentValues.push_back({ value.id, value.value });
+
+    const auto macroBindingResult = buildPublishedMacroBindingTable(macroBindingRequest);
+    if (!macroBindingResult.built || macroBindingResult.table == nullptr)
+    {
+        performancePublishController.fail(
+            controller.currentRequest.identity,
+            makePerformancePublishFailure(
+                "performance-macro-binding-rejected",
+                "performance.macroBindings",
+                "The immutable published macro binding table could not be constructed."));
+        return {};
+    }
+    authorization->macroBindings = macroBindingResult.table;
     if (!performancePublishController.authorizeActivation(*authorization, nowMicros))
         return {};
     return authorization;
@@ -1559,6 +1588,7 @@ bool EngineFacade::acknowledgePerformanceActivation(
     }
     currentSessionState.transientMetrics.integrationState = "Published revision active";
     currentSessionState.transientMetrics.lastFailure.clear();
+    activePublishedMacroBindings = payload->macroBindings;
     refreshDiagnosticsSnapshot();
     markStateChanged();
     return true;

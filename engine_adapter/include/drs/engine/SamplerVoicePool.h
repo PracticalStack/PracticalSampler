@@ -73,7 +73,8 @@ public:
                        std::uint64_t activationGeneration = 0) noexcept;
     void clearRenderModel() noexcept;
     SamplerVoicePoolRenderResult renderBlock(SamplerAudioBufferView output,
-                                             SamplerRenderEventView events) noexcept;
+                                             SamplerRenderEventView events,
+                                             SamplerRenderControlValues controls = {}) noexcept;
     void resetVoices() noexcept;
 
     std::size_t activeVoiceCount() const noexcept;
@@ -99,7 +100,8 @@ private:
                      std::uint32_t frameCount,
                      SamplerVoicePoolRenderResult& result) noexcept;
     void applyEvent(const SamplerRenderEvent& event,
-                    SamplerVoicePoolRenderResult& result) noexcept;
+                    SamplerVoicePoolRenderResult& result,
+                    const SamplerRenderControlValues& controls) noexcept;
     std::size_t selectRouteIndex(int midiNote, int velocity) const noexcept;
     std::size_t acquireSlot(bool& stolen,
                             bool& generationStolen,

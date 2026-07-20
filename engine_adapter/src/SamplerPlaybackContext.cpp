@@ -120,7 +120,8 @@ std::size_t SamplerPlaybackContext::serviceRetirements()
 
 SamplerPlaybackContextRenderResult SamplerPlaybackContext::renderBlock(
     SamplerAudioBufferView output,
-    SamplerRenderEventView events) noexcept
+    SamplerRenderEventView events,
+    SamplerRenderControlValues controls) noexcept
 {
     SamplerPlaybackContextRenderResult result;
     if (!isPrepared || !output.isValid() || !events.isValid())
@@ -141,7 +142,7 @@ SamplerPlaybackContextRenderResult SamplerPlaybackContext::renderBlock(
         return result;
     }
 
-    result.voicePool = voicePool.renderBlock(output, eventScratch.view());
+    result.voicePool = voicePool.renderBlock(output, eventScratch.view(), controls);
     result.accepted = result.voicePool.accepted;
     if (result.accepted)
     {

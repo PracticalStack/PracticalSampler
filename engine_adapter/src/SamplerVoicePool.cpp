@@ -87,7 +87,8 @@ void SamplerVoicePool::clearRenderModel() noexcept
 }
 
 SamplerVoicePoolRenderResult SamplerVoicePool::renderBlock(SamplerAudioBufferView output,
-                                                           SamplerRenderEventView events) noexcept
+                                                           SamplerRenderEventView events,
+                                                           SamplerRenderControlValues controls) noexcept
 {
     SamplerVoicePoolRenderResult result;
     if (renderModel == nullptr || !output.isValid() || !events.isValid() || events.size > SamplerEventBlock::capacity)
@@ -111,7 +112,7 @@ SamplerVoicePoolRenderResult SamplerVoicePool::renderBlock(SamplerAudioBufferVie
         const auto eventOffset = events[index].sampleOffset;
         renderRange(output, renderedThrough, eventOffset - renderedThrough, result);
         renderedThrough = eventOffset;
-        applyEvent(events[index], result);
+        applyEvent(events[index], result, controls);
         ++result.render.consumedEventCount;
     }
     renderRange(output, renderedThrough, output.frameCount - renderedThrough, result);
@@ -244,7 +245,8 @@ void SamplerVoicePool::renderRange(SamplerAudioBufferView output,
 }
 
 void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
-                                  SamplerVoicePoolRenderResult& result) noexcept
+                                  SamplerVoicePoolRenderResult& result,
+                                  const SamplerRenderControlValues& controls) noexcept
 {
     switch (event.type)
     {
@@ -258,12 +260,15 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
             }
 
             const auto sourceMidiNote = static_cast<int>(event.midiNote);
-            const auto effectiveMidiNote = std::clamp(
-                sourceMidiNote + renderModel->getMidiNoteOffset(), 0, 127);
+            const auto midiNoteOffset = controls.overrideMidiNoteOffset
+                ? controls.midiNoteOffset : renderModel->getMidiNoteOffset();
+            const auto effectiveMidiNote = std::clamp(sourceMidiNote + midiNoteOffset, 0, 127);
             const auto eventVelocity = std::clamp(
                 static_cast<int>(std::lround(event.velocity * 127.0f)), 1, 127);
-            const auto effectiveVelocity = renderModel->getFixedVelocity() > 0
-                ? renderModel->getFixedVelocity()
+            const auto fixedVelocity = controls.overrideFixedVelocity
+                ? controls.fixedVelocity : renderModel->getFixedVelocity();
+            const auto effectiveVelocity = fixedVelocity > 0
+                ? fixedVelocity
                 : eventVelocity;
             const auto routeIndex = selectRouteIndex(effectiveMidiNote, effectiveVelocity);
             if (routeIndex == std::numeric_limits<std::size_t>::max())

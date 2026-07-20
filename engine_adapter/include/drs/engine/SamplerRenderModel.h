@@ -67,6 +67,14 @@ struct SamplerRenderRequest
     double outputSampleRate = 0.0;
 };
 
+struct SamplerRenderControlValues
+{
+    bool overrideMidiNoteOffset = false;
+    int midiNoteOffset = 0;
+    bool overrideFixedVelocity = false;
+    int fixedVelocity = 0;
+};
+
 struct SamplerRenderResult
 {
     std::uint32_t renderedFrameCount = 0;

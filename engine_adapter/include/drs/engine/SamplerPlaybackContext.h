@@ -85,7 +85,8 @@ public:
 
     // Audio-owned callback API. Pending activation is consumed before the first rendered frame.
     SamplerPlaybackContextRenderResult renderBlock(SamplerAudioBufferView output,
-                                                   SamplerRenderEventView events) noexcept;
+                                                   SamplerRenderEventView events,
+                                                   SamplerRenderControlValues controls = {}) noexcept;
     void resetAtBlockBoundary() noexcept;
     void closeAtBlockBoundary() noexcept;
 

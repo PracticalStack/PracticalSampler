@@ -1,5 +1,7 @@
 #pragma once
 
+#include "drs/engine/PublishedMacroBinding.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -131,6 +133,7 @@ struct PerformancePublishActivationPayload final
     std::string sourceProvenanceDigest;
     std::string macroSchemaDigest;
     std::uint64_t retainedPreparedBytes = 0;
+    ImmutablePublishedMacroBindingTablePtr macroBindings;
     std::shared_ptr<const PlaybackActivationPayload> playbackPayload;
 };
 

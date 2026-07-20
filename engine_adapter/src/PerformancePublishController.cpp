@@ -49,6 +49,9 @@ bool matchesAcceptedActivation(const PerformancePublishControllerSnapshot& snaps
         && payload.sourceProvenanceDigest == snapshot.acceptedSourceProvenanceDigest
         && payload.macroSchemaDigest == snapshot.acceptedMacroSchemaDigest
         && payload.macroSchemaDigest == snapshot.currentRequest.identity.macroSchemaDigest
+        && payload.macroBindings != nullptr
+        && payload.macroBindings->revision == payload.revision
+        && payload.macroBindings->macroSchemaDigest == payload.macroSchemaDigest
         && playback->revision == payload.revision
         && playback->snapshotBuildId == payload.snapshotBuildId
         && playback->preparedBuildId == payload.preparedBuildId

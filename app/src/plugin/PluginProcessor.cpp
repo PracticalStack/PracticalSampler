@@ -358,6 +358,7 @@ Processor::Processor()
     for (const auto& macro : engineFacade.getMacroDescriptors())
         parameterState.addParameterListener(buildMacroParameterId(macro.id), this);
 
+    initializePublishedMacroRealtimeState();
     syncParametersFromEngine();
     serviceMessageThreadWork();
     updateRealtimeSafetyState();
@@ -480,9 +481,26 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
             static_cast<std::uint32_t>(buffer.getNumChannels()),
             static_cast<std::uint32_t>(frameCount)
         };
+        const auto performanceBeforeRender = performancePlaybackContext.getSnapshot();
+        if (pendingPerformanceActivation != nullptr
+            && performanceBeforeRender.hasPendingActivation
+            && pendingPerformanceActivation->macroBindings != nullptr)
+        {
+            installPublishedMacroCallbackView(
+                pendingPerformanceActivation->macroBindings->callbackView);
+        }
+        const auto performanceMacroControls = buildPublishedMacroRenderControls();
+        diagnosticActivePublishedMacroFixedVelocity.store(
+            performanceMacroControls.overrideFixedVelocity
+                ? performanceMacroControls.fixedVelocity : 0,
+            std::memory_order_relaxed);
+        diagnosticActivePublishedMacroMidiNoteOffset.store(
+            performanceMacroControls.overrideMidiNoteOffset
+                ? performanceMacroControls.midiNoteOffset : 0,
+            std::memory_order_relaxed);
         const auto performanceRenderStart = std::chrono::steady_clock::now();
         const auto performanceResult = performancePlaybackContext.renderBlock(
-            output, performanceEvents.view());
+            output, performanceEvents.view(), performanceMacroControls);
         const auto performanceRenderEnd = std::chrono::steady_clock::now();
         const auto previewResult = authoringPreviewPlaybackContext.renderBlock(
             output, authoringPreviewEvents.view());
@@ -1221,13 +1239,86 @@ void Processor::parameterChanged(const juce::String& parameterID, float newValue
     if (isSynchronizingParameterState)
         return;
 
-    const auto parameterIdText = parameterID.toStdString();
-    const auto macroPrefix = std::string("macro.");
-    if (parameterIdText.rfind(macroPrefix, 0) != 0)
+    const auto slot = std::find(hostMacroParameterIds.begin(), hostMacroParameterIds.end(), parameterID);
+    if (slot == hostMacroParameterIds.end())
         return;
 
-    engineFacade.setMacroValue(parameterIdText.substr(macroPrefix.size()), static_cast<double>(newValue));
-    synchronizePerformanceActivation(false);
+    const auto slotIndex = static_cast<std::size_t>(std::distance(hostMacroParameterIds.begin(), slot));
+    hostMacroValues[slotIndex].store(newValue, std::memory_order_relaxed);
+    hostMacroValueSequences[slotIndex].fetch_add(1, std::memory_order_release);
+
+    engineFacade.setMacroValue(hostMacroStableIds[slotIndex], static_cast<double>(newValue));
+}
+
+void Processor::initializePublishedMacroRealtimeState()
+{
+    const auto macros = engineFacade.getMacroDescriptors();
+    hostMacroParameterIds.reserve(std::min(macros.size(), maxPublishedMacroSlots));
+    hostMacroStableIds.reserve(std::min(macros.size(), maxPublishedMacroSlots));
+    activePublishedMacroCallbackView.hostSlotCount
+        = std::min(macros.size(), maxPublishedMacroSlots);
+    for (std::size_t index = 0; index < activePublishedMacroCallbackView.hostSlotCount; ++index)
+    {
+        const auto& macro = macros[index];
+        hostMacroParameterIds.push_back(buildMacroParameterId(macro.id));
+        hostMacroStableIds.push_back(macro.id);
+        hostMacroValues[index].store(static_cast<float>(macro.currentValue), std::memory_order_relaxed);
+        hostMacroValueSequences[index].store(1, std::memory_order_relaxed);
+        auto& slot = activePublishedMacroCallbackView.slots[index];
+        slot.assigned = true;
+        slot.minValue = macro.minValue;
+        slot.maxValue = macro.maxValue;
+        slot.publishedValue = macro.currentValue;
+        if (macro.id == "tone")
+            slot.renderTarget = drs::engine::PublishedMacroRenderTarget::toneVelocity;
+        else if (macro.id == "motion")
+            slot.renderTarget = drs::engine::PublishedMacroRenderTarget::motionPitch;
+    }
+}
+
+void Processor::installPublishedMacroCallbackView(
+    const drs::engine::PublishedMacroCallbackView& view) noexcept
+{
+    activePublishedMacroCallbackView = view;
+    diagnosticActivePublishedMacroRevision.store(view.revision, std::memory_order_relaxed);
+    for (std::size_t index = 0; index < maxPublishedMacroSlots; ++index)
+    {
+        activePublishedMacroBaselines[index]
+            = hostMacroValueSequences[index].load(std::memory_order_acquire);
+    }
+}
+
+drs::engine::SamplerRenderControlValues Processor::buildPublishedMacroRenderControls() const noexcept
+{
+    drs::engine::SamplerRenderControlValues controls;
+    const auto slotCount = std::min(activePublishedMacroCallbackView.hostSlotCount,
+                                    maxPublishedMacroSlots);
+    for (std::size_t index = 0; index < slotCount; ++index)
+    {
+        const auto& slot = activePublishedMacroCallbackView.slots[index];
+        if (!slot.assigned)
+            continue;
+
+        auto value = slot.publishedValue;
+        if (hostMacroValueSequences[index].load(std::memory_order_acquire)
+            > activePublishedMacroBaselines[index])
+        {
+            value = hostMacroValues[index].load(std::memory_order_relaxed);
+        }
+        value = std::clamp(value, slot.minValue, slot.maxValue);
+        if (slot.renderTarget == drs::engine::PublishedMacroRenderTarget::toneVelocity)
+        {
+            controls.overrideFixedVelocity = true;
+            controls.fixedVelocity = std::clamp(
+                static_cast<int>(std::lround(32.0 + value * 95.0)), 1, 127);
+        }
+        else if (slot.renderTarget == drs::engine::PublishedMacroRenderTarget::motionPitch)
+        {
+            controls.overrideMidiNoteOffset = true;
+            controls.midiNoteOffset = static_cast<int>(std::lround((value - 0.5) * 24.0));
+        }
+    }
+    return controls;
 }
 
 void Processor::syncEngineFromParameters()
@@ -1243,12 +1334,20 @@ void Processor::syncParametersFromEngine()
 {
     const juce::ScopedValueSetter<bool> syncGuard(isSynchronizingParameterState, true);
 
-    for (const auto& macro : engineFacade.getMacroDescriptors())
+    const auto macros = engineFacade.getMacroDescriptors();
+    for (std::size_t index = 0; index < macros.size(); ++index)
     {
+        const auto& macro = macros[index];
         if (auto* parameter = dynamic_cast<juce::RangedAudioParameter*>(
                 parameterState.getParameter(buildMacroParameterId(macro.id))))
         {
             parameter->setValueNotifyingHost(parameter->convertTo0to1(static_cast<float>(macro.currentValue)));
+        }
+        if (index < maxPublishedMacroSlots)
+        {
+            hostMacroValues[index].store(static_cast<float>(macro.currentValue),
+                                         std::memory_order_relaxed);
+            hostMacroValueSequences[index].fetch_add(1, std::memory_order_release);
         }
     }
 }
@@ -1416,8 +1515,25 @@ bool Processor::synchronizePerformanceActivation(bool installImmediately)
         if (defaultArticulation != articulations.end())
             options.selectedArticulationId = defaultArticulation->id;
     }
-    options.midiNoteOffset = computeMotionRenderNote(sessionState, 60) - 60;
-    options.fixedVelocity = computeToneRenderVelocity(sessionState);
+    if (authorized != nullptr && authorized->macroBindings != nullptr)
+    {
+        for (const auto& slot : authorized->macroBindings->callbackView.slots)
+        {
+            if (!slot.assigned)
+                continue;
+            const auto value = std::clamp(slot.publishedValue, slot.minValue, slot.maxValue);
+            if (slot.renderTarget == drs::engine::PublishedMacroRenderTarget::toneVelocity)
+                options.fixedVelocity = std::clamp(
+                    static_cast<int>(std::lround(32.0 + value * 95.0)), 1, 127);
+            else if (slot.renderTarget == drs::engine::PublishedMacroRenderTarget::motionPitch)
+                options.midiNoteOffset = static_cast<int>(std::lround((value - 0.5) * 24.0));
+        }
+    }
+    else
+    {
+        options.midiNoteOffset = computeMotionRenderNote(sessionState, 60) - 60;
+        options.fixedVelocity = computeToneRenderVelocity(sessionState);
+    }
     const auto modelResult = drs::engine::buildSamplerRenderModel(payload, options);
     if (!modelResult.built || modelResult.model == nullptr)
     {
@@ -1734,6 +1850,12 @@ ProcessorRealtimeSafetySnapshot Processor::composeDiagnosticsSnapshot(
     snapshot.pendingAuthoringPreviewRevision = audioValues.pendingAuthoringPreviewRevision;
     snapshot.activePublishedRevision = audioValues.activePublishedRevision;
     snapshot.pendingPublishedRevision = audioValues.pendingPublishedRevision;
+    snapshot.activePublishedMacroRevision
+        = diagnosticActivePublishedMacroRevision.load(std::memory_order_acquire);
+    snapshot.activePublishedMacroFixedVelocity
+        = diagnosticActivePublishedMacroFixedVelocity.load(std::memory_order_acquire);
+    snapshot.activePublishedMacroMidiNoteOffset
+        = diagnosticActivePublishedMacroMidiNoteOffset.load(std::memory_order_acquire);
     snapshot.activePreparedBuildId = audioValues.activePreparedBuildId;
     snapshot.pendingPreparedBuildId = audioValues.pendingPreparedBuildId;
     const auto controller = authoringPreviewController.getSnapshot();
@@ -1892,6 +2014,12 @@ ProcessorRealtimeSafetySnapshot Processor::getRealtimeSafetySnapshot() const
     snapshot.pendingAuthoringPreviewRevision = audioValues.pendingAuthoringPreviewRevision;
     snapshot.activePublishedRevision = audioValues.activePublishedRevision;
     snapshot.pendingPublishedRevision = audioValues.pendingPublishedRevision;
+    snapshot.activePublishedMacroRevision
+        = diagnosticActivePublishedMacroRevision.load(std::memory_order_acquire);
+    snapshot.activePublishedMacroFixedVelocity
+        = diagnosticActivePublishedMacroFixedVelocity.load(std::memory_order_acquire);
+    snapshot.activePublishedMacroMidiNoteOffset
+        = diagnosticActivePublishedMacroMidiNoteOffset.load(std::memory_order_acquire);
     snapshot.activePreparedBuildId = audioValues.activePreparedBuildId;
     snapshot.pendingPreparedBuildId = audioValues.pendingPreparedBuildId;
 

@@ -86,6 +86,9 @@ struct ProcessorRealtimeSafetySnapshot
     std::size_t pendingAuthoringPreviewRevision = 0;
     std::size_t activePublishedRevision = 0;
     std::size_t pendingPublishedRevision = 0;
+    std::size_t activePublishedMacroRevision = 0;
+    int activePublishedMacroFixedVelocity = 0;
+    int activePublishedMacroMidiNoteOffset = 0;
     std::uint64_t activePreparedBuildId = 0;
     std::uint64_t pendingPreparedBuildId = 0;
     std::string authoringPreviewRevisionState;
@@ -184,6 +187,8 @@ public:
 
 private:
     static constexpr std::size_t maxRealtimeActiveVoices = drs::engine::SamplerVoicePool::capacity;
+    static constexpr std::size_t maxPublishedMacroSlots
+        = drs::engine::maximumPublishedMacroHostSlots;
 
     struct QueuedRealtimeNoteEvent
     {
@@ -210,6 +215,10 @@ private:
     static juce::String buildMacroParameterId(const std::string& macroId);
     static juce::AudioProcessorValueTreeState::ParameterLayout buildParameterLayout(
         const drs::engine::EngineFacade& engineFacade);
+    void initializePublishedMacroRealtimeState();
+    void installPublishedMacroCallbackView(
+        const drs::engine::PublishedMacroCallbackView& view) noexcept;
+    drs::engine::SamplerRenderControlValues buildPublishedMacroRenderControls() const noexcept;
     void drainRealtimeNoteEvents(RealtimeNoteEventQueue& queue,
                                  drs::engine::SamplerEventBlock& destination,
                                  std::uint32_t frameCount) noexcept;
@@ -344,6 +353,15 @@ private:
     RealtimeNoteEventQueue authoringPreviewNoteQueue;
     RealtimeNoteEventQueue performanceSurfaceNoteQueue;
     juce::AudioProcessorValueTreeState parameterState;
+    std::vector<juce::String> hostMacroParameterIds;
+    std::vector<std::string> hostMacroStableIds;
+    std::array<std::atomic<float>, maxPublishedMacroSlots> hostMacroValues {};
+    std::array<std::atomic<std::uint64_t>, maxPublishedMacroSlots> hostMacroValueSequences {};
+    drs::engine::PublishedMacroCallbackView activePublishedMacroCallbackView;
+    std::array<std::uint64_t, maxPublishedMacroSlots> activePublishedMacroBaselines {};
+    std::atomic<std::size_t> diagnosticActivePublishedMacroRevision { 0 };
+    std::atomic<int> diagnosticActivePublishedMacroFixedVelocity { 0 };
+    std::atomic<int> diagnosticActivePublishedMacroMidiNoteOffset { 0 };
     drs::app::AuthoringImportResponsivenessSnapshot authoringImportResponsivenessSnapshot;
     juce::File authoringProjectFile;
     std::shared_ptr<const ProcessorRealtimeSafetySnapshot> publishedRealtimeSafetySnapshot;

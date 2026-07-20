@@ -353,6 +353,10 @@ public:
     {
         return performancePublishController.getSnapshot();
     }
+    ImmutablePublishedMacroBindingTablePtr getActivePublishedMacroBindings() const
+    {
+        return activePublishedMacroBindings;
+    }
     std::vector<EngineArticulationDescriptor> getArticulationDescriptors() const;
     std::vector<EngineMacroDescriptor> getMacroDescriptors() const;
     bool setSelectedArticulation(const std::string& articulationId);
@@ -418,5 +422,6 @@ private:
     std::uint64_t nextPreviewVoiceId = 4000;
     std::uint64_t performancePublishProjectGeneration = 1;
     std::uint64_t nextPerformanceActivationToken = 1;
+    ImmutablePublishedMacroBindingTablePtr activePublishedMacroBindings;
 };
 } // namespace drs::engine

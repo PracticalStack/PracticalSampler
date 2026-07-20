@@ -52,11 +52,23 @@ must match the audio-boundary acknowledgement. Staging rejection preserves exact
 and old payloads retire through bounded off-audio tokens. The direct audit now reports exactly
 **five** remaining seams.
 
+## Mini Sprint 6.6 update
+
+Generation-owned held and releasing voices do not change the five remaining shell, presentation,
+or macro-binding seams. The direct audit therefore remains stable at exactly **five**.
+
+## Mini Sprint 6.7 update
+
+The Performance authorization payload now carries an immutable, revision/digest-matched published
+macro table, and the processor exchanges its bounded callback view with the audio generation at the
+same block boundary. Compatible stable IDs preserve and clamp values; new, retired, reordered,
+renamed, unassigned, and over-capacity controls have deterministic outcomes. The direct audit now
+reports exactly **four** remaining seams, all owned by Mini Sprint 6.8.
+
 ## Retirement ownership
 
 | Seam | Owning mini sprint |
 |---|---|
-| Immutable published macro binding | 6.7 |
 | Three direct shell/UI calls and typed presentation | 6.8 |
 
 Mini Sprint 6.9 removes any remaining compatibility branches and converts the executable into a

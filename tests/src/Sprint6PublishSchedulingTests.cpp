@@ -77,6 +77,11 @@ PerformancePublishActivationPayload activationPayload(const PerformancePublishRe
     payload.sourceProvenanceDigest = result.sourceProvenanceDigest;
     payload.macroSchemaDigest = result.preparedMacroSchemaDigest;
     payload.retainedPreparedBytes = 4096;
+    auto macroBindings = std::make_shared<ImmutablePublishedMacroBindingTable>();
+    macroBindings->revision = payload.revision;
+    macroBindings->macroSchemaDigest = payload.macroSchemaDigest;
+    macroBindings->callbackView.revision = payload.revision;
+    payload.macroBindings = std::move(macroBindings);
     auto playback = std::make_shared<PlaybackActivationPayload>();
     playback->lane = PlaybackActivationLane::performance;
     playback->revision = payload.revision;

@@ -43,7 +43,8 @@ int main()
             { "published lifecycle remains string-only in the public facade snapshot",
               facadeHeader.find("std::string publishedRevisionState;") != std::string::npos },
             { "mutable facade macro values are not yet bound to an immutable published schema",
-              facadeSource.find("bool EngineFacade::setMacroValue(") != std::string::npos }
+              facadeSource.find("buildPublishedMacroBindingTable(") == std::string::npos
+                || processorHeader.find("activePublishedMacroCallbackView") == std::string::npos }
         };
 
         auto observedGapCount = std::size_t { 0 };
