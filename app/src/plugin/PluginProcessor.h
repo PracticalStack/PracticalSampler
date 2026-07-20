@@ -59,6 +59,8 @@ struct ProcessorRealtimeSafetySnapshot
     std::uint64_t activeActivationPayloadBytes = 0;
     std::uint64_t pendingActivationPayloadBytes = 0;
     std::uint64_t retiredActivationPayloadBytes = 0;
+    std::uint64_t lastActivationReclamationLatencyBlocks = 0;
+    std::uint64_t maxActivationReclamationLatencyBlocks = 0;
     std::size_t largeResourceReleasesOnAudioThread = 0;
     std::size_t allocationsOnAudioThread = 0;
     std::size_t deallocationsOnAudioThread = 0;
@@ -208,9 +210,6 @@ private:
     bool stageAuthoringPreviewActivation(const drs::engine::AuthoringPreviewRequest& request,
                                          bool installImmediately);
     bool synchronizePerformanceActivation(bool installImmediately);
-    bool stagePerformanceActivation(const drs::engine::EnginePerformanceSnapshot& performanceSnapshot,
-                                    const drs::engine::RuntimeSessionStateSnapshot& sessionState,
-                                    bool installImmediately);
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     void syncEngineFromParameters();
     void syncParametersFromEngine();
@@ -257,6 +256,8 @@ private:
         std::uint64_t activeActivationPayloadBytes = 0;
         std::uint64_t pendingActivationPayloadBytes = 0;
         std::uint64_t retiredActivationPayloadBytes = 0;
+        std::uint64_t lastActivationReclamationLatencyBlocks = 0;
+        std::uint64_t maxActivationReclamationLatencyBlocks = 0;
         bool hasActiveAuthoringPreviewActivation = false;
         bool hasPendingAuthoringPreviewActivation = false;
         bool hasActivePerformanceActivation = false;
@@ -295,6 +296,8 @@ private:
         std::atomic<std::uint64_t> activeActivationPayloadBytes { 0 };
         std::atomic<std::uint64_t> pendingActivationPayloadBytes { 0 };
         std::atomic<std::uint64_t> retiredActivationPayloadBytes { 0 };
+        std::atomic<std::uint64_t> lastActivationReclamationLatencyBlocks { 0 };
+        std::atomic<std::uint64_t> maxActivationReclamationLatencyBlocks { 0 };
         std::atomic<bool> hasActiveAuthoringPreviewActivation { false };
         std::atomic<bool> hasPendingAuthoringPreviewActivation { false };
         std::atomic<bool> hasActivePerformanceActivation { false };
@@ -316,6 +319,7 @@ private:
     drs::engine::SamplerPlaybackContext performancePlaybackContext {
         drs::engine::PlaybackActivationLane::performance
     };
+    drs::engine::PerformancePublishActivationPayloadPtr pendingPerformanceActivation;
     drs::engine::SamplerPlaybackContext authoringPreviewPlaybackContext {
         drs::engine::PlaybackActivationLane::preview
     };

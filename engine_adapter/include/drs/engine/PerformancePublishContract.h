@@ -2,11 +2,14 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
 namespace drs::engine
 {
+struct PlaybackActivationPayload;
+
 enum class PerformancePublishCommandType : std::uint8_t
 {
     publishCurrentDraft = 0
@@ -56,6 +59,12 @@ enum class PerformancePublishFindingSeverity : std::uint8_t
     error
 };
 
+enum class PerformancePublishRequestOrigin : std::uint8_t
+{
+    explicitCommand = 0,
+    bootstrap
+};
+
 struct PerformancePublishFinding
 {
     PerformancePublishFindingSeverity severity = PerformancePublishFindingSeverity::information;
@@ -72,12 +81,14 @@ struct PerformancePublishRequestIdentity
     std::size_t draftRevision = 0;
     std::string authoredContentDigest;
     std::string macroSchemaDigest;
+    PerformancePublishRequestOrigin origin = PerformancePublishRequestOrigin::explicitCommand;
 
     bool operator==(const PerformancePublishRequestIdentity& other) const noexcept
     {
         return requestId == other.requestId
             && cancellationGeneration == other.cancellationGeneration
             && projectGeneration == other.projectGeneration
+            && origin == other.origin
             && draftRevision == other.draftRevision
             && authoredContentDigest == other.authoredContentDigest
             && macroSchemaDigest == other.macroSchemaDigest;
@@ -106,6 +117,25 @@ struct PerformancePublishResult
     std::string preparedMacroSchemaDigest;
     std::vector<PerformancePublishFinding> findings;
 };
+
+struct PerformancePublishActivationPayload final
+{
+    std::uint64_t activationToken = 0;
+    PerformancePublishRequestIdentity requestIdentity;
+    std::size_t revision = 0;
+    std::uint64_t snapshotBuildId = 0;
+    std::uint64_t preparedBuildId = 0;
+    std::string snapshotContentDigest;
+    std::string preparedContentDigest;
+    std::string routeDigest;
+    std::string sourceProvenanceDigest;
+    std::string macroSchemaDigest;
+    std::uint64_t retainedPreparedBytes = 0;
+    std::shared_ptr<const PlaybackActivationPayload> playbackPayload;
+};
+
+using PerformancePublishActivationPayloadPtr
+    = std::shared_ptr<const PerformancePublishActivationPayload>;
 
 enum class PerformancePublishCompletionDisposition : std::uint8_t
 {
@@ -162,7 +192,7 @@ constexpr bool isPerformancePublishPreparationTransitionAllowed(
                 || to == State::canceled || to == State::superseded;
         case State::ready:
             return to == State::idle || to == State::queued
-                || to == State::canceled || to == State::superseded;
+                || to == State::failed || to == State::canceled || to == State::superseded;
         case State::failed:
         case State::canceled:
         case State::superseded:

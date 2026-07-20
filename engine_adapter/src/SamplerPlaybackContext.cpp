@@ -63,6 +63,19 @@ bool SamplerPlaybackContext::stageActivation(SamplerRenderModelPtr model)
     return true;
 }
 
+bool SamplerPlaybackContext::cancelPendingActivation()
+{
+    const auto pending = pendingActivationSlot.exchange(-1, std::memory_order_acq_rel);
+    diagnosticPendingRevision.store(0, std::memory_order_release);
+    diagnosticPendingPreparedBuildId.store(0, std::memory_order_release);
+    diagnosticPendingPayloadBytes.store(0, std::memory_order_release);
+    if (pending < 0)
+        return false;
+    const auto& slot = activationSlots[static_cast<std::size_t>(pending)];
+    releaseSlotOnMessageThread({ pending, slot.serial });
+    return true;
+}
+
 bool SamplerPlaybackContext::activatePendingForPreparation() noexcept
 {
     if (!isPrepared || activeActivationSlot >= 0)
@@ -78,6 +91,17 @@ std::size_t SamplerPlaybackContext::serviceRetirements()
     RetirementToken token;
     while (dequeueRetirement(token))
     {
+        const auto renderedBlocks = diagnosticRenderedBlockCount.load(std::memory_order_acquire);
+        const auto latencyBlocks = renderedBlocks >= token.enqueuedAtRenderedBlockCount
+            ? renderedBlocks - token.enqueuedAtRenderedBlockCount
+            : 0;
+        lastReclamationLatencyBlocks.store(latencyBlocks, std::memory_order_relaxed);
+        auto maximumLatency = maxReclamationLatencyBlocks.load(std::memory_order_relaxed);
+        while (maximumLatency < latencyBlocks
+               && !maxReclamationLatencyBlocks.compare_exchange_weak(
+                   maximumLatency, latencyBlocks, std::memory_order_relaxed))
+        {
+        }
         const auto& slot = activationSlots[static_cast<std::size_t>(token.slotIndex)];
         const auto& payload = slot.model != nullptr
             ? slot.model->getRetainedActivationPayload()
@@ -211,6 +235,10 @@ SamplerPlaybackContextSnapshot SamplerPlaybackContext::getSnapshot() const noexc
         = diagnosticRetiredBacklog.load(std::memory_order_acquire);
     snapshot.counters.reclaimedActivationCount
         = reclaimedActivationCount.load(std::memory_order_relaxed);
+    snapshot.counters.lastReclamationLatencyBlocks
+        = lastReclamationLatencyBlocks.load(std::memory_order_relaxed);
+    snapshot.counters.maxReclamationLatencyBlocks
+        = maxReclamationLatencyBlocks.load(std::memory_order_relaxed);
     return snapshot;
 }
 
@@ -279,6 +307,7 @@ bool SamplerPlaybackContext::enqueueRetirement(RetirementToken token) noexcept
     const auto next = static_cast<std::uint32_t>((write + 1u) % retirementQueue.size());
     if (next == retirementReadIndex.load(std::memory_order_acquire))
         return false;
+    token.enqueuedAtRenderedBlockCount = counters.renderedBlockCount;
     retirementQueue[write] = token;
     retirementWriteIndex.store(next, std::memory_order_release);
     return true;

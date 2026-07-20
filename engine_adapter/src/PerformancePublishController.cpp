@@ -1,4 +1,5 @@
 #include "drs/engine/PerformancePublishController.h"
+#include "drs/engine/DraftPlaybackContract.h"
 
 #include <algorithm>
 #include <atomic>
@@ -24,6 +25,40 @@ bool sameCapturedInput(const PerformancePublishRequestIdentity& identity,
         && identity.authoredContentDigest == authoredContentDigest
         && identity.macroSchemaDigest == macroSchemaDigest;
 }
+
+bool matchesAcceptedActivation(const PerformancePublishControllerSnapshot& snapshot,
+                               const PerformancePublishActivationPayload& payload) noexcept
+{
+    const auto& playback = payload.playbackPayload;
+    return snapshot.hasRequest
+        && payload.activationToken != 0
+        && playback != nullptr
+        && playback->lane == PlaybackActivationLane::performance
+        && playback->activationEligible
+        && playback->lifecycleState == PlaybackSnapshotLifecycleState::active
+        && playback->snapshot != nullptr
+        && playback->prepared != nullptr
+        && payload.requestIdentity == snapshot.currentRequest.identity
+        && payload.revision == snapshot.currentRequest.identity.draftRevision
+        && payload.snapshotBuildId != 0
+        && payload.preparedBuildId == snapshot.acceptedPreparedBuildId
+        && payload.preparedBuildId != 0
+        && payload.snapshotContentDigest == snapshot.currentRequest.identity.authoredContentDigest
+        && payload.preparedContentDigest == snapshot.acceptedPreparedDigest
+        && payload.routeDigest == snapshot.acceptedRouteDigest
+        && payload.sourceProvenanceDigest == snapshot.acceptedSourceProvenanceDigest
+        && payload.macroSchemaDigest == snapshot.acceptedMacroSchemaDigest
+        && payload.macroSchemaDigest == snapshot.currentRequest.identity.macroSchemaDigest
+        && playback->revision == payload.revision
+        && playback->snapshotBuildId == payload.snapshotBuildId
+        && playback->preparedBuildId == payload.preparedBuildId
+        && playback->snapshotContentDigest == payload.snapshotContentDigest
+        && playback->preparedContentDigest == payload.preparedContentDigest
+        && playback->routeDigest == payload.routeDigest
+        && playback->sourceProvenanceDigest == payload.sourceProvenanceDigest
+        && playback->macroSchemaDigest == payload.macroSchemaDigest
+        && playback->retainedPreparedBytes == payload.retainedPreparedBytes;
+}
 } // namespace
 
 PerformancePublishController::PerformancePublishController(
@@ -39,7 +74,8 @@ PerformancePublishRequestResult PerformancePublishController::request(
     std::size_t draftRevision,
     std::string authoredContentDigest,
     std::string macroSchemaDigest,
-    std::uint64_t nowMicros)
+    std::uint64_t nowMicros,
+    PerformancePublishRequestOrigin origin)
 {
     PerformancePublishRequestResult result;
     if (projectGeneration == 0 || authoredContentDigest.empty() || macroSchemaDigest.empty())
@@ -90,6 +126,7 @@ PerformancePublishRequestResult PerformancePublishController::request(
     next.identity.requestId = nextRequestId++;
     next.identity.cancellationGeneration = cancellationGeneration;
     next.identity.projectGeneration = projectGeneration;
+    next.identity.origin = origin;
     next.identity.draftRevision = draftRevision;
     next.identity.authoredContentDigest = std::move(authoredContentDigest);
     next.identity.macroSchemaDigest = std::move(macroSchemaDigest);
@@ -106,6 +143,9 @@ PerformancePublishRequestResult PerformancePublishController::request(
     snapshot.acceptedRouteDigest.clear();
     snapshot.acceptedSourceProvenanceDigest.clear();
     snapshot.acceptedMacroSchemaDigest.clear();
+    snapshot.pendingActivationToken = 0;
+    snapshot.pendingSnapshotBuildId = 0;
+    snapshot.pendingPayloadBytes = 0;
     snapshot.requestReceivedAtMicros = nowMicros;
     snapshot.launchedAtMicros = 0;
     snapshot.readyAtMicros = 0;
@@ -180,35 +220,56 @@ bool PerformancePublishController::acceptPrepared(const PerformancePublishResult
     return true;
 }
 
-bool PerformancePublishController::markActivationPending(
-    const PerformancePublishRequestIdentity& identity,
+bool PerformancePublishController::authorizeActivation(
+    const PerformancePublishActivationPayload& payload,
     std::uint64_t nowMicros)
 {
-    if (!isCurrent(identity)
+    if (!matchesAcceptedActivation(snapshot, payload)
         || snapshot.preparationState != PerformancePublishPreparationState::ready
-        || snapshot.acceptedPreparedBuildId == 0)
+        || snapshot.activationState != PerformancePublishActivationState::noActivation)
+    {
+        ++snapshot.activationAuthorizationRejectedCount;
+        publishSnapshot();
         return false;
+    }
     snapshot.activationState = PerformancePublishActivationState::pending;
+    snapshot.pendingActivationToken = payload.activationToken;
+    snapshot.pendingSnapshotBuildId = payload.snapshotBuildId;
+    snapshot.pendingPayloadBytes = payload.retainedPreparedBytes;
     snapshot.activationPendingAtMicros = nowMicros;
+    ++snapshot.activationAuthorizedCount;
     publishSnapshot();
     return true;
 }
 
-bool PerformancePublishController::markActive(
-    const PerformancePublishRequestIdentity& identity,
+bool PerformancePublishController::acknowledgeActivation(
+    const PerformancePublishActivationPayload& payload,
     std::uint64_t nowMicros)
 {
-    if (!isCurrent(identity)
-        || snapshot.activationState != PerformancePublishActivationState::pending)
+    if (!matchesAcceptedActivation(snapshot, payload)
+        || snapshot.activationState != PerformancePublishActivationState::pending
+        || snapshot.pendingActivationToken != payload.activationToken
+        || snapshot.pendingSnapshotBuildId != payload.snapshotBuildId
+        || snapshot.pendingPayloadBytes != payload.retainedPreparedBytes)
+    {
+        ++snapshot.activationAcknowledgementRejectedCount;
+        publishSnapshot();
         return false;
+    }
     snapshot.activationState = PerformancePublishActivationState::active;
     snapshot.hasActiveRequest = true;
-    snapshot.activeRequestIdentity = identity;
-    snapshot.activePreparedBuildId = snapshot.acceptedPreparedBuildId;
-    snapshot.activePreparedDigest = snapshot.acceptedPreparedDigest;
-    snapshot.activeRouteDigest = snapshot.acceptedRouteDigest;
-    snapshot.activeSourceProvenanceDigest = snapshot.acceptedSourceProvenanceDigest;
-    snapshot.activeMacroSchemaDigest = snapshot.acceptedMacroSchemaDigest;
+    snapshot.activeRequestIdentity = payload.requestIdentity;
+    snapshot.activeActivationToken = payload.activationToken;
+    snapshot.activeSnapshotBuildId = payload.snapshotBuildId;
+    snapshot.activePreparedBuildId = payload.preparedBuildId;
+    snapshot.activePayloadBytes = payload.retainedPreparedBytes;
+    snapshot.activePreparedDigest = payload.preparedContentDigest;
+    snapshot.activeRouteDigest = payload.routeDigest;
+    snapshot.activeSourceProvenanceDigest = payload.sourceProvenanceDigest;
+    snapshot.activeMacroSchemaDigest = payload.macroSchemaDigest;
+    snapshot.pendingActivationToken = 0;
+    snapshot.pendingSnapshotBuildId = 0;
+    snapshot.pendingPayloadBytes = 0;
     snapshot.activeAtMicros = nowMicros;
     if (nowMicros != 0 && snapshot.requestReceivedAtMicros != 0
         && nowMicros >= snapshot.requestReceivedAtMicros)
@@ -217,6 +278,38 @@ bool PerformancePublishController::markActive(
         updateMaximum(snapshot.maxRequestToActiveMicros, snapshot.lastRequestToActiveMicros);
     }
     ++snapshot.activationCount;
+    publishSnapshot();
+    return true;
+}
+
+bool PerformancePublishController::rejectActivationStaging(
+    const PerformancePublishActivationPayload& payload,
+    PerformancePublishFinding finding)
+{
+    if (!isCurrent(payload.requestIdentity)
+        || snapshot.preparationState != PerformancePublishPreparationState::ready
+        || snapshot.activationState != PerformancePublishActivationState::pending
+        || snapshot.pendingActivationToken != payload.activationToken)
+    {
+        ++snapshot.activationStagingRejectedCount;
+        publishSnapshot();
+        return false;
+    }
+    if (!transitionTo(PerformancePublishPreparationState::failed))
+        return false;
+    snapshot.hasFailedRequest = true;
+    snapshot.failedRequestIdentity = payload.requestIdentity;
+    snapshot.failureFinding = std::move(finding);
+    snapshot.activationState = PerformancePublishActivationState::noActivation;
+    snapshot.pendingActivationToken = 0;
+    snapshot.pendingSnapshotBuildId = 0;
+    snapshot.pendingPayloadBytes = 0;
+    ++snapshot.failedCount;
+    ++snapshot.activationStagingRejectedCount;
+    recordCompletion(payload.requestIdentity,
+                     PerformancePublishPreparationState::failed,
+                     payload.preparedBuildId,
+                     false);
     publishSnapshot();
     return true;
 }
@@ -231,6 +324,7 @@ bool PerformancePublishController::fail(const PerformancePublishRequestIdentity&
         publishSnapshot();
         return false;
     }
+    const auto wasReady = snapshot.preparationState == PerformancePublishPreparationState::ready;
     if (snapshot.preparationState == PerformancePublishPreparationState::queued)
     {
         if (!transitionTo(PerformancePublishPreparationState::preparing))
@@ -244,8 +338,12 @@ bool PerformancePublishController::fail(const PerformancePublishRequestIdentity&
     snapshot.failedRequestIdentity = identity;
     snapshot.failureFinding = std::move(finding);
     snapshot.activationState = PerformancePublishActivationState::noActivation;
+    snapshot.pendingActivationToken = 0;
+    snapshot.pendingSnapshotBuildId = 0;
+    snapshot.pendingPayloadBytes = 0;
     snapshot.pendingDepth = 0;
-    ++snapshot.completedCount;
+    if (!wasReady)
+        ++snapshot.completedCount;
     ++snapshot.failedCount;
     recordCompletion(identity, PerformancePublishPreparationState::failed, 0, false);
     publishSnapshot();
@@ -262,12 +360,17 @@ bool PerformancePublishController::cancelCurrent()
         && !(state == PerformancePublishPreparationState::ready
              && snapshot.activationState == PerformancePublishActivationState::pending))
         return false;
+    const auto wasReady = state == PerformancePublishPreparationState::ready;
     if (!transitionTo(PerformancePublishPreparationState::canceled))
         return false;
     snapshot.activationState = PerformancePublishActivationState::noActivation;
+    snapshot.pendingActivationToken = 0;
+    snapshot.pendingSnapshotBuildId = 0;
+    snapshot.pendingPayloadBytes = 0;
     snapshot.pendingDepth = 0;
     ++snapshot.canceledCount;
-    ++snapshot.completedCount;
+    if (!wasReady)
+        ++snapshot.completedCount;
     ++cancellationGeneration;
     recordCompletion(snapshot.currentRequest.identity,
                      PerformancePublishPreparationState::canceled,
@@ -290,10 +393,19 @@ void PerformancePublishController::reset(bool clearActive,
     const auto rejectedCount = snapshot.rejectedCount;
     const auto failedCount = snapshot.failedCount;
     const auto activationCount = snapshot.activationCount;
+    const auto activationAuthorizedCount = snapshot.activationAuthorizedCount;
+    const auto activationAuthorizationRejectedCount = snapshot.activationAuthorizationRejectedCount;
+    const auto activationStagingRejectedCount = snapshot.activationStagingRejectedCount;
+    const auto activationAcknowledgementRejectedCount = snapshot.activationAcknowledgementRejectedCount;
     const auto maximumPendingDepth = snapshot.maximumPendingDepth;
     const auto activeRequestIdentity = snapshot.activeRequestIdentity;
+    const auto activeActivationToken = snapshot.activeActivationToken;
+    const auto activeSnapshotBuildId = snapshot.activeSnapshotBuildId;
     const auto activePreparedBuildId = snapshot.activePreparedBuildId;
+    const auto activePayloadBytes = snapshot.activePayloadBytes;
     const auto activePreparedDigest = snapshot.activePreparedDigest;
+    const auto activeRouteDigest = snapshot.activeRouteDigest;
+    const auto activeSourceProvenanceDigest = snapshot.activeSourceProvenanceDigest;
     const auto activeMacroSchemaDigest = snapshot.activeMacroSchemaDigest;
     const auto hasActiveRequest = snapshot.hasActiveRequest;
 
@@ -308,13 +420,22 @@ void PerformancePublishController::reset(bool clearActive,
     snapshot.rejectedCount = rejectedCount;
     snapshot.failedCount = failedCount;
     snapshot.activationCount = activationCount;
+    snapshot.activationAuthorizedCount = activationAuthorizedCount;
+    snapshot.activationAuthorizationRejectedCount = activationAuthorizationRejectedCount;
+    snapshot.activationStagingRejectedCount = activationStagingRejectedCount;
+    snapshot.activationAcknowledgementRejectedCount = activationAcknowledgementRejectedCount;
     snapshot.maximumPendingDepth = maximumPendingDepth;
     if (!clearActive)
     {
         snapshot.hasActiveRequest = hasActiveRequest;
         snapshot.activeRequestIdentity = activeRequestIdentity;
+        snapshot.activeActivationToken = activeActivationToken;
+        snapshot.activeSnapshotBuildId = activeSnapshotBuildId;
         snapshot.activePreparedBuildId = activePreparedBuildId;
+        snapshot.activePayloadBytes = activePayloadBytes;
         snapshot.activePreparedDigest = activePreparedDigest;
+        snapshot.activeRouteDigest = activeRouteDigest;
+        snapshot.activeSourceProvenanceDigest = activeSourceProvenanceDigest;
         snapshot.activeMacroSchemaDigest = activeMacroSchemaDigest;
     }
     if (advanceCancellationGeneration)

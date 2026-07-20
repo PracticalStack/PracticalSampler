@@ -44,11 +44,18 @@ fairness, cooperative in-flight cancellation, completion backpressure, and expli
 budgets. This slice owns none of the six remaining shell, processor-activation, presentation, or
 macro-value seams, so the direct audit remains stable at exactly **six**.
 
+## Mini Sprint 6.5 update
+
+The processor no longer owns a `stagePerformanceActivation()` eligibility branch. One immutable
+token/build/digest authorization now comes from the Publish controller before renderer staging and
+must match the audio-boundary acknowledgement. Staging rejection preserves exact last-known-good,
+and old payloads retire through bounded off-audio tokens. The direct audit now reports exactly
+**five** remaining seams.
+
 ## Retirement ownership
 
 | Seam | Owning mini sprint |
 |---|---|
-| Processor activation eligibility/staging | 6.5 |
 | Immutable published macro binding | 6.7 |
 | Three direct shell/UI calls and typed presentation | 6.8 |
 

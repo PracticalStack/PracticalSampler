@@ -29,7 +29,10 @@ struct PerformancePublishControllerSnapshot
     PerformancePublishRequest currentRequest;
     bool hasActiveRequest = false;
     PerformancePublishRequestIdentity activeRequestIdentity;
+    std::uint64_t activeActivationToken = 0;
+    std::uint64_t activeSnapshotBuildId = 0;
     std::uint64_t activePreparedBuildId = 0;
+    std::uint64_t activePayloadBytes = 0;
     std::string activePreparedDigest;
     std::string activeRouteDigest;
     std::string activeSourceProvenanceDigest;
@@ -44,6 +47,9 @@ struct PerformancePublishControllerSnapshot
     std::string acceptedRouteDigest;
     std::string acceptedSourceProvenanceDigest;
     std::string acceptedMacroSchemaDigest;
+    std::uint64_t pendingActivationToken = 0;
+    std::uint64_t pendingSnapshotBuildId = 0;
+    std::uint64_t pendingPayloadBytes = 0;
     std::size_t requestedCount = 0;
     std::size_t duplicateSuppressedCount = 0;
     std::size_t launchedCount = 0;
@@ -54,6 +60,10 @@ struct PerformancePublishControllerSnapshot
     std::size_t rejectedCount = 0;
     std::size_t failedCount = 0;
     std::size_t activationCount = 0;
+    std::size_t activationAuthorizedCount = 0;
+    std::size_t activationAuthorizationRejectedCount = 0;
+    std::size_t activationStagingRejectedCount = 0;
+    std::size_t activationAcknowledgementRejectedCount = 0;
     std::size_t pendingDepth = 0;
     std::size_t maximumPendingDepth = 0;
     std::size_t retainedCompletionRecordCount = 0;
@@ -88,15 +98,19 @@ public:
                                             std::size_t draftRevision,
                                             std::string authoredContentDigest,
                                             std::string macroSchemaDigest,
-                                            std::uint64_t nowMicros = 0);
+                                            std::uint64_t nowMicros = 0,
+                                            PerformancePublishRequestOrigin origin
+                                                = PerformancePublishRequestOrigin::explicitCommand);
     bool markPreparing(const PerformancePublishRequestIdentity& identity,
                        std::uint64_t nowMicros = 0);
     bool acceptPrepared(const PerformancePublishResult& result,
                         std::uint64_t nowMicros = 0);
-    bool markActivationPending(const PerformancePublishRequestIdentity& identity,
+    bool authorizeActivation(const PerformancePublishActivationPayload& payload,
+                             std::uint64_t nowMicros = 0);
+    bool acknowledgeActivation(const PerformancePublishActivationPayload& payload,
                                std::uint64_t nowMicros = 0);
-    bool markActive(const PerformancePublishRequestIdentity& identity,
-                    std::uint64_t nowMicros = 0);
+    bool rejectActivationStaging(const PerformancePublishActivationPayload& payload,
+                                 PerformancePublishFinding finding);
     bool fail(const PerformancePublishRequestIdentity& identity,
               PerformancePublishFinding finding);
     bool cancelCurrent();

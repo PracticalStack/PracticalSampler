@@ -336,6 +336,15 @@ public:
     {
         return draftPlaybackContract.getStatus().performance.activationPayload;
     }
+    PlaybackActivationPayloadPtr getBootstrapPerformanceActivationPayload() const;
+    PerformancePublishActivationPayloadPtr authorizePerformanceActivation(
+        std::uint64_t nowMicros = 0);
+    bool rejectPerformanceActivationStaging(
+        const PerformancePublishActivationPayloadPtr& payload,
+        PerformancePublishFinding finding);
+    bool acknowledgePerformanceActivation(
+        const PerformancePublishActivationPayloadPtr& payload,
+        std::uint64_t nowMicros = 0);
     PreparedPlaybackWorkerStatus getPreparedPlaybackWorkerStatus() const
     {
         return preparedPlaybackService.getWorkerStatus();
@@ -353,8 +362,6 @@ public:
     bool cancelPreviewPreparation(
         const std::string& reason = "Preview preparation superseded by a newer request");
     bool publishCurrentDraft();
-    bool markPerformancePublishActivationPending(std::uint64_t nowMicros = 0);
-    bool markPerformancePublishActive(std::uint64_t nowMicros = 0);
     void closeDraftPlaybackProject();
     bool reopenDraftPlaybackProject(std::size_t revision);
     bool replaceDraftPlaybackAuthoringProject(RuntimeProjectModel project);
@@ -384,7 +391,8 @@ private:
     PreparedPlaybackBuildResult buildRejectedPreparedPlayback(const PlaybackSnapshotBuildResult& snapshotResult);
     bool enqueuePreparedPlaybackBuild(std::uint64_t contractRequestId,
                                       const PlaybackSnapshotBuildResult& snapshotResult,
-                                      PreparedPlaybackWorkLane lane);
+                                      PreparedPlaybackWorkLane lane,
+                                      bool bootstrapPerformance = false);
     bool pumpPreparedPlaybackWorkerCompletions();
     void markStateChanged();
     void clearPendingPreparedCompletions();
@@ -409,5 +417,6 @@ private:
     std::uint64_t stateRevision = 0;
     std::uint64_t nextPreviewVoiceId = 4000;
     std::uint64_t performancePublishProjectGeneration = 1;
+    std::uint64_t nextPerformanceActivationToken = 1;
 };
 } // namespace drs::engine

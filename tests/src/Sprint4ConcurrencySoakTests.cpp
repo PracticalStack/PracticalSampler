@@ -170,7 +170,9 @@ int main()
     const auto passed = !failed.load(std::memory_order_acquire)
         && uiPollCount.load(std::memory_order_acquire) > 0
         && snapshot.processBlockCount == audioBlockCount + 32
-        && snapshot.performanceActivationCount > 1
+        // Draft macro edits exercise Preview only. Performance must remain on the
+        // controller-authorized last-known-good activation until a newer Publish.
+        && snapshot.performanceActivationCount == 1
         && snapshot.authoringPreviewActivationCount > 1
         && snapshot.retiredActivationCount > 0
         && snapshot.reclaimedActivationPayloadCount > 0

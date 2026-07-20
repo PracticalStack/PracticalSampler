@@ -1,3 +1,4 @@
+#include "drs/engine/DraftPlaybackContract.h"
 #include "drs/engine/PerformancePublishController.h"
 
 #include <atomic>
@@ -28,6 +29,41 @@ drs::engine::PerformancePublishResult eligibleResult(
     result.sourceProvenanceDigest = "sources:" + std::to_string(preparedBuildId);
     result.preparedMacroSchemaDigest = identity.macroSchemaDigest;
     return result;
+}
+
+drs::engine::PerformancePublishActivationPayload activationPayload(
+    const drs::engine::PerformancePublishResult& result,
+    std::uint64_t activationToken)
+{
+    drs::engine::PerformancePublishActivationPayload payload;
+    payload.activationToken = activationToken;
+    payload.requestIdentity = result.identity;
+    payload.revision = result.identity.draftRevision;
+    payload.snapshotBuildId = 5000 + result.preparedBuildId;
+    payload.preparedBuildId = result.preparedBuildId;
+    payload.snapshotContentDigest = result.identity.authoredContentDigest;
+    payload.preparedContentDigest = result.preparedContentDigest;
+    payload.routeDigest = result.routeDigest;
+    payload.sourceProvenanceDigest = result.sourceProvenanceDigest;
+    payload.macroSchemaDigest = result.preparedMacroSchemaDigest;
+    payload.retainedPreparedBytes = 4096;
+    auto playback = std::make_shared<drs::engine::PlaybackActivationPayload>();
+    playback->lane = drs::engine::PlaybackActivationLane::performance;
+    playback->revision = payload.revision;
+    playback->snapshotBuildId = payload.snapshotBuildId;
+    playback->preparedBuildId = payload.preparedBuildId;
+    playback->lifecycleState = drs::engine::PlaybackSnapshotLifecycleState::active;
+    playback->activationEligible = true;
+    playback->snapshotContentDigest = payload.snapshotContentDigest;
+    playback->preparedContentDigest = payload.preparedContentDigest;
+    playback->routeDigest = payload.routeDigest;
+    playback->sourceProvenanceDigest = payload.sourceProvenanceDigest;
+    playback->macroSchemaDigest = payload.macroSchemaDigest;
+    playback->retainedPreparedBytes = payload.retainedPreparedBytes;
+    playback->snapshot = std::make_shared<drs::engine::ImmutablePlaybackSnapshot>();
+    playback->prepared = std::make_shared<drs::engine::ImmutablePreparedPlayback>();
+    payload.playbackPayload = std::move(playback);
+    return payload;
 }
 } // namespace
 
@@ -66,9 +102,16 @@ int main()
         require(controller.markPreparing(second.request.identity, 160),
                 "The newest request must launch independently of the stale completion.");
         const auto current = eligibleResult(second.request.identity, 702);
-        require(controller.acceptPrepared(current, 220)
-                    && controller.markActivationPending(second.request.identity, 230)
-                    && controller.markActive(second.request.identity, 250),
+        const auto currentActivation = activationPayload(current, 9002);
+        require(controller.acceptPrepared(current, 220),
+                "The exact newest eligible result must become Ready.");
+        auto mismatchedActivation = currentActivation;
+        ++mismatchedActivation.preparedBuildId;
+        require(!controller.authorizeActivation(mismatchedActivation, 225)
+                    && controller.getSnapshot().activationAuthorizationRejectedCount == 1,
+                "A mismatched immutable activation payload must never enter a slot.");
+        require(controller.authorizeActivation(currentActivation, 230)
+                    && controller.acknowledgeActivation(currentActivation, 250),
                 "The exact newest eligible result must progress through Ready, Pending, and Active.");
 
         const auto active = controller.getSnapshot();
@@ -83,6 +126,33 @@ int main()
         require(active.lastRequestToReadyMicros == 90
                     && active.maxRequestToReadyMicros >= active.lastRequestToReadyMicros,
                 "Publish diagnostics must measure the complete request-to-ready interval.");
+
+        const auto staging = controller.request(4, 19, "authored:19", "macros:c", 270);
+        require(staging.accepted && controller.markPreparing(staging.request.identity, 275),
+                "Staging-rejection coverage requires a newer prepared request.");
+        const auto stagingResult = eligibleResult(staging.request.identity, 703);
+        const auto stagingActivation = activationPayload(stagingResult, 9003);
+        require(controller.acceptPrepared(stagingResult, 280)
+                    && controller.authorizeActivation(stagingActivation, 285)
+                    && controller.rejectActivationStaging(
+                        stagingActivation,
+                        { PerformancePublishFindingSeverity::error,
+                          "activation-slot-rejected", "activationSlots", "No slot was available." }),
+                "A controller-authorized payload must accept a typed staging rejection.");
+        const auto stagingFailed = controller.getSnapshot();
+        require(stagingFailed.preparationState == PerformancePublishPreparationState::failed
+                    && stagingFailed.activationState == PerformancePublishActivationState::noActivation
+                    && stagingFailed.hasFailedRequest
+                    && stagingFailed.failedRequestIdentity == staging.request.identity
+                    && stagingFailed.hasActiveRequest
+                    && stagingFailed.activeRequestIdentity == second.request.identity
+                    && stagingFailed.activePreparedBuildId == 702
+                    && stagingFailed.pendingActivationToken == 0
+                    && stagingFailed.activationStagingRejectedCount == 1,
+                "Staging rejection must preserve and never relabel exact last-known-good truth.");
+        require(!controller.acknowledgeActivation(stagingActivation, 290)
+                    && controller.getSnapshot().activePreparedBuildId == 702,
+                "A rejected or repeated activation acknowledgement must not advance Performance.");
 
         const auto third = controller.request(4, 19, "authored:19", "macros:c", 300);
         require(third.accepted && controller.markPreparing(third.request.identity, 310),
@@ -105,8 +175,10 @@ int main()
                 "An explicit retry of a failed captured input must create a new request.");
         require(controller.cancelCurrent()
                     && controller.getSnapshot().preparationState
-                        == PerformancePublishPreparationState::canceled,
-                "The controller must expose a terminal cancellation path.");
+                        == PerformancePublishPreparationState::canceled
+                    && controller.getSnapshot().activeRequestIdentity == second.request.identity
+                    && controller.getSnapshot().activePreparedBuildId == 702,
+                "Cancellation must terminate requested work while preserving last-known-good.");
         require(controller.getCompletionRecords().size() <= 3
                     && controller.getSnapshot().retainedCompletionRecordCount <= 3
                     && controller.getSnapshot().maximumPendingDepth == 1,
@@ -152,11 +224,12 @@ int main()
                                                               revision * 100 + 10),
                     "Concurrent snapshot exercise must launch each explicit request.");
             const auto result = eligibleResult(request.request.identity, 1000 + revision);
+            const auto activation = activationPayload(result, 10000 + revision);
             require(concurrentController.acceptPrepared(result, revision * 100 + 20)
-                        && concurrentController.markActivationPending(request.request.identity,
-                                                                     revision * 100 + 30)
-                        && concurrentController.markActive(request.request.identity,
-                                                          revision * 100 + 40),
+                        && concurrentController.authorizeActivation(activation,
+                                                                    revision * 100 + 30)
+                        && concurrentController.acknowledgeActivation(activation,
+                                                                      revision * 100 + 40),
                     "Concurrent snapshot exercise must publish coherent complete states.");
         }
         stopReader.store(true, std::memory_order_release);

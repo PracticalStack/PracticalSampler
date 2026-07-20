@@ -21,6 +21,8 @@ struct SamplerPlaybackContextCounters
     std::uint64_t appliedActivationCount = 0;
     std::uint64_t enqueuedRetirementCount = 0;
     std::uint64_t reclaimedActivationCount = 0;
+    std::uint64_t lastReclamationLatencyBlocks = 0;
+    std::uint64_t maxReclamationLatencyBlocks = 0;
 };
 
 struct SamplerPlaybackContextSnapshot
@@ -71,6 +73,7 @@ public:
 
     // Message-owned activation/reclamation API. Model ownership never moves on the audio thread.
     bool stageActivation(SamplerRenderModelPtr model);
+    bool cancelPendingActivation();
     bool activatePendingForPreparation() noexcept;
     std::size_t serviceRetirements();
 
@@ -95,6 +98,7 @@ private:
     {
         int slotIndex = -1;
         std::uint64_t serial = 0;
+        std::uint64_t enqueuedAtRenderedBlockCount = 0;
     };
 
     bool applyPendingActivationAtBlockBoundary() noexcept;
@@ -150,6 +154,8 @@ private:
     std::atomic<std::uint32_t> retirementWriteIndex { 0 };
     std::atomic<std::uint32_t> retirementReadIndex { 0 };
     std::atomic<std::uint64_t> reclaimedActivationCount { 0 };
+    std::atomic<std::uint64_t> lastReclamationLatencyBlocks { 0 };
+    std::atomic<std::uint64_t> maxReclamationLatencyBlocks { 0 };
     SamplerPlaybackContextCounters counters;
 };
 } // namespace drs::engine

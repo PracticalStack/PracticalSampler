@@ -867,6 +867,8 @@ void Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
         return;
 
     authoringSession.replaceProject(std::move(project));
+    performancePlaybackContext.cancelPendingActivation();
+    pendingPerformanceActivation.reset();
     engineFacade.closeDraftPlaybackProject();
     engineFacade.reopenDraftPlaybackProject(authoringSession.getDocumentState().revision);
     authoringWaveformPreviewCache.clear();
@@ -887,6 +889,8 @@ void Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
 void Processor::closeAuthoringProject(drs::engine::RuntimeProjectModel unloadedProject)
 {
     engineFacade.cancelPreviewPreparation("Authoring project closed");
+    performancePlaybackContext.cancelPendingActivation();
+    pendingPerformanceActivation.reset();
     engineFacade.closeDraftPlaybackProject();
     authoringSession.replaceProject(std::move(unloadedProject));
     authoringWaveformPreviewCache.clear();
@@ -987,20 +991,45 @@ bool Processor::serviceMessageThreadWork()
     diagnosticsReclaimedActivationPayloadCount.fetch_add(reclaimed, std::memory_order_relaxed);
 
     auto synchronizedPerformancePublish = false;
-    const auto performanceContextBeforeSynchronization = performancePlaybackContext.getSnapshot();
     const auto publishControllerBeforeSynchronization
         = engineFacade.getPerformancePublishControllerSnapshot();
-    if (publishControllerBeforeSynchronization.hasRequest
-        && publishControllerBeforeSynchronization.activationState
-            == drs::engine::PerformancePublishActivationState::pending
+    if (pendingPerformanceActivation != nullptr
+        && (!publishControllerBeforeSynchronization.hasRequest
+            || publishControllerBeforeSynchronization.currentRequest.identity
+                != pendingPerformanceActivation->requestIdentity
+            || publishControllerBeforeSynchronization.activationState
+                != drs::engine::PerformancePublishActivationState::pending
+            || publishControllerBeforeSynchronization.pendingActivationToken
+                != pendingPerformanceActivation->activationToken))
+    {
+        performancePlaybackContext.cancelPendingActivation();
+        pendingPerformanceActivation.reset();
+        synchronizedPerformancePublish = true;
+    }
+    const auto performanceContextBeforeSynchronization = performancePlaybackContext.getSnapshot();
+    if (pendingPerformanceActivation != nullptr
         && performanceContextBeforeSynchronization.hasActiveActivation
         && !performanceContextBeforeSynchronization.hasPendingActivation
         && performanceContextBeforeSynchronization.activeRevision
-            == publishControllerBeforeSynchronization.currentRequest.identity.draftRevision
+            == pendingPerformanceActivation->revision
         && performanceContextBeforeSynchronization.activePreparedBuildId
-            == publishControllerBeforeSynchronization.acceptedPreparedBuildId)
+            == pendingPerformanceActivation->preparedBuildId)
     {
-        synchronizedPerformancePublish = engineFacade.markPerformancePublishActive(serviceTimeMicros);
+        synchronizedPerformancePublish = engineFacade.acknowledgePerformanceActivation(
+            pendingPerformanceActivation, serviceTimeMicros);
+        if (synchronizedPerformancePublish)
+            pendingPerformanceActivation.reset();
+    }
+    else if (pendingPerformanceActivation != nullptr
+             && !performanceContextBeforeSynchronization.hasPendingActivation)
+    {
+        synchronizedPerformancePublish = engineFacade.rejectPerformanceActivationStaging(
+            pendingPerformanceActivation,
+            { drs::engine::PerformancePublishFindingSeverity::error,
+              "performance-activation-apply-rejected",
+              "performance.activationSlot",
+              "The audio boundary rejected the authorized Performance activation payload." });
+        pendingPerformanceActivation.reset();
     }
 
     auto synchronizedActivation = false;
@@ -1338,24 +1367,27 @@ bool Processor::stageAuthoringPreviewActivation(const drs::engine::AuthoringPrev
 
 bool Processor::synchronizePerformanceActivation(bool installImmediately)
 {
-    const auto performanceSnapshot = engineFacade.getPerformanceSnapshot();
-    const auto& sessionState = engineFacade.getCurrentSessionState();
-    return stagePerformanceActivation(performanceSnapshot, sessionState, installImmediately);
-}
-
-bool Processor::stagePerformanceActivation(const drs::engine::EnginePerformanceSnapshot& performanceSnapshot,
-                                           const drs::engine::RuntimeSessionStateSnapshot& sessionState,
-                                           bool installImmediately)
-{
     const auto reclaimed = performancePlaybackContext.serviceRetirements();
     diagnosticsRetiredActivationCount.fetch_add(reclaimed, std::memory_order_relaxed);
     diagnosticsReclaimedActivationPayloadCount.fetch_add(reclaimed, std::memory_order_relaxed);
-    const auto payload = engineFacade.getPerformanceActivationPayload();
-    if (!performanceSnapshot.loaded || payload == nullptr
-        || payload->revision != performanceSnapshot.publishedRevision)
-    {
+    if (pendingPerformanceActivation != nullptr)
         return false;
-    }
+
+    const auto performanceSnapshot = performancePlaybackContext.getSnapshot();
+    auto authorized = engineFacade.authorizePerformanceActivation(monotonicMicros());
+    auto payload = authorized != nullptr
+        ? authorized->playbackPayload
+        : drs::engine::PlaybackActivationPayloadPtr {};
+    const auto bootstrap = !performanceSnapshot.hasActiveActivation
+        && (authorized == nullptr
+            || authorized->requestIdentity.origin
+                == drs::engine::PerformancePublishRequestOrigin::bootstrap);
+    if (bootstrap && authorized == nullptr)
+        payload = engineFacade.getBootstrapPerformanceActivationPayload();
+    if (payload == nullptr)
+        return false;
+
+    const auto& sessionState = engineFacade.getCurrentSessionState();
 
     drs::engine::SamplerRenderModelBuildOptions options;
     options.selectedArticulationId = sessionState.selectedArticulationId;
@@ -1374,31 +1406,41 @@ bool Processor::stagePerformanceActivation(const drs::engine::EnginePerformanceS
     options.midiNoteOffset = computeMotionRenderNote(sessionState, 60) - 60;
     options.fixedVelocity = computeToneRenderVelocity(sessionState);
     const auto modelResult = drs::engine::buildSamplerRenderModel(payload, options);
-    if (!modelResult.built || modelResult.model == nullptr
-        || !performancePlaybackContext.stageActivation(modelResult.model))
+    if (!modelResult.built || modelResult.model == nullptr)
     {
+        if (authorized != nullptr)
+            engineFacade.rejectPerformanceActivationStaging(
+                authorized,
+                { drs::engine::PerformancePublishFindingSeverity::error,
+                  "performance-render-model-rejected",
+                  "performance.renderModel",
+                  "The controller-authorized Performance payload could not build a render model." });
+        return false;
+    }
+    if (!performancePlaybackContext.stageActivation(modelResult.model))
+    {
+        if (authorized != nullptr)
+            engineFacade.rejectPerformanceActivationStaging(
+                authorized,
+                { drs::engine::PerformancePublishFindingSeverity::error,
+                  "performance-activation-slot-rejected",
+                  "performance.activationSlots",
+                  "The bounded Performance activation slots rejected the authorized payload." });
         return false;
     }
 
-    const auto publishController = engineFacade.getPerformancePublishControllerSnapshot();
-    const auto controllerOwnsPayload = publishController.hasRequest
-        && publishController.preparationState
-            == drs::engine::PerformancePublishPreparationState::ready
-        && publishController.currentRequest.identity.draftRevision == payload->revision
-        && publishController.acceptedPreparedBuildId == payload->preparedBuildId;
-    if (controllerOwnsPayload
-        && publishController.activationState
-            == drs::engine::PerformancePublishActivationState::noActivation
-        && !engineFacade.markPerformancePublishActivationPending(monotonicMicros()))
-    {
-        return false;
-    }
+    pendingPerformanceActivation = authorized;
 
-    if (installImmediately && performancePlaybackContext.activatePendingForPreparation())
+    if (installImmediately && bootstrap
+        && performancePlaybackContext.activatePendingForPreparation())
     {
         diagnosticsPerformanceActivationCount.fetch_add(1, std::memory_order_relaxed);
-        if (controllerOwnsPayload)
-            engineFacade.markPerformancePublishActive(monotonicMicros());
+        if (pendingPerformanceActivation != nullptr)
+        {
+            engineFacade.acknowledgePerformanceActivation(
+                pendingPerformanceActivation, monotonicMicros());
+            pendingPerformanceActivation.reset();
+        }
     }
     return true;
 }
@@ -1468,6 +1510,12 @@ Processor::AudioDiagnosticsValues Processor::captureActivationDiagnostics() cons
         + performance.pendingActivationPayloadBytes;
     values.retiredActivationPayloadBytes = preview.retiredActivationPayloadBytes
         + performance.retiredActivationPayloadBytes;
+    values.lastActivationReclamationLatencyBlocks = std::max(
+        preview.counters.lastReclamationLatencyBlocks,
+        performance.counters.lastReclamationLatencyBlocks);
+    values.maxActivationReclamationLatencyBlocks = std::max(
+        preview.counters.maxReclamationLatencyBlocks,
+        performance.counters.maxReclamationLatencyBlocks);
     values.performanceContextIdentity = static_cast<std::uint32_t>(performance.lane) + 1u;
     values.authoringPreviewContextIdentity = static_cast<std::uint32_t>(preview.lane) + 1u;
     values.performanceVoiceStealCount = performance.counters.stolenVoiceCount;
@@ -1529,6 +1577,10 @@ void Processor::publishAudioDiagnostics()
     audioDiagnosticsPublication.activeActivationPayloadBytes.store(values.activeActivationPayloadBytes, std::memory_order_relaxed);
     audioDiagnosticsPublication.pendingActivationPayloadBytes.store(values.pendingActivationPayloadBytes, std::memory_order_relaxed);
     audioDiagnosticsPublication.retiredActivationPayloadBytes.store(values.retiredActivationPayloadBytes, std::memory_order_relaxed);
+    audioDiagnosticsPublication.lastActivationReclamationLatencyBlocks.store(
+        values.lastActivationReclamationLatencyBlocks, std::memory_order_relaxed);
+    audioDiagnosticsPublication.maxActivationReclamationLatencyBlocks.store(
+        values.maxActivationReclamationLatencyBlocks, std::memory_order_relaxed);
     audioDiagnosticsPublication.hasActiveAuthoringPreviewActivation.store(values.hasActiveAuthoringPreviewActivation, std::memory_order_relaxed);
     audioDiagnosticsPublication.hasPendingAuthoringPreviewActivation.store(values.hasPendingAuthoringPreviewActivation, std::memory_order_relaxed);
     audioDiagnosticsPublication.hasActivePerformanceActivation.store(values.hasActivePerformanceActivation, std::memory_order_relaxed);
@@ -1574,6 +1626,10 @@ Processor::AudioDiagnosticsValues Processor::readAudioDiagnostics(std::uint64_t&
         values.activeActivationPayloadBytes = audioDiagnosticsPublication.activeActivationPayloadBytes.load(std::memory_order_relaxed);
         values.pendingActivationPayloadBytes = audioDiagnosticsPublication.pendingActivationPayloadBytes.load(std::memory_order_relaxed);
         values.retiredActivationPayloadBytes = audioDiagnosticsPublication.retiredActivationPayloadBytes.load(std::memory_order_relaxed);
+        values.lastActivationReclamationLatencyBlocks =
+            audioDiagnosticsPublication.lastActivationReclamationLatencyBlocks.load(std::memory_order_relaxed);
+        values.maxActivationReclamationLatencyBlocks =
+            audioDiagnosticsPublication.maxActivationReclamationLatencyBlocks.load(std::memory_order_relaxed);
         values.hasActiveAuthoringPreviewActivation = audioDiagnosticsPublication.hasActiveAuthoringPreviewActivation.load(std::memory_order_relaxed);
         values.hasPendingAuthoringPreviewActivation = audioDiagnosticsPublication.hasPendingAuthoringPreviewActivation.load(std::memory_order_relaxed);
         values.hasActivePerformanceActivation = audioDiagnosticsPublication.hasActivePerformanceActivation.load(std::memory_order_relaxed);
@@ -1627,6 +1683,10 @@ ProcessorRealtimeSafetySnapshot Processor::composeDiagnosticsSnapshot(
     snapshot.activeActivationPayloadBytes = audioValues.activeActivationPayloadBytes;
     snapshot.pendingActivationPayloadBytes = audioValues.pendingActivationPayloadBytes;
     snapshot.retiredActivationPayloadBytes = audioValues.retiredActivationPayloadBytes;
+    snapshot.lastActivationReclamationLatencyBlocks =
+        audioValues.lastActivationReclamationLatencyBlocks;
+    snapshot.maxActivationReclamationLatencyBlocks =
+        audioValues.maxActivationReclamationLatencyBlocks;
     applyRealtimeGuardDiagnostics(snapshot);
     snapshot.callbackBudgetMicros = diagnosticsCallbackBudgetMicros.load(std::memory_order_acquire);
     snapshot.lastProcessBlockMicros = diagnosticsLastProcessBlockMicros.load(std::memory_order_acquire);
@@ -1706,6 +1766,10 @@ void Processor::publishMessageDiagnostics()
     audioValues.activeActivationPayloadBytes = activationValues.activeActivationPayloadBytes;
     audioValues.pendingActivationPayloadBytes = activationValues.pendingActivationPayloadBytes;
     audioValues.retiredActivationPayloadBytes = activationValues.retiredActivationPayloadBytes;
+    audioValues.lastActivationReclamationLatencyBlocks =
+        activationValues.lastActivationReclamationLatencyBlocks;
+    audioValues.maxActivationReclamationLatencyBlocks =
+        activationValues.maxActivationReclamationLatencyBlocks;
     audioValues.performanceContextIdentity = activationValues.performanceContextIdentity;
     audioValues.authoringPreviewContextIdentity = activationValues.authoringPreviewContextIdentity;
     audioValues.performanceVoiceStealCount = activationValues.performanceVoiceStealCount;
@@ -1766,6 +1830,10 @@ ProcessorRealtimeSafetySnapshot Processor::getRealtimeSafetySnapshot() const
     snapshot.activeActivationPayloadBytes = audioValues.activeActivationPayloadBytes;
     snapshot.pendingActivationPayloadBytes = audioValues.pendingActivationPayloadBytes;
     snapshot.retiredActivationPayloadBytes = audioValues.retiredActivationPayloadBytes;
+    snapshot.lastActivationReclamationLatencyBlocks =
+        audioValues.lastActivationReclamationLatencyBlocks;
+    snapshot.maxActivationReclamationLatencyBlocks =
+        audioValues.maxActivationReclamationLatencyBlocks;
     applyRealtimeGuardDiagnostics(snapshot);
     snapshot.callbackBudgetMicros = diagnosticsCallbackBudgetMicros.load(std::memory_order_acquire);
     snapshot.lastProcessBlockMicros = diagnosticsLastProcessBlockMicros.load(std::memory_order_acquire);

@@ -1,4 +1,5 @@
 #include "drs/engine/PerformancePublishController.h"
+#include "drs/engine/DraftPlaybackContract.h"
 #include "drs/engine/PlaybackSnapshot.h"
 #include "drs/engine/PreparedPlayback.h"
 #include "drs/engine/RuntimeLoader.h"
@@ -59,6 +60,40 @@ PerformancePublishResult eligibleResult(const PerformancePublishRequestIdentity&
     result.sourceProvenanceDigest = "sources:" + std::to_string(buildId);
     result.preparedMacroSchemaDigest = identity.macroSchemaDigest;
     return result;
+}
+
+PerformancePublishActivationPayload activationPayload(const PerformancePublishResult& result,
+                                                       std::uint64_t activationToken)
+{
+    PerformancePublishActivationPayload payload;
+    payload.activationToken = activationToken;
+    payload.requestIdentity = result.identity;
+    payload.revision = result.identity.draftRevision;
+    payload.snapshotBuildId = 5000 + result.preparedBuildId;
+    payload.preparedBuildId = result.preparedBuildId;
+    payload.snapshotContentDigest = result.identity.authoredContentDigest;
+    payload.preparedContentDigest = result.preparedContentDigest;
+    payload.routeDigest = result.routeDigest;
+    payload.sourceProvenanceDigest = result.sourceProvenanceDigest;
+    payload.macroSchemaDigest = result.preparedMacroSchemaDigest;
+    payload.retainedPreparedBytes = 4096;
+    auto playback = std::make_shared<PlaybackActivationPayload>();
+    playback->lane = PlaybackActivationLane::performance;
+    playback->revision = payload.revision;
+    playback->snapshotBuildId = payload.snapshotBuildId;
+    playback->preparedBuildId = payload.preparedBuildId;
+    playback->lifecycleState = PlaybackSnapshotLifecycleState::active;
+    playback->activationEligible = true;
+    playback->snapshotContentDigest = payload.snapshotContentDigest;
+    playback->preparedContentDigest = payload.preparedContentDigest;
+    playback->routeDigest = payload.routeDigest;
+    playback->sourceProvenanceDigest = payload.sourceProvenanceDigest;
+    playback->macroSchemaDigest = payload.macroSchemaDigest;
+    playback->retainedPreparedBytes = payload.retainedPreparedBytes;
+    playback->snapshot = std::make_shared<ImmutablePlaybackSnapshot>();
+    playback->prepared = std::make_shared<ImmutablePreparedPlayback>();
+    payload.playbackPayload = std::move(playback);
+    return payload;
 }
 
 RuntimeProjectModel buildCancellationProject(const RuntimeProjectModel& source)
@@ -241,10 +276,12 @@ int main()
 
         PerformancePublishController controller({ 8 });
         const auto initial = controller.request(7, 1, "authored:1", "macros:1", 10);
+        const auto initialResult = eligibleResult(initial.request.identity, 100);
+        const auto initialActivation = activationPayload(initialResult, 7001);
         require(initial.accepted && controller.markPreparing(initial.request.identity, 20)
-                    && controller.acceptPrepared(eligibleResult(initial.request.identity, 100), 30)
-                    && controller.markActivationPending(initial.request.identity, 40)
-                    && controller.markActive(initial.request.identity, 50),
+                    && controller.acceptPrepared(initialResult, 30)
+                    && controller.authorizeActivation(initialActivation, 40)
+                    && controller.acknowledgeActivation(initialActivation, 50),
                 "Controller stress requires one last-known-good active Publish.");
         auto newest = initial;
         for (std::size_t index = 0; index < 1000; ++index)

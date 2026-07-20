@@ -1451,19 +1451,117 @@ bool EngineFacade::publishCurrentDraft()
     return true;
 }
 
-bool EngineFacade::markPerformancePublishActivationPending(std::uint64_t nowMicros)
+PlaybackActivationPayloadPtr EngineFacade::getBootstrapPerformanceActivationPayload() const
 {
     const auto controller = performancePublishController.getSnapshot();
-    return controller.hasRequest
-        && performancePublishController.markActivationPending(
-            controller.currentRequest.identity, nowMicros);
+    const auto& performance = draftPlaybackContract.getStatus().performance;
+    if (controller.hasRequest
+        || !performance.available
+        || !performance.activationEligible
+        || performance.activationPayload == nullptr)
+    {
+        return {};
+    }
+    return performance.activationPayload;
 }
 
-bool EngineFacade::markPerformancePublishActive(std::uint64_t nowMicros)
+PerformancePublishActivationPayloadPtr EngineFacade::authorizePerformanceActivation(
+    std::uint64_t nowMicros)
 {
     const auto controller = performancePublishController.getSnapshot();
-    return controller.hasRequest
-        && performancePublishController.markActive(controller.currentRequest.identity, nowMicros);
+    if (!controller.hasRequest
+        || controller.preparationState != PerformancePublishPreparationState::ready
+        || controller.activationState != PerformancePublishActivationState::noActivation)
+    {
+        return {};
+    }
+
+    const auto& prepared = draftPlaybackContract.getStatus().performance;
+    const auto& payload = prepared.activationPayload;
+    const auto exactPayload = prepared.available
+        && prepared.activationEligible
+        && payload != nullptr
+        && payload->lane == PlaybackActivationLane::performance
+        && payload->activationEligible
+        && payload->lifecycleState == PlaybackSnapshotLifecycleState::active
+        && payload->snapshot != nullptr
+        && payload->prepared != nullptr
+        && payload->revision == controller.currentRequest.identity.draftRevision
+        && payload->snapshotBuildId != 0
+        && payload->preparedBuildId == controller.acceptedPreparedBuildId
+        && payload->snapshotContentDigest == controller.currentRequest.identity.authoredContentDigest
+        && payload->preparedContentDigest == controller.acceptedPreparedDigest
+        && payload->routeDigest == controller.acceptedRouteDigest
+        && payload->sourceProvenanceDigest == controller.acceptedSourceProvenanceDigest
+        && payload->macroSchemaDigest == controller.acceptedMacroSchemaDigest
+        && payload->macroSchemaDigest == controller.currentRequest.identity.macroSchemaDigest;
+    if (!exactPayload)
+    {
+        performancePublishController.fail(
+            controller.currentRequest.identity,
+            makePerformancePublishFailure(
+                "performance-activation-payload-mismatch",
+                "performance.activationPayload",
+                "The prepared Performance payload no longer matches the controller-authorized identity."));
+        currentSessionState.transientMetrics.integrationState = "Publish activation staging failed";
+        currentSessionState.transientMetrics.lastFailure =
+            "The prepared Performance payload no longer matches the controller-authorized identity.";
+        refreshDiagnosticsSnapshot();
+        markStateChanged();
+        return {};
+    }
+
+    auto authorization = std::make_shared<PerformancePublishActivationPayload>();
+    authorization->activationToken = nextPerformanceActivationToken++;
+    if (nextPerformanceActivationToken == 0)
+        nextPerformanceActivationToken = 1;
+    authorization->requestIdentity = controller.currentRequest.identity;
+    authorization->revision = payload->revision;
+    authorization->snapshotBuildId = payload->snapshotBuildId;
+    authorization->preparedBuildId = payload->preparedBuildId;
+    authorization->snapshotContentDigest = payload->snapshotContentDigest;
+    authorization->preparedContentDigest = payload->preparedContentDigest;
+    authorization->routeDigest = payload->routeDigest;
+    authorization->sourceProvenanceDigest = payload->sourceProvenanceDigest;
+    authorization->macroSchemaDigest = payload->macroSchemaDigest;
+    authorization->retainedPreparedBytes = payload->retainedPreparedBytes;
+    authorization->playbackPayload = payload;
+    if (!performancePublishController.authorizeActivation(*authorization, nowMicros))
+        return {};
+    return authorization;
+}
+
+bool EngineFacade::rejectPerformanceActivationStaging(
+    const PerformancePublishActivationPayloadPtr& payload,
+    PerformancePublishFinding finding)
+{
+    if (payload == nullptr
+        || !performancePublishController.rejectActivationStaging(*payload, std::move(finding)))
+    {
+        return false;
+    }
+    currentSessionState.transientMetrics.integrationState = "Publish activation staging failed";
+    currentSessionState.transientMetrics.lastFailure =
+        performancePublishController.getSnapshot().failureFinding.message;
+    refreshDiagnosticsSnapshot();
+    markStateChanged();
+    return true;
+}
+
+bool EngineFacade::acknowledgePerformanceActivation(
+    const PerformancePublishActivationPayloadPtr& payload,
+    std::uint64_t nowMicros)
+{
+    if (payload == nullptr
+        || !performancePublishController.acknowledgeActivation(*payload, nowMicros))
+    {
+        return false;
+    }
+    currentSessionState.transientMetrics.integrationState = "Published revision active";
+    currentSessionState.transientMetrics.lastFailure.clear();
+    refreshDiagnosticsSnapshot();
+    markStateChanged();
+    return true;
 }
 
 void EngineFacade::closeDraftPlaybackProject()
@@ -1557,7 +1655,8 @@ PreparedPlaybackBuildResult EngineFacade::buildRejectedPreparedPlayback(const Pl
 
 bool EngineFacade::enqueuePreparedPlaybackBuild(std::uint64_t contractRequestId,
                                                 const PlaybackSnapshotBuildResult& snapshotResult,
-                                                PreparedPlaybackWorkLane lane)
+                                                PreparedPlaybackWorkLane lane,
+                                                bool bootstrapPerformance)
 {
     auto publishIdentity = PerformancePublishRequestIdentity {};
     if (lane == PreparedPlaybackWorkLane::performance)
@@ -1577,7 +1676,10 @@ bool EngineFacade::enqueuePreparedPlaybackBuild(std::uint64_t contractRequestId,
                 snapshotResult.snapshot.draftRevision,
                 snapshotResult.snapshot.contentDigest,
                 macroSchemaDigest,
-                monotonicMicros());
+                monotonicMicros(),
+                bootstrapPerformance
+                    ? PerformancePublishRequestOrigin::bootstrap
+                    : PerformancePublishRequestOrigin::explicitCommand);
             if (!request.accepted
                 || !performancePublishController.markPreparing(request.request.identity, monotonicMicros()))
                 return false;
@@ -1687,7 +1789,7 @@ bool EngineFacade::pumpPreparedPlaybackWorkerCompletions()
             {
                 if (preparation.completeProject && preparation.activationEligible)
                 {
-                    currentSessionState.transientMetrics.integrationState = "Published revision activated";
+                    currentSessionState.transientMetrics.integrationState = "Published revision prepared for activation";
                     currentSessionState.transientMetrics.lastFailure.clear();
                 }
                 else
@@ -2165,7 +2267,8 @@ void EngineFacade::initializeDraftPlaybackContract(bool activatePerformanceRevis
                 }
                 else if (!enqueuePreparedPlaybackBuild(publishRequest.requestId,
                                                        publishBuild,
-                                                       PreparedPlaybackWorkLane::performance))
+                                                       PreparedPlaybackWorkLane::performance,
+                                                       true))
                 {
                     PreparedPlaybackBuildResult queueRejected;
                     queueRejected.snapshotBuildId = publishBuild.buildId;
