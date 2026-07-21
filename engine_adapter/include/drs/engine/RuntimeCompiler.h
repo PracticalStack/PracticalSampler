@@ -28,6 +28,7 @@ struct RuntimeCompileZoneDefinition
     int keyHigh = 127;
     int velocityLow = 1;
     int velocityHigh = 127;
+    VelocityCrossfadeDescriptor velocityCrossfade;
     std::uint64_t prefetchBytes = 16384;
 };
 

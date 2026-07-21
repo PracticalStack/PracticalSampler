@@ -408,6 +408,7 @@ drs::engine::AuthoringZoneSummary makeZoneSummary(const drs::engine::RuntimeProj
     summary.keyHigh = zone.keyHigh;
     summary.velocityLow = zone.velocityLow;
     summary.velocityHigh = zone.velocityHigh;
+    summary.velocityCrossfade = zone.velocityCrossfade;
     summary.gainDb = zone.gainDb;
     summary.pan = zone.pan;
     summary.loopEnabled = zone.loopEnabled;
@@ -2397,6 +2398,65 @@ void exerciseGateAWorkflow(drs::app::AuthoringPanel& panel,
 
     saveComponentPng(panel, outputDirectory / (shellName + "-gate-a-final.png"));
 }
+
+void exerciseCrossfadeDebugVisibility()
+{
+    const auto projectLoad = drs::engine::loadPhase2ReferenceProjectManifest();
+    require(projectLoad.loaded, "Phase 2 reference project must load for crossfade debug visibility coverage.");
+
+    auto project = projectLoad.project;
+    require(!project.authoring.zones.empty(),
+            "Crossfade debug visibility coverage requires at least one authored zone.");
+
+    auto& crossfadeZone = project.authoring.zones.front();
+    crossfadeZone.velocityLow = 1;
+    crossfadeZone.velocityHigh = 127;
+    crossfadeZone.velocityCrossfade.fadeInLowVelocity = 1;
+    crossfadeZone.velocityCrossfade.fadeInHighVelocity = 32;
+    crossfadeZone.velocityCrossfade.fadeOutLowVelocity = 96;
+    crossfadeZone.velocityCrossfade.fadeOutHighVelocity = 127;
+    project.authoring.selectedZoneId = crossfadeZone.id;
+
+    drs::engine::AuthoringSession session(project);
+    drs::app::AuthoringPanel panel(session,
+                                   []()
+                                   {
+                                       return makePreviewFixture();
+                                   },
+                                   []()
+                                   {
+                                       return makeAuthoringPreviewStatusFixture();
+                                   },
+                                   []()
+                                   {
+                                       return makeImportMetricsFixture();
+                                   },
+                                   drs::app::AuthoringPanel::LayoutMode::expanded,
+                                   []() {},
+                                   []()
+                                   {
+                                       return makeDraftPlaybackStatusFixture();
+                                   });
+    panel.setTopLeftPosition(0, 0);
+    panel.setSize(1400, 900);
+    panel.setVisible(true);
+    panel.resized();
+    panel.reloadFromSession();
+
+    auto& zoneSelector = requireComboBox(panel, "authoringZoneSelector");
+    auto crossfadeVisible = false;
+    for (int index = 0; index < zoneSelector.getNumItems(); ++index)
+    {
+        if (zoneSelector.getItemText(index).contains("Xfade in 1-32 out 96-127"))
+        {
+            crossfadeVisible = true;
+            break;
+        }
+    }
+
+    require(crossfadeVisible,
+            "Zone selector debug text should surface authored velocity crossfade ranges for inspection.");
+}
 } // namespace
 
 int main()
@@ -2438,6 +2498,7 @@ int main()
 
         exerciseSummaryStripLeaf(outputDirectory);
         exerciseZoneMappingEditorLeaf(outputDirectory);
+        exerciseCrossfadeDebugVisibility();
         exerciseRepeatedStructureListComponent();
         writeReachabilityChecklist(inventory);
 

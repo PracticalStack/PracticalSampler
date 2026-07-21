@@ -133,6 +133,7 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
         zone.keyHigh = projectZone.keyHigh;
         zone.velocityLow = projectZone.velocityLow;
         zone.velocityHigh = projectZone.velocityHigh;
+        zone.velocityCrossfade = projectZone.velocityCrossfade;
         zone.streamOffsetBytes = 0;
         zone.prefetchBytes = 16384;
         zone.releaseSeconds = projectZone.releaseSeconds;

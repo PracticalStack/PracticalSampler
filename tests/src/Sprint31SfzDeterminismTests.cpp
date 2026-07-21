@@ -130,6 +130,10 @@ void requireZoneEquals(const drs::engine::RuntimeProjectZoneDefinition& expected
                 && expected.keyHigh == actual.keyHigh
                 && expected.velocityLow == actual.velocityLow
                 && expected.velocityHigh == actual.velocityHigh
+                && expected.velocityCrossfade.fadeInLowVelocity == actual.velocityCrossfade.fadeInLowVelocity
+                && expected.velocityCrossfade.fadeInHighVelocity == actual.velocityCrossfade.fadeInHighVelocity
+                && expected.velocityCrossfade.fadeOutLowVelocity == actual.velocityCrossfade.fadeOutLowVelocity
+                && expected.velocityCrossfade.fadeOutHighVelocity == actual.velocityCrossfade.fadeOutHighVelocity
                 && expected.gainDb == actual.gainDb
                 && expected.pan == actual.pan
                 && expected.sampleStartFrame == actual.sampleStartFrame

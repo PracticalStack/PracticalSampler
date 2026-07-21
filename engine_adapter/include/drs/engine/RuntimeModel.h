@@ -1,5 +1,7 @@
 #pragma once
 
+#include "drs/engine/VelocityCrossfade.h"
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -31,6 +33,7 @@ struct RuntimeProjectZoneDefinition
     int keyHigh = 127;
     int velocityLow = 1;
     int velocityHigh = 127;
+    VelocityCrossfadeDescriptor velocityCrossfade;
     double gainDb = 0.0;
     double pan = 0.0;
     std::uint64_t sampleStartFrame = 0;
@@ -178,6 +181,7 @@ struct RuntimeZoneDefinition
     int keyHigh = 127;
     int velocityLow = 1;
     int velocityHigh = 127;
+    VelocityCrossfadeDescriptor velocityCrossfade;
     std::uint64_t streamOffsetBytes = 0;
     std::uint64_t prefetchBytes = 0;
     double releaseSeconds = 0.0;

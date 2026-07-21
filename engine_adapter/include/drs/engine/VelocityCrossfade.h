@@ -108,6 +108,11 @@ constexpr bool hasFadeOut(const VelocityCrossfadeDescriptor& descriptor) noexcep
     return descriptor.fadeOutLowVelocity > 0 || descriptor.fadeOutHighVelocity > 0;
 }
 
+constexpr bool hasAnyVelocityCrossfadeValue(const VelocityCrossfadeDescriptor& descriptor) noexcept
+{
+    return hasFadeIn(descriptor) || hasFadeOut(descriptor);
+}
+
 constexpr bool hasCompleteFadeIn(const VelocityCrossfadeDescriptor& descriptor) noexcept
 {
     return descriptor.fadeInLowVelocity > 0 && descriptor.fadeInHighVelocity > 0;

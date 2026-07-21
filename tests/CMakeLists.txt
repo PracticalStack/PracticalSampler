@@ -1013,6 +1013,23 @@ add_test(
     COMMAND drs_phase3_crossfade_fixture_characterization_tests
 )
 
+add_executable(drs_phase3_crossfade_persistence_tests
+    src/Phase3CrossfadePersistenceTests.cpp
+)
+
+target_link_libraries(drs_phase3_crossfade_persistence_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+)
+
+target_compile_features(drs_phase3_crossfade_persistence_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase3.crossfade_persistence
+    COMMAND drs_phase3_crossfade_persistence_tests
+)
+
 # Direct-only expected-red audit for the parser/report/UI seams intentionally left open by Sprint 3.1.1.
 add_executable(drs_sprint31_sfz_contract_red_tests
     src/Sprint31SfzContractRedTests.cpp

@@ -19,6 +19,7 @@ struct AuthoringZoneSummary
     int keyHigh = 127;
     int velocityLow = 1;
     int velocityHigh = 127;
+    VelocityCrossfadeDescriptor velocityCrossfade;
     double gainDb = 0.0;
     double pan = 0.0;
     bool loopEnabled = false;

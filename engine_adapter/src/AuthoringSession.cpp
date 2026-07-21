@@ -34,6 +34,7 @@ std::vector<AuthoringZoneSummary> buildZoneSummaries(const RuntimeProjectModel& 
         summary.keyHigh = zone.keyHigh;
         summary.velocityLow = zone.velocityLow;
         summary.velocityHigh = zone.velocityHigh;
+        summary.velocityCrossfade = zone.velocityCrossfade;
         summary.gainDb = zone.gainDb;
         summary.pan = zone.pan;
         summary.loopEnabled = zone.loopEnabled;

@@ -293,6 +293,109 @@ ordered_json serializeProjectMacros(const std::vector<RuntimeProjectMacroDefinit
     return array;
 }
 
+ordered_json serializeVelocityCrossfade(const VelocityCrossfadeDescriptor& crossfade)
+{
+    ordered_json crossfadeObject;
+    crossfadeObject["fadeInLowVelocity"] = crossfade.fadeInLowVelocity;
+    crossfadeObject["fadeInHighVelocity"] = crossfade.fadeInHighVelocity;
+    crossfadeObject["fadeOutLowVelocity"] = crossfade.fadeOutLowVelocity;
+    crossfadeObject["fadeOutHighVelocity"] = crossfade.fadeOutHighVelocity;
+    crossfadeObject["curve"] = "linear";
+    return crossfadeObject;
+}
+
+template <typename TResult>
+std::optional<VelocityCrossfadeDescriptor> readOptionalVelocityCrossfade(const json& object,
+                                                                         TResult& result,
+                                                                         const char* propertyName,
+                                                                         const char* context)
+{
+    const auto iterator = object.find(propertyName);
+    if (iterator == object.end())
+        return std::nullopt;
+
+    if (!iterator->is_object())
+    {
+        addIssue(result, std::string(context) + " field '" + propertyName + "' must be an object.");
+        return std::nullopt;
+    }
+
+    VelocityCrossfadeDescriptor descriptor;
+
+    if (const auto fadeInLowVelocity =
+            readOptional<TResult, int>(*iterator, result, "fadeInLowVelocity", context))
+    {
+        descriptor.fadeInLowVelocity = *fadeInLowVelocity;
+    }
+
+    if (const auto fadeInHighVelocity =
+            readOptional<TResult, int>(*iterator, result, "fadeInHighVelocity", context))
+    {
+        descriptor.fadeInHighVelocity = *fadeInHighVelocity;
+    }
+
+    if (const auto fadeOutLowVelocity =
+            readOptional<TResult, int>(*iterator, result, "fadeOutLowVelocity", context))
+    {
+        descriptor.fadeOutLowVelocity = *fadeOutLowVelocity;
+    }
+
+    if (const auto fadeOutHighVelocity =
+            readOptional<TResult, int>(*iterator, result, "fadeOutHighVelocity", context))
+    {
+        descriptor.fadeOutHighVelocity = *fadeOutHighVelocity;
+    }
+
+    if (const auto curve = readOptional<TResult, std::string>(*iterator, result, "curve", context))
+    {
+        if (*curve != "linear")
+            addIssue(result, std::string(context) + " field '" + propertyName + ".curve' must be 'linear'.");
+    }
+
+    return descriptor;
+}
+
+VelocityCrossfadeZoneDefinition buildVelocityCrossfadeValidationZone(int velocityLow,
+                                                                    int velocityHigh,
+                                                                    const VelocityCrossfadeDescriptor& crossfade)
+{
+    VelocityCrossfadeZoneDefinition zone;
+    zone.velocityLow = velocityLow;
+    zone.velocityHigh = velocityHigh;
+    zone.crossfade = crossfade;
+    return zone;
+}
+
+std::string buildVelocityCrossfadeIssue(const std::string& context,
+                                        VelocityCrossfadeZoneIssue issue)
+{
+    switch (issue)
+    {
+        case VelocityCrossfadeZoneIssue::none:
+            return {};
+        case VelocityCrossfadeZoneIssue::velocityRangeInvalid:
+            return context + " must keep velocityLow/velocityHigh within 1-127 and ordered low-to-high for crossfade support.";
+        case VelocityCrossfadeZoneIssue::unsupportedCurve:
+            return context + " must use the linear velocityCrossfade curve.";
+        case VelocityCrossfadeZoneIssue::fadeInPartial:
+            return context + " must define both velocityCrossfade.fadeInLowVelocity and fadeInHighVelocity when fade-in metadata is present.";
+        case VelocityCrossfadeZoneIssue::fadeInOutOfRange:
+            return context + " must anchor velocityCrossfade fade-in to velocityLow and keep it inside the zone velocity window.";
+        case VelocityCrossfadeZoneIssue::fadeInInverted:
+            return context + " must keep velocityCrossfade fadeInLowVelocity lower than fadeInHighVelocity.";
+        case VelocityCrossfadeZoneIssue::fadeOutPartial:
+            return context + " must define both velocityCrossfade.fadeOutLowVelocity and fadeOutHighVelocity when fade-out metadata is present.";
+        case VelocityCrossfadeZoneIssue::fadeOutOutOfRange:
+            return context + " must anchor velocityCrossfade fade-out to velocityHigh and keep it inside the zone velocity window.";
+        case VelocityCrossfadeZoneIssue::fadeOutInverted:
+            return context + " must keep velocityCrossfade.fadeOutLowVelocity lower than fadeOutHighVelocity.";
+        case VelocityCrossfadeZoneIssue::fadeWindowsOverlap:
+            return context + " must keep velocityCrossfade fade-in and fade-out windows disjoint within one zone.";
+    }
+
+    return context + " contains an unknown velocityCrossfade validation issue.";
+}
+
 ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinition>& zones)
 {
     ordered_json array = ordered_json::array();
@@ -310,6 +413,8 @@ ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinitio
         zoneObject["keyHigh"] = zone.keyHigh;
         zoneObject["velocityLow"] = zone.velocityLow;
         zoneObject["velocityHigh"] = zone.velocityHigh;
+        if (hasAnyVelocityCrossfadeValue(zone.velocityCrossfade))
+            zoneObject["velocityCrossfade"] = serializeVelocityCrossfade(zone.velocityCrossfade);
         zoneObject["gainDb"] = zone.gainDb;
         zoneObject["pan"] = zone.pan;
         zoneObject["sampleStartFrame"] = zone.sampleStartFrame;
@@ -647,6 +752,11 @@ RuntimeProjectLoadResult loadRuntimeProjectManifest(const std::string& manifestP
                         zone.velocityLow = *velocityLow;
                     if (const auto velocityHigh = readRequired<RuntimeProjectLoadResult, int>(zoneObject, result, "velocityHigh", context.c_str()))
                         zone.velocityHigh = *velocityHigh;
+                    if (const auto velocityCrossfade =
+                            readOptionalVelocityCrossfade(zoneObject, result, "velocityCrossfade", context.c_str()))
+                    {
+                        zone.velocityCrossfade = *velocityCrossfade;
+                    }
                     if (const auto gainDb = readRequired<RuntimeProjectLoadResult, double>(zoneObject, result, "gainDb", context.c_str()))
                         zone.gainDb = *gainDb;
                     if (const auto pan = readRequired<RuntimeProjectLoadResult, double>(zoneObject, result, "pan", context.c_str()))
@@ -1032,6 +1142,14 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
             if (zone.velocityLow > zone.velocityHigh)
                 addIssue(result, "Project zone '" + zone.id + "' has velocityLow greater than velocityHigh.");
+
+            if (hasAnyVelocityCrossfadeValue(zone.velocityCrossfade))
+            {
+                const auto crossfadeIssue = validateFirstPassVelocityCrossfadeZone(
+                    buildVelocityCrossfadeValidationZone(zone.velocityLow, zone.velocityHigh, zone.velocityCrossfade));
+                if (crossfadeIssue != VelocityCrossfadeZoneIssue::none)
+                    addIssue(result, buildVelocityCrossfadeIssue("Project zone '" + zone.id + "'", crossfadeIssue));
+            }
 
             if (zone.loopEnabled && zone.loopStartFrame > zone.loopEndFrame)
                 addIssue(result, "Project zone '" + zone.id + "' has loopStartFrame greater than loopEndFrame.");
@@ -1487,6 +1605,11 @@ RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manif
 
             if (const auto velocityHigh = readRequired<RuntimeManifestLoadResult, int>(zoneObject, result, "velocityHigh", context.c_str()))
                 zone.velocityHigh = *velocityHigh;
+            if (const auto velocityCrossfade =
+                    readOptionalVelocityCrossfade(zoneObject, result, "velocityCrossfade", context.c_str()))
+            {
+                zone.velocityCrossfade = *velocityCrossfade;
+            }
 
             if (const auto streamOffsetBytes = readRequired<RuntimeManifestLoadResult, std::uint64_t>(zoneObject, result, "streamOffsetBytes", context.c_str()))
                 zone.streamOffsetBytes = *streamOffsetBytes;
@@ -1535,6 +1658,14 @@ RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manif
 
             if (zone.velocityLow > zone.velocityHigh)
                 addIssue(result, context + " has velocityLow greater than velocityHigh.");
+
+            if (hasAnyVelocityCrossfadeValue(zone.velocityCrossfade))
+            {
+                const auto crossfadeIssue = validateFirstPassVelocityCrossfadeZone(
+                    buildVelocityCrossfadeValidationZone(zone.velocityLow, zone.velocityHigh, zone.velocityCrossfade));
+                if (crossfadeIssue != VelocityCrossfadeZoneIssue::none)
+                    addIssue(result, buildVelocityCrossfadeIssue(context, crossfadeIssue));
+            }
 
             result.metrics.totalPrefetchBytes += zone.prefetchBytes;
             instrument.zones.push_back(std::move(zone));
@@ -1683,6 +1814,8 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
         zoneObject["keyHigh"] = zone.keyHigh;
         zoneObject["velocityLow"] = zone.velocityLow;
         zoneObject["velocityHigh"] = zone.velocityHigh;
+        if (hasAnyVelocityCrossfadeValue(zone.velocityCrossfade))
+            zoneObject["velocityCrossfade"] = serializeVelocityCrossfade(zone.velocityCrossfade);
         zoneObject["streamOffsetBytes"] = zone.streamOffsetBytes;
         zoneObject["prefetchBytes"] = zone.prefetchBytes;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;

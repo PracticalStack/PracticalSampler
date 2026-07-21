@@ -117,8 +117,27 @@ void drawAuthoringFocusRing(juce::Graphics& g,
 
 juce::String formatZoneRange(const drs::engine::AuthoringZoneSummary& zone)
 {
-    return "Keys " + juce::String(zone.keyLow) + "-" + juce::String(zone.keyHigh)
+    auto text = "Keys " + juce::String(zone.keyLow) + "-" + juce::String(zone.keyHigh)
         + " | Vel " + juce::String(zone.velocityLow) + "-" + juce::String(zone.velocityHigh);
+
+    if (drs::engine::hasAnyVelocityCrossfadeValue(zone.velocityCrossfade))
+    {
+        text += " | Xfade";
+
+        if (drs::engine::hasCompleteFadeIn(zone.velocityCrossfade))
+        {
+            text += " in " + juce::String(zone.velocityCrossfade.fadeInLowVelocity)
+                + "-" + juce::String(zone.velocityCrossfade.fadeInHighVelocity);
+        }
+
+        if (drs::engine::hasCompleteFadeOut(zone.velocityCrossfade))
+        {
+            text += " out " + juce::String(zone.velocityCrossfade.fadeOutLowVelocity)
+                + "-" + juce::String(zone.velocityCrossfade.fadeOutHighVelocity);
+        }
+    }
+
+    return text;
 }
 
 juce::String formatMicros(std::uint64_t micros);
