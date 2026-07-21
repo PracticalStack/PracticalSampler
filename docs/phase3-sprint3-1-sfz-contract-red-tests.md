@@ -16,15 +16,18 @@ silently.
 
 The audit currently expects these seams to remain open:
 
-- no shared `app/src/shared/SfzImportReportModel.h`
 - no standalone-shell `.sfz` chooser or review entry path
 - no plug-in-shell `.sfz` chooser or review entry path
-- no explicit engine-facade SFZ document import entry point
 
 Sprint 3.1.2 retires the parser-only gaps by landing:
 
 - `engine_adapter/include/drs/engine/SfzImport.h`
 - `engine_adapter/src/SfzImport.cpp`
+
+Sprint 3.1.3 retires the report/facade seam by landing:
+
+- `app/src/shared/SfzImportReportModel.h`
+- an explicit `EngineFacade::analyzeSfzImportDocument(...)` entry point
 
 If the audit ever goes green unexpectedly, either:
 

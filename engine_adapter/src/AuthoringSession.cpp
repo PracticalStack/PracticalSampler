@@ -200,10 +200,20 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
     std::vector<RuntimeProjectZoneDefinition> zones,
     const std::string& label)
 {
-    if (sampleSources.empty() || zones.empty())
+    return appendImportedContent(std::move(sampleSources), std::move(zones), {}, {}, label);
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
+    std::vector<RuntimeProjectSampleSource> sampleSources,
+    std::vector<RuntimeProjectZoneDefinition> zones,
+    std::vector<std::string> projectNotes,
+    std::vector<std::string> authoringNotes,
+    const std::string& label)
+{
+    if (zones.empty())
         return makeRejectedResult(getDocumentState(),
                                   "Authoring import rejected",
-                                  "Imported content must include at least one sample source and one zone.");
+                                  "Imported content must include at least one zone.");
 
     auto project = getProject();
     const auto originalSampleSourceCount = project.sampleSources.size();
@@ -215,16 +225,25 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
     project.authoring.zones.insert(project.authoring.zones.end(),
                                    std::make_move_iterator(zones.begin()),
                                    std::make_move_iterator(zones.end()));
+    project.notes.insert(project.notes.end(),
+                         std::make_move_iterator(projectNotes.begin()),
+                         std::make_move_iterator(projectNotes.end()));
+    project.authoring.notes.insert(project.authoring.notes.end(),
+                                   std::make_move_iterator(authoringNotes.begin()),
+                                   std::make_move_iterator(authoringNotes.end()));
     project.authoring.selectedZoneId = project.authoring.zones[originalZoneCount].id;
 
-    return documentController.commitSnapshot(
-        project,
-        label,
-        {
-            "sampleSources[" + std::to_string(originalSampleSourceCount) + "]",
-            "authoring.zones[" + std::to_string(originalZoneCount) + "]",
-            "authoring.selectedZoneId"
-        });
+    std::vector<std::string> changedPaths {
+        "sampleSources[" + std::to_string(originalSampleSourceCount) + "]",
+        "authoring.zones[" + std::to_string(originalZoneCount) + "]",
+        "authoring.selectedZoneId"
+    };
+    if (!projectNotes.empty())
+        changedPaths.push_back("notes");
+    if (!authoringNotes.empty())
+        changedPaths.push_back("authoring.notes");
+
+    return documentController.commitSnapshot(project, label, changedPaths);
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::updateMacro(std::size_t macroIndex,

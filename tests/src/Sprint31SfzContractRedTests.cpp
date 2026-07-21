@@ -36,20 +36,14 @@ int main()
     try
     {
         const auto root = resolveStudioRoot();
-        const auto engineFacadeHeader = readText(root / "engine_adapter/include/drs/engine/EngineFacade.h");
         const auto mainComponent = readText(root / "app/src/standalone/MainComponent.cpp");
         const auto pluginEditor = readText(root / "app/src/plugin/PluginEditor.cpp");
 
         const std::vector<std::pair<std::string, bool>> openGaps {
-            { "shared SFZ review-model surface is still missing",
-              !std::filesystem::exists(root / "app/src/shared/SfzImportReportModel.h") },
             { "standalone shell still has no .sfz chooser or review entry path",
               mainComponent.find(".sfz") == std::string::npos },
             { "plug-in shell still has no .sfz chooser or review entry path",
-              pluginEditor.find(".sfz") == std::string::npos },
-            { "engine facade still has no explicit SFZ document import entry point",
-              engineFacadeHeader.find("importSfz") == std::string::npos
-                && engineFacadeHeader.find("beginSfzImport") == std::string::npos }
+              pluginEditor.find(".sfz") == std::string::npos }
         };
 
         auto openGapCount = std::size_t { 0 };

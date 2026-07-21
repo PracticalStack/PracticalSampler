@@ -8,6 +8,7 @@ set(DRS_APP_SHARED_SOURCES
     src/shared/PerformancePanel.h
     src/shared/ProjectStorage.cpp
     src/shared/ProjectStorage.h
+    src/shared/SfzImportReportModel.h
     src/shared/StatusPanel.cpp
     src/shared/StatusPanel.h
     src/shared/authoring/AuthoringViewModels.h

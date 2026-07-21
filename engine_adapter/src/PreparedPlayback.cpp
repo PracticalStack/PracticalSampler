@@ -184,6 +184,9 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
         zoneObject["loopEnabled"] = zone.loopEnabled;
         zoneObject["loopStartFrame"] = zone.loopStartFrame;
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
+        zoneObject["releaseSeconds"] = zone.releaseSeconds;
+        zoneObject["roundRobinLength"] = zone.roundRobinLength;
+        zoneObject["roundRobinPosition"] = zone.roundRobinPosition;
         if (zone.triggerMode == ZoneTriggerMode::oneShot)
             zoneObject["triggerMode"] = "one-shot";
         zones.push_back(std::move(zoneObject));
@@ -910,6 +913,9 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             zone.loopEnabled,
             zone.loopStartFrame,
             zone.loopEndFrame,
+            zone.releaseSeconds,
+            zone.roundRobinLength,
+            zone.roundRobinPosition,
             zone.triggerMode
         });
     }
@@ -1568,6 +1574,9 @@ std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& 
         value["loopEnabled"] = zone.loopEnabled;
         value["loopStartFrame"] = zone.loopStartFrame;
         value["loopEndFrame"] = zone.loopEndFrame;
+        value["releaseSeconds"] = zone.releaseSeconds;
+        value["roundRobinLength"] = zone.roundRobinLength;
+        value["roundRobinPosition"] = zone.roundRobinPosition;
         if (zone.triggerMode == ZoneTriggerMode::oneShot)
             value["triggerMode"] = "one-shot";
         zones.push_back(std::move(value));
@@ -1597,6 +1606,9 @@ std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& 
         value["loopEnabled"] = handle.loopEnabled;
         value["loopStartFrame"] = handle.loopStartFrame;
         value["loopEndFrame"] = handle.loopEndFrame;
+        value["releaseSeconds"] = handle.releaseSeconds;
+        value["roundRobinLength"] = handle.roundRobinLength;
+        value["roundRobinPosition"] = handle.roundRobinPosition;
         if (handle.triggerMode == ZoneTriggerMode::oneShot)
             value["triggerMode"] = "one-shot";
         preparedRoutes.push_back(std::move(value));
@@ -1786,6 +1798,9 @@ bool operator==(const PreparedPlaybackZoneHandle& left, const PreparedPlaybackZo
         && left.loopEnabled == right.loopEnabled
         && left.loopStartFrame == right.loopStartFrame
         && left.loopEndFrame == right.loopEndFrame
+        && left.releaseSeconds == right.releaseSeconds
+        && left.roundRobinLength == right.roundRobinLength
+        && left.roundRobinPosition == right.roundRobinPosition
         && left.triggerMode == right.triggerMode;
 }
 

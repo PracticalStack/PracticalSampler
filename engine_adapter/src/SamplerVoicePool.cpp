@@ -8,10 +8,43 @@ namespace drs::engine
 {
 namespace
 {
-bool routeMatches(const SamplerRenderRoute& route, int midiNote, int velocity) noexcept
+bool routeMatches(const SamplerRenderRoute& route,
+                  int midiNote,
+                  int velocity,
+                  int roundRobinPosition = 0) noexcept
 {
-    return midiNote >= route.keyLow && midiNote <= route.keyHigh
+    const auto rangeMatches = midiNote >= route.keyLow && midiNote <= route.keyHigh
         && velocity >= route.velocityLow && velocity <= route.velocityHigh;
+    if (!rangeMatches)
+        return false;
+
+    if (route.roundRobinLength <= 0 || route.roundRobinPosition <= 0 || roundRobinPosition <= 0)
+        return true;
+
+    return route.roundRobinPosition == roundRobinPosition;
+}
+
+int resolveRoundRobinPosition(const std::vector<SamplerRenderRoute>& routes,
+                              int midiNote,
+                              int velocity,
+                              std::uint64_t voiceId) noexcept
+{
+    int roundRobinLength = 0;
+    for (const auto& route : routes)
+    {
+        if (midiNote < route.keyLow || midiNote > route.keyHigh
+            || velocity < route.velocityLow || velocity > route.velocityHigh)
+        {
+            continue;
+        }
+
+        roundRobinLength = std::max(roundRobinLength, route.roundRobinLength);
+    }
+
+    if (roundRobinLength <= 0)
+        return 0;
+
+    return static_cast<int>(((voiceId - 1) % static_cast<std::uint64_t>(roundRobinLength)) + 1);
 }
 } // namespace
 
@@ -284,16 +317,21 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
             // The effective-velocity fallback preserves legacy fixed-layer presets when the
             // physical velocity has no route in the selected articulation.
             const auto& routes = renderModel->getRoutes();
+            const auto physicalRoundRobinPosition =
+                resolveRoundRobinPosition(routes, sourceMidiNote, eventVelocity, nextVoiceId);
             const auto hasPhysicalVelocityRoute = std::any_of(routes.begin(), routes.end(), [&](const auto& route)
             {
-                return routeMatches(route, sourceMidiNote, eventVelocity);
+                return routeMatches(route, sourceMidiNote, eventVelocity, physicalRoundRobinPosition);
             });
             const auto routingVelocity = hasPhysicalVelocityRoute ? eventVelocity : effectiveVelocity;
+            const auto routingRoundRobinPosition = hasPhysicalVelocityRoute
+                ? physicalRoundRobinPosition
+                : resolveRoundRobinPosition(routes, sourceMidiNote, effectiveVelocity, nextVoiceId);
             const auto hasMatchingRoute = hasPhysicalVelocityRoute
                 || (effectiveVelocity != eventVelocity
                     && std::any_of(routes.begin(), routes.end(), [&](const auto& route)
                     {
-                        return routeMatches(route, sourceMidiNote, effectiveVelocity);
+                        return routeMatches(route, sourceMidiNote, effectiveVelocity, routingRoundRobinPosition);
                     }));
             if (!hasMatchingRoute)
             {
@@ -303,7 +341,7 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
 
             for (std::size_t routeIndex = 0; routeIndex < routes.size(); ++routeIndex)
             {
-                if (!routeMatches(routes[routeIndex], sourceMidiNote, routingVelocity))
+                if (!routeMatches(routes[routeIndex], sourceMidiNote, routingVelocity, routingRoundRobinPosition))
                     continue;
 
                 bool stolen = false;

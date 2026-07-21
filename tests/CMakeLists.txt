@@ -845,6 +845,71 @@ add_test(
     COMMAND drs_sprint31_sfz_normalization_tests
 )
 
+add_executable(drs_sprint31_sfz_compatibility_tests
+    src/Sprint31SfzCompatibilityTests.cpp
+)
+
+target_link_libraries(drs_sprint31_sfz_compatibility_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_definitions(drs_sprint31_sfz_compatibility_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_sprint31_sfz_compatibility_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint31.sfz_compatibility
+    COMMAND drs_sprint31_sfz_compatibility_tests
+)
+
+add_executable(drs_sprint31_sfz_report_model_tests
+    src/Sprint31SfzReportModelTests.cpp
+)
+
+target_link_libraries(drs_sprint31_sfz_report_model_tests
+    PRIVATE
+        drs_app_shared
+        drs_sample_import
+)
+
+target_compile_definitions(drs_sprint31_sfz_report_model_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_sprint31_sfz_report_model_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint31.sfz_report_model
+    COMMAND drs_sprint31_sfz_report_model_tests
+)
+
+add_executable(drs_sprint31_sfz_projection_tests
+    src/Sprint31SfzProjectionTests.cpp
+)
+
+target_link_libraries(drs_sprint31_sfz_projection_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+)
+
+target_compile_definitions(drs_sprint31_sfz_projection_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_sprint31_sfz_projection_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint31.sfz_projection
+    COMMAND drs_sprint31_sfz_projection_tests
+)
+
 # Direct-only expected-red audit for the parser/report/UI seams intentionally left open by Sprint 3.1.1.
 add_executable(drs_sprint31_sfz_contract_red_tests
     src/Sprint31SfzContractRedTests.cpp
@@ -1970,6 +2035,8 @@ add_dependencies(drs_all_tests
     drs_sprint31_sfz_fixture_characterization_tests
     drs_sprint31_sfz_parser_tests
     drs_sprint31_sfz_normalization_tests
+    drs_sprint31_sfz_compatibility_tests
+    drs_sprint31_sfz_report_model_tests
     drs_sprint31_sfz_contract_red_tests
     drs_sprint6_publish_contract_tests
     drs_sprint6_publish_contract_seam_tests

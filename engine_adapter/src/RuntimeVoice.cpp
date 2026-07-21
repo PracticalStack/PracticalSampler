@@ -96,6 +96,27 @@ bool zoneMatchesTrigger(const RuntimeZoneDefinition& zone, int midiNote, int vel
         && velocity <= zone.velocityHigh;
 }
 
+int resolveRoundRobinPosition(const RuntimeInstrumentModel& instrument,
+                              const std::string& articulationId,
+                              int midiNote,
+                              int velocity,
+                              std::uint64_t voiceId)
+{
+    int roundRobinLength = 0;
+    for (const auto& zone : instrument.zones)
+    {
+        if (zone.articulationId != articulationId || !zoneMatchesTrigger(zone, midiNote, velocity))
+            continue;
+
+        roundRobinLength = std::max(roundRobinLength, zone.roundRobinLength);
+    }
+
+    if (roundRobinLength <= 0)
+        return 0;
+
+    return static_cast<int>(((voiceId - 1) % static_cast<std::uint64_t>(roundRobinLength)) + 1);
+}
+
 int absoluteDifference(int left, int right)
 {
     return left > right ? (left - right) : (right - left);
@@ -186,10 +207,21 @@ RuntimeVoiceRouteResolution resolveRuntimeVoiceRoute(const RuntimeInstrumentMode
             return result;
         }
 
+        const auto roundRobinPosition =
+            resolveRoundRobinPosition(instrument, targetArticulationId, request.midiNote, request.velocity, request.voiceId);
+
         for (const auto& zone : instrument.zones)
         {
             if (zone.articulationId != targetArticulationId || !zoneMatchesTrigger(zone, request.midiNote, request.velocity))
                 continue;
+
+            if (zone.roundRobinLength > 0
+                && zone.roundRobinPosition > 0
+                && roundRobinPosition > 0
+                && zone.roundRobinPosition != roundRobinPosition)
+            {
+                continue;
+            }
 
             if (selectedZone == nullptr || isBetterZoneCandidate(zone, *selectedZone, request.midiNote))
                 selectedZone = &zone;

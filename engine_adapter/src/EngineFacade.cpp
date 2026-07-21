@@ -5,6 +5,8 @@
 #include "drs/engine/RuntimeLoadProfile.h"
 #include "drs/engine/RuntimePresetState.h"
 #include "drs/engine/RuntimeLoader.h"
+#include "drs/engine/SfzImportProjection.h"
+#include "drs/engine/SfzImportReport.h"
 #include "drs/engine/RuntimeStreamingService.h"
 #include "drs/engine/RuntimeStream.h"
 #include "drs/engine/RuntimeVoice.h"
@@ -2073,6 +2075,17 @@ EnginePreviewPlaybackSnapshot EngineFacade::auditionPreviewNote(int midiNote, in
     markStateChanged();
 
     return previewPlaybackSnapshot;
+}
+
+SfzImportAnalysisResult EngineFacade::analyzeSfzImportDocument(const std::string& sfzPath) const
+{
+    return ::drs::engine::analyzeSfzImportDocument(sfzPath);
+}
+
+SfzImportProjectionResult EngineFacade::projectSfzImportDocument(const RuntimeProjectModel& baseProject,
+                                                                 const std::string& sfzPath) const
+{
+    return ::drs::engine::projectSfzImportDocument(baseProject, sfzPath);
 }
 
 std::string EngineFacade::exportPresetStateJson() const

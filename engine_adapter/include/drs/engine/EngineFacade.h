@@ -7,6 +7,8 @@
 #include "drs/engine/PreparedPlayback.h"
 #include "drs/engine/RuntimePresetState.h"
 #include "drs/engine/RuntimeModel.h"
+#include "drs/engine/SfzImportProjection.h"
+#include "drs/engine/SfzImportReport.h"
 
 #include <chrono>
 #include <atomic>
@@ -387,6 +389,9 @@ public:
     bool completeDraftPlaybackDeviceRestart(bool restored);
     bool waitForPreparedPlaybackIdle(std::chrono::milliseconds timeout = std::chrono::milliseconds(1000));
     EnginePreviewPlaybackSnapshot auditionPreviewNote(int midiNote, int velocity);
+    SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath) const;
+    SfzImportProjectionResult projectSfzImportDocument(const RuntimeProjectModel& baseProject,
+                                                       const std::string& sfzPath) const;
     std::string exportPresetStateJson() const;
     EnginePresetStateRestoreResult restorePresetStateJson(const std::string& presetStateJson);
     EnginePresetStateRestoreResult restorePresetStateFile(const std::string& presetStatePath);

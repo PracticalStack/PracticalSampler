@@ -316,6 +316,9 @@ ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinitio
         zoneObject["loopEnabled"] = zone.loopEnabled;
         zoneObject["loopStartFrame"] = zone.loopStartFrame;
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
+        zoneObject["releaseSeconds"] = zone.releaseSeconds;
+        zoneObject["roundRobinLength"] = zone.roundRobinLength;
+        zoneObject["roundRobinPosition"] = zone.roundRobinPosition;
         if (zone.triggerMode == ZoneTriggerMode::oneShot)
             zoneObject["triggerMode"] = "one-shot";
         array.push_back(std::move(zoneObject));
@@ -656,6 +659,12 @@ RuntimeProjectLoadResult loadRuntimeProjectManifest(const std::string& manifestP
                         zone.loopStartFrame = *loopStartFrame;
                     if (const auto loopEndFrame = readRequired<RuntimeProjectLoadResult, std::uint64_t>(zoneObject, result, "loopEndFrame", context.c_str()))
                         zone.loopEndFrame = *loopEndFrame;
+                    if (const auto releaseSeconds = readOptional<RuntimeProjectLoadResult, double>(zoneObject, result, "releaseSeconds", context.c_str()))
+                        zone.releaseSeconds = *releaseSeconds;
+                    if (const auto roundRobinLength = readOptional<RuntimeProjectLoadResult, int>(zoneObject, result, "roundRobinLength", context.c_str()))
+                        zone.roundRobinLength = *roundRobinLength;
+                    if (const auto roundRobinPosition = readOptional<RuntimeProjectLoadResult, int>(zoneObject, result, "roundRobinPosition", context.c_str()))
+                        zone.roundRobinPosition = *roundRobinPosition;
                     if (const auto triggerMode = readOptional<RuntimeProjectLoadResult, std::string>(zoneObject, result, "triggerMode", context.c_str()))
                     {
                         if (*triggerMode == "gated")
@@ -1026,6 +1035,24 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
             if (zone.loopEnabled && zone.loopStartFrame > zone.loopEndFrame)
                 addIssue(result, "Project zone '" + zone.id + "' has loopStartFrame greater than loopEndFrame.");
+
+            if (zone.releaseSeconds < 0.0)
+                addIssue(result, "Project zone '" + zone.id + "' must not have a negative releaseSeconds.");
+
+            if (zone.roundRobinLength < 0)
+                addIssue(result, "Project zone '" + zone.id + "' must not have a negative roundRobinLength.");
+
+            if (zone.roundRobinPosition < 0)
+                addIssue(result, "Project zone '" + zone.id + "' must not have a negative roundRobinPosition.");
+
+            if (zone.roundRobinPosition > 0 && zone.roundRobinLength <= 0)
+                addIssue(result, "Project zone '" + zone.id + "' must set roundRobinLength when roundRobinPosition is present.");
+
+            if (zone.roundRobinLength > 0
+                && (zone.roundRobinPosition < 1 || zone.roundRobinPosition > zone.roundRobinLength))
+            {
+                addIssue(result, "Project zone '" + zone.id + "' has roundRobinPosition outside roundRobinLength.");
+            }
         }
 
         if (!authoring.selectedZoneId.empty() && !zoneIds.count(authoring.selectedZoneId))
@@ -1466,6 +1493,12 @@ RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manif
 
             if (const auto prefetchBytes = readRequired<RuntimeManifestLoadResult, std::uint64_t>(zoneObject, result, "prefetchBytes", context.c_str()))
                 zone.prefetchBytes = *prefetchBytes;
+            if (const auto releaseSeconds = readOptional<RuntimeManifestLoadResult, double>(zoneObject, result, "releaseSeconds", context.c_str()))
+                zone.releaseSeconds = *releaseSeconds;
+            if (const auto roundRobinLength = readOptional<RuntimeManifestLoadResult, int>(zoneObject, result, "roundRobinLength", context.c_str()))
+                zone.roundRobinLength = *roundRobinLength;
+            if (const auto roundRobinPosition = readOptional<RuntimeManifestLoadResult, int>(zoneObject, result, "roundRobinPosition", context.c_str()))
+                zone.roundRobinPosition = *roundRobinPosition;
             if (const auto triggerMode = readOptional<RuntimeManifestLoadResult, std::string>(zoneObject, result, "triggerMode", context.c_str()))
             {
                 if (*triggerMode == "gated")
@@ -1484,6 +1517,21 @@ RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manif
 
             if (zone.keyLow > zone.keyHigh)
                 addIssue(result, context + " has keyLow greater than keyHigh.");
+
+            if (zone.releaseSeconds < 0.0)
+                addIssue(result, context + " must not have a negative releaseSeconds.");
+
+            if (zone.roundRobinLength < 0 || zone.roundRobinPosition < 0)
+                addIssue(result, context + " must not have negative round-robin metadata.");
+
+            if (zone.roundRobinPosition > 0 && zone.roundRobinLength <= 0)
+                addIssue(result, context + " must define roundRobinLength when roundRobinPosition is present.");
+
+            if (zone.roundRobinLength > 0
+                && (zone.roundRobinPosition < 1 || zone.roundRobinPosition > zone.roundRobinLength))
+            {
+                addIssue(result, context + " has roundRobinPosition outside roundRobinLength.");
+            }
 
             if (zone.velocityLow > zone.velocityHigh)
                 addIssue(result, context + " has velocityLow greater than velocityHigh.");
@@ -1637,6 +1685,9 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
         zoneObject["velocityHigh"] = zone.velocityHigh;
         zoneObject["streamOffsetBytes"] = zone.streamOffsetBytes;
         zoneObject["prefetchBytes"] = zone.prefetchBytes;
+        zoneObject["releaseSeconds"] = zone.releaseSeconds;
+        zoneObject["roundRobinLength"] = zone.roundRobinLength;
+        zoneObject["roundRobinPosition"] = zone.roundRobinPosition;
         if (zone.triggerMode == ZoneTriggerMode::oneShot)
             zoneObject["triggerMode"] = "one-shot";
         zones.push_back(std::move(zoneObject));

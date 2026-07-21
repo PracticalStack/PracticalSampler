@@ -40,6 +40,9 @@ bool zonesMatch(const PlaybackSnapshotZone& authored, const PreparedPlaybackZone
         && authored.loopEnabled == prepared.loopEnabled
         && authored.loopStartFrame == prepared.loopStartFrame
         && authored.loopEndFrame == prepared.loopEndFrame
+        && authored.releaseSeconds == prepared.releaseSeconds
+        && authored.roundRobinLength == prepared.roundRobinLength
+        && authored.roundRobinPosition == prepared.roundRobinPosition
         && authored.triggerMode == prepared.triggerMode;
 }
 } // namespace

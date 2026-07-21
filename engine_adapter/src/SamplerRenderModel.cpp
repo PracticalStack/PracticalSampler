@@ -46,6 +46,9 @@ bool sameTopology(const PlaybackSnapshotZone& snapshotZone,
         && snapshotZone.loopEnabled == preparedZone.loopEnabled
         && snapshotZone.loopStartFrame == preparedZone.loopStartFrame
         && snapshotZone.loopEndFrame == preparedZone.loopEndFrame
+        && snapshotZone.releaseSeconds == preparedZone.releaseSeconds
+        && snapshotZone.roundRobinLength == preparedZone.roundRobinLength
+        && snapshotZone.roundRobinPosition == preparedZone.roundRobinPosition
         && snapshotZone.triggerMode == preparedZone.triggerMode;
 }
 
@@ -320,6 +323,9 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
                                   zone.loopEnabled,
                                   zone.loopStartFrame,
                                   zone.loopEndFrame,
+                                  zone.releaseSeconds,
+                                  zone.roundRobinLength,
+                                  zone.roundRobinPosition,
                                   zone.triggerMode });
     }
 

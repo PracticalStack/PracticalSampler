@@ -57,6 +57,11 @@ public:
     RuntimeProjectDocumentActionResult appendImportedContent(std::vector<RuntimeProjectSampleSource> sampleSources,
                                                             std::vector<RuntimeProjectZoneDefinition> zones,
                                                             const std::string& label);
+    RuntimeProjectDocumentActionResult appendImportedContent(std::vector<RuntimeProjectSampleSource> sampleSources,
+                                                            std::vector<RuntimeProjectZoneDefinition> zones,
+                                                            std::vector<std::string> projectNotes,
+                                                            std::vector<std::string> authoringNotes,
+                                                            const std::string& label);
     RuntimeProjectDocumentActionResult updateMacro(std::size_t macroIndex,
                                                    const RuntimeProjectMacroDefinition& macro,
                                                    const std::string& label);

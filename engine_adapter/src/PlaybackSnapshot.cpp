@@ -193,6 +193,9 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
         zoneObject["loopEnabled"] = zone.loopEnabled;
         zoneObject["loopStartFrame"] = zone.loopStartFrame;
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
+        zoneObject["releaseSeconds"] = zone.releaseSeconds;
+        zoneObject["roundRobinLength"] = zone.roundRobinLength;
+        zoneObject["roundRobinPosition"] = zone.roundRobinPosition;
         if (zone.triggerMode == ZoneTriggerMode::oneShot)
             zoneObject["triggerMode"] = "one-shot";
         zones.push_back(std::move(zoneObject));
@@ -409,6 +412,21 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
         if (zone.loopEnabled && zone.loopEndFrame < zone.loopStartFrame)
             addFinding(result, PlaybackSnapshotFindingSeverity::error, "invalid-zone-loop-range", path,
                        "Loop-enabled zones must not declare loopEndFrame before loopStartFrame.");
+        if (zone.releaseSeconds < 0.0)
+            addFinding(result, PlaybackSnapshotFindingSeverity::error, "invalid-zone-release", path,
+                       "Zone releaseSeconds must not be negative.");
+        if (zone.roundRobinLength < 0 || zone.roundRobinPosition < 0)
+            addFinding(result, PlaybackSnapshotFindingSeverity::error, "invalid-zone-round-robin", path,
+                       "Zone round-robin metadata must not be negative.");
+        if (zone.roundRobinPosition > 0 && zone.roundRobinLength <= 0)
+            addFinding(result, PlaybackSnapshotFindingSeverity::error, "missing-zone-round-robin-length", path,
+                       "Zone roundRobinPosition requires a positive roundRobinLength.");
+        if (zone.roundRobinLength > 0
+            && (zone.roundRobinPosition < 1 || zone.roundRobinPosition > zone.roundRobinLength))
+        {
+            addFinding(result, PlaybackSnapshotFindingSeverity::error, "invalid-zone-round-robin-position", path,
+                       "Zone roundRobinPosition must stay within roundRobinLength.");
+        }
 
         result.snapshot.zones.push_back({
             zone.id,
@@ -427,6 +445,9 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
             zone.loopEnabled,
             zone.loopStartFrame,
             zone.loopEndFrame,
+            zone.releaseSeconds,
+            zone.roundRobinLength,
+            zone.roundRobinPosition,
             zone.triggerMode
         });
 

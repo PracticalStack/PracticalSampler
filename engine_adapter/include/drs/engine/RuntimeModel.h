@@ -37,6 +37,9 @@ struct RuntimeProjectZoneDefinition
     bool loopEnabled = false;
     std::uint64_t loopStartFrame = 0;
     std::uint64_t loopEndFrame = 0;
+    double releaseSeconds = 0.0;
+    int roundRobinLength = 0;
+    int roundRobinPosition = 0;
     ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;
 };
 
@@ -177,6 +180,9 @@ struct RuntimeZoneDefinition
     int velocityHigh = 127;
     std::uint64_t streamOffsetBytes = 0;
     std::uint64_t prefetchBytes = 0;
+    double releaseSeconds = 0.0;
+    int roundRobinLength = 0;
+    int roundRobinPosition = 0;
     ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;
 };
 

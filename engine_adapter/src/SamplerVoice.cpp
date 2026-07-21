@@ -61,6 +61,7 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
     sample = &selectedSample;
     positionFrames = static_cast<double>(selectedRoute.sampleStartFrame);
     incrementFrames = increment;
+    outputSampleRate = request.outputSampleRate;
     baseGain = static_cast<float>(gain);
     panGains = computeSamplerPanGains(selectedRoute.pan);
     loopActive = selectedRoute.loopEnabled
@@ -78,7 +79,15 @@ bool SamplerVoice::beginRelease() noexcept
         return false;
 
     lifecycleState = SamplerVoiceLifecycleState::releasing;
-    releaseSamplesTotal = compatibilityReleaseSampleCount;
+    if (route != nullptr && route->releaseSeconds > 0.0 && std::isfinite(outputSampleRate) && outputSampleRate > 0.0)
+    {
+        releaseSamplesTotal = static_cast<std::uint32_t>(
+            std::max(1ll, static_cast<long long>(std::llround(route->releaseSeconds * outputSampleRate))));
+    }
+    else
+    {
+        releaseSamplesTotal = compatibilityReleaseSampleCount;
+    }
     releaseSamplesRemaining = releaseSamplesTotal;
     return true;
 }
@@ -185,6 +194,7 @@ void SamplerVoice::reset() noexcept
     sample = nullptr;
     positionFrames = 0.0;
     incrementFrames = 1.0;
+    outputSampleRate = 48000.0;
     baseGain = 0.0f;
     panGains = {};
     loopActive = false;
