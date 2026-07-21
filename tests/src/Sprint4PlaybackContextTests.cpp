@@ -46,22 +46,21 @@ ModelLifetime buildModel(drs::engine::PlaybackActivationLane lane,
     drs::engine::ImmutablePlaybackSnapshot snapshot;
     snapshot.draftRevision = revision;
     snapshot.contentDigest = "context-snapshot-" + suffix;
-    snapshot.zones.push_back({ "context-zone-" + suffix,
-                               "context-sample-" + suffix,
-                               "Context Zone",
-                               "context-group",
-                               "sustain",
-                               60,
-                               0,
-                               127,
-                               1,
-                               127,
-                               0.0,
-                               0.0,
-                               0,
-                               true,
-                               0,
-                               4 });
+    drs::engine::PlaybackSnapshotZone snapshotZone;
+    snapshotZone.id = "context-zone-" + suffix;
+    snapshotZone.sampleSourceId = "context-sample-" + suffix;
+    snapshotZone.displayName = "Context Zone";
+    snapshotZone.groupId = "context-group";
+    snapshotZone.articulationId = "sustain";
+    snapshotZone.rootKey = 60;
+    snapshotZone.keyLow = 0;
+    snapshotZone.keyHigh = 127;
+    snapshotZone.velocityLow = 1;
+    snapshotZone.velocityHigh = 127;
+    snapshotZone.loopEnabled = true;
+    snapshotZone.loopStartFrame = 0;
+    snapshotZone.loopEndFrame = 4;
+    snapshot.zones.push_back(std::move(snapshotZone));
 
     auto decoded = std::make_shared<drs::engine::PreparedPlaybackDecodedSampleData>();
     decoded->normalizedChannels = { { sampleValue, sampleValue, sampleValue, sampleValue } };
@@ -79,22 +78,21 @@ ModelLifetime buildModel(drs::engine::PlaybackActivationLane lane,
     prepared.draftRevision = revision;
     prepared.preparedContentDigest = "context-prepared-" + suffix;
     prepared.samples.push_back(std::move(sample));
-    prepared.zones.push_back({ "context-zone-" + suffix,
-                               "context-sample-" + suffix,
-                               "context-stream-" + suffix,
-                               0,
-                               0,
-                               60,
-                               0,
-                               127,
-                               1,
-                               127,
-                               0.0,
-                               0.0,
-                               0,
-                               true,
-                               0,
-                               4 });
+    drs::engine::PreparedPlaybackZoneHandle preparedZone;
+    preparedZone.zoneId = "context-zone-" + suffix;
+    preparedZone.sampleSourceId = "context-sample-" + suffix;
+    preparedZone.streamSampleId = "context-stream-" + suffix;
+    preparedZone.preparedSampleIndex = 0;
+    preparedZone.preparedStreamIndex = 0;
+    preparedZone.rootKey = 60;
+    preparedZone.keyLow = 0;
+    preparedZone.keyHigh = 127;
+    preparedZone.velocityLow = 1;
+    preparedZone.velocityHigh = 127;
+    preparedZone.loopEnabled = true;
+    preparedZone.loopStartFrame = 0;
+    preparedZone.loopEndFrame = 4;
+    prepared.zones.push_back(std::move(preparedZone));
 
     auto payload = std::make_shared<drs::engine::PlaybackActivationPayload>();
     payload->lane = lane;

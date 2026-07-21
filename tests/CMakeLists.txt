@@ -506,6 +506,23 @@ add_test(
     COMMAND drs_sprint4_offline_renderer_tests
 )
 
+# Sprint 4.8 crossfade route selection, diagnostics, and RR overlap matrix.
+add_executable(drs_sprint4_crossfade_mixing_tests
+    src/Sprint4CrossfadeMixingTests.cpp
+)
+
+target_link_libraries(drs_sprint4_crossfade_mixing_tests
+    PRIVATE
+        drs_sampler_core
+)
+
+target_compile_features(drs_sprint4_crossfade_mixing_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint4.crossfade_mixing
+    COMMAND drs_sprint4_crossfade_mixing_tests
+)
+
 # Sprint 5.1 frozen Preview scope/lifecycle/note-policy contract.
 add_executable(drs_sprint5_preview_contract_tests
     src/Sprint5PreviewContractTests.cpp
@@ -2164,6 +2181,7 @@ add_dependencies(drs_all_tests
     drs_sprint4_playback_context_tests
     drs_sprint4_shell_cutover_tests
     drs_sprint4_offline_renderer_tests
+    drs_sprint4_crossfade_mixing_tests
     drs_sprint5_preview_contract_tests
     drs_sprint5_preview_controller_tests
     drs_sprint5_preview_controller_integration_tests

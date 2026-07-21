@@ -111,6 +111,7 @@ private:
     const SamplerRenderModel* renderModel = nullptr;
     double sampleRate = 0.0;
     std::uint64_t nextVoiceId = 1;
+    std::uint64_t nextTriggerId = 1;
     std::uint64_t activeGeneration = 0;
     std::uint64_t nextGeneratedActivation = 1;
     bool sustainPedalDown = false;

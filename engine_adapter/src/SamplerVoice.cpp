@@ -22,6 +22,7 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
         || request.sourceMidiNote < 0 || request.sourceMidiNote > 127
         || request.effectiveMidiNote < 0 || request.effectiveMidiNote > 127
         || request.effectiveVelocity < 1 || request.effectiveVelocity > 127
+        || !std::isfinite(request.routeGainMultiplier) || request.routeGainMultiplier <= 0.0
         || !std::isfinite(request.outputSampleRate) || request.outputSampleRate <= 0.0)
     {
         return false;
@@ -45,6 +46,7 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
     const auto increment = pitchRatio * (selectedSample.sampleRate / request.outputSampleRate);
     const auto gain = 0.25
         * (static_cast<double>(request.effectiveVelocity) / 127.0)
+        * request.routeGainMultiplier
         * std::pow(10.0, selectedRoute.gainDb / 20.0);
     if (!std::isfinite(increment) || increment <= 0.0 || !std::isfinite(gain))
         return false;

@@ -40,6 +40,26 @@ bool sameTopology(const PlaybackSnapshotZone& snapshotZone,
         && snapshotZone.keyHigh == preparedZone.keyHigh
         && snapshotZone.velocityLow == preparedZone.velocityLow
         && snapshotZone.velocityHigh == preparedZone.velocityHigh
+        && snapshotZone.velocityCrossfade.fadeInLowVelocity == preparedZone.velocityCrossfade.fadeInLowVelocity
+        && snapshotZone.velocityCrossfade.fadeInHighVelocity == preparedZone.velocityCrossfade.fadeInHighVelocity
+        && snapshotZone.velocityCrossfade.fadeOutLowVelocity == preparedZone.velocityCrossfade.fadeOutLowVelocity
+        && snapshotZone.velocityCrossfade.fadeOutHighVelocity == preparedZone.velocityCrossfade.fadeOutHighVelocity
+        && snapshotZone.velocityCrossfadeRuntime.effectiveLowVelocity
+            == preparedZone.velocityCrossfadeRuntime.effectiveLowVelocity
+        && snapshotZone.velocityCrossfadeRuntime.effectiveHighVelocity
+            == preparedZone.velocityCrossfadeRuntime.effectiveHighVelocity
+        && snapshotZone.velocityCrossfadeRuntime.fadeInNeighborZoneId
+            == preparedZone.velocityCrossfadeRuntime.fadeInNeighborZoneId
+        && snapshotZone.velocityCrossfadeRuntime.fadeOutNeighborZoneId
+            == preparedZone.velocityCrossfadeRuntime.fadeOutNeighborZoneId
+        && snapshotZone.velocityCrossfadeRuntime.fadeInOverlapLowVelocity
+            == preparedZone.velocityCrossfadeRuntime.fadeInOverlapLowVelocity
+        && snapshotZone.velocityCrossfadeRuntime.fadeInOverlapHighVelocity
+            == preparedZone.velocityCrossfadeRuntime.fadeInOverlapHighVelocity
+        && snapshotZone.velocityCrossfadeRuntime.fadeOutOverlapLowVelocity
+            == preparedZone.velocityCrossfadeRuntime.fadeOutOverlapLowVelocity
+        && snapshotZone.velocityCrossfadeRuntime.fadeOutOverlapHighVelocity
+            == preparedZone.velocityCrossfadeRuntime.fadeOutOverlapHighVelocity
         && snapshotZone.gainDb == preparedZone.gainDb
         && snapshotZone.pan == preparedZone.pan
         && snapshotZone.sampleStartFrame == preparedZone.sampleStartFrame
@@ -326,7 +346,11 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
                                   zone.releaseSeconds,
                                   zone.roundRobinLength,
                                   zone.roundRobinPosition,
-                                  zone.triggerMode });
+                                  zone.triggerMode,
+                                  options.auditionSelectedZone ? VelocityCrossfadeDescriptor {} : zone.velocityCrossfade,
+                                  options.auditionSelectedZone
+                                      ? VelocityCrossfadeRuntimeDescriptor {}
+                                      : zone.velocityCrossfadeRuntime });
     }
 
     result.built = true;

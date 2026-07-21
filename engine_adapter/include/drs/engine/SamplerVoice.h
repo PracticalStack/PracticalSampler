@@ -22,6 +22,7 @@ struct SamplerVoiceStartRequest
     int sourceMidiNote = 60;
     int effectiveMidiNote = 60;
     int effectiveVelocity = 127;
+    double routeGainMultiplier = 1.0;
     double outputSampleRate = 48000.0;
     std::uint64_t activationGeneration = 1;
 };

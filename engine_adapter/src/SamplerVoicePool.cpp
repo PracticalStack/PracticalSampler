@@ -8,6 +8,8 @@ namespace drs::engine
 {
 namespace
 {
+constexpr std::size_t crossfadeRouteLimit = 2;
+
 bool routeMatches(const SamplerRenderRoute& route,
                   int midiNote,
                   int velocity,
@@ -45,6 +47,32 @@ int resolveRoundRobinPosition(const std::vector<SamplerRenderRoute>& routes,
         return 0;
 
     return static_cast<int>(((voiceId - 1) % static_cast<std::uint64_t>(roundRobinLength)) + 1);
+}
+
+bool routeHasCrossfade(const SamplerRenderRoute& route) noexcept
+{
+    return hasAnyVelocityCrossfadeValue(route.velocityCrossfade);
+}
+
+bool routeHasCrossfadeRuntime(const SamplerRenderRoute& route) noexcept
+{
+    return hasAnyVelocityCrossfadeRuntimeValue(route.velocityCrossfadeRuntime);
+}
+
+double computeRouteCrossfadeGain(const SamplerRenderRoute& route, int velocity) noexcept
+{
+    return computeFirstPassVelocityCrossfadeGain(
+        { route.velocityLow, route.velocityHigh, route.velocityCrossfade },
+        velocity);
+}
+
+bool areCrossfadeNeighbors(const SamplerRenderRoute& left,
+                           const SamplerRenderRoute& right) noexcept
+{
+    return left.velocityCrossfadeRuntime.fadeInNeighborZoneId == right.zoneId
+        || left.velocityCrossfadeRuntime.fadeOutNeighborZoneId == right.zoneId
+        || right.velocityCrossfadeRuntime.fadeInNeighborZoneId == left.zoneId
+        || right.velocityCrossfadeRuntime.fadeOutNeighborZoneId == left.zoneId;
 }
 } // namespace
 
@@ -85,6 +113,7 @@ bool SamplerVoicePool::prepare(const SamplerRenderModel& model,
 
     resetVoices();
     nextVoiceId = 1;
+    nextTriggerId = 1;
     nextGeneratedActivation = 1;
     return activateModel(model, outputSampleRate, activationGeneration);
 }
@@ -124,6 +153,7 @@ void SamplerVoicePool::clearRenderModel() noexcept
     renderModel = nullptr;
     sampleRate = 0.0;
     nextVoiceId = 1;
+    nextTriggerId = 1;
     activeGeneration = 0;
     nextGeneratedActivation = 1;
 }
@@ -318,7 +348,7 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
             // physical velocity has no route in the selected articulation.
             const auto& routes = renderModel->getRoutes();
             const auto physicalRoundRobinPosition =
-                resolveRoundRobinPosition(routes, sourceMidiNote, eventVelocity, nextVoiceId);
+                resolveRoundRobinPosition(routes, sourceMidiNote, eventVelocity, nextTriggerId);
             const auto hasPhysicalVelocityRoute = std::any_of(routes.begin(), routes.end(), [&](const auto& route)
             {
                 return routeMatches(route, sourceMidiNote, eventVelocity, physicalRoundRobinPosition);
@@ -326,7 +356,7 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
             const auto routingVelocity = hasPhysicalVelocityRoute ? eventVelocity : effectiveVelocity;
             const auto routingRoundRobinPosition = hasPhysicalVelocityRoute
                 ? physicalRoundRobinPosition
-                : resolveRoundRobinPosition(routes, sourceMidiNote, effectiveVelocity, nextVoiceId);
+                : resolveRoundRobinPosition(routes, sourceMidiNote, effectiveVelocity, nextTriggerId);
             const auto hasMatchingRoute = hasPhysicalVelocityRoute
                 || (effectiveVelocity != eventVelocity
                     && std::any_of(routes.begin(), routes.end(), [&](const auto& route)
@@ -339,11 +369,73 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 return;
             }
 
+            struct CrossfadeCandidate
+            {
+                std::size_t routeIndex = 0;
+                double gainMultiplier = 1.0;
+            };
+
+            std::array<CrossfadeCandidate, crossfadeRouteLimit> crossfadeCandidates {};
+            std::size_t positiveCrossfadeCount = 0;
+            bool hasCrossfadeMatch = false;
+            bool hasNonCrossfadeMatch = false;
+            bool crossfadeFallback = false;
+
             for (std::size_t routeIndex = 0; routeIndex < routes.size(); ++routeIndex)
             {
                 if (!routeMatches(routes[routeIndex], sourceMidiNote, routingVelocity, routingRoundRobinPosition))
                     continue;
 
+                if (!routeHasCrossfade(routes[routeIndex]))
+                {
+                    hasNonCrossfadeMatch = true;
+                    continue;
+                }
+
+                hasCrossfadeMatch = true;
+                if (!routeHasCrossfadeRuntime(routes[routeIndex]))
+                {
+                    crossfadeFallback = true;
+                    continue;
+                }
+
+                const auto gainMultiplier = computeRouteCrossfadeGain(routes[routeIndex], routingVelocity);
+                if (!std::isfinite(gainMultiplier) || gainMultiplier <= 0.0)
+                    continue;
+
+                if (positiveCrossfadeCount < crossfadeCandidates.size())
+                    crossfadeCandidates[positiveCrossfadeCount] = { routeIndex, gainMultiplier };
+                ++positiveCrossfadeCount;
+            }
+
+            auto useLegacyRouting = !hasCrossfadeMatch;
+            if (hasCrossfadeMatch)
+            {
+                if (crossfadeFallback
+                    || positiveCrossfadeCount == 0
+                    || positiveCrossfadeCount > crossfadeRouteLimit)
+                {
+                    useLegacyRouting = true;
+                }
+                else if (positiveCrossfadeCount == crossfadeRouteLimit)
+                {
+                    const auto& firstRoute = routes[crossfadeCandidates[0].routeIndex];
+                    const auto& secondRoute = routes[crossfadeCandidates[1].routeIndex];
+                    useLegacyRouting = !areCrossfadeNeighbors(firstRoute, secondRoute);
+                }
+                else
+                {
+                    useLegacyRouting = false;
+                }
+
+                if (useLegacyRouting)
+                    ++result.render.crossfadeFallbackCount;
+            }
+
+            const auto startRoute = [&](std::size_t routeIndex,
+                                        double routeGainMultiplier,
+                                        bool countAsCrossfade) noexcept
+            {
                 bool stolen = false;
                 bool generationStolen = false;
                 bool releasingStolen = false;
@@ -356,13 +448,14 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 request.sourceMidiNote = sourceMidiNote;
                 request.effectiveMidiNote = effectiveMidiNote;
                 request.effectiveVelocity = effectiveVelocity;
+                request.routeGainMultiplier = routeGainMultiplier;
                 request.outputSampleRate = sampleRate;
                 if (!slot.voice.start(*renderModel, request))
                 {
                     slot.state = SamplerVoiceSlotState::free;
                     slot.sustainDeferred = false;
                     ++result.render.droppedEventCount;
-                    continue;
+                    return false;
                 }
 
                 slot.state = SamplerVoiceSlotState::active;
@@ -371,13 +464,61 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 if (nextVoiceId == 0)
                     nextVoiceId = 1;
                 ++result.render.startedVoiceCount;
+                if (countAsCrossfade)
+                    ++result.render.crossfadeStartedVoiceCount;
                 if (stolen)
                     ++result.render.stolenVoiceCount;
                 if (generationStolen)
                     ++result.render.generationStealCount;
                 if (releasingStolen)
                     ++result.render.releasingVoiceStealCount;
+                return true;
+            };
+
+            if (useLegacyRouting)
+            {
+                for (std::size_t routeIndex = 0; routeIndex < routes.size(); ++routeIndex)
+                {
+                    if (!routeMatches(routes[routeIndex], sourceMidiNote, routingVelocity, routingRoundRobinPosition))
+                        continue;
+
+                    startRoute(routeIndex, 1.0, false);
+                }
+                ++nextTriggerId;
+                if (nextTriggerId == 0)
+                    nextTriggerId = 1;
+                return;
             }
+
+            for (std::size_t routeIndex = 0; routeIndex < routes.size(); ++routeIndex)
+            {
+                if (!routeMatches(routes[routeIndex], sourceMidiNote, routingVelocity, routingRoundRobinPosition)
+                    || routeHasCrossfade(routes[routeIndex]))
+                {
+                    continue;
+                }
+
+                startRoute(routeIndex, 1.0, false);
+            }
+
+            std::size_t crossfadeStartedForEvent = 0;
+            for (std::size_t candidateIndex = 0;
+                 candidateIndex < std::min(positiveCrossfadeCount, crossfadeCandidates.size());
+                 ++candidateIndex)
+            {
+                if (startRoute(crossfadeCandidates[candidateIndex].routeIndex,
+                               crossfadeCandidates[candidateIndex].gainMultiplier,
+                               true))
+                {
+                    ++crossfadeStartedForEvent;
+                }
+            }
+
+            if (crossfadeStartedForEvent >= 2)
+                ++result.render.crossfadeOverlapHitCount;
+            ++nextTriggerId;
+            if (nextTriggerId == 0)
+                nextTriggerId = 1;
             return;
         }
 

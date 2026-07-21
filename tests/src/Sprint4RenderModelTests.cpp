@@ -36,22 +36,24 @@ struct RenderModelFixture
     {
         snapshot.draftRevision = revision;
         snapshot.contentDigest = snapshotDigest;
-        snapshot.zones.push_back({ "zone-a",
-                                   "sample-a",
-                                   "Zone A",
-                                   "group-a",
-                                   "sustain",
-                                   60,
-                                   36,
-                                   84,
-                                   1,
-                                   127,
-                                   -3.0,
-                                   0.25,
-                                   1,
-                                   true,
-                                   2,
-                                   6 });
+        drs::engine::PlaybackSnapshotZone snapshotZone;
+        snapshotZone.id = "zone-a";
+        snapshotZone.sampleSourceId = "sample-a";
+        snapshotZone.displayName = "Zone A";
+        snapshotZone.groupId = "group-a";
+        snapshotZone.articulationId = "sustain";
+        snapshotZone.rootKey = 60;
+        snapshotZone.keyLow = 36;
+        snapshotZone.keyHigh = 84;
+        snapshotZone.velocityLow = 1;
+        snapshotZone.velocityHigh = 127;
+        snapshotZone.gainDb = -3.0;
+        snapshotZone.pan = 0.25;
+        snapshotZone.sampleStartFrame = 1;
+        snapshotZone.loopEnabled = true;
+        snapshotZone.loopStartFrame = 2;
+        snapshotZone.loopEndFrame = 6;
+        snapshot.zones.push_back(std::move(snapshotZone));
 
         auto decoded = std::make_shared<drs::engine::PreparedPlaybackDecodedSampleData>();
         decoded->normalizedChannels = {
@@ -72,22 +74,24 @@ struct RenderModelFixture
         prepared.snapshotContentDigest = snapshotDigest;
         prepared.draftRevision = revision;
         prepared.preparedContentDigest = preparedDigest;
-        prepared.zones.push_back({ "zone-a",
-                                   "sample-a",
-                                   "stream-a",
-                                   0,
-                                   0,
-                                   60,
-                                   36,
-                                   84,
-                                   1,
-                                   127,
-                                   -3.0,
-                                   0.25,
-                                   1,
-                                   true,
-                                   2,
-                                   6 });
+        drs::engine::PreparedPlaybackZoneHandle preparedZone;
+        preparedZone.zoneId = "zone-a";
+        preparedZone.sampleSourceId = "sample-a";
+        preparedZone.streamSampleId = "stream-a";
+        preparedZone.preparedSampleIndex = 0;
+        preparedZone.preparedStreamIndex = 0;
+        preparedZone.rootKey = 60;
+        preparedZone.keyLow = 36;
+        preparedZone.keyHigh = 84;
+        preparedZone.velocityLow = 1;
+        preparedZone.velocityHigh = 127;
+        preparedZone.gainDb = -3.0;
+        preparedZone.pan = 0.25;
+        preparedZone.sampleStartFrame = 1;
+        preparedZone.loopEnabled = true;
+        preparedZone.loopStartFrame = 2;
+        preparedZone.loopEndFrame = 6;
+        prepared.zones.push_back(std::move(preparedZone));
     }
 
     drs::engine::PlaybackActivationPayloadPtr makePayload(bool includeSnapshot = true,

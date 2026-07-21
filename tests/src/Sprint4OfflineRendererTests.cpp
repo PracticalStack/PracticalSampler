@@ -66,22 +66,24 @@ drs::engine::SamplerRenderModelPtr makeModel(const std::string& id, const ModelS
     drs::engine::ImmutablePlaybackSnapshot snapshot;
     snapshot.draftRevision = 1;
     snapshot.contentDigest = "offline-snapshot-" + id;
-    snapshot.zones.push_back({ "zone-" + id,
-                               "sample-" + id,
-                               id,
-                               "offline-group",
-                               "offline-articulation",
-                               spec.rootKey,
-                               0,
-                               127,
-                               1,
-                               127,
-                               spec.gainDb,
-                               spec.pan,
-                               spec.sampleStartFrame,
-                               spec.loopEnabled,
-                               spec.loopStartFrame,
-                               spec.loopEndFrame });
+    drs::engine::PlaybackSnapshotZone snapshotZone;
+    snapshotZone.id = "zone-" + id;
+    snapshotZone.sampleSourceId = "sample-" + id;
+    snapshotZone.displayName = id;
+    snapshotZone.groupId = "offline-group";
+    snapshotZone.articulationId = "offline-articulation";
+    snapshotZone.rootKey = spec.rootKey;
+    snapshotZone.keyLow = 0;
+    snapshotZone.keyHigh = 127;
+    snapshotZone.velocityLow = 1;
+    snapshotZone.velocityHigh = 127;
+    snapshotZone.gainDb = spec.gainDb;
+    snapshotZone.pan = spec.pan;
+    snapshotZone.sampleStartFrame = spec.sampleStartFrame;
+    snapshotZone.loopEnabled = spec.loopEnabled;
+    snapshotZone.loopStartFrame = spec.loopStartFrame;
+    snapshotZone.loopEndFrame = spec.loopEndFrame;
+    snapshot.zones.push_back(std::move(snapshotZone));
 
     auto decoded = std::make_shared<drs::engine::PreparedPlaybackDecodedSampleData>();
     decoded->normalizedChannels = spec.channels;
@@ -99,22 +101,24 @@ drs::engine::SamplerRenderModelPtr makeModel(const std::string& id, const ModelS
     prepared.draftRevision = 1;
     prepared.preparedContentDigest = "offline-prepared-" + id;
     prepared.samples.push_back(std::move(sample));
-    prepared.zones.push_back({ "zone-" + id,
-                               "sample-" + id,
-                               "stream-" + id,
-                               0,
-                               0,
-                               spec.rootKey,
-                               0,
-                               127,
-                               1,
-                               127,
-                               spec.gainDb,
-                               spec.pan,
-                               spec.sampleStartFrame,
-                               spec.loopEnabled,
-                               spec.loopStartFrame,
-                               spec.loopEndFrame });
+    drs::engine::PreparedPlaybackZoneHandle preparedZone;
+    preparedZone.zoneId = "zone-" + id;
+    preparedZone.sampleSourceId = "sample-" + id;
+    preparedZone.streamSampleId = "stream-" + id;
+    preparedZone.preparedSampleIndex = 0;
+    preparedZone.preparedStreamIndex = 0;
+    preparedZone.rootKey = spec.rootKey;
+    preparedZone.keyLow = 0;
+    preparedZone.keyHigh = 127;
+    preparedZone.velocityLow = 1;
+    preparedZone.velocityHigh = 127;
+    preparedZone.gainDb = spec.gainDb;
+    preparedZone.pan = spec.pan;
+    preparedZone.sampleStartFrame = spec.sampleStartFrame;
+    preparedZone.loopEnabled = spec.loopEnabled;
+    preparedZone.loopStartFrame = spec.loopStartFrame;
+    preparedZone.loopEndFrame = spec.loopEndFrame;
+    prepared.zones.push_back(std::move(preparedZone));
 
     auto payload = std::make_shared<drs::engine::PlaybackActivationPayload>();
     payload->lane = drs::engine::PlaybackActivationLane::performance;

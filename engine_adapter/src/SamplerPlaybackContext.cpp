@@ -221,6 +221,12 @@ SamplerPlaybackContextSnapshot SamplerPlaybackContext::getSnapshot() const noexc
             = diagnosticReleasingVoiceStealCount.load(std::memory_order_relaxed);
         snapshot.counters.droppedEventCount = diagnosticDroppedEventCount.load(std::memory_order_relaxed);
         snapshot.counters.resetVoiceCount = diagnosticResetVoiceCount.load(std::memory_order_relaxed);
+        snapshot.counters.crossfadeStartedVoiceCount
+            = diagnosticCrossfadeStartedVoiceCount.load(std::memory_order_relaxed);
+        snapshot.counters.crossfadeOverlapHitCount
+            = diagnosticCrossfadeOverlapHitCount.load(std::memory_order_relaxed);
+        snapshot.counters.crossfadeFallbackCount
+            = diagnosticCrossfadeFallbackCount.load(std::memory_order_relaxed);
         snapshot.counters.appliedActivationCount = diagnosticAppliedActivationCount.load(std::memory_order_relaxed);
         snapshot.counters.enqueuedRetirementCount = diagnosticEnqueuedRetirementCount.load(std::memory_order_relaxed);
         if (before == diagnosticRealtimeSequence.load(std::memory_order_acquire))
@@ -373,6 +379,9 @@ void SamplerPlaybackContext::accumulate(const SamplerVoicePoolRenderResult& resu
     counters.releasingVoiceStealCount += result.render.releasingVoiceStealCount;
     counters.droppedEventCount += result.render.droppedEventCount;
     counters.resetVoiceCount += result.resetVoiceCount;
+    counters.crossfadeStartedVoiceCount += result.render.crossfadeStartedVoiceCount;
+    counters.crossfadeOverlapHitCount += result.render.crossfadeOverlapHitCount;
+    counters.crossfadeFallbackCount += result.render.crossfadeFallbackCount;
 }
 
 void SamplerPlaybackContext::publishRealtimeDiagnostics() noexcept
@@ -415,6 +424,12 @@ void SamplerPlaybackContext::publishRealtimeDiagnostics() noexcept
                                              std::memory_order_release);
     diagnosticDroppedEventCount.store(counters.droppedEventCount, std::memory_order_release);
     diagnosticResetVoiceCount.store(counters.resetVoiceCount, std::memory_order_release);
+    diagnosticCrossfadeStartedVoiceCount.store(counters.crossfadeStartedVoiceCount,
+                                               std::memory_order_release);
+    diagnosticCrossfadeOverlapHitCount.store(counters.crossfadeOverlapHitCount,
+                                             std::memory_order_release);
+    diagnosticCrossfadeFallbackCount.store(counters.crossfadeFallbackCount,
+                                           std::memory_order_release);
     diagnosticAppliedActivationCount.store(counters.appliedActivationCount, std::memory_order_release);
     diagnosticEnqueuedRetirementCount.store(counters.enqueuedRetirementCount, std::memory_order_release);
     diagnosticRealtimeSequence.fetch_add(1, std::memory_order_release);

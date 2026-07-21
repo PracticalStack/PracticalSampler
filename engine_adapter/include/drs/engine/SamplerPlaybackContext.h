@@ -20,6 +20,9 @@ struct SamplerPlaybackContextCounters
     std::uint64_t releasingVoiceStealCount = 0;
     std::uint64_t droppedEventCount = 0;
     std::uint64_t resetVoiceCount = 0;
+    std::uint64_t crossfadeStartedVoiceCount = 0;
+    std::uint64_t crossfadeOverlapHitCount = 0;
+    std::uint64_t crossfadeFallbackCount = 0;
     std::uint64_t appliedActivationCount = 0;
     std::uint64_t enqueuedRetirementCount = 0;
     std::uint64_t reclaimedActivationCount = 0;
@@ -158,6 +161,9 @@ private:
     std::atomic<std::uint64_t> diagnosticReleasingVoiceStealCount { 0 };
     std::atomic<std::uint64_t> diagnosticDroppedEventCount { 0 };
     std::atomic<std::uint64_t> diagnosticResetVoiceCount { 0 };
+    std::atomic<std::uint64_t> diagnosticCrossfadeStartedVoiceCount { 0 };
+    std::atomic<std::uint64_t> diagnosticCrossfadeOverlapHitCount { 0 };
+    std::atomic<std::uint64_t> diagnosticCrossfadeFallbackCount { 0 };
     std::atomic<std::uint64_t> diagnosticAppliedActivationCount { 0 };
     std::atomic<std::uint64_t> diagnosticEnqueuedRetirementCount { 0 };
     std::uint64_t nextActivationSerial = 1;

@@ -86,6 +86,9 @@ struct SamplerRenderResult
     std::uint32_t generationStealCount = 0;
     std::uint32_t releasingVoiceStealCount = 0;
     std::uint32_t droppedEventCount = 0;
+    std::uint32_t crossfadeStartedVoiceCount = 0;
+    std::uint32_t crossfadeOverlapHitCount = 0;
+    std::uint32_t crossfadeFallbackCount = 0;
 };
 
 struct SamplerRenderSample
@@ -120,6 +123,8 @@ struct SamplerRenderRoute
     int roundRobinLength = 0;
     int roundRobinPosition = 0;
     ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;
+    VelocityCrossfadeDescriptor velocityCrossfade;
+    VelocityCrossfadeRuntimeDescriptor velocityCrossfadeRuntime;
 };
 
 struct SamplerRenderModelBuildResult;

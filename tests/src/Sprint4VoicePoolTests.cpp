@@ -136,23 +136,19 @@ drs::engine::SamplerRenderModelPtr buildModel(std::size_t frameCount = 4096,
         const auto zoneId = "pool-zone-" + suffix;
         const auto sampleId = "pool-sample-" + suffix;
         const auto streamId = "pool-stream-" + suffix;
-        snapshot.zones.push_back({ zoneId,
-                                   sampleId,
-                                   "Pool Zone " + suffix,
-                                   "pool-group",
-                                   "sustain",
-                                   60,
-                                   keyLow,
-                                   keyHigh,
-                                   1,
-                                   127,
-                                   0.0,
-                                   0.0,
-                                   0,
-                                   false,
-                                   0,
-                                   0,
-                                   triggerMode });
+        drs::engine::PlaybackSnapshotZone snapshotZone;
+        snapshotZone.id = zoneId;
+        snapshotZone.sampleSourceId = sampleId;
+        snapshotZone.displayName = "Pool Zone " + suffix;
+        snapshotZone.groupId = "pool-group";
+        snapshotZone.articulationId = "sustain";
+        snapshotZone.rootKey = 60;
+        snapshotZone.keyLow = keyLow;
+        snapshotZone.keyHigh = keyHigh;
+        snapshotZone.velocityLow = 1;
+        snapshotZone.velocityHigh = 127;
+        snapshotZone.triggerMode = triggerMode;
+        snapshot.zones.push_back(std::move(snapshotZone));
 
         auto decoded = std::make_shared<drs::engine::PreparedPlaybackDecodedSampleData>();
         decoded->normalizedChannels = { std::vector<float>(frameCount, 1.0f) };
@@ -164,23 +160,19 @@ drs::engine::SamplerRenderModelPtr buildModel(std::size_t frameCount = 4096,
         sample.channelCount = 1;
         sample.decodedSampleData = std::move(decoded);
         prepared.samples.push_back(std::move(sample));
-        prepared.zones.push_back({ zoneId,
-                                   sampleId,
-                                   streamId,
-                                   layerIndex,
-                                   layerIndex,
-                                   60,
-                                   keyLow,
-                                   keyHigh,
-                                   1,
-                                   127,
-                                   0.0,
-                                   0.0,
-                                   0,
-                                   false,
-                                   0,
-                                   0,
-                                   triggerMode });
+        drs::engine::PreparedPlaybackZoneHandle preparedZone;
+        preparedZone.zoneId = zoneId;
+        preparedZone.sampleSourceId = sampleId;
+        preparedZone.streamSampleId = streamId;
+        preparedZone.preparedSampleIndex = layerIndex;
+        preparedZone.preparedStreamIndex = layerIndex;
+        preparedZone.rootKey = 60;
+        preparedZone.keyLow = keyLow;
+        preparedZone.keyHigh = keyHigh;
+        preparedZone.velocityLow = 1;
+        preparedZone.velocityHigh = 127;
+        preparedZone.triggerMode = triggerMode;
+        prepared.zones.push_back(std::move(preparedZone));
     }
 
     auto payload = std::make_shared<drs::engine::PlaybackActivationPayload>();
