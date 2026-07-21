@@ -166,7 +166,7 @@ int main()
                                  "Review UI should surface the imported SFZ document path.");
             requireLabelContains(component,
                                  "sfzImportReviewSummaryLabel",
-                                 "Converted:",
+                                 "Approximated: 0",
                                  "Review UI should surface conversion counts.");
             requireLabelContains(component,
                                  "sfzImportReviewProjectionLabel",
@@ -177,7 +177,10 @@ int main()
             require(requireButton(component, "sfzImportReviewApplyButton").isEnabled(),
                     "Review UI should keep apply enabled for the first SFZ fixture.");
 
-            requireButton(component, "sfzImportReviewApplyButton").triggerClick();
+            auto& applyButton = requireButton(component, "sfzImportReviewApplyButton");
+            require(static_cast<bool>(applyButton.onClick),
+                    "Review UI should wire the import button callback.");
+            applyButton.onClick();
             pumpMessages(30);
         }
 
@@ -209,7 +212,10 @@ int main()
             require(requireEditor(component, "sfzImportReviewFindingsEditor").getText().contains("Projection issues:"),
                     "Blocked SFZ review should surface projection issues in the findings panel.");
 
-            requireButton(component, "sfzImportReviewCancelButton").triggerClick();
+            auto& cancelButton = requireButton(component, "sfzImportReviewCancelButton");
+            require(static_cast<bool>(cancelButton.onClick),
+                    "Review UI should wire the cancel button callback.");
+            cancelButton.onClick();
             pumpMessages(30);
         }
 

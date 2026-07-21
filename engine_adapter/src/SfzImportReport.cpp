@@ -1,9 +1,13 @@
 #include "drs/engine/SfzImportReport.h"
+#include "drs/engine/VelocityCrossfade.h"
 
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
 #include <map>
+#include <optional>
+#include <set>
+#include <sstream>
 
 namespace drs::engine
 {
@@ -35,6 +39,35 @@ struct SupportKey
     }
 };
 
+struct CrossfadeOpcodeKey
+{
+    std::string sourcePath;
+    std::size_t lineNumber = 0;
+    std::size_t columnNumber = 0;
+    SfzOpcodeScope scope = SfzOpcodeScope::unknown;
+    std::string opcodeName;
+
+    bool operator<(const CrossfadeOpcodeKey& other) const noexcept
+    {
+        if (sourcePath != other.sourcePath)
+            return sourcePath < other.sourcePath;
+        if (lineNumber != other.lineNumber)
+            return lineNumber < other.lineNumber;
+        if (columnNumber != other.columnNumber)
+            return columnNumber < other.columnNumber;
+        if (scope != other.scope)
+            return scope < other.scope;
+        return opcodeName < other.opcodeName;
+    }
+};
+
+struct CrossfadeRegionTopology
+{
+    VelocityCrossfadeTopologyZoneDefinition topologyZone;
+    std::vector<CrossfadeOpcodeKey> ownerOpcodes;
+    VelocityCrossfadeZoneIssue zoneIssue = VelocityCrossfadeZoneIssue::none;
+};
+
 std::string toLowerAscii(const std::string& text)
 {
     std::string lowered = text;
@@ -59,6 +92,127 @@ bool isCurveValueOpcode(const std::string& opcodeName)
                        {
                            return std::isdigit(character) != 0;
                        });
+}
+
+bool isVelocityCrossfadeOpcode(const std::string& opcodeName)
+{
+    return opcodeName == "xfin_lovel" || opcodeName == "xfin_hivel"
+        || opcodeName == "xfout_lovel" || opcodeName == "xfout_hivel";
+}
+
+std::optional<int> parseIntValue(const std::string& text)
+{
+    try
+    {
+        return std::stoi(text);
+    }
+    catch (...)
+    {
+        return std::nullopt;
+    }
+}
+
+std::optional<int> parseMidiNoteValue(const std::string& text)
+{
+    if (text.empty())
+        return std::nullopt;
+
+    const auto lowered = toLowerAscii(text);
+    const bool numeric = std::all_of(lowered.begin(),
+                                     lowered.end(),
+                                     [](char character)
+                                     {
+                                         return std::isdigit(static_cast<unsigned char>(character)) != 0
+                                             || character == '-';
+                                     });
+    if (numeric)
+    {
+        const auto value = parseIntValue(lowered);
+        if (value.has_value() && *value >= 0 && *value <= 127)
+            return value;
+        return std::nullopt;
+    }
+
+    if (lowered.size() < 2 || lowered.size() > 4)
+        return std::nullopt;
+
+    int semitone = 0;
+    switch (lowered[0])
+    {
+        case 'c': semitone = 0; break;
+        case 'd': semitone = 2; break;
+        case 'e': semitone = 4; break;
+        case 'f': semitone = 5; break;
+        case 'g': semitone = 7; break;
+        case 'a': semitone = 9; break;
+        case 'b': semitone = 11; break;
+        default:
+            return std::nullopt;
+    }
+
+    std::size_t octaveStart = 1;
+    if (lowered.size() > 2 && (lowered[1] == '#' || lowered[1] == 'b'))
+    {
+        semitone += lowered[1] == '#' ? 1 : -1;
+        octaveStart = 2;
+    }
+
+    const auto octaveText = lowered.substr(octaveStart);
+    if (octaveText.empty())
+        return std::nullopt;
+
+    const auto octave = parseIntValue(octaveText);
+    if (!octave.has_value())
+        return std::nullopt;
+
+    const auto midiNote = ((*octave + 1) * 12) + semitone;
+    if (midiNote >= 0 && midiNote <= 127)
+        return midiNote;
+
+    return std::nullopt;
+}
+
+std::uint64_t computeFnv1a64(const std::string& text) noexcept
+{
+    std::uint64_t hash = 14695981039346656037ull;
+    for (const auto character : text)
+    {
+        hash ^= static_cast<unsigned char>(character);
+        hash *= 1099511628211ull;
+    }
+
+    return hash;
+}
+
+std::uint64_t buildCrossfadePairingKey(const std::string& articulationId,
+                                       int rootKey,
+                                       int keyLow,
+                                       int keyHigh,
+                                       int roundRobinLength,
+                                       int roundRobinPosition)
+{
+    std::ostringstream stream;
+    stream << articulationId
+           << "|" << rootKey
+           << "|" << keyLow
+           << "|" << keyHigh
+           << "|" << roundRobinLength
+           << "|" << roundRobinPosition;
+    return computeFnv1a64(stream.str());
+}
+
+std::string buildArticulationId(const SfzNormalizedSection& section)
+{
+    if (const auto* trigger = findEffectiveOpcode(section, "trigger"))
+    {
+        const auto lowered = toLowerAscii(trigger->value);
+        if (lowered == "release")
+            return "release";
+        if (lowered == "legato")
+            return "legato";
+    }
+
+    return "sustain";
 }
 
 std::size_t dispositionRank(const SfzImportSupportDisposition disposition) noexcept
@@ -89,10 +243,297 @@ std::size_t countParsedOpcodes(const SfzParsedDocument& document) noexcept
 
 std::string findEffectiveSampleReference(const SfzNormalizedSection& section)
 {
-    if (const auto* sample = findEffectiveOpcode(section, "sample"))
-        return sample->value;
+    const auto* sample = findEffectiveOpcode(section, "sample");
+    if (sample == nullptr)
+        return {};
 
-    return {};
+    fs::path resolvedBase = fs::path(sample->location.sourcePath).parent_path();
+    if (const auto* prefix = findEffectiveOpcode(section, "prefix_sfz_path");
+        prefix != nullptr && !prefix->value.empty())
+    {
+        resolvedBase /= fs::path(prefix->value);
+    }
+
+    const fs::path samplePath(sample->value);
+    return samplePath.is_absolute()
+        ? samplePath.lexically_normal().generic_string()
+        : (resolvedBase / samplePath).lexically_normal().generic_string();
+}
+
+std::string resolveSamplePathForSection(const SfzNormalizedSection& section,
+                                        const SfzResolvedOpcode& opcode)
+{
+    fs::path resolvedBase = fs::path(opcode.location.sourcePath).parent_path();
+    if (const auto* prefix = findEffectiveOpcode(section, "prefix_sfz_path");
+        prefix != nullptr && !prefix->value.empty())
+    {
+        resolvedBase /= fs::path(prefix->value);
+    }
+
+    const fs::path samplePath(opcode.value);
+    return samplePath.is_absolute()
+        ? samplePath.lexically_normal().generic_string()
+        : (resolvedBase / samplePath).lexically_normal().generic_string();
+}
+
+OpcodeClassification classifySampleOpcode(const SfzNormalizedSection& section,
+                                          const SfzResolvedOpcode& opcode)
+{
+    const auto resolvedSamplePath = resolveSamplePathForSection(section, opcode);
+    if (!fs::exists(resolvedSamplePath))
+    {
+        return { SfzImportSupportDisposition::blocking,
+                 "zone.samplePath",
+                 "Sample file resolution is required before any native zone can be created.",
+                 "sfz.sample.missing",
+                 "Referenced sample file is missing",
+                 "The importer could not resolve sample '" + opcode.value + "' for this region." };
+    }
+
+    return { SfzImportSupportDisposition::converted,
+             "zone.samplePath",
+             "Relative sample references can map directly into native zone source paths." };
+}
+
+CrossfadeOpcodeKey makeCrossfadeOpcodeKey(const SfzResolvedOpcode& opcode)
+{
+    return {
+        opcode.location.sourcePath,
+        opcode.location.lineNumber,
+        opcode.location.columnNumber,
+        opcode.location.scope,
+        opcode.name
+    };
+}
+
+std::vector<CrossfadeOpcodeKey> collectCrossfadeOwnerKeys(const SfzNormalizedSection& section)
+{
+    std::set<CrossfadeOpcodeKey> uniqueKeys;
+    for (const auto& opcode : section.effectiveOpcodes)
+    {
+        if (isVelocityCrossfadeOpcode(toLowerAscii(opcode.name)))
+            uniqueKeys.insert(makeCrossfadeOpcodeKey(opcode));
+    }
+
+    return { uniqueKeys.begin(), uniqueKeys.end() };
+}
+
+std::string buildVelocityCrossfadeIssueDetail(VelocityCrossfadeZoneIssue issue)
+{
+    switch (issue)
+    {
+        case VelocityCrossfadeZoneIssue::none:
+            return {};
+        case VelocityCrossfadeZoneIssue::velocityRangeInvalid:
+            return "The imported velocity bounds do not resolve to an ordered 1-127 range.";
+        case VelocityCrossfadeZoneIssue::unsupportedCurve:
+            return "Only the first-pass linear crossfade curve is currently supported.";
+        case VelocityCrossfadeZoneIssue::fadeInPartial:
+            return "Fade-in metadata must provide both xfin_lovel and xfin_hivel.";
+        case VelocityCrossfadeZoneIssue::fadeInOutOfRange:
+            return "Fade-in boundaries must begin at the owning layer's velocityLow and stay within range.";
+        case VelocityCrossfadeZoneIssue::fadeInInverted:
+            return "Fade-in boundaries must rise from low to high velocity.";
+        case VelocityCrossfadeZoneIssue::fadeOutPartial:
+            return "Fade-out metadata must provide both xfout_lovel and xfout_hivel.";
+        case VelocityCrossfadeZoneIssue::fadeOutOutOfRange:
+            return "Fade-out boundaries must end at the owning layer's velocityHigh and stay within range.";
+        case VelocityCrossfadeZoneIssue::fadeOutInverted:
+            return "Fade-out boundaries must rise from low to high velocity.";
+        case VelocityCrossfadeZoneIssue::fadeWindowsOverlap:
+            return "Fade-in and fade-out windows on the same layer must not touch or overlap.";
+    }
+
+    return "The imported velocity-crossfade shape is outside the supported first-pass contract.";
+}
+
+std::string buildVelocityCrossfadeTopologyDetail(VelocityCrossfadeTopologyIssue issue)
+{
+    switch (issue)
+    {
+        case VelocityCrossfadeTopologyIssue::none:
+            return {};
+        case VelocityCrossfadeTopologyIssue::fadeInMissingPartner:
+            return "The imported fade-in layer did not resolve a single lower adjacent partner.";
+        case VelocityCrossfadeTopologyIssue::fadeInAmbiguousPartner:
+            return "The imported fade-in layer resolved multiple lower adjacent partners.";
+        case VelocityCrossfadeTopologyIssue::fadeOutMissingPartner:
+            return "The imported fade-out layer did not resolve a single upper adjacent partner.";
+        case VelocityCrossfadeTopologyIssue::fadeOutAmbiguousPartner:
+            return "The imported fade-out layer resolved multiple upper adjacent partners.";
+    }
+
+    return "The imported velocity-crossfade topology is outside the supported first-pass contract.";
+}
+
+OpcodeClassification makeSupportedVelocityCrossfadeClassification()
+{
+    return {
+        SfzImportSupportDisposition::converted,
+        "zone.velocityCrossfade",
+        "Linear adjacent velocity-crossfade boundaries map into native metadata and now play back with deterministic gains."
+    };
+}
+
+OpcodeClassification makeUnsupportedVelocityCrossfadeClassification(const std::string& detail)
+{
+    return {
+        SfzImportSupportDisposition::approximated,
+        "zone.velocityCrossfade",
+        "Velocity-crossfade metadata can be preserved, but this shape falls outside the supported first-pass playback contract.",
+        "sfz.velocity_crossfade.approximated",
+        "Velocity crossfade requires review",
+        detail.empty()
+            ? "This SFZ uses velocity-crossfade boundaries that are not yet guaranteed to play back as authored."
+            : "This SFZ uses velocity-crossfade boundaries that are not yet guaranteed to play back as authored. "
+                + detail
+    };
+}
+
+std::map<CrossfadeOpcodeKey, OpcodeClassification> buildVelocityCrossfadeOpcodeClassifications(
+    const SfzNormalizedDocument& document)
+{
+    std::vector<CrossfadeRegionTopology> regions;
+    regions.reserve(document.sections.size());
+
+    for (const auto& section : document.sections)
+    {
+        if (section.scope != SfzOpcodeScope::region)
+            continue;
+
+        auto ownerOpcodes = collectCrossfadeOwnerKeys(section);
+        if (ownerOpcodes.empty())
+            continue;
+
+        CrossfadeRegionTopology region;
+        region.ownerOpcodes = std::move(ownerOpcodes);
+        region.topologyZone.crossfade = {};
+        region.topologyZone.crossfade.fadeInLowVelocity =
+            parseIntValue(findEffectiveOpcode(section, "xfin_lovel") != nullptr
+                              ? findEffectiveOpcode(section, "xfin_lovel")->value
+                              : "0")
+                .value_or(0);
+        region.topologyZone.crossfade.fadeInHighVelocity =
+            parseIntValue(findEffectiveOpcode(section, "xfin_hivel") != nullptr
+                              ? findEffectiveOpcode(section, "xfin_hivel")->value
+                              : "0")
+                .value_or(0);
+        region.topologyZone.crossfade.fadeOutLowVelocity =
+            parseIntValue(findEffectiveOpcode(section, "xfout_lovel") != nullptr
+                              ? findEffectiveOpcode(section, "xfout_lovel")->value
+                              : "0")
+                .value_or(0);
+        region.topologyZone.crossfade.fadeOutHighVelocity =
+            parseIntValue(findEffectiveOpcode(section, "xfout_hivel") != nullptr
+                              ? findEffectiveOpcode(section, "xfout_hivel")->value
+                              : "0")
+                .value_or(0);
+
+        const auto rootKey = parseMidiNoteValue(findEffectiveOpcode(section, "pitch_keycenter") != nullptr
+                                                    ? findEffectiveOpcode(section, "pitch_keycenter")->value
+                                                    : "60")
+                                 .value_or(60);
+        const auto keyLow = parseMidiNoteValue(findEffectiveOpcode(section, "lokey") != nullptr
+                                                   ? findEffectiveOpcode(section, "lokey")->value
+                                                   : std::to_string(rootKey))
+                                .value_or(rootKey);
+        const auto keyHigh = parseMidiNoteValue(findEffectiveOpcode(section, "hikey") != nullptr
+                                                    ? findEffectiveOpcode(section, "hikey")->value
+                                                    : std::to_string(rootKey))
+                                 .value_or(rootKey);
+        auto velocityLow = parseIntValue(findEffectiveOpcode(section, "lovel") != nullptr
+                                             ? findEffectiveOpcode(section, "lovel")->value
+                                             : "1")
+                               .value_or(1);
+        auto velocityHigh = parseIntValue(findEffectiveOpcode(section, "hivel") != nullptr
+                                              ? findEffectiveOpcode(section, "hivel")->value
+                                              : "127")
+                                .value_or(127);
+        if (region.topologyZone.crossfade.fadeInLowVelocity > 0)
+            velocityLow = region.topologyZone.crossfade.fadeInLowVelocity;
+        if (region.topologyZone.crossfade.fadeOutHighVelocity > 0)
+            velocityHigh = region.topologyZone.crossfade.fadeOutHighVelocity;
+
+        region.topologyZone.velocityLow = velocityLow;
+        region.topologyZone.velocityHigh = velocityHigh;
+        region.topologyZone.roundRobinLength = parseIntValue(findEffectiveOpcode(section, "seq_length") != nullptr
+                                                                 ? findEffectiveOpcode(section, "seq_length")->value
+                                                                 : "0")
+                                                   .value_or(0);
+        region.topologyZone.roundRobinPosition = parseIntValue(findEffectiveOpcode(section, "seq_position") != nullptr
+                                                                   ? findEffectiveOpcode(section, "seq_position")->value
+                                                                   : "0")
+                                                     .value_or(0);
+        region.topologyZone.pairingKey = buildCrossfadePairingKey(buildArticulationId(section),
+                                                                  rootKey,
+                                                                  keyLow,
+                                                                  keyHigh,
+                                                                  region.topologyZone.roundRobinLength,
+                                                                  region.topologyZone.roundRobinPosition);
+
+        const VelocityCrossfadeZoneDefinition validationZone {
+            region.topologyZone.velocityLow,
+            region.topologyZone.velocityHigh,
+            region.topologyZone.crossfade
+        };
+        region.zoneIssue = validateFirstPassVelocityCrossfadeZone(validationZone);
+        regions.push_back(std::move(region));
+    }
+
+    std::vector<VelocityCrossfadeTopologyZoneDefinition> topologyZones;
+    topologyZones.reserve(regions.size());
+    for (const auto& region : regions)
+        topologyZones.push_back(region.topologyZone);
+
+    std::vector<VelocityCrossfadeTopologyFinding> topologyFindings;
+    buildFirstPassVelocityCrossfadeRuntimeTopology(topologyZones, &topologyFindings);
+
+    std::map<std::size_t, VelocityCrossfadeTopologyIssue> topologyIssuesByRegion;
+    for (const auto& finding : topologyFindings)
+    {
+        if (finding.issue == VelocityCrossfadeTopologyIssue::none)
+            continue;
+
+        const auto existing = topologyIssuesByRegion.find(finding.zoneIndex);
+        if (existing == topologyIssuesByRegion.end()
+            || static_cast<int>(finding.issue) < static_cast<int>(existing->second))
+        {
+            topologyIssuesByRegion[finding.zoneIndex] = finding.issue;
+        }
+    }
+
+    std::map<CrossfadeOpcodeKey, OpcodeClassification> classifications;
+    for (std::size_t regionIndex = 0; regionIndex < regions.size(); ++regionIndex)
+    {
+        OpcodeClassification classification;
+        if (regions[regionIndex].zoneIssue != VelocityCrossfadeZoneIssue::none)
+        {
+            classification = makeUnsupportedVelocityCrossfadeClassification(
+                buildVelocityCrossfadeIssueDetail(regions[regionIndex].zoneIssue));
+        }
+        else if (const auto topologyIssue = topologyIssuesByRegion.find(regionIndex);
+                 topologyIssue != topologyIssuesByRegion.end())
+        {
+            classification = makeUnsupportedVelocityCrossfadeClassification(
+                buildVelocityCrossfadeTopologyDetail(topologyIssue->second));
+        }
+        else
+        {
+            classification = makeSupportedVelocityCrossfadeClassification();
+        }
+
+        for (const auto& ownerKey : regions[regionIndex].ownerOpcodes)
+        {
+            auto existing = classifications.find(ownerKey);
+            if (existing == classifications.end()
+                || dispositionRank(classification.disposition) > dispositionRank(existing->second.disposition))
+            {
+                classifications[ownerKey] = classification;
+            }
+        }
+    }
+
+    return classifications;
 }
 
 void incrementDispositionCount(SfzImportReportSummary& summary,
@@ -185,25 +626,6 @@ OpcodeClassification classifyOpcode(const SfzResolvedOpcode& opcode)
 {
     const auto opcodeName = toLowerAscii(opcode.name);
 
-    if (opcodeName == "sample")
-    {
-        const auto resolvedSamplePath =
-            fs::path(opcode.location.sourcePath).parent_path() / fs::path(opcode.value);
-        if (!fs::exists(resolvedSamplePath))
-        {
-            return { SfzImportSupportDisposition::blocking,
-                     "zone.samplePath",
-                     "Sample file resolution is required before any native zone can be created.",
-                     "sfz.sample.missing",
-                     "Referenced sample file is missing",
-                     "The importer could not resolve sample '" + opcode.value + "' next to the declaring SFZ file." };
-        }
-
-        return { SfzImportSupportDisposition::converted,
-                 "zone.samplePath",
-                 "Relative sample references can map directly into native zone source paths." };
-    }
-
     if (opcodeName == "lokey")
     {
         return { SfzImportSupportDisposition::converted,
@@ -239,6 +661,13 @@ OpcodeClassification classifyOpcode(const SfzResolvedOpcode& opcode)
                  "Upper velocity bounds map directly into native velocity ranges." };
     }
 
+    if (opcodeName == "prefix_sfz_path")
+    {
+        return { SfzImportSupportDisposition::converted,
+                 "zone.samplePath",
+                 "Sample-path prefixes are consumed during import so each referenced sample resolves into a native source path." };
+    }
+
     if (opcodeName == "seq_length")
     {
         return { SfzImportSupportDisposition::converted,
@@ -265,17 +694,6 @@ OpcodeClassification classifyOpcode(const SfzResolvedOpcode& opcode)
         return { SfzImportSupportDisposition::converted,
                  "ampEnvelope.releaseSeconds",
                  "Per-zone and inherited release times can map into native envelope release controls." };
-    }
-
-    if (opcodeName == "xfin_lovel" || opcodeName == "xfin_hivel"
-        || opcodeName == "xfout_lovel" || opcodeName == "xfout_hivel")
-    {
-        return { SfzImportSupportDisposition::approximated,
-                 "zone.velocityCrossfade",
-                 "Velocity-crossfade edges can be preserved, but true crossfade playback is not yet guaranteed.",
-                 "sfz.velocity_crossfade.approximated",
-                 "Velocity crossfade will be approximated",
-                 "This SFZ uses velocity-crossfade boundaries that Phase 3.1 currently reports as a lossy import." };
     }
 
     if (opcodeName == "label_cc1")
@@ -365,6 +783,8 @@ SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath)
             result.report.summary.sourceFileCount = result.report.sourceFiles.size();
             result.report.summary.sectionCount = result.normalizeResult.document.sections.size();
             result.report.summary.opcodeCount = 0;
+            const auto crossfadeClassifications =
+                buildVelocityCrossfadeOpcodeClassifications(result.normalizeResult.document);
 
             std::map<SupportKey, SfzImportOpcodeSupportSummary> supportSummaries;
 
@@ -375,7 +795,18 @@ SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath)
 
                 for (const auto& opcode : section.localOpcodes)
                 {
-                    const auto classification = classifyOpcode(opcode);
+                    auto classification = toLowerAscii(opcode.name) == "sample"
+                        ? classifySampleOpcode(section, opcode)
+                        : classifyOpcode(opcode);
+                    if (isVelocityCrossfadeOpcode(toLowerAscii(opcode.name)))
+                    {
+                        const auto classificationIterator =
+                            crossfadeClassifications.find(makeCrossfadeOpcodeKey(opcode));
+                        classification = classificationIterator != crossfadeClassifications.end()
+                            ? classificationIterator->second
+                            : makeUnsupportedVelocityCrossfadeClassification(
+                                "The importer could not confirm a supported adjacent-layer pairing for this opcode.");
+                    }
                     incrementDispositionCount(result.report.summary, classification.disposition);
                     addClassificationFinding(result.report.findings,
                                              classification,

@@ -246,6 +246,22 @@ bool shouldEnableLoop(const SfzNormalizedSection& section)
     return true;
 }
 
+fs::path resolveSamplePath(const SfzNormalizedSection& section,
+                           const SfzResolvedOpcode& sampleOpcode)
+{
+    fs::path resolvedBase = fs::path(sampleOpcode.location.sourcePath).parent_path();
+    if (const auto* prefix = findEffectiveOpcode(section, "prefix_sfz_path");
+        prefix != nullptr && !prefix->value.empty())
+    {
+        resolvedBase /= fs::path(prefix->value);
+    }
+
+    const fs::path samplePath(sampleOpcode.value);
+    return samplePath.is_absolute()
+        ? samplePath.lexically_normal()
+        : (resolvedBase / samplePath).lexically_normal();
+}
+
 std::vector<std::string> buildProjectNotes(const SfzImportReport& report)
 {
     std::vector<std::string> notes;
@@ -375,8 +391,7 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
             continue;
         }
 
-        const auto samplePath = (fs::path(sampleOpcode->location.sourcePath).parent_path() / fs::path(sampleOpcode->value))
-            .lexically_normal();
+        const auto samplePath = resolveSamplePath(section, *sampleOpcode);
         const auto canonicalSamplePath = samplePath.generic_string();
 
         std::string sampleSourceId;

@@ -1,7 +1,9 @@
 #include "drs/engine/SfzImportReport.h"
 
 #include <algorithm>
+#include <array>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -56,6 +58,29 @@ std::size_t countFindingsWithCode(const drs::engine::SfzImportReport& report,
                           return finding.code == code;
                       }));
 }
+
+std::filesystem::path resolveFirstSamplePath(const std::filesystem::path& fixturePath)
+{
+    constexpr std::array extensions { ".flac", ".wav", ".aif", ".aiff" };
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(fixturePath.parent_path()))
+    {
+        if (!entry.is_regular_file())
+            continue;
+
+        const auto extension = entry.path().extension().generic_string();
+        if (std::find(extensions.begin(), extensions.end(), extension) != extensions.end())
+            return entry.path();
+    }
+
+    throw std::runtime_error("Could not locate a sample asset next to the first SFZ fixture.");
+}
+
+void writeTextFile(const std::filesystem::path& path, const std::string& text)
+{
+    std::filesystem::create_directories(path.parent_path());
+    std::ofstream output(path, std::ios::binary);
+    output << text;
+}
 } // namespace
 
 int main()
@@ -89,25 +114,25 @@ int main()
                 "The first SFZ fixture report section count changed unexpectedly.");
         require(analysis.report.summary.opcodeCount == 1608,
                 "The first SFZ fixture report opcode count changed unexpectedly.");
-        require(analysis.report.summary.convertedOpcodeCount == 1583,
+        require(analysis.report.summary.convertedOpcodeCount == 1599,
                 "The first SFZ fixture converted-opcode count changed unexpectedly.");
-        require(analysis.report.summary.approximatedOpcodeCount == 16,
+        require(analysis.report.summary.approximatedOpcodeCount == 0,
                 "The first SFZ fixture approximated-opcode count changed unexpectedly.");
         require(analysis.report.summary.reportedOnlyOpcodeCount == 9,
                 "The first SFZ fixture reported-only opcode count changed unexpectedly.");
         require(analysis.report.summary.blockingOpcodeCount == 0,
                 "The first SFZ fixture should not currently report blocking opcode counts.");
-        require(analysis.report.summary.warningFindingCount == 25
+        require(analysis.report.summary.warningFindingCount == 9
                     && analysis.report.summary.errorFindingCount == 0,
                 "The first SFZ fixture finding severity counts changed unexpectedly.");
 
         require(analysis.report.traceEntries.size() == analysis.report.summary.opcodeCount,
                 "The SFZ trace map should currently contain one entry per local opcode.");
-        require(analysis.report.findings.size() == 25,
+        require(analysis.report.findings.size() == 9,
                 "The first SFZ fixture finding count changed unexpectedly.");
 
-        require(countFindingsWithCode(analysis.report, "sfz.velocity_crossfade.approximated") == 16,
-                "Velocity crossfade warnings should currently land on every crossfade opcode occurrence.");
+        require(countFindingsWithCode(analysis.report, "sfz.velocity_crossfade.approximated") == 0,
+                "Supported velocity crossfades should no longer emit approximation findings.");
         require(countFindingsWithCode(analysis.report, "sfz.cc.label.reported") == 1,
                 "The first SFZ fixture should still report exactly one CC label finding.");
         require(countFindingsWithCode(analysis.report, "sfz.cc.default.reported") == 1,
@@ -121,9 +146,9 @@ int main()
 
         const auto* crossfadeSummary = findSupportSummary(analysis.report, SfzOpcodeScope::group, "xfin_lovel");
         require(crossfadeSummary != nullptr
-                    && crossfadeSummary->disposition == SfzImportSupportDisposition::approximated
+                    && crossfadeSummary->disposition == SfzImportSupportDisposition::converted
                     && crossfadeSummary->occurrenceCount == 4,
-                "The support matrix should classify group xfin_lovel as a repeated lossy crossfade mapping.");
+                "The support matrix should classify supported group xfin_lovel as converted.");
         const auto* seqLengthSummary = findSupportSummary(analysis.report, SfzOpcodeScope::region, "seq_length");
         require(seqLengthSummary != nullptr
                     && seqLengthSummary->disposition == SfzImportSupportDisposition::converted
@@ -146,6 +171,33 @@ int main()
                     && traceIterator->disposition == SfzImportSupportDisposition::reportedOnly
                     && traceIterator->findingCode == "sfz.cc.label.reported",
                 "The trace map should preserve the CC1 label as a report-first control opcode.");
+
+        const auto samplePath = resolveFirstSamplePath(fixturePath).lexically_normal();
+        const auto invalidFixtureDirectory =
+            std::filesystem::temp_directory_path() / "drs-sprint31-sfz-crossfade-review";
+        const auto invalidFixturePath = invalidFixtureDirectory / "unsupported-topology.sfz";
+        writeTextFile(
+            invalidFixturePath,
+            "<group>\n"
+            "pitch_keycenter=60\n"
+            "lokey=60\n"
+            "hikey=60\n"
+            "lovel=25\n"
+            "hivel=84\n"
+            "xfin_lovel=25\n"
+            "xfin_hivel=60\n"
+            "<region>\n"
+            "sample=" + samplePath.generic_string() + "\n");
+        const auto invalidAnalysis = analyzeSfzImportDocument(invalidFixturePath.generic_string());
+        require(invalidAnalysis.analyzed && invalidAnalysis.report.available,
+                "Unsupported crossfade topology should still produce a review report.");
+        require(countFindingsWithCode(invalidAnalysis.report, "sfz.velocity_crossfade.approximated") == 2,
+                "Unsupported crossfade topology should remain visible through approximation findings.");
+        const auto* invalidCrossfadeSummary =
+            findSupportSummary(invalidAnalysis.report, SfzOpcodeScope::group, "xfin_lovel");
+        require(invalidCrossfadeSummary != nullptr
+                    && invalidCrossfadeSummary->disposition == SfzImportSupportDisposition::approximated,
+                "Unsupported crossfade topology should remain classified as approximated.");
 
         std::cout << "Sprint 3.1.3 SFZ compatibility tests passed." << std::endl;
         return 0;

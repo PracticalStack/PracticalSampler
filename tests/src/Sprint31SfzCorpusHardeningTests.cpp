@@ -63,6 +63,7 @@ struct FixtureExpectation
 {
     const char* label = "";
     const char* relativePath = "";
+    std::size_t expectedConvertedCount = 0;
     std::size_t expectedApproximateCount = 0;
     std::size_t expectedWarningCount = 0;
     std::string expectedSampleFragment;
@@ -78,31 +79,37 @@ int main()
         const std::vector<FixtureExpectation> fixtures {
             { "mono-xfade",
               "DemoSFVInstruments/jlearman.jRhodes3d-master-rr/jRhodes3d-mono/_jRhodes3d-mono-flac.sfz",
-              16,
-              25,
+              1599,
+              0,
+              9,
               "jRhodes3d-mono" },
             { "mono-no-xfade",
               "DemoSFVInstruments/jlearman.jRhodes3d-master-rr/jRhodes3d-mono-no-xfade.sfz",
+              1592,
               0,
               9,
               "jRhodes3d-mono" },
             { "stereo-xfade",
               "DemoSFVInstruments/jlearman.jRhodes3d-master-rr/jRhodes3d-st.sfz",
-              16,
-              25,
+              1600,
+              0,
+              9,
               "jRhodes3d-st" },
             { "stereo-no-xfade",
               "DemoSFVInstruments/jlearman.jRhodes3d-master-rr/jRhodes3d-st-no-xfade.sfz",
+              1592,
               0,
               9,
               "jRhodes3d-st" },
             { "stereo-vibrato-xfade",
               "DemoSFVInstruments/jlearman.jRhodes3d-master-rr/jRhodes3d-sv.sfz",
-              16,
-              25,
+              1600,
+              0,
+              9,
               "jRhodes3d-sv" },
             { "stereo-vibrato-no-xfade",
               "DemoSFVInstruments/jlearman.jRhodes3d-master-rr/jRhodes3d-sv-no-xfade.sfz",
+              1592,
               0,
               9,
               "jRhodes3d-sv" }
@@ -138,19 +145,28 @@ int main()
                             + analysis.report.summary.reportedOnlyOpcodeCount
                             + analysis.report.summary.blockingOpcodeCount,
                     std::string("Fixture opcode summary should still balance exactly: ") + fixture.label);
-            require(analysis.report.summary.convertedOpcodeCount == 1583,
-                    std::string("Fixture converted-opcode count changed unexpectedly: ") + fixture.label);
+            require(analysis.report.summary.convertedOpcodeCount == fixture.expectedConvertedCount,
+                    std::string("Fixture converted-opcode count changed unexpectedly: ") + fixture.label
+                        + " expected=" + std::to_string(fixture.expectedConvertedCount)
+                        + " actual=" + std::to_string(analysis.report.summary.convertedOpcodeCount));
             require(analysis.report.summary.approximatedOpcodeCount == fixture.expectedApproximateCount,
-                    std::string("Fixture approximated-opcode count changed unexpectedly: ") + fixture.label);
+                    std::string("Fixture approximated-opcode count changed unexpectedly: ") + fixture.label
+                        + " expected=" + std::to_string(fixture.expectedApproximateCount)
+                        + " actual=" + std::to_string(analysis.report.summary.approximatedOpcodeCount));
             require(analysis.report.summary.reportedOnlyOpcodeCount == 9,
-                    std::string("Fixture reported-only opcode count changed unexpectedly: ") + fixture.label);
+                    std::string("Fixture reported-only opcode count changed unexpectedly: ") + fixture.label
+                        + " actual=" + std::to_string(analysis.report.summary.reportedOnlyOpcodeCount));
             require(analysis.report.summary.blockingOpcodeCount == 0,
-                    std::string("Fixture should not contribute blocking opcode counts: ") + fixture.label);
+                    std::string("Fixture should not contribute blocking opcode counts: ") + fixture.label
+                        + " actual=" + std::to_string(analysis.report.summary.blockingOpcodeCount));
             require(analysis.report.summary.warningFindingCount == fixture.expectedWarningCount
                         && analysis.report.summary.errorFindingCount == 0,
-                    std::string("Fixture warning/error counts changed unexpectedly: ") + fixture.label);
+                    std::string("Fixture warning/error counts changed unexpectedly: ") + fixture.label
+                        + " warnings=" + std::to_string(analysis.report.summary.warningFindingCount)
+                        + " errors=" + std::to_string(analysis.report.summary.errorFindingCount));
             require(analysis.report.findings.size() == fixture.expectedWarningCount,
-                    std::string("Fixture finding count changed unexpectedly: ") + fixture.label);
+                    std::string("Fixture finding count changed unexpectedly: ") + fixture.label
+                        + " actual=" + std::to_string(analysis.report.findings.size()));
 
             const auto crossfadeFindingCount =
                 countFindingsWithCode(analysis, "sfz.velocity_crossfade.approximated");

@@ -67,9 +67,10 @@ void requireFindingEquals(const drs::engine::SfzImportFinding& expected,
                 && expected.summary == actual.summary
                 && expected.detail == actual.detail
                 && expected.location.scope == actual.location.scope
-                && expected.location.headerName == actual.location.headerName
                 && expected.location.sourcePath == actual.location.sourcePath
-                && expected.location.lineNumber == actual.location.lineNumber,
+                && expected.location.lineNumber == actual.location.lineNumber
+                && expected.location.columnNumber == actual.location.columnNumber
+                && expected.location.opcode == actual.location.opcode,
             context);
 }
 
@@ -87,9 +88,10 @@ void requireTraceEquals(const drs::engine::SfzImportTraceEntry& expected,
                 && expected.disposition == actual.disposition
                 && expected.findingCode == actual.findingCode
                 && expected.location.scope == actual.location.scope
-                && expected.location.headerName == actual.location.headerName
                 && expected.location.sourcePath == actual.location.sourcePath
-                && expected.location.lineNumber == actual.location.lineNumber,
+                && expected.location.lineNumber == actual.location.lineNumber
+                && expected.location.columnNumber == actual.location.columnNumber
+                && expected.location.opcode == actual.location.opcode,
             context);
 }
 

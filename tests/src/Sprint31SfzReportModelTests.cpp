@@ -54,16 +54,16 @@ int main()
                 "The shared SFZ report model should preserve the explicit confirmation gate.");
         require(model.headline == "Review SFZ import",
                 "The shared SFZ report model headline changed unexpectedly.");
-        require(!model.guidance.empty(),
+        require(model.guidance.find("velocity crossfades will be preserved") != std::string::npos,
                 "The shared SFZ report model should publish creator guidance.");
         require(model.documentPath == analysis.report.rootDocumentPath,
                 "The shared SFZ report model should preserve the analyzed document path.");
-        require(model.convertedCount == 1583
-                    && model.approximatedCount == 16
+        require(model.convertedCount == 1599
+                    && model.approximatedCount == 0
                     && model.reportedOnlyCount == 9
                     && model.blockingCount == 0,
                 "The shared SFZ report model summary counts changed unexpectedly.");
-        require(model.report.findings.size() == 25,
+        require(model.report.findings.size() == 9,
                 "The shared SFZ report model should preserve the full compatibility finding list.");
 
         const auto missingAnalysis = engineFacade.analyzeSfzImportDocument(
