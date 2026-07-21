@@ -63,7 +63,10 @@
       "velocityLow": 1,
       "velocityHigh": 95,
       "streamOffsetBytes": 0,
-      "prefetchBytes": 16384
+      "prefetchBytes": 16384,
+      "releaseSeconds": 0.0,
+      "roundRobinLength": 0,
+      "roundRobinPosition": 0
     },
     {
       "id": "pad-a3-accent",
@@ -77,7 +80,10 @@
       "velocityLow": 96,
       "velocityHigh": 127,
       "streamOffsetBytes": 0,
-      "prefetchBytes": 16384
+      "prefetchBytes": 16384,
+      "releaseSeconds": 0.0,
+      "roundRobinLength": 0,
+      "roundRobinPosition": 0
     },
     {
       "id": "lead-a4",
@@ -91,7 +97,10 @@
       "velocityLow": 1,
       "velocityHigh": 95,
       "streamOffsetBytes": 393216,
-      "prefetchBytes": 16384
+      "prefetchBytes": 16384,
+      "releaseSeconds": 0.0,
+      "roundRobinLength": 0,
+      "roundRobinPosition": 0
     },
     {
       "id": "lead-a4-accent",
@@ -105,7 +114,10 @@
       "velocityLow": 96,
       "velocityHigh": 127,
       "streamOffsetBytes": 393216,
-      "prefetchBytes": 16384
+      "prefetchBytes": 16384,
+      "releaseSeconds": 0.0,
+      "roundRobinLength": 0,
+      "roundRobinPosition": 0
     }
   ],
   "validationNotes": [

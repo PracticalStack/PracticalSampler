@@ -1030,6 +1030,29 @@ add_test(
     COMMAND drs_phase3_crossfade_persistence_tests
 )
 
+add_executable(drs_phase3_crossfade_prepared_playback_tests
+    src/Phase3CrossfadePreparedPlaybackTests.cpp
+)
+
+target_link_libraries(drs_phase3_crossfade_prepared_playback_tests
+    PRIVATE
+        drs_engine_adapter
+        drs_sample_import
+        juce::juce_audio_formats
+)
+
+target_compile_features(drs_phase3_crossfade_prepared_playback_tests PRIVATE cxx_std_17)
+
+target_include_directories(drs_phase3_crossfade_prepared_playback_tests
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/third_party/juce/modules
+)
+
+add_test(
+    NAME drs.phase3.crossfade_prepared_playback
+    COMMAND drs_phase3_crossfade_prepared_playback_tests
+)
+
 # Direct-only expected-red audit for the parser/report/UI seams intentionally left open by Sprint 3.1.1.
 add_executable(drs_sprint31_sfz_contract_red_tests
     src/Sprint31SfzContractRedTests.cpp
@@ -2157,7 +2180,12 @@ add_dependencies(drs_all_tests
     drs_sprint31_sfz_normalization_tests
     drs_sprint31_sfz_compatibility_tests
     drs_sprint31_sfz_report_model_tests
+    drs_sprint31_sfz_projection_tests
     drs_sprint31_sfz_contract_red_tests
+    drs_phase3_crossfade_contract_tests
+    drs_phase3_crossfade_fixture_characterization_tests
+    drs_phase3_crossfade_persistence_tests
+    drs_phase3_crossfade_prepared_playback_tests
     drs_sprint6_publish_contract_tests
     drs_sprint6_publish_contract_seam_tests
     drs_sprint6_publish_controller_tests

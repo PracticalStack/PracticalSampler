@@ -3,6 +3,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <string>
+#include <vector>
+
 namespace drs::engine
 {
 enum class VelocityCrossfadeCurve : uint8_t
@@ -26,6 +29,18 @@ struct VelocityCrossfadeZoneDefinition
     VelocityCrossfadeDescriptor crossfade;
 };
 
+struct VelocityCrossfadeRuntimeDescriptor
+{
+    int effectiveLowVelocity = 0;
+    int effectiveHighVelocity = 0;
+    std::string fadeInNeighborZoneId;
+    std::string fadeOutNeighborZoneId;
+    int fadeInOverlapLowVelocity = 0;
+    int fadeInOverlapHighVelocity = 0;
+    int fadeOutOverlapLowVelocity = 0;
+    int fadeOutOverlapHighVelocity = 0;
+};
+
 enum class VelocityCrossfadeZoneIssue : uint8_t
 {
     none = 0,
@@ -46,6 +61,43 @@ enum class VelocityCrossfadePairIssue : uint8_t
     lowerZoneUnsupported,
     upperZoneUnsupported,
     overlapMismatch
+};
+
+enum class VelocityCrossfadeTopologyIssue : uint8_t
+{
+    none = 0,
+    fadeInMissingPartner,
+    fadeInAmbiguousPartner,
+    fadeOutMissingPartner,
+    fadeOutAmbiguousPartner
+};
+
+struct VelocityCrossfadeTopologyZoneDefinition
+{
+    uint64_t pairingKey = 0;
+    int velocityLow = 1;
+    int velocityHigh = 127;
+    int roundRobinLength = 0;
+    int roundRobinPosition = 0;
+    VelocityCrossfadeDescriptor crossfade;
+};
+
+struct VelocityCrossfadeRuntimeTopology
+{
+    int effectiveLowVelocity = 0;
+    int effectiveHighVelocity = 0;
+    int fadeInNeighborZoneIndex = -1;
+    int fadeOutNeighborZoneIndex = -1;
+    int fadeInOverlapLowVelocity = 0;
+    int fadeInOverlapHighVelocity = 0;
+    int fadeOutOverlapLowVelocity = 0;
+    int fadeOutOverlapHighVelocity = 0;
+};
+
+struct VelocityCrossfadeTopologyFinding
+{
+    size_t zoneIndex = 0;
+    VelocityCrossfadeTopologyIssue issue = VelocityCrossfadeTopologyIssue::none;
 };
 
 struct VelocityCrossfadeFirstPassFixtureCharacterization
@@ -111,6 +163,18 @@ constexpr bool hasFadeOut(const VelocityCrossfadeDescriptor& descriptor) noexcep
 constexpr bool hasAnyVelocityCrossfadeValue(const VelocityCrossfadeDescriptor& descriptor) noexcept
 {
     return hasFadeIn(descriptor) || hasFadeOut(descriptor);
+}
+
+inline bool hasAnyVelocityCrossfadeRuntimeValue(const VelocityCrossfadeRuntimeDescriptor& descriptor) noexcept
+{
+    return descriptor.effectiveLowVelocity > 0
+        || descriptor.effectiveHighVelocity > 0
+        || !descriptor.fadeInNeighborZoneId.empty()
+        || !descriptor.fadeOutNeighborZoneId.empty()
+        || descriptor.fadeInOverlapLowVelocity > 0
+        || descriptor.fadeInOverlapHighVelocity > 0
+        || descriptor.fadeOutOverlapLowVelocity > 0
+        || descriptor.fadeOutOverlapHighVelocity > 0;
 }
 
 constexpr bool hasCompleteFadeIn(const VelocityCrossfadeDescriptor& descriptor) noexcept
@@ -253,5 +317,116 @@ inline bool participatesInFirstPassVelocityCrossfade(const VelocityCrossfadeZone
                                                      int velocity) noexcept
 {
     return computeFirstPassVelocityCrossfadeGain(zone, velocity) > 0.0;
+}
+
+inline std::vector<VelocityCrossfadeRuntimeTopology> buildFirstPassVelocityCrossfadeRuntimeTopology(
+    const std::vector<VelocityCrossfadeTopologyZoneDefinition>& zones,
+    std::vector<VelocityCrossfadeTopologyFinding>* findings = nullptr)
+{
+    std::vector<VelocityCrossfadeRuntimeTopology> topology(zones.size());
+
+    for (size_t zoneIndex = 0; zoneIndex < zones.size(); ++zoneIndex)
+    {
+        const auto& zone = zones[zoneIndex];
+        auto& runtime = topology[zoneIndex];
+        if (!hasAnyVelocityCrossfadeValue(zone.crossfade))
+            continue;
+
+        const VelocityCrossfadeZoneDefinition validationZone { zone.velocityLow, zone.velocityHigh, zone.crossfade };
+        runtime.effectiveLowVelocity = effectiveVelocityLow(validationZone);
+        runtime.effectiveHighVelocity = effectiveVelocityHigh(validationZone);
+
+        if (hasCompleteFadeIn(zone.crossfade))
+        {
+            std::vector<size_t> candidates;
+            for (size_t candidateIndex = 0; candidateIndex < zones.size(); ++candidateIndex)
+            {
+                if (candidateIndex == zoneIndex)
+                    continue;
+
+                const auto& candidate = zones[candidateIndex];
+                if (candidate.pairingKey != zone.pairingKey
+                    || candidate.roundRobinLength != zone.roundRobinLength
+                    || candidate.roundRobinPosition != zone.roundRobinPosition)
+                {
+                    continue;
+                }
+
+                const VelocityCrossfadeZoneDefinition lower {
+                    candidate.velocityLow,
+                    candidate.velocityHigh,
+                    candidate.crossfade
+                };
+                if (validateFirstPassVelocityCrossfadePair(lower, validationZone)
+                    == VelocityCrossfadePairIssue::none)
+                {
+                    candidates.push_back(candidateIndex);
+                }
+            }
+
+            if (candidates.size() == 1)
+            {
+                runtime.fadeInNeighborZoneIndex = static_cast<int>(candidates.front());
+                runtime.fadeInOverlapLowVelocity = zone.crossfade.fadeInLowVelocity;
+                runtime.fadeInOverlapHighVelocity = zone.crossfade.fadeInHighVelocity;
+            }
+            else if (findings != nullptr)
+            {
+                findings->push_back({
+                    zoneIndex,
+                    candidates.empty()
+                        ? VelocityCrossfadeTopologyIssue::fadeInMissingPartner
+                        : VelocityCrossfadeTopologyIssue::fadeInAmbiguousPartner
+                });
+            }
+        }
+
+        if (hasCompleteFadeOut(zone.crossfade))
+        {
+            std::vector<size_t> candidates;
+            for (size_t candidateIndex = 0; candidateIndex < zones.size(); ++candidateIndex)
+            {
+                if (candidateIndex == zoneIndex)
+                    continue;
+
+                const auto& candidate = zones[candidateIndex];
+                if (candidate.pairingKey != zone.pairingKey
+                    || candidate.roundRobinLength != zone.roundRobinLength
+                    || candidate.roundRobinPosition != zone.roundRobinPosition)
+                {
+                    continue;
+                }
+
+                const VelocityCrossfadeZoneDefinition upper {
+                    candidate.velocityLow,
+                    candidate.velocityHigh,
+                    candidate.crossfade
+                };
+                if (validateFirstPassVelocityCrossfadePair(validationZone, upper)
+                    == VelocityCrossfadePairIssue::none)
+                {
+                    candidates.push_back(candidateIndex);
+                }
+            }
+
+            if (candidates.size() == 1)
+            {
+                runtime.fadeOutNeighborZoneIndex = static_cast<int>(candidates.front());
+                runtime.fadeOutOverlapLowVelocity = zone.crossfade.fadeOutLowVelocity;
+                runtime.fadeOutOverlapHighVelocity = zone.crossfade.fadeOutHighVelocity;
+            }
+            else if (findings != nullptr)
+            {
+                findings->push_back({
+                    zoneIndex,
+                    candidates.empty()
+                        ? VelocityCrossfadeTopologyIssue::fadeOutMissingPartner
+                        : VelocityCrossfadeTopologyIssue::fadeOutAmbiguousPartner
+                });
+            }
+        }
+    }
+
+    return topology;
 }
 } // namespace drs::engine

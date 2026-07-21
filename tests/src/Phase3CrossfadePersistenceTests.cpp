@@ -77,14 +77,34 @@ int main()
         }
 
         auto crossfadeProject = phase2Project.project;
-        auto& crossfadeZone = crossfadeProject.authoring.zones.front();
-        crossfadeProject.authoring.selectedZoneId = crossfadeZone.id;
-        crossfadeZone.velocityLow = 1;
-        crossfadeZone.velocityHigh = 127;
-        crossfadeZone.velocityCrossfade.fadeInLowVelocity = 1;
-        crossfadeZone.velocityCrossfade.fadeInHighVelocity = 32;
-        crossfadeZone.velocityCrossfade.fadeOutLowVelocity = 96;
-        crossfadeZone.velocityCrossfade.fadeOutHighVelocity = 127;
+        require(crossfadeProject.authoring.zones.size() >= 2,
+                "Crossfade persistence tests require at least two authored zones.");
+
+        auto& lowerZone = crossfadeProject.authoring.zones.at(0);
+        auto& upperZone = crossfadeProject.authoring.zones.at(1);
+        crossfadeProject.authoring.selectedZoneId = lowerZone.id;
+
+        lowerZone.rootKey = 57;
+        lowerZone.keyLow = 36;
+        lowerZone.keyHigh = 59;
+        lowerZone.velocityLow = 1;
+        lowerZone.velocityHigh = 60;
+        lowerZone.roundRobinLength = 1;
+        lowerZone.roundRobinPosition = 1;
+        lowerZone.velocityCrossfade = {};
+        lowerZone.velocityCrossfade.fadeOutLowVelocity = 25;
+        lowerZone.velocityCrossfade.fadeOutHighVelocity = 60;
+
+        upperZone.rootKey = lowerZone.rootKey;
+        upperZone.keyLow = lowerZone.keyLow;
+        upperZone.keyHigh = lowerZone.keyHigh;
+        upperZone.velocityLow = 25;
+        upperZone.velocityHigh = 127;
+        upperZone.roundRobinLength = 1;
+        upperZone.roundRobinPosition = 1;
+        upperZone.velocityCrossfade = {};
+        upperZone.velocityCrossfade.fadeInLowVelocity = 25;
+        upperZone.velocityCrossfade.fadeInHighVelocity = 60;
 
         const auto tempDirectory = fs::temp_directory_path() / "drs-phase3-crossfade-persistence-tests";
         const auto projectPath = tempDirectory / "crossfade-roundtrip.drsproj";
@@ -102,11 +122,17 @@ int main()
         const auto roundTripProject = loadRuntimeProjectManifest(projectPath.generic_string());
         require(roundTripProject.loaded, "Crossfade-authored project should survive save/load round-tripping.");
         requireCrossfadeEquals(roundTripProject.project.authoring.zones.front().velocityCrossfade,
-                               1,
-                               32,
-                               96,
-                               127,
-                               "Round-tripped project zone crossfade metadata");
+                               0,
+                               0,
+                               25,
+                               60,
+                               "Round-tripped lower project zone crossfade metadata");
+        requireCrossfadeEquals(roundTripProject.project.authoring.zones.at(1).velocityCrossfade,
+                               25,
+                               60,
+                               0,
+                               0,
+                               "Round-tripped upper project zone crossfade metadata");
 
         writeTextFile(streamPath, "phase3 crossfade persistence stream placeholder");
         const auto instrument = drs::app::buildInstrumentManifestForProject(crossfadeProject,
@@ -114,11 +140,17 @@ int main()
         require(instrument.zones.size() == crossfadeProject.authoring.zones.size(),
                 "Project-to-instrument conversion should preserve every authored zone.");
         requireCrossfadeEquals(instrument.zones.front().velocityCrossfade,
-                               1,
-                               32,
-                               96,
-                               127,
-                               "Built instrument zone crossfade metadata");
+                               0,
+                               0,
+                               25,
+                               60,
+                               "Built lower instrument zone crossfade metadata");
+        requireCrossfadeEquals(instrument.zones.at(1).velocityCrossfade,
+                               25,
+                               60,
+                               0,
+                               0,
+                               "Built upper instrument zone crossfade metadata");
 
         const auto serializedInstrument = serializeRuntimeInstrumentManifest(instrument,
                                                                             instrumentPath.generic_string());
@@ -130,14 +162,21 @@ int main()
         require(roundTripInstrument.loaded,
                 "Crossfade-authored instrument manifest should survive save/load round-tripping.");
         requireCrossfadeEquals(roundTripInstrument.instrument.zones.front().velocityCrossfade,
-                               1,
-                               32,
-                               96,
-                               127,
-                               "Round-tripped instrument zone crossfade metadata");
+                               0,
+                               0,
+                               25,
+                               60,
+                               "Round-tripped lower instrument zone crossfade metadata");
+        requireCrossfadeEquals(roundTripInstrument.instrument.zones.at(1).velocityCrossfade,
+                               25,
+                               60,
+                               0,
+                               0,
+                               "Round-tripped upper instrument zone crossfade metadata");
 
         auto invalidProject = crossfadeProject;
-        invalidProject.authoring.zones.front().velocityCrossfade.fadeInLowVelocity = 4;
+        invalidProject.authoring.zones.front().velocityCrossfade.fadeOutLowVelocity =
+            invalidProject.authoring.zones.front().velocityCrossfade.fadeOutHighVelocity;
         const auto invalidProjectPath = tempDirectory / "crossfade-invalid.drsproj";
         writeTextFile(invalidProjectPath,
                       serializeRuntimeProjectManifest(invalidProject, invalidProjectPath.generic_string()));
@@ -161,10 +200,10 @@ int main()
         require(containsIssueFragment(rejectedEdit.issues, "velocityCrossfade"),
                 "Rejected authoring edits should report a velocityCrossfade validation issue.");
         requireCrossfadeEquals(session.getSelectedZone()->velocityCrossfade,
-                               1,
-                               32,
-                               96,
-                               127,
+                               0,
+                               0,
+                               25,
+                               60,
                                "Rejected authoring edit rollback");
 
         std::cout << "Phase 3 crossfade persistence tests passed." << std::endl;

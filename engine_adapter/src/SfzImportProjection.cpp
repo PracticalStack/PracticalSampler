@@ -420,6 +420,30 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
                                               ? findEffectiveOpcode(section, "hivel")->value
                                               : "127")
                                 .value_or(127);
+        zone.velocityCrossfade.fadeInLowVelocity =
+            parseIntValue(findEffectiveOpcode(section, "xfin_lovel") != nullptr
+                              ? findEffectiveOpcode(section, "xfin_lovel")->value
+                              : "0")
+                .value_or(0);
+        zone.velocityCrossfade.fadeInHighVelocity =
+            parseIntValue(findEffectiveOpcode(section, "xfin_hivel") != nullptr
+                              ? findEffectiveOpcode(section, "xfin_hivel")->value
+                              : "0")
+                .value_or(0);
+        zone.velocityCrossfade.fadeOutLowVelocity =
+            parseIntValue(findEffectiveOpcode(section, "xfout_lovel") != nullptr
+                              ? findEffectiveOpcode(section, "xfout_lovel")->value
+                              : "0")
+                .value_or(0);
+        zone.velocityCrossfade.fadeOutHighVelocity =
+            parseIntValue(findEffectiveOpcode(section, "xfout_hivel") != nullptr
+                              ? findEffectiveOpcode(section, "xfout_hivel")->value
+                              : "0")
+                .value_or(0);
+        if (zone.velocityCrossfade.fadeInLowVelocity > 0)
+            zone.velocityLow = zone.velocityCrossfade.fadeInLowVelocity;
+        if (zone.velocityCrossfade.fadeOutHighVelocity > 0)
+            zone.velocityHigh = zone.velocityCrossfade.fadeOutHighVelocity;
         zone.gainDb = parseDoubleValue(findEffectiveOpcode(section, "volume") != nullptr
                                            ? findEffectiveOpcode(section, "volume")->value
                                            : "0")

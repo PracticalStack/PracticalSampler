@@ -52,6 +52,39 @@ std::string computeFnv1a64Hex(const std::string& text)
     return stream.str();
 }
 
+ordered_json serializeVelocityCrossfade(const VelocityCrossfadeDescriptor& crossfade)
+{
+    return {
+        { "fadeInLowVelocity", crossfade.fadeInLowVelocity },
+        { "fadeInHighVelocity", crossfade.fadeInHighVelocity },
+        { "fadeOutLowVelocity", crossfade.fadeOutLowVelocity },
+        { "fadeOutHighVelocity", crossfade.fadeOutHighVelocity },
+        { "curve", "linear" }
+    };
+}
+
+ordered_json serializeVelocityCrossfadeRuntime(const VelocityCrossfadeRuntimeDescriptor& runtime)
+{
+    ordered_json value;
+    value["effectiveLowVelocity"] = runtime.effectiveLowVelocity;
+    value["effectiveHighVelocity"] = runtime.effectiveHighVelocity;
+
+    if (!runtime.fadeInNeighborZoneId.empty())
+        value["fadeInNeighborZoneId"] = runtime.fadeInNeighborZoneId;
+    if (!runtime.fadeOutNeighborZoneId.empty())
+        value["fadeOutNeighborZoneId"] = runtime.fadeOutNeighborZoneId;
+    if (runtime.fadeInOverlapLowVelocity > 0)
+        value["fadeInOverlapLowVelocity"] = runtime.fadeInOverlapLowVelocity;
+    if (runtime.fadeInOverlapHighVelocity > 0)
+        value["fadeInOverlapHighVelocity"] = runtime.fadeInOverlapHighVelocity;
+    if (runtime.fadeOutOverlapLowVelocity > 0)
+        value["fadeOutOverlapLowVelocity"] = runtime.fadeOutOverlapLowVelocity;
+    if (runtime.fadeOutOverlapHighVelocity > 0)
+        value["fadeOutOverlapHighVelocity"] = runtime.fadeOutOverlapHighVelocity;
+
+    return value;
+}
+
 ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool includeDigest)
 {
     ordered_json root;
@@ -178,6 +211,10 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
         zoneObject["keyHigh"] = zone.keyHigh;
         zoneObject["velocityLow"] = zone.velocityLow;
         zoneObject["velocityHigh"] = zone.velocityHigh;
+        if (hasAnyVelocityCrossfadeValue(zone.velocityCrossfade))
+            zoneObject["velocityCrossfade"] = serializeVelocityCrossfade(zone.velocityCrossfade);
+        if (hasAnyVelocityCrossfadeRuntimeValue(zone.velocityCrossfadeRuntime))
+            zoneObject["velocityCrossfadeRuntime"] = serializeVelocityCrossfadeRuntime(zone.velocityCrossfadeRuntime);
         zoneObject["gainDb"] = zone.gainDb;
         zoneObject["pan"] = zone.pan;
         zoneObject["sampleStartFrame"] = zone.sampleStartFrame;
@@ -907,6 +944,8 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             zone.keyHigh,
             zone.velocityLow,
             zone.velocityHigh,
+            zone.velocityCrossfade,
+            zone.velocityCrossfadeRuntime,
             zone.gainDb,
             zone.pan,
             zone.sampleStartFrame,
@@ -1568,6 +1607,10 @@ std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& 
         value["keyHigh"] = zone.keyHigh;
         value["velocityLow"] = zone.velocityLow;
         value["velocityHigh"] = zone.velocityHigh;
+        if (hasAnyVelocityCrossfadeValue(zone.velocityCrossfade))
+            value["velocityCrossfade"] = serializeVelocityCrossfade(zone.velocityCrossfade);
+        if (hasAnyVelocityCrossfadeRuntimeValue(zone.velocityCrossfadeRuntime))
+            value["velocityCrossfadeRuntime"] = serializeVelocityCrossfadeRuntime(zone.velocityCrossfadeRuntime);
         value["gainDb"] = zone.gainDb;
         value["pan"] = zone.pan;
         value["sampleStartFrame"] = zone.sampleStartFrame;
@@ -1600,6 +1643,10 @@ std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& 
         value["keyHigh"] = handle.keyHigh;
         value["velocityLow"] = handle.velocityLow;
         value["velocityHigh"] = handle.velocityHigh;
+        if (hasAnyVelocityCrossfadeValue(handle.velocityCrossfade))
+            value["velocityCrossfade"] = serializeVelocityCrossfade(handle.velocityCrossfade);
+        if (hasAnyVelocityCrossfadeRuntimeValue(handle.velocityCrossfadeRuntime))
+            value["velocityCrossfadeRuntime"] = serializeVelocityCrossfadeRuntime(handle.velocityCrossfadeRuntime);
         value["gainDb"] = handle.gainDb;
         value["pan"] = handle.pan;
         value["sampleStartFrame"] = handle.sampleStartFrame;
@@ -1792,6 +1839,18 @@ bool operator==(const PreparedPlaybackZoneHandle& left, const PreparedPlaybackZo
         && left.keyHigh == right.keyHigh
         && left.velocityLow == right.velocityLow
         && left.velocityHigh == right.velocityHigh
+        && left.velocityCrossfade.fadeInLowVelocity == right.velocityCrossfade.fadeInLowVelocity
+        && left.velocityCrossfade.fadeInHighVelocity == right.velocityCrossfade.fadeInHighVelocity
+        && left.velocityCrossfade.fadeOutLowVelocity == right.velocityCrossfade.fadeOutLowVelocity
+        && left.velocityCrossfade.fadeOutHighVelocity == right.velocityCrossfade.fadeOutHighVelocity
+        && left.velocityCrossfadeRuntime.effectiveLowVelocity == right.velocityCrossfadeRuntime.effectiveLowVelocity
+        && left.velocityCrossfadeRuntime.effectiveHighVelocity == right.velocityCrossfadeRuntime.effectiveHighVelocity
+        && left.velocityCrossfadeRuntime.fadeInNeighborZoneId == right.velocityCrossfadeRuntime.fadeInNeighborZoneId
+        && left.velocityCrossfadeRuntime.fadeOutNeighborZoneId == right.velocityCrossfadeRuntime.fadeOutNeighborZoneId
+        && left.velocityCrossfadeRuntime.fadeInOverlapLowVelocity == right.velocityCrossfadeRuntime.fadeInOverlapLowVelocity
+        && left.velocityCrossfadeRuntime.fadeInOverlapHighVelocity == right.velocityCrossfadeRuntime.fadeInOverlapHighVelocity
+        && left.velocityCrossfadeRuntime.fadeOutOverlapLowVelocity == right.velocityCrossfadeRuntime.fadeOutOverlapLowVelocity
+        && left.velocityCrossfadeRuntime.fadeOutOverlapHighVelocity == right.velocityCrossfadeRuntime.fadeOutOverlapHighVelocity
         && left.gainDb == right.gainDb
         && left.pan == right.pan
         && left.sampleStartFrame == right.sampleStartFrame

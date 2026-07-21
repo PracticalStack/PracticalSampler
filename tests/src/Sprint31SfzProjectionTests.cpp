@@ -57,6 +57,52 @@ void writeTextFile(const fs::path& path, const std::string& text)
     std::ofstream output(path, std::ios::binary);
     output << text;
 }
+
+void requireCrossfadeEquals(const drs::engine::VelocityCrossfadeDescriptor& crossfade,
+                            int fadeInLowVelocity,
+                            int fadeInHighVelocity,
+                            int fadeOutLowVelocity,
+                            int fadeOutHighVelocity,
+                            const std::string& context)
+{
+    require(crossfade.fadeInLowVelocity == fadeInLowVelocity,
+            context + " should preserve fadeInLowVelocity.");
+    require(crossfade.fadeInHighVelocity == fadeInHighVelocity,
+            context + " should preserve fadeInHighVelocity.");
+    require(crossfade.fadeOutLowVelocity == fadeOutLowVelocity,
+            context + " should preserve fadeOutLowVelocity.");
+    require(crossfade.fadeOutHighVelocity == fadeOutHighVelocity,
+            context + " should preserve fadeOutHighVelocity.");
+}
+
+void requireCrossfadeRuntimeEquals(const drs::engine::VelocityCrossfadeRuntimeDescriptor& runtime,
+                                   int effectiveLowVelocity,
+                                   int effectiveHighVelocity,
+                                   const std::string& fadeInNeighborZoneId,
+                                   const std::string& fadeOutNeighborZoneId,
+                                   int fadeInOverlapLowVelocity,
+                                   int fadeInOverlapHighVelocity,
+                                   int fadeOutOverlapLowVelocity,
+                                   int fadeOutOverlapHighVelocity,
+                                   const std::string& context)
+{
+    require(runtime.effectiveLowVelocity == effectiveLowVelocity,
+            context + " should preserve effectiveLowVelocity.");
+    require(runtime.effectiveHighVelocity == effectiveHighVelocity,
+            context + " should preserve effectiveHighVelocity.");
+    require(runtime.fadeInNeighborZoneId == fadeInNeighborZoneId,
+            context + " should preserve fadeInNeighborZoneId.");
+    require(runtime.fadeOutNeighborZoneId == fadeOutNeighborZoneId,
+            context + " should preserve fadeOutNeighborZoneId.");
+    require(runtime.fadeInOverlapLowVelocity == fadeInOverlapLowVelocity,
+            context + " should preserve fadeInOverlapLowVelocity.");
+    require(runtime.fadeInOverlapHighVelocity == fadeInOverlapHighVelocity,
+            context + " should preserve fadeInOverlapHighVelocity.");
+    require(runtime.fadeOutOverlapLowVelocity == fadeOutOverlapLowVelocity,
+            context + " should preserve fadeOutOverlapLowVelocity.");
+    require(runtime.fadeOutOverlapHighVelocity == fadeOutOverlapHighVelocity,
+            context + " should preserve fadeOutOverlapHighVelocity.");
+}
 } // namespace
 
 int main()
@@ -86,6 +132,7 @@ int main()
         const auto& firstZone = projection.zones.at(0);
         const auto& secondZone = projection.zones.at(1);
         const auto& thirdZone = projection.zones.at(2);
+        const auto& secondLayerFirstZone = projection.zones.at(45);
         require(firstZone.roundRobinLength == 3
                     && secondZone.roundRobinLength == 3
                     && thirdZone.roundRobinLength == 3,
@@ -101,6 +148,18 @@ int main()
         require(firstZone.sampleSourceId != secondZone.sampleSourceId
                     && secondZone.sampleSourceId != thirdZone.sampleSourceId,
                 "The first round-robin regions should still point at distinct sample sources.");
+        requireCrossfadeEquals(firstZone.velocityCrossfade,
+                               0,
+                               0,
+                               25,
+                               60,
+                               "The first projected SFZ region crossfade metadata");
+        requireCrossfadeEquals(secondLayerFirstZone.velocityCrossfade,
+                               25,
+                               60,
+                               61,
+                               84,
+                               "The second projected SFZ layer crossfade metadata");
 
         AuthoringSession session(blankProject);
         const auto applyResult = applySfzImportProjection(session, projection, "Import Sprint 3.1.4 SFZ fixture");
@@ -145,6 +204,38 @@ int main()
                     && instrument.zones.at(1).roundRobinPosition == 2
                     && instrument.zones.at(0).releaseSeconds == 0.5,
                 "Projected SFZ round-robin and release metadata should survive project-to-instrument conversion.");
+        requireCrossfadeEquals(instrument.zones.at(0).velocityCrossfade,
+                               0,
+                               0,
+                               25,
+                               60,
+                               "Projected first instrument zone crossfade metadata");
+        requireCrossfadeEquals(instrument.zones.at(45).velocityCrossfade,
+                               25,
+                               60,
+                               61,
+                               84,
+                               "Projected second instrument layer crossfade metadata");
+        requireCrossfadeRuntimeEquals(instrument.zones.at(0).velocityCrossfadeRuntime,
+                                      1,
+                                      60,
+                                      "",
+                                      instrument.zones.at(45).id,
+                                      0,
+                                      0,
+                                      25,
+                                      60,
+                                      "Projected first instrument zone runtime crossfade metadata");
+        requireCrossfadeRuntimeEquals(instrument.zones.at(45).velocityCrossfadeRuntime,
+                                      25,
+                                      84,
+                                      instrument.zones.at(0).id,
+                                      instrument.zones.at(90).id,
+                                      25,
+                                      60,
+                                      61,
+                                      84,
+                                      "Projected second instrument layer runtime crossfade metadata");
 
         writeTextFile(streamPath, "projection stream placeholder");
         writeTextFile(instrumentPath,
@@ -158,6 +249,18 @@ int main()
                     && roundTripProject.project.authoring.zones.at(0).roundRobinPosition == 1
                     && roundTripProject.project.authoring.zones.at(0).releaseSeconds == 0.5,
                 "Projected SFZ zone metadata should survive project round-tripping.");
+        requireCrossfadeEquals(roundTripProject.project.authoring.zones.at(0).velocityCrossfade,
+                               0,
+                               0,
+                               25,
+                               60,
+                               "Round-tripped projected first project zone crossfade metadata");
+        requireCrossfadeEquals(roundTripProject.project.authoring.zones.at(45).velocityCrossfade,
+                               25,
+                               60,
+                               61,
+                               84,
+                               "Round-tripped projected second project layer crossfade metadata");
 
         const auto roundTripInstrument = loadRuntimeInstrumentManifest(instrumentPath.generic_string());
         require(roundTripInstrument.loaded,
@@ -166,6 +269,38 @@ int main()
                     && roundTripInstrument.instrument.zones.at(2).roundRobinPosition == 3
                     && roundTripInstrument.instrument.zones.at(0).releaseSeconds == 0.5,
                 "Round-tripped native instrument zones should preserve SFZ round-robin and release metadata.");
+        requireCrossfadeEquals(roundTripInstrument.instrument.zones.at(0).velocityCrossfade,
+                               0,
+                               0,
+                               25,
+                               60,
+                               "Round-tripped projected first instrument zone crossfade metadata");
+        requireCrossfadeEquals(roundTripInstrument.instrument.zones.at(45).velocityCrossfade,
+                               25,
+                               60,
+                               61,
+                               84,
+                               "Round-tripped projected second instrument layer crossfade metadata");
+        requireCrossfadeRuntimeEquals(roundTripInstrument.instrument.zones.at(0).velocityCrossfadeRuntime,
+                                      1,
+                                      60,
+                                      "",
+                                      roundTripInstrument.instrument.zones.at(45).id,
+                                      0,
+                                      0,
+                                      25,
+                                      60,
+                                      "Round-tripped projected first instrument runtime crossfade metadata");
+        requireCrossfadeRuntimeEquals(roundTripInstrument.instrument.zones.at(45).velocityCrossfadeRuntime,
+                                      25,
+                                      84,
+                                      roundTripInstrument.instrument.zones.at(0).id,
+                                      roundTripInstrument.instrument.zones.at(90).id,
+                                      25,
+                                      60,
+                                      61,
+                                      84,
+                                      "Round-tripped projected second instrument runtime crossfade metadata");
 
         RuntimeStreamContainerModel streamContainer;
         streamContainer.schemaName = "drs.streamContainer";

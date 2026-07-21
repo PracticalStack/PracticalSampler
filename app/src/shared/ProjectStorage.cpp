@@ -3,11 +3,87 @@
 #include "drs/engine/RuntimeLoader.h"
 
 #include <algorithm>
+#include <sstream>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 
 namespace drs::app
 {
+namespace
+{
+std::uint64_t computeFnv1a64(std::string_view text) noexcept
+{
+    std::uint64_t hash = 14695981039346656037ull;
+    for (const auto character : text)
+    {
+        hash ^= static_cast<unsigned char>(character);
+        hash *= 1099511628211ull;
+    }
+
+    return hash;
+}
+
+std::uint64_t buildCrossfadePairingKey(const drs::engine::RuntimeZoneDefinition& zone)
+{
+    std::ostringstream stream;
+    stream << zone.articulationId
+           << "|" << zone.rootKey
+           << "|" << zone.keyLow
+           << "|" << zone.keyHigh
+           << "|" << zone.roundRobinLength
+           << "|" << zone.roundRobinPosition;
+    return computeFnv1a64(stream.str());
+}
+
+void populateCrossfadeRuntimeDescriptors(std::vector<drs::engine::RuntimeZoneDefinition>& zones)
+{
+    std::vector<drs::engine::VelocityCrossfadeTopologyZoneDefinition> topologyZones;
+    topologyZones.reserve(zones.size());
+
+    for (const auto& zone : zones)
+    {
+        drs::engine::VelocityCrossfadeTopologyZoneDefinition topologyZone;
+        topologyZone.pairingKey = buildCrossfadePairingKey(zone);
+        topologyZone.velocityLow = zone.velocityLow;
+        topologyZone.velocityHigh = zone.velocityHigh;
+        topologyZone.roundRobinLength = zone.roundRobinLength;
+        topologyZone.roundRobinPosition = zone.roundRobinPosition;
+        topologyZone.crossfade = zone.velocityCrossfade;
+        topologyZones.push_back(topologyZone);
+    }
+
+    const auto runtimeTopology = drs::engine::buildFirstPassVelocityCrossfadeRuntimeTopology(topologyZones);
+    for (std::size_t index = 0; index < zones.size(); ++index)
+    {
+        auto& zone = zones[index];
+        zone.velocityCrossfadeRuntime = {};
+        if (!drs::engine::hasAnyVelocityCrossfadeValue(zone.velocityCrossfade))
+            continue;
+
+        const auto& topology = runtimeTopology[index];
+        zone.velocityCrossfadeRuntime.effectiveLowVelocity = topology.effectiveLowVelocity;
+        zone.velocityCrossfadeRuntime.effectiveHighVelocity = topology.effectiveHighVelocity;
+        zone.velocityCrossfadeRuntime.fadeInOverlapLowVelocity = topology.fadeInOverlapLowVelocity;
+        zone.velocityCrossfadeRuntime.fadeInOverlapHighVelocity = topology.fadeInOverlapHighVelocity;
+        zone.velocityCrossfadeRuntime.fadeOutOverlapLowVelocity = topology.fadeOutOverlapLowVelocity;
+        zone.velocityCrossfadeRuntime.fadeOutOverlapHighVelocity = topology.fadeOutOverlapHighVelocity;
+
+        if (topology.fadeInNeighborZoneIndex >= 0)
+        {
+            zone.velocityCrossfadeRuntime.fadeInNeighborZoneId =
+                zones[static_cast<std::size_t>(topology.fadeInNeighborZoneIndex)].id;
+        }
+
+        if (topology.fadeOutNeighborZoneIndex >= 0)
+        {
+            zone.velocityCrossfadeRuntime.fadeOutNeighborZoneId =
+                zones[static_cast<std::size_t>(topology.fadeOutNeighborZoneIndex)].id;
+        }
+    }
+}
+} // namespace
+
 juce::File ensureProjectFileExtension(juce::File file)
 {
     if (file == juce::File())
@@ -142,6 +218,8 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
         zone.triggerMode = projectZone.triggerMode;
         instrument.zones.push_back(std::move(zone));
     }
+
+    populateCrossfadeRuntimeDescriptors(instrument.zones);
 
     instrument.validationNotes = {
         "Generated from the current Decent Rhapsody Studio authoring project when the project was saved."

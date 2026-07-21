@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <filesystem>
 #include <optional>
+#include <sstream>
+#include <string_view>
 #include <unordered_map>
 
 namespace drs::engine
@@ -56,6 +58,98 @@ std::string toContainerRelativePath(const fs::path& containerPath, const std::st
         return relativePath.generic_string();
 
     return candidate.generic_string();
+}
+
+std::uint64_t computeFnv1a64(std::string_view text) noexcept
+{
+    std::uint64_t hash = 14695981039346656037ull;
+    for (const auto character : text)
+    {
+        hash ^= static_cast<unsigned char>(character);
+        hash *= 1099511628211ull;
+    }
+
+    return hash;
+}
+
+std::uint64_t buildCrossfadePairingKey(const RuntimeCompileZoneDefinition& zone)
+{
+    std::ostringstream stream;
+    stream << zone.articulationId
+           << "|" << zone.rootKey
+           << "|" << zone.keyLow
+           << "|" << zone.keyHigh
+           << "|" << zone.roundRobinLength
+           << "|" << zone.roundRobinPosition;
+    return computeFnv1a64(stream.str());
+}
+
+std::string buildCrossfadeTopologyIssue(const std::string& zoneId,
+                                        VelocityCrossfadeTopologyIssue issue)
+{
+    switch (issue)
+    {
+        case VelocityCrossfadeTopologyIssue::none:
+            return {};
+        case VelocityCrossfadeTopologyIssue::fadeInMissingPartner:
+            return "Zone '" + zoneId + "' must resolve exactly one lower crossfade partner for velocityCrossfade fade-in.";
+        case VelocityCrossfadeTopologyIssue::fadeInAmbiguousPartner:
+            return "Zone '" + zoneId + "' matched multiple lower crossfade partners for velocityCrossfade fade-in.";
+        case VelocityCrossfadeTopologyIssue::fadeOutMissingPartner:
+            return "Zone '" + zoneId + "' must resolve exactly one upper crossfade partner for velocityCrossfade fade-out.";
+        case VelocityCrossfadeTopologyIssue::fadeOutAmbiguousPartner:
+            return "Zone '" + zoneId + "' matched multiple upper crossfade partners for velocityCrossfade fade-out.";
+    }
+
+    return "Zone '" + zoneId + "' produced an unknown velocityCrossfade topology issue.";
+}
+
+void populateCrossfadeRuntimeDescriptors(const RuntimeCompilePlan& plan,
+                                         std::vector<RuntimeZoneDefinition>& zones)
+{
+    std::vector<VelocityCrossfadeTopologyZoneDefinition> topologyZones;
+    topologyZones.reserve(plan.zones.size());
+
+    for (const auto& zone : plan.zones)
+    {
+        VelocityCrossfadeTopologyZoneDefinition topologyZone;
+        topologyZone.pairingKey = buildCrossfadePairingKey(zone);
+        topologyZone.velocityLow = zone.velocityLow;
+        topologyZone.velocityHigh = zone.velocityHigh;
+        topologyZone.roundRobinLength = zone.roundRobinLength;
+        topologyZone.roundRobinPosition = zone.roundRobinPosition;
+        topologyZone.crossfade = zone.velocityCrossfade;
+        topologyZones.push_back(topologyZone);
+    }
+
+    const auto runtimeTopology = buildFirstPassVelocityCrossfadeRuntimeTopology(topologyZones);
+    for (std::size_t index = 0; index < zones.size() && index < runtimeTopology.size(); ++index)
+    {
+        auto& zone = zones[index];
+        zone.velocityCrossfadeRuntime = {};
+        if (!hasAnyVelocityCrossfadeValue(zone.velocityCrossfade))
+            continue;
+
+        const auto& topology = runtimeTopology[index];
+        zone.velocityCrossfadeRuntime.effectiveLowVelocity = topology.effectiveLowVelocity;
+        zone.velocityCrossfadeRuntime.effectiveHighVelocity = topology.effectiveHighVelocity;
+        zone.velocityCrossfadeRuntime.fadeInOverlapLowVelocity = topology.fadeInOverlapLowVelocity;
+        zone.velocityCrossfadeRuntime.fadeInOverlapHighVelocity = topology.fadeInOverlapHighVelocity;
+        zone.velocityCrossfadeRuntime.fadeOutOverlapLowVelocity = topology.fadeOutOverlapLowVelocity;
+        zone.velocityCrossfadeRuntime.fadeOutOverlapHighVelocity = topology.fadeOutOverlapHighVelocity;
+
+        if (topology.fadeInNeighborZoneIndex >= 0)
+        {
+            zone.velocityCrossfadeRuntime.fadeInNeighborZoneId =
+                zones[static_cast<std::size_t>(topology.fadeInNeighborZoneIndex)].id;
+        }
+
+        if (topology.fadeOutNeighborZoneIndex >= 0)
+        {
+            zone.velocityCrossfadeRuntime.fadeOutNeighborZoneId =
+                zones[static_cast<std::size_t>(topology.fadeOutNeighborZoneIndex)].id;
+        }
+    }
 }
 } // namespace
 
@@ -156,6 +250,8 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
 
     std::unordered_map<std::string, std::uint64_t> maxPrefetchBySourceId;
     maxPrefetchBySourceId.reserve(plan.sampleSources.size());
+    std::vector<VelocityCrossfadeTopologyZoneDefinition> crossfadeTopologyZones;
+    crossfadeTopologyZones.reserve(plan.zones.size());
 
     for (const auto& zonePlan : plan.zones)
     {
@@ -177,8 +273,39 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
 
         if (zonePlan.velocityLow > zonePlan.velocityHigh)
             addIssue(result, "Zone '" + zonePlan.id + "' has velocityLow greater than velocityHigh.");
+        if (hasAnyVelocityCrossfadeValue(zonePlan.velocityCrossfade))
+        {
+            const VelocityCrossfadeZoneDefinition crossfadeZone {
+                zonePlan.velocityLow,
+                zonePlan.velocityHigh,
+                zonePlan.velocityCrossfade
+            };
+            const auto crossfadeIssue = validateFirstPassVelocityCrossfadeZone(crossfadeZone);
+            if (crossfadeIssue != VelocityCrossfadeZoneIssue::none)
+                addIssue(result, "Zone '" + zonePlan.id + "' carries unsupported velocityCrossfade metadata in the compile plan.");
+        }
+
+        VelocityCrossfadeTopologyZoneDefinition topologyZone;
+        topologyZone.pairingKey = buildCrossfadePairingKey(zonePlan);
+        topologyZone.velocityLow = zonePlan.velocityLow;
+        topologyZone.velocityHigh = zonePlan.velocityHigh;
+        topologyZone.roundRobinLength = zonePlan.roundRobinLength;
+        topologyZone.roundRobinPosition = zonePlan.roundRobinPosition;
+        topologyZone.crossfade = zonePlan.velocityCrossfade;
+        crossfadeTopologyZones.push_back(topologyZone);
+
         maxPrefetchBySourceId[zonePlan.sourceId] = std::max(maxPrefetchBySourceId[zonePlan.sourceId],
                                                             zonePlan.prefetchBytes);
+    }
+
+    std::vector<VelocityCrossfadeTopologyFinding> crossfadeTopologyFindings;
+    buildFirstPassVelocityCrossfadeRuntimeTopology(crossfadeTopologyZones, &crossfadeTopologyFindings);
+    for (const auto& finding : crossfadeTopologyFindings)
+    {
+        if (finding.zoneIndex >= plan.zones.size())
+            continue;
+
+        addIssue(result, buildCrossfadeTopologyIssue(plan.zones[finding.zoneIndex].id, finding.issue));
     }
 
     if (!result.issues.empty())
@@ -258,10 +385,15 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         zone.keyHigh = zonePlan.keyHigh;
         zone.velocityLow = zonePlan.velocityLow;
         zone.velocityHigh = zonePlan.velocityHigh;
+        zone.velocityCrossfade = zonePlan.velocityCrossfade;
         zone.streamOffsetBytes = streamOffsetBySourceId.at(zonePlan.sourceId);
         zone.prefetchBytes = clampedPrefetchBytes;
+        zone.roundRobinLength = zonePlan.roundRobinLength;
+        zone.roundRobinPosition = zonePlan.roundRobinPosition;
         result.instrument.zones.push_back(std::move(zone));
     }
+
+    populateCrossfadeRuntimeDescriptors(plan, result.instrument.zones);
 
     result.compiled = true;
     result.state = "Compile completed";

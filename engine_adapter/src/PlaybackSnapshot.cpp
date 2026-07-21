@@ -74,6 +74,134 @@ ordered_json serializeStringArray(const std::vector<std::string>& values)
     return array;
 }
 
+ordered_json serializeVelocityCrossfade(const VelocityCrossfadeDescriptor& crossfade)
+{
+    return {
+        { "fadeInLowVelocity", crossfade.fadeInLowVelocity },
+        { "fadeInHighVelocity", crossfade.fadeInHighVelocity },
+        { "fadeOutLowVelocity", crossfade.fadeOutLowVelocity },
+        { "fadeOutHighVelocity", crossfade.fadeOutHighVelocity },
+        { "curve", "linear" }
+    };
+}
+
+ordered_json serializeVelocityCrossfadeRuntime(const VelocityCrossfadeRuntimeDescriptor& runtime)
+{
+    ordered_json value;
+    value["effectiveLowVelocity"] = runtime.effectiveLowVelocity;
+    value["effectiveHighVelocity"] = runtime.effectiveHighVelocity;
+
+    if (!runtime.fadeInNeighborZoneId.empty())
+        value["fadeInNeighborZoneId"] = runtime.fadeInNeighborZoneId;
+    if (!runtime.fadeOutNeighborZoneId.empty())
+        value["fadeOutNeighborZoneId"] = runtime.fadeOutNeighborZoneId;
+    if (runtime.fadeInOverlapLowVelocity > 0)
+        value["fadeInOverlapLowVelocity"] = runtime.fadeInOverlapLowVelocity;
+    if (runtime.fadeInOverlapHighVelocity > 0)
+        value["fadeInOverlapHighVelocity"] = runtime.fadeInOverlapHighVelocity;
+    if (runtime.fadeOutOverlapLowVelocity > 0)
+        value["fadeOutOverlapLowVelocity"] = runtime.fadeOutOverlapLowVelocity;
+    if (runtime.fadeOutOverlapHighVelocity > 0)
+        value["fadeOutOverlapHighVelocity"] = runtime.fadeOutOverlapHighVelocity;
+
+    return value;
+}
+
+std::uint64_t buildCrossfadePairingKey(const std::string& articulationId,
+                                       int rootKey,
+                                       int keyLow,
+                                       int keyHigh,
+                                       int roundRobinLength,
+                                       int roundRobinPosition) noexcept
+{
+    std::ostringstream stream;
+    stream << articulationId
+           << "|" << rootKey
+           << "|" << keyLow
+           << "|" << keyHigh
+           << "|" << roundRobinLength
+           << "|" << roundRobinPosition;
+    const auto hex = computeFnv1a64Hex(stream.str());
+    return static_cast<std::uint64_t>(std::stoull(hex, nullptr, 16));
+}
+
+std::string buildCrossfadeTopologyMessage(const std::string& zoneId,
+                                          VelocityCrossfadeTopologyIssue issue)
+{
+    switch (issue)
+    {
+        case VelocityCrossfadeTopologyIssue::none:
+            return {};
+        case VelocityCrossfadeTopologyIssue::fadeInMissingPartner:
+            return "Zone '" + zoneId + "' must resolve exactly one lower crossfade partner for velocityCrossfade fade-in.";
+        case VelocityCrossfadeTopologyIssue::fadeInAmbiguousPartner:
+            return "Zone '" + zoneId + "' matched multiple lower crossfade partners for velocityCrossfade fade-in.";
+        case VelocityCrossfadeTopologyIssue::fadeOutMissingPartner:
+            return "Zone '" + zoneId + "' must resolve exactly one upper crossfade partner for velocityCrossfade fade-out.";
+        case VelocityCrossfadeTopologyIssue::fadeOutAmbiguousPartner:
+            return "Zone '" + zoneId + "' matched multiple upper crossfade partners for velocityCrossfade fade-out.";
+    }
+
+    return "Zone '" + zoneId + "' produced an unknown velocityCrossfade topology issue.";
+}
+
+std::vector<VelocityCrossfadeRuntimeDescriptor> buildSnapshotCrossfadeRuntimeDescriptors(
+    const RuntimeProjectModel& project)
+{
+    std::vector<VelocityCrossfadeTopologyZoneDefinition> topologyZones;
+    topologyZones.reserve(project.authoring.zones.size());
+
+    for (const auto& zone : project.authoring.zones)
+    {
+        VelocityCrossfadeTopologyZoneDefinition topologyZone;
+        topologyZone.pairingKey = buildCrossfadePairingKey(zone.articulationId,
+                                                           zone.rootKey,
+                                                           zone.keyLow,
+                                                           zone.keyHigh,
+                                                           zone.roundRobinLength,
+                                                           zone.roundRobinPosition);
+        topologyZone.velocityLow = zone.velocityLow;
+        topologyZone.velocityHigh = zone.velocityHigh;
+        topologyZone.roundRobinLength = zone.roundRobinLength;
+        topologyZone.roundRobinPosition = zone.roundRobinPosition;
+        topologyZone.crossfade = zone.velocityCrossfade;
+        topologyZones.push_back(topologyZone);
+    }
+
+    const auto runtimeTopology = buildFirstPassVelocityCrossfadeRuntimeTopology(topologyZones);
+    std::vector<VelocityCrossfadeRuntimeDescriptor> descriptors(project.authoring.zones.size());
+
+    for (std::size_t index = 0; index < project.authoring.zones.size(); ++index)
+    {
+        const auto& zone = project.authoring.zones[index];
+        if (!hasAnyVelocityCrossfadeValue(zone.velocityCrossfade))
+            continue;
+
+        const auto& topology = runtimeTopology[index];
+        auto& descriptor = descriptors[index];
+        descriptor.effectiveLowVelocity = topology.effectiveLowVelocity;
+        descriptor.effectiveHighVelocity = topology.effectiveHighVelocity;
+        descriptor.fadeInOverlapLowVelocity = topology.fadeInOverlapLowVelocity;
+        descriptor.fadeInOverlapHighVelocity = topology.fadeInOverlapHighVelocity;
+        descriptor.fadeOutOverlapLowVelocity = topology.fadeOutOverlapLowVelocity;
+        descriptor.fadeOutOverlapHighVelocity = topology.fadeOutOverlapHighVelocity;
+
+        if (topology.fadeInNeighborZoneIndex >= 0)
+        {
+            descriptor.fadeInNeighborZoneId =
+                project.authoring.zones[static_cast<std::size_t>(topology.fadeInNeighborZoneIndex)].id;
+        }
+
+        if (topology.fadeOutNeighborZoneIndex >= 0)
+        {
+            descriptor.fadeOutNeighborZoneId =
+                project.authoring.zones[static_cast<std::size_t>(topology.fadeOutNeighborZoneIndex)].id;
+        }
+    }
+
+    return descriptors;
+}
+
 ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool includeDigest)
 {
     ordered_json root;
@@ -187,6 +315,10 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
         zoneObject["keyHigh"] = zone.keyHigh;
         zoneObject["velocityLow"] = zone.velocityLow;
         zoneObject["velocityHigh"] = zone.velocityHigh;
+        if (hasAnyVelocityCrossfadeValue(zone.velocityCrossfade))
+            zoneObject["velocityCrossfade"] = serializeVelocityCrossfade(zone.velocityCrossfade);
+        if (hasAnyVelocityCrossfadeRuntimeValue(zone.velocityCrossfadeRuntime))
+            zoneObject["velocityCrossfadeRuntime"] = serializeVelocityCrossfadeRuntime(zone.velocityCrossfadeRuntime);
         zoneObject["gainDb"] = zone.gainDb;
         zoneObject["pan"] = zone.pan;
         zoneObject["sampleStartFrame"] = zone.sampleStartFrame;
@@ -369,6 +501,27 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
     std::unordered_map<std::string, std::size_t> groupRouteIndices;
     std::unordered_map<std::string, std::size_t> zoneIndices;
     result.snapshot.zones.reserve(project.authoring.zones.size());
+    const auto crossfadeRuntimeDescriptors = buildSnapshotCrossfadeRuntimeDescriptors(project);
+    std::vector<VelocityCrossfadeTopologyZoneDefinition> crossfadeTopologyZones;
+    crossfadeTopologyZones.reserve(project.authoring.zones.size());
+    for (const auto& zone : project.authoring.zones)
+    {
+        VelocityCrossfadeTopologyZoneDefinition topologyZone;
+        topologyZone.pairingKey = buildCrossfadePairingKey(zone.articulationId,
+                                                           zone.rootKey,
+                                                           zone.keyLow,
+                                                           zone.keyHigh,
+                                                           zone.roundRobinLength,
+                                                           zone.roundRobinPosition);
+        topologyZone.velocityLow = zone.velocityLow;
+        topologyZone.velocityHigh = zone.velocityHigh;
+        topologyZone.roundRobinLength = zone.roundRobinLength;
+        topologyZone.roundRobinPosition = zone.roundRobinPosition;
+        topologyZone.crossfade = zone.velocityCrossfade;
+        crossfadeTopologyZones.push_back(topologyZone);
+    }
+    std::vector<VelocityCrossfadeTopologyFinding> crossfadeTopologyFindings;
+    buildFirstPassVelocityCrossfadeRuntimeTopology(crossfadeTopologyZones, &crossfadeTopologyFindings);
 
     for (std::size_t index = 0; index < project.authoring.zones.size(); ++index)
     {
@@ -408,6 +561,23 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
         if (zone.velocityLow > zone.velocityHigh)
             addFinding(result, PlaybackSnapshotFindingSeverity::error, "invalid-zone-velocity-range", path,
                        "Zone velocityLow must not exceed velocityHigh.");
+        if (hasAnyVelocityCrossfadeValue(zone.velocityCrossfade))
+        {
+            const VelocityCrossfadeZoneDefinition crossfadeZone {
+                zone.velocityLow,
+                zone.velocityHigh,
+                zone.velocityCrossfade
+            };
+            const auto crossfadeIssue = validateFirstPassVelocityCrossfadeZone(crossfadeZone);
+            if (crossfadeIssue != VelocityCrossfadeZoneIssue::none)
+            {
+                addFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           "invalid-zone-velocity-crossfade",
+                           path + ".velocityCrossfade",
+                           "Zone '" + zone.id + "' carries unsupported velocityCrossfade metadata in the playback snapshot build.");
+            }
+        }
 
         if (zone.loopEnabled && zone.loopEndFrame < zone.loopStartFrame)
             addFinding(result, PlaybackSnapshotFindingSeverity::error, "invalid-zone-loop-range", path,
@@ -439,6 +609,8 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
             zone.keyHigh,
             zone.velocityLow,
             zone.velocityHigh,
+            zone.velocityCrossfade,
+            crossfadeRuntimeDescriptors[index],
             zone.gainDb,
             zone.pan,
             zone.sampleStartFrame,
@@ -489,6 +661,20 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
                     route.articulationIds.push_back(zone.articulationId);
             }
         }
+    }
+
+    for (const auto& finding : crossfadeTopologyFindings)
+    {
+        if (finding.zoneIndex >= project.authoring.zones.size())
+            continue;
+
+        const auto& zone = project.authoring.zones[finding.zoneIndex];
+        const auto path = "authoring.zones[" + std::to_string(finding.zoneIndex) + "].velocityCrossfade";
+        addFinding(result,
+                   PlaybackSnapshotFindingSeverity::error,
+                   "invalid-zone-velocity-crossfade-topology",
+                   path,
+                   buildCrossfadeTopologyMessage(zone.id, finding.issue));
     }
 
     if (!project.authoring.selectedZoneId.empty() && !zoneIndices.count(project.authoring.selectedZoneId))

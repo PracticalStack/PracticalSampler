@@ -29,6 +29,8 @@ struct RuntimeCompileZoneDefinition
     int velocityLow = 1;
     int velocityHigh = 127;
     VelocityCrossfadeDescriptor velocityCrossfade;
+    int roundRobinLength = 0;
+    int roundRobinPosition = 0;
     std::uint64_t prefetchBytes = 16384;
 };
 
