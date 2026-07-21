@@ -910,6 +910,28 @@ add_test(
     COMMAND drs_sprint31_sfz_projection_tests
 )
 
+add_executable(drs_sprint31_sfz_review_ui_tests
+    src/Sprint31SfzReviewUiTests.cpp
+)
+
+target_link_libraries(drs_sprint31_sfz_review_ui_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+)
+
+target_compile_definitions(drs_sprint31_sfz_review_ui_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_sprint31_sfz_review_ui_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint31.sfz_review_ui
+    COMMAND drs_sprint31_sfz_review_ui_tests
+)
+
 # Direct-only expected-red audit for the parser/report/UI seams intentionally left open by Sprint 3.1.1.
 add_executable(drs_sprint31_sfz_contract_red_tests
     src/Sprint31SfzContractRedTests.cpp

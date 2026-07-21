@@ -44,6 +44,7 @@ private:
         saveProjectCommandId,
         saveProjectAsCommandId,
         importWavCommandId,
+        importSfzCommandId,
         audioDeviceSettingsCommandId,
         preferencesCommandId,
         exitApplicationCommandId
@@ -64,7 +65,9 @@ private:
     void saveProject(std::function<void(bool)> completion = {});
     void saveProjectAs(std::function<void(bool)> completion = {});
     void importWavFiles();
+    void importSfzFile();
     void importSampleFiles(std::vector<juce::File> selectedFiles);
+    void reviewSfzImportFile(const juce::File& selectedFile);
     void showAudioDeviceSettingsDialog();
     void showPreferencesDialog();
     void restoreSelectedZoneRootKey();
@@ -95,6 +98,7 @@ private:
     void launchNewProjectChooser(std::function<void(juce::File)> completion);
     void launchSaveProjectChooser(std::function<void(juce::File)> completion);
     void launchImportWavChooser(std::function<void(std::vector<juce::File>)> completion);
+    void launchImportSfzChooser(std::function<void(juce::File)> completion);
     void promptForRootKeySelection(const juce::String& title,
                                    const juce::String& message,
                                    int initialRootKey,

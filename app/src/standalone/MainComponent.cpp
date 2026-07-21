@@ -3,12 +3,14 @@
 #include "drs/engine/SampleImport.h"
 #include "drs/engine/RuntimeLoader.h"
 #include "shared/ProjectStorage.h"
+#include "shared/SfzImportWorkflow.h"
 #include "shared/authoring/AuthoringWorkspaceLayout.h"
 
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
 #include <memory>
+#include <thread>
 #include <unordered_set>
 
 namespace drs::standalone
@@ -529,6 +531,7 @@ juce::PopupMenu MainComponent::getMenuForIndex(int topLevelMenuIndex, const juce
         menu.addItem(saveProjectCommandId, "Save");
         menu.addItem(saveProjectAsCommandId, "Save As...");
         menu.addItem(importWavCommandId, "Import WAV...");
+        menu.addItem(importSfzCommandId, "Import SFZ...");
         menu.addSeparator();
         menu.addItem(exitApplicationCommandId, "Exit");
     }
@@ -563,6 +566,9 @@ void MainComponent::menuItemSelected(int menuItemID, int)
             break;
         case importWavCommandId:
             importWavFiles();
+            break;
+        case importSfzCommandId:
+            importSfzFile();
             break;
         case audioDeviceSettingsCommandId:
             showAudioDeviceSettingsDialog();
@@ -743,6 +749,16 @@ void MainComponent::importWavFiles()
     {
         if (safeThis != nullptr && !selectedFiles.empty())
             safeThis->importSampleFiles(std::move(selectedFiles));
+    });
+}
+
+void MainComponent::importSfzFile()
+{
+    auto safeThis = juce::Component::SafePointer<MainComponent>(this);
+    launchImportSfzChooser([safeThis](juce::File selectedFile)
+    {
+        if (safeThis != nullptr && selectedFile != juce::File())
+            safeThis->reviewSfzImportFile(selectedFile);
     });
 }
 
@@ -958,6 +974,73 @@ void MainComponent::importSampleFiles(std::vector<juce::File> selectedFiles)
     }
 
     beginImport(true);
+}
+
+void MainComponent::reviewSfzImportFile(const juce::File& selectedFile)
+{
+    auto safeThis = juce::Component::SafePointer<MainComponent>(this);
+    auto beginReview = [safeThis, selectedFile](bool ready) mutable
+    {
+        if (!ready || safeThis == nullptr || selectedFile == juce::File())
+            return;
+
+        const auto baseProject = safeThis->processor.getAuthoringSession().getProject();
+        const auto sfzPath = selectedFile.getFullPathName().toStdString();
+
+        std::thread([safeThis, baseProject, sfzPath]()
+        {
+            auto review = drs::app::prepareSfzImportReview(baseProject, sfzPath);
+            juce::MessageManager::callAsync([safeThis, review = std::move(review)]() mutable
+            {
+                if (safeThis == nullptr)
+                    return;
+
+                if (!review.prepared)
+                {
+                    juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                                           "Import SFZ Failed",
+                                                           drs::app::buildSfzImportIssueSummary(review));
+                    return;
+                }
+
+                auto reviewState = std::make_shared<drs::app::SfzImportReviewPreparationResult>(std::move(review));
+                drs::app::showSfzImportReviewDialog(
+                    safeThis.getComponent(),
+                    *reviewState,
+                    [safeThis, reviewState](bool accepted) mutable
+                    {
+                        if (!accepted || safeThis == nullptr)
+                            return;
+
+                        const auto appliedSummary = drs::app::buildSfzImportAppliedSummary(*reviewState);
+                        const auto importResult = drs::engine::applySfzImportProjection(
+                            safeThis->processor.getAuthoringSession(),
+                            std::move(reviewState->projection),
+                            "Import SFZ document");
+                        if (!importResult.applied)
+                        {
+                            juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                                                   "Import SFZ Failed",
+                                                                   safeThis->buildProjectIssueSummary(importResult.issues));
+                            return;
+                        }
+
+                        safeThis->refreshProjectViews();
+                        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon,
+                                                               "Import SFZ Complete",
+                                                               appliedSummary);
+                    });
+            });
+        }).detach();
+    };
+
+    if (currentProjectFile == juce::File())
+    {
+        saveProjectAs(std::move(beginReview));
+        return;
+    }
+
+    beginReview(true);
 }
 
 void MainComponent::restoreSelectedZoneRootKey()
@@ -1503,6 +1586,32 @@ void MainComponent::launchImportWavChooser(std::function<void(std::vector<juce::
                                        safeThis->activeFileChooser.reset();
                                        if (completion)
                                            completion(std::move(selectedFiles));
+                                   });
+}
+
+void MainComponent::launchImportSfzChooser(std::function<void(juce::File)> completion)
+{
+    auto initialDirectory = getLibraryLocation();
+    if (!initialDirectory.isDirectory())
+        initialDirectory = buildChooserBaseDirectory();
+    activeFileChooser = std::make_unique<juce::FileChooser>("Import SFZ document into the current project",
+                                                            initialDirectory,
+                                                            "*.sfz",
+                                                            true,
+                                                            false,
+                                                            this);
+    auto safeThis = juce::Component::SafePointer<MainComponent>(this);
+    activeFileChooser->launchAsync(juce::FileBrowserComponent::openMode
+                                       | juce::FileBrowserComponent::canSelectFiles,
+                                   [safeThis, completion = std::move(completion)](const juce::FileChooser& chooser) mutable
+                                   {
+                                       if (safeThis == nullptr)
+                                           return;
+
+                                       const auto selectedFile = chooser.getResult();
+                                       safeThis->activeFileChooser.reset();
+                                       if (completion)
+                                           completion(selectedFile);
                                    });
 }
 

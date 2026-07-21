@@ -52,23 +52,23 @@ int main()
             if (observed)
             {
                 ++openGapCount;
-                std::cerr << "Sprint 3.1.1 SFZ open gap: " << label << std::endl;
+                std::cerr << "Sprint 3.1.5 SFZ open gap: " << label << std::endl;
             }
         }
 
         if (openGapCount == 0)
         {
-            std::cout << "Sprint 3.1.1 SFZ open-gap audit passed." << std::endl;
+            std::cout << "Sprint 3.1.5 SFZ open-gap audit passed." << std::endl;
             return 0;
         }
 
-        std::cerr << "Sprint 3.1.1 SFZ open-gap audit found " << openGapCount
+        std::cerr << "Sprint 3.1.5 SFZ open-gap audit found " << openGapCount
                   << " remaining implementation gap(s)." << std::endl;
         return 1;
     }
     catch (const std::exception& exception)
     {
-        std::cerr << "Sprint 3.1.1 SFZ open-gap audit failed unexpectedly: "
+        std::cerr << "Sprint 3.1.5 SFZ open-gap audit failed unexpectedly: "
                   << exception.what() << std::endl;
         return 2;
     }
