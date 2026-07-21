@@ -189,6 +189,7 @@ add_library(drs_engine_adapter STATIC
     src/RuntimeLoadProfile.cpp
     src/RuntimeLoader.cpp
     src/RuntimePresetState.cpp
+    src/SfzImport.cpp
     src/RuntimeStreamingService.cpp
     src/RuntimeStream.cpp
     src/RuntimeVoice.cpp
@@ -209,6 +210,8 @@ add_library(drs_engine_adapter STATIC
     include/drs/engine/ProjectDocument.h
     include/drs/engine/RuntimePresetState.h
     include/drs/engine/RuntimeLoadProfile.h
+    include/drs/engine/SfzImport.h
+    include/drs/engine/SfzImportContract.h
 )
 
 target_include_directories(drs_engine_adapter
@@ -273,6 +276,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     src/RuntimeStreamingService.cpp
     src/RuntimeStream.cpp
     src/RuntimeVoice.cpp
+    src/SfzImport.cpp
     src/SamplerPlaybackContext.cpp
     src/SamplerRenderModel.cpp
     src/SamplerVoice.cpp
@@ -305,6 +309,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     include/drs/engine/RuntimeVoice.h
     include/drs/engine/SamplerPlaybackContext.h
     include/drs/engine/SampleImport.h
+    include/drs/engine/SfzImport.h
+    include/drs/engine/SfzImportContract.h
     include/drs/engine/SamplerRenderModel.h
     include/drs/engine/SamplerVoice.h
     include/drs/engine/SamplerVoicePool.h

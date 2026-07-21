@@ -770,6 +770,93 @@ add_test(
     COMMAND drs_sprint6_publish_contract_tests
 )
 
+# Sprint 3.1.1 frozen SFZ analyze/review/commit contract.
+add_executable(drs_sprint31_sfz_contract_tests
+    src/Sprint31SfzContractTests.cpp
+)
+
+target_link_libraries(drs_sprint31_sfz_contract_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_features(drs_sprint31_sfz_contract_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint31.sfz_contract
+    COMMAND drs_sprint31_sfz_contract_tests
+)
+
+add_executable(drs_sprint31_sfz_fixture_characterization_tests
+    src/Sprint31SfzFixtureCharacterizationTests.cpp
+)
+
+target_link_libraries(drs_sprint31_sfz_fixture_characterization_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_definitions(drs_sprint31_sfz_fixture_characterization_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_sprint31_sfz_fixture_characterization_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint31.sfz_fixture_profile
+    COMMAND drs_sprint31_sfz_fixture_characterization_tests
+)
+
+add_executable(drs_sprint31_sfz_parser_tests
+    src/Sprint31SfzParserTests.cpp
+)
+
+target_link_libraries(drs_sprint31_sfz_parser_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_definitions(drs_sprint31_sfz_parser_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_sprint31_sfz_parser_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint31.sfz_parser
+    COMMAND drs_sprint31_sfz_parser_tests
+)
+
+add_executable(drs_sprint31_sfz_normalization_tests
+    src/Sprint31SfzNormalizationTests.cpp
+)
+
+target_link_libraries(drs_sprint31_sfz_normalization_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_features(drs_sprint31_sfz_normalization_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint31.sfz_normalization
+    COMMAND drs_sprint31_sfz_normalization_tests
+)
+
+# Direct-only expected-red audit for the parser/report/UI seams intentionally left open by Sprint 3.1.1.
+add_executable(drs_sprint31_sfz_contract_red_tests
+    src/Sprint31SfzContractRedTests.cpp
+)
+
+target_compile_definitions(drs_sprint31_sfz_contract_red_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_sprint31_sfz_contract_red_tests PRIVATE cxx_std_17)
+
 # Permanent source-level regression audit for Publish replacement seams retired by Sprint 6.
 add_executable(drs_sprint6_publish_contract_seam_tests
     src/Sprint6PublishContractSeamTests.cpp
@@ -1879,6 +1966,11 @@ add_dependencies(drs_all_tests
     drs_sprint5_preview_shell_parity_tests
     drs_sprint5_preview_contract_red_tests
     drs_sprint5_integration_hardening_tests
+    drs_sprint31_sfz_contract_tests
+    drs_sprint31_sfz_fixture_characterization_tests
+    drs_sprint31_sfz_parser_tests
+    drs_sprint31_sfz_normalization_tests
+    drs_sprint31_sfz_contract_red_tests
     drs_sprint6_publish_contract_tests
     drs_sprint6_publish_contract_seam_tests
     drs_sprint6_publish_controller_tests
