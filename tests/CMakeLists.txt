@@ -975,6 +975,44 @@ add_test(
     COMMAND drs_sprint31_sfz_determinism_tests
 )
 
+# Phase 3 crossfade Sprint 1 contract and fixture baseline.
+add_executable(drs_phase3_crossfade_contract_tests
+    src/Phase3CrossfadeContractTests.cpp
+)
+
+target_link_libraries(drs_phase3_crossfade_contract_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_features(drs_phase3_crossfade_contract_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase3.crossfade_contract
+    COMMAND drs_phase3_crossfade_contract_tests
+)
+
+add_executable(drs_phase3_crossfade_fixture_characterization_tests
+    src/Phase3CrossfadeFixtureCharacterizationTests.cpp
+)
+
+target_link_libraries(drs_phase3_crossfade_fixture_characterization_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_definitions(drs_phase3_crossfade_fixture_characterization_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_phase3_crossfade_fixture_characterization_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase3.crossfade_fixture_profile
+    COMMAND drs_phase3_crossfade_fixture_characterization_tests
+)
+
 # Direct-only expected-red audit for the parser/report/UI seams intentionally left open by Sprint 3.1.1.
 add_executable(drs_sprint31_sfz_contract_red_tests
     src/Sprint31SfzContractRedTests.cpp
