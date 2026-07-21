@@ -1,5 +1,7 @@
 #pragma once
 
+#include "drs/engine/RuntimeModel.h"
+
 #include <functional>
 #include <string>
 #include <vector>
@@ -47,6 +49,7 @@ struct ZoneFieldValuesViewModel
     double gainDb = 0.0;
     double pan = 0.0;
     bool loopEnabled = false;
+    drs::engine::ZoneTriggerMode triggerMode = drs::engine::ZoneTriggerMode::gated;
     std::string emptyStateText;
 };
 

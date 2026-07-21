@@ -118,7 +118,8 @@ void requireVector(const std::vector<float>& actual,
 drs::engine::SamplerRenderModelPtr buildModel(std::size_t frameCount = 4096,
                                               int keyLow = 0,
                                               int keyHigh = 127,
-                                              std::size_t layerCount = 1)
+                                              std::size_t layerCount = 1,
+                                              drs::engine::ZoneTriggerMode triggerMode = drs::engine::ZoneTriggerMode::gated)
 {
     drs::engine::ImmutablePlaybackSnapshot snapshot;
     snapshot.draftRevision = 43;
@@ -150,7 +151,8 @@ drs::engine::SamplerRenderModelPtr buildModel(std::size_t frameCount = 4096,
                                    0,
                                    false,
                                    0,
-                                   0 });
+                                   0,
+                                   triggerMode });
 
         auto decoded = std::make_shared<drs::engine::PreparedPlaybackDecodedSampleData>();
         decoded->normalizedChannels = { std::vector<float>(frameCount, 1.0f) };
@@ -177,7 +179,8 @@ drs::engine::SamplerRenderModelPtr buildModel(std::size_t frameCount = 4096,
                                    0,
                                    false,
                                    0,
-                                   0 });
+                                   0,
+                                   triggerMode });
     }
 
     auto payload = std::make_shared<drs::engine::PlaybackActivationPayload>();
@@ -396,6 +399,40 @@ void runOverlappingLayerMatrix()
             "Note-off must release every voice started by an overlapping layered trigger.");
 }
 
+void runTriggerModeMatrix()
+{
+    const auto model = buildModel(8, 0, 127, 1, drs::engine::ZoneTriggerMode::oneShot);
+    drs::engine::SamplerVoicePool pool;
+    require(pool.prepare(*model, 48000.0), "One-shot voice pool should prepare.");
+
+    drs::engine::SamplerEventBlock events;
+    events.push(noteOn(0));
+    events.push(noteOff(2));
+    StereoOutput firstOutput(4);
+    auto result = pool.renderBlock(firstOutput.view(), events.view());
+    require(result.render.startedVoiceCount == 1
+                && result.render.releasedVoiceCount == 0
+                && result.activeVoiceCount == 1
+                && result.releasingVoiceCount == 0,
+            "One-shot voices must ignore matching note-off events.");
+    requireVector(firstOutput.left, { 0.25f, 0.25f, 0.25f, 0.25f },
+                  "One-shot playback should continue after note-off");
+
+    events.clear();
+    StereoOutput naturalEndOutput(4);
+    result = pool.renderBlock(naturalEndOutput.view(), events.view());
+    require(result.render.completedVoiceCount == 1 && result.finishedVoiceCount == 1,
+            "One-shot voices must still stop at the sample's natural end.");
+
+    pool.resetVoices();
+    events.push(noteOn(0));
+    events.push(command(drs::engine::SamplerRenderEventType::allNotesOff, 1));
+    StereoOutput allOffOutput(2);
+    result = pool.renderBlock(allOffOutput.view(), events.view());
+    require(result.render.releasedVoiceCount == 1 && result.releasingVoiceCount == 1,
+            "All-notes-off must remain able to release one-shot voices.");
+}
+
 void runCapacityAndStealMatrix()
 {
     const auto model = buildModel();
@@ -501,6 +538,7 @@ int main()
         runSampleAccurateTimingMatrix();
         runNoteOwnershipAndCommandMatrix();
         runOverlappingLayerMatrix();
+        runTriggerModeMatrix();
         runCapacityAndStealMatrix();
         runOverflowDropAndRealtimeMatrix();
         std::cout << "Sprint 4.3 fixed voice-pool and sample-accurate event matrix passed." << std::endl;

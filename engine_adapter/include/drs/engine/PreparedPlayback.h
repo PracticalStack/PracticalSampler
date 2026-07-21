@@ -111,6 +111,7 @@ struct PreparedPlaybackZoneHandle
     bool loopEnabled = false;
     std::uint64_t loopStartFrame = 0;
     std::uint64_t loopEndFrame = 0;
+    ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;
 };
 
 // S3.7-T5 deferral note: this remains a public aggregate for current prepared-cache plumbing,

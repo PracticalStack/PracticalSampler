@@ -363,6 +363,29 @@ void CompactInspectorToggleRow::resized()
     toggle.setBounds(row);
 }
 
+CompactInspectorComboRow::CompactInspectorComboRow(const juce::String& titleText,
+                                                   const juce::String& rowComponentId)
+{
+    setComponentID(rowComponentId);
+    configureInspectorLabel(label, titleText, 12.5f, true);
+    configureAccessibleMetadata(label,
+                                titleText,
+                                "Inspector field label.");
+    configureAccessibleMetadata(comboBox,
+                                titleText,
+                                "Selects the " + titleText.toLowerCase() + ".",
+                                "Choose one of the available values.");
+    addAndMakeVisible(label);
+    addAndMakeVisible(comboBox);
+}
+
+void CompactInspectorComboRow::resized()
+{
+    auto row = getLocalBounds().removeFromTop(28);
+    label.setBounds(row.removeFromLeft(row.getWidth() - 150));
+    comboBox.setBounds(row);
+}
+
 CompactInspectorActionRow::CompactInspectorActionRow(const juce::String& titleText,
                                                      const juce::String& rowComponentId,
                                                      const juce::String& buttonText)

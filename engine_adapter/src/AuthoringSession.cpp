@@ -37,6 +37,7 @@ std::vector<AuthoringZoneSummary> buildZoneSummaries(const RuntimeProjectModel& 
         summary.gainDb = zone.gainDb;
         summary.pan = zone.pan;
         summary.loopEnabled = zone.loopEnabled;
+        summary.triggerMode = zone.triggerMode;
         summary.selected = zone.id == project.authoring.selectedZoneId;
         summaries.push_back(std::move(summary));
     }

@@ -69,6 +69,10 @@ public:
     double getIncrementFrames() const noexcept { return incrementFrames; }
     float getBaseGain() const noexcept { return baseGain; }
     bool isLoopActive() const noexcept { return loopActive; }
+    bool ignoresNoteOff() const noexcept
+    {
+        return route != nullptr && route->triggerMode == ZoneTriggerMode::oneShot;
+    }
     SamplerPanGains getPanGains() const noexcept { return panGains; }
     std::uint32_t getReleaseSamplesRemaining() const noexcept { return releaseSamplesRemaining; }
     std::uint32_t getReleaseSamplesTotal() const noexcept { return releaseSamplesTotal; }

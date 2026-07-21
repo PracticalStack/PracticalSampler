@@ -184,6 +184,8 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
         zoneObject["loopEnabled"] = zone.loopEnabled;
         zoneObject["loopStartFrame"] = zone.loopStartFrame;
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
+        if (zone.triggerMode == ZoneTriggerMode::oneShot)
+            zoneObject["triggerMode"] = "one-shot";
         zones.push_back(std::move(zoneObject));
     }
     root["zones"] = std::move(zones);
@@ -907,7 +909,8 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             zone.sampleStartFrame,
             zone.loopEnabled,
             zone.loopStartFrame,
-            zone.loopEndFrame
+            zone.loopEndFrame,
+            zone.triggerMode
         });
     }
 
@@ -1565,6 +1568,8 @@ std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& 
         value["loopEnabled"] = zone.loopEnabled;
         value["loopStartFrame"] = zone.loopStartFrame;
         value["loopEndFrame"] = zone.loopEndFrame;
+        if (zone.triggerMode == ZoneTriggerMode::oneShot)
+            value["triggerMode"] = "one-shot";
         zones.push_back(std::move(value));
     }
     root["zones"] = std::move(zones);
@@ -1592,6 +1597,8 @@ std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& 
         value["loopEnabled"] = handle.loopEnabled;
         value["loopStartFrame"] = handle.loopStartFrame;
         value["loopEndFrame"] = handle.loopEndFrame;
+        if (handle.triggerMode == ZoneTriggerMode::oneShot)
+            value["triggerMode"] = "one-shot";
         preparedRoutes.push_back(std::move(value));
     }
     root["preparedRoutes"] = std::move(preparedRoutes);
@@ -1778,7 +1785,8 @@ bool operator==(const PreparedPlaybackZoneHandle& left, const PreparedPlaybackZo
         && left.sampleStartFrame == right.sampleStartFrame
         && left.loopEnabled == right.loopEnabled
         && left.loopStartFrame == right.loopStartFrame
-        && left.loopEndFrame == right.loopEndFrame;
+        && left.loopEndFrame == right.loopEndFrame
+        && left.triggerMode == right.triggerMode;
 }
 
 bool operator==(const ImmutablePreparedPlayback& left, const ImmutablePreparedPlayback& right)

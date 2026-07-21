@@ -724,6 +724,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         values.gainDb = zone.gainDb;
         values.pan = zone.pan;
         values.loopEnabled = zone.loopEnabled;
+        values.triggerMode = zone.triggerMode;
         applySelectedZoneEdit(values, juce::String::fromUTF8(label.c_str()));
     });
 
@@ -1751,6 +1752,7 @@ authoring::ZoneFieldValuesViewModel AuthoringPanel::buildZoneFieldValuesViewMode
         viewModel.gainDb = zone->gainDb;
         viewModel.pan = zone->pan;
         viewModel.loopEnabled = zone->loopEnabled;
+        viewModel.triggerMode = zone->triggerMode;
     }
 
     return viewModel;
@@ -2855,6 +2857,7 @@ void AuthoringPanel::applySelectedZoneEdit(const authoring::ZoneFieldValuesViewM
     editedZone.gainDb = values.gainDb;
     editedZone.pan = values.pan;
     editedZone.loopEnabled = values.loopEnabled;
+    editedZone.triggerMode = values.triggerMode;
 
     authoringSession.updateSelectedZone(editedZone, label.toStdString());
     refreshFromSession();

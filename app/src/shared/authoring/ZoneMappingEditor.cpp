@@ -10,6 +10,7 @@ constexpr int sectionGap = 8;
 constexpr int sliderRowHeight = 44;
 constexpr int rangeRowHeight = 58;
 constexpr int toggleRowHeight = 24;
+constexpr int comboRowHeight = 28;
 constexpr int actionRowHeight = 24;
 constexpr int messageRowHeight = 20;
 
@@ -38,6 +39,7 @@ ZoneMappingEditor::ZoneMappingEditor()
       gainRow("Gain (dB)", "authoringGainRow", -24.0, 12.0, 0.1),
       panRow("Pan", "authoringPanRow", -1.0, 1.0, 0.01),
       loopToggleRow("Loop", "authoringLoopRow", "Enabled"),
+      triggerModeRow("Trigger mode", "authoringTriggerModeRow"),
       previewZoneRow("Audition", "authoringInspectorPreviewRow", "Preview Zone"),
       restoreRootKeyRow("Reference", "authoringRestoreRootKeyRow", "Restore Root Key"),
       validationMessage("authoringZoneValidationMessage", juce::Justification::centredLeft)
@@ -57,6 +59,9 @@ ZoneMappingEditor::ZoneMappingEditor()
     gainRow.getSlider().setComponentID("authoringGainSlider");
     panRow.getSlider().setComponentID("authoringPanSlider");
     loopToggleRow.getToggle().setComponentID("authoringLoopEnabledToggle");
+    triggerModeRow.getComboBox().setComponentID("authoringTriggerModeSelector");
+    triggerModeRow.getComboBox().addItem("Gated", 1);
+    triggerModeRow.getComboBox().addItem("One-shot", 2);
     previewZoneRow.getButton().setComponentID("authoringInspectorPreviewButton");
     restoreRootKeyRow.getButton().setComponentID("authoringRestoreRootKeyButton");
     mapSection.getDisclosureButton().setExplicitFocusOrder(40);
@@ -71,8 +76,11 @@ ZoneMappingEditor::ZoneMappingEditor()
     panRow.getSlider().setExplicitFocusOrder(49);
     advancedSection.getDisclosureButton().setExplicitFocusOrder(50);
     loopToggleRow.getToggle().setExplicitFocusOrder(51);
-    previewZoneRow.getButton().setExplicitFocusOrder(52);
-    restoreRootKeyRow.getButton().setExplicitFocusOrder(53);
+    triggerModeRow.getComboBox().setExplicitFocusOrder(52);
+    previewZoneRow.getButton().setExplicitFocusOrder(53);
+    restoreRootKeyRow.getButton().setExplicitFocusOrder(54);
+    triggerModeRow.getComboBox().setHelpText(
+        "Gated samples release on note-off. One-shot samples play to their natural end.");
     previewZoneRow.getButton().setHelpText("Auditions the selected zone from the mapping inspector.");
     restoreRootKeyRow.getButton().setHelpText(
         "Restores the selected zone root key from the imported sample reference pitch.");
@@ -89,10 +97,11 @@ ZoneMappingEditor::ZoneMappingEditor()
     mixSectionContent.setSize(0, sliderRowHeight + 6 + sliderRowHeight);
 
     addOwnedRow(advancedSectionContent, loopToggleRow, toggleRowHeight);
+    addOwnedRow(advancedSectionContent, triggerModeRow, comboRowHeight);
     addOwnedRow(advancedSectionContent, previewZoneRow, actionRowHeight);
     addOwnedRow(advancedSectionContent, restoreRootKeyRow, actionRowHeight);
     addOwnedRow(advancedSectionContent, validationMessage, messageRowHeight);
-    advancedSectionContent.setSize(0, toggleRowHeight + 6 + actionRowHeight + 6
+    advancedSectionContent.setSize(0, toggleRowHeight + 6 + comboRowHeight + 6 + actionRowHeight + 6
                                       + actionRowHeight + 6 + messageRowHeight);
 
     mapSection.setContent(&mapSectionContent);
@@ -123,6 +132,11 @@ ZoneMappingEditor::ZoneMappingEditor()
     loopToggleRow.getToggle().onClick = [this]
     {
         commitCurrentValues("Toggle zone loop");
+    };
+
+    triggerModeRow.getComboBox().onChange = [this]
+    {
+        commitCurrentValues("Update zone trigger mode");
     };
 
     restoreRootKeyRow.getButton().onClick = [this]
@@ -187,6 +201,8 @@ void ZoneMappingEditor::resized()
     auto advancedArea = advancedSectionContent.getLocalBounds();
     loopToggleRow.setBounds(advancedArea.removeFromTop(toggleRowHeight));
     advancedArea.removeFromTop(6);
+    triggerModeRow.setBounds(advancedArea.removeFromTop(comboRowHeight));
+    advancedArea.removeFromTop(6);
     previewZoneRow.setBounds(advancedArea.removeFromTop(actionRowHeight));
     advancedArea.removeFromTop(6);
     restoreRootKeyRow.setBounds(advancedArea.removeFromTop(actionRowHeight));
@@ -219,6 +235,7 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
              static_cast<juce::Component*>(&gainRow),
              static_cast<juce::Component*>(&panRow),
              static_cast<juce::Component*>(&loopToggleRow),
+             static_cast<juce::Component*>(&triggerModeRow),
              static_cast<juce::Component*>(&previewZoneRow),
              static_cast<juce::Component*>(&restoreRootKeyRow),
              static_cast<juce::Component*>(&validationMessage),
@@ -230,6 +247,7 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
              static_cast<juce::Component*>(&gainRow.getSlider()),
              static_cast<juce::Component*>(&panRow.getSlider()),
              static_cast<juce::Component*>(&loopToggleRow.getToggle()),
+             static_cast<juce::Component*>(&triggerModeRow.getComboBox()),
              static_cast<juce::Component*>(&previewZoneRow.getButton()),
              static_cast<juce::Component*>(&restoreRootKeyRow.getButton())
          })
@@ -262,6 +280,9 @@ ZoneMappingEditor::CommitValues ZoneMappingEditor::collectCurrentValues() const
     values.gainDb = gainRow.getSlider().getValue();
     values.pan = panRow.getSlider().getValue();
     values.loopEnabled = loopToggleRow.getToggle().getToggleState();
+    values.triggerMode = triggerModeRow.getComboBox().getSelectedId() == 2
+        ? drs::engine::ZoneTriggerMode::oneShot
+        : drs::engine::ZoneTriggerMode::gated;
 
     const auto normalizedKeyRange = values.keyLow > values.keyHigh;
     const auto normalizedVelocityRange = values.velocityLow > values.velocityHigh;
@@ -303,6 +324,9 @@ void ZoneMappingEditor::applyValuesToControls(const ZoneFieldValuesViewModel& va
     gainRow.getSlider().setValue(values.gainDb, juce::dontSendNotification);
     panRow.getSlider().setValue(values.pan, juce::dontSendNotification);
     loopToggleRow.getToggle().setToggleState(values.loopEnabled, juce::dontSendNotification);
+    triggerModeRow.getComboBox().setSelectedId(
+        values.triggerMode == drs::engine::ZoneTriggerMode::oneShot ? 2 : 1,
+        juce::dontSendNotification);
 }
 
 void ZoneMappingEditor::refreshValidationMessage(const juce::String& messageText)

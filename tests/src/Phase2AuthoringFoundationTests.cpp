@@ -144,12 +144,14 @@ int main()
         auto firstEdit = controller.getProject();
         firstEdit.authoring.selectedZoneId = "pad-a3-high";
         firstEdit.authoring.zones[2].gainDb = 2.0;
+        firstEdit.authoring.zones[2].triggerMode = drs::engine::ZoneTriggerMode::oneShot;
         firstEdit.authoring.notes.push_back("First transaction for Sprint 1 history coverage.");
 
         const auto firstCommit = controller.commitSnapshot(
             firstEdit,
             "Select alternate zone and trim lead gain",
-            {"authoring.selectedZoneId", "authoring.zones[2].gainDb", "authoring.notes"});
+            {"authoring.selectedZoneId", "authoring.zones[2].gainDb",
+             "authoring.zones[2].triggerMode", "authoring.notes"});
         require(firstCommit.applied, "First authoring project transaction should commit successfully.");
         require(firstCommit.documentState.revision == 1, "First authoring project transaction should increment revision.");
         require(firstCommit.documentState.undoDepth == 1, "First authoring project transaction should create one undo checkpoint.");
@@ -203,6 +205,10 @@ int main()
                 "Saved Phase 2 authoring project must preserve the edited FX bypass state.");
         require(roundTripLoad.project.authoring.selectedZoneId == "pad-a3-high",
                 "Saved Phase 2 authoring project must preserve the edited selected zone.");
+        require(roundTripLoad.project.authoring.zones[2].triggerMode == drs::engine::ZoneTriggerMode::oneShot,
+                "Saved Phase 2 authoring project must preserve one-shot trigger mode.");
+        require(roundTripJson.find("\"triggerMode\": \"one-shot\"") != std::string::npos,
+                "One-shot zones must serialize their trigger mode explicitly.");
 
         const auto blankProjectPath = tempDirectory / "blank-project-roundtrip.drsproj";
         writeTextFile(blankProjectPath,

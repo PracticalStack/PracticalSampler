@@ -135,6 +135,7 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
         zone.velocityHigh = projectZone.velocityHigh;
         zone.streamOffsetBytes = 0;
         zone.prefetchBytes = 16384;
+        zone.triggerMode = projectZone.triggerMode;
         instrument.zones.push_back(std::move(zone));
     }
 

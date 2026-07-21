@@ -193,6 +193,8 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
         zoneObject["loopEnabled"] = zone.loopEnabled;
         zoneObject["loopStartFrame"] = zone.loopStartFrame;
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
+        if (zone.triggerMode == ZoneTriggerMode::oneShot)
+            zoneObject["triggerMode"] = "one-shot";
         zones.push_back(std::move(zoneObject));
     }
     root["zones"] = std::move(zones);
@@ -424,7 +426,8 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
             zone.sampleStartFrame,
             zone.loopEnabled,
             zone.loopStartFrame,
-            zone.loopEndFrame
+            zone.loopEndFrame,
+            zone.triggerMode
         });
 
         if (!zone.articulationId.empty())

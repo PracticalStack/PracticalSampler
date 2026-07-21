@@ -45,7 +45,8 @@ bool sameTopology(const PlaybackSnapshotZone& snapshotZone,
         && snapshotZone.sampleStartFrame == preparedZone.sampleStartFrame
         && snapshotZone.loopEnabled == preparedZone.loopEnabled
         && snapshotZone.loopStartFrame == preparedZone.loopStartFrame
-        && snapshotZone.loopEndFrame == preparedZone.loopEndFrame;
+        && snapshotZone.loopEndFrame == preparedZone.loopEndFrame
+        && snapshotZone.triggerMode == preparedZone.triggerMode;
 }
 
 bool hasDuplicateSnapshotZoneId(const ImmutablePlaybackSnapshot& snapshot,
@@ -318,7 +319,8 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
                                   zone.sampleStartFrame,
                                   zone.loopEnabled,
                                   zone.loopStartFrame,
-                                  zone.loopEndFrame });
+                                  zone.loopEndFrame,
+                                  zone.triggerMode });
     }
 
     result.built = true;

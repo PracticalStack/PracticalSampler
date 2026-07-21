@@ -316,6 +316,8 @@ ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinitio
         zoneObject["loopEnabled"] = zone.loopEnabled;
         zoneObject["loopStartFrame"] = zone.loopStartFrame;
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
+        if (zone.triggerMode == ZoneTriggerMode::oneShot)
+            zoneObject["triggerMode"] = "one-shot";
         array.push_back(std::move(zoneObject));
     }
 
@@ -654,6 +656,15 @@ RuntimeProjectLoadResult loadRuntimeProjectManifest(const std::string& manifestP
                         zone.loopStartFrame = *loopStartFrame;
                     if (const auto loopEndFrame = readRequired<RuntimeProjectLoadResult, std::uint64_t>(zoneObject, result, "loopEndFrame", context.c_str()))
                         zone.loopEndFrame = *loopEndFrame;
+                    if (const auto triggerMode = readOptional<RuntimeProjectLoadResult, std::string>(zoneObject, result, "triggerMode", context.c_str()))
+                    {
+                        if (*triggerMode == "gated")
+                            zone.triggerMode = ZoneTriggerMode::gated;
+                        else if (*triggerMode == "one-shot")
+                            zone.triggerMode = ZoneTriggerMode::oneShot;
+                        else
+                            addIssue(result, context + " field 'triggerMode' must be 'gated' or 'one-shot'.");
+                    }
 
                     authoring.zones.push_back(std::move(zone));
                 }
@@ -1455,6 +1466,15 @@ RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manif
 
             if (const auto prefetchBytes = readRequired<RuntimeManifestLoadResult, std::uint64_t>(zoneObject, result, "prefetchBytes", context.c_str()))
                 zone.prefetchBytes = *prefetchBytes;
+            if (const auto triggerMode = readOptional<RuntimeManifestLoadResult, std::string>(zoneObject, result, "triggerMode", context.c_str()))
+            {
+                if (*triggerMode == "gated")
+                    zone.triggerMode = ZoneTriggerMode::gated;
+                else if (*triggerMode == "one-shot")
+                    zone.triggerMode = ZoneTriggerMode::oneShot;
+                else
+                    addIssue(result, context + " field 'triggerMode' must be 'gated' or 'one-shot'.");
+            }
 
             if (!groupIds.count(zone.groupId))
                 addIssue(result, context + " references unknown group '" + zone.groupId + "'.");
@@ -1617,6 +1637,8 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
         zoneObject["velocityHigh"] = zone.velocityHigh;
         zoneObject["streamOffsetBytes"] = zone.streamOffsetBytes;
         zoneObject["prefetchBytes"] = zone.prefetchBytes;
+        if (zone.triggerMode == ZoneTriggerMode::oneShot)
+            zoneObject["triggerMode"] = "one-shot";
         zones.push_back(std::move(zoneObject));
     }
     root["zones"] = std::move(zones);

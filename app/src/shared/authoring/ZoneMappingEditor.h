@@ -48,6 +48,7 @@ private:
     CompactInspectorSliderRow gainRow;
     CompactInspectorSliderRow panRow;
     CompactInspectorToggleRow loopToggleRow;
+    CompactInspectorComboRow triggerModeRow;
     CompactInspectorActionRow previewZoneRow;
     CompactInspectorActionRow restoreRootKeyRow;
     CompactInspectorMessage validationMessage;

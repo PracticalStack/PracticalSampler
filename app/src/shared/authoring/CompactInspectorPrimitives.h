@@ -134,6 +134,24 @@ private:
     juce::ToggleButton toggle;
 };
 
+class CompactInspectorComboRow final : public juce::Component
+{
+public:
+    CompactInspectorComboRow(const juce::String& titleText,
+                             const juce::String& rowComponentId);
+
+    void resized() override;
+
+    juce::ComboBox& getComboBox() { return comboBox; }
+    const juce::ComboBox& getComboBox() const { return comboBox; }
+    juce::Label& getLabel() { return label; }
+    const juce::Label& getLabel() const { return label; }
+
+private:
+    juce::Label label;
+    juce::ComboBox comboBox;
+};
+
 class CompactInspectorActionRow final : public juce::Component
 {
 public:

@@ -411,6 +411,7 @@ drs::engine::AuthoringZoneSummary makeZoneSummary(const drs::engine::RuntimeProj
     summary.gainDb = zone.gainDb;
     summary.pan = zone.pan;
     summary.loopEnabled = zone.loopEnabled;
+    summary.triggerMode = zone.triggerMode;
     summary.selected = true;
     return summary;
 }
@@ -719,7 +720,7 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
 {
     drs::app::authoring::ZoneMappingEditor editor;
     editor.setTopLeftPosition(0, 0);
-    editor.setSize(360, 520);
+    editor.setSize(360, 560);
     editor.setVisible(true);
 
     drs::app::authoring::ZoneFieldValuesViewModel emptyViewModel;
@@ -784,6 +785,8 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
             "Zone mapping editor should expose one pan control after removing old mapping rows.");
     require(countDescendantsById(editor, "authoringLoopEnabledToggle") == 1,
             "Zone mapping editor should expose one loop toggle after removing old mapping rows.");
+    require(countDescendantsById(editor, "authoringTriggerModeSelector") == 1,
+            "Zone mapping editor should expose one trigger-mode selector.");
     require(countDescendantsById(editor, "authoringRestoreRootKeyButton") == 1,
             "Zone mapping editor should expose one restore-root-key action after removing old mapping rows.");
 
@@ -799,6 +802,7 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
              juce::String("authoringMixInspectorSectionDisclosure"),
              juce::String("authoringAdvancedInspectorSection"),
              juce::String("authoringAdvancedInspectorSectionDisclosure"),
+             juce::String("authoringTriggerModeSelector"),
              juce::String("authoringRestoreRootKeyButton")
          })
     {
@@ -809,6 +813,7 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     requireNonEmptyAccessibilityHelpText(editor, "authoringRootKeySlider");
     requireNonEmptyAccessibilityHelpText(editor, "authoringKeyLowSlider");
     requireNonEmptyAccessibilityHelpText(editor, "authoringKeyHighSlider");
+    requireNonEmptyAccessibilityHelpText(editor, "authoringTriggerModeSelector");
     requireNonEmptyAccessibilityHelpText(editor, "authoringRestoreRootKeyButton");
     requireIncreasingFocusOrder(editor,
                                 {
@@ -824,6 +829,7 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
                                     "authoringPanSlider",
                                     "authoringAdvancedInspectorSectionDisclosure",
                                     "authoringLoopEnabledToggle",
+                                    "authoringTriggerModeSelector",
                                     "authoringRestoreRootKeyButton"
                                 });
 
@@ -837,6 +843,7 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     requireAccessibilityHandlerState(editor, "authoringGainSlider", false);
     requireAccessibilityHandlerState(editor, "authoringPanSlider", false);
     requireAccessibilityHandlerState(editor, "authoringLoopEnabledToggle", false);
+    requireAccessibilityHandlerState(editor, "authoringTriggerModeSelector", false);
     requireAccessibilityHandlerState(editor, "authoringRestoreRootKeyButton", false);
 
     for (const auto& componentId : {
@@ -882,9 +889,11 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     if (findDescendantById(editor, "authoringRestoreRootKeyButton")->getBounds().isEmpty())
         requireButton(editor, "authoringAdvancedInspectorSectionDisclosure").onClick();
     requireComponentVisibleWithin(editor, "authoringLoopEnabledToggle", bounds);
+    requireComponentVisibleWithin(editor, "authoringTriggerModeSelector", bounds);
     requireComponentVisibleWithin(editor, "authoringRestoreRootKeyButton", bounds);
     requireComponentVisibleWithin(editor, "authoringZoneValidationMessage", bounds);
     requireAccessibilityHandlerState(editor, "authoringLoopEnabledToggle", true);
+    requireAccessibilityHandlerState(editor, "authoringTriggerModeSelector", true);
     requireAccessibilityHandlerState(editor, "authoringRestoreRootKeyButton", true);
 
     auto& rootKeySlider = requireSlider(editor, "authoringRootKeySlider");
@@ -961,6 +970,16 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     require(lastCommitLabel == "Toggle zone loop", "Zone mapping editor should label loop edits.");
     require(lastCommittedValues.loopEnabled, "Zone mapping editor should report the toggled loop state.");
 
+    auto& triggerModeSelector = requireComboBox(editor, "authoringTriggerModeSelector");
+    require(triggerModeSelector.getSelectedId() == 1,
+            "Zone mapping editor should default selected zones to gated trigger mode.");
+    triggerModeSelector.setSelectedId(2, juce::sendNotificationSync);
+    require(commitRequests == 7, "Zone mapping editor should commit trigger-mode edits.");
+    require(lastCommitLabel == "Update zone trigger mode",
+            "Zone mapping editor should label trigger-mode edits.");
+    require(lastCommittedValues.triggerMode == drs::engine::ZoneTriggerMode::oneShot,
+            "Zone mapping editor should report one-shot trigger mode.");
+
     requireButton(editor, "authoringRestoreRootKeyButton").onClick();
     require(restoreRequests == 1, "Zone mapping editor should emit restore-root-key callbacks.");
 
@@ -976,7 +995,7 @@ void writeReachabilityChecklist(std::ostream& inventory)
     inventory << "- Persistent map: authoringZoneMap\n";
     inventory << "- Drawer host: authoringDrawer, authoringDrawerTabStrip, authoringDrawerToggleButton\n";
     inventory << "- Drawer tabs: authoringDrawerWaveformTab, authoringDrawerMacrosTab, authoringDrawerRoutingTab, authoringDrawerPerformanceTab\n";
-    inventory << "- Mapping inspector: authoringRootKeySlider, authoringKeyLowSlider, authoringKeyHighSlider, authoringVelocityLowSlider, authoringVelocityHighSlider, authoringGainSlider, authoringPanSlider, authoringLoopEnabledToggle, authoringRestoreRootKeyButton\n";
+    inventory << "- Mapping inspector: authoringRootKeySlider, authoringKeyLowSlider, authoringKeyHighSlider, authoringVelocityLowSlider, authoringVelocityHighSlider, authoringGainSlider, authoringPanSlider, authoringLoopEnabledToggle, authoringTriggerModeSelector, authoringRestoreRootKeyButton\n";
     inventory << "- Drawer context: authoringDrawerTitleLabel, authoringDrawerScopeLabel, authoringDrawerBreadcrumbLabel\n";
     inventory << "- Waveform drawer content: authoringWaveformPreview, authoringWaveformStatusLabel, authoringWaveformInfoLabel, authoringWaveformLoopLabel, authoringWaveformImportLabel\n";
     inventory << "- Macros drawer content: authoringMacroList, authoringMacroListBox, authoringMacroAssignmentSelector, authoringMacroRoleSelector, authoringMacroDefaultSlider, authoringMacroMinSlider, authoringMacroMaxSlider, authoringMacroMoveUpButton, authoringMacroMoveDownButton\n";
@@ -2321,6 +2340,11 @@ void exerciseGateAWorkflow(drs::app::AuthoringPanel& panel,
     require(session.getSelectedZone()->loopEnabled,
             "Gate A workflow should commit loop-toggle edits through the compact inspector.");
 
+    auto& triggerModeSelector = requireComboBox(panel, "authoringTriggerModeSelector");
+    triggerModeSelector.setSelectedId(2, juce::sendNotificationSync);
+    require(session.getSelectedZone()->triggerMode == drs::engine::ZoneTriggerMode::oneShot,
+            "Gate A workflow should commit one-shot trigger mode through the compact inspector.");
+
     const auto expectedPreview = session.buildSelectedZonePreviewRequest();
     require(expectedPreview.available, "Gate A workflow preview should be available after zone edits.");
     previewButton.onClick();
@@ -2361,6 +2385,8 @@ void exerciseGateAWorkflow(drs::app::AuthoringPanel& panel,
               << " gain=" << session.getSelectedZone()->gainDb
               << " pan=" << session.getSelectedZone()->pan
               << " loop=" << (session.getSelectedZone()->loopEnabled ? "true" : "false")
+              << " trigger=" << (session.getSelectedZone()->triggerMode == drs::engine::ZoneTriggerMode::oneShot
+                                      ? "one-shot" : "gated")
               << " dirty=" << (session.getDocumentState().dirty ? "true" : "false")
               << " undo=" << session.getDocumentState().undoDepth
               << " redo=" << session.getDocumentState().redoDepth

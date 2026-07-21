@@ -354,6 +354,11 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 if (slot.state == SamplerVoiceSlotState::active
                     && slot.voice.getSourceMidiNote() == static_cast<int>(event.midiNote))
                 {
+                    if (slot.voice.ignoresNoteOff())
+                    {
+                        slot.sustainDeferred = false;
+                        continue;
+                    }
                     if (sustainPedalDown)
                     {
                         slot.sustainDeferred = true;

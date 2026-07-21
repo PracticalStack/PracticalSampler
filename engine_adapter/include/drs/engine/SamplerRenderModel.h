@@ -116,6 +116,7 @@ struct SamplerRenderRoute
     bool loopEnabled = false;
     std::uint64_t loopStartFrame = 0;
     std::uint64_t loopEndFrame = 0;
+    ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;
 };
 
 struct SamplerRenderModelBuildResult;

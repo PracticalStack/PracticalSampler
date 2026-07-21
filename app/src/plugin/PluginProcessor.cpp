@@ -132,6 +132,7 @@ std::string buildSelectedZonePreviewFingerprint(
         + "|" + std::to_string(zone.gainDb) + "|" + std::to_string(zone.pan)
         + "|" + std::to_string(zone.sampleStartFrame)
         + "|" + std::to_string(zone.loopEnabled)
+        + "|" + std::to_string(static_cast<int>(zone.triggerMode))
         + "|" + std::to_string(zone.loopStartFrame)
         + "|" + std::to_string(zone.loopEndFrame);
 }

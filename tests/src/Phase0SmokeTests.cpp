@@ -168,6 +168,15 @@ int main()
             = selfContainedProjectFile.withFileExtension(".drinst").getFullPathName().toStdString();
         storageTestProject.authoring.schemaName = "drs.authoring";
         storageTestProject.authoring.schemaVersion = 1;
+        storageTestProject.sampleSources.push_back({ "crash-cymbal", "Samples/crash.wav", "cymbal" });
+        drs::engine::RuntimeProjectZoneDefinition crashZone;
+        crashZone.id = "crash-cymbal-zone";
+        crashZone.sampleSourceId = "crash-cymbal";
+        crashZone.displayName = "Crash Cymbal";
+        crashZone.groupId = "cymbals";
+        crashZone.articulationId = "sustain";
+        crashZone.triggerMode = drs::engine::ZoneTriggerMode::oneShot;
+        storageTestProject.authoring.zones.push_back(crashZone);
         require(drs::app::saveProjectFiles(storageTestProject, selfContainedProjectFile).saved,
                 "Saving a project should write the complete project file set.");
         require(selfContainedProjectFile.existsAsFile(),
@@ -179,6 +188,10 @@ int main()
         require(selfContainedProjectFile.withFileExtension(".drinst").loadFileAsString().contains(
                     "\"sourceProject\": \"Felt Piano.drsproj\""),
                 "The saved instrument should reference its source project manifest.");
+        require(selfContainedProjectFile.loadFileAsString().contains("\"triggerMode\": \"one-shot\"")
+                    && selfContainedProjectFile.withFileExtension(".drinst").loadFileAsString().contains(
+                        "\"triggerMode\": \"one-shot\""),
+                "Saving a one-shot zone should preserve trigger mode in both project manifests.");
         require(selfContainedProjectFile.getParentDirectory().getChildFile("Samples").isDirectory(),
                 "New project storage should create a Samples directory beside the project manifest.");
         require(storageTestRoot.deleteRecursively(),

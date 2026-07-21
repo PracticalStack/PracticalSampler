@@ -22,6 +22,7 @@ struct AuthoringZoneSummary
     double gainDb = 0.0;
     double pan = 0.0;
     bool loopEnabled = false;
+    ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;
     bool selected = false;
 };
 

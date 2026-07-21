@@ -6,6 +6,12 @@
 
 namespace drs::engine
 {
+enum class ZoneTriggerMode : std::uint8_t
+{
+    gated,
+    oneShot
+};
+
 struct RuntimeProjectSampleSource
 {
     std::string id;
@@ -31,6 +37,7 @@ struct RuntimeProjectZoneDefinition
     bool loopEnabled = false;
     std::uint64_t loopStartFrame = 0;
     std::uint64_t loopEndFrame = 0;
+    ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;
 };
 
 struct RuntimeProjectMacroTargetDefinition
@@ -170,6 +177,7 @@ struct RuntimeZoneDefinition
     int velocityHigh = 127;
     std::uint64_t streamOffsetBytes = 0;
     std::uint64_t prefetchBytes = 0;
+    ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;
 };
 
 struct RuntimeInstrumentModel
