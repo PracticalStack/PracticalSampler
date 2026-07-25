@@ -1,7 +1,12 @@
 #include "drs/engine/SfzImportProjection.h"
+#include "drs/engine/RuntimeLoader.h"
+#include "drs/engine/VelocityCrossfade.h"
+#include "shared/ProjectStorage.h"
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -15,6 +20,13 @@ void require(bool condition, const std::string& message)
 {
     if (!condition)
         throw std::runtime_error(message);
+}
+
+void writeTextFile(const fs::path& path, const std::string& text)
+{
+    fs::create_directories(path.parent_path());
+    std::ofstream output(path, std::ios::binary);
+    output << text;
 }
 
 fs::path resolveFixturePath(const fs::path& relativeFixturePath)
@@ -59,6 +71,65 @@ std::size_t countFindingsWithCode(const drs::engine::SfzImportAnalysisResult& an
                       }));
 }
 
+template <typename TZone>
+std::size_t countCrossfadeZones(const std::vector<TZone>& zones)
+{
+    return static_cast<std::size_t>(
+        std::count_if(zones.begin(),
+                      zones.end(),
+                      [](const TZone& zone)
+                      {
+                          return drs::engine::hasAnyVelocityCrossfadeValue(zone.velocityCrossfade);
+                      }));
+}
+
+template <typename TZone>
+double computeZoneGain(const TZone& zone, int velocity)
+{
+    if (!drs::engine::hasAnyVelocityCrossfadeValue(zone.velocityCrossfade))
+        return velocity >= zone.velocityLow && velocity <= zone.velocityHigh ? 1.0 : 0.0;
+
+    return drs::engine::computeFirstPassVelocityCrossfadeGain(
+        { zone.velocityLow, zone.velocityHigh, zone.velocityCrossfade },
+        velocity);
+}
+
+struct OverlapSummary
+{
+    std::size_t positiveParticipantCount = 0;
+    double totalGain = 0.0;
+};
+
+template <typename TZone>
+OverlapSummary summarizeOverlap(const std::vector<TZone>& zones,
+                                int midiNote,
+                                int velocity,
+                                int roundRobinPosition)
+{
+    OverlapSummary summary;
+    for (const auto& zone : zones)
+    {
+        if (midiNote < zone.keyLow || midiNote > zone.keyHigh)
+            continue;
+
+        if (zone.roundRobinLength > 0
+            && zone.roundRobinPosition > 0
+            && zone.roundRobinPosition != roundRobinPosition)
+        {
+            continue;
+        }
+
+        const auto gain = computeZoneGain(zone, velocity);
+        if (gain <= 0.0)
+            continue;
+
+        ++summary.positiveParticipantCount;
+        summary.totalGain += gain;
+    }
+
+    return summary;
+}
+
 struct FixtureExpectation
 {
     const char* label = "";
@@ -66,6 +137,7 @@ struct FixtureExpectation
     std::size_t expectedConvertedCount = 0;
     std::size_t expectedApproximateCount = 0;
     std::size_t expectedWarningCount = 0;
+    bool expectsCrossfadeOverlap = false;
     std::string expectedSampleFragment;
 };
 } // namespace
@@ -82,36 +154,42 @@ int main()
               1599,
               0,
               9,
+              true,
               "jRhodes3d-mono" },
             { "mono-no-xfade",
               "DemoSFVInstruments/jlearman.jRhodes3d-master-rr/jRhodes3d-mono-no-xfade.sfz",
               1592,
               0,
               9,
+              false,
               "jRhodes3d-mono" },
             { "stereo-xfade",
               "DemoSFVInstruments/jlearman.jRhodes3d-master-rr/jRhodes3d-st.sfz",
               1600,
               0,
               9,
+              true,
               "jRhodes3d-st" },
             { "stereo-no-xfade",
               "DemoSFVInstruments/jlearman.jRhodes3d-master-rr/jRhodes3d-st-no-xfade.sfz",
               1592,
               0,
               9,
+              false,
               "jRhodes3d-st" },
             { "stereo-vibrato-xfade",
               "DemoSFVInstruments/jlearman.jRhodes3d-master-rr/jRhodes3d-sv.sfz",
               1600,
               0,
               9,
+              true,
               "jRhodes3d-sv" },
             { "stereo-vibrato-no-xfade",
               "DemoSFVInstruments/jlearman.jRhodes3d-master-rr/jRhodes3d-sv-no-xfade.sfz",
               1592,
               0,
               9,
+              false,
               "jRhodes3d-sv" }
         };
 
@@ -205,6 +283,98 @@ int main()
                                     return sampleSource.path.find(fixture.expectedSampleFragment) != std::string::npos;
                                 }),
                     std::string("Fixture projected sample paths should stay rooted in the expected corpus folder: ")
+                        + fixture.label);
+
+            const auto projectedCrossfadeZoneCount = countCrossfadeZones(projection.zones);
+            if (fixture.expectsCrossfadeOverlap)
+            {
+                require(projectedCrossfadeZoneCount > 0,
+                        std::string("Crossfade fixtures should still project native crossfade metadata: ")
+                            + fixture.label);
+            }
+            else
+            {
+                require(projectedCrossfadeZoneCount == 0,
+                        std::string("No-crossfade fixtures should stay free of projected crossfade metadata: ")
+                            + fixture.label);
+            }
+
+            const auto projectedOverlap = summarizeOverlap(projection.zones, 29, 32, 1);
+            require(projectedOverlap.positiveParticipantCount
+                        == (fixture.expectsCrossfadeOverlap ? std::size_t { 2 } : std::size_t { 1 }),
+                    std::string("Projected overlap participant count changed unexpectedly: ") + fixture.label);
+            require(std::abs(projectedOverlap.totalGain - 1.0) < 0.0001,
+                    std::string("Projected overlap gains should stay normalized: ") + fixture.label);
+
+            AuthoringSession session(project);
+            const auto applyResult = applySfzImportProjection(
+                session,
+                projection,
+                std::string("Sprint 3.1.6 import ") + fixture.label);
+            require(applyResult.applied,
+                    std::string("Corpus fixtures should stay applyable after review: ") + fixture.label);
+
+            const auto tempDirectory =
+                fs::temp_directory_path() / "drs-sprint31-sfz-corpus-hardening" / fixture.label;
+            const auto projectPath = tempDirectory / "roundtrip.drsproj";
+            const auto instrumentPath = tempDirectory / "roundtrip.drinst";
+            const auto streamPath = tempDirectory / "roundtrip.drstrm";
+
+            auto savedProject = session.getProject();
+            savedProject.defaultInstrumentManifestPath = instrumentPath.generic_string();
+            const auto instrument = drs::app::buildInstrumentManifestForProject(
+                savedProject,
+                juce::File(projectPath.generic_string()));
+            require(instrument.zones.size() == projection.zones.size(),
+                    std::string("Publish conversion should preserve projected zone counts: ") + fixture.label);
+            require(countCrossfadeZones(instrument.zones)
+                        == (fixture.expectsCrossfadeOverlap ? projectedCrossfadeZoneCount : std::size_t { 0 }),
+                    std::string("Publish conversion crossfade metadata changed unexpectedly: ") + fixture.label);
+
+            const auto instrumentOverlap = summarizeOverlap(instrument.zones, 29, 32, 1);
+            require(instrumentOverlap.positiveParticipantCount == projectedOverlap.positiveParticipantCount,
+                    std::string("Preview/publish overlap participant parity changed unexpectedly: ")
+                        + fixture.label);
+            require(std::abs(instrumentOverlap.totalGain - projectedOverlap.totalGain) < 0.0001,
+                    std::string("Preview/publish overlap gain parity changed unexpectedly: ")
+                        + fixture.label);
+
+            writeTextFile(streamPath, "sprint31 corpus hardening stream placeholder");
+            writeTextFile(projectPath,
+                          serializeRuntimeProjectManifest(savedProject, projectPath.generic_string()));
+            writeTextFile(instrumentPath,
+                          serializeRuntimeInstrumentManifest(instrument, instrumentPath.generic_string()));
+
+            const auto roundTripProject = loadRuntimeProjectManifest(projectPath.generic_string());
+            require(roundTripProject.loaded,
+                    std::string("Corpus project round-trip should stay valid: ") + fixture.label);
+            require(countCrossfadeZones(roundTripProject.project.authoring.zones)
+                        == (fixture.expectsCrossfadeOverlap ? projectedCrossfadeZoneCount : std::size_t { 0 }),
+                    std::string("Project round-trip crossfade metadata changed unexpectedly: ") + fixture.label);
+            const auto roundTripProjectOverlap =
+                summarizeOverlap(roundTripProject.project.authoring.zones, 29, 32, 1);
+            require(roundTripProjectOverlap.positiveParticipantCount == projectedOverlap.positiveParticipantCount,
+                    std::string("Project round-trip overlap participant parity changed unexpectedly: ")
+                        + fixture.label);
+            require(std::abs(roundTripProjectOverlap.totalGain - projectedOverlap.totalGain) < 0.0001,
+                    std::string("Project round-trip overlap gain parity changed unexpectedly: ")
+                        + fixture.label);
+
+            const auto roundTripInstrument = loadRuntimeInstrumentManifest(instrumentPath.generic_string());
+            require(roundTripInstrument.loaded,
+                    std::string("Corpus instrument round-trip should stay valid: ") + fixture.label);
+            require(countCrossfadeZones(roundTripInstrument.instrument.zones)
+                        == (fixture.expectsCrossfadeOverlap ? projectedCrossfadeZoneCount : std::size_t { 0 }),
+                    std::string("Instrument round-trip crossfade metadata changed unexpectedly: ")
+                        + fixture.label);
+            const auto roundTripInstrumentOverlap =
+                summarizeOverlap(roundTripInstrument.instrument.zones, 29, 32, 1);
+            require(roundTripInstrumentOverlap.positiveParticipantCount
+                        == projectedOverlap.positiveParticipantCount,
+                    std::string("Instrument round-trip overlap participant parity changed unexpectedly: ")
+                        + fixture.label);
+            require(std::abs(roundTripInstrumentOverlap.totalGain - projectedOverlap.totalGain) < 0.0001,
+                    std::string("Instrument round-trip overlap gain parity changed unexpectedly: ")
                         + fixture.label);
         }
 

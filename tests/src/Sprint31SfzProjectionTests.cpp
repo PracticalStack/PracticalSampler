@@ -4,6 +4,7 @@
 #include "drs/engine/SfzImportProjection.h"
 #include "shared/ProjectStorage.h"
 
+#include <array>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -35,6 +36,22 @@ fs::path resolveFirstFixturePath()
         return workspaceFixturePath;
 
     throw std::runtime_error("Could not locate " + relativeFixturePath.generic_string());
+}
+
+fs::path resolveFirstSamplePath(const fs::path& fixturePath)
+{
+    constexpr std::array extensions { ".flac", ".wav", ".aif", ".aiff" };
+    for (const auto& entry : fs::recursive_directory_iterator(fixturePath.parent_path()))
+    {
+        if (!entry.is_regular_file())
+            continue;
+
+        const auto extension = entry.path().extension().generic_string();
+        if (std::find(extensions.begin(), extensions.end(), extension) != extensions.end())
+            return entry.path();
+    }
+
+    throw std::runtime_error("Could not locate a sample asset next to the first SFZ fixture.");
 }
 
 drs::engine::RuntimeProjectModel makeBlankPhase2Project(const fs::path& fixturePath)
@@ -339,6 +356,50 @@ int main()
                     && secondRoute.zoneId != thirdRoute.zoneId
                     && firstRoute.zoneId != thirdRoute.zoneId,
                 "Projected SFZ round-robin routing should select a different region for the first three voice starts.");
+
+        const auto unsupportedSamplePath = resolveFirstSamplePath(fixturePath).lexically_normal();
+        const auto unsupportedFixtureDirectory =
+            fs::temp_directory_path() / "drs-sprint31-sfz-projection-fallback";
+        const auto unsupportedFixturePath = unsupportedFixtureDirectory / "unsupported-topology.sfz";
+        writeTextFile(
+            unsupportedFixturePath,
+            "<group>\n"
+            "pitch_keycenter=60\n"
+            "lokey=60\n"
+            "hikey=60\n"
+            "lovel=25\n"
+            "hivel=84\n"
+            "xfin_lovel=25\n"
+            "xfin_hivel=60\n"
+            "<region>\n"
+            "sample=" + unsupportedSamplePath.generic_string() + "\n");
+
+        const auto unsupportedAnalysis = analyzeSfzImportDocument(unsupportedFixturePath.generic_string());
+        require(unsupportedAnalysis.analyzed && unsupportedAnalysis.report.available,
+                "Unsupported topology should still analyze for projection fallback coverage.");
+        const auto unsupportedProjection = projectSfzImportAnalysis(blankProject, unsupportedAnalysis);
+        require(unsupportedProjection.projected && unsupportedProjection.playable
+                    && unsupportedProjection.lossy && !unsupportedProjection.blocking,
+                "Unsupported crossfade topology should degrade into a playable reviewed projection.");
+        require(unsupportedProjection.zones.size() == 1,
+                "Unsupported topology fallback should still create one native zone.");
+        require(!hasAnyVelocityCrossfadeValue(unsupportedProjection.zones.front().velocityCrossfade),
+                "Unsupported topology fallback should strip native crossfade metadata from the projected zone.");
+        require(unsupportedProjection.zones.front().velocityLow == 25
+                    && unsupportedProjection.zones.front().velocityHigh == 84,
+                "Unsupported topology fallback should preserve the plain velocity window.");
+
+        AuthoringSession fallbackSession(blankProject);
+        const auto fallbackApplyResult = applySfzImportProjection(
+            fallbackSession,
+            unsupportedProjection,
+            "Import unsupported SFZ topology as fallback");
+        require(fallbackApplyResult.applied,
+                "Unsupported topology fallback should remain applyable after review.");
+        require(fallbackSession.getProject().authoring.zones.size() == 1
+                    && !hasAnyVelocityCrossfadeValue(
+                        fallbackSession.getProject().authoring.zones.front().velocityCrossfade),
+                "Unsupported topology fallback should persist as a plain native zone.");
 
         std::cout << "Sprint 3.1.4 SFZ projection tests passed." << std::endl;
         return 0;

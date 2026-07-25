@@ -955,6 +955,7 @@ add_executable(drs_sprint31_sfz_corpus_hardening_tests
 
 target_link_libraries(drs_sprint31_sfz_corpus_hardening_tests
     PRIVATE
+        drs_app_shared
         drs_engine_adapter
 )
 

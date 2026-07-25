@@ -17,6 +17,28 @@ namespace
 {
 namespace fs = std::filesystem;
 
+struct CrossfadeOpcodeKey
+{
+    std::string sourcePath;
+    std::size_t lineNumber = 0;
+    std::size_t columnNumber = 0;
+    SfzOpcodeScope scope = SfzOpcodeScope::unknown;
+    std::string opcodeName;
+
+    bool operator<(const CrossfadeOpcodeKey& other) const noexcept
+    {
+        if (sourcePath != other.sourcePath)
+            return sourcePath < other.sourcePath;
+        if (lineNumber != other.lineNumber)
+            return lineNumber < other.lineNumber;
+        if (columnNumber != other.columnNumber)
+            return columnNumber < other.columnNumber;
+        if (scope != other.scope)
+            return scope < other.scope;
+        return opcodeName < other.opcodeName;
+    }
+};
+
 std::string toLowerAscii(const std::string& text)
 {
     std::string lowered = text;
@@ -246,6 +268,14 @@ bool shouldEnableLoop(const SfzNormalizedSection& section)
     return true;
 }
 
+bool isVelocityCrossfadeOpcode(const std::string& opcodeName)
+{
+    return opcodeName == "xfin_lovel"
+        || opcodeName == "xfin_hivel"
+        || opcodeName == "xfout_lovel"
+        || opcodeName == "xfout_hivel";
+}
+
 fs::path resolveSamplePath(const SfzNormalizedSection& section,
                            const SfzResolvedOpcode& sampleOpcode)
 {
@@ -260,6 +290,61 @@ fs::path resolveSamplePath(const SfzNormalizedSection& section,
     return samplePath.is_absolute()
         ? samplePath.lexically_normal()
         : (resolvedBase / samplePath).lexically_normal();
+}
+
+CrossfadeOpcodeKey makeCrossfadeOpcodeKey(const SfzImportTraceEntry& trace)
+{
+    return {
+        trace.location.sourcePath,
+        trace.location.lineNumber,
+        trace.location.columnNumber,
+        trace.location.scope,
+        toLowerAscii(trace.opcodeName)
+    };
+}
+
+CrossfadeOpcodeKey makeCrossfadeOpcodeKey(const SfzResolvedOpcode& opcode)
+{
+    return {
+        opcode.location.sourcePath,
+        opcode.location.lineNumber,
+        opcode.location.columnNumber,
+        opcode.location.scope,
+        toLowerAscii(opcode.name)
+    };
+}
+
+std::set<CrossfadeOpcodeKey> collectUnsupportedVelocityCrossfadeOpcodes(
+    const SfzImportAnalysisResult& analysis)
+{
+    std::set<CrossfadeOpcodeKey> unsupportedOpcodes;
+    for (const auto& trace : analysis.report.traceEntries)
+    {
+        const auto opcodeName = toLowerAscii(trace.opcodeName);
+        if (!isVelocityCrossfadeOpcode(opcodeName))
+            continue;
+
+        if (trace.disposition != SfzImportSupportDisposition::converted)
+            unsupportedOpcodes.insert(makeCrossfadeOpcodeKey(trace));
+    }
+
+    return unsupportedOpcodes;
+}
+
+bool sectionUsesUnsupportedVelocityCrossfade(
+    const SfzNormalizedSection& section,
+    const std::set<CrossfadeOpcodeKey>& unsupportedOpcodes)
+{
+    for (const auto& opcode : section.effectiveOpcodes)
+    {
+        if (!isVelocityCrossfadeOpcode(toLowerAscii(opcode.name)))
+            continue;
+
+        if (unsupportedOpcodes.find(makeCrossfadeOpcodeKey(opcode)) != unsupportedOpcodes.end())
+            return true;
+    }
+
+    return false;
 }
 
 std::vector<std::string> buildProjectNotes(const SfzImportReport& report)
@@ -375,6 +460,8 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         sampleSourceIdsByPath.emplace(fs::path(sampleSource.path).lexically_normal().generic_string(),
                                       sampleSource.id);
 
+    const auto unsupportedCrossfadeOpcodes = collectUnsupportedVelocityCrossfadeOpcodes(analysis);
+
     result.projectNotes = buildProjectNotes(analysis.report);
     result.authoringNotes = buildAuthoringNotes(analysis.report);
 
@@ -393,6 +480,8 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
 
         const auto samplePath = resolveSamplePath(section, *sampleOpcode);
         const auto canonicalSamplePath = samplePath.generic_string();
+        const auto preserveVelocityCrossfade =
+            !sectionUsesUnsupportedVelocityCrossfade(section, unsupportedCrossfadeOpcodes);
 
         std::string sampleSourceId;
         const auto existingSampleSource = sampleSourceIdsByPath.find(canonicalSamplePath);
@@ -435,30 +524,33 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
                                               ? findEffectiveOpcode(section, "hivel")->value
                                               : "127")
                                 .value_or(127);
-        zone.velocityCrossfade.fadeInLowVelocity =
+        VelocityCrossfadeDescriptor crossfade;
+        crossfade.fadeInLowVelocity =
             parseIntValue(findEffectiveOpcode(section, "xfin_lovel") != nullptr
                               ? findEffectiveOpcode(section, "xfin_lovel")->value
                               : "0")
                 .value_or(0);
-        zone.velocityCrossfade.fadeInHighVelocity =
+        crossfade.fadeInHighVelocity =
             parseIntValue(findEffectiveOpcode(section, "xfin_hivel") != nullptr
                               ? findEffectiveOpcode(section, "xfin_hivel")->value
                               : "0")
                 .value_or(0);
-        zone.velocityCrossfade.fadeOutLowVelocity =
+        crossfade.fadeOutLowVelocity =
             parseIntValue(findEffectiveOpcode(section, "xfout_lovel") != nullptr
                               ? findEffectiveOpcode(section, "xfout_lovel")->value
                               : "0")
                 .value_or(0);
-        zone.velocityCrossfade.fadeOutHighVelocity =
+        crossfade.fadeOutHighVelocity =
             parseIntValue(findEffectiveOpcode(section, "xfout_hivel") != nullptr
                               ? findEffectiveOpcode(section, "xfout_hivel")->value
                               : "0")
                 .value_or(0);
-        if (zone.velocityCrossfade.fadeInLowVelocity > 0)
-            zone.velocityLow = zone.velocityCrossfade.fadeInLowVelocity;
-        if (zone.velocityCrossfade.fadeOutHighVelocity > 0)
-            zone.velocityHigh = zone.velocityCrossfade.fadeOutHighVelocity;
+        if (drs::engine::hasCompleteFadeIn(crossfade))
+            zone.velocityLow = crossfade.fadeInLowVelocity;
+        if (drs::engine::hasCompleteFadeOut(crossfade))
+            zone.velocityHigh = crossfade.fadeOutHighVelocity;
+        if (preserveVelocityCrossfade)
+            zone.velocityCrossfade = crossfade;
         zone.gainDb = parseDoubleValue(findEffectiveOpcode(section, "volume") != nullptr
                                            ? findEffectiveOpcode(section, "volume")->value
                                            : "0")
