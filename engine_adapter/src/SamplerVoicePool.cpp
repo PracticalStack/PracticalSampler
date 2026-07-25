@@ -10,6 +10,25 @@ namespace
 {
 constexpr std::size_t crossfadeRouteLimit = 2;
 
+int eventPriorityAtSharedOffset(const SamplerRenderEvent& event) noexcept
+{
+    switch (event.type)
+    {
+        case SamplerRenderEventType::reset:
+            return 0;
+        case SamplerRenderEventType::allNotesOff:
+            return 1;
+        case SamplerRenderEventType::sustainPedal:
+            return 2;
+        case SamplerRenderEventType::noteOff:
+            return 3;
+        case SamplerRenderEventType::noteOn:
+            return 4;
+    }
+
+    return std::numeric_limits<int>::max();
+}
+
 bool routeMatches(const SamplerRenderRoute& route,
                   int midiNote,
                   int velocity,
@@ -85,8 +104,17 @@ bool SamplerEventBlock::push(SamplerRenderEvent event) noexcept
     }
 
     auto insertionIndex = eventCount;
-    while (insertionIndex > 0 && events[insertionIndex - 1].sampleOffset > event.sampleOffset)
+    while (insertionIndex > 0)
     {
+        const auto& previous = events[insertionIndex - 1];
+        if (previous.sampleOffset < event.sampleOffset)
+            break;
+        if (previous.sampleOffset == event.sampleOffset
+            && eventPriorityAtSharedOffset(previous) <= eventPriorityAtSharedOffset(event))
+        {
+            break;
+        }
+
         events[insertionIndex] = events[insertionIndex - 1];
         --insertionIndex;
     }

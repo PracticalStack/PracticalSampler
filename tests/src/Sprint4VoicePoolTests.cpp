@@ -256,10 +256,10 @@ void runEventBlockContract()
                 && view[0].sampleOffset == 2
                 && view[1].sampleOffset == 4
                 && view[2].sampleOffset == 8
-                && view[2].type == drs::engine::SamplerRenderEventType::noteOn
+                && view[2].type == drs::engine::SamplerRenderEventType::noteOff
                 && view[3].sampleOffset == 8
-                && view[3].type == drs::engine::SamplerRenderEventType::noteOff,
-            "Event block must stable-sort offsets while preserving equal-offset insertion order.");
+                && view[3].type == drs::engine::SamplerRenderEventType::noteOn,
+            "Event block must sort shared offsets so release-style events run before note-ons.");
 
     block.clear();
     for (std::size_t index = 0; index < drs::engine::SamplerEventBlock::capacity; ++index)
@@ -314,9 +314,9 @@ void runNoteOwnershipAndCommandMatrix()
     sameOffset.push(noteOff(0));
     StereoOutput firstOutput(4);
     auto result = pool.renderBlock(firstOutput.view(), sameOffset.view());
-    require(result.activeVoiceCount == 0 && result.releasingVoiceCount == 1
-                && result.render.releasedVoiceCount == 1,
-            "Equal-offset note-on then note-off must preserve insertion order.");
+    require(result.activeVoiceCount == 1 && result.releasingVoiceCount == 0
+                && result.render.releasedVoiceCount == 0,
+            "Equal-offset note-on/note-off must retrigger cleanly for host loop restarts.");
 
     pool.resetVoices();
     sameOffset.clear();
@@ -325,7 +325,7 @@ void runNoteOwnershipAndCommandMatrix()
     StereoOutput secondOutput(4);
     result = pool.renderBlock(secondOutput.view(), sameOffset.view());
     require(result.activeVoiceCount == 1 && result.releasingVoiceCount == 0,
-            "Equal-offset note-off then note-on must preserve insertion order.");
+            "Equal-offset note-off/note-on must keep the restarted note active.");
 
     pool.resetVoices();
     drs::engine::SamplerEventBlock repeated;

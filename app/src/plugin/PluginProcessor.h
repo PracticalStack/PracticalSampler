@@ -411,6 +411,11 @@ private:
     std::size_t performancePeakReleasingVoiceCount = 0;
     std::size_t authoringPreviewPeakActiveVoiceCount = 0;
     std::size_t authoringPreviewPeakReleasingVoiceCount = 0;
+    bool hasPreviousHostTransportObservation = false;
+    bool previousHostTransportWasPlaying = false;
+    bool previousHostTransportHadTimeInSamples = false;
+    std::int64_t previousHostTransportTimeInSamples = 0;
+    int previousHostTransportBlockSize = 0;
     std::size_t observedDraftPlaybackProjectRevision = std::numeric_limits<std::size_t>::max();
     std::uint64_t observedEngineStateRevision = 0;
     bool authoringPreviewDirectAuditionRequested = false;

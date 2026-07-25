@@ -70,6 +70,35 @@ std::uint64_t monotonicMicros()
         std::chrono::steady_clock::now().time_since_epoch()).count());
 }
 
+struct HostTransportObservation
+{
+    bool valid = false;
+    bool isPlaying = false;
+    bool hasTimeInSamples = false;
+    std::int64_t timeInSamples = 0;
+};
+
+HostTransportObservation readHostTransportObservation(juce::AudioPlayHead* playHead)
+{
+    HostTransportObservation observation;
+    if (playHead == nullptr)
+        return observation;
+
+    const auto position = playHead->getPosition();
+    if (!position.hasValue())
+        return observation;
+
+    observation.valid = true;
+    observation.isPlaying = position->getIsPlaying();
+    if (const auto timeInSamples = position->getTimeInSamples())
+    {
+        observation.hasTimeInSamples = true;
+        observation.timeInSamples = *timeInSamples;
+    }
+
+    return observation;
+}
+
 template <typename Finding>
 drs::engine::AuthoringPreviewFailureFinding makePreviewFailureFinding(
     const Finding& finding)
@@ -386,6 +415,11 @@ void Processor::prepareToPlay(double sampleRate, int samplesPerBlock)
     currentSampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;
     performanceSurfaceNoteQueue.reset();
     authoringPreviewNoteQueue.reset();
+    hasPreviousHostTransportObservation = false;
+    previousHostTransportWasPlaying = false;
+    previousHostTransportHadTimeInSamples = false;
+    previousHostTransportTimeInSamples = 0;
+    previousHostTransportBlockSize = 0;
     authoringPreviewCommandAdapter.clearOwnership();
     performancePlaybackContext.prepare(currentSampleRate);
     authoringPreviewPlaybackContext.prepare(currentSampleRate);
@@ -397,6 +431,11 @@ void Processor::prepareToPlay(double sampleRate, int samplesPerBlock)
 void Processor::releaseResources()
 {
     authoringPreviewCommandAdapter.clearOwnership();
+    hasPreviousHostTransportObservation = false;
+    previousHostTransportWasPlaying = false;
+    previousHostTransportHadTimeInSamples = false;
+    previousHostTransportTimeInSamples = 0;
+    previousHostTransportBlockSize = 0;
     performancePlaybackContext.resetAtBlockBoundary();
     authoringPreviewPlaybackContext.resetAtBlockBoundary();
     updateRealtimeSafetyState();
@@ -421,6 +460,30 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
     drs::engine::SamplerEventBlock performanceEvents;
     drs::engine::SamplerEventBlock authoringPreviewEvents;
     const auto frameCount = buffer.getNumSamples();
+    const auto hostTransport = readHostTransportObservation(getPlayHead());
+    auto resetPerformanceForTransportDiscontinuity = false;
+    if (hostTransport.valid && hasPreviousHostTransportObservation)
+    {
+        if (previousHostTransportWasPlaying && !hostTransport.isPlaying)
+        {
+            resetPerformanceForTransportDiscontinuity = true;
+        }
+        else if (previousHostTransportWasPlaying && hostTransport.isPlaying
+                 && previousHostTransportHadTimeInSamples && hostTransport.hasTimeInSamples)
+        {
+            const auto expectedTimeInSamples = previousHostTransportTimeInSamples
+                + static_cast<std::int64_t>(std::max(previousHostTransportBlockSize, 0));
+            if (hostTransport.timeInSamples != expectedTimeInSamples)
+                resetPerformanceForTransportDiscontinuity = true;
+        }
+    }
+    if (resetPerformanceForTransportDiscontinuity)
+        performancePlaybackContext.resetAtBlockBoundary();
+    hasPreviousHostTransportObservation = hostTransport.valid;
+    previousHostTransportWasPlaying = hostTransport.isPlaying;
+    previousHostTransportHadTimeInSamples = hostTransport.hasTimeInSamples;
+    previousHostTransportTimeInSamples = hostTransport.timeInSamples;
+    previousHostTransportBlockSize = frameCount;
     if (authoringPreviewCloseRequested.exchange(false, std::memory_order_acq_rel))
         authoringPreviewPlaybackContext.closeAtBlockBoundary();
     drainRealtimeNoteEvents(performanceSurfaceNoteQueue, performanceEvents,

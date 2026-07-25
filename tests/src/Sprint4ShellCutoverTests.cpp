@@ -12,6 +12,25 @@
 
 namespace
 {
+class TestPlayHead final : public juce::AudioPlayHead
+{
+public:
+    juce::Optional<PositionInfo> getPosition() const override
+    {
+        return position;
+    }
+
+    void setPosition(bool playing, std::int64_t timeInSamples)
+    {
+        position = PositionInfo {};
+        position.setIsPlaying(playing);
+        position.setTimeInSamples(timeInSamples);
+    }
+
+private:
+    PositionInfo position;
+};
+
 void require(bool condition, const std::string& message)
 {
     if (!condition)
@@ -129,6 +148,39 @@ ShellResult runShell(drs::plugin::Processor& processor,
                                          hostBuffer.getNumSamples() - eventOffset);
     require(hostMagnitude > 0.0001f,
             shellLabel + " should render host MIDI after its exact sample offset.");
+
+    TestPlayHead playHead;
+    processor.setPlayHead(&playHead);
+    playHead.setPosition(true, 0);
+    juce::AudioBuffer<float> transportStartBuffer(2, 256);
+    juce::MidiBuffer transportStartMidi;
+    transportStartMidi.addEvent(juce::MidiMessage::noteOn(1, 57, static_cast<juce::uint8>(100)), 0);
+    processor.processBlock(transportStartBuffer, transportStartMidi);
+    diagnostics = processor.getRealtimeSafetySnapshot();
+    require(diagnostics.performanceActiveVoiceCount > 0,
+            shellLabel + " should keep a host-started looped voice active before a transport seek.");
+
+    playHead.setPosition(true, 256);
+    juce::AudioBuffer<float> transportAdvanceBuffer(2, 256);
+    processor.processBlock(transportAdvanceBuffer, emptyMidi);
+    diagnostics = processor.getRealtimeSafetySnapshot();
+    require(diagnostics.performanceActiveVoiceCount > 0,
+            shellLabel + " should keep the sustained Performance voice active during contiguous transport.");
+
+    playHead.setPosition(true, 0);
+    juce::AudioBuffer<float> transportLoopBuffer(2, 256);
+    processor.processBlock(transportLoopBuffer, emptyMidi);
+    diagnostics = processor.getRealtimeSafetySnapshot();
+    require(diagnostics.performanceActiveVoiceCount == 0,
+            shellLabel + " should clear stale Performance voices when the host loops or seeks backward.");
+
+    juce::AudioBuffer<float> transportRestartBuffer(2, 256);
+    juce::MidiBuffer transportRestartMidi;
+    transportRestartMidi.addEvent(juce::MidiMessage::noteOn(1, 57, static_cast<juce::uint8>(100)), 0);
+    processor.processBlock(transportRestartBuffer, transportRestartMidi);
+    require(magnitude(transportRestartBuffer, 0, transportRestartBuffer.getNumSamples()) > 0.0001f,
+            shellLabel + " should still render the restarted note immediately after a host loop reset.");
+    processor.setPlayHead(nullptr);
 
     const auto replacementRevision = firstPayload->revision + 1;
     require(processor.getEngineFacade().stageDraftRevision(replacementRevision)
