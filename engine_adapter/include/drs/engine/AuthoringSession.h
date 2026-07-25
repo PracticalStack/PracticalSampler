@@ -55,6 +55,7 @@ public:
     RuntimeProjectDocumentActionResult selectPerformanceBank(const std::string& performanceBankId);
     RuntimeProjectDocumentActionResult updateSelectedZone(const RuntimeProjectZoneDefinition& zone,
                                                           const std::string& label);
+    RuntimeProjectDocumentActionResult deleteSelectedSample();
     RuntimeProjectDocumentActionResult appendImportedContent(std::vector<RuntimeProjectSampleSource> sampleSources,
                                                             std::vector<RuntimeProjectZoneDefinition> zones,
                                                             const std::string& label);

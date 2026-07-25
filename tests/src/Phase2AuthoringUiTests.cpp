@@ -994,6 +994,7 @@ void writeReachabilityChecklist(std::ostream& inventory)
     inventory << "- Playback banner: authoringPlaybackBanner, authoringPlaybackBannerLabel, authoringPlaybackBannerPrepareButton, authoringPlaybackBannerPublishButton\n";
     inventory << "- Toolbar row: authoringZoneSelector\n";
     inventory << "- Persistent map: authoringZoneMap\n";
+    inventory << "- Zone Map context menu: Delete Selected Sample\n";
     inventory << "- Drawer host: authoringDrawer, authoringDrawerTabStrip, authoringDrawerToggleButton\n";
     inventory << "- Drawer tabs: authoringDrawerWaveformTab, authoringDrawerMacrosTab, authoringDrawerRoutingTab, authoringDrawerPerformanceTab\n";
     inventory << "- Mapping inspector: authoringRootKeySlider, authoringKeyLowSlider, authoringKeyHighSlider, authoringVelocityLowSlider, authoringVelocityHighSlider, authoringGainSlider, authoringPanSlider, authoringLoopEnabledToggle, authoringTriggerModeSelector, authoringRestoreRootKeyButton\n";
@@ -2467,6 +2468,19 @@ int main()
 
         drs::app::authoring::ZoneMapCanvas dropTargetZoneMap;
         std::vector<juce::File> droppedSampleFiles;
+        int deleteSelectedSampleRequests = 0;
+        drs::engine::AuthoringZoneSummary contextMenuZone;
+        contextMenuZone.id = "context-menu-zone";
+        contextMenuZone.displayName = "Context Menu Zone";
+        contextMenuZone.selected = true;
+        dropTargetZoneMap.setZoneSummaries({contextMenuZone});
+        dropTargetZoneMap.setOnDeleteSelectedSampleRequested([&deleteSelectedSampleRequests]
+        {
+            ++deleteSelectedSampleRequests;
+        });
+        require(dropTargetZoneMap.requestDeleteSelectedSample()
+                    && deleteSelectedSampleRequests == 1,
+                "Zone Map should route Delete Selected Sample through its context-menu callback.");
         dropTargetZoneMap.setOnSampleFilesDropped([&droppedSampleFiles](std::vector<juce::File> files)
         {
             droppedSampleFiles = std::move(files);
@@ -2597,6 +2611,18 @@ int main()
             exerciseSurface(panel, 3, shellName, "routing", outputDirectory, inventory, baselineFindings);
             exerciseSurface(panel, 4, shellName, "performance", outputDirectory, inventory, baselineFindings);
             exerciseHostedFocusTransitions(panel, shellName);
+
+            auto& contextMenuZoneMap = requireZoneMapCanvas(panel, "authoringZoneMap");
+            const auto zoneCountBeforeDelete = session.getProject().authoring.zones.size();
+            require(contextMenuZoneMap.requestDeleteSelectedSample(),
+                    "Zone Map context-menu deletion should be enabled for a selected sample.");
+            require(session.getProject().authoring.zones.size() + 1 == zoneCountBeforeDelete,
+                    "Zone Map context-menu deletion should remove the selected sample from the session.");
+            require(session.undo().applied,
+                    "Zone Map context-menu deletion should remain undoable.");
+            panel.reloadFromSession();
+            require(session.getProject().authoring.zones.size() == zoneCountBeforeDelete,
+                    "Undo should restore the sample deleted from the Zone Map context menu.");
         };
 
         runShell("compact",

@@ -82,6 +82,33 @@ int main()
         require(!badSelection.applied, "Unknown zone selection should be rejected.");
         require(session.getDocumentState().revision == 2, "Rejected selection should not change project revision.");
 
+        drs::engine::AuthoringSession uniqueSourceDeletionSession(projectLoad.project);
+        const auto uniqueSourceDeletion = uniqueSourceDeletionSession.deleteSelectedSample();
+        require(uniqueSourceDeletion.applied,
+                "Deleting the selected sample should create an undoable project transaction.");
+        require(uniqueSourceDeletionSession.getProject().authoring.zones.size() == 2,
+                "Deleting a selected sample should remove its zone mapping.");
+        require(uniqueSourceDeletionSession.getProject().sampleSources.size() == 1,
+                "Deleting the last zone for a sample source should remove the unused source record.");
+        require(uniqueSourceDeletionSession.getProject().authoring.selectedZoneId == "pad-a3-high",
+                "Deleting the final zone should select the previous neighboring zone.");
+        require(uniqueSourceDeletionSession.undo().applied
+                    && uniqueSourceDeletionSession.getProject().authoring.zones.size() == 3
+                    && uniqueSourceDeletionSession.getProject().sampleSources.size() == 2
+                    && uniqueSourceDeletionSession.getProject().authoring.selectedZoneId == "lead-a4-sustain",
+                "Undo should restore the deleted zone, source record, and selection.");
+
+        drs::engine::AuthoringSession sharedSourceDeletionSession(projectLoad.project);
+        require(sharedSourceDeletionSession.selectZone("pad-a3-high").applied,
+                "Shared-source deletion fixture should select the high pad zone.");
+        require(sharedSourceDeletionSession.deleteSelectedSample().applied,
+                "Deleting a zone that shares a source should succeed.");
+        require(sharedSourceDeletionSession.getProject().authoring.zones.size() == 2
+                    && sharedSourceDeletionSession.getProject().sampleSources.size() == 2,
+                "Deleting one shared-source zone must preserve its source for remaining zones.");
+        require(sharedSourceDeletionSession.getProject().authoring.selectedZoneId == "lead-a4-sustain",
+                "Deletion should select the zone now occupying the deleted zone's position.");
+
         std::cout << "Phase 2 mapping workspace tests passed." << std::endl;
         return 0;
     }

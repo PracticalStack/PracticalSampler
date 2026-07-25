@@ -730,6 +730,15 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         if (sampleFilesDroppedCallback)
             sampleFilesDroppedCallback(std::move(files));
     });
+    zoneMap.setOnDeleteSelectedSampleRequested([this]
+    {
+        if (isRefreshing)
+            return;
+
+        const auto result = authoringSession.deleteSelectedSample();
+        if (result.applied)
+            refreshFromSession();
+    });
     zoneMap.setOnZoneRangeCommitRequested([this](const drs::engine::AuthoringZoneSummary& zone,
                                                  const std::string& label)
     {
@@ -1088,7 +1097,7 @@ void AuthoringPanel::configureAccessibilityAndFocus()
     configureAccessibleMetadata(zoneMap,
                                 "Zone map",
                                 "Displays project zones across key and velocity ranges.",
-                                "Use arrow keys to move selection or drag handles to edit ranges.");
+                                "Use arrow keys to move selection, drag handles to edit ranges, or right-click to delete the selected sample.");
     zoneMap.setExplicitFocusOrder(30);
 
     configureAccessibleMetadata(drawerRegion,

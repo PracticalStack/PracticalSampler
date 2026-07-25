@@ -16,6 +16,7 @@ const auto zoneMapFocusRing = juce::Colour::fromRGB(24, 29, 33);
 const auto zoneMapFocusHalo = juce::Colour::fromRGBA(255, 255, 255, 232);
 constexpr float rangeHandleRadius = 6.0f;
 constexpr float rangeHandleHitRadius = 12.0f;
+constexpr int deleteSelectedSampleMenuItemId = 1;
 
 bool isSupportedSampleFile(const juce::String& path)
 {
@@ -69,6 +70,11 @@ void ZoneMapCanvas::setOnZoneAuditionRequested(
 void ZoneMapCanvas::setOnSampleFilesDropped(std::function<void(std::vector<juce::File>)> nextCallback)
 {
     onSampleFilesDropped = std::move(nextCallback);
+}
+
+void ZoneMapCanvas::setOnDeleteSelectedSampleRequested(std::function<void()> nextCallback)
+{
+    onDeleteSelectedSampleRequested = std::move(nextCallback);
 }
 
 bool ZoneMapCanvas::isInterestedInFileDrag(const juce::StringArray& files)
@@ -165,6 +171,15 @@ bool ZoneMapCanvas::requestAuditionAt(juce::Point<float> position)
         onZoneSelectionRequested(zone.id);
     onZoneAuditionRequested(zone.id, zone.rootKey,
                             std::clamp((zone.velocityLow + zone.velocityHigh) / 2, 1, 127));
+    return true;
+}
+
+bool ZoneMapCanvas::requestDeleteSelectedSample()
+{
+    if (!findSelectedZoneIndex().has_value() || !onDeleteSelectedSampleRequested)
+        return false;
+
+    onDeleteSelectedSampleRequested();
     return true;
 }
 
@@ -281,14 +296,42 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
 void ZoneMapCanvas::mouseDown(const juce::MouseEvent& event)
 {
     grabKeyboardFocus();
+    if (event.mods.isPopupMenu())
+    {
+        cancelActiveRangeGesture();
+        requestSelectionAt(event.position);
+        showContextMenuAt(event.getScreenPosition());
+        return;
+    }
+
     if (!beginRangeGestureAt(event.position))
         requestSelectionAt(event.position);
 }
 
 void ZoneMapCanvas::mouseDoubleClick(const juce::MouseEvent& event)
 {
+    if (event.mods.isPopupMenu())
+        return;
+
     grabKeyboardFocus();
     requestAuditionAt(event.position);
+}
+
+void ZoneMapCanvas::showContextMenuAt(juce::Point<int> screenPosition)
+{
+    juce::PopupMenu menu;
+    menu.addItem(deleteSelectedSampleMenuItemId,
+                 "Delete Selected Sample",
+                 findSelectedZoneIndex().has_value() && onDeleteSelectedSampleRequested != nullptr);
+
+    auto safeThis = juce::Component::SafePointer<ZoneMapCanvas>(this);
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea(
+                           {screenPosition.x, screenPosition.y, 1, 1}),
+                       [safeThis](int menuItemId)
+                       {
+                           if (safeThis != nullptr && menuItemId == deleteSelectedSampleMenuItemId)
+                               safeThis->requestDeleteSelectedSample();
+                       });
 }
 
 void ZoneMapCanvas::mouseDrag(const juce::MouseEvent& event)

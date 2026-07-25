@@ -1,6 +1,7 @@
 #include "drs/engine/AuthoringSession.h"
 
 #include <algorithm>
+#include <cstddef>
 
 namespace drs::engine
 {
@@ -194,6 +195,59 @@ RuntimeProjectDocumentActionResult AuthoringSession::updateSelectedZone(const Ru
                                                  "authoring.zones[" + std::to_string(*selectedZoneIndex) + "]",
                                                  "authoring.selectedZoneId"
                                              });
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::deleteSelectedSample()
+{
+    const auto selectedZoneIndex = findSelectedZoneIndex(getProject());
+    if (!selectedZoneIndex.has_value())
+        return makeRejectedResult(getDocumentState(),
+                                  "Sample deletion rejected",
+                                  "No sample is currently selected for deletion.");
+
+    auto project = getProject();
+    const auto sampleSourceId = project.authoring.zones[*selectedZoneIndex].sampleSourceId;
+    project.authoring.zones.erase(project.authoring.zones.begin()
+                                  + static_cast<std::ptrdiff_t>(*selectedZoneIndex));
+
+    const auto sourceStillUsed = std::any_of(project.authoring.zones.begin(),
+                                             project.authoring.zones.end(),
+                                             [&](const RuntimeProjectZoneDefinition& zone)
+                                             {
+                                                 return zone.sampleSourceId == sampleSourceId;
+                                             });
+    if (!sourceStillUsed)
+    {
+        project.sampleSources.erase(
+            std::remove_if(project.sampleSources.begin(),
+                           project.sampleSources.end(),
+                           [&](const RuntimeProjectSampleSource& source)
+                           {
+                               return source.id == sampleSourceId;
+                           }),
+            project.sampleSources.end());
+    }
+
+    if (project.authoring.zones.empty())
+    {
+        project.authoring.selectedZoneId.clear();
+    }
+    else
+    {
+        const auto nextIndex = std::min(*selectedZoneIndex, project.authoring.zones.size() - 1);
+        project.authoring.selectedZoneId = project.authoring.zones[nextIndex].id;
+    }
+
+    std::vector<std::string> changedPaths {
+        "authoring.zones",
+        "authoring.selectedZoneId"
+    };
+    if (!sourceStillUsed)
+        changedPaths.push_back("sampleSources");
+
+    return documentController.commitSnapshot(project,
+                                             "Delete selected sample",
+                                             std::move(changedPaths));
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
