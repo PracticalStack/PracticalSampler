@@ -3,6 +3,7 @@
 #include "drs/engine/VelocityCrossfade.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -12,6 +13,19 @@ enum class ZoneTriggerMode : std::uint8_t
 {
     gated,
     oneShot
+};
+
+enum class RoundRobinMode : std::uint8_t
+{
+    sequential
+};
+
+struct RoundRobinDescriptor
+{
+    std::string poolId;
+    int slotCount = 0;
+    int slotIndex = 0;
+    RoundRobinMode mode = RoundRobinMode::sequential;
 };
 
 struct RuntimeProjectSampleSource
@@ -41,6 +55,7 @@ struct RuntimeProjectZoneDefinition
     std::uint64_t loopStartFrame = 0;
     std::uint64_t loopEndFrame = 0;
     double releaseSeconds = 0.0;
+    std::optional<RoundRobinDescriptor> roundRobin;
     int roundRobinLength = 0;
     int roundRobinPosition = 0;
     ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;
@@ -186,6 +201,7 @@ struct RuntimeZoneDefinition
     std::uint64_t streamOffsetBytes = 0;
     std::uint64_t prefetchBytes = 0;
     double releaseSeconds = 0.0;
+    std::optional<RoundRobinDescriptor> roundRobin;
     int roundRobinLength = 0;
     int roundRobinPosition = 0;
     ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;

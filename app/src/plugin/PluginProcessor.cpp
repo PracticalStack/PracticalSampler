@@ -209,10 +209,10 @@ drs::engine::RuntimeProjectModel buildInitialAuthoringProject()
 {
     drs::engine::RuntimeProjectModel project;
     project.schemaName = "drs.project";
-    project.schemaVersion = 2;
+    project.schemaVersion = 3;
     project.displayName = "No Project Loaded";
     project.authoring.schemaName = "drs.authoring";
-    project.authoring.schemaVersion = 1;
+    project.authoring.schemaVersion = 2;
     project.authoring.notes = { "Open a project or create a new one to begin authoring." };
     project.notes = { "This session starts without loading the checked-in reference project." };
     return project;

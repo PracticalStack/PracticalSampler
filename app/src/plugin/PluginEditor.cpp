@@ -102,6 +102,39 @@ std::string makeUniqueId(const std::string& preferredId, std::unordered_set<std:
     return candidate;
 }
 
+std::optional<drs::engine::RuntimeProjectModel> upgradeLoadedProjectToLatestSchema(
+    const drs::engine::RuntimeProjectModel& project,
+    std::vector<std::string>& issues)
+{
+    auto upgradedProject = project;
+
+    if (upgradedProject.schemaVersion == 1)
+    {
+        const auto phase2Migration = drs::engine::migrateRuntimeProjectToPhase2Authoring(upgradedProject);
+        if (!phase2Migration.valid)
+        {
+            issues = phase2Migration.issues;
+            return std::nullopt;
+        }
+
+        upgradedProject = phase2Migration.project;
+    }
+
+    if (upgradedProject.schemaVersion == 2 && upgradedProject.authoring.schemaVersion == 1)
+    {
+        const auto phase3Migration = drs::engine::migrateRuntimeProjectToPhase3RoundRobinSchema(upgradedProject);
+        if (!phase3Migration.valid)
+        {
+            issues = phase3Migration.issues;
+            return std::nullopt;
+        }
+
+        upgradedProject = phase3Migration.project;
+    }
+
+    return upgradedProject;
+}
+
 class PreferencesComponent final : public juce::Component
 {
 public:
@@ -1121,9 +1154,19 @@ bool Editor::loadProjectFromFile(const juce::File& file)
         return false;
     }
 
+    std::vector<std::string> migrationIssues;
+    const auto upgradedProject = upgradeLoadedProjectToLatestSchema(loadResult.project, migrationIssues);
+    if (!upgradedProject.has_value())
+    {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Open Project Failed",
+                                               buildProjectIssueSummary(migrationIssues));
+        return false;
+    }
+
     processor.setAuthoringProjectFile(targetFile);
     setRecentProjectDirectory(targetFile.getParentDirectory());
-    processor.replaceAuthoringProject(loadResult.project);
+    processor.replaceAuthoringProject(*upgradedProject);
     refreshProjectViews();
     return true;
 }
@@ -1197,10 +1240,10 @@ drs::engine::RuntimeProjectModel Editor::buildUnloadedProjectState() const
 {
     drs::engine::RuntimeProjectModel project;
     project.schemaName = "drs.project";
-    project.schemaVersion = 2;
+    project.schemaVersion = 3;
     project.displayName = "No Project Loaded";
     project.authoring.schemaName = "drs.authoring";
-    project.authoring.schemaVersion = 1;
+    project.authoring.schemaVersion = 2;
     project.authoring.notes = { "Open a project or create a new one to begin authoring." };
     project.notes = { "This session starts without loading the checked-in reference project." };
     return project;
@@ -1213,16 +1256,16 @@ drs::engine::RuntimeProjectModel Editor::buildEmptyProjectTemplate() const
 
     drs::engine::RuntimeProjectModel project;
     project.schemaName = "drs.project";
-    project.schemaVersion = 2;
+    project.schemaVersion = 3;
     project.projectId = makeProjectId();
     project.displayName = "Untitled Project";
     project.contentRootPath = defaultProjectDirectory.getFullPathName().toStdString();
     project.defaultInstrumentManifestPath = defaultInstrumentFile.getFullPathName().toStdString();
     project.authoring.schemaName = "drs.authoring";
-    project.authoring.schemaVersion = 1;
+    project.authoring.schemaVersion = 2;
     project.authoring.notes = { "Created in the plug-in authoring shell." };
     project.notes = {
-        "Created as a new Phase 2 authoring project from the plug-in shell.",
+        "Created as a new Phase 3 authoring project from the plug-in shell.",
         "Sample sources and zones can be added in later authoring sprints."
     };
     return project;

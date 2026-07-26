@@ -32,6 +32,18 @@ std::string toDisplayPath(const fs::path& path)
     return path.lexically_normal().generic_string();
 }
 
+std::uint64_t computeFnv1a64(const std::string& text)
+{
+    std::uint64_t hash = 14695981039346656037ull;
+    for (const auto character : text)
+    {
+        hash ^= static_cast<unsigned char>(character);
+        hash *= 1099511628211ull;
+    }
+
+    return hash;
+}
+
 std::string readTextFile(const fs::path& filePath)
 {
     std::ifstream input(filePath, std::ios::binary);
@@ -258,6 +270,170 @@ RuntimeProjectAuthoringState buildDefaultPhase2AuthoringState()
     return authoring;
 }
 
+std::string toRoundRobinModeString(RoundRobinMode mode)
+{
+    switch (mode)
+    {
+        case RoundRobinMode::sequential:
+            return "sequential";
+    }
+
+    return "sequential";
+}
+
+ordered_json serializeRoundRobin(const RoundRobinDescriptor& roundRobin)
+{
+    ordered_json object;
+    object["poolId"] = roundRobin.poolId;
+    object["slotCount"] = roundRobin.slotCount;
+    object["slotIndex"] = roundRobin.slotIndex;
+    object["mode"] = toRoundRobinModeString(roundRobin.mode);
+    return object;
+}
+
+template <typename TResult>
+std::optional<RoundRobinDescriptor> readOptionalRoundRobin(const json& object,
+                                                           TResult& result,
+                                                           const char* propertyName,
+                                                           const char* context)
+{
+    const auto iterator = object.find(propertyName);
+    if (iterator == object.end())
+        return std::nullopt;
+
+    if (!iterator->is_object())
+    {
+        addIssue(result, std::string(context) + " field '" + propertyName + "' must be an object.");
+        return std::nullopt;
+    }
+
+    RoundRobinDescriptor descriptor;
+    bool valid = true;
+
+    if (const auto poolId = readRequired<TResult, std::string>(*iterator, result, "poolId", context))
+        descriptor.poolId = *poolId;
+    else
+        valid = false;
+
+    if (const auto slotCount = readRequired<TResult, int>(*iterator, result, "slotCount", context))
+        descriptor.slotCount = *slotCount;
+    else
+        valid = false;
+
+    if (const auto slotIndex = readRequired<TResult, int>(*iterator, result, "slotIndex", context))
+        descriptor.slotIndex = *slotIndex;
+    else
+        valid = false;
+
+    if (const auto mode = readRequired<TResult, std::string>(*iterator, result, "mode", context))
+    {
+        if (*mode == "sequential")
+            descriptor.mode = RoundRobinMode::sequential;
+        else
+        {
+            addIssue(result, std::string(context) + " field '" + propertyName + ".mode' must be 'sequential'.");
+            valid = false;
+        }
+    }
+    else
+    {
+        valid = false;
+    }
+
+    return valid ? std::optional<RoundRobinDescriptor>(descriptor) : std::nullopt;
+}
+
+template <typename TZone>
+void applyRoundRobinDescriptor(TZone& zone, const RoundRobinDescriptor& roundRobin)
+{
+    zone.roundRobin = roundRobin;
+    zone.roundRobinLength = roundRobin.slotCount;
+    zone.roundRobinPosition = roundRobin.slotIndex;
+}
+
+template <typename TZone>
+std::optional<RoundRobinDescriptor> synthesizeRoundRobinFromLegacyScalars(const TZone& zone)
+{
+    if (zone.roundRobinLength <= 0 || zone.roundRobinPosition <= 0)
+        return std::nullopt;
+
+    std::ostringstream stream;
+    stream << zone.groupId
+           << "|"
+           << zone.articulationId
+           << "|"
+           << zone.rootKey
+           << "|"
+           << zone.keyLow
+           << "|"
+           << zone.keyHigh
+           << "|"
+           << zone.roundRobinLength
+           << "|"
+           << static_cast<int>(zone.triggerMode);
+
+    RoundRobinDescriptor roundRobin;
+    roundRobin.poolId = "legacy-rr-" + std::to_string(computeFnv1a64(stream.str()));
+    roundRobin.slotCount = zone.roundRobinLength;
+    roundRobin.slotIndex = zone.roundRobinPosition;
+    roundRobin.mode = RoundRobinMode::sequential;
+    return roundRobin;
+}
+
+template <typename TResult>
+void validateRoundRobinDescriptor(TResult& result,
+                                  const std::string& context,
+                                  const std::optional<RoundRobinDescriptor>& roundRobin,
+                                  int roundRobinLength,
+                                  int roundRobinPosition,
+                                  bool explicitObjectRequired,
+                                  bool requireScalarMirror)
+{
+    if (roundRobinLength < 0)
+        addIssue(result, context + " must not have a negative roundRobinLength.");
+
+    if (roundRobinPosition < 0)
+        addIssue(result, context + " must not have a negative roundRobinPosition.");
+
+    if (roundRobinPosition > 0 && roundRobinLength <= 0)
+        addIssue(result, context + " must set roundRobinLength when roundRobinPosition is present.");
+
+    if (roundRobinLength > 0
+        && (roundRobinPosition < 1 || roundRobinPosition > roundRobinLength))
+    {
+        addIssue(result, context + " has roundRobinPosition outside roundRobinLength.");
+    }
+
+    if (!roundRobin.has_value())
+    {
+        if (explicitObjectRequired && (roundRobinLength > 0 || roundRobinPosition > 0))
+            addIssue(result, context + " must use the roundRobin object in the current schema.");
+
+        return;
+    }
+
+    if (roundRobin->poolId.empty())
+        addIssue(result, context + " roundRobin.poolId must not be empty.");
+
+    if (roundRobin->slotCount <= 0)
+        addIssue(result, context + " roundRobin.slotCount must be greater than zero.");
+
+    if (roundRobin->slotCount > 0
+        && (roundRobin->slotIndex < 1 || roundRobin->slotIndex > roundRobin->slotCount))
+    {
+        addIssue(result, context + " roundRobin.slotIndex must stay within roundRobin.slotCount.");
+    }
+
+    if (roundRobin->mode != RoundRobinMode::sequential)
+        addIssue(result, context + " roundRobin.mode must be sequential for the first-release contract.");
+
+    if (requireScalarMirror && roundRobinLength != roundRobin->slotCount)
+        addIssue(result, context + " roundRobinLength must mirror roundRobin.slotCount.");
+
+    if (requireScalarMirror && roundRobinPosition != roundRobin->slotIndex)
+        addIssue(result, context + " roundRobinPosition must mirror roundRobin.slotIndex.");
+}
+
 ordered_json serializeMacroTargets(const std::vector<RuntimeProjectMacroTargetDefinition>& targets)
 {
     ordered_json array = ordered_json::array();
@@ -418,18 +594,6 @@ std::string buildVelocityCrossfadeIssue(const std::string& context,
     return context + " contains an unknown velocityCrossfade validation issue.";
 }
 
-std::uint64_t computeFnv1a64(const std::string& text) noexcept
-{
-    std::uint64_t hash = 14695981039346656037ull;
-    for (const auto character : text)
-    {
-        hash ^= static_cast<unsigned char>(character);
-        hash *= 1099511628211ull;
-    }
-
-    return hash;
-}
-
 std::string buildVelocityCrossfadeTopologyIssue(const std::string& context,
                                                 VelocityCrossfadeTopologyIssue issue)
 {
@@ -534,7 +698,8 @@ void populateVelocityCrossfadeRuntimeDescriptors(std::vector<RuntimeZoneDefiniti
     }
 }
 
-ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinition>& zones)
+ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinition>& zones,
+                                   bool useExplicitRoundRobin)
 {
     ordered_json array = ordered_json::array();
 
@@ -560,8 +725,16 @@ ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinitio
         zoneObject["loopStartFrame"] = zone.loopStartFrame;
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
-        zoneObject["roundRobinLength"] = zone.roundRobinLength;
-        zoneObject["roundRobinPosition"] = zone.roundRobinPosition;
+        if (useExplicitRoundRobin)
+        {
+            if (zone.roundRobin.has_value())
+                zoneObject["roundRobin"] = serializeRoundRobin(*zone.roundRobin);
+        }
+        else
+        {
+            zoneObject["roundRobinLength"] = zone.roundRobinLength;
+            zoneObject["roundRobinPosition"] = zone.roundRobinPosition;
+        }
         if (zone.triggerMode == ZoneTriggerMode::oneShot)
             zoneObject["triggerMode"] = "one-shot";
         array.push_back(std::move(zoneObject));
@@ -832,12 +1005,12 @@ RuntimeProjectLoadResult loadRuntimeProjectManifest(const std::string& manifestP
 
     project.notes = readRequiredStringArray(root, result, "notes", "Project");
 
-    if (project.schemaVersion == 2)
+    if (project.schemaVersion == 2 || project.schemaVersion == 3)
     {
         const auto authoringIterator = root.find("authoring");
         if (authoringIterator == root.end() || !authoringIterator->is_object())
         {
-            addIssue(result, "Project schemaVersion 2 requires an 'authoring' object.");
+            addIssue(result, "Project authoring schemas require an 'authoring' object.");
         }
         else
         {
@@ -909,10 +1082,38 @@ RuntimeProjectLoadResult loadRuntimeProjectManifest(const std::string& manifestP
                         zone.loopEndFrame = *loopEndFrame;
                     if (const auto releaseSeconds = readOptional<RuntimeProjectLoadResult, double>(zoneObject, result, "releaseSeconds", context.c_str()))
                         zone.releaseSeconds = *releaseSeconds;
-                    if (const auto roundRobinLength = readOptional<RuntimeProjectLoadResult, int>(zoneObject, result, "roundRobinLength", context.c_str()))
-                        zone.roundRobinLength = *roundRobinLength;
-                    if (const auto roundRobinPosition = readOptional<RuntimeProjectLoadResult, int>(zoneObject, result, "roundRobinPosition", context.c_str()))
-                        zone.roundRobinPosition = *roundRobinPosition;
+
+                    const auto explicitRoundRobin = readOptionalRoundRobin(zoneObject, result, "roundRobin", context.c_str());
+                    const auto hasExplicitRoundRobinField = zoneObject.find("roundRobin") != zoneObject.end();
+                    if (hasExplicitRoundRobinField)
+                    {
+                        if (explicitRoundRobin.has_value())
+                            applyRoundRobinDescriptor(zone, *explicitRoundRobin);
+
+                        if (project.schemaVersion >= 3
+                            && authoring.schemaVersion >= 2
+                            && (zoneObject.find("roundRobinLength") != zoneObject.end()
+                                || zoneObject.find("roundRobinPosition") != zoneObject.end()))
+                        {
+                            addIssue(result, context + " must not mix roundRobin scalars with the roundRobin object in the current schema.");
+                        }
+                    }
+                    else
+                    {
+                        if (const auto roundRobinLength = readOptional<RuntimeProjectLoadResult, int>(zoneObject, result, "roundRobinLength", context.c_str()))
+                            zone.roundRobinLength = *roundRobinLength;
+                        if (const auto roundRobinPosition = readOptional<RuntimeProjectLoadResult, int>(zoneObject, result, "roundRobinPosition", context.c_str()))
+                            zone.roundRobinPosition = *roundRobinPosition;
+
+                        if (project.schemaVersion >= 3
+                            && authoring.schemaVersion >= 2
+                            && (zone.roundRobinLength > 0 || zone.roundRobinPosition > 0))
+                        {
+                            addIssue(result, context + " must use the roundRobin object in schemaVersion 3 files.");
+                        }
+
+                    }
+
                     if (const auto triggerMode = readOptional<RuntimeProjectLoadResult, std::string>(zoneObject, result, "triggerMode", context.c_str()))
                     {
                         if (*triggerMode == "gated")
@@ -921,6 +1122,12 @@ RuntimeProjectLoadResult loadRuntimeProjectManifest(const std::string& manifestP
                             zone.triggerMode = ZoneTriggerMode::oneShot;
                         else
                             addIssue(result, context + " field 'triggerMode' must be 'gated' or 'one-shot'.");
+                    }
+
+                    if (!hasExplicitRoundRobinField)
+                    {
+                        if (const auto synthesizedRoundRobin = synthesizeRoundRobinFromLegacyScalars(zone))
+                            applyRoundRobinDescriptor(zone, *synthesizedRoundRobin);
                     }
 
                     authoring.zones.push_back(std::move(zone));
@@ -1191,8 +1398,8 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
     if (project.schemaName != "drs.project")
         addIssue(result, "Project schemaName must be 'drs.project'.");
 
-    if (project.schemaVersion != 1 && project.schemaVersion != 2)
-        addIssue(result, "Project schemaVersion must be 1 or 2.");
+    if (project.schemaVersion != 1 && project.schemaVersion != 2 && project.schemaVersion != 3)
+        addIssue(result, "Project schemaVersion must be 1, 2, or 3.");
 
     if (project.projectId.empty())
         addIssue(result, "Project projectId must not be empty.");
@@ -1226,15 +1433,19 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         }
     }
 
-    if (project.schemaVersion == 2)
+    if (project.schemaVersion == 2 || project.schemaVersion == 3)
     {
         const auto& authoring = project.authoring;
+        const auto explicitRoundRobinRequired = project.schemaVersion >= 3;
 
         if (authoring.schemaName != "drs.authoring")
             addIssue(result, "Project authoring schemaName must be 'drs.authoring'.");
 
-        if (authoring.schemaVersion != 1)
-            addIssue(result, "Project authoring schemaVersion must be 1.");
+        if (project.schemaVersion == 2 && authoring.schemaVersion != 1)
+            addIssue(result, "Project authoring schemaVersion must be 1 for schemaVersion 2 projects.");
+
+        if (project.schemaVersion == 3 && authoring.schemaVersion != 2)
+            addIssue(result, "Project authoring schemaVersion must be 2 for schemaVersion 3 projects.");
 
         if (hasDuplicateIds(authoring.zones))
             addIssue(result, "Project authoring zone ids must be unique.");
@@ -1295,20 +1506,13 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
             if (zone.releaseSeconds < 0.0)
                 addIssue(result, "Project zone '" + zone.id + "' must not have a negative releaseSeconds.");
 
-            if (zone.roundRobinLength < 0)
-                addIssue(result, "Project zone '" + zone.id + "' must not have a negative roundRobinLength.");
-
-            if (zone.roundRobinPosition < 0)
-                addIssue(result, "Project zone '" + zone.id + "' must not have a negative roundRobinPosition.");
-
-            if (zone.roundRobinPosition > 0 && zone.roundRobinLength <= 0)
-                addIssue(result, "Project zone '" + zone.id + "' must set roundRobinLength when roundRobinPosition is present.");
-
-            if (zone.roundRobinLength > 0
-                && (zone.roundRobinPosition < 1 || zone.roundRobinPosition > zone.roundRobinLength))
-            {
-                addIssue(result, "Project zone '" + zone.id + "' has roundRobinPosition outside roundRobinLength.");
-            }
+            validateRoundRobinDescriptor(result,
+                                         "Project zone '" + zone.id + "'",
+                                         zone.roundRobin,
+                                         zone.roundRobinLength,
+                                         zone.roundRobinPosition,
+                                         explicitRoundRobinRequired,
+                                         explicitRoundRobinRequired);
         }
 
         for (const auto& finding : collectVelocityCrossfadeTopologyFindings(authoring.zones))
@@ -1500,6 +1704,55 @@ RuntimeProjectMigrationResult migrateRuntimeProjectToPhase2Authoring(const Runti
     result.valid = validation.valid;
     result.migrated = validation.valid;
     result.state = validation.valid ? "Project migrated to the Phase 2 authoring schema" : validation.state;
+    return result;
+}
+
+RuntimeProjectMigrationResult migrateRuntimeProjectToPhase3RoundRobinSchema(const RuntimeProjectModel& project)
+{
+    RuntimeProjectMigrationResult result;
+    result.state = "Project round-robin migration failed";
+
+    if (project.schemaVersion == 3 && project.authoring.schemaVersion == 2)
+    {
+        result.project = project;
+        const auto validation = validateRuntimeProjectModel(result.project);
+        result.issues = validation.issues;
+        result.valid = validation.valid;
+        result.state = validation.valid
+            ? "Project already uses the Phase 3 Round Robin schema"
+            : validation.state;
+        return result;
+    }
+
+    if (project.schemaVersion != 2 || project.authoring.schemaVersion != 1)
+    {
+        addIssue(result, "Only Project schemaVersion 2 with authoring schemaVersion 1 can be migrated into the Phase 3 Round Robin schema.");
+        return result;
+    }
+
+    result.project = project;
+    result.project.schemaVersion = 3;
+    result.project.authoring.schemaVersion = 2;
+
+    for (auto& zone : result.project.authoring.zones)
+    {
+        if (zone.roundRobin.has_value())
+        {
+            applyRoundRobinDescriptor(zone, *zone.roundRobin);
+            continue;
+        }
+
+        if (const auto synthesizedRoundRobin = synthesizeRoundRobinFromLegacyScalars(zone))
+            applyRoundRobinDescriptor(zone, *synthesizedRoundRobin);
+    }
+
+    const auto validation = validateRuntimeProjectModel(result.project);
+    result.issues = validation.issues;
+    result.valid = validation.valid;
+    result.migrated = validation.valid;
+    result.state = validation.valid
+        ? "Project migrated to the Phase 3 Round Robin schema"
+        : validation.state;
     return result;
 }
 
@@ -1766,10 +2019,34 @@ RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manif
                 zone.prefetchBytes = *prefetchBytes;
             if (const auto releaseSeconds = readOptional<RuntimeManifestLoadResult, double>(zoneObject, result, "releaseSeconds", context.c_str()))
                 zone.releaseSeconds = *releaseSeconds;
-            if (const auto roundRobinLength = readOptional<RuntimeManifestLoadResult, int>(zoneObject, result, "roundRobinLength", context.c_str()))
-                zone.roundRobinLength = *roundRobinLength;
-            if (const auto roundRobinPosition = readOptional<RuntimeManifestLoadResult, int>(zoneObject, result, "roundRobinPosition", context.c_str()))
-                zone.roundRobinPosition = *roundRobinPosition;
+
+            const auto explicitRoundRobin = readOptionalRoundRobin(zoneObject, result, "roundRobin", context.c_str());
+            const auto hasExplicitRoundRobinField = zoneObject.find("roundRobin") != zoneObject.end();
+            if (hasExplicitRoundRobinField)
+            {
+                if (explicitRoundRobin.has_value())
+                    applyRoundRobinDescriptor(zone, *explicitRoundRobin);
+
+                if (instrument.schemaVersion >= 2
+                    && (zoneObject.find("roundRobinLength") != zoneObject.end()
+                        || zoneObject.find("roundRobinPosition") != zoneObject.end()))
+                {
+                    addIssue(result, context + " must not mix roundRobin scalars with the roundRobin object in the current schema.");
+                }
+            }
+            else
+            {
+                if (const auto roundRobinLength = readOptional<RuntimeManifestLoadResult, int>(zoneObject, result, "roundRobinLength", context.c_str()))
+                    zone.roundRobinLength = *roundRobinLength;
+                if (const auto roundRobinPosition = readOptional<RuntimeManifestLoadResult, int>(zoneObject, result, "roundRobinPosition", context.c_str()))
+                    zone.roundRobinPosition = *roundRobinPosition;
+
+                if (instrument.schemaVersion >= 2
+                    && (zone.roundRobinLength > 0 || zone.roundRobinPosition > 0))
+                {
+                    addIssue(result, context + " must use the roundRobin object in schemaVersion 2 manifests.");
+                }
+            }
             if (const auto triggerMode = readOptional<RuntimeManifestLoadResult, std::string>(zoneObject, result, "triggerMode", context.c_str()))
             {
                 if (*triggerMode == "gated")
@@ -1778,6 +2055,12 @@ RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manif
                     zone.triggerMode = ZoneTriggerMode::oneShot;
                 else
                     addIssue(result, context + " field 'triggerMode' must be 'gated' or 'one-shot'.");
+            }
+
+            if (!hasExplicitRoundRobinField)
+            {
+                if (const auto synthesizedRoundRobin = synthesizeRoundRobinFromLegacyScalars(zone))
+                    applyRoundRobinDescriptor(zone, *synthesizedRoundRobin);
             }
 
             if (!groupIds.count(zone.groupId))
@@ -1792,17 +2075,13 @@ RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manif
             if (zone.releaseSeconds < 0.0)
                 addIssue(result, context + " must not have a negative releaseSeconds.");
 
-            if (zone.roundRobinLength < 0 || zone.roundRobinPosition < 0)
-                addIssue(result, context + " must not have negative round-robin metadata.");
-
-            if (zone.roundRobinPosition > 0 && zone.roundRobinLength <= 0)
-                addIssue(result, context + " must define roundRobinLength when roundRobinPosition is present.");
-
-            if (zone.roundRobinLength > 0
-                && (zone.roundRobinPosition < 1 || zone.roundRobinPosition > zone.roundRobinLength))
-            {
-                addIssue(result, context + " has roundRobinPosition outside roundRobinLength.");
-            }
+            validateRoundRobinDescriptor(result,
+                                         context,
+                                         zone.roundRobin,
+                                         zone.roundRobinLength,
+                                         zone.roundRobinPosition,
+                                         instrument.schemaVersion >= 2,
+                                         instrument.schemaVersion >= 2);
 
             if (zone.velocityLow > zone.velocityHigh)
                 addIssue(result, context + " has velocityLow greater than velocityHigh.");
@@ -1843,8 +2122,8 @@ RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manif
     if (instrument.schemaName != "drs.instrument")
         addIssue(result, "Manifest schemaName must be 'drs.instrument' for the Sprint 1 loader.");
 
-    if (instrument.schemaVersion != 1)
-        addIssue(result, "Manifest schemaVersion must be 1 for the Sprint 1 loader.");
+    if (instrument.schemaVersion != 1 && instrument.schemaVersion != 2)
+        addIssue(result, "Manifest schemaVersion must be 1 or 2.");
 
     if (instrument.zones.empty())
         addIssue(result, "Manifest must declare at least one zone.");
@@ -1900,7 +2179,7 @@ std::string serializeRuntimeProjectManifest(const RuntimeProjectModel& project, 
         authoring["schemaVersion"] = project.authoring.schemaVersion;
         authoring["selectedZoneId"] = project.authoring.selectedZoneId;
         authoring["selectedPerformanceBankId"] = project.authoring.selectedPerformanceBankId;
-        authoring["zones"] = serializeProjectZones(project.authoring.zones);
+        authoring["zones"] = serializeProjectZones(project.authoring.zones, project.schemaVersion >= 3);
         authoring["macros"] = serializeProjectMacros(project.authoring.macros);
         authoring["fxSlots"] = serializeFxSlots(project.authoring.fxSlots);
         authoring["routingBuses"] = serializeRoutingBuses(project.authoring.routingBuses);
@@ -1981,8 +2260,16 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
         zoneObject["streamOffsetBytes"] = zone.streamOffsetBytes;
         zoneObject["prefetchBytes"] = zone.prefetchBytes;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
-        zoneObject["roundRobinLength"] = zone.roundRobinLength;
-        zoneObject["roundRobinPosition"] = zone.roundRobinPosition;
+        if (instrument.schemaVersion >= 2)
+        {
+            if (zone.roundRobin.has_value())
+                zoneObject["roundRobin"] = serializeRoundRobin(*zone.roundRobin);
+        }
+        else
+        {
+            zoneObject["roundRobinLength"] = zone.roundRobinLength;
+            zoneObject["roundRobinPosition"] = zone.roundRobinPosition;
+        }
         if (zone.triggerMode == ZoneTriggerMode::oneShot)
             zoneObject["triggerMode"] = "one-shot";
         zones.push_back(std::move(zoneObject));

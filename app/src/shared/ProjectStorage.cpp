@@ -24,6 +24,38 @@ std::uint64_t computeFnv1a64(std::string_view text) noexcept
     return hash;
 }
 
+std::optional<drs::engine::RoundRobinDescriptor> materializeRoundRobinDescriptor(
+    const drs::engine::RuntimeProjectZoneDefinition& zone)
+{
+    if (zone.roundRobin.has_value())
+        return zone.roundRobin;
+
+    if (zone.roundRobinLength <= 0 || zone.roundRobinPosition <= 0)
+        return std::nullopt;
+
+    std::ostringstream stream;
+    stream << zone.groupId
+           << "|"
+           << zone.articulationId
+           << "|"
+           << zone.rootKey
+           << "|"
+           << zone.keyLow
+           << "|"
+           << zone.keyHigh
+           << "|"
+           << zone.roundRobinLength
+           << "|"
+           << static_cast<int>(zone.triggerMode);
+
+    drs::engine::RoundRobinDescriptor roundRobin;
+    roundRobin.poolId = "legacy-rr-" + std::to_string(computeFnv1a64(stream.str()));
+    roundRobin.slotCount = zone.roundRobinLength;
+    roundRobin.slotIndex = zone.roundRobinPosition;
+    roundRobin.mode = drs::engine::RoundRobinMode::sequential;
+    return roundRobin;
+}
+
 std::uint64_t buildCrossfadePairingKey(const drs::engine::RuntimeZoneDefinition& zone)
 {
     std::ostringstream stream;
@@ -138,7 +170,7 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
 {
     drs::engine::RuntimeInstrumentModel instrument;
     instrument.schemaName = "drs.instrument";
-    instrument.schemaVersion = 1;
+    instrument.schemaVersion = 2;
     instrument.instrumentId = project.projectId.empty() ? "instrument" : project.projectId + ".instrument";
     instrument.displayName = project.displayName;
     instrument.sourceProjectPath = projectFile.getFullPathName().toStdString();
@@ -213,8 +245,17 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
         zone.streamOffsetBytes = 0;
         zone.prefetchBytes = 16384;
         zone.releaseSeconds = projectZone.releaseSeconds;
-        zone.roundRobinLength = projectZone.roundRobinLength;
-        zone.roundRobinPosition = projectZone.roundRobinPosition;
+        if (const auto roundRobin = materializeRoundRobinDescriptor(projectZone))
+        {
+            zone.roundRobin = *roundRobin;
+            zone.roundRobinLength = roundRobin->slotCount;
+            zone.roundRobinPosition = roundRobin->slotIndex;
+        }
+        else
+        {
+            zone.roundRobinLength = projectZone.roundRobinLength;
+            zone.roundRobinPosition = projectZone.roundRobinPosition;
+        }
         zone.triggerMode = projectZone.triggerMode;
         instrument.zones.push_back(std::move(zone));
     }

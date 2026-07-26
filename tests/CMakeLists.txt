@@ -1104,6 +1104,23 @@ add_test(
     COMMAND drs_phase3_round_robin_fixture_characterization_tests
 )
 
+add_executable(drs_phase3_round_robin_schema_persistence_tests
+    src/Phase3RoundRobinSchemaPersistenceTests.cpp
+)
+
+target_link_libraries(drs_phase3_round_robin_schema_persistence_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+)
+
+target_compile_features(drs_phase3_round_robin_schema_persistence_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase3.round_robin_schema_persistence
+    COMMAND drs_phase3_round_robin_schema_persistence_tests
+)
+
 add_executable(drs_phase3_round_robin_contract_red_tests
     src/Phase3RoundRobinContractRedTests.cpp
 )
