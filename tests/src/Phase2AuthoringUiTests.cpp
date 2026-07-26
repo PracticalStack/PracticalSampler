@@ -412,6 +412,9 @@ drs::engine::AuthoringZoneSummary makeZoneSummary(const drs::engine::RuntimeProj
     summary.gainDb = zone.gainDb;
     summary.pan = zone.pan;
     summary.loopEnabled = zone.loopEnabled;
+    summary.roundRobin = zone.roundRobin;
+    summary.roundRobinLength = zone.roundRobinLength;
+    summary.roundRobinPosition = zone.roundRobinPosition;
     summary.triggerMode = zone.triggerMode;
     summary.selected = true;
     return summary;
@@ -721,7 +724,7 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
 {
     drs::app::authoring::ZoneMappingEditor editor;
     editor.setTopLeftPosition(0, 0);
-    editor.setSize(360, 560);
+    editor.setSize(360, 720);
     editor.setVisible(true);
 
     drs::app::authoring::ZoneFieldValuesViewModel emptyViewModel;
@@ -739,6 +742,10 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
 
     int commitRequests = 0;
     int restoreRequests = 0;
+    int createRoundRobinPoolRequests = 0;
+    int addCompatibleRoundRobinRequests = 0;
+    int normalizeRoundRobinRequests = 0;
+    int removeRoundRobinRequests = 0;
     std::string lastCommitLabel;
     drs::app::authoring::ZoneFieldValuesViewModel lastCommittedValues;
 
@@ -754,6 +761,22 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     {
         ++restoreRequests;
     };
+    callbacks.onCreateRoundRobinPoolRequested = [&createRoundRobinPoolRequests]
+    {
+        ++createRoundRobinPoolRequests;
+    };
+    callbacks.onAddCompatibleZonesToRoundRobinPoolRequested = [&addCompatibleRoundRobinRequests]
+    {
+        ++addCompatibleRoundRobinRequests;
+    };
+    callbacks.onNormalizeRoundRobinPoolRequested = [&normalizeRoundRobinRequests]
+    {
+        ++normalizeRoundRobinRequests;
+    };
+    callbacks.onRemoveSelectedZoneFromRoundRobinPoolRequested = [&removeRoundRobinRequests]
+    {
+        ++removeRoundRobinRequests;
+    };
     editor.setCallbacks(std::move(callbacks));
 
     drs::app::authoring::ZoneFieldValuesViewModel populatedViewModel;
@@ -766,6 +789,15 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     populatedViewModel.gainDb = -3.5;
     populatedViewModel.pan = 0.25;
     populatedViewModel.loopEnabled = false;
+    populatedViewModel.roundRobinEnabled = true;
+    populatedViewModel.roundRobinPoolText = "Pool: rr-main";
+    populatedViewModel.roundRobinSlotText = "Slot: 1 of 3 | Mode: sequential";
+    populatedViewModel.roundRobinHintText = "Pool members: 3 | Unpooled matches: 1";
+    populatedViewModel.canCreateRoundRobinPool = true;
+    populatedViewModel.canAddCompatibleZonesToRoundRobinPool = true;
+    populatedViewModel.canNormalizeRoundRobinPool = true;
+    populatedViewModel.canRemoveZoneFromRoundRobinPool = true;
+    populatedViewModel.previewAdvancesRoundRobin = true;
     editor.setViewModel(populatedViewModel);
     editor.resized();
 
@@ -788,6 +820,14 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
             "Zone mapping editor should expose one loop toggle after removing old mapping rows.");
     require(countDescendantsById(editor, "authoringTriggerModeSelector") == 1,
             "Zone mapping editor should expose one trigger-mode selector.");
+    require(countDescendantsById(editor, "authoringCreateRoundRobinPoolRow") == 1,
+            "Zone mapping editor should expose one create-pool action.");
+    require(countDescendantsById(editor, "authoringAddCompatibleZonesRow") == 1,
+            "Zone mapping editor should expose one add-compatible-zones action.");
+    require(countDescendantsById(editor, "authoringNormalizeRoundRobinPoolRow") == 1,
+            "Zone mapping editor should expose one normalize-pool action.");
+    require(countDescendantsById(editor, "authoringRemoveRoundRobinPoolRow") == 1,
+            "Zone mapping editor should expose one remove-pool action.");
     require(countDescendantsById(editor, "authoringRestoreRootKeyButton") == 1,
             "Zone mapping editor should expose one restore-root-key action after removing old mapping rows.");
 
@@ -799,6 +839,12 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
              juce::String("authoringKeyHighSlider"),
              juce::String("authoringSampleInspectorSection"),
              juce::String("authoringSampleInspectorSectionDisclosure"),
+             juce::String("authoringRoundRobinInspectorSection"),
+             juce::String("authoringRoundRobinInspectorSectionDisclosure"),
+             juce::String("authoringCreateRoundRobinPoolButton"),
+             juce::String("authoringAddCompatibleZonesButton"),
+             juce::String("authoringNormalizeRoundRobinPoolButton"),
+             juce::String("authoringRemoveRoundRobinPoolButton"),
              juce::String("authoringMixInspectorSection"),
              juce::String("authoringMixInspectorSectionDisclosure"),
              juce::String("authoringAdvancedInspectorSection"),
@@ -825,6 +871,11 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
                                     "authoringSampleInspectorSectionDisclosure",
                                     "authoringVelocityLowSlider",
                                     "authoringVelocityHighSlider",
+                                    "authoringRoundRobinInspectorSectionDisclosure",
+                                    "authoringCreateRoundRobinPoolButton",
+                                    "authoringAddCompatibleZonesButton",
+                                    "authoringNormalizeRoundRobinPoolButton",
+                                    "authoringRemoveRoundRobinPoolButton",
                                     "authoringMixInspectorSectionDisclosure",
                                     "authoringGainSlider",
                                     "authoringPanSlider",
@@ -841,6 +892,10 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     requireAccessibilityHandlerState(editor, "authoringKeyHighSlider", true);
     requireAccessibilityHandlerState(editor, "authoringVelocityLowSlider", false);
     requireAccessibilityHandlerState(editor, "authoringVelocityHighSlider", false);
+    requireAccessibilityHandlerState(editor, "authoringCreateRoundRobinPoolButton", false);
+    requireAccessibilityHandlerState(editor, "authoringAddCompatibleZonesButton", false);
+    requireAccessibilityHandlerState(editor, "authoringNormalizeRoundRobinPoolButton", false);
+    requireAccessibilityHandlerState(editor, "authoringRemoveRoundRobinPoolButton", false);
     requireAccessibilityHandlerState(editor, "authoringGainSlider", false);
     requireAccessibilityHandlerState(editor, "authoringPanSlider", false);
     requireAccessibilityHandlerState(editor, "authoringLoopEnabledToggle", false);
@@ -850,10 +905,12 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     for (const auto& componentId : {
              juce::String("authoringMapInspectorSection"),
              juce::String("authoringSampleInspectorSection"),
+             juce::String("authoringRoundRobinInspectorSection"),
              juce::String("authoringMixInspectorSection"),
              juce::String("authoringAdvancedInspectorSection"),
              juce::String("authoringMapInspectorSectionDisclosure"),
              juce::String("authoringSampleInspectorSectionDisclosure"),
+             juce::String("authoringRoundRobinInspectorSectionDisclosure"),
              juce::String("authoringMixInspectorSectionDisclosure"),
              juce::String("authoringAdvancedInspectorSectionDisclosure")
          })
@@ -880,6 +937,30 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     requireAccessibilityHandlerState(editor, "authoringVelocityLowSlider", false);
     requireAccessibilityHandlerState(editor, "authoringVelocityHighSlider", false);
 
+    if (findDescendantById(editor, "authoringCreateRoundRobinPoolRow")->getBounds().isEmpty())
+        requireButton(editor, "authoringRoundRobinInspectorSectionDisclosure").onClick();
+    requireComponentVisibleWithin(editor, "authoringRoundRobinPoolMessage", bounds);
+    requireComponentVisibleWithin(editor, "authoringRoundRobinSlotMessage", bounds);
+    requireComponentVisibleWithin(editor, "authoringRoundRobinHintMessage", bounds);
+    requireComponentVisibleWithin(editor, "authoringCreateRoundRobinPoolRow", bounds);
+    requireComponentVisibleWithin(editor, "authoringAddCompatibleZonesRow", bounds);
+    requireComponentVisibleWithin(editor, "authoringNormalizeRoundRobinPoolRow", bounds);
+    requireComponentVisibleWithin(editor, "authoringRemoveRoundRobinPoolRow", bounds);
+    require(requireMessageText(editor, "authoringRoundRobinPoolMessage") == "Pool: rr-main",
+            "Zone mapping editor should show the Round Robin pool identity.");
+    require(requireMessageText(editor, "authoringRoundRobinSlotMessage") == "Slot: 1 of 3 | Mode: sequential",
+            "Zone mapping editor should show the Round Robin slot and mode.");
+    require(requireMessageText(editor, "authoringRoundRobinHintMessage") == "Pool members: 3 | Unpooled matches: 1",
+            "Zone mapping editor should show Round Robin grouping guidance.");
+    requireAccessibilityHandlerState(editor, "authoringCreateRoundRobinPoolButton", true);
+    requireAccessibilityHandlerState(editor, "authoringAddCompatibleZonesButton", true);
+    requireAccessibilityHandlerState(editor, "authoringNormalizeRoundRobinPoolButton", true);
+    requireAccessibilityHandlerState(editor, "authoringRemoveRoundRobinPoolButton", true);
+    require(requireButton(editor, "authoringCreateRoundRobinPoolButton").getButtonText() == "Split to New Pool",
+            "Round Robin pool creation should relabel itself when the selected zone is already pooled.");
+    require(requireButton(editor, "authoringInspectorPreviewButton").getButtonText() == "Preview / Advance",
+            "Round Robin zones should advertise preview slot advancement.");
+
     if (findDescendantById(editor, "authoringGainSlider")->getBounds().isEmpty())
         requireButton(editor, "authoringMixInspectorSectionDisclosure").onClick();
     requireComponentVisibleWithin(editor, "authoringGainSlider", bounds);
@@ -887,8 +968,9 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     requireAccessibilityHandlerState(editor, "authoringGainSlider", true);
     requireAccessibilityHandlerState(editor, "authoringPanSlider", true);
 
-    if (findDescendantById(editor, "authoringRestoreRootKeyButton")->getBounds().isEmpty())
-        requireButton(editor, "authoringAdvancedInspectorSectionDisclosure").onClick();
+    auto& advancedDisclosure = requireButton(editor, "authoringAdvancedInspectorSectionDisclosure");
+    if (advancedDisclosure.getButtonText() == "Show")
+        advancedDisclosure.onClick();
     requireComponentVisibleWithin(editor, "authoringLoopEnabledToggle", bounds);
     requireComponentVisibleWithin(editor, "authoringTriggerModeSelector", bounds);
     requireComponentVisibleWithin(editor, "authoringRestoreRootKeyButton", bounds);
@@ -983,6 +1065,18 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
 
     requireButton(editor, "authoringRestoreRootKeyButton").onClick();
     require(restoreRequests == 1, "Zone mapping editor should emit restore-root-key callbacks.");
+    requireButton(editor, "authoringCreateRoundRobinPoolButton").onClick();
+    require(createRoundRobinPoolRequests == 1,
+            "Zone mapping editor should emit create-pool callbacks.");
+    requireButton(editor, "authoringAddCompatibleZonesButton").onClick();
+    require(addCompatibleRoundRobinRequests == 1,
+            "Zone mapping editor should emit add-compatible-zones callbacks.");
+    requireButton(editor, "authoringNormalizeRoundRobinPoolButton").onClick();
+    require(normalizeRoundRobinRequests == 1,
+            "Zone mapping editor should emit normalize-pool callbacks.");
+    requireButton(editor, "authoringRemoveRoundRobinPoolButton").onClick();
+    require(removeRoundRobinRequests == 1,
+            "Zone mapping editor should emit remove-pool callbacks.");
 
     saveComponentPng(editor, outputDirectory / "leaf-zone-mapping-editor.png");
 }
@@ -997,7 +1091,7 @@ void writeReachabilityChecklist(std::ostream& inventory)
     inventory << "- Zone Map context menu: Delete Selected Sample\n";
     inventory << "- Drawer host: authoringDrawer, authoringDrawerTabStrip, authoringDrawerToggleButton\n";
     inventory << "- Drawer tabs: authoringDrawerWaveformTab, authoringDrawerMacrosTab, authoringDrawerRoutingTab, authoringDrawerPerformanceTab\n";
-    inventory << "- Mapping inspector: authoringRootKeySlider, authoringKeyLowSlider, authoringKeyHighSlider, authoringVelocityLowSlider, authoringVelocityHighSlider, authoringGainSlider, authoringPanSlider, authoringLoopEnabledToggle, authoringTriggerModeSelector, authoringRestoreRootKeyButton\n";
+    inventory << "- Mapping inspector: authoringRootKeySlider, authoringKeyLowSlider, authoringKeyHighSlider, authoringVelocityLowSlider, authoringVelocityHighSlider, authoringCreateRoundRobinPoolButton, authoringAddCompatibleZonesButton, authoringNormalizeRoundRobinPoolButton, authoringRemoveRoundRobinPoolButton, authoringGainSlider, authoringPanSlider, authoringLoopEnabledToggle, authoringTriggerModeSelector, authoringRestoreRootKeyButton\n";
     inventory << "- Drawer context: authoringDrawerTitleLabel, authoringDrawerScopeLabel, authoringDrawerBreadcrumbLabel\n";
     inventory << "- Waveform drawer content: authoringWaveformPreview, authoringWaveformStatusLabel, authoringWaveformInfoLabel, authoringWaveformLoopLabel, authoringWaveformImportLabel\n";
     inventory << "- Macros drawer content: authoringMacroList, authoringMacroListBox, authoringMacroAssignmentSelector, authoringMacroRoleSelector, authoringMacroDefaultSlider, authoringMacroMinSlider, authoringMacroMaxSlider, authoringMacroMoveUpButton, authoringMacroMoveDownButton\n";

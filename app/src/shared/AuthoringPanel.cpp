@@ -234,6 +234,55 @@ int findAssignmentIndex(const std::string& parameterId)
     return -1;
 }
 
+bool sameVelocityCrossfadeDescriptor(const drs::engine::VelocityCrossfadeDescriptor& left,
+                                     const drs::engine::VelocityCrossfadeDescriptor& right) noexcept
+{
+    return left.fadeInLowVelocity == right.fadeInLowVelocity
+        && left.fadeInHighVelocity == right.fadeInHighVelocity
+        && left.fadeOutLowVelocity == right.fadeOutLowVelocity
+        && left.fadeOutHighVelocity == right.fadeOutHighVelocity
+        && left.curve == right.curve;
+}
+
+bool isRoundRobinGroupingCompatible(const drs::engine::RuntimeProjectZoneDefinition& anchor,
+                                    const drs::engine::RuntimeProjectZoneDefinition& candidate) noexcept
+{
+    return anchor.groupId == candidate.groupId
+        && anchor.articulationId == candidate.articulationId
+        && anchor.rootKey == candidate.rootKey
+        && anchor.keyLow == candidate.keyLow
+        && anchor.keyHigh == candidate.keyHigh
+        && anchor.velocityLow == candidate.velocityLow
+        && anchor.velocityHigh == candidate.velocityHigh
+        && sameVelocityCrossfadeDescriptor(anchor.velocityCrossfade, candidate.velocityCrossfade)
+        && anchor.triggerMode == candidate.triggerMode;
+}
+
+std::size_t countRoundRobinPoolMembers(const drs::engine::RuntimeProjectModel& project,
+                                       const drs::engine::RoundRobinDescriptor& roundRobin)
+{
+    return static_cast<std::size_t>(std::count_if(project.authoring.zones.begin(),
+                                                  project.authoring.zones.end(),
+                                                  [&](const auto& zone)
+                                                  {
+                                                      return zone.roundRobin.has_value()
+                                                          && zone.roundRobin->poolId == roundRobin.poolId;
+                                                  }));
+}
+
+std::size_t countCompatibleUnpooledRoundRobinZones(const drs::engine::RuntimeProjectModel& project,
+                                                   const drs::engine::RuntimeProjectZoneDefinition& anchor)
+{
+    return static_cast<std::size_t>(std::count_if(project.authoring.zones.begin(),
+                                                  project.authoring.zones.end(),
+                                                  [&](const auto& zone)
+                                                  {
+                                                      return zone.id != anchor.id
+                                                          && !zone.roundRobin.has_value()
+                                                          && isRoundRobinGroupingCompatible(anchor, zone);
+                                                  }));
+}
+
 bool isExpandedLayout(AuthoringPanel::LayoutMode layoutMode)
 {
     return layoutMode == AuthoringPanel::LayoutMode::expanded;
@@ -704,6 +753,38 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     zoneCallbacks.onPreviewRequested = [this]
     {
         previewSelectedZone(drs::engine::AuthoringPreviewAuditionSource::inspector);
+    };
+    zoneCallbacks.onCreateRoundRobinPoolRequested = [this]
+    {
+        if (isRefreshing)
+            return;
+
+        if (authoringSession.createRoundRobinPoolForSelectedZone("Create Round Robin pool").applied)
+            refreshFromSession();
+    };
+    zoneCallbacks.onAddCompatibleZonesToRoundRobinPoolRequested = [this]
+    {
+        if (isRefreshing)
+            return;
+
+        if (authoringSession.addCompatibleZonesToSelectedRoundRobinPool("Add compatible zones to Round Robin pool").applied)
+            refreshFromSession();
+    };
+    zoneCallbacks.onNormalizeRoundRobinPoolRequested = [this]
+    {
+        if (isRefreshing)
+            return;
+
+        if (authoringSession.normalizeSelectedRoundRobinPool("Normalize Round Robin slot numbering").applied)
+            refreshFromSession();
+    };
+    zoneCallbacks.onRemoveSelectedZoneFromRoundRobinPoolRequested = [this]
+    {
+        if (isRefreshing)
+            return;
+
+        if (authoringSession.removeSelectedZoneFromRoundRobinPool("Remove selected zone from Round Robin pool").applied)
+            refreshFromSession();
     };
     zoneMappingEditor.setCallbacks(std::move(zoneCallbacks));
     zoneMap.setOnZoneSelectionRequested([this](const std::string& zoneId)
@@ -1769,6 +1850,7 @@ authoring::ZoneFieldValuesViewModel AuthoringPanel::buildZoneFieldValuesViewMode
     authoring::ZoneFieldValuesViewModel viewModel;
     viewModel.emptyStateText = "Select a zone to edit mapping values.";
 
+    const auto project = authoringSession.getProject();
     if (const auto zone = authoringSession.getSelectedZone(); zone.has_value())
     {
         viewModel.hasSelection = true;
@@ -1781,6 +1863,39 @@ authoring::ZoneFieldValuesViewModel AuthoringPanel::buildZoneFieldValuesViewMode
         viewModel.pan = zone->pan;
         viewModel.loopEnabled = zone->loopEnabled;
         viewModel.triggerMode = zone->triggerMode;
+
+        const auto compatibleUnpooledZoneCount = countCompatibleUnpooledRoundRobinZones(project, *zone);
+        viewModel.roundRobinEnabled = zone->roundRobin.has_value();
+        viewModel.canCreateRoundRobinPool = true;
+        viewModel.canAddCompatibleZonesToRoundRobinPool = compatibleUnpooledZoneCount > 0;
+        viewModel.canNormalizeRoundRobinPool = zone->roundRobin.has_value();
+        viewModel.canRemoveZoneFromRoundRobinPool = zone->roundRobin.has_value();
+
+        if (zone->roundRobin.has_value())
+        {
+            const auto poolMemberCount = countRoundRobinPoolMembers(project, *zone->roundRobin);
+            viewModel.roundRobinPoolText = "Pool: " + zone->roundRobin->poolId;
+            viewModel.roundRobinSlotText = "Slot: "
+                + std::to_string(zone->roundRobin->slotIndex)
+                + " of " + std::to_string(zone->roundRobin->slotCount)
+                + " | Mode: sequential";
+            viewModel.roundRobinHintText = compatibleUnpooledZoneCount > 0
+                ? "Pool members: " + std::to_string(poolMemberCount)
+                    + " | Unpooled matches: " + std::to_string(compatibleUnpooledZoneCount)
+                : "Pool members: " + std::to_string(poolMemberCount)
+                    + " | No unpooled matching zones";
+            viewModel.previewAdvancesRoundRobin = poolMemberCount > 1;
+        }
+        else
+        {
+            viewModel.roundRobinPoolText = "Pool: none";
+            viewModel.roundRobinSlotText = compatibleUnpooledZoneCount > 0
+                ? "Slot: standalone | Mode: sequential when grouped"
+                : "Slot: standalone";
+            viewModel.roundRobinHintText = compatibleUnpooledZoneCount > 0
+                ? "Compatible unpooled zones: " + std::to_string(compatibleUnpooledZoneCount)
+                : "No compatible unpooled zones available for grouping";
+        }
     }
 
     return viewModel;

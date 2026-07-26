@@ -23,6 +23,9 @@ struct AuthoringZoneSummary
     double gainDb = 0.0;
     double pan = 0.0;
     bool loopEnabled = false;
+    std::optional<RoundRobinDescriptor> roundRobin;
+    int roundRobinLength = 0;
+    int roundRobinPosition = 0;
     ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;
     bool selected = false;
 };
@@ -55,6 +58,10 @@ public:
     RuntimeProjectDocumentActionResult selectPerformanceBank(const std::string& performanceBankId);
     RuntimeProjectDocumentActionResult updateSelectedZone(const RuntimeProjectZoneDefinition& zone,
                                                           const std::string& label);
+    RuntimeProjectDocumentActionResult createRoundRobinPoolForSelectedZone(const std::string& label);
+    RuntimeProjectDocumentActionResult addCompatibleZonesToSelectedRoundRobinPool(const std::string& label);
+    RuntimeProjectDocumentActionResult normalizeSelectedRoundRobinPool(const std::string& label);
+    RuntimeProjectDocumentActionResult removeSelectedZoneFromRoundRobinPool(const std::string& label);
     RuntimeProjectDocumentActionResult deleteSelectedSample();
     RuntimeProjectDocumentActionResult appendImportedContent(std::vector<RuntimeProjectSampleSource> sampleSources,
                                                             std::vector<RuntimeProjectZoneDefinition> zones,

@@ -34,17 +34,26 @@ private:
     CompactInspectorMessage emptyStateMessage;
     CompactInspectorSection mapSection;
     CompactInspectorSection sampleSection;
+    CompactInspectorSection roundRobinSection;
     CompactInspectorSection mixSection;
     CompactInspectorSection advancedSection;
 
     juce::Component mapSectionContent;
     juce::Component sampleSectionContent;
+    juce::Component roundRobinSectionContent;
     juce::Component mixSectionContent;
     juce::Component advancedSectionContent;
 
     CompactInspectorSliderRow rootKeyRow;
     CompactInspectorRangeRow keyRangeRow;
     CompactInspectorRangeRow velocityRangeRow;
+    CompactInspectorMessage roundRobinPoolMessage;
+    CompactInspectorMessage roundRobinSlotMessage;
+    CompactInspectorMessage roundRobinHintMessage;
+    CompactInspectorActionRow createRoundRobinPoolRow;
+    CompactInspectorActionRow addCompatibleZonesRow;
+    CompactInspectorActionRow normalizeRoundRobinPoolRow;
+    CompactInspectorActionRow removeRoundRobinPoolRow;
     CompactInspectorSliderRow gainRow;
     CompactInspectorSliderRow panRow;
     CompactInspectorToggleRow loopToggleRow;

@@ -49,6 +49,16 @@ struct ZoneFieldValuesViewModel
     double gainDb = 0.0;
     double pan = 0.0;
     bool loopEnabled = false;
+    bool roundRobinEnabled = false;
+    std::string roundRobinPoolText;
+    std::string roundRobinSlotText;
+    std::string roundRobinModeText;
+    std::string roundRobinHintText;
+    bool canCreateRoundRobinPool = false;
+    bool canAddCompatibleZonesToRoundRobinPool = false;
+    bool canNormalizeRoundRobinPool = false;
+    bool canRemoveZoneFromRoundRobinPool = false;
+    bool previewAdvancesRoundRobin = false;
     drs::engine::ZoneTriggerMode triggerMode = drs::engine::ZoneTriggerMode::gated;
     std::string emptyStateText;
 };
@@ -111,6 +121,10 @@ struct ZoneFieldCallbacks
     std::function<void(const ZoneFieldValuesViewModel&, const std::string&)> onCommitRequested;
     std::function<void()> onRestoreRootKeyRequested;
     std::function<void()> onPreviewRequested;
+    std::function<void()> onCreateRoundRobinPoolRequested;
+    std::function<void()> onAddCompatibleZonesToRoundRobinPoolRequested;
+    std::function<void()> onNormalizeRoundRobinPoolRequested;
+    std::function<void()> onRemoveSelectedZoneFromRoundRobinPoolRequested;
 };
 
 using RefreshEditIntent = std::function<void(const std::string&)>;
