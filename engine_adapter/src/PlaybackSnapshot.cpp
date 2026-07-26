@@ -107,6 +107,59 @@ ordered_json serializeVelocityCrossfadeRuntime(const VelocityCrossfadeRuntimeDes
     return value;
 }
 
+std::string toRoundRobinModeString(RoundRobinMode mode)
+{
+    switch (mode)
+    {
+        case RoundRobinMode::sequential:
+            return "sequential";
+    }
+
+    return "sequential";
+}
+
+ordered_json serializeRoundRobin(const RoundRobinDescriptor& roundRobin)
+{
+    ordered_json value;
+    value["poolId"] = roundRobin.poolId;
+    value["slotCount"] = roundRobin.slotCount;
+    value["slotIndex"] = roundRobin.slotIndex;
+    value["mode"] = toRoundRobinModeString(roundRobin.mode);
+    return value;
+}
+
+std::optional<RoundRobinDescriptor> materializeRoundRobinDescriptor(
+    const RuntimeProjectZoneDefinition& zone)
+{
+    if (zone.roundRobin.has_value())
+        return zone.roundRobin;
+
+    if (zone.roundRobinLength <= 0 || zone.roundRobinPosition <= 0)
+        return std::nullopt;
+
+    std::ostringstream stream;
+    stream << zone.groupId
+           << "|"
+           << zone.articulationId
+           << "|"
+           << zone.rootKey
+           << "|"
+           << zone.keyLow
+           << "|"
+           << zone.keyHigh
+           << "|"
+           << zone.roundRobinLength
+           << "|"
+           << static_cast<int>(zone.triggerMode);
+
+    RoundRobinDescriptor roundRobin;
+    roundRobin.poolId = "legacy-rr-" + computeFnv1a64Hex(stream.str());
+    roundRobin.slotCount = zone.roundRobinLength;
+    roundRobin.slotIndex = zone.roundRobinPosition;
+    roundRobin.mode = RoundRobinMode::sequential;
+    return roundRobin;
+}
+
 std::uint64_t buildCrossfadePairingKey(const std::string& articulationId,
                                        int rootKey,
                                        int keyLow,
@@ -326,8 +379,8 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
         zoneObject["loopStartFrame"] = zone.loopStartFrame;
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
-        zoneObject["roundRobinLength"] = zone.roundRobinLength;
-        zoneObject["roundRobinPosition"] = zone.roundRobinPosition;
+        if (zone.roundRobin.has_value())
+            zoneObject["roundRobin"] = serializeRoundRobin(*zone.roundRobin);
         if (zone.triggerMode == ZoneTriggerMode::oneShot)
             zoneObject["triggerMode"] = "one-shot";
         zones.push_back(std::move(zoneObject));
@@ -527,6 +580,7 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
     {
         const auto& zone = project.authoring.zones[index];
         const auto path = "authoring.zones[" + std::to_string(index) + "]";
+        const auto roundRobin = materializeRoundRobinDescriptor(zone);
 
         if (zone.id.empty())
             addFinding(result, PlaybackSnapshotFindingSeverity::error, "missing-zone-id", path + ".id",
@@ -597,6 +651,23 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
             addFinding(result, PlaybackSnapshotFindingSeverity::error, "invalid-zone-round-robin-position", path,
                        "Zone roundRobinPosition must stay within roundRobinLength.");
         }
+        if (roundRobin.has_value())
+        {
+            if (roundRobin->poolId.empty())
+            {
+                addFinding(result, PlaybackSnapshotFindingSeverity::error, "invalid-zone-round-robin-pool-id", path,
+                           "Zone Round Robin poolId must be non-empty when Round Robin metadata is present.");
+            }
+            if (roundRobin->slotCount != zone.roundRobinLength
+                || roundRobin->slotIndex != zone.roundRobinPosition)
+            {
+                addFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           "invalid-zone-round-robin-shape",
+                           path,
+                           "Zone Round Robin descriptor must mirror the scalar Round Robin slot metadata.");
+            }
+        }
 
         result.snapshot.zones.push_back({
             zone.id,
@@ -618,6 +689,7 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
             zone.loopStartFrame,
             zone.loopEndFrame,
             zone.releaseSeconds,
+            roundRobin,
             zone.roundRobinLength,
             zone.roundRobinPosition,
             zone.triggerMode

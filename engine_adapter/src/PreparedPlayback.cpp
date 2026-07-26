@@ -85,6 +85,27 @@ ordered_json serializeVelocityCrossfadeRuntime(const VelocityCrossfadeRuntimeDes
     return value;
 }
 
+std::string toRoundRobinModeString(RoundRobinMode mode)
+{
+    switch (mode)
+    {
+        case RoundRobinMode::sequential:
+            return "sequential";
+    }
+
+    return "sequential";
+}
+
+ordered_json serializeRoundRobin(const RoundRobinDescriptor& roundRobin)
+{
+    ordered_json value;
+    value["poolId"] = roundRobin.poolId;
+    value["slotCount"] = roundRobin.slotCount;
+    value["slotIndex"] = roundRobin.slotIndex;
+    value["mode"] = toRoundRobinModeString(roundRobin.mode);
+    return value;
+}
+
 ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool includeDigest)
 {
     ordered_json root;
@@ -222,8 +243,8 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
         zoneObject["loopStartFrame"] = zone.loopStartFrame;
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
-        zoneObject["roundRobinLength"] = zone.roundRobinLength;
-        zoneObject["roundRobinPosition"] = zone.roundRobinPosition;
+        if (zone.roundRobin.has_value())
+            zoneObject["roundRobin"] = serializeRoundRobin(*zone.roundRobin);
         if (zone.triggerMode == ZoneTriggerMode::oneShot)
             zoneObject["triggerMode"] = "one-shot";
         zones.push_back(std::move(zoneObject));
@@ -953,6 +974,7 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             zone.loopStartFrame,
             zone.loopEndFrame,
             zone.releaseSeconds,
+            zone.roundRobin,
             zone.roundRobinLength,
             zone.roundRobinPosition,
             zone.triggerMode
@@ -1618,8 +1640,8 @@ std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& 
         value["loopStartFrame"] = zone.loopStartFrame;
         value["loopEndFrame"] = zone.loopEndFrame;
         value["releaseSeconds"] = zone.releaseSeconds;
-        value["roundRobinLength"] = zone.roundRobinLength;
-        value["roundRobinPosition"] = zone.roundRobinPosition;
+        if (zone.roundRobin.has_value())
+            value["roundRobin"] = serializeRoundRobin(*zone.roundRobin);
         if (zone.triggerMode == ZoneTriggerMode::oneShot)
             value["triggerMode"] = "one-shot";
         zones.push_back(std::move(value));
@@ -1654,8 +1676,8 @@ std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& 
         value["loopStartFrame"] = handle.loopStartFrame;
         value["loopEndFrame"] = handle.loopEndFrame;
         value["releaseSeconds"] = handle.releaseSeconds;
-        value["roundRobinLength"] = handle.roundRobinLength;
-        value["roundRobinPosition"] = handle.roundRobinPosition;
+        if (handle.roundRobin.has_value())
+            value["roundRobin"] = serializeRoundRobin(*handle.roundRobin);
         if (handle.triggerMode == ZoneTriggerMode::oneShot)
             value["triggerMode"] = "one-shot";
         preparedRoutes.push_back(std::move(value));
@@ -1858,6 +1880,7 @@ bool operator==(const PreparedPlaybackZoneHandle& left, const PreparedPlaybackZo
         && left.loopStartFrame == right.loopStartFrame
         && left.loopEndFrame == right.loopEndFrame
         && left.releaseSeconds == right.releaseSeconds
+        && left.roundRobin == right.roundRobin
         && left.roundRobinLength == right.roundRobinLength
         && left.roundRobinPosition == right.roundRobinPosition
         && left.triggerMode == right.triggerMode;

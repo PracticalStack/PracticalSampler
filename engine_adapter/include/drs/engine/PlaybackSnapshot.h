@@ -101,6 +101,7 @@ struct PlaybackSnapshotZone
     std::uint64_t loopStartFrame = 0;
     std::uint64_t loopEndFrame = 0;
     double releaseSeconds = 0.0;
+    std::optional<RoundRobinDescriptor> roundRobin;
     int roundRobinLength = 0;
     int roundRobinPosition = 0;
     ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;

@@ -28,6 +28,19 @@ struct RoundRobinDescriptor
     RoundRobinMode mode = RoundRobinMode::sequential;
 };
 
+inline bool operator==(const RoundRobinDescriptor& left, const RoundRobinDescriptor& right) noexcept
+{
+    return left.poolId == right.poolId
+        && left.slotCount == right.slotCount
+        && left.slotIndex == right.slotIndex
+        && left.mode == right.mode;
+}
+
+inline bool operator!=(const RoundRobinDescriptor& left, const RoundRobinDescriptor& right) noexcept
+{
+    return !(left == right);
+}
+
 struct RuntimeProjectSampleSource
 {
     std::string id;

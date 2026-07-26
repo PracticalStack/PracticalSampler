@@ -1121,6 +1121,25 @@ add_test(
     COMMAND drs_phase3_round_robin_schema_persistence_tests
 )
 
+add_executable(drs_phase3_round_robin_prepared_playback_tests
+    src/Phase3RoundRobinPreparedPlaybackTests.cpp
+)
+
+target_link_libraries(drs_phase3_round_robin_prepared_playback_tests
+    PRIVATE
+        drs_engine_adapter
+        drs_sampler_core
+        drs_sample_import
+        juce::juce_audio_formats
+)
+
+target_compile_features(drs_phase3_round_robin_prepared_playback_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase3.round_robin_prepared_playback
+    COMMAND drs_phase3_round_robin_prepared_playback_tests
+)
+
 add_executable(drs_phase3_round_robin_contract_red_tests
     src/Phase3RoundRobinContractRedTests.cpp
 )

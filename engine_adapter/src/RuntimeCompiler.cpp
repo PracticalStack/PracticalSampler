@@ -84,6 +84,36 @@ std::uint64_t buildCrossfadePairingKey(const RuntimeCompileZoneDefinition& zone)
     return computeFnv1a64(stream.str());
 }
 
+std::optional<RoundRobinDescriptor> materializeRoundRobinDescriptor(const RuntimeCompileZoneDefinition& zone)
+{
+    if (zone.roundRobin.has_value())
+        return zone.roundRobin;
+
+    if (zone.roundRobinLength <= 0 || zone.roundRobinPosition <= 0)
+        return std::nullopt;
+
+    std::ostringstream stream;
+    stream << zone.groupId
+           << "|"
+           << zone.articulationId
+           << "|"
+           << zone.rootKey
+           << "|"
+           << zone.keyLow
+           << "|"
+           << zone.keyHigh
+           << "|"
+           << zone.roundRobinLength
+           << "|0";
+
+    RoundRobinDescriptor roundRobin;
+    roundRobin.poolId = "legacy-rr-" + std::to_string(computeFnv1a64(stream.str()));
+    roundRobin.slotCount = zone.roundRobinLength;
+    roundRobin.slotIndex = zone.roundRobinPosition;
+    roundRobin.mode = RoundRobinMode::sequential;
+    return roundRobin;
+}
+
 std::string buildCrossfadeTopologyIssue(const std::string& zoneId,
                                         VelocityCrossfadeTopologyIssue issue)
 {
@@ -229,7 +259,7 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
     }
 
     result.instrument.schemaName = "drs.instrument";
-    result.instrument.schemaVersion = 1;
+    result.instrument.schemaVersion = 2;
     result.instrument.instrumentId = plan.instrumentId;
     result.instrument.displayName = plan.instrumentDisplayName;
     result.instrument.sourceProjectPath = plan.outputProjectPath;
@@ -255,6 +285,7 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
 
     for (const auto& zonePlan : plan.zones)
     {
+        const auto roundRobin = materializeRoundRobinDescriptor(zonePlan);
         const auto sourceIterator = sourceById.find(zonePlan.sourceId);
         if (sourceIterator == sourceById.end())
         {
@@ -273,6 +304,25 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
 
         if (zonePlan.velocityLow > zonePlan.velocityHigh)
             addIssue(result, "Zone '" + zonePlan.id + "' has velocityLow greater than velocityHigh.");
+        if (zonePlan.roundRobinLength < 0 || zonePlan.roundRobinPosition < 0)
+            addIssue(result, "Zone '" + zonePlan.id + "' must not have negative round-robin metadata.");
+        if (zonePlan.roundRobinPosition > 0 && zonePlan.roundRobinLength <= 0)
+            addIssue(result, "Zone '" + zonePlan.id + "' must define roundRobinLength when roundRobinPosition is present.");
+        if (zonePlan.roundRobinLength > 0
+            && (zonePlan.roundRobinPosition < 1 || zonePlan.roundRobinPosition > zonePlan.roundRobinLength))
+        {
+            addIssue(result, "Zone '" + zonePlan.id + "' has roundRobinPosition outside roundRobinLength.");
+        }
+        if (roundRobin.has_value())
+        {
+            if (roundRobin->poolId.empty())
+                addIssue(result, "Zone '" + zonePlan.id + "' must provide a non-empty Round Robin poolId.");
+            if (roundRobin->slotCount != zonePlan.roundRobinLength
+                || roundRobin->slotIndex != zonePlan.roundRobinPosition)
+            {
+                addIssue(result, "Zone '" + zonePlan.id + "' must keep roundRobin slot data aligned with the scalar Round Robin fields.");
+            }
+        }
         if (hasAnyVelocityCrossfadeValue(zonePlan.velocityCrossfade))
         {
             const VelocityCrossfadeZoneDefinition crossfadeZone {
@@ -373,6 +423,7 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
             * static_cast<std::uint64_t>(source.metadata.channelCount)
             * sizeof(float);
         const auto clampedPrefetchBytes = std::min(zonePlan.prefetchBytes, payloadSizeBytes);
+        const auto roundRobin = materializeRoundRobinDescriptor(zonePlan);
 
         RuntimeZoneDefinition zone;
         zone.id = zonePlan.id;
@@ -388,6 +439,7 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         zone.velocityCrossfade = zonePlan.velocityCrossfade;
         zone.streamOffsetBytes = streamOffsetBySourceId.at(zonePlan.sourceId);
         zone.prefetchBytes = clampedPrefetchBytes;
+        zone.roundRobin = roundRobin;
         zone.roundRobinLength = zonePlan.roundRobinLength;
         zone.roundRobinPosition = zonePlan.roundRobinPosition;
         result.instrument.zones.push_back(std::move(zone));
