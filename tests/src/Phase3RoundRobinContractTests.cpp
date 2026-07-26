@@ -142,10 +142,10 @@ int main()
         }
 
         const std::vector<VelocityCrossfadeTopologyZoneDefinition> pairedZones {
-            { 11u, 1, 60, 2, 1, { 0, 0, 25, 60, VelocityCrossfadeCurve::linear } },
-            { 11u, 25, 84, 2, 1, { 25, 60, 0, 0, VelocityCrossfadeCurve::linear } },
-            { 11u, 1, 60, 2, 2, { 0, 0, 25, 60, VelocityCrossfadeCurve::linear } },
-            { 11u, 25, 84, 2, 2, { 25, 60, 0, 0, VelocityCrossfadeCurve::linear } }
+            { 11u, 1, 60, "rr-main", 2, 1, { 0, 0, 25, 60, VelocityCrossfadeCurve::linear } },
+            { 11u, 25, 84, "rr-main", 2, 1, { 25, 60, 0, 0, VelocityCrossfadeCurve::linear } },
+            { 11u, 1, 60, "rr-main", 2, 2, { 0, 0, 25, 60, VelocityCrossfadeCurve::linear } },
+            { 11u, 25, 84, "rr-main", 2, 2, { 25, 60, 0, 0, VelocityCrossfadeCurve::linear } }
         };
         std::vector<VelocityCrossfadeTopologyFinding> pairedFindings;
         const auto pairedTopology =
@@ -160,9 +160,9 @@ int main()
                 "RR-aware crossfade topology pairing should stay slot-local.");
 
         const std::vector<VelocityCrossfadeTopologyZoneDefinition> missingPartnerZones {
-            { 11u, 1, 60, 2, 1, { 0, 0, 25, 60, VelocityCrossfadeCurve::linear } },
-            { 11u, 25, 84, 2, 1, { 25, 60, 0, 0, VelocityCrossfadeCurve::linear } },
-            { 11u, 1, 60, 2, 2, { 0, 0, 25, 60, VelocityCrossfadeCurve::linear } }
+            { 11u, 1, 60, "rr-main", 2, 1, { 0, 0, 25, 60, VelocityCrossfadeCurve::linear } },
+            { 11u, 25, 84, "rr-main", 2, 1, { 25, 60, 0, 0, VelocityCrossfadeCurve::linear } },
+            { 11u, 1, 60, "rr-main", 2, 2, { 0, 0, 25, 60, VelocityCrossfadeCurve::linear } }
         };
         std::vector<VelocityCrossfadeTopologyFinding> missingPartnerFindings;
         const auto missingPartnerTopology =
@@ -171,6 +171,36 @@ int main()
                 "A missing RR-matched crossfade partner must not synthesize an unrelated neighbor.");
         require(hasIssueForZone(missingPartnerFindings, 2, VelocityCrossfadeTopologyIssue::fadeOutMissingPartner),
                 "A missing RR-matched crossfade partner should remain a typed topology finding.");
+
+        const std::vector<VelocityCrossfadeTopologyZoneDefinition> duplicateSlotZones {
+            { 11u, 1, 60, "rr-main", 2, 1, { 0, 0, 25, 60, VelocityCrossfadeCurve::linear } },
+            { 11u, 1, 60, "rr-main", 2, 1, { 0, 0, 25, 60, VelocityCrossfadeCurve::linear } }
+        };
+        std::vector<VelocityCrossfadeTopologyFinding> duplicateSlotFindings;
+        buildFirstPassVelocityCrossfadeRuntimeTopology(duplicateSlotZones, &duplicateSlotFindings);
+        require(hasIssueForZone(duplicateSlotFindings, 0, VelocityCrossfadeTopologyIssue::roundRobinDuplicateSlot)
+                    && hasIssueForZone(duplicateSlotFindings, 1, VelocityCrossfadeTopologyIssue::roundRobinDuplicateSlot),
+                "Duplicate RR slots should surface typed topology findings.");
+
+        const std::vector<VelocityCrossfadeTopologyZoneDefinition> incompletePoolZones {
+            { 11u, 1, 60, "rr-main", 3, 1, { 0, 0, 25, 60, VelocityCrossfadeCurve::linear } },
+            { 11u, 25, 84, "rr-main", 3, 2, { 25, 60, 0, 0, VelocityCrossfadeCurve::linear } }
+        };
+        std::vector<VelocityCrossfadeTopologyFinding> incompletePoolFindings;
+        buildFirstPassVelocityCrossfadeRuntimeTopology(incompletePoolZones, &incompletePoolFindings);
+        require(hasIssueForZone(incompletePoolFindings, 0, VelocityCrossfadeTopologyIssue::roundRobinIncompletePool)
+                    && hasIssueForZone(incompletePoolFindings, 1, VelocityCrossfadeTopologyIssue::roundRobinIncompletePool),
+                "Incomplete RR pool coverage should surface typed topology findings.");
+
+        const std::vector<VelocityCrossfadeTopologyZoneDefinition> mixedSlotCountZones {
+            { 11u, 1, 60, "rr-main", 2, 1, { 0, 0, 25, 60, VelocityCrossfadeCurve::linear } },
+            { 11u, 25, 84, "rr-main", 3, 2, { 25, 60, 0, 0, VelocityCrossfadeCurve::linear } }
+        };
+        std::vector<VelocityCrossfadeTopologyFinding> mixedSlotCountFindings;
+        buildFirstPassVelocityCrossfadeRuntimeTopology(mixedSlotCountZones, &mixedSlotCountFindings);
+        require(hasIssueForZone(mixedSlotCountFindings, 0, VelocityCrossfadeTopologyIssue::roundRobinMixedSlotCount)
+                    && hasIssueForZone(mixedSlotCountFindings, 1, VelocityCrossfadeTopologyIssue::roundRobinMixedSlotCount),
+                "Mixed RR slot-count pools should surface typed topology findings.");
 
         std::cout << "Phase 3 Round Robin Sprint 1 contract tests passed." << std::endl;
         return 0;

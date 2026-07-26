@@ -69,7 +69,10 @@ enum class VelocityCrossfadeTopologyIssue : uint8_t
     fadeInMissingPartner,
     fadeInAmbiguousPartner,
     fadeOutMissingPartner,
-    fadeOutAmbiguousPartner
+    fadeOutAmbiguousPartner,
+    roundRobinDuplicateSlot,
+    roundRobinIncompletePool,
+    roundRobinMixedSlotCount
 };
 
 struct VelocityCrossfadeTopologyZoneDefinition
@@ -77,6 +80,7 @@ struct VelocityCrossfadeTopologyZoneDefinition
     uint64_t pairingKey = 0;
     int velocityLow = 1;
     int velocityHigh = 127;
+    std::string roundRobinPoolId;
     int roundRobinLength = 0;
     int roundRobinPosition = 0;
     VelocityCrossfadeDescriptor crossfade;
@@ -324,6 +328,99 @@ inline std::vector<VelocityCrossfadeRuntimeTopology> buildFirstPassVelocityCross
     std::vector<VelocityCrossfadeTopologyFinding>* findings = nullptr)
 {
     std::vector<VelocityCrossfadeRuntimeTopology> topology(zones.size());
+    const auto pushFinding = [&](size_t zoneIndex, VelocityCrossfadeTopologyIssue issue)
+    {
+        if (findings == nullptr || issue == VelocityCrossfadeTopologyIssue::none)
+            return;
+
+        for (const auto& existing : *findings)
+        {
+            if (existing.zoneIndex == zoneIndex && existing.issue == issue)
+                return;
+        }
+
+        findings->push_back({ zoneIndex, issue });
+    };
+    const auto usesRoundRobin = [](const VelocityCrossfadeTopologyZoneDefinition& zone) noexcept
+    {
+        return zone.roundRobinLength > 0 && zone.roundRobinPosition > 0;
+    };
+    const auto sameRoundRobinPool = [&](const VelocityCrossfadeTopologyZoneDefinition& left,
+                                        const VelocityCrossfadeTopologyZoneDefinition& right) noexcept
+    {
+        if (!usesRoundRobin(left) || !usesRoundRobin(right))
+            return !usesRoundRobin(left) && !usesRoundRobin(right);
+
+        return left.roundRobinPoolId == right.roundRobinPoolId;
+    };
+    const auto sameCrossfadeShape = [](const VelocityCrossfadeTopologyZoneDefinition& left,
+                                       const VelocityCrossfadeTopologyZoneDefinition& right) noexcept
+    {
+        return left.velocityLow == right.velocityLow
+            && left.velocityHigh == right.velocityHigh
+            && left.crossfade.fadeInLowVelocity == right.crossfade.fadeInLowVelocity
+            && left.crossfade.fadeInHighVelocity == right.crossfade.fadeInHighVelocity
+            && left.crossfade.fadeOutLowVelocity == right.crossfade.fadeOutLowVelocity
+            && left.crossfade.fadeOutHighVelocity == right.crossfade.fadeOutHighVelocity
+            && left.crossfade.curve == right.crossfade.curve;
+    };
+
+    for (size_t zoneIndex = 0; zoneIndex < zones.size(); ++zoneIndex)
+    {
+        const auto& zone = zones[zoneIndex];
+        if (!usesRoundRobin(zone))
+            continue;
+
+        bool mixedSlotCount = false;
+        std::vector<bool> coveredSlots(static_cast<size_t>(zone.roundRobinLength) + 1u, false);
+        coveredSlots[static_cast<size_t>(zone.roundRobinPosition)] = true;
+
+        for (size_t candidateIndex = 0; candidateIndex < zones.size(); ++candidateIndex)
+        {
+            if (candidateIndex == zoneIndex)
+                continue;
+
+            const auto& candidate = zones[candidateIndex];
+            if (candidate.pairingKey != zone.pairingKey || !sameRoundRobinPool(candidate, zone))
+                continue;
+
+            if (candidate.roundRobinLength != zone.roundRobinLength)
+            {
+                mixedSlotCount = true;
+                pushFinding(candidateIndex, VelocityCrossfadeTopologyIssue::roundRobinMixedSlotCount);
+                continue;
+            }
+
+            if (candidate.roundRobinPosition > 0
+                && candidate.roundRobinPosition <= candidate.roundRobinLength)
+            {
+                coveredSlots[static_cast<size_t>(candidate.roundRobinPosition)] = true;
+            }
+
+            if (candidate.roundRobinPosition == zone.roundRobinPosition
+                && sameCrossfadeShape(candidate, zone))
+            {
+                pushFinding(zoneIndex, VelocityCrossfadeTopologyIssue::roundRobinDuplicateSlot);
+                pushFinding(candidateIndex, VelocityCrossfadeTopologyIssue::roundRobinDuplicateSlot);
+            }
+        }
+
+        if (mixedSlotCount)
+            pushFinding(zoneIndex, VelocityCrossfadeTopologyIssue::roundRobinMixedSlotCount);
+
+        auto completeCoverage = !coveredSlots.empty();
+        for (int slotIndex = 1; slotIndex <= zone.roundRobinLength; ++slotIndex)
+        {
+            if (!coveredSlots[static_cast<size_t>(slotIndex)])
+            {
+                completeCoverage = false;
+                break;
+            }
+        }
+
+        if (!completeCoverage)
+            pushFinding(zoneIndex, VelocityCrossfadeTopologyIssue::roundRobinIncompletePool);
+    }
 
     for (size_t zoneIndex = 0; zoneIndex < zones.size(); ++zoneIndex)
     {
@@ -346,6 +443,7 @@ inline std::vector<VelocityCrossfadeRuntimeTopology> buildFirstPassVelocityCross
 
                 const auto& candidate = zones[candidateIndex];
                 if (candidate.pairingKey != zone.pairingKey
+                    || !sameRoundRobinPool(candidate, zone)
                     || candidate.roundRobinLength != zone.roundRobinLength
                     || candidate.roundRobinPosition != zone.roundRobinPosition)
                 {
@@ -391,6 +489,7 @@ inline std::vector<VelocityCrossfadeRuntimeTopology> buildFirstPassVelocityCross
 
                 const auto& candidate = zones[candidateIndex];
                 if (candidate.pairingKey != zone.pairingKey
+                    || !sameRoundRobinPool(candidate, zone)
                     || candidate.roundRobinLength != zone.roundRobinLength
                     || candidate.roundRobinPosition != zone.roundRobinPosition)
                 {

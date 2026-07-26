@@ -462,12 +462,24 @@ void runRoundRobinLaneAndGenerationMatrix()
                 "Preview RR should advance to slot 2.");
     requireNear(renderSingleFrameNote(performance, 60), 0.25f,
                 "Performance RR must keep its own slot counter.");
+    auto previewSnapshot = preview.getSnapshot();
+    auto performanceSnapshot = performance.getSnapshot();
+    require(previewSnapshot.counters.roundRobinPoolHitCount == 2
+                && previewSnapshot.counters.roundRobinPoolMissCount == 0
+                && previewSnapshot.counters.roundRobinFallbackCount == 0
+                && performanceSnapshot.counters.roundRobinPoolHitCount == 1,
+            "RR counters must remain lane-local and visible in playback diagnostics.");
 
     auto replacementModel = buildRoundRobinModel(drs::engine::PlaybackActivationLane::preview, 42, 1.0f, 2.0f);
     require(preview.stageActivation(replacementModel.model),
             "Replacement preview RR activation should stage.");
     requireNear(renderSingleFrameNote(preview, 60), 0.25f,
                 "A new activation generation should reset the RR slot sequence.");
+    previewSnapshot = preview.getSnapshot();
+    require(previewSnapshot.counters.roundRobinPoolHitCount == 3
+                && previewSnapshot.counters.roundRobinPoolMissCount == 0
+                && previewSnapshot.counters.roundRobinFallbackCount == 0,
+            "RR counters should continue across generations without introducing false misses.");
 }
 } // namespace
 

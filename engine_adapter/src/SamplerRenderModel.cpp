@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <sstream>
+#include <string_view>
 #include <utility>
 
 namespace drs::engine
@@ -29,6 +31,58 @@ const PlaybackSnapshotZone* findSnapshotZone(const ImmutablePlaybackSnapshot& sn
                                            return zone.id == zoneId;
                                        });
     return iterator == snapshot.zones.end() ? nullptr : &(*iterator);
+}
+
+std::uint64_t computeFnv1a64(std::string_view text) noexcept
+{
+    std::uint64_t hash = 14695981039346656037ull;
+    for (const auto character : text)
+    {
+        hash ^= static_cast<unsigned char>(character);
+        hash *= 1099511628211ull;
+    }
+
+    return hash;
+}
+
+std::uint64_t buildCrossfadePairingKey(const PreparedPlaybackZoneHandle& zone)
+{
+    std::ostringstream stream;
+    stream << zone.rootKey
+           << "|" << zone.keyLow
+           << "|" << zone.keyHigh;
+    return computeFnv1a64(stream.str());
+}
+
+std::string resolveRoundRobinPoolId(const PreparedPlaybackZoneHandle& zone)
+{
+    return zone.roundRobin.has_value() ? zone.roundRobin->poolId : std::string {};
+}
+
+std::string buildCrossfadeTopologyMessage(const std::string& zoneId,
+                                          VelocityCrossfadeTopologyIssue issue)
+{
+    switch (issue)
+    {
+        case VelocityCrossfadeTopologyIssue::none:
+            return {};
+        case VelocityCrossfadeTopologyIssue::fadeInMissingPartner:
+            return "Zone '" + zoneId + "' must resolve exactly one lower crossfade partner for velocityCrossfade fade-in.";
+        case VelocityCrossfadeTopologyIssue::fadeInAmbiguousPartner:
+            return "Zone '" + zoneId + "' matched multiple lower crossfade partners for velocityCrossfade fade-in.";
+        case VelocityCrossfadeTopologyIssue::fadeOutMissingPartner:
+            return "Zone '" + zoneId + "' must resolve exactly one upper crossfade partner for velocityCrossfade fade-out.";
+        case VelocityCrossfadeTopologyIssue::fadeOutAmbiguousPartner:
+            return "Zone '" + zoneId + "' matched multiple upper crossfade partners for velocityCrossfade fade-out.";
+        case VelocityCrossfadeTopologyIssue::roundRobinDuplicateSlot:
+            return "Zone '" + zoneId + "' duplicates a Round Robin slot within one crossfade layer.";
+        case VelocityCrossfadeTopologyIssue::roundRobinIncompletePool:
+            return "Zone '" + zoneId + "' belongs to a Round Robin pool with incomplete slot coverage.";
+        case VelocityCrossfadeTopologyIssue::roundRobinMixedSlotCount:
+            return "Zone '" + zoneId + "' belongs to a Round Robin pool with mixed slot counts.";
+    }
+
+    return "Zone '" + zoneId + "' produced an unknown velocityCrossfade topology issue.";
 }
 
 bool sameTopology(const PlaybackSnapshotZone& snapshotZone,
@@ -275,6 +329,35 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
         else if (!sameTopology(*snapshotZone, zone))
             addError(result, "render-model-route-topology-mismatch", path,
                      "Snapshot and prepared route topology must agree before rendering.");
+    }
+
+    std::vector<VelocityCrossfadeTopologyZoneDefinition> crossfadeTopologyZones;
+    crossfadeTopologyZones.reserve(prepared.zones.size());
+    for (const auto& zone : prepared.zones)
+    {
+        VelocityCrossfadeTopologyZoneDefinition topologyZone;
+        topologyZone.pairingKey = buildCrossfadePairingKey(zone);
+        topologyZone.velocityLow = zone.velocityLow;
+        topologyZone.velocityHigh = zone.velocityHigh;
+        topologyZone.roundRobinPoolId = resolveRoundRobinPoolId(zone);
+        topologyZone.roundRobinLength = zone.roundRobinLength;
+        topologyZone.roundRobinPosition = zone.roundRobinPosition;
+        topologyZone.crossfade = zone.velocityCrossfade;
+        crossfadeTopologyZones.push_back(topologyZone);
+    }
+
+    std::vector<VelocityCrossfadeTopologyFinding> crossfadeTopologyFindings;
+    buildFirstPassVelocityCrossfadeRuntimeTopology(crossfadeTopologyZones, &crossfadeTopologyFindings);
+    for (const auto& finding : crossfadeTopologyFindings)
+    {
+        if (finding.zoneIndex >= prepared.zones.size())
+            continue;
+
+        const auto& zone = prepared.zones[finding.zoneIndex];
+        addError(result,
+                 "render-model-velocity-crossfade-topology-invalid",
+                 "payload.prepared.zones[" + std::to_string(finding.zoneIndex) + "].velocityCrossfade",
+                 buildCrossfadeTopologyMessage(zone.zoneId, finding.issue));
     }
 
     const auto routeSelected = [&](const PreparedPlaybackZoneHandle& zone)

@@ -457,17 +457,25 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 : eventVelocity;
             std::array<SelectedRoundRobinSlot, roundRobinPoolCapacity> roundRobinSelections {};
             std::size_t roundRobinSelectionCount = 0;
+            bool sawRoundRobinCandidate = false;
             for (const auto& route : renderModel->getRoutes())
             {
-                if (!routeUsesRoundRobin(route)
-                    || !routeCouldRespondToTrigger(route, sourceMidiNote, eventVelocity, effectiveVelocity))
-                {
+                if (!routeCouldRespondToTrigger(route, sourceMidiNote, eventVelocity, effectiveVelocity))
                     continue;
-                }
 
+                if (!routeUsesRoundRobin(route))
+                    continue;
+
+                sawRoundRobinCandidate = true;
                 const auto slotCount = resolveRoundRobinSlotCount(route);
                 const auto poolId = resolveRoundRobinPoolId(route);
                 const auto usesLegacyScalarKey = usesLegacyRoundRobinKey(route);
+                if (roundRobinSelectionCount >= roundRobinSelections.size())
+                {
+                    ++result.render.roundRobinFallbackCount;
+                    continue;
+                }
+
                 auto alreadySelected = false;
                 for (std::size_t index = 0; index < roundRobinSelectionCount; ++index)
                 {
@@ -486,11 +494,24 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 if (alreadySelected || roundRobinSelectionCount >= roundRobinSelections.size())
                     continue;
 
+                int slotIndex = 1;
+                const auto foundPool = peekRoundRobinSlot(poolId,
+                                                          slotCount,
+                                                          usesLegacyScalarKey,
+                                                          slotIndex);
                 roundRobinSelections[roundRobinSelectionCount].poolId = poolId;
                 roundRobinSelections[roundRobinSelectionCount].slotCount = slotCount;
                 roundRobinSelections[roundRobinSelectionCount].usesLegacyScalarKey = usesLegacyScalarKey;
-                roundRobinSelections[roundRobinSelectionCount].slotIndex =
-                    peekRoundRobinSlot(poolId, slotCount, usesLegacyScalarKey);
+                roundRobinSelections[roundRobinSelectionCount].slotIndex = slotIndex;
+                if (foundPool)
+                {
+                    ++result.render.roundRobinPoolHitCount;
+                }
+                else
+                {
+                    ++result.render.roundRobinPoolMissCount;
+                    ++result.render.roundRobinFallbackCount;
+                }
                 ++roundRobinSelectionCount;
             }
             // Route the physical gesture first. Published pitch/velocity modulation shapes the
@@ -519,14 +540,20 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                     }));
             if (!hasMatchingRoute)
             {
+                if (sawRoundRobinCandidate)
+                    ++result.render.roundRobinFallbackCount;
                 ++result.render.droppedEventCount;
                 return;
             }
             for (std::size_t index = 0; index < roundRobinSelectionCount; ++index)
             {
-                advanceRoundRobinSlot(roundRobinSelections[index].poolId,
-                                      roundRobinSelections[index].slotCount,
-                                      roundRobinSelections[index].usesLegacyScalarKey);
+                if (!advanceRoundRobinSlot(roundRobinSelections[index].poolId,
+                                           roundRobinSelections[index].slotCount,
+                                           roundRobinSelections[index].usesLegacyScalarKey))
+                {
+                    ++result.render.roundRobinPoolMissCount;
+                    ++result.render.roundRobinFallbackCount;
+                }
             }
 
             struct CrossfadeCandidate
@@ -824,12 +851,16 @@ void SamplerVoicePool::rebuildRoundRobinPools(const SamplerRenderModel& model) n
     }
 }
 
-int SamplerVoicePool::peekRoundRobinSlot(std::string_view poolId,
-                                         int slotCount,
-                                         bool usesLegacyScalarKey) const noexcept
+bool SamplerVoicePool::peekRoundRobinSlot(std::string_view poolId,
+                                          int slotCount,
+                                          bool usesLegacyScalarKey,
+                                          int& slotIndex) const noexcept
 {
     if (slotCount <= 0)
-        return 0;
+    {
+        slotIndex = 0;
+        return false;
+    }
 
     for (std::size_t index = 0; index < roundRobinPoolCount; ++index)
     {
@@ -839,18 +870,22 @@ int SamplerVoicePool::peekRoundRobinSlot(std::string_view poolId,
                                poolId,
                                slotCount,
                                usesLegacyScalarKey))
-            return roundRobinPools[index].nextSlotIndex;
+        {
+            slotIndex = roundRobinPools[index].nextSlotIndex;
+            return true;
+        }
     }
 
-    return 1;
+    slotIndex = 1;
+    return false;
 }
 
-void SamplerVoicePool::advanceRoundRobinSlot(std::string_view poolId,
+bool SamplerVoicePool::advanceRoundRobinSlot(std::string_view poolId,
                                              int slotCount,
                                              bool usesLegacyScalarKey) noexcept
 {
     if (slotCount <= 0)
-        return;
+        return false;
 
     for (std::size_t index = 0; index < roundRobinPoolCount; ++index)
     {
@@ -864,8 +899,10 @@ void SamplerVoicePool::advanceRoundRobinSlot(std::string_view poolId,
 
         roundRobinPools[index].nextSlotIndex =
             advanceRoundRobinSlotIndex(roundRobinPools[index].nextSlotIndex, slotCount);
-        return;
+        return true;
     }
+
+    return false;
 }
 
 std::size_t SamplerVoicePool::acquireSlot(bool& stolen,

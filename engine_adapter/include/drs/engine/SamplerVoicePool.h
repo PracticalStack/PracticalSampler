@@ -120,10 +120,11 @@ private:
                     const SamplerRenderControlValues& controls) noexcept;
     void resetRoundRobinPools() noexcept;
     void rebuildRoundRobinPools(const SamplerRenderModel& model) noexcept;
-    int peekRoundRobinSlot(std::string_view poolId,
-                           int slotCount,
-                           bool usesLegacyScalarKey) const noexcept;
-    void advanceRoundRobinSlot(std::string_view poolId,
+    bool peekRoundRobinSlot(std::string_view poolId,
+                            int slotCount,
+                            bool usesLegacyScalarKey,
+                            int& slotIndex) const noexcept;
+    bool advanceRoundRobinSlot(std::string_view poolId,
                                int slotCount,
                                bool usesLegacyScalarKey) noexcept;
     std::size_t acquireSlot(bool& stolen,

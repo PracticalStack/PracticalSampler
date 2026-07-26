@@ -89,6 +89,9 @@ struct SamplerRenderResult
     std::uint32_t crossfadeStartedVoiceCount = 0;
     std::uint32_t crossfadeOverlapHitCount = 0;
     std::uint32_t crossfadeFallbackCount = 0;
+    std::uint32_t roundRobinPoolHitCount = 0;
+    std::uint32_t roundRobinPoolMissCount = 0;
+    std::uint32_t roundRobinFallbackCount = 0;
 };
 
 struct SamplerRenderSample

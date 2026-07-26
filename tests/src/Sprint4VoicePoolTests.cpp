@@ -353,7 +353,9 @@ bool containsVoiceId(const drs::engine::SamplerVoicePool& pool, std::uint64_t vo
     return false;
 }
 
-float renderSingleFrameNoteOn(drs::engine::SamplerVoicePool& pool, int note)
+drs::engine::SamplerVoicePoolRenderResult renderSingleFrameNoteOn(drs::engine::SamplerVoicePool& pool,
+                                                                  int note,
+                                                                  float& mixedSample)
 {
     drs::engine::SamplerEventBlock events;
     events.push(noteOn(0, note));
@@ -361,7 +363,8 @@ float renderSingleFrameNoteOn(drs::engine::SamplerVoicePool& pool, int note)
     const auto result = pool.renderBlock(output.view(), events.view());
     require(result.accepted && result.render.startedVoiceCount >= 1,
             "Single-frame RR trigger should start at least one voice.");
-    return output.left.front();
+    mixedSample = output.left.front();
+    return result;
 }
 
 void runEventBlockContract()
@@ -561,13 +564,22 @@ void runRoundRobinRoutingMatrix()
     drs::engine::SamplerVoicePool sequentialPool;
     require(sequentialPool.prepare(*sequentialModel, 48000.0),
             "Sequential RR pool should prepare.");
-    requireNear(renderSingleFrameNoteOn(sequentialPool, 60), 0.25f,
+    float mixedSample = 0.0f;
+    auto renderResult = renderSingleFrameNoteOn(sequentialPool, 60, mixedSample);
+    requireNear(mixedSample, 0.25f,
                 "First RR trigger should select slot 1.");
-    requireNear(renderSingleFrameNoteOn(sequentialPool, 60), 0.5f,
+    require(renderResult.render.roundRobinPoolHitCount == 1
+                && renderResult.render.roundRobinPoolMissCount == 0
+                && renderResult.render.roundRobinFallbackCount == 0,
+            "Valid RR routing should record one pool hit and no RR fallbacks.");
+    renderResult = renderSingleFrameNoteOn(sequentialPool, 60, mixedSample);
+    requireNear(mixedSample, 0.5f,
                 "Second RR trigger should select slot 2.");
-    requireNear(renderSingleFrameNoteOn(sequentialPool, 60), 0.75f,
+    renderResult = renderSingleFrameNoteOn(sequentialPool, 60, mixedSample);
+    requireNear(mixedSample, 0.75f,
                 "Third RR trigger should select slot 3.");
-    requireNear(renderSingleFrameNoteOn(sequentialPool, 60), 0.25f,
+    renderResult = renderSingleFrameNoteOn(sequentialPool, 60, mixedSample);
+    requireNear(mixedSample, 0.25f,
                 "Fourth RR trigger should wrap back to slot 1.");
 
     const auto multiPoolModel = buildRoundRobinModel({
@@ -579,11 +591,20 @@ void runRoundRobinRoutingMatrix()
     drs::engine::SamplerVoicePool multiPool;
     require(multiPool.prepare(*multiPoolModel, 48000.0),
             "Multi-pool RR model should prepare.");
-    requireNear(renderSingleFrameNoteOn(multiPool, 60), 2.75f,
+    renderResult = renderSingleFrameNoteOn(multiPool, 60, mixedSample);
+    requireNear(mixedSample, 2.75f,
                 "First shared RR trigger should start slot 1 in both pools.");
-    requireNear(renderSingleFrameNoteOn(multiPool, 61), 0.5f,
+    require(renderResult.render.roundRobinPoolHitCount == 2
+                && renderResult.render.roundRobinPoolMissCount == 0
+                && renderResult.render.roundRobinFallbackCount == 0,
+            "Shared-note RR routing should record one hit per participating pool.");
+    renderResult = renderSingleFrameNoteOn(multiPool, 61, mixedSample);
+    requireNear(mixedSample, 0.5f,
                 "A trigger that only hits pool A should advance only pool A.");
-    requireNear(renderSingleFrameNoteOn(multiPool, 60), 5.25f,
+    require(renderResult.render.roundRobinPoolHitCount == 1,
+            "A note that reaches only one RR family should hit only that pool.");
+    renderResult = renderSingleFrameNoteOn(multiPool, 60, mixedSample);
+    requireNear(mixedSample, 5.25f,
                 "Pool B must not phase-lock to pool A when it misses an intervening note.");
 }
 

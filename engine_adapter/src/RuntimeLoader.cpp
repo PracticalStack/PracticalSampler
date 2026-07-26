@@ -609,6 +609,12 @@ std::string buildVelocityCrossfadeTopologyIssue(const std::string& context,
             return context + " must resolve exactly one upper crossfade partner for velocityCrossfade fade-out.";
         case VelocityCrossfadeTopologyIssue::fadeOutAmbiguousPartner:
             return context + " matched multiple upper crossfade partners for velocityCrossfade fade-out.";
+        case VelocityCrossfadeTopologyIssue::roundRobinDuplicateSlot:
+            return context + " duplicates a Round Robin slot within one crossfade layer.";
+        case VelocityCrossfadeTopologyIssue::roundRobinIncompletePool:
+            return context + " belongs to a Round Robin pool with incomplete slot coverage.";
+        case VelocityCrossfadeTopologyIssue::roundRobinMixedSlotCount:
+            return context + " belongs to a Round Robin pool with mixed slot counts.";
     }
 
     return context + " contains an unknown velocityCrossfade topology issue.";
@@ -621,10 +627,14 @@ std::uint64_t buildVelocityCrossfadePairingKey(const TZone& zone)
     stream << zone.articulationId
            << "|" << zone.rootKey
            << "|" << zone.keyLow
-           << "|" << zone.keyHigh
-           << "|" << zone.roundRobinLength
-           << "|" << zone.roundRobinPosition;
+           << "|" << zone.keyHigh;
     return computeFnv1a64(stream.str());
+}
+
+template <typename TZone>
+std::string resolveVelocityCrossfadeRoundRobinPoolId(const TZone& zone)
+{
+    return zone.roundRobin.has_value() ? zone.roundRobin->poolId : std::string {};
 }
 
 template <typename TZone>
@@ -640,6 +650,7 @@ std::vector<VelocityCrossfadeTopologyFinding> collectVelocityCrossfadeTopologyFi
         topologyZone.pairingKey = buildVelocityCrossfadePairingKey(zone);
         topologyZone.velocityLow = zone.velocityLow;
         topologyZone.velocityHigh = zone.velocityHigh;
+        topologyZone.roundRobinPoolId = resolveVelocityCrossfadeRoundRobinPoolId(zone);
         topologyZone.roundRobinLength = zone.roundRobinLength;
         topologyZone.roundRobinPosition = zone.roundRobinPosition;
         topologyZone.crossfade = zone.velocityCrossfade;
@@ -662,6 +673,7 @@ void populateVelocityCrossfadeRuntimeDescriptors(std::vector<RuntimeZoneDefiniti
         topologyZone.pairingKey = buildVelocityCrossfadePairingKey(zone);
         topologyZone.velocityLow = zone.velocityLow;
         topologyZone.velocityHigh = zone.velocityHigh;
+        topologyZone.roundRobinPoolId = resolveVelocityCrossfadeRoundRobinPoolId(zone);
         topologyZone.roundRobinLength = zone.roundRobinLength;
         topologyZone.roundRobinPosition = zone.roundRobinPosition;
         topologyZone.crossfade = zone.velocityCrossfade;

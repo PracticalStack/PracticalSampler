@@ -343,6 +343,38 @@ void runRouteTopologyFailures()
         value.snapshot.zones.push_back(value.snapshot.zones[0]);
         value.prepared.zones.push_back(value.prepared.zones[0]);
     });
+    expectRejected("render-model-velocity-crossfade-topology-invalid", [](RenderModelFixture& value)
+    {
+        drs::engine::RoundRobinDescriptor roundRobin;
+        roundRobin.poolId = "rr-main";
+        roundRobin.slotCount = 2;
+        roundRobin.slotIndex = 1;
+        roundRobin.mode = drs::engine::RoundRobinMode::sequential;
+
+        value.snapshot.zones[0].roundRobin = roundRobin;
+        value.snapshot.zones[0].roundRobinLength = 2;
+        value.snapshot.zones[0].roundRobinPosition = 1;
+        value.snapshot.zones[0].velocityLow = 1;
+        value.snapshot.zones[0].velocityHigh = 60;
+
+        value.prepared.zones[0].roundRobin = roundRobin;
+        value.prepared.zones[0].roundRobinLength = 2;
+        value.prepared.zones[0].roundRobinPosition = 1;
+        value.prepared.zones[0].velocityLow = 1;
+        value.prepared.zones[0].velocityHigh = 60;
+
+        auto duplicateSnapshotZone = value.snapshot.zones[0];
+        duplicateSnapshotZone.id = "zone-b";
+        duplicateSnapshotZone.sampleSourceId = "sample-a";
+        duplicateSnapshotZone.displayName = "Zone B";
+        value.snapshot.zones.push_back(std::move(duplicateSnapshotZone));
+
+        auto duplicatePreparedZone = value.prepared.zones[0];
+        duplicatePreparedZone.zoneId = "zone-b";
+        duplicatePreparedZone.preparedSampleIndex = 0;
+        duplicatePreparedZone.preparedStreamIndex = 0;
+        value.prepared.zones.push_back(std::move(duplicatePreparedZone));
+    });
 }
 
 void runRouteNormalizationOptions()

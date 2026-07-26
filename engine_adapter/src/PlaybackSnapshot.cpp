@@ -163,17 +163,13 @@ std::optional<RoundRobinDescriptor> materializeRoundRobinDescriptor(
 std::uint64_t buildCrossfadePairingKey(const std::string& articulationId,
                                        int rootKey,
                                        int keyLow,
-                                       int keyHigh,
-                                       int roundRobinLength,
-                                       int roundRobinPosition) noexcept
+                                       int keyHigh) noexcept
 {
     std::ostringstream stream;
     stream << articulationId
            << "|" << rootKey
            << "|" << keyLow
-           << "|" << keyHigh
-           << "|" << roundRobinLength
-           << "|" << roundRobinPosition;
+           << "|" << keyHigh;
     const auto hex = computeFnv1a64Hex(stream.str());
     return static_cast<std::uint64_t>(std::stoull(hex, nullptr, 16));
 }
@@ -193,6 +189,12 @@ std::string buildCrossfadeTopologyMessage(const std::string& zoneId,
             return "Zone '" + zoneId + "' must resolve exactly one upper crossfade partner for velocityCrossfade fade-out.";
         case VelocityCrossfadeTopologyIssue::fadeOutAmbiguousPartner:
             return "Zone '" + zoneId + "' matched multiple upper crossfade partners for velocityCrossfade fade-out.";
+        case VelocityCrossfadeTopologyIssue::roundRobinDuplicateSlot:
+            return "Zone '" + zoneId + "' duplicates a Round Robin slot within one crossfade layer.";
+        case VelocityCrossfadeTopologyIssue::roundRobinIncompletePool:
+            return "Zone '" + zoneId + "' belongs to a Round Robin pool with incomplete slot coverage.";
+        case VelocityCrossfadeTopologyIssue::roundRobinMixedSlotCount:
+            return "Zone '" + zoneId + "' belongs to a Round Robin pool with mixed slot counts.";
     }
 
     return "Zone '" + zoneId + "' produced an unknown velocityCrossfade topology issue.";
@@ -206,15 +208,15 @@ std::vector<VelocityCrossfadeRuntimeDescriptor> buildSnapshotCrossfadeRuntimeDes
 
     for (const auto& zone : project.authoring.zones)
     {
+        const auto roundRobin = materializeRoundRobinDescriptor(zone);
         VelocityCrossfadeTopologyZoneDefinition topologyZone;
         topologyZone.pairingKey = buildCrossfadePairingKey(zone.articulationId,
                                                            zone.rootKey,
                                                            zone.keyLow,
-                                                           zone.keyHigh,
-                                                           zone.roundRobinLength,
-                                                           zone.roundRobinPosition);
+                                                           zone.keyHigh);
         topologyZone.velocityLow = zone.velocityLow;
         topologyZone.velocityHigh = zone.velocityHigh;
+        topologyZone.roundRobinPoolId = roundRobin.has_value() ? roundRobin->poolId : std::string {};
         topologyZone.roundRobinLength = zone.roundRobinLength;
         topologyZone.roundRobinPosition = zone.roundRobinPosition;
         topologyZone.crossfade = zone.velocityCrossfade;
@@ -559,15 +561,15 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
     crossfadeTopologyZones.reserve(project.authoring.zones.size());
     for (const auto& zone : project.authoring.zones)
     {
+        const auto roundRobin = materializeRoundRobinDescriptor(zone);
         VelocityCrossfadeTopologyZoneDefinition topologyZone;
         topologyZone.pairingKey = buildCrossfadePairingKey(zone.articulationId,
                                                            zone.rootKey,
                                                            zone.keyLow,
-                                                           zone.keyHigh,
-                                                           zone.roundRobinLength,
-                                                           zone.roundRobinPosition);
+                                                           zone.keyHigh);
         topologyZone.velocityLow = zone.velocityLow;
         topologyZone.velocityHigh = zone.velocityHigh;
+        topologyZone.roundRobinPoolId = roundRobin.has_value() ? roundRobin->poolId : std::string {};
         topologyZone.roundRobinLength = zone.roundRobinLength;
         topologyZone.roundRobinPosition = zone.roundRobinPosition;
         topologyZone.crossfade = zone.velocityCrossfade;

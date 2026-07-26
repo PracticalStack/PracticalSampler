@@ -62,9 +62,7 @@ std::uint64_t buildCrossfadePairingKey(const drs::engine::RuntimeZoneDefinition&
     stream << zone.articulationId
            << "|" << zone.rootKey
            << "|" << zone.keyLow
-           << "|" << zone.keyHigh
-           << "|" << zone.roundRobinLength
-           << "|" << zone.roundRobinPosition;
+           << "|" << zone.keyHigh;
     return computeFnv1a64(stream.str());
 }
 
@@ -79,6 +77,7 @@ void populateCrossfadeRuntimeDescriptors(std::vector<drs::engine::RuntimeZoneDef
         topologyZone.pairingKey = buildCrossfadePairingKey(zone);
         topologyZone.velocityLow = zone.velocityLow;
         topologyZone.velocityHigh = zone.velocityHigh;
+        topologyZone.roundRobinPoolId = zone.roundRobin.has_value() ? zone.roundRobin->poolId : std::string {};
         topologyZone.roundRobinLength = zone.roundRobinLength;
         topologyZone.roundRobinPosition = zone.roundRobinPosition;
         topologyZone.crossfade = zone.velocityCrossfade;

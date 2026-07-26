@@ -78,9 +78,7 @@ std::uint64_t buildCrossfadePairingKey(const RuntimeCompileZoneDefinition& zone)
     stream << zone.articulationId
            << "|" << zone.rootKey
            << "|" << zone.keyLow
-           << "|" << zone.keyHigh
-           << "|" << zone.roundRobinLength
-           << "|" << zone.roundRobinPosition;
+           << "|" << zone.keyHigh;
     return computeFnv1a64(stream.str());
 }
 
@@ -129,6 +127,12 @@ std::string buildCrossfadeTopologyIssue(const std::string& zoneId,
             return "Zone '" + zoneId + "' must resolve exactly one upper crossfade partner for velocityCrossfade fade-out.";
         case VelocityCrossfadeTopologyIssue::fadeOutAmbiguousPartner:
             return "Zone '" + zoneId + "' matched multiple upper crossfade partners for velocityCrossfade fade-out.";
+        case VelocityCrossfadeTopologyIssue::roundRobinDuplicateSlot:
+            return "Zone '" + zoneId + "' duplicates a Round Robin slot within one crossfade layer.";
+        case VelocityCrossfadeTopologyIssue::roundRobinIncompletePool:
+            return "Zone '" + zoneId + "' belongs to a Round Robin pool with incomplete slot coverage.";
+        case VelocityCrossfadeTopologyIssue::roundRobinMixedSlotCount:
+            return "Zone '" + zoneId + "' belongs to a Round Robin pool with mixed slot counts.";
     }
 
     return "Zone '" + zoneId + "' produced an unknown velocityCrossfade topology issue.";
@@ -142,10 +146,12 @@ void populateCrossfadeRuntimeDescriptors(const RuntimeCompilePlan& plan,
 
     for (const auto& zone : plan.zones)
     {
+        const auto roundRobin = materializeRoundRobinDescriptor(zone);
         VelocityCrossfadeTopologyZoneDefinition topologyZone;
         topologyZone.pairingKey = buildCrossfadePairingKey(zone);
         topologyZone.velocityLow = zone.velocityLow;
         topologyZone.velocityHigh = zone.velocityHigh;
+        topologyZone.roundRobinPoolId = roundRobin.has_value() ? roundRobin->poolId : std::string {};
         topologyZone.roundRobinLength = zone.roundRobinLength;
         topologyZone.roundRobinPosition = zone.roundRobinPosition;
         topologyZone.crossfade = zone.velocityCrossfade;
@@ -339,6 +345,7 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         topologyZone.pairingKey = buildCrossfadePairingKey(zonePlan);
         topologyZone.velocityLow = zonePlan.velocityLow;
         topologyZone.velocityHigh = zonePlan.velocityHigh;
+        topologyZone.roundRobinPoolId = roundRobin.has_value() ? roundRobin->poolId : std::string {};
         topologyZone.roundRobinLength = zonePlan.roundRobinLength;
         topologyZone.roundRobinPosition = zonePlan.roundRobinPosition;
         topologyZone.crossfade = zonePlan.velocityCrossfade;
