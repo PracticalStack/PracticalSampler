@@ -5,6 +5,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 
 namespace drs::engine
 {
@@ -88,6 +89,21 @@ public:
     SamplerVoiceSlotSnapshot getSlotSnapshot(std::size_t index) const noexcept;
 
 private:
+    struct RoundRobinPoolKey
+    {
+        std::string_view poolId;
+        int slotCount = 0;
+        bool usesLegacyScalarKey = false;
+    };
+
+    struct RoundRobinPoolState
+    {
+        RoundRobinPoolKey key;
+        int nextSlotIndex = 1;
+    };
+
+    static constexpr std::size_t roundRobinPoolCapacity = 256;
+
     struct Slot
     {
         SamplerVoice voice;
@@ -102,12 +118,22 @@ private:
     void applyEvent(const SamplerRenderEvent& event,
                     SamplerVoicePoolRenderResult& result,
                     const SamplerRenderControlValues& controls) noexcept;
+    void resetRoundRobinPools() noexcept;
+    void rebuildRoundRobinPools(const SamplerRenderModel& model) noexcept;
+    int peekRoundRobinSlot(std::string_view poolId,
+                           int slotCount,
+                           bool usesLegacyScalarKey) const noexcept;
+    void advanceRoundRobinSlot(std::string_view poolId,
+                               int slotCount,
+                               bool usesLegacyScalarKey) noexcept;
     std::size_t acquireSlot(bool& stolen,
                             bool& generationStolen,
                             bool& releasingStolen) noexcept;
     void updateCounts(SamplerVoicePoolRenderResult& result) const noexcept;
 
     std::array<Slot, capacity> slots {};
+    std::array<RoundRobinPoolState, roundRobinPoolCapacity> roundRobinPools {};
+    std::size_t roundRobinPoolCount = 0;
     const SamplerRenderModel* renderModel = nullptr;
     double sampleRate = 0.0;
     std::uint64_t nextVoiceId = 1;

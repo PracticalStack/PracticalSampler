@@ -10,6 +10,94 @@ namespace
 {
 constexpr std::size_t crossfadeRouteLimit = 2;
 
+bool hasExplicitRoundRobin(const SamplerRenderRoute& route) noexcept
+{
+    return route.roundRobin.has_value()
+        && route.roundRobin->slotCount > 0
+        && route.roundRobin->slotIndex > 0;
+}
+
+int resolveRoundRobinSlotCount(const SamplerRenderRoute& route) noexcept
+{
+    if (hasExplicitRoundRobin(route))
+        return route.roundRobin->slotCount;
+
+    return route.roundRobinLength;
+}
+
+int resolveRoundRobinSlotIndex(const SamplerRenderRoute& route) noexcept
+{
+    if (hasExplicitRoundRobin(route))
+        return route.roundRobin->slotIndex;
+
+    return route.roundRobinPosition;
+}
+
+bool routeUsesRoundRobin(const SamplerRenderRoute& route) noexcept
+{
+    return resolveRoundRobinSlotCount(route) > 0
+        && resolveRoundRobinSlotIndex(route) > 0;
+}
+
+std::string_view resolveRoundRobinPoolId(const SamplerRenderRoute& route) noexcept
+{
+    if (hasExplicitRoundRobin(route) && !route.roundRobin->poolId.empty())
+        return route.roundRobin->poolId;
+
+    return {};
+}
+
+bool usesLegacyRoundRobinKey(const SamplerRenderRoute& route) noexcept
+{
+    return routeUsesRoundRobin(route) && resolveRoundRobinPoolId(route).empty();
+}
+
+bool sameRoundRobinPool(std::string_view leftPoolId,
+                        int leftSlotCount,
+                        bool leftUsesLegacyScalarKey,
+                        std::string_view rightPoolId,
+                        int rightSlotCount,
+                        bool rightUsesLegacyScalarKey) noexcept
+{
+    return leftSlotCount == rightSlotCount
+        && leftUsesLegacyScalarKey == rightUsesLegacyScalarKey
+        && (leftUsesLegacyScalarKey || leftPoolId == rightPoolId);
+}
+
+bool routeCouldRespondToTrigger(const SamplerRenderRoute& route,
+                                int midiNote,
+                                int physicalVelocity,
+                                int effectiveVelocity) noexcept
+{
+    if (midiNote < route.keyLow || midiNote > route.keyHigh)
+        return false;
+
+    const auto physicalVelocityMatches = physicalVelocity >= route.velocityLow
+        && physicalVelocity <= route.velocityHigh;
+    const auto effectiveVelocityMatches = effectiveVelocity >= route.velocityLow
+        && effectiveVelocity <= route.velocityHigh;
+    return physicalVelocityMatches || effectiveVelocityMatches;
+}
+
+int advanceRoundRobinSlotIndex(int currentSlotIndex, int slotCount) noexcept
+{
+    if (slotCount <= 1)
+        return 1;
+
+    ++currentSlotIndex;
+    if (currentSlotIndex > slotCount || currentSlotIndex <= 0)
+        currentSlotIndex = 1;
+    return currentSlotIndex;
+}
+
+struct SelectedRoundRobinSlot
+{
+    std::string_view poolId;
+    int slotCount = 0;
+    bool usesLegacyScalarKey = false;
+    int slotIndex = 0;
+};
+
 int eventPriorityAtSharedOffset(const SamplerRenderEvent& event) noexcept
 {
     switch (event.type)
@@ -32,40 +120,34 @@ int eventPriorityAtSharedOffset(const SamplerRenderEvent& event) noexcept
 bool routeMatches(const SamplerRenderRoute& route,
                   int midiNote,
                   int velocity,
-                  int roundRobinPosition = 0) noexcept
+                  const SelectedRoundRobinSlot* roundRobinSelections,
+                  std::size_t roundRobinSelectionCount) noexcept
 {
     const auto rangeMatches = midiNote >= route.keyLow && midiNote <= route.keyHigh
         && velocity >= route.velocityLow && velocity <= route.velocityHigh;
     if (!rangeMatches)
         return false;
 
-    if (route.roundRobinLength <= 0 || route.roundRobinPosition <= 0 || roundRobinPosition <= 0)
+    if (!routeUsesRoundRobin(route))
         return true;
 
-    return route.roundRobinPosition == roundRobinPosition;
-}
-
-int resolveRoundRobinPosition(const std::vector<SamplerRenderRoute>& routes,
-                              int midiNote,
-                              int velocity,
-                              std::uint64_t voiceId) noexcept
-{
-    int roundRobinLength = 0;
-    for (const auto& route : routes)
+    const auto poolId = resolveRoundRobinPoolId(route);
+    const auto slotCount = resolveRoundRobinSlotCount(route);
+    const auto usesLegacyScalarKey = usesLegacyRoundRobinKey(route);
+    for (std::size_t index = 0; index < roundRobinSelectionCount; ++index)
     {
-        if (midiNote < route.keyLow || midiNote > route.keyHigh
-            || velocity < route.velocityLow || velocity > route.velocityHigh)
+        if (sameRoundRobinPool(roundRobinSelections[index].poolId,
+                               roundRobinSelections[index].slotCount,
+                               roundRobinSelections[index].usesLegacyScalarKey,
+                               poolId,
+                               slotCount,
+                               usesLegacyScalarKey))
         {
-            continue;
+            return resolveRoundRobinSlotIndex(route) == roundRobinSelections[index].slotIndex;
         }
-
-        roundRobinLength = std::max(roundRobinLength, route.roundRobinLength);
     }
 
-    if (roundRobinLength <= 0)
-        return 0;
-
-    return static_cast<int>(((voiceId - 1) % static_cast<std::uint64_t>(roundRobinLength)) + 1);
+    return false;
 }
 
 bool routeHasCrossfade(const SamplerRenderRoute& route) noexcept
@@ -140,6 +222,7 @@ bool SamplerVoicePool::prepare(const SamplerRenderModel& model,
     }
 
     resetVoices();
+    resetRoundRobinPools();
     nextVoiceId = 1;
     nextTriggerId = 1;
     nextGeneratedActivation = 1;
@@ -172,6 +255,7 @@ bool SamplerVoicePool::activateModel(const SamplerRenderModel& model,
     renderModel = &model;
     sampleRate = outputSampleRate;
     activeGeneration = activationGeneration;
+    rebuildRoundRobinPools(model);
     return true;
 }
 
@@ -184,6 +268,7 @@ void SamplerVoicePool::clearRenderModel() noexcept
     nextTriggerId = 1;
     activeGeneration = 0;
     nextGeneratedActivation = 1;
+    resetRoundRobinPools();
 }
 
 SamplerVoicePoolRenderResult SamplerVoicePool::renderBlock(SamplerAudioBufferView output,
@@ -370,31 +455,78 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
             const auto effectiveVelocity = fixedVelocity > 0
                 ? fixedVelocity
                 : eventVelocity;
+            std::array<SelectedRoundRobinSlot, roundRobinPoolCapacity> roundRobinSelections {};
+            std::size_t roundRobinSelectionCount = 0;
+            for (const auto& route : renderModel->getRoutes())
+            {
+                if (!routeUsesRoundRobin(route)
+                    || !routeCouldRespondToTrigger(route, sourceMidiNote, eventVelocity, effectiveVelocity))
+                {
+                    continue;
+                }
+
+                const auto slotCount = resolveRoundRobinSlotCount(route);
+                const auto poolId = resolveRoundRobinPoolId(route);
+                const auto usesLegacyScalarKey = usesLegacyRoundRobinKey(route);
+                auto alreadySelected = false;
+                for (std::size_t index = 0; index < roundRobinSelectionCount; ++index)
+                {
+                    if (sameRoundRobinPool(roundRobinSelections[index].poolId,
+                                           roundRobinSelections[index].slotCount,
+                                           roundRobinSelections[index].usesLegacyScalarKey,
+                                           poolId,
+                                           slotCount,
+                                           usesLegacyScalarKey))
+                    {
+                        alreadySelected = true;
+                        break;
+                    }
+                }
+
+                if (alreadySelected || roundRobinSelectionCount >= roundRobinSelections.size())
+                    continue;
+
+                roundRobinSelections[roundRobinSelectionCount].poolId = poolId;
+                roundRobinSelections[roundRobinSelectionCount].slotCount = slotCount;
+                roundRobinSelections[roundRobinSelectionCount].usesLegacyScalarKey = usesLegacyScalarKey;
+                roundRobinSelections[roundRobinSelectionCount].slotIndex =
+                    peekRoundRobinSlot(poolId, slotCount, usesLegacyScalarKey);
+                ++roundRobinSelectionCount;
+            }
             // Route the physical gesture first. Published pitch/velocity modulation shapes the
             // started voices and must not make otherwise playable authored zones disappear.
             // The effective-velocity fallback preserves legacy fixed-layer presets when the
             // physical velocity has no route in the selected articulation.
             const auto& routes = renderModel->getRoutes();
-            const auto physicalRoundRobinPosition =
-                resolveRoundRobinPosition(routes, sourceMidiNote, eventVelocity, nextTriggerId);
             const auto hasPhysicalVelocityRoute = std::any_of(routes.begin(), routes.end(), [&](const auto& route)
             {
-                return routeMatches(route, sourceMidiNote, eventVelocity, physicalRoundRobinPosition);
+                return routeMatches(route,
+                                    sourceMidiNote,
+                                    eventVelocity,
+                                    roundRobinSelections.data(),
+                                    roundRobinSelectionCount);
             });
             const auto routingVelocity = hasPhysicalVelocityRoute ? eventVelocity : effectiveVelocity;
-            const auto routingRoundRobinPosition = hasPhysicalVelocityRoute
-                ? physicalRoundRobinPosition
-                : resolveRoundRobinPosition(routes, sourceMidiNote, effectiveVelocity, nextTriggerId);
             const auto hasMatchingRoute = hasPhysicalVelocityRoute
                 || (effectiveVelocity != eventVelocity
                     && std::any_of(routes.begin(), routes.end(), [&](const auto& route)
                     {
-                        return routeMatches(route, sourceMidiNote, effectiveVelocity, routingRoundRobinPosition);
+                        return routeMatches(route,
+                                            sourceMidiNote,
+                                            effectiveVelocity,
+                                            roundRobinSelections.data(),
+                                            roundRobinSelectionCount);
                     }));
             if (!hasMatchingRoute)
             {
                 ++result.render.droppedEventCount;
                 return;
+            }
+            for (std::size_t index = 0; index < roundRobinSelectionCount; ++index)
+            {
+                advanceRoundRobinSlot(roundRobinSelections[index].poolId,
+                                      roundRobinSelections[index].slotCount,
+                                      roundRobinSelections[index].usesLegacyScalarKey);
             }
 
             struct CrossfadeCandidate
@@ -411,7 +543,11 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
 
             for (std::size_t routeIndex = 0; routeIndex < routes.size(); ++routeIndex)
             {
-                if (!routeMatches(routes[routeIndex], sourceMidiNote, routingVelocity, routingRoundRobinPosition))
+                if (!routeMatches(routes[routeIndex],
+                                  sourceMidiNote,
+                                  routingVelocity,
+                                  roundRobinSelections.data(),
+                                  roundRobinSelectionCount))
                     continue;
 
                 if (!routeHasCrossfade(routes[routeIndex]))
@@ -507,7 +643,11 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
             {
                 for (std::size_t routeIndex = 0; routeIndex < routes.size(); ++routeIndex)
                 {
-                    if (!routeMatches(routes[routeIndex], sourceMidiNote, routingVelocity, routingRoundRobinPosition))
+                    if (!routeMatches(routes[routeIndex],
+                                      sourceMidiNote,
+                                      routingVelocity,
+                                      roundRobinSelections.data(),
+                                      roundRobinSelectionCount))
                         continue;
 
                     startRoute(routeIndex, 1.0, false);
@@ -520,7 +660,11 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
 
             for (std::size_t routeIndex = 0; routeIndex < routes.size(); ++routeIndex)
             {
-                if (!routeMatches(routes[routeIndex], sourceMidiNote, routingVelocity, routingRoundRobinPosition)
+                if (!routeMatches(routes[routeIndex],
+                                  sourceMidiNote,
+                                  routingVelocity,
+                                  roundRobinSelections.data(),
+                                  roundRobinSelectionCount)
                     || routeHasCrossfade(routes[routeIndex]))
                 {
                     continue;
@@ -634,6 +778,94 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
     }
 
     ++result.render.droppedEventCount;
+}
+
+void SamplerVoicePool::resetRoundRobinPools() noexcept
+{
+    roundRobinPoolCount = 0;
+    for (auto& pool : roundRobinPools)
+        pool = {};
+}
+
+void SamplerVoicePool::rebuildRoundRobinPools(const SamplerRenderModel& model) noexcept
+{
+    resetRoundRobinPools();
+    for (const auto& route : model.getRoutes())
+    {
+        if (!routeUsesRoundRobin(route) || roundRobinPoolCount >= roundRobinPools.size())
+            continue;
+
+        const auto poolId = resolveRoundRobinPoolId(route);
+        const auto slotCount = resolveRoundRobinSlotCount(route);
+        const auto usesLegacyScalarKey = usesLegacyRoundRobinKey(route);
+        auto knownPool = false;
+        for (std::size_t index = 0; index < roundRobinPoolCount; ++index)
+        {
+            if (sameRoundRobinPool(roundRobinPools[index].key.poolId,
+                                   roundRobinPools[index].key.slotCount,
+                                   roundRobinPools[index].key.usesLegacyScalarKey,
+                                   poolId,
+                                   slotCount,
+                                   usesLegacyScalarKey))
+            {
+                knownPool = true;
+                break;
+            }
+        }
+
+        if (knownPool)
+            continue;
+
+        roundRobinPools[roundRobinPoolCount].key.poolId = poolId;
+        roundRobinPools[roundRobinPoolCount].key.slotCount = slotCount;
+        roundRobinPools[roundRobinPoolCount].key.usesLegacyScalarKey = usesLegacyScalarKey;
+        roundRobinPools[roundRobinPoolCount].nextSlotIndex = 1;
+        ++roundRobinPoolCount;
+    }
+}
+
+int SamplerVoicePool::peekRoundRobinSlot(std::string_view poolId,
+                                         int slotCount,
+                                         bool usesLegacyScalarKey) const noexcept
+{
+    if (slotCount <= 0)
+        return 0;
+
+    for (std::size_t index = 0; index < roundRobinPoolCount; ++index)
+    {
+        if (sameRoundRobinPool(roundRobinPools[index].key.poolId,
+                               roundRobinPools[index].key.slotCount,
+                               roundRobinPools[index].key.usesLegacyScalarKey,
+                               poolId,
+                               slotCount,
+                               usesLegacyScalarKey))
+            return roundRobinPools[index].nextSlotIndex;
+    }
+
+    return 1;
+}
+
+void SamplerVoicePool::advanceRoundRobinSlot(std::string_view poolId,
+                                             int slotCount,
+                                             bool usesLegacyScalarKey) noexcept
+{
+    if (slotCount <= 0)
+        return;
+
+    for (std::size_t index = 0; index < roundRobinPoolCount; ++index)
+    {
+        if (!sameRoundRobinPool(roundRobinPools[index].key.poolId,
+                                roundRobinPools[index].key.slotCount,
+                                roundRobinPools[index].key.usesLegacyScalarKey,
+                                poolId,
+                                slotCount,
+                                usesLegacyScalarKey))
+            continue;
+
+        roundRobinPools[index].nextSlotIndex =
+            advanceRoundRobinSlotIndex(roundRobinPools[index].nextSlotIndex, slotCount);
+        return;
+    }
 }
 
 std::size_t SamplerVoicePool::acquireSlot(bool& stolen,

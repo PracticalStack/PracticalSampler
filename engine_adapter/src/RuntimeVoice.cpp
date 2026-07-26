@@ -96,25 +96,46 @@ bool zoneMatchesTrigger(const RuntimeZoneDefinition& zone, int midiNote, int vel
         && velocity <= zone.velocityHigh;
 }
 
-int resolveRoundRobinPosition(const RuntimeInstrumentModel& instrument,
-                              const std::string& articulationId,
-                              int midiNote,
-                              int velocity,
-                              std::uint64_t voiceId)
+std::uint64_t floorDivide(std::uint64_t numerator, std::uint64_t denominator)
 {
-    int roundRobinLength = 0;
-    for (const auto& zone : instrument.zones)
-    {
-        if (zone.articulationId != articulationId || !zoneMatchesTrigger(zone, midiNote, velocity))
-            continue;
+    return denominator == 0 ? 0 : numerator / denominator;
+}
 
-        roundRobinLength = std::max(roundRobinLength, zone.roundRobinLength);
-    }
+int resolveRoundRobinSlotCount(const RuntimeZoneDefinition& zone)
+{
+    if (zone.roundRobin.has_value() && zone.roundRobin->slotCount > 0)
+        return zone.roundRobin->slotCount;
 
-    if (roundRobinLength <= 0)
+    return zone.roundRobinLength;
+}
+
+int resolveRoundRobinSlotIndex(const RuntimeZoneDefinition& zone)
+{
+    if (zone.roundRobin.has_value() && zone.roundRobin->slotIndex > 0)
+        return zone.roundRobin->slotIndex;
+
+    return zone.roundRobinPosition;
+}
+
+int resolveSequentialRoundRobinSlot(std::uint64_t triggerOrdinal, int slotCount)
+{
+    if (slotCount <= 0 || triggerOrdinal == 0)
         return 0;
 
-    return static_cast<int>(((voiceId - 1) % static_cast<std::uint64_t>(roundRobinLength)) + 1);
+    const auto completedCycles = floorDivide(triggerOrdinal - 1, static_cast<std::uint64_t>(slotCount));
+    const auto cycleStart = completedCycles * static_cast<std::uint64_t>(slotCount);
+    return static_cast<int>((triggerOrdinal - 1) - cycleStart) + 1;
+}
+
+bool zoneMatchesRoundRobinSlot(const RuntimeZoneDefinition& zone, std::uint64_t triggerOrdinal)
+{
+    const auto slotCount = resolveRoundRobinSlotCount(zone);
+    const auto slotIndex = resolveRoundRobinSlotIndex(zone);
+    if (slotCount <= 0 || slotIndex <= 0)
+        return true;
+
+    const auto selectedSlot = resolveSequentialRoundRobinSlot(triggerOrdinal, slotCount);
+    return selectedSlot <= 0 || selectedSlot == slotIndex;
 }
 
 int absoluteDifference(int left, int right)
@@ -142,11 +163,6 @@ bool isBetterZoneCandidate(const RuntimeZoneDefinition& candidate,
         return candidateVelocitySpan < currentVelocitySpan;
 
     return candidate.id < currentBest.id;
-}
-
-std::uint64_t floorDivide(std::uint64_t numerator, std::uint64_t denominator)
-{
-    return denominator == 0 ? 0 : numerator / denominator;
 }
 } // namespace
 
@@ -207,18 +223,12 @@ RuntimeVoiceRouteResolution resolveRuntimeVoiceRoute(const RuntimeInstrumentMode
             return result;
         }
 
-        const auto roundRobinPosition =
-            resolveRoundRobinPosition(instrument, targetArticulationId, request.midiNote, request.velocity, request.voiceId);
-
         for (const auto& zone : instrument.zones)
         {
             if (zone.articulationId != targetArticulationId || !zoneMatchesTrigger(zone, request.midiNote, request.velocity))
                 continue;
 
-            if (zone.roundRobinLength > 0
-                && zone.roundRobinPosition > 0
-                && roundRobinPosition > 0
-                && zone.roundRobinPosition != roundRobinPosition)
+            if (!zoneMatchesRoundRobinSlot(zone, request.voiceId))
             {
                 continue;
             }

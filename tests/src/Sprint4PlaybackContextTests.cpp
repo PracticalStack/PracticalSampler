@@ -116,6 +116,108 @@ ModelLifetime buildModel(drs::engine::PlaybackActivationLane lane,
     return result;
 }
 
+ModelLifetime buildRoundRobinModel(drs::engine::PlaybackActivationLane lane,
+                                   std::size_t revision,
+                                   float slotOneValue,
+                                   float slotTwoValue)
+{
+    const auto laneName = lane == drs::engine::PlaybackActivationLane::preview
+        ? "preview"
+        : "performance";
+    const auto suffix = laneName + std::string("-rr-") + std::to_string(revision);
+
+    drs::engine::ImmutablePlaybackSnapshot snapshot;
+    snapshot.draftRevision = revision;
+    snapshot.contentDigest = "context-round-robin-snapshot-" + suffix;
+
+    drs::engine::ImmutablePreparedPlayback prepared;
+    prepared.snapshotBuildId = 7000 + revision;
+    prepared.snapshotContentDigest = snapshot.contentDigest;
+    prepared.draftRevision = revision;
+    prepared.preparedContentDigest = "context-round-robin-prepared-" + suffix;
+
+    const std::array slotValues { slotOneValue, slotTwoValue };
+    for (std::size_t index = 0; index < slotValues.size(); ++index)
+    {
+        const auto slotNumber = static_cast<int>(index + 1);
+        const auto slotSuffix = suffix + "-slot-" + std::to_string(slotNumber);
+
+        drs::engine::PlaybackSnapshotZone snapshotZone;
+        snapshotZone.id = "context-rr-zone-" + slotSuffix;
+        snapshotZone.sampleSourceId = "context-rr-sample-" + slotSuffix;
+        snapshotZone.displayName = "Context RR Zone";
+        snapshotZone.groupId = "context-group";
+        snapshotZone.articulationId = "sustain";
+        snapshotZone.rootKey = 60;
+        snapshotZone.keyLow = 60;
+        snapshotZone.keyHigh = 60;
+        snapshotZone.velocityLow = 1;
+        snapshotZone.velocityHigh = 127;
+        snapshotZone.roundRobin = drs::engine::RoundRobinDescriptor {
+            std::string("context-rr-pool-") + laneName,
+            2,
+            slotNumber,
+            drs::engine::RoundRobinMode::sequential
+        };
+        snapshotZone.roundRobinLength = 2;
+        snapshotZone.roundRobinPosition = slotNumber;
+        snapshot.zones.push_back(std::move(snapshotZone));
+
+        auto decoded = std::make_shared<drs::engine::PreparedPlaybackDecodedSampleData>();
+        decoded->normalizedChannels = { { slotValues[index] } };
+        drs::engine::PreparedPlaybackSampleHandle sample;
+        sample.sampleSourceId = "context-rr-sample-" + slotSuffix;
+        sample.streamSampleId = "context-rr-stream-" + slotSuffix;
+        sample.sampleRate = 48000.0;
+        sample.frameCount = 1;
+        sample.channelCount = 1;
+        sample.decodedSampleData = std::move(decoded);
+        prepared.samples.push_back(std::move(sample));
+
+        drs::engine::PreparedPlaybackZoneHandle preparedZone;
+        preparedZone.zoneId = "context-rr-zone-" + slotSuffix;
+        preparedZone.sampleSourceId = "context-rr-sample-" + slotSuffix;
+        preparedZone.streamSampleId = "context-rr-stream-" + slotSuffix;
+        preparedZone.preparedSampleIndex = index;
+        preparedZone.preparedStreamIndex = index;
+        preparedZone.rootKey = 60;
+        preparedZone.keyLow = 60;
+        preparedZone.keyHigh = 60;
+        preparedZone.velocityLow = 1;
+        preparedZone.velocityHigh = 127;
+        preparedZone.roundRobin = drs::engine::RoundRobinDescriptor {
+            std::string("context-rr-pool-") + laneName,
+            2,
+            slotNumber,
+            drs::engine::RoundRobinMode::sequential
+        };
+        preparedZone.roundRobinLength = 2;
+        preparedZone.roundRobinPosition = slotNumber;
+        prepared.zones.push_back(std::move(preparedZone));
+    }
+
+    auto payload = std::make_shared<drs::engine::PlaybackActivationPayload>();
+    payload->lane = lane;
+    payload->revision = revision;
+    payload->snapshotBuildId = prepared.snapshotBuildId;
+    payload->preparedBuildId = 8000 + revision;
+    payload->lifecycleState = lane == drs::engine::PlaybackActivationLane::preview
+        ? drs::engine::PlaybackSnapshotLifecycleState::ready
+        : drs::engine::PlaybackSnapshotLifecycleState::active;
+    payload->activationEligible = true;
+    payload->snapshotContentDigest = snapshot.contentDigest;
+    payload->preparedContentDigest = prepared.preparedContentDigest;
+    payload->snapshot = std::make_shared<const drs::engine::ImmutablePlaybackSnapshot>(std::move(snapshot));
+    payload->prepared = std::make_shared<const drs::engine::ImmutablePreparedPlayback>(std::move(prepared));
+
+    ModelLifetime result;
+    result.payload = payload;
+    const auto build = drs::engine::buildSamplerRenderModel(payload);
+    require(build.built && build.model != nullptr, "Playback-context RR fixture model should validate.");
+    result.model = build.model;
+    return result;
+}
+
 struct StereoOutput
 {
     std::vector<float> left;
@@ -158,6 +260,15 @@ drs::engine::SamplerRenderEventView eventView(const std::array<drs::engine::Samp
 drs::engine::SamplerRenderEventView noEvents()
 {
     return { nullptr, 0 };
+}
+
+float renderSingleFrameNote(drs::engine::SamplerPlaybackContext& context, int note)
+{
+    const std::array events { noteOn(0, note) };
+    StereoOutput output(1);
+    const auto result = context.renderBlock(output.view(), eventView(events));
+    require(result.accepted, "Single-frame context render should be accepted.");
+    return output.left.front();
 }
 
 void runIndependentContextMatrix()
@@ -331,6 +442,33 @@ void runRestartCloseAndDrainMatrix()
     require(context.serviceRetirements() == 0,
             "Repeated retirement drain must be idempotent.");
 }
+
+void runRoundRobinLaneAndGenerationMatrix()
+{
+    drs::engine::SamplerPlaybackContext preview(drs::engine::PlaybackActivationLane::preview);
+    drs::engine::SamplerPlaybackContext performance(drs::engine::PlaybackActivationLane::performance);
+    require(preview.prepare(48000.0) && performance.prepare(48000.0),
+            "RR playback contexts should prepare.");
+
+    auto previewModel = buildRoundRobinModel(drs::engine::PlaybackActivationLane::preview, 40, 1.0f, 2.0f);
+    auto performanceModel = buildRoundRobinModel(drs::engine::PlaybackActivationLane::performance, 41, 1.0f, 2.0f);
+    require(preview.stageActivation(previewModel.model)
+                && performance.stageActivation(performanceModel.model),
+            "RR activations should stage for both lanes.");
+
+    requireNear(renderSingleFrameNote(preview, 60), 0.25f,
+                "Preview RR should start on slot 1.");
+    requireNear(renderSingleFrameNote(preview, 60), 0.5f,
+                "Preview RR should advance to slot 2.");
+    requireNear(renderSingleFrameNote(performance, 60), 0.25f,
+                "Performance RR must keep its own slot counter.");
+
+    auto replacementModel = buildRoundRobinModel(drs::engine::PlaybackActivationLane::preview, 42, 1.0f, 2.0f);
+    require(preview.stageActivation(replacementModel.model),
+            "Replacement preview RR activation should stage.");
+    requireNear(renderSingleFrameNote(preview, 60), 0.25f,
+                "A new activation generation should reset the RR slot sequence.");
+}
 } // namespace
 
 int main()
@@ -341,6 +479,7 @@ int main()
         runConcurrentRenderMatrix();
         runBlockBoundaryAndLifetimeMatrix();
         runRestartCloseAndDrainMatrix();
+        runRoundRobinLaneAndGenerationMatrix();
         std::cout << "Sprint 4.5 playback-context isolation and activation-lifetime matrix passed."
                   << std::endl;
         return 0;

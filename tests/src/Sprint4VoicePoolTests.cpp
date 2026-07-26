@@ -105,6 +105,13 @@ void require(bool condition, const std::string& message)
         throw std::runtime_error(message);
 }
 
+void requireNear(float actual, float expected, const std::string& message)
+{
+    if (std::abs(actual - expected) > tolerance)
+        throw std::runtime_error(message + " (actual=" + std::to_string(actual)
+                                 + ", expected=" + std::to_string(expected) + ")");
+}
+
 void requireVector(const std::vector<float>& actual,
                    const std::vector<float>& expected,
                    const std::string& message)
@@ -191,6 +198,114 @@ drs::engine::SamplerRenderModelPtr buildModel(std::size_t frameCount = 4096,
     return result.model;
 }
 
+struct RoundRobinRouteSpec
+{
+    std::string zoneSuffix;
+    int keyLow = 0;
+    int keyHigh = 127;
+    int velocityLow = 1;
+    int velocityHigh = 127;
+    float sampleValue = 1.0f;
+    std::string poolId;
+    int slotCount = 0;
+    int slotIndex = 0;
+};
+
+drs::engine::SamplerRenderModelPtr buildRoundRobinModel(
+    const std::vector<RoundRobinRouteSpec>& routes,
+    std::size_t revision = 44,
+    drs::engine::PlaybackActivationLane lane = drs::engine::PlaybackActivationLane::preview)
+{
+    drs::engine::ImmutablePlaybackSnapshot snapshot;
+    snapshot.draftRevision = revision;
+    snapshot.contentDigest = "sprint4-round-robin-snapshot-" + std::to_string(revision);
+
+    drs::engine::ImmutablePreparedPlayback prepared;
+    prepared.snapshotBuildId = 4400 + revision;
+    prepared.snapshotContentDigest = snapshot.contentDigest;
+    prepared.draftRevision = snapshot.draftRevision;
+    prepared.preparedContentDigest = "sprint4-round-robin-prepared-" + std::to_string(revision);
+
+    for (std::size_t index = 0; index < routes.size(); ++index)
+    {
+        const auto& route = routes[index];
+        const auto zoneId = "rr-zone-" + route.zoneSuffix;
+        const auto sampleId = "rr-sample-" + route.zoneSuffix;
+        const auto streamId = "rr-stream-" + route.zoneSuffix;
+
+        drs::engine::PlaybackSnapshotZone snapshotZone;
+        snapshotZone.id = zoneId;
+        snapshotZone.sampleSourceId = sampleId;
+        snapshotZone.displayName = "RR Zone " + route.zoneSuffix;
+        snapshotZone.groupId = "rr-group";
+        snapshotZone.articulationId = "sustain";
+        snapshotZone.rootKey = route.keyLow;
+        snapshotZone.keyLow = route.keyLow;
+        snapshotZone.keyHigh = route.keyHigh;
+        snapshotZone.velocityLow = route.velocityLow;
+        snapshotZone.velocityHigh = route.velocityHigh;
+        snapshotZone.roundRobin = drs::engine::RoundRobinDescriptor {
+            route.poolId,
+            route.slotCount,
+            route.slotIndex,
+            drs::engine::RoundRobinMode::sequential
+        };
+        snapshotZone.roundRobinLength = route.slotCount;
+        snapshotZone.roundRobinPosition = route.slotIndex;
+        snapshot.zones.push_back(std::move(snapshotZone));
+
+        auto decoded = std::make_shared<drs::engine::PreparedPlaybackDecodedSampleData>();
+        decoded->normalizedChannels = { std::vector<float> { route.sampleValue } };
+        drs::engine::PreparedPlaybackSampleHandle sample;
+        sample.sampleSourceId = sampleId;
+        sample.streamSampleId = streamId;
+        sample.sampleRate = 48000.0;
+        sample.frameCount = 1;
+        sample.channelCount = 1;
+        sample.decodedSampleData = std::move(decoded);
+        prepared.samples.push_back(std::move(sample));
+
+        drs::engine::PreparedPlaybackZoneHandle preparedZone;
+        preparedZone.zoneId = zoneId;
+        preparedZone.sampleSourceId = sampleId;
+        preparedZone.streamSampleId = streamId;
+        preparedZone.preparedSampleIndex = index;
+        preparedZone.preparedStreamIndex = index;
+        preparedZone.rootKey = route.keyLow;
+        preparedZone.keyLow = route.keyLow;
+        preparedZone.keyHigh = route.keyHigh;
+        preparedZone.velocityLow = route.velocityLow;
+        preparedZone.velocityHigh = route.velocityHigh;
+        preparedZone.roundRobin = drs::engine::RoundRobinDescriptor {
+            route.poolId,
+            route.slotCount,
+            route.slotIndex,
+            drs::engine::RoundRobinMode::sequential
+        };
+        preparedZone.roundRobinLength = route.slotCount;
+        preparedZone.roundRobinPosition = route.slotIndex;
+        prepared.zones.push_back(std::move(preparedZone));
+    }
+
+    auto payload = std::make_shared<drs::engine::PlaybackActivationPayload>();
+    payload->lane = lane;
+    payload->revision = snapshot.draftRevision;
+    payload->snapshotBuildId = prepared.snapshotBuildId;
+    payload->preparedBuildId = 5400 + revision;
+    payload->lifecycleState = lane == drs::engine::PlaybackActivationLane::preview
+        ? drs::engine::PlaybackSnapshotLifecycleState::ready
+        : drs::engine::PlaybackSnapshotLifecycleState::active;
+    payload->activationEligible = true;
+    payload->snapshotContentDigest = snapshot.contentDigest;
+    payload->preparedContentDigest = prepared.preparedContentDigest;
+    payload->snapshot = std::make_shared<const drs::engine::ImmutablePlaybackSnapshot>(std::move(snapshot));
+    payload->prepared = std::make_shared<const drs::engine::ImmutablePreparedPlayback>(std::move(prepared));
+    const auto result = drs::engine::buildSamplerRenderModel(payload);
+    require(result.built && result.model != nullptr,
+            "Round-robin voice-pool fixture model should validate.");
+    return result.model;
+}
+
 struct StereoOutput
 {
     std::vector<float> left;
@@ -236,6 +351,17 @@ bool containsVoiceId(const drs::engine::SamplerVoicePool& pool, std::uint64_t vo
         if (pool.getSlotSnapshot(index).voiceId == voiceId)
             return true;
     return false;
+}
+
+float renderSingleFrameNoteOn(drs::engine::SamplerVoicePool& pool, int note)
+{
+    drs::engine::SamplerEventBlock events;
+    events.push(noteOn(0, note));
+    StereoOutput output(1);
+    const auto result = pool.renderBlock(output.view(), events.view());
+    require(result.accepted && result.render.startedVoiceCount >= 1,
+            "Single-frame RR trigger should start at least one voice.");
+    return output.left.front();
 }
 
 void runEventBlockContract()
@@ -425,6 +551,42 @@ void runTriggerModeMatrix()
             "All-notes-off must remain able to release one-shot voices.");
 }
 
+void runRoundRobinRoutingMatrix()
+{
+    const auto sequentialModel = buildRoundRobinModel({
+        { "main-1", 60, 60, 1, 127, 1.0f, "rr-main", 3, 1 },
+        { "main-2", 60, 60, 1, 127, 2.0f, "rr-main", 3, 2 },
+        { "main-3", 60, 60, 1, 127, 3.0f, "rr-main", 3, 3 }
+    });
+    drs::engine::SamplerVoicePool sequentialPool;
+    require(sequentialPool.prepare(*sequentialModel, 48000.0),
+            "Sequential RR pool should prepare.");
+    requireNear(renderSingleFrameNoteOn(sequentialPool, 60), 0.25f,
+                "First RR trigger should select slot 1.");
+    requireNear(renderSingleFrameNoteOn(sequentialPool, 60), 0.5f,
+                "Second RR trigger should select slot 2.");
+    requireNear(renderSingleFrameNoteOn(sequentialPool, 60), 0.75f,
+                "Third RR trigger should select slot 3.");
+    requireNear(renderSingleFrameNoteOn(sequentialPool, 60), 0.25f,
+                "Fourth RR trigger should wrap back to slot 1.");
+
+    const auto multiPoolModel = buildRoundRobinModel({
+        { "pool-a-1", 60, 61, 1, 127, 1.0f, "rr-a", 2, 1 },
+        { "pool-a-2", 60, 61, 1, 127, 2.0f, "rr-a", 2, 2 },
+        { "pool-b-1", 60, 60, 1, 127, 10.0f, "rr-b", 2, 1 },
+        { "pool-b-2", 60, 60, 1, 127, 20.0f, "rr-b", 2, 2 }
+    }, 45);
+    drs::engine::SamplerVoicePool multiPool;
+    require(multiPool.prepare(*multiPoolModel, 48000.0),
+            "Multi-pool RR model should prepare.");
+    requireNear(renderSingleFrameNoteOn(multiPool, 60), 2.75f,
+                "First shared RR trigger should start slot 1 in both pools.");
+    requireNear(renderSingleFrameNoteOn(multiPool, 61), 0.5f,
+                "A trigger that only hits pool A should advance only pool A.");
+    requireNear(renderSingleFrameNoteOn(multiPool, 60), 5.25f,
+                "Pool B must not phase-lock to pool A when it misses an intervening note.");
+}
+
 void runCapacityAndStealMatrix()
 {
     const auto model = buildModel();
@@ -531,6 +693,7 @@ int main()
         runNoteOwnershipAndCommandMatrix();
         runOverlappingLayerMatrix();
         runTriggerModeMatrix();
+        runRoundRobinRoutingMatrix();
         runCapacityAndStealMatrix();
         runOverflowDropAndRealtimeMatrix();
         std::cout << "Sprint 4.3 fixed voice-pool and sample-accurate event matrix passed." << std::endl;
