@@ -268,7 +268,30 @@ int main()
                       "  ],\n"
                       "  \"zones\": [\n"
                       "    {\n"
-                      "      \"id\": \"precedence-zone\",\n"
+                      "      \"id\": \"precedence-zone-1\",\n"
+                      "      \"groupId\": \"main\",\n"
+                      "      \"articulationId\": \"sustain\",\n"
+                      "      \"samplePath\": \"precedence-source.flac\",\n"
+                      "      \"streamAssetPath\": \"precedence-source.drstrm\",\n"
+                      "      \"rootKey\": 60,\n"
+                      "      \"keyLow\": 60,\n"
+                      "      \"keyHigh\": 60,\n"
+                      "      \"velocityLow\": 1,\n"
+                      "      \"velocityHigh\": 127,\n"
+                      "      \"streamOffsetBytes\": 0,\n"
+                      "      \"prefetchBytes\": 16384,\n"
+                      "      \"releaseSeconds\": 0.0,\n"
+                      "      \"roundRobin\": {\n"
+                      "        \"poolId\": \"precedence-pool\",\n"
+                      "        \"slotCount\": 3,\n"
+                      "        \"slotIndex\": 1,\n"
+                      "        \"mode\": \"sequential\"\n"
+                      "      },\n"
+                      "      \"roundRobinLength\": 9,\n"
+                      "      \"roundRobinPosition\": 9\n"
+                      "    },\n"
+                      "    {\n"
+                      "      \"id\": \"precedence-zone-2\",\n"
                       "      \"groupId\": \"main\",\n"
                       "      \"articulationId\": \"sustain\",\n"
                       "      \"samplePath\": \"precedence-source.flac\",\n"
@@ -289,6 +312,29 @@ int main()
                       "      },\n"
                       "      \"roundRobinLength\": 9,\n"
                       "      \"roundRobinPosition\": 9\n"
+                      "    },\n"
+                      "    {\n"
+                      "      \"id\": \"precedence-zone-3\",\n"
+                      "      \"groupId\": \"main\",\n"
+                      "      \"articulationId\": \"sustain\",\n"
+                      "      \"samplePath\": \"precedence-source.flac\",\n"
+                      "      \"streamAssetPath\": \"precedence-source.drstrm\",\n"
+                      "      \"rootKey\": 60,\n"
+                      "      \"keyLow\": 60,\n"
+                      "      \"keyHigh\": 60,\n"
+                      "      \"velocityLow\": 1,\n"
+                      "      \"velocityHigh\": 127,\n"
+                      "      \"streamOffsetBytes\": 0,\n"
+                      "      \"prefetchBytes\": 16384,\n"
+                      "      \"releaseSeconds\": 0.0,\n"
+                      "      \"roundRobin\": {\n"
+                      "        \"poolId\": \"precedence-pool\",\n"
+                      "        \"slotCount\": 3,\n"
+                      "        \"slotIndex\": 3,\n"
+                      "        \"mode\": \"sequential\"\n"
+                      "      },\n"
+                      "      \"roundRobinLength\": 9,\n"
+                      "      \"roundRobinPosition\": 9\n"
                       "    }\n"
                       "  ],\n"
                       "  \"validationNotes\": [\"Legacy precedence fixture.\"]\n"
@@ -297,13 +343,15 @@ int main()
         const auto precedenceLoad = loadRuntimeInstrumentManifest(precedenceManifestPath.generic_string());
         require(precedenceLoad.loaded,
                 "Legacy manifest containing both RR representations should still load when the explicit object is valid.");
-        requireRoundRobinEquals(precedenceLoad.instrument.zones.front().roundRobin,
+        require(precedenceLoad.instrument.zones.size() == 3,
+                "Legacy precedence fixture should preserve the full explicit Round Robin pool.");
+        requireRoundRobinEquals(precedenceLoad.instrument.zones[1].roundRobin,
                                 "precedence-pool",
                                 3,
                                 2,
                                 "Legacy precedence zone");
-        require(precedenceLoad.instrument.zones.front().roundRobinLength == 3
-                    && precedenceLoad.instrument.zones.front().roundRobinPosition == 2,
+        require(precedenceLoad.instrument.zones[1].roundRobinLength == 3
+                    && precedenceLoad.instrument.zones[1].roundRobinPosition == 2,
                 "Explicit Round Robin objects should win over legacy RR scalars when both appear.");
 
         std::cout << "Phase 3 Round Robin schema persistence tests passed." << std::endl;

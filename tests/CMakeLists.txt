@@ -1140,6 +1140,39 @@ add_test(
     COMMAND drs_phase3_round_robin_prepared_playback_tests
 )
 
+juce_add_console_app(drs_phase3_round_robin_hardening_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 3 Round Robin Sprint 8 Hardening Tests"
+)
+
+target_sources(drs_phase3_round_robin_hardening_tests
+    PRIVATE
+        src/Phase3RoundRobinHardeningTests.cpp
+)
+
+target_compile_definitions(drs_phase3_round_robin_hardening_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_link_libraries(drs_phase3_round_robin_hardening_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+        drs_sample_import
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase3_round_robin_hardening_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase3.round_robin_hardening
+    COMMAND drs_phase3_round_robin_hardening_tests
+)
+
 add_executable(drs_phase3_round_robin_contract_red_tests
     src/Phase3RoundRobinContractRedTests.cpp
 )
@@ -2287,6 +2320,9 @@ add_dependencies(drs_all_tests
     drs_phase3_crossfade_prepared_playback_tests
     drs_phase3_round_robin_contract_tests
     drs_phase3_round_robin_fixture_characterization_tests
+    drs_phase3_round_robin_schema_persistence_tests
+    drs_phase3_round_robin_prepared_playback_tests
+    drs_phase3_round_robin_hardening_tests
     drs_phase3_round_robin_contract_red_tests
     drs_sprint6_publish_contract_tests
     drs_sprint6_publish_contract_seam_tests
