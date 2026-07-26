@@ -1071,6 +1071,50 @@ add_test(
     COMMAND drs_phase3_crossfade_prepared_playback_tests
 )
 
+# Phase 3 Round Robin Sprint 1 contract and fixture baseline.
+add_executable(drs_phase3_round_robin_contract_tests
+    src/Phase3RoundRobinContractTests.cpp
+)
+
+target_link_libraries(drs_phase3_round_robin_contract_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_features(drs_phase3_round_robin_contract_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase3.round_robin_contract
+    COMMAND drs_phase3_round_robin_contract_tests
+)
+
+add_executable(drs_phase3_round_robin_fixture_characterization_tests
+    src/Phase3RoundRobinFixtureCharacterizationTests.cpp
+)
+
+target_compile_definitions(drs_phase3_round_robin_fixture_characterization_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_phase3_round_robin_fixture_characterization_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase3.round_robin_fixture_profile
+    COMMAND drs_phase3_round_robin_fixture_characterization_tests
+)
+
+add_executable(drs_phase3_round_robin_contract_red_tests
+    src/Phase3RoundRobinContractRedTests.cpp
+)
+
+target_compile_definitions(drs_phase3_round_robin_contract_red_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_phase3_round_robin_contract_red_tests PRIVATE cxx_std_17)
+
 # Direct-only expected-red audit for the parser/report/UI seams intentionally left open by Sprint 3.1.1.
 add_executable(drs_sprint31_sfz_contract_red_tests
     src/Sprint31SfzContractRedTests.cpp
@@ -2205,6 +2249,9 @@ add_dependencies(drs_all_tests
     drs_phase3_crossfade_fixture_characterization_tests
     drs_phase3_crossfade_persistence_tests
     drs_phase3_crossfade_prepared_playback_tests
+    drs_phase3_round_robin_contract_tests
+    drs_phase3_round_robin_fixture_characterization_tests
+    drs_phase3_round_robin_contract_red_tests
     drs_sprint6_publish_contract_tests
     drs_sprint6_publish_contract_seam_tests
     drs_sprint6_publish_controller_tests
