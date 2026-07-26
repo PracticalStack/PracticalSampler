@@ -90,6 +90,17 @@ bool hasFindingCode(const drs::engine::AuthoringImportQueueItem& item, const std
                            return finding.code == code;
                        });
 }
+
+bool hasFindingCode(const std::vector<drs::engine::AuthoringImportFinding>& findings,
+                    const std::string& code)
+{
+    return std::any_of(findings.begin(),
+                       findings.end(),
+                       [&](const drs::engine::AuthoringImportFinding& finding)
+                       {
+                           return finding.code == code;
+                       });
+}
 } // namespace
 
 int main()
@@ -100,11 +111,15 @@ int main()
         const auto buffer = buildReferenceBuffer();
         juce::WavAudioFormat wavFormat;
 
+        const auto cleanSiblingOnePath = scratchDirectory / "Pad_Sustain_C4_vel064_rr1.wav";
         const auto cleanPath = scratchDirectory / "Pad_Sustain_C4_vel064_rr2.wav";
+        const auto cleanSiblingThreePath = scratchDirectory / "Pad_Sustain_C4_vel064_rr3.wav";
         const auto ambiguousPath = scratchDirectory / "MysteryTexture.wav";
         const auto conflictPath = scratchDirectory / "Lead_A4.wav";
         const auto canceledPath = scratchDirectory / "Shimmer_Bad Name!.wav";
         const auto unsupportedPath = scratchDirectory / "Unsupported.txt";
+        const auto sparseOnePath = scratchDirectory / "Brush_Sustain_D4_vel096_rr1.wav";
+        const auto sparseThreePath = scratchDirectory / "Brush_Sustain_D4_vel096_rr3.wav";
 
         juce::StringPairArray matchingMetadata;
         matchingMetadata.set("MidiUnityNote", "60");
@@ -115,10 +130,14 @@ int main()
         juce::StringPairArray conflictingMetadata;
         conflictingMetadata.set("MidiUnityNote", "60");
 
+        writeAudioFile(cleanSiblingOnePath, wavFormat, buffer, matchingMetadata);
         writeAudioFile(cleanPath, wavFormat, buffer, matchingMetadata);
+        writeAudioFile(cleanSiblingThreePath, wavFormat, buffer, matchingMetadata);
         writeAudioFile(ambiguousPath, wavFormat, buffer, {});
         writeAudioFile(conflictPath, wavFormat, buffer, conflictingMetadata);
         writeAudioFile(canceledPath, wavFormat, buffer, {});
+        writeAudioFile(sparseOnePath, wavFormat, buffer, matchingMetadata);
+        writeAudioFile(sparseThreePath, wavFormat, buffer, matchingMetadata);
 
         {
             juce::FileOutputStream unsupportedOutput(juce::File(unsupportedPath.generic_string()));
@@ -132,8 +151,22 @@ int main()
         require(directHeuristics.suggestedZone.zone.velocityLow == 33
                     && directHeuristics.suggestedZone.zone.velocityHigh == 64,
                 "Direct filename heuristics velocity bucket changed unexpectedly.");
-        require(directHeuristics.suggestedZone.roundRobinIndex == 2,
-                "Direct filename heuristics round-robin parsing changed unexpectedly.");
+        require(directHeuristics.suggestedZone.zone.roundRobin.has_value(),
+                "Direct filename heuristics should now infer an explicit round-robin descriptor.");
+        require(directHeuristics.suggestedZone.zone.roundRobin->slotCount == 3
+                    && directHeuristics.suggestedZone.zone.roundRobin->slotIndex == 2
+                    && directHeuristics.suggestedZone.zone.roundRobin->mode
+                        == drs::engine::RoundRobinMode::sequential,
+                "Direct filename heuristics round-robin slot metadata changed unexpectedly.");
+        require(directHeuristics.suggestedZone.zone.roundRobinLength == 3
+                    && directHeuristics.suggestedZone.zone.roundRobinPosition == 2,
+                "Direct filename heuristics should keep round-robin scalar metadata aligned.");
+
+        const auto sparseHeuristics = drs::engine::parseSampleFilenameHeuristics(sparseThreePath.generic_string());
+        require(!sparseHeuristics.suggestedZone.zone.roundRobin.has_value(),
+                "Sparse round-robin sibling pools should remain ungrouped until reviewed.");
+        require(hasFindingCode(sparseHeuristics.findings, "round_robin.sparse_slots"),
+                "Sparse round-robin sibling pools should surface a typed review finding.");
 
         const auto ambiguousRootInference = drs::engine::inferSampleRootKey(ambiguousPath.generic_string());
         require(!ambiguousRootInference.resolved, "Ambiguous root-key inference should require manual confirmation.");
@@ -193,6 +226,10 @@ int main()
                 "Clean import velocity range changed unexpectedly.");
         require(cleanItem.suggestedZone.zone.articulationId == "sustain",
                 "Clean import articulation inference changed unexpectedly.");
+        require(cleanItem.suggestedZone.zone.roundRobin.has_value()
+                    && cleanItem.suggestedZone.zone.roundRobin->slotCount == 3
+                    && cleanItem.suggestedZone.zone.roundRobin->slotIndex == 2,
+                "Clean import should preserve the inferred round-robin pool descriptor.");
         require(cleanItem.suggestedZone.zone.loopEnabled,
                 "Clean import should preserve loop metadata into the suggested zone.");
         require(drs::engine::acceptAuthoringImportQueueItem(queue, cleanItem.id),

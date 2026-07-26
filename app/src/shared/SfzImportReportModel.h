@@ -24,6 +24,19 @@ inline bool reportHasVelocityCrossfadeWithDisposition(
                        });
 }
 
+inline bool reportHasRoundRobinWithDisposition(const drs::engine::SfzImportReport& report,
+                                               drs::engine::SfzImportSupportDisposition disposition)
+{
+    return std::any_of(report.opcodeSupport.begin(),
+                       report.opcodeSupport.end(),
+                       [disposition](const drs::engine::SfzImportOpcodeSupportSummary& summary)
+                       {
+                           return (summary.opcodeName == "seq_length"
+                                      || summary.opcodeName == "seq_position")
+                               && summary.disposition == disposition;
+                       });
+}
+
 struct SfzImportReportModel
 {
     bool available = false;
@@ -79,15 +92,35 @@ inline SfzImportReportModel makeSfzImportReportModel(
             model.guidance =
                 "Some velocity crossfades still fall outside the supported linear-adjacent contract, or other review-only features remain. Confirm the findings before final import.";
         }
-        else if (reportHasVelocityCrossfadeWithDisposition(model.report, drs::engine::SfzImportSupportDisposition::converted))
-        {
-            model.guidance =
-                "Supported linear velocity crossfades will be preserved and play back natively. Review-only findings still need acknowledgement before final import.";
-        }
         else
         {
-            model.guidance =
-                "This SFZ uses lossy or report-first features that must be acknowledged before final import.";
+            const auto preservesCrossfades = reportHasVelocityCrossfadeWithDisposition(
+                model.report,
+                drs::engine::SfzImportSupportDisposition::converted);
+            const auto preservesRoundRobin = reportHasRoundRobinWithDisposition(
+                model.report,
+                drs::engine::SfzImportSupportDisposition::converted);
+
+            if (preservesCrossfades && preservesRoundRobin)
+            {
+                model.guidance =
+                    "Supported linear velocity crossfades will be preserved, and supported sequential round robins will be grouped into native Round Robin pools. Review-only findings still need acknowledgement before final import.";
+            }
+            else if (preservesCrossfades)
+            {
+                model.guidance =
+                    "Supported linear velocity crossfades will be preserved and play back natively. Review-only findings still need acknowledgement before final import.";
+            }
+            else if (preservesRoundRobin)
+            {
+                model.guidance =
+                    "Supported sequential round robins will be preserved and grouped into native Round Robin pools. Review-only findings still need acknowledgement before final import.";
+            }
+            else
+            {
+                model.guidance =
+                    "This SFZ uses lossy or report-first features that must be acknowledged before final import.";
+            }
         }
     }
     else
@@ -97,6 +130,10 @@ inline SfzImportReportModel makeSfzImportReportModel(
                              model.report,
                              drs::engine::SfzImportSupportDisposition::converted)
             ? "No blocking or lossy findings were detected. Supported linear velocity crossfades will be preserved."
+            : reportHasRoundRobinWithDisposition(
+                  model.report,
+                  drs::engine::SfzImportSupportDisposition::converted)
+            ? "No blocking or lossy findings were detected. Supported sequential round robins will be preserved."
             : "No blocking or lossy findings were detected.";
     }
 

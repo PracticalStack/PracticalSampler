@@ -116,7 +116,6 @@ struct AuthoringImportZoneSuggestion
     RuntimeProjectZoneDefinition zone;
     std::string rootKeySource;
     std::string velocitySource;
-    int roundRobinIndex = 0;
 };
 
 struct AuthoringImportQueueItem

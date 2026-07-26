@@ -251,6 +251,44 @@ std::string buildGroupId(const SfzNormalizedSection& section,
     return slugify(stream.str());
 }
 
+std::string buildRoundRobinPoolSignature(const RuntimeProjectZoneDefinition& zone)
+{
+    std::ostringstream stream;
+    stream << zone.articulationId
+           << "|" << zone.rootKey
+           << "|" << zone.keyLow
+           << "|" << zone.keyHigh;
+    return slugify(stream.str());
+}
+
+std::optional<RoundRobinDescriptor> buildSequentialRoundRobinDescriptor(
+    const RuntimeProjectZoneDefinition& zone,
+    std::set<std::string>& usedPoolIds,
+    std::map<std::string, std::string>& poolIdsBySignature)
+{
+    if (zone.roundRobinLength <= 0
+        || zone.roundRobinPosition <= 0
+        || zone.roundRobinPosition > zone.roundRobinLength)
+    {
+        return std::nullopt;
+    }
+
+    const auto signature = buildRoundRobinPoolSignature(zone);
+    auto existingPool = poolIdsBySignature.find(signature);
+    if (existingPool == poolIdsBySignature.end())
+    {
+        const auto poolId = makeUniqueId(usedPoolIds, "sfz-rr-" + signature);
+        existingPool = poolIdsBySignature.emplace(signature, poolId).first;
+    }
+
+    return RoundRobinDescriptor {
+        existingPool->second,
+        zone.roundRobinLength,
+        zone.roundRobinPosition,
+        RoundRobinMode::sequential
+    };
+}
+
 bool shouldEnableLoop(const SfzNormalizedSection& section)
 {
     const auto* loopStart = findEffectiveOpcode(section, "loop_start");
@@ -407,6 +445,16 @@ RuntimeProjectModel buildProvisionalProject(const RuntimeProjectModel& baseProje
         project.authoring.selectedZoneId = projection.zones.front().id;
     return project;
 }
+
+bool projectUsesExplicitRoundRobin(const RuntimeProjectModel& project)
+{
+    return std::any_of(project.authoring.zones.begin(),
+                       project.authoring.zones.end(),
+                       [](const RuntimeProjectZoneDefinition& zone)
+                       {
+                           return zone.roundRobin.has_value();
+                       });
+}
 } // namespace
 
 SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& baseProject,
@@ -455,12 +503,20 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
     for (const auto& zone : baseProject.authoring.zones)
         usedZoneIds.insert(zone.id);
 
+    std::set<std::string> usedRoundRobinPoolIds;
+    for (const auto& zone : baseProject.authoring.zones)
+    {
+        if (zone.roundRobin.has_value() && !zone.roundRobin->poolId.empty())
+            usedRoundRobinPoolIds.insert(zone.roundRobin->poolId);
+    }
+
     std::map<std::string, std::string> sampleSourceIdsByPath;
     for (const auto& sampleSource : baseProject.sampleSources)
         sampleSourceIdsByPath.emplace(fs::path(sampleSource.path).lexically_normal().generic_string(),
                                       sampleSource.id);
 
     const auto unsupportedCrossfadeOpcodes = collectUnsupportedVelocityCrossfadeOpcodes(analysis);
+    std::map<std::string, std::string> roundRobinPoolIdsBySignature;
 
     result.projectNotes = buildProjectNotes(analysis.report);
     result.authoringNotes = buildAuthoringNotes(analysis.report);
@@ -587,6 +643,9 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
                                     zone.keyHigh,
                                     zone.velocityLow,
                                     zone.velocityHigh);
+        zone.roundRobin = buildSequentialRoundRobinDescriptor(zone,
+                                                              usedRoundRobinPoolIds,
+                                                              roundRobinPoolIdsBySignature);
 
         if (const auto* trigger = findEffectiveOpcode(section, "trigger"))
         {
@@ -606,7 +665,21 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         return result;
     }
 
-    const auto provisionalProject = buildProvisionalProject(baseProject, result);
+    auto provisionalProject = buildProvisionalProject(baseProject, result);
+    if (projectUsesExplicitRoundRobin(provisionalProject)
+        && (provisionalProject.schemaVersion != 3 || provisionalProject.authoring.schemaVersion != 2))
+    {
+        const auto migration = migrateRuntimeProjectToPhase3RoundRobinSchema(provisionalProject);
+        if (!migration.valid)
+        {
+            result.state = "SFZ projection failed";
+            result.issues.insert(result.issues.end(), migration.issues.begin(), migration.issues.end());
+            return result;
+        }
+
+        provisionalProject = migration.project;
+    }
+
     const auto validation = validateRuntimeProjectModel(provisionalProject);
     if (!validation.valid)
     {

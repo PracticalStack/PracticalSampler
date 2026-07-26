@@ -152,7 +152,8 @@ int main()
         const auto* seqLengthSummary = findSupportSummary(analysis.report, SfzOpcodeScope::region, "seq_length");
         require(seqLengthSummary != nullptr
                     && seqLengthSummary->disposition == SfzImportSupportDisposition::converted
-                    && seqLengthSummary->occurrenceCount == 225,
+                    && seqLengthSummary->occurrenceCount == 225
+                    && seqLengthSummary->nativeTarget == "zone.roundRobin.slotCount",
                 "The support matrix should keep round-robin sequence length as a converted region feature.");
         const auto* curveSummary = findSupportSummary(analysis.report, SfzOpcodeScope::curve, "curve_index");
         require(curveSummary != nullptr
@@ -198,6 +199,91 @@ int main()
         require(invalidCrossfadeSummary != nullptr
                     && invalidCrossfadeSummary->disposition == SfzImportSupportDisposition::approximated,
                 "Unsupported crossfade topology should remain classified as approximated.");
+
+        const auto sparseFixturePath = invalidFixtureDirectory / "sparse-round-robin.sfz";
+        writeTextFile(
+            sparseFixturePath,
+            "<region>\n"
+            "sample=" + samplePath.generic_string() + "\n"
+            "pitch_keycenter=60\n"
+            "lokey=60\n"
+            "hikey=60\n"
+            "seq_length=3\n"
+            "seq_position=1\n"
+            "<region>\n"
+            "sample=" + samplePath.generic_string() + "\n"
+            "pitch_keycenter=60\n"
+            "lokey=60\n"
+            "hikey=60\n"
+            "seq_length=3\n"
+            "seq_position=3\n");
+        const auto sparseAnalysis = analyzeSfzImportDocument(sparseFixturePath.generic_string());
+        require(countFindingsWithCode(sparseAnalysis.report, "sfz.round_robin.sparse_slots.reported") >= 1,
+                "Sparse sequential round-robin pools should surface a typed review finding.");
+        const auto* sparseSummary = findSupportSummary(sparseAnalysis.report, SfzOpcodeScope::region, "seq_length");
+        require(sparseSummary != nullptr
+                    && sparseSummary->disposition == SfzImportSupportDisposition::reportedOnly,
+                "Sparse sequential round-robin pools should keep seq_length in the review-only bucket.");
+
+        const auto mixedLengthFixturePath = invalidFixtureDirectory / "mixed-round-robin-lengths.sfz";
+        writeTextFile(
+            mixedLengthFixturePath,
+            "<region>\n"
+            "sample=" + samplePath.generic_string() + "\n"
+            "pitch_keycenter=60\n"
+            "lokey=60\n"
+            "hikey=60\n"
+            "seq_length=2\n"
+            "seq_position=1\n"
+            "<region>\n"
+            "sample=" + samplePath.generic_string() + "\n"
+            "pitch_keycenter=60\n"
+            "lokey=60\n"
+            "hikey=60\n"
+            "seq_length=3\n"
+            "seq_position=2\n");
+        const auto mixedLengthAnalysis = analyzeSfzImportDocument(mixedLengthFixturePath.generic_string());
+        require(countFindingsWithCode(mixedLengthAnalysis.report, "sfz.round_robin.mixed_lengths.reported") >= 1,
+                "Mixed sequential round-robin lengths should surface a typed review finding.");
+
+        const auto conflictingFixturePath = invalidFixtureDirectory / "conflicting-round-robin-slots.sfz";
+        writeTextFile(
+            conflictingFixturePath,
+            "<region>\n"
+            "sample=" + samplePath.generic_string() + "\n"
+            "pitch_keycenter=60\n"
+            "lokey=60\n"
+            "hikey=60\n"
+            "seq_length=2\n"
+            "seq_position=1\n"
+            "<region>\n"
+            "sample=" + samplePath.generic_string() + "\n"
+            "pitch_keycenter=60\n"
+            "lokey=60\n"
+            "hikey=60\n"
+            "seq_length=2\n"
+            "seq_position=1\n");
+        const auto conflictingAnalysis = analyzeSfzImportDocument(conflictingFixturePath.generic_string());
+        require(countFindingsWithCode(conflictingAnalysis.report, "sfz.round_robin.conflicting_group.reported") >= 1,
+                "Conflicting sequential round-robin slot assignments should surface a typed review finding.");
+
+        const auto randomPolicyFixturePath = invalidFixtureDirectory / "random-round-robin-policy.sfz";
+        writeTextFile(
+            randomPolicyFixturePath,
+            "<region>\n"
+            "sample=" + samplePath.generic_string() + "\n"
+            "pitch_keycenter=60\n"
+            "lokey=60\n"
+            "hikey=60\n"
+            "lorand=0\n"
+            "hirand=0.5\n");
+        const auto randomPolicyAnalysis = analyzeSfzImportDocument(randomPolicyFixturePath.generic_string());
+        const auto* lorandSummary = findSupportSummary(randomPolicyAnalysis.report, SfzOpcodeScope::region, "lorand");
+        require(lorandSummary != nullptr
+                    && lorandSummary->disposition == SfzImportSupportDisposition::reportedOnly,
+                "Unsupported random round-robin policy opcodes should stay review-only.");
+        require(countFindingsWithCode(randomPolicyAnalysis.report, "sfz.round_robin.random_policy.reported") >= 1,
+                "Unsupported random round-robin policy opcodes should surface a typed review finding.");
 
         std::cout << "Sprint 3.1.3 SFZ compatibility tests passed." << std::endl;
         return 0;

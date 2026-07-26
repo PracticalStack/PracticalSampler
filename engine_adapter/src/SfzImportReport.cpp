@@ -100,6 +100,11 @@ bool isVelocityCrossfadeOpcode(const std::string& opcodeName)
         || opcodeName == "xfout_lovel" || opcodeName == "xfout_hivel";
 }
 
+bool isSequentialRoundRobinOpcode(const std::string& opcodeName)
+{
+    return opcodeName == "seq_length" || opcodeName == "seq_position";
+}
+
 std::optional<int> parseIntValue(const std::string& text)
 {
     try
@@ -191,13 +196,13 @@ std::uint64_t buildCrossfadePairingKey(const std::string& articulationId,
                                        int roundRobinLength,
                                        int roundRobinPosition)
 {
+    (void) roundRobinLength;
+    (void) roundRobinPosition;
     std::ostringstream stream;
     stream << articulationId
            << "|" << rootKey
            << "|" << keyLow
-           << "|" << keyHigh
-           << "|" << roundRobinLength
-           << "|" << roundRobinPosition;
+           << "|" << keyHigh;
     return computeFnv1a64(stream.str());
 }
 
@@ -213,6 +218,36 @@ std::string buildArticulationId(const SfzNormalizedSection& section)
     }
 
     return "sustain";
+}
+
+std::string buildRoundRobinPoolSignature(const SfzNormalizedSection& section,
+                                         int rootKey,
+                                         int keyLow,
+                                         int keyHigh,
+                                         int velocityLow,
+                                         int velocityHigh)
+{
+    std::ostringstream stream;
+    stream << buildArticulationId(section)
+           << "|" << rootKey
+           << "|" << keyLow
+           << "|" << keyHigh
+           << "|" << velocityLow
+           << "|" << velocityHigh;
+    return stream.str();
+}
+
+std::string buildCrossfadeRoundRobinPoolSignature(const SfzNormalizedSection& section,
+                                                  int rootKey,
+                                                  int keyLow,
+                                                  int keyHigh)
+{
+    std::ostringstream stream;
+    stream << buildArticulationId(section)
+           << "|" << rootKey
+           << "|" << keyLow
+           << "|" << keyHigh;
+    return stream.str();
 }
 
 std::size_t dispositionRank(const SfzImportSupportDisposition disposition) noexcept
@@ -390,6 +425,214 @@ OpcodeClassification makeUnsupportedVelocityCrossfadeClassification(const std::s
     };
 }
 
+OpcodeClassification makeUnsupportedRoundRobinClassification(const std::string& findingCode,
+                                                             const std::string& findingSummary,
+                                                             const std::string& detail)
+{
+    return {
+        SfzImportSupportDisposition::reportedOnly,
+        "report.roundRobin",
+        "Sequential round-robin metadata is recognized, but this pool needs creator review before it can be converted into a native Round Robin object.",
+        findingCode,
+        findingSummary,
+        detail
+    };
+}
+
+std::vector<CrossfadeOpcodeKey> collectSequentialRoundRobinOwnerKeys(const SfzNormalizedSection& section)
+{
+    std::set<CrossfadeOpcodeKey> uniqueKeys;
+    for (const auto& opcode : section.effectiveOpcodes)
+    {
+        if (isSequentialRoundRobinOpcode(toLowerAscii(opcode.name)))
+            uniqueKeys.insert(makeCrossfadeOpcodeKey(opcode));
+    }
+
+    return { uniqueKeys.begin(), uniqueKeys.end() };
+}
+
+void assignRoundRobinClassification(std::map<CrossfadeOpcodeKey, OpcodeClassification>& classifications,
+                                    const std::vector<CrossfadeOpcodeKey>& ownerKeys,
+                                    const OpcodeClassification& classification)
+{
+    for (const auto& ownerKey : ownerKeys)
+    {
+        auto existing = classifications.find(ownerKey);
+        if (existing == classifications.end()
+            || dispositionRank(classification.disposition) > dispositionRank(existing->second.disposition))
+        {
+            classifications[ownerKey] = classification;
+        }
+    }
+}
+
+std::map<CrossfadeOpcodeKey, OpcodeClassification> buildSequentialRoundRobinOpcodeClassifications(
+    const SfzNormalizedDocument& document)
+{
+    struct SequentialRoundRobinRegion
+    {
+        std::string poolSignature;
+        int roundRobinLength = 0;
+        int roundRobinPosition = 0;
+        std::vector<CrossfadeOpcodeKey> ownerKeys;
+    };
+
+    std::vector<SequentialRoundRobinRegion> regions;
+    std::map<CrossfadeOpcodeKey, OpcodeClassification> classifications;
+
+    for (const auto& section : document.sections)
+    {
+        if (section.scope != SfzOpcodeScope::region)
+            continue;
+
+        auto ownerKeys = collectSequentialRoundRobinOwnerKeys(section);
+        if (ownerKeys.empty())
+            continue;
+
+        const auto rootKey = parseMidiNoteValue(findEffectiveOpcode(section, "pitch_keycenter") != nullptr
+                                                    ? findEffectiveOpcode(section, "pitch_keycenter")->value
+                                                    : "60")
+                                 .value_or(60);
+        const auto keyLow = parseMidiNoteValue(findEffectiveOpcode(section, "lokey") != nullptr
+                                                   ? findEffectiveOpcode(section, "lokey")->value
+                                                   : std::to_string(rootKey))
+                                .value_or(rootKey);
+        const auto keyHigh = parseMidiNoteValue(findEffectiveOpcode(section, "hikey") != nullptr
+                                                    ? findEffectiveOpcode(section, "hikey")->value
+                                                    : std::to_string(rootKey))
+                                 .value_or(rootKey);
+        auto velocityLow = parseIntValue(findEffectiveOpcode(section, "lovel") != nullptr
+                                             ? findEffectiveOpcode(section, "lovel")->value
+                                             : "1")
+                               .value_or(1);
+        auto velocityHigh = parseIntValue(findEffectiveOpcode(section, "hivel") != nullptr
+                                              ? findEffectiveOpcode(section, "hivel")->value
+                                              : "127")
+                                .value_or(127);
+        if (const auto fadeInLowVelocity = parseIntValue(findEffectiveOpcode(section, "xfin_lovel") != nullptr
+                                                             ? findEffectiveOpcode(section, "xfin_lovel")->value
+                                                             : "0");
+            fadeInLowVelocity.value_or(0) > 0)
+        {
+            velocityLow = *fadeInLowVelocity;
+        }
+        if (const auto fadeOutHighVelocity = parseIntValue(findEffectiveOpcode(section, "xfout_hivel") != nullptr
+                                                               ? findEffectiveOpcode(section, "xfout_hivel")->value
+                                                               : "0");
+            fadeOutHighVelocity.value_or(0) > 0)
+        {
+            velocityHigh = *fadeOutHighVelocity;
+        }
+
+        SequentialRoundRobinRegion region;
+        region.roundRobinLength = parseIntValue(findEffectiveOpcode(section, "seq_length") != nullptr
+                                                    ? findEffectiveOpcode(section, "seq_length")->value
+                                                    : "0")
+                                      .value_or(0);
+        region.roundRobinPosition = parseIntValue(findEffectiveOpcode(section, "seq_position") != nullptr
+                                                      ? findEffectiveOpcode(section, "seq_position")->value
+                                                      : "0")
+                                        .value_or(0);
+        region.poolSignature = buildRoundRobinPoolSignature(section,
+                                                            rootKey,
+                                                            keyLow,
+                                                            keyHigh,
+                                                            velocityLow,
+                                                            velocityHigh);
+        region.ownerKeys = std::move(ownerKeys);
+
+        if (region.roundRobinLength <= 0
+            || region.roundRobinPosition <= 0
+            || region.roundRobinPosition > region.roundRobinLength)
+        {
+            assignRoundRobinClassification(
+                classifications,
+                region.ownerKeys,
+                makeUnsupportedRoundRobinClassification(
+                    "sfz.round_robin.slot_contract.reported",
+                    "Sequential round-robin slot metadata requires review",
+                    "The importer only converts sequential round-robin regions when seq_length and seq_position form a positive in-range slot contract."));
+        }
+
+        regions.push_back(std::move(region));
+    }
+
+    std::map<std::string, std::vector<std::size_t>> regionsByPoolSignature;
+    for (std::size_t index = 0; index < regions.size(); ++index)
+    {
+        if (regions[index].roundRobinLength > 0
+            && regions[index].roundRobinPosition > 0
+            && regions[index].roundRobinPosition <= regions[index].roundRobinLength)
+        {
+            regionsByPoolSignature[regions[index].poolSignature].push_back(index);
+        }
+    }
+
+    for (const auto& [_, regionIndices] : regionsByPoolSignature)
+    {
+        std::set<int> uniqueLengths;
+        std::set<int> uniquePositions;
+        std::map<int, int> positionCounts;
+        std::vector<CrossfadeOpcodeKey> ownerKeys;
+
+        for (const auto regionIndex : regionIndices)
+        {
+            const auto& region = regions[regionIndex];
+            uniqueLengths.insert(region.roundRobinLength);
+            uniquePositions.insert(region.roundRobinPosition);
+            ++positionCounts[region.roundRobinPosition];
+            ownerKeys.insert(ownerKeys.end(), region.ownerKeys.begin(), region.ownerKeys.end());
+        }
+
+        if (uniqueLengths.size() > 1)
+        {
+            assignRoundRobinClassification(
+                classifications,
+                ownerKeys,
+                makeUnsupportedRoundRobinClassification(
+                    "sfz.round_robin.mixed_lengths.reported",
+                    "Sequential round-robin pool declares mixed lengths",
+                    "Regions that share the same articulation, key, and velocity window must agree on one seq_length value before the importer can build a native Round Robin pool."));
+            continue;
+        }
+
+        const auto duplicateSlot = std::find_if(positionCounts.begin(),
+                                                positionCounts.end(),
+                                                [](const auto& entry)
+                                                {
+                                                    return entry.second > 1;
+                                                });
+        if (duplicateSlot != positionCounts.end())
+        {
+            assignRoundRobinClassification(
+                classifications,
+                ownerKeys,
+                makeUnsupportedRoundRobinClassification(
+                    "sfz.round_robin.conflicting_group.reported",
+                    "Sequential round-robin pool maps multiple regions to one slot",
+                    "Regions that share the same articulation, key, and velocity window must not reuse the same seq_position when building a native Round Robin pool."));
+            continue;
+        }
+
+        const auto expectedLength = *uniqueLengths.begin();
+        const auto contiguous = !uniquePositions.empty()
+            && *uniquePositions.begin() == 1
+            && static_cast<int>(uniquePositions.size()) == expectedLength;
+        if (!contiguous)
+        {
+            assignRoundRobinClassification(
+                classifications,
+                ownerKeys,
+                makeUnsupportedRoundRobinClassification(
+                    "sfz.round_robin.sparse_slots.reported",
+                    "Sequential round-robin pool has sparse slot coverage",
+                    "The importer only converts sequential round-robin pools when every slot from 1 through seq_length is present exactly once within the pool."));
+        }
+    }
+
+    return classifications;
+}
+
 std::map<CrossfadeOpcodeKey, OpcodeClassification> buildVelocityCrossfadeOpcodeClassifications(
     const SfzNormalizedDocument& document)
 {
@@ -464,6 +707,13 @@ std::map<CrossfadeOpcodeKey, OpcodeClassification> buildVelocityCrossfadeOpcodeC
                                                                    ? findEffectiveOpcode(section, "seq_position")->value
                                                                    : "0")
                                                      .value_or(0);
+        if (region.topologyZone.roundRobinLength > 0 && region.topologyZone.roundRobinPosition > 0)
+        {
+            region.topologyZone.roundRobinPoolId = buildCrossfadeRoundRobinPoolSignature(section,
+                                                                                         rootKey,
+                                                                                         keyLow,
+                                                                                         keyHigh);
+        }
         region.topologyZone.pairingKey = buildCrossfadePairingKey(buildArticulationId(section),
                                                                   rootKey,
                                                                   keyLow,
@@ -671,15 +921,39 @@ OpcodeClassification classifyOpcode(const SfzResolvedOpcode& opcode)
     if (opcodeName == "seq_length")
     {
         return { SfzImportSupportDisposition::converted,
-                 "zone.roundRobin.length",
-                 "Round-robin sequence length remains part of the required Phase 3.1 import contract." };
+                 "zone.roundRobin.slotCount",
+                 "Sequential round-robin sequence length converts into native Round Robin pool metadata and deterministic slot advancement." };
     }
 
     if (opcodeName == "seq_position")
     {
         return { SfzImportSupportDisposition::converted,
-                 "zone.roundRobin.position",
-                 "Round-robin sequence position remains part of the required Phase 3.1 import contract." };
+                 "zone.roundRobin.slotIndex",
+                 "Sequential round-robin sequence position converts into native Round Robin pool metadata and deterministic slot advancement." };
+    }
+
+    if (opcodeName == "lorand" || opcodeName == "hirand")
+    {
+        return { SfzImportSupportDisposition::reportedOnly,
+                 "report.roundRobin.randomPolicy",
+                 "Randomized region-selection policies remain review-only because the native Round Robin contract is currently deterministic and sequential.",
+                 "sfz.round_robin.random_policy.reported",
+                 "Random round-robin policy will be reported",
+                 "The importer recognizes SFZ random round-robin policy opcodes, but does not convert them into the native sequential Round Robin behavior." };
+    }
+
+    if (opcodeName == "sw_last"
+        || opcodeName == "sw_lokey"
+        || opcodeName == "sw_hikey"
+        || opcodeName == "sw_default"
+        || opcodeName == "sw_label")
+    {
+        return { SfzImportSupportDisposition::reportedOnly,
+                 "report.roundRobin.switchPolicy",
+                 "Switch-driven region-selection policies remain review-only because they do not map directly onto the native sequential Round Robin contract.",
+                 "sfz.round_robin.switch_policy.reported",
+                 "Switch-driven round-robin policy will be reported",
+                 "The importer recognizes SFZ switch-driven region-selection policy opcodes, but does not convert them into the native sequential Round Robin behavior." };
     }
 
     if (opcodeName == "volume")
@@ -785,6 +1059,8 @@ SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath)
             result.report.summary.opcodeCount = 0;
             const auto crossfadeClassifications =
                 buildVelocityCrossfadeOpcodeClassifications(result.normalizeResult.document);
+            const auto roundRobinClassifications =
+                buildSequentialRoundRobinOpcodeClassifications(result.normalizeResult.document);
 
             std::map<SupportKey, SfzImportOpcodeSupportSummary> supportSummaries;
 
@@ -806,6 +1082,15 @@ SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath)
                             ? classificationIterator->second
                             : makeUnsupportedVelocityCrossfadeClassification(
                                 "The importer could not confirm a supported adjacent-layer pairing for this opcode.");
+                    }
+                    else if (isSequentialRoundRobinOpcode(toLowerAscii(opcode.name)))
+                    {
+                        if (const auto classificationIterator =
+                                roundRobinClassifications.find(makeCrossfadeOpcodeKey(opcode));
+                            classificationIterator != roundRobinClassifications.end())
+                        {
+                            classification = classificationIterator->second;
+                        }
                     }
                     incrementDispositionCount(result.report.summary, classification.disposition);
                     addClassificationFinding(result.report.findings,

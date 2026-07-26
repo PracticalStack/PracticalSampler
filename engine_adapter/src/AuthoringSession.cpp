@@ -1,4 +1,5 @@
 #include "drs/engine/AuthoringSession.h"
+#include "drs/engine/RuntimeLoader.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -539,6 +540,26 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
                                    std::make_move_iterator(authoringNotes.begin()),
                                    std::make_move_iterator(authoringNotes.end()));
     project.authoring.selectedZoneId = project.authoring.zones[originalZoneCount].id;
+
+    const auto requiresRoundRobinSchema = std::any_of(project.authoring.zones.begin(),
+                                                      project.authoring.zones.end(),
+                                                      [](const RuntimeProjectZoneDefinition& zone)
+                                                      {
+                                                          return zone.roundRobin.has_value();
+                                                      });
+    if (requiresRoundRobinSchema
+        && (project.schemaVersion != 3 || project.authoring.schemaVersion != 2))
+    {
+        const auto migration = migrateRuntimeProjectToPhase3RoundRobinSchema(project);
+        if (!migration.valid)
+            return makeRejectedResult(getDocumentState(),
+                                      "Authoring import rejected",
+                                      migration.issues.empty()
+                                          ? "Round Robin import could not migrate the project schema."
+                                          : migration.issues.front());
+
+        project = migration.project;
+    }
 
     std::vector<std::string> changedPaths {
         "sampleSources[" + std::to_string(originalSampleSourceCount) + "]",

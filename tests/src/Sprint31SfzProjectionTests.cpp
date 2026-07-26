@@ -158,6 +158,15 @@ int main()
                     && secondZone.roundRobinPosition == 2
                     && thirdZone.roundRobinPosition == 3,
                 "The first projected SFZ regions should preserve round-robin positions 1, 2, and 3.");
+        require(firstZone.roundRobin.has_value()
+                    && secondZone.roundRobin.has_value()
+                    && thirdZone.roundRobin.has_value()
+                    && firstZone.roundRobin->poolId == secondZone.roundRobin->poolId
+                    && secondZone.roundRobin->poolId == thirdZone.roundRobin->poolId
+                    && firstZone.roundRobin->slotCount == 3
+                    && secondZone.roundRobin->slotIndex == 2
+                    && thirdZone.roundRobin->mode == RoundRobinMode::sequential,
+                "The first projected SFZ regions should now share one explicit sequential round-robin pool descriptor.");
         require(firstZone.gainDb == 6.0,
                 "The projected SFZ master volume should map into native zone gain.");
         require(firstZone.releaseSeconds == 0.5,
@@ -266,6 +275,10 @@ int main()
                     && roundTripProject.project.authoring.zones.at(0).roundRobinPosition == 1
                     && roundTripProject.project.authoring.zones.at(0).releaseSeconds == 0.5,
                 "Projected SFZ zone metadata should survive project round-tripping.");
+        require(roundTripProject.project.authoring.zones.at(0).roundRobin.has_value()
+                    && roundTripProject.project.authoring.zones.at(0).roundRobin->slotCount == 3
+                    && roundTripProject.project.authoring.zones.at(0).roundRobin->slotIndex == 1,
+                "Projected SFZ zones should preserve explicit round-robin descriptors through project round-tripping.");
         requireCrossfadeEquals(roundTripProject.project.authoring.zones.at(0).velocityCrossfade,
                                0,
                                0,
@@ -286,6 +299,10 @@ int main()
                     && roundTripInstrument.instrument.zones.at(2).roundRobinPosition == 3
                     && roundTripInstrument.instrument.zones.at(0).releaseSeconds == 0.5,
                 "Round-tripped native instrument zones should preserve SFZ round-robin and release metadata.");
+        require(roundTripInstrument.instrument.zones.at(0).roundRobin.has_value()
+                    && roundTripInstrument.instrument.zones.at(0).roundRobin->slotCount == 3
+                    && roundTripInstrument.instrument.zones.at(2).roundRobin->slotIndex == 3,
+                "Round-tripped native instrument zones should preserve explicit round-robin descriptors.");
         requireCrossfadeEquals(roundTripInstrument.instrument.zones.at(0).velocityCrossfade,
                                0,
                                0,

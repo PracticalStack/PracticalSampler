@@ -56,6 +56,8 @@ int main()
                 "The shared SFZ report model headline changed unexpectedly.");
         require(model.guidance.find("velocity crossfades will be preserved") != std::string::npos,
                 "The shared SFZ report model should publish creator guidance.");
+        require(model.guidance.find("round robins will be grouped into native Round Robin pools") != std::string::npos,
+                "The shared SFZ report model should acknowledge converted sequential round-robin pools.");
         require(model.documentPath == analysis.report.rootDocumentPath,
                 "The shared SFZ report model should preserve the analyzed document path.");
         require(model.convertedCount == 1599

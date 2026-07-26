@@ -11,6 +11,7 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <unordered_map>
 
@@ -82,6 +83,23 @@ std::string computeFnv1aChecksumHex(const fs::path& path)
             hash ^= static_cast<unsigned char>(buffer[index]);
             hash *= prime;
         }
+    }
+
+    std::ostringstream stream;
+    stream << std::hex << std::setfill('0') << std::setw(16) << hash;
+    return stream.str();
+}
+
+std::string computeFnv1a64Hex(const std::string& text)
+{
+    constexpr std::uint64_t offsetBasis = 14695981039346656037ull;
+    constexpr std::uint64_t prime = 1099511628211ull;
+
+    std::uint64_t hash = offsetBasis;
+    for (const auto character : text)
+    {
+        hash ^= static_cast<unsigned char>(character);
+        hash *= prime;
     }
 
     std::ostringstream stream;
@@ -282,6 +300,211 @@ std::vector<std::string> splitFilenameStem(const std::string& filenameStem)
         tokens.push_back(current);
 
     return tokens;
+}
+
+std::optional<int> parseMidiNoteToken(const std::string& token);
+std::optional<int> parseVelocityToken(const std::string& token);
+std::optional<int> parseRoundRobinToken(const std::string& token);
+std::optional<std::string> parseArticulationToken(const std::string& token);
+std::string noteTokenCanonicalName(int midiNote);
+
+struct ParsedFilenameContext
+{
+    std::vector<SampleFilenameToken> tokens;
+    std::optional<int> detectedVelocity;
+    std::optional<int> detectedRoundRobin;
+    std::optional<std::string> detectedArticulation;
+};
+
+ParsedFilenameContext parseFilenameContext(const std::string& filenameStem)
+{
+    ParsedFilenameContext context;
+    const auto rawTokens = splitFilenameStem(filenameStem);
+
+    for (const auto& rawToken : rawTokens)
+    {
+        SampleFilenameToken token;
+        token.text = rawToken;
+        token.normalizedText = toLowerAscii(rawToken);
+        token.kind = SampleFilenameTokenKind::text;
+
+        if (const auto rootKey = parseMidiNoteToken(rawToken); rootKey.has_value())
+        {
+            token.kind = SampleFilenameTokenKind::rootNote;
+            token.numericValue = *rootKey;
+            token.canonicalValue = noteTokenCanonicalName(*rootKey);
+        }
+        else if (const auto velocity = parseVelocityToken(rawToken); velocity.has_value())
+        {
+            token.kind = SampleFilenameTokenKind::velocity;
+            token.numericValue = *velocity;
+            token.canonicalValue = std::to_string(*velocity);
+            if (!context.detectedVelocity.has_value())
+                context.detectedVelocity = *velocity;
+        }
+        else if (const auto roundRobin = parseRoundRobinToken(rawToken); roundRobin.has_value())
+        {
+            token.kind = SampleFilenameTokenKind::roundRobin;
+            token.numericValue = *roundRobin;
+            token.canonicalValue = std::to_string(*roundRobin);
+            if (!context.detectedRoundRobin.has_value())
+                context.detectedRoundRobin = *roundRobin;
+        }
+        else if (const auto articulation = parseArticulationToken(rawToken); articulation.has_value())
+        {
+            token.kind = SampleFilenameTokenKind::articulation;
+            token.canonicalValue = *articulation;
+            context.detectedArticulation = *articulation;
+        }
+
+        context.tokens.push_back(std::move(token));
+    }
+
+    return context;
+}
+
+std::string buildRoundRobinGroupSignature(const std::vector<SampleFilenameToken>& tokens)
+{
+    std::ostringstream stream;
+    for (const auto& token : tokens)
+    {
+        if (token.kind == SampleFilenameTokenKind::roundRobin)
+            continue;
+
+        switch (token.kind)
+        {
+            case SampleFilenameTokenKind::rootNote:
+                stream << "root:" << token.canonicalValue;
+                break;
+            case SampleFilenameTokenKind::velocity:
+                stream << "velocity:" << token.canonicalValue;
+                break;
+            case SampleFilenameTokenKind::articulation:
+                stream << "articulation:" << token.canonicalValue;
+                break;
+            case SampleFilenameTokenKind::text:
+            case SampleFilenameTokenKind::unknown:
+                stream << "text:" << token.normalizedText;
+                break;
+            case SampleFilenameTokenKind::roundRobin:
+                break;
+        }
+
+        stream << "|";
+    }
+
+    return stream.str();
+}
+
+void applyRoundRobinDescriptor(RuntimeProjectZoneDefinition& zone,
+                               const std::string& poolId,
+                               int slotCount,
+                               int slotIndex)
+{
+    zone.roundRobin = RoundRobinDescriptor {
+        poolId,
+        slotCount,
+        slotIndex,
+        RoundRobinMode::sequential
+    };
+    zone.roundRobinLength = slotCount;
+    zone.roundRobinPosition = slotIndex;
+}
+
+void inferRoundRobinPoolFromSiblings(const fs::path& samplePath,
+                                     const ParsedFilenameContext& context,
+                                     RuntimeProjectZoneDefinition& zone,
+                                     std::vector<AuthoringImportFinding>& findings)
+{
+    if (!context.detectedRoundRobin.has_value())
+        return;
+
+    const auto parentPath = samplePath.parent_path();
+    if (parentPath.empty() || !fs::exists(parentPath))
+        return;
+
+    const auto groupSignature = buildRoundRobinGroupSignature(context.tokens);
+    std::set<int> uniqueSlots;
+    std::unordered_map<int, int> slotCounts;
+
+    for (const auto& entry : fs::directory_iterator(parentPath))
+    {
+        if (!entry.is_regular_file())
+            continue;
+
+        const auto siblingPath = entry.path();
+        if (toLowerAscii(siblingPath.extension().generic_string())
+            != toLowerAscii(samplePath.extension().generic_string()))
+        {
+            continue;
+        }
+
+        const auto siblingContext = parseFilenameContext(siblingPath.stem().generic_string());
+        if (!siblingContext.detectedRoundRobin.has_value())
+            continue;
+
+        if (buildRoundRobinGroupSignature(siblingContext.tokens) != groupSignature)
+            continue;
+
+        uniqueSlots.insert(*siblingContext.detectedRoundRobin);
+        ++slotCounts[*siblingContext.detectedRoundRobin];
+    }
+
+    if (uniqueSlots.empty())
+        return;
+
+    std::vector<std::string> relatedTokens;
+    relatedTokens.reserve(uniqueSlots.size());
+    for (const auto slot : uniqueSlots)
+        relatedTokens.push_back("rr" + std::to_string(slot));
+
+    const auto highestSlot = *uniqueSlots.rbegin();
+    const auto hasDuplicateSlot = std::any_of(slotCounts.begin(),
+                                              slotCounts.end(),
+                                              [](const auto& entry)
+                                              {
+                                                  return entry.second > 1;
+                                              });
+    const bool contiguous = *uniqueSlots.begin() == 1
+        && static_cast<int>(uniqueSlots.size()) == highestSlot;
+
+    if (hasDuplicateSlot)
+    {
+        addFinding(findings,
+                   AuthoringImportFindingSeverity::warning,
+                   "round_robin.conflicting_group",
+                   "Round-robin slot mapping conflicts across sibling files",
+                   "Sibling files inferred multiple samples for the same round-robin slot. Confirm or regroup these files before accepting the draft zone.",
+                   true,
+                   relatedTokens);
+        return;
+    }
+
+    if (!contiguous || highestSlot <= 1)
+    {
+        addFinding(findings,
+                   AuthoringImportFindingSeverity::warning,
+                   "round_robin.sparse_slots",
+                   "Round-robin sibling pool is incomplete",
+                   "Sibling files exposed round-robin slots that do not form a contiguous 1-based pool, so the importer left the draft zone ungrouped for review.",
+                   true,
+                   relatedTokens);
+        return;
+    }
+
+    applyRoundRobinDescriptor(zone,
+                              "rr-import-" + computeFnv1a64Hex(parentPath.lexically_normal().generic_string()
+                                                               + "|" + groupSignature),
+                              highestSlot,
+                              *context.detectedRoundRobin);
+    addFinding(findings,
+               AuthoringImportFindingSeverity::info,
+               "round_robin.inferred",
+               "Inferred round-robin pool from sibling files",
+               "Sibling files resolved a " + std::to_string(highestSlot)
+                   + "-slot sequential round-robin pool for this draft zone.",
+               false,
+               relatedTokens);
 }
 
 std::optional<int> parseMidiNoteToken(const std::string& token)
@@ -736,50 +959,8 @@ ParsedSampleFilenameHeuristics parseSampleFilenameHeuristics(const std::string& 
 
     const fs::path sourcePath(samplePath);
     const auto filenameStem = sourcePath.stem().generic_string();
-    const auto rawTokens = splitFilenameStem(filenameStem);
-
-    std::optional<int> detectedVelocity;
-    std::optional<int> detectedRoundRobin;
-    std::optional<std::string> detectedArticulation;
-
-    for (const auto& rawToken : rawTokens)
-    {
-        SampleFilenameToken token;
-        token.text = rawToken;
-        token.normalizedText = toLowerAscii(rawToken);
-        token.kind = SampleFilenameTokenKind::text;
-
-        if (const auto rootKey = parseMidiNoteToken(rawToken); rootKey.has_value())
-        {
-            token.kind = SampleFilenameTokenKind::rootNote;
-            token.numericValue = *rootKey;
-            token.canonicalValue = noteTokenCanonicalName(*rootKey);
-        }
-        else if (const auto velocity = parseVelocityToken(rawToken); velocity.has_value())
-        {
-            token.kind = SampleFilenameTokenKind::velocity;
-            token.numericValue = *velocity;
-            token.canonicalValue = std::to_string(*velocity);
-            if (!detectedVelocity.has_value())
-                detectedVelocity = *velocity;
-        }
-        else if (const auto roundRobin = parseRoundRobinToken(rawToken); roundRobin.has_value())
-        {
-            token.kind = SampleFilenameTokenKind::roundRobin;
-            token.numericValue = *roundRobin;
-            token.canonicalValue = std::to_string(*roundRobin);
-            if (!detectedRoundRobin.has_value())
-                detectedRoundRobin = *roundRobin;
-        }
-        else if (const auto articulation = parseArticulationToken(rawToken); articulation.has_value())
-        {
-            token.kind = SampleFilenameTokenKind::articulation;
-            token.canonicalValue = *articulation;
-            detectedArticulation = *articulation;
-        }
-
-        result.tokens.push_back(std::move(token));
-    }
+    const auto context = parseFilenameContext(filenameStem);
+    result.tokens = context.tokens;
 
     auto& suggestion = result.suggestedZone;
     suggestion.suggested = true;
@@ -787,8 +968,8 @@ ParsedSampleFilenameHeuristics parseSampleFilenameHeuristics(const std::string& 
     suggestion.zone.id = slugify(filenameStem);
     suggestion.zone.sampleSourceId = suggestion.sourceSampleId;
     suggestion.zone.displayName = toDisplayName(filenameStem);
-    suggestion.zone.groupId = detectedArticulation.value_or("default-group");
-    suggestion.zone.articulationId = detectedArticulation.value_or("default");
+    suggestion.zone.groupId = context.detectedArticulation.value_or("default-group");
+    suggestion.zone.articulationId = context.detectedArticulation.value_or("default");
     suggestion.zone.gainDb = 0.0;
     suggestion.zone.pan = 0.0;
     suggestion.zone.sampleStartFrame = 0;
@@ -800,27 +981,27 @@ ParsedSampleFilenameHeuristics parseSampleFilenameHeuristics(const std::string& 
         suggestion.zone.loopEndFrame = metadata->loopEndFrame;
     }
 
-    if (detectedArticulation.has_value())
+    if (context.detectedArticulation.has_value())
     {
         addFinding(result.findings,
                    AuthoringImportFindingSeverity::info,
                    "articulation.detected",
                    "Detected articulation token",
-                   "Filename token inferred articulation '" + *detectedArticulation + "'.",
+                   "Filename token inferred articulation '" + *context.detectedArticulation + "'.",
                    false,
-                   {*detectedArticulation});
+                   {*context.detectedArticulation});
     }
 
-    if (detectedRoundRobin.has_value())
+    if (context.detectedRoundRobin.has_value())
     {
-        suggestion.roundRobinIndex = *detectedRoundRobin;
         addFinding(result.findings,
                    AuthoringImportFindingSeverity::info,
                    "round_robin.detected",
                    "Detected round-robin token",
-                   "Filename token inferred round-robin index " + std::to_string(*detectedRoundRobin) + ".",
+                   "Filename token inferred round-robin slot " + std::to_string(*context.detectedRoundRobin) + ".",
                    false,
-                   {"rr" + std::to_string(*detectedRoundRobin)});
+                   {"rr" + std::to_string(*context.detectedRoundRobin)});
+        inferRoundRobinPoolFromSiblings(sourcePath, context, suggestion.zone, result.findings);
     }
 
     const auto rootKeyInference = inferSampleRootKey(samplePath, metadata);
@@ -842,9 +1023,9 @@ ParsedSampleFilenameHeuristics parseSampleFilenameHeuristics(const std::string& 
                            rootKeyInference.findings.begin(),
                            rootKeyInference.findings.end());
 
-    if (detectedVelocity.has_value())
+    if (context.detectedVelocity.has_value())
     {
-        const auto [velocityLow, velocityHigh] = velocityBucketRange(*detectedVelocity);
+        const auto [velocityLow, velocityHigh] = velocityBucketRange(*context.detectedVelocity);
         suggestion.zone.velocityLow = velocityLow;
         suggestion.zone.velocityHigh = velocityHigh;
         suggestion.velocitySource = "filename";
@@ -852,7 +1033,7 @@ ParsedSampleFilenameHeuristics parseSampleFilenameHeuristics(const std::string& 
                    AuthoringImportFindingSeverity::info,
                    "velocity.detected",
                    "Detected velocity layer token",
-                   "Filename token inferred a velocity layer centered on " + std::to_string(*detectedVelocity)
+                   "Filename token inferred a velocity layer centered on " + std::to_string(*context.detectedVelocity)
                        + ", mapped to the range " + std::to_string(velocityLow) + "-" + std::to_string(velocityHigh) + ".");
     }
     else
