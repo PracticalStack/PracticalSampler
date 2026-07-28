@@ -10,6 +10,8 @@ namespace
 const auto zoneMapGrid = juce::Colour::fromRGB(230, 220, 207);
 const auto zoneMapSelected = juce::Colour::fromRGB(28, 108, 88);
 const auto zoneMapAccent = juce::Colour::fromRGB(181, 96, 21);
+const auto zoneMapSelectedFill = zoneMapSelected.withAlpha(0.62f);
+const auto zoneMapAccentFill = zoneMapAccent.withAlpha(0.5f);
 const auto zoneMapLabelFill = juce::Colour::fromRGBA(20, 25, 31, 168);
 const auto zoneMapOutline = juce::Colour::fromRGBA(24, 29, 33, 92);
 const auto zoneMapFocusRing = juce::Colour::fromRGB(24, 29, 33);
@@ -236,7 +238,7 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
             continue;
 
         const auto zoneBounds = layoutIterator->bounds;
-        g.setColour(zone.selected ? zoneMapSelected : zoneMapAccent.withMultipliedAlpha(0.72f));
+        g.setColour(zone.selected ? zoneMapSelectedFill : zoneMapAccentFill);
         g.fillRoundedRectangle(zoneBounds, 8.0f);
 
         g.setColour(zone.selected ? juce::Colours::white : zoneMapOutline);
