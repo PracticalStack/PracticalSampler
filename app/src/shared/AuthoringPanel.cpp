@@ -821,6 +821,10 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     groupDeleteButton.setComponentID("authoringGroupDeleteButton");
     groupRoundRobinLabel.setComponentID("authoringGroupRoundRobinLabel");
     groupRoundRobinHintLabel.setComponentID("authoringGroupRoundRobinHintLabel");
+    groupCreateRoundRobinPoolButton.setComponentID("authoringGroupCreateRoundRobinPoolButton");
+    groupAddCompatibleZonesButton.setComponentID("authoringGroupAddCompatibleZonesButton");
+    groupNormalizeRoundRobinPoolButton.setComponentID("authoringGroupNormalizeRoundRobinPoolButton");
+    groupRemoveRoundRobinAnchorButton.setComponentID("authoringGroupRemoveRoundRobinAnchorButton");
     performanceBankSelector.setComponentID("authoringPerformanceBankSelector");
     triggerSlotSelector.setComponentID("authoringTriggerSlotSelector");
     triggerEventSelector.setComponentID("authoringTriggerEventSelector");
@@ -878,38 +882,6 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     zoneCallbacks.onPreviewRequested = [this]
     {
         previewSelectedZone(drs::engine::AuthoringPreviewAuditionSource::inspector);
-    };
-    zoneCallbacks.onCreateRoundRobinPoolRequested = [this]
-    {
-        if (isRefreshing)
-            return;
-
-        if (authoringSession.createRoundRobinPoolForSelectedZone("Create Round Robin pool").applied)
-            refreshFromSession();
-    };
-    zoneCallbacks.onAddCompatibleZonesToRoundRobinPoolRequested = [this]
-    {
-        if (isRefreshing)
-            return;
-
-        if (authoringSession.addCompatibleZonesToSelectedRoundRobinPool("Add compatible zones to Round Robin pool").applied)
-            refreshFromSession();
-    };
-    zoneCallbacks.onNormalizeRoundRobinPoolRequested = [this]
-    {
-        if (isRefreshing)
-            return;
-
-        if (authoringSession.normalizeSelectedRoundRobinPool("Normalize Round Robin slot numbering").applied)
-            refreshFromSession();
-    };
-    zoneCallbacks.onRemoveSelectedZoneFromRoundRobinPoolRequested = [this]
-    {
-        if (isRefreshing)
-            return;
-
-        if (authoringSession.removeSelectedZoneFromRoundRobinPool("Remove selected zone from Round Robin pool").applied)
-            refreshFromSession();
     };
     zoneMappingEditor.setCallbacks(std::move(zoneCallbacks));
     zoneMap.setOnZoneSelectionRequested([this](const std::string& zoneId)
@@ -1018,6 +990,42 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     };
     groupDeleteButton.setButtonText("Delete Group");
     groupDeleteButton.onClick = [this] { deleteSelectedGroup(); };
+    groupCreateRoundRobinPoolButton.setButtonText("New RR Pool");
+    groupCreateRoundRobinPoolButton.onClick = [this]
+    {
+        if (isRefreshing)
+            return;
+
+        if (authoringSession.createRoundRobinPoolForSelectedGroup("Create selected-group Round Robin pool").applied)
+            refreshFromSession();
+    };
+    groupAddCompatibleZonesButton.setButtonText("Add Compatible");
+    groupAddCompatibleZonesButton.onClick = [this]
+    {
+        if (isRefreshing)
+            return;
+
+        if (authoringSession.addCompatibleZonesToSelectedGroupRoundRobinPool("Add compatible zones to selected-group Round Robin pool").applied)
+            refreshFromSession();
+    };
+    groupNormalizeRoundRobinPoolButton.setButtonText("Normalize");
+    groupNormalizeRoundRobinPoolButton.onClick = [this]
+    {
+        if (isRefreshing)
+            return;
+
+        if (authoringSession.normalizeSelectedGroupRoundRobinPool("Normalize selected-group Round Robin slot numbering").applied)
+            refreshFromSession();
+    };
+    groupRemoveRoundRobinAnchorButton.setButtonText("Remove Anchor");
+    groupRemoveRoundRobinAnchorButton.onClick = [this]
+    {
+        if (isRefreshing)
+            return;
+
+        if (authoringSession.removeSelectedGroupAnchorFromRoundRobinPool("Remove selected-group audition anchor from Round Robin pool").applied)
+            refreshFromSession();
+    };
 
     zoneSelector.onChange = [this]
     {
@@ -1308,6 +1316,10 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&groupDeleteButton),
              static_cast<juce::Component*>(&groupRoundRobinLabel),
              static_cast<juce::Component*>(&groupRoundRobinHintLabel),
+             static_cast<juce::Component*>(&groupCreateRoundRobinPoolButton),
+             static_cast<juce::Component*>(&groupAddCompatibleZonesButton),
+             static_cast<juce::Component*>(&groupNormalizeRoundRobinPoolButton),
+             static_cast<juce::Component*>(&groupRemoveRoundRobinAnchorButton),
              static_cast<juce::Component*>(&performanceBankSelector),
              static_cast<juce::Component*>(&triggerSlotSelector),
              static_cast<juce::Component*>(&triggerEventLabel),
@@ -1600,12 +1612,32 @@ void AuthoringPanel::configureAccessibilityAndFocus()
     configureAccessibleMetadata(groupRoundRobinHintLabel,
                                 "Group round robin guidance",
                                 "Guides how round-robin edits currently relate to the selected group.");
+    configureAccessibleMetadata(groupCreateRoundRobinPoolButton,
+                                "Create group round robin pool",
+                                "Creates a new Round Robin pool for the selected group's audition anchor.",
+                                "Press to create a new pool for the selected group's audition anchor.");
+    configureAccessibleMetadata(groupAddCompatibleZonesButton,
+                                "Add compatible group zones",
+                                "Adds exact-match compatible zones into the selected group's anchor-owned Round Robin pool.",
+                                "Press to add compatible zones to the selected group's pool.");
+    configureAccessibleMetadata(groupNormalizeRoundRobinPoolButton,
+                                "Normalize group round robin",
+                                "Renumbers the selected group's anchor-owned Round Robin pool.",
+                                "Press to normalize the selected group's pool slot numbering.");
+    configureAccessibleMetadata(groupRemoveRoundRobinAnchorButton,
+                                "Remove group round robin anchor",
+                                "Removes the selected group's audition anchor from its Round Robin pool.",
+                                "Press to remove the selected group's audition anchor from its pool.");
     groupVisibilityToggle.setExplicitFocusOrder(71);
     groupGainSlider.setExplicitFocusOrder(72);
     groupPanSlider.setExplicitFocusOrder(73);
     groupRoutingSelector.setExplicitFocusOrder(74);
     groupAnchorSelector.setExplicitFocusOrder(75);
     groupDeleteButton.setExplicitFocusOrder(76);
+    groupCreateRoundRobinPoolButton.setExplicitFocusOrder(77);
+    groupAddCompatibleZonesButton.setExplicitFocusOrder(78);
+    groupNormalizeRoundRobinPoolButton.setExplicitFocusOrder(79);
+    groupRemoveRoundRobinAnchorButton.setExplicitFocusOrder(80);
 
     configureAccessibleMetadata(performanceBankSelector,
                                 "Performance bank selector",
@@ -1830,18 +1862,22 @@ void AuthoringPanel::resized()
 
     if (drawerState.activeTab == authoring::DrawerTab::groups)
     {
-        auto row = drawerEditorArea.removeFromTop(24);
+        const auto fieldRowHeight = expanded ? 24 : 20;
+        const auto summaryRowHeight = expanded ? 18 : 16;
+        const auto actionRowHeight = expanded ? 24 : 20;
+
+        auto row = drawerEditorArea.removeFromTop(fieldRowHeight);
         layoutLabelAndField(row, groupNameLabel, groupNameEditor, 92);
         drawerEditorArea.removeFromTop(2);
 
-        row = drawerEditorArea.removeFromTop(24);
+        row = drawerEditorArea.removeFromTop(fieldRowHeight);
         auto deleteArea = row.removeFromRight(136);
         deleteArea.removeFromLeft(8);
         layoutLabelAndField(row, groupVisibilityLabel, groupVisibilityToggle, 74);
         groupDeleteButton.setBounds(deleteArea);
         drawerEditorArea.removeFromTop(2);
 
-        row = drawerEditorArea.removeFromTop(24);
+        row = drawerEditorArea.removeFromTop(fieldRowHeight);
         layoutDualLabelAndFieldRow(row,
                                    groupGainLabel,
                                    groupGainSlider,
@@ -1851,7 +1887,7 @@ void AuthoringPanel::resized()
                                    36);
         drawerEditorArea.removeFromTop(2);
 
-        row = drawerEditorArea.removeFromTop(24);
+        row = drawerEditorArea.removeFromTop(fieldRowHeight);
         layoutDualLabelAndFieldRow(row,
                                    groupRoutingLabel,
                                    groupRoutingSelector,
@@ -1860,13 +1896,42 @@ void AuthoringPanel::resized()
                                    groupAnchorSelector,
                                    96);
         drawerEditorArea.removeFromTop(2);
-        groupSummaryLabel.setBounds(drawerEditorArea.removeFromTop(18));
+        groupSummaryLabel.setBounds(drawerEditorArea.removeFromTop(summaryRowHeight));
         drawerEditorArea.removeFromTop(2);
-        groupRoundRobinLabel.setBounds(drawerEditorArea.removeFromTop(18));
+        groupRoundRobinLabel.setBounds(drawerEditorArea.removeFromTop(summaryRowHeight));
         drawerEditorArea.removeFromTop(2);
         groupRoundRobinHintLabel.setBounds(expanded
                                                ? drawerEditorArea.removeFromTop(20)
                                                : juce::Rectangle<int> {});
+        const auto showTwoActionRows = expanded
+            && drawerEditorArea.getHeight() >= actionRowHeight * 2 + 2;
+        if (showTwoActionRows)
+        {
+            drawerEditorArea.removeFromTop(2);
+            auto actionRow = drawerEditorArea.removeFromTop(actionRowHeight);
+            auto leftAction = actionRow.removeFromLeft((actionRow.getWidth() - 8) / 2);
+            actionRow.removeFromLeft(8);
+            groupCreateRoundRobinPoolButton.setBounds(leftAction);
+            groupAddCompatibleZonesButton.setBounds(actionRow);
+            drawerEditorArea.removeFromTop(2);
+            actionRow = drawerEditorArea.removeFromTop(actionRowHeight);
+            leftAction = actionRow.removeFromLeft((actionRow.getWidth() - 8) / 2);
+            actionRow.removeFromLeft(8);
+            groupNormalizeRoundRobinPoolButton.setBounds(leftAction);
+            groupRemoveRoundRobinAnchorButton.setBounds(actionRow);
+        }
+        else
+        {
+            auto actionRow = drawerEditorArea.removeFromTop(actionRowHeight);
+            const auto buttonWidth = std::max(1, (actionRow.getWidth() - 9) / 4);
+            groupCreateRoundRobinPoolButton.setBounds(actionRow.removeFromLeft(buttonWidth));
+            actionRow.removeFromLeft(3);
+            groupAddCompatibleZonesButton.setBounds(actionRow.removeFromLeft(buttonWidth));
+            actionRow.removeFromLeft(3);
+            groupNormalizeRoundRobinPoolButton.setBounds(actionRow.removeFromLeft(buttonWidth));
+            actionRow.removeFromLeft(3);
+            groupRemoveRoundRobinAnchorButton.setBounds(actionRow);
+        }
     }
     else if (drawerState.activeTab == authoring::DrawerTab::macros)
     {
@@ -2527,7 +2592,11 @@ void AuthoringPanel::refreshDrawerVisibility()
         || isComponentFocusedWithin(focusedComponent, groupPanSlider)
         || isComponentFocusedWithin(focusedComponent, groupRoutingSelector)
         || isComponentFocusedWithin(focusedComponent, groupAnchorSelector)
-        || isComponentFocusedWithin(focusedComponent, groupDeleteButton);
+        || isComponentFocusedWithin(focusedComponent, groupDeleteButton)
+        || isComponentFocusedWithin(focusedComponent, groupCreateRoundRobinPoolButton)
+        || isComponentFocusedWithin(focusedComponent, groupAddCompatibleZonesButton)
+        || isComponentFocusedWithin(focusedComponent, groupNormalizeRoundRobinPoolButton)
+        || isComponentFocusedWithin(focusedComponent, groupRemoveRoundRobinAnchorButton);
     const auto focusWithinMacros = isComponentFocusedWithin(focusedComponent, macroList)
         || isComponentFocusedWithin(focusedComponent, macroAssignmentSelector)
         || isComponentFocusedWithin(focusedComponent, macroRoleSelector)
@@ -2582,6 +2651,10 @@ void AuthoringPanel::refreshDrawerVisibility()
     setVisibleAndAccessible(groupSummaryLabel, drawerContentVisible && groupsTab);
     setVisibleAndAccessible(groupRoundRobinLabel, drawerContentVisible && groupsTab);
     setVisibleAndAccessible(groupRoundRobinHintLabel, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupCreateRoundRobinPoolButton, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupAddCompatibleZonesButton, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupNormalizeRoundRobinPoolButton, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupRemoveRoundRobinAnchorButton, drawerContentVisible && groupsTab);
 
     setVisibleAndAccessible(macroList, drawerContentVisible && macrosTab);
     setVisibleAndAccessible(macroAssignmentLabel, drawerContentVisible && macrosTab);
@@ -2796,6 +2869,34 @@ void AuthoringPanel::refreshContextualAccessibility()
                                            hasSelectedGroup
                                                ? "Read the selected group's round-robin guidance."
                                                : "Select a group to review round-robin guidance.");
+    updateAccessibleDescriptionAndHelpText(groupCreateRoundRobinPoolButton,
+                                           hasSelectedGroup
+                                               ? "Creates a new Round Robin pool for " + groupName + "'s audition anchor."
+                                               : "Unavailable because no group is selected.",
+                                           hasSelectedGroup
+                                               ? "Press to create or split a pool from the selected group's audition anchor."
+                                               : "Select a group before creating a Round Robin pool.");
+    updateAccessibleDescriptionAndHelpText(groupAddCompatibleZonesButton,
+                                           hasSelectedGroup
+                                               ? "Adds exact-match compatible zones into " + groupName + "'s anchor-owned pool."
+                                               : "Unavailable because no group is selected.",
+                                           hasSelectedGroup
+                                               ? "Press to add compatible zones to the selected group's Round Robin pool."
+                                               : "Select a group before adding compatible zones.");
+    updateAccessibleDescriptionAndHelpText(groupNormalizeRoundRobinPoolButton,
+                                           hasSelectedGroup
+                                               ? "Normalizes slot numbering for " + groupName + "'s anchor-owned pool."
+                                               : "Unavailable because no group is selected.",
+                                           hasSelectedGroup
+                                               ? "Press to normalize the selected group's Round Robin slot numbering."
+                                               : "Select a group before normalizing Round Robin slots.");
+    updateAccessibleDescriptionAndHelpText(groupRemoveRoundRobinAnchorButton,
+                                           hasSelectedGroup
+                                               ? "Removes " + groupName + "'s audition anchor from its Round Robin pool."
+                                               : "Unavailable because no group is selected.",
+                                           hasSelectedGroup
+                                               ? "Press to remove the selected group's audition anchor from its pool."
+                                               : "Select a group before removing an anchor from Round Robin.");
 
     const auto hasSelectedMacro = !project.authoring.macros.empty()
         && selectedMacroIndex >= 0
@@ -3351,6 +3452,8 @@ void AuthoringPanel::refreshFromSession()
 
         auto roundRobinGroupZones = 0;
         auto unpooledGroupZones = 0;
+        auto compatibleUnpooledGroupZones = 0;
+        auto anchorZonePooled = false;
         for (const auto& zone : project.authoring.zones)
         {
             if (zone.groupId != selectedGroup->id)
@@ -3359,6 +3462,18 @@ void AuthoringPanel::refreshFromSession()
                 ++roundRobinGroupZones;
             else
                 ++unpooledGroupZones;
+
+            if (zone.id == selectedGroup->auditionAnchorZoneId)
+            {
+                anchorZonePooled = zone.roundRobin.has_value();
+                for (const auto& candidate : project.authoring.zones)
+                {
+                    if (candidate.id == zone.id || candidate.roundRobin.has_value())
+                        continue;
+                    if (isRoundRobinGroupingCompatible(zone, candidate))
+                        ++compatibleUnpooledGroupZones;
+                }
+            }
         }
         groupRoundRobinLabel.setText(
             "Round Robin | pooled zones " + juce::String(roundRobinGroupZones)
@@ -3366,9 +3481,15 @@ void AuthoringPanel::refreshFromSession()
             juce::dontSendNotification);
         groupRoundRobinHintLabel.setText(
             selectedGroup->auditionAnchorZoneId.empty()
-                ? "Choose an audition anchor before managing anchor-driven preview or RR entry points."
-                : "Use the selected group's anchor zone in the zone inspector below for current RR edits.",
+                ? "Choose an audition anchor before managing group-owned Round Robin actions."
+                : "Group RR actions use the selected group's audition anchor and preserve exact-match compatibility.",
             juce::dontSendNotification);
+        groupCreateRoundRobinPoolButton.setButtonText(anchorZonePooled ? "Split RR Pool" : "New RR Pool");
+        groupCreateRoundRobinPoolButton.setEnabled(!selectedGroup->auditionAnchorZoneId.empty());
+        groupAddCompatibleZonesButton.setEnabled(!selectedGroup->auditionAnchorZoneId.empty()
+                                                 && compatibleUnpooledGroupZones > 0);
+        groupNormalizeRoundRobinPoolButton.setEnabled(anchorZonePooled);
+        groupRemoveRoundRobinAnchorButton.setEnabled(anchorZonePooled);
     }
     else
     {
@@ -3389,6 +3510,10 @@ void AuthoringPanel::refreshFromSession()
         groupMoveUpButton.setEnabled(false);
         groupMoveDownButton.setEnabled(false);
         groupDeleteButton.setEnabled(false);
+        groupCreateRoundRobinPoolButton.setEnabled(false);
+        groupAddCompatibleZonesButton.setEnabled(false);
+        groupNormalizeRoundRobinPoolButton.setEnabled(false);
+        groupRemoveRoundRobinAnchorButton.setEnabled(false);
     }
 
     if (!project.authoring.macros.empty())
@@ -3826,17 +3951,8 @@ void AuthoringPanel::previewSelectedGroupAnchor()
     if (!previewEnabledToggle.getToggleState())
         return;
 
-    const auto selectedGroup = authoringSession.getSelectedGroup();
-    if (!selectedGroup.has_value() || selectedGroup->auditionAnchorZoneId.empty() || !previewCommandCallback)
-        return;
-
-    const auto zoneIterator = std::find_if(authoringSession.getProject().authoring.zones.begin(),
-                                           authoringSession.getProject().authoring.zones.end(),
-                                           [&](const auto& zone)
-                                           {
-                                               return zone.id == selectedGroup->auditionAnchorZoneId;
-                                           });
-    if (zoneIterator == authoringSession.getProject().authoring.zones.end())
+    const auto previewRequest = authoringSession.buildSelectedGroupPreviewRequest();
+    if (!previewRequest.available || !previewCommandCallback)
         return;
 
     constexpr auto source = drs::engine::AuthoringPreviewAuditionSource::inspector;
@@ -3845,14 +3961,15 @@ void AuthoringPanel::previewSelectedGroupAnchor()
     releaseTimedPreview(sourceIndex);
 
     drs::engine::AuthoringPreviewCommand command;
-    command.type = drs::engine::AuthoringPreviewCommandType::auditionSelectedZone;
+    command.type = drs::engine::AuthoringPreviewCommandType::auditionSelectedGroup;
     command.source = source;
-    command.midiNote = zoneIterator->rootKey;
-    command.velocity = static_cast<float>(std::clamp((zoneIterator->velocityLow + zoneIterator->velocityHigh) / 2, 1, 127)) / 127.0f;
-    command.selectedZoneId = zoneIterator->id;
+    command.midiNote = previewRequest.midiNote;
+    command.velocity = static_cast<float>(previewRequest.velocity) / 127.0f;
+    command.selectedZoneId = previewRequest.anchorZoneId;
+    command.selectedGroupId = previewRequest.groupId;
     previewCommandCallback(command);
 
-    timedPreviewNotes[sourceIndex] = { true, zoneIterator->rootKey,
+    timedPreviewNotes[sourceIndex] = { true, previewRequest.midiNote,
                                        juce::Time::getMillisecondCounterHiRes() + 180.0 };
     startTimer(previewReleaseTimerId, 10);
 }

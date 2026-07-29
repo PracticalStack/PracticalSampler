@@ -26,6 +26,10 @@ int main()
                 "Selected-zone Preview must reject a request without a selected zone.");
         require(authoringPreviewScopeIsEligible(AuthoringPreviewScope::selectedZone, true),
                 "Selected-zone Preview must accept an identified selected zone.");
+        require(!authoringPreviewScopeIsEligible(AuthoringPreviewScope::selectedGroup, false, false),
+                "Selected-group Preview must reject a request without a selected group.");
+        require(authoringPreviewScopeIsEligible(AuthoringPreviewScope::selectedGroup, false, true),
+                "Selected-group Preview must accept an identified selected group.");
         require(authoringPreviewScopeIsEligible(AuthoringPreviewScope::currentDraft, false),
                 "Current-draft Preview must not require a selected zone.");
 
@@ -47,12 +51,15 @@ int main()
         };
         auto differentSelection = first;
         differentSelection.selectedZoneId = "lead-a4-sustain";
+        auto differentGroup = first;
+        differentGroup.selectedGroupId = "lead-core";
         auto differentScope = first;
         differentScope.scope = AuthoringPreviewScope::currentDraft;
         auto differentGeneration = first;
         ++differentGeneration.cancellationGeneration;
-        require(first != differentSelection && first != differentScope && first != differentGeneration,
-                "Request identity must distinguish selection, scope, and cancellation generation independently of revision.");
+        require(first != differentSelection && first != differentGroup
+                    && first != differentScope && first != differentGeneration,
+                "Request identity must distinguish selection, group ownership, scope, and cancellation generation independently of revision.");
 
         require(authoringPreviewNotePolicyFor(Event::activationReplacement) == Action::allowOldVoicesToFinish
                     && authoringPreviewNotePolicyFor(Event::selectionChange) == Action::allowOldVoicesToFinish

@@ -31,20 +31,25 @@ AuthoringPreviewRequestResult AuthoringPreviewController::request(
     AuthoringPreviewRequestReason reason,
     AuthoringPreviewInvalidationCategory invalidationCategory,
     std::string requestSignature,
-    std::uint64_t nowMicros)
+    std::uint64_t nowMicros,
+    std::string selectedGroupId)
 {
     AuthoringPreviewRequestResult result;
-    if (!authoringPreviewScopeIsEligible(scope, !selectedZoneId.empty()))
+    if (!authoringPreviewScopeIsEligible(scope,
+                                         !selectedZoneId.empty(),
+                                         !selectedGroupId.empty()))
         return result;
 
     if (snapshot.hasRequest
         && snapshot.currentRequest.identity.draftRevision == draftRevision
         && snapshot.currentRequest.identity.scope == scope
         && snapshot.currentRequest.identity.selectedZoneId == selectedZoneId
+        && snapshot.currentRequest.identity.selectedGroupId == selectedGroupId
         && snapshot.currentRequest.requestSignature == requestSignature)
     {
         const auto directAudition
             = reason == AuthoringPreviewRequestReason::explicitSelectedZoneAudition
+            || reason == AuthoringPreviewRequestReason::explicitSelectedGroupAudition
             || reason == AuthoringPreviewRequestReason::explicitCurrentDraftAudition;
         if (directAudition
             && snapshot.preparationState == AuthoringPreviewPreparationState::queued)
@@ -93,6 +98,7 @@ AuthoringPreviewRequestResult AuthoringPreviewController::request(
     next.identity.draftRevision = draftRevision;
     next.identity.scope = scope;
     next.identity.selectedZoneId = std::move(selectedZoneId);
+    next.identity.selectedGroupId = std::move(selectedGroupId);
     next.reason = reason;
     next.invalidationCategory = invalidationCategory;
     next.requestSignature = std::move(requestSignature);
@@ -111,7 +117,10 @@ AuthoringPreviewRequestResult AuthoringPreviewController::request(
     snapshot.acceptedSnapshotDigest.clear();
     snapshot.acceptedPreparedDigest.clear();
     snapshot.reusablePreparedBuildId = findReusablePreparedBuildId(
-        next.identity.scope, next.identity.selectedZoneId, next.requestSignature);
+        next.identity.scope,
+        next.identity.selectedZoneId,
+        next.identity.selectedGroupId,
+        next.requestSignature);
     snapshot.coalescingBurstStartedAtMicros = burstStartedAt;
     snapshot.launchEligibleAtMicros = std::min(windowDeadline, maximumDeadline);
     snapshot.failureState.clear();
@@ -142,6 +151,7 @@ AuthoringPreviewLaunchResult AuthoringPreviewController::launchIfEligible(
 
     const auto directAudition
         = snapshot.currentRequest.reason == AuthoringPreviewRequestReason::explicitSelectedZoneAudition
+        || snapshot.currentRequest.reason == AuthoringPreviewRequestReason::explicitSelectedGroupAudition
         || snapshot.currentRequest.reason == AuthoringPreviewRequestReason::explicitCurrentDraftAudition;
     const auto projectOpened
         = snapshot.currentRequest.reason == AuthoringPreviewRequestReason::projectOpened;
@@ -398,12 +408,14 @@ void AuthoringPreviewController::recordCompletion(
 std::uint64_t AuthoringPreviewController::findReusablePreparedBuildId(
     AuthoringPreviewScope scope,
     const std::string& selectedZoneId,
+    const std::string& selectedGroupId,
     const std::string& requestSignature) const
 {
     for (auto iterator = warmPreparedRecords.rbegin(); iterator != warmPreparedRecords.rend(); ++iterator)
     {
         if (iterator->scope == scope
             && iterator->selectedZoneId == selectedZoneId
+            && iterator->selectedGroupId == selectedGroupId
             && iterator->requestSignature == requestSignature)
             return iterator->preparedBuildId;
     }
@@ -418,6 +430,7 @@ void AuthoringPreviewController::rememberPreparedResult(
     {
         if (iterator->scope == request.identity.scope
             && iterator->selectedZoneId == request.identity.selectedZoneId
+            && iterator->selectedGroupId == request.identity.selectedGroupId
             && iterator->requestSignature == request.requestSignature)
         {
             warmPreparedRecords.erase(iterator);
@@ -426,6 +439,7 @@ void AuthoringPreviewController::rememberPreparedResult(
     }
     warmPreparedRecords.push_back({ request.identity.scope,
                                     request.identity.selectedZoneId,
+                                    request.identity.selectedGroupId,
                                     request.requestSignature,
                                     preparedBuildId });
     while (warmPreparedRecords.size() > config.maximumWarmPreparedRecords)

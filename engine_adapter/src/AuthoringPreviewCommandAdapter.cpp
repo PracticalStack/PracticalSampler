@@ -32,6 +32,7 @@ AuthoringPreviewCommandDispatch AuthoringPreviewCommandAdapter::dispatch(
         case AuthoringPreviewCommandType::noteOff:
             return dispatchNoteOff(command);
         case AuthoringPreviewCommandType::auditionSelectedZone:
+        case AuthoringPreviewCommandType::auditionSelectedGroup:
         case AuthoringPreviewCommandType::auditionCurrentDraft:
         {
             if (command.type == AuthoringPreviewCommandType::auditionSelectedZone
@@ -41,13 +42,22 @@ AuthoringPreviewCommandDispatch AuthoringPreviewCommandAdapter::dispatch(
                 countRejected(rejected, "preview-command-selection-missing");
                 return rejected;
             }
+            if (command.type == AuthoringPreviewCommandType::auditionSelectedGroup
+                && command.selectedGroupId.empty())
+            {
+                AuthoringPreviewCommandDispatch rejected;
+                countRejected(rejected, "preview-command-group-missing");
+                return rejected;
+            }
 
             AuthoringPreviewCommandDispatch result;
             result.accepted = true;
             result.preparationRequested = true;
             result.requestedScope = command.type == AuthoringPreviewCommandType::auditionCurrentDraft
                 ? AuthoringPreviewScope::currentDraft
-                : AuthoringPreviewScope::selectedZone;
+                : (command.type == AuthoringPreviewCommandType::auditionSelectedGroup
+                       ? AuthoringPreviewScope::selectedGroup
+                       : AuthoringPreviewScope::selectedZone);
             if (command.emitNote)
             {
                 auto note = dispatchNoteOn(command);

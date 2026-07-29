@@ -118,21 +118,6 @@ ZoneMappingEditor::ZoneMappingEditor()
     addOwnedRow(sampleSectionContent, velocityRangeRow, rangeRowHeight);
     sampleSectionContent.setSize(0, rangeRowHeight);
 
-    addOwnedRow(roundRobinSectionContent, roundRobinPoolMessage, roundRobinMessageRowHeight);
-    addOwnedRow(roundRobinSectionContent, roundRobinSlotMessage, roundRobinMessageRowHeight);
-    addOwnedRow(roundRobinSectionContent, roundRobinHintMessage, roundRobinMessageRowHeight);
-    addOwnedRow(roundRobinSectionContent, createRoundRobinPoolRow, actionRowHeight);
-    addOwnedRow(roundRobinSectionContent, addCompatibleZonesRow, actionRowHeight);
-    addOwnedRow(roundRobinSectionContent, normalizeRoundRobinPoolRow, actionRowHeight);
-    addOwnedRow(roundRobinSectionContent, removeRoundRobinPoolRow, actionRowHeight);
-    roundRobinSectionContent.setSize(0, roundRobinMessageRowHeight + 6
-                                        + roundRobinMessageRowHeight + 6
-                                        + roundRobinMessageRowHeight + 6
-                                        + actionRowHeight + 6
-                                        + actionRowHeight + 6
-                                        + actionRowHeight + 6
-                                        + actionRowHeight);
-
     addOwnedRow(mixSectionContent, gainRow, sliderRowHeight);
     addOwnedRow(mixSectionContent, panRow, sliderRowHeight);
     mixSectionContent.setSize(0, sliderRowHeight + 6 + sliderRowHeight);
@@ -147,12 +132,10 @@ ZoneMappingEditor::ZoneMappingEditor()
 
     mapSection.setContent(&mapSectionContent);
     sampleSection.setContent(&sampleSectionContent);
-    roundRobinSection.setContent(&roundRobinSectionContent);
     mixSection.setContent(&mixSectionContent);
     advancedSection.setContent(&advancedSectionContent);
     mapSection.setOnExpandedChanged([this](bool) { resized(); });
     sampleSection.setOnExpandedChanged([this](bool) { resized(); });
-    roundRobinSection.setOnExpandedChanged([this](bool) { resized(); });
     mixSection.setOnExpandedChanged([this](bool) { resized(); });
     advancedSection.setOnExpandedChanged([this](bool) { resized(); });
 
@@ -192,32 +175,10 @@ ZoneMappingEditor::ZoneMappingEditor()
         if (callbacks.onPreviewRequested)
             callbacks.onPreviewRequested();
     };
-    createRoundRobinPoolRow.getButton().onClick = [this]
-    {
-        if (callbacks.onCreateRoundRobinPoolRequested)
-            callbacks.onCreateRoundRobinPoolRequested();
-    };
-    addCompatibleZonesRow.getButton().onClick = [this]
-    {
-        if (callbacks.onAddCompatibleZonesToRoundRobinPoolRequested)
-            callbacks.onAddCompatibleZonesToRoundRobinPoolRequested();
-    };
-    normalizeRoundRobinPoolRow.getButton().onClick = [this]
-    {
-        if (callbacks.onNormalizeRoundRobinPoolRequested)
-            callbacks.onNormalizeRoundRobinPoolRequested();
-    };
-    removeRoundRobinPoolRow.getButton().onClick = [this]
-    {
-        if (callbacks.onRemoveSelectedZoneFromRoundRobinPoolRequested)
-            callbacks.onRemoveSelectedZoneFromRoundRobinPoolRequested();
-    };
-
     for (auto* component : {
              static_cast<juce::Component*>(&emptyStateMessage),
              static_cast<juce::Component*>(&mapSection),
              static_cast<juce::Component*>(&sampleSection),
-             static_cast<juce::Component*>(&roundRobinSection),
              static_cast<juce::Component*>(&mixSection),
              static_cast<juce::Component*>(&advancedSection)
          })
@@ -246,7 +207,6 @@ void ZoneMappingEditor::resized()
 
     layoutSection(mapSection, true);
     layoutSection(sampleSection, true);
-    layoutSection(roundRobinSection, true);
     layoutSection(mixSection, true);
     layoutSection(advancedSection, false);
 
@@ -257,21 +217,6 @@ void ZoneMappingEditor::resized()
 
     auto sampleArea = sampleSectionContent.getLocalBounds();
     velocityRangeRow.setBounds(sampleArea.removeFromTop(rangeRowHeight));
-
-    auto roundRobinArea = roundRobinSectionContent.getLocalBounds();
-    roundRobinPoolMessage.setBounds(roundRobinArea.removeFromTop(roundRobinMessageRowHeight));
-    roundRobinArea.removeFromTop(6);
-    roundRobinSlotMessage.setBounds(roundRobinArea.removeFromTop(roundRobinMessageRowHeight));
-    roundRobinArea.removeFromTop(6);
-    roundRobinHintMessage.setBounds(roundRobinArea.removeFromTop(roundRobinMessageRowHeight));
-    roundRobinArea.removeFromTop(6);
-    createRoundRobinPoolRow.setBounds(roundRobinArea.removeFromTop(actionRowHeight));
-    roundRobinArea.removeFromTop(6);
-    addCompatibleZonesRow.setBounds(roundRobinArea.removeFromTop(actionRowHeight));
-    roundRobinArea.removeFromTop(6);
-    normalizeRoundRobinPoolRow.setBounds(roundRobinArea.removeFromTop(actionRowHeight));
-    roundRobinArea.removeFromTop(6);
-    removeRoundRobinPoolRow.setBounds(roundRobinArea.removeFromTop(actionRowHeight));
 
     auto mixArea = mixSectionContent.getLocalBounds();
     gainRow.setBounds(mixArea.removeFromTop(sliderRowHeight));
@@ -296,9 +241,6 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
     emptyStateMessage.setText(juce::String::fromUTF8(viewModel.emptyStateText.c_str()));
 
     applyValuesToControls(viewModel);
-    roundRobinPoolMessage.setText(juce::String::fromUTF8(viewModel.roundRobinPoolText.c_str()));
-    roundRobinSlotMessage.setText(juce::String::fromUTF8(viewModel.roundRobinSlotText.c_str()));
-    roundRobinHintMessage.setText(juce::String::fromUTF8(viewModel.roundRobinHintText.c_str()));
 
     const auto hasSelection = viewModel.hasSelection;
 
@@ -306,24 +248,15 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
     for (auto* component : {
              static_cast<juce::Component*>(&mapSection),
              static_cast<juce::Component*>(&sampleSection),
-             static_cast<juce::Component*>(&roundRobinSection),
              static_cast<juce::Component*>(&mixSection),
              static_cast<juce::Component*>(&advancedSection),
              static_cast<juce::Component*>(&mapSectionContent),
              static_cast<juce::Component*>(&sampleSectionContent),
-             static_cast<juce::Component*>(&roundRobinSectionContent),
              static_cast<juce::Component*>(&mixSectionContent),
              static_cast<juce::Component*>(&advancedSectionContent),
              static_cast<juce::Component*>(&rootKeyRow),
              static_cast<juce::Component*>(&keyRangeRow),
              static_cast<juce::Component*>(&velocityRangeRow),
-             static_cast<juce::Component*>(&roundRobinPoolMessage),
-             static_cast<juce::Component*>(&roundRobinSlotMessage),
-             static_cast<juce::Component*>(&roundRobinHintMessage),
-             static_cast<juce::Component*>(&createRoundRobinPoolRow),
-             static_cast<juce::Component*>(&addCompatibleZonesRow),
-             static_cast<juce::Component*>(&normalizeRoundRobinPoolRow),
-             static_cast<juce::Component*>(&removeRoundRobinPoolRow),
              static_cast<juce::Component*>(&gainRow),
              static_cast<juce::Component*>(&panRow),
              static_cast<juce::Component*>(&loopToggleRow),
@@ -340,10 +273,6 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
              static_cast<juce::Component*>(&panRow.getSlider()),
              static_cast<juce::Component*>(&loopToggleRow.getToggle()),
              static_cast<juce::Component*>(&triggerModeRow.getComboBox()),
-             static_cast<juce::Component*>(&createRoundRobinPoolRow.getButton()),
-             static_cast<juce::Component*>(&addCompatibleZonesRow.getButton()),
-             static_cast<juce::Component*>(&normalizeRoundRobinPoolRow.getButton()),
-             static_cast<juce::Component*>(&removeRoundRobinPoolRow.getButton()),
              static_cast<juce::Component*>(&previewZoneRow.getButton()),
              static_cast<juce::Component*>(&restoreRootKeyRow.getButton())
          })
@@ -353,26 +282,12 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
 
     restoreRootKeyRow.getButton().setEnabled(viewModel.hasSelection);
     previewZoneRow.getButton().setEnabled(viewModel.hasSelection);
-    createRoundRobinPoolRow.getButton().setButtonText(viewModel.roundRobinEnabled
-                                                          ? "Split to New Pool"
-                                                          : "Create Pool");
-    createRoundRobinPoolRow.getButton().setHelpText(viewModel.roundRobinEnabled
-                                                        ? "Moves the selected zone into a new Round Robin pool and explicitly reindexes the previous pool."
-                                                        : "Creates a dedicated sequential Round Robin pool for the selected zone.");
     previewZoneRow.getButton().setButtonText(viewModel.previewAdvancesRoundRobin
                                                  ? "Preview / Advance"
                                                  : "Preview Zone");
     previewZoneRow.getButton().setHelpText(viewModel.previewAdvancesRoundRobin
                                                ? "Auditions the selected zone and advances its active Round Robin slot."
                                                : "Auditions the selected zone from the mapping inspector.");
-    createRoundRobinPoolRow.getButton().setEnabled(viewModel.hasSelection
-                                                   && viewModel.canCreateRoundRobinPool);
-    addCompatibleZonesRow.getButton().setEnabled(viewModel.hasSelection
-                                                 && viewModel.canAddCompatibleZonesToRoundRobinPool);
-    normalizeRoundRobinPoolRow.getButton().setEnabled(viewModel.hasSelection
-                                                      && viewModel.canNormalizeRoundRobinPool);
-    removeRoundRobinPoolRow.getButton().setEnabled(viewModel.hasSelection
-                                                   && viewModel.canRemoveZoneFromRoundRobinPool);
     refreshValidationMessage({});
     resized();
 }

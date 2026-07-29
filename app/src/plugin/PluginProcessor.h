@@ -421,6 +421,8 @@ private:
     bool authoringPreviewDirectAuditionRequested = false;
     drs::engine::AuthoringPreviewScope authoringPreviewRequestedScope
         = drs::engine::AuthoringPreviewScope::selectedZone;
+    std::string pendingAuthoringPreviewZoneId;
+    std::string pendingAuthoringPreviewGroupId;
     double currentSampleRate = 44100.0;
     bool isSynchronizingParameterState = false;
     RealtimeGuardState realtimeGuardState;

@@ -32,15 +32,24 @@ bool sameVelocityCrossfadeDescriptor(const VelocityCrossfadeDescriptor& left,
 bool isRoundRobinGroupingCompatible(const RuntimeProjectZoneDefinition& anchor,
                                     const RuntimeProjectZoneDefinition& candidate) noexcept
 {
-    return anchor.groupId == candidate.groupId
-        && anchor.articulationId == candidate.articulationId
-        && anchor.rootKey == candidate.rootKey
-        && anchor.keyLow == candidate.keyLow
-        && anchor.keyHigh == candidate.keyHigh
-        && anchor.velocityLow == candidate.velocityLow
-        && anchor.velocityHigh == candidate.velocityHigh
-        && sameVelocityCrossfadeDescriptor(anchor.velocityCrossfade, candidate.velocityCrossfade)
-        && anchor.triggerMode == candidate.triggerMode;
+    const auto sameGroup = anchor.groupId == candidate.groupId;
+    const auto sameArticulation = anchor.articulationId == candidate.articulationId;
+    const auto sameRootKey = anchor.rootKey == candidate.rootKey;
+    const auto sameKeyRange = anchor.keyLow == candidate.keyLow
+        && anchor.keyHigh == candidate.keyHigh;
+    const auto sameVelocityRange = anchor.velocityLow == candidate.velocityLow
+        && anchor.velocityHigh == candidate.velocityHigh;
+    const auto sameCrossfadeShape = sameVelocityCrossfadeDescriptor(
+        anchor.velocityCrossfade, candidate.velocityCrossfade);
+    const auto sameTriggerMode = anchor.triggerMode == candidate.triggerMode;
+
+    return sameGroup
+        && sameArticulation
+        && sameRootKey
+        && sameKeyRange
+        && sameVelocityRange
+        && sameCrossfadeShape
+        && sameTriggerMode;
 }
 
 bool usesExplicitZoneGroupsSchema(const RuntimeProjectModel& project) noexcept
@@ -446,6 +455,123 @@ std::optional<std::size_t> findSelectedPerformanceBankIndex(const RuntimeProject
 
     return static_cast<std::size_t>(std::distance(project.authoring.performanceBanks.begin(), iterator));
 }
+
+std::optional<std::size_t> findSelectedGroupRoundRobinAnchorIndex(const RuntimeProjectModel& project)
+{
+    if (!usesExplicitZoneGroupsSchema(project))
+        return std::nullopt;
+
+    const auto groupIndex = findGroupIndexById(project, project.authoring.selectedGroupId);
+    if (!groupIndex.has_value())
+        return std::nullopt;
+
+    const auto& group = project.authoring.groups[*groupIndex];
+    if (const auto anchorIndex = findZoneIndexById(project, group.auditionAnchorZoneId);
+        anchorIndex.has_value() && project.authoring.zones[*anchorIndex].groupId == group.id)
+    {
+        return anchorIndex;
+    }
+
+    if (const auto representativeZoneId = findRepresentativeZoneIdForGroup(project, group.id);
+        representativeZoneId.has_value())
+    {
+        return findZoneIndexById(project, *representativeZoneId);
+    }
+
+    return std::nullopt;
+}
+
+std::vector<std::string> buildRoundRobinChangedPaths(const RuntimeProjectModel& project)
+{
+    std::vector<std::string> changedPaths { "authoring.zones" };
+    if (usesExplicitZoneGroupsSchema(project))
+    {
+        changedPaths.push_back("authoring.groups");
+        changedPaths.push_back("authoring.selectedGroupId");
+    }
+    return changedPaths;
+}
+
+void createRoundRobinPoolForAnchor(RuntimeProjectModel& project, std::size_t anchorIndex)
+{
+    auto& selectedZone = project.authoring.zones[anchorIndex];
+
+    if (selectedZone.roundRobin.has_value())
+    {
+        auto previousPoolMembers = collectRoundRobinPoolMemberIndices(project, selectedZone.roundRobin->poolId);
+        previousPoolMembers.erase(
+            std::remove(previousPoolMembers.begin(), previousPoolMembers.end(), anchorIndex),
+            previousPoolMembers.end());
+        if (!previousPoolMembers.empty())
+            normalizeRoundRobinPool(project, previousPoolMembers, selectedZone.roundRobin->poolId);
+    }
+
+    applyRoundRobinAssignment(selectedZone, allocateRoundRobinPoolId(project), 1, 1);
+}
+
+void addCompatibleZonesToAnchorRoundRobinPool(RuntimeProjectModel& project, std::size_t anchorIndex)
+{
+    const auto anchorZone = project.authoring.zones[anchorIndex];
+
+    std::string poolId;
+    std::vector<std::size_t> memberIndices;
+    if (anchorZone.roundRobin.has_value())
+    {
+        poolId = anchorZone.roundRobin->poolId;
+        memberIndices = collectRoundRobinPoolMemberIndices(project, poolId);
+    }
+    else
+    {
+        poolId = allocateRoundRobinPoolId(project);
+        memberIndices.push_back(anchorIndex);
+    }
+
+    for (std::size_t index = 0; index < project.authoring.zones.size(); ++index)
+    {
+        if (std::find(memberIndices.begin(), memberIndices.end(), index) != memberIndices.end())
+            continue;
+
+        const auto& candidate = project.authoring.zones[index];
+        if (!isRoundRobinGroupingCompatible(anchorZone, candidate))
+            continue;
+        if (candidate.roundRobin.has_value())
+            continue;
+
+        memberIndices.push_back(index);
+    }
+
+    if (memberIndices.empty())
+        memberIndices.push_back(anchorIndex);
+
+    std::stable_sort(memberIndices.begin(),
+                     memberIndices.end(),
+                     [&](std::size_t leftIndex, std::size_t rightIndex)
+                     {
+                         if (!anchorZone.roundRobin.has_value())
+                         {
+                             if (leftIndex == anchorIndex)
+                                 return true;
+                             if (rightIndex == anchorIndex)
+                                 return false;
+                         }
+
+                         const auto& left = project.authoring.zones[leftIndex];
+                         const auto& right = project.authoring.zones[rightIndex];
+                         const auto leftSlot = left.roundRobin.has_value() ? left.roundRobin->slotIndex : 0;
+                         const auto rightSlot = right.roundRobin.has_value() ? right.roundRobin->slotIndex : 0;
+                         if (leftSlot != rightSlot)
+                         {
+                             if (leftSlot == 0)
+                                 return false;
+                             if (rightSlot == 0)
+                                 return true;
+                             return leftSlot < rightSlot;
+                         }
+                         return leftIndex < rightIndex;
+                     });
+
+    normalizeRoundRobinPool(project, memberIndices, poolId);
+}
 } // namespace
 
 AuthoringSession::AuthoringSession(RuntimeProjectModel project)
@@ -519,6 +645,34 @@ AuthoringZonePreviewRequest AuthoringSession::buildSelectedZonePreviewRequest() 
     request.zoneId = zone->id;
     request.articulationId = zone->articulationId;
     request.state = "Zone preview ready";
+    return request;
+}
+
+AuthoringGroupPreviewRequest AuthoringSession::buildSelectedGroupPreviewRequest() const
+{
+    AuthoringGroupPreviewRequest request;
+    const auto group = getSelectedGroup();
+    if (!group.has_value())
+    {
+        request.state = "No group selected";
+        return request;
+    }
+
+    const auto anchorIndex = findSelectedGroupRoundRobinAnchorIndex(getProject());
+    if (!anchorIndex.has_value())
+    {
+        request.groupId = group->id;
+        request.state = "Selected group has no auditionable zones";
+        return request;
+    }
+
+    const auto& anchorZone = getProject().authoring.zones[*anchorIndex];
+    request.available = true;
+    request.groupId = group->id;
+    request.anchorZoneId = anchorZone.id;
+    request.midiNote = std::clamp(anchorZone.rootKey, anchorZone.keyLow, anchorZone.keyHigh);
+    request.velocity = std::clamp((anchorZone.velocityLow + anchorZone.velocityHigh) / 2, 1, 127);
+    request.state = "Group preview ready";
     return request;
 }
 
@@ -842,29 +996,9 @@ RuntimeProjectDocumentActionResult AuthoringSession::createRoundRobinPoolForSele
                                   "No zone is currently selected for Round Robin editing.");
 
     auto project = getProject();
-    auto& selectedZone = project.authoring.zones[*selectedZoneIndex];
-
-    if (selectedZone.roundRobin.has_value())
-    {
-        auto previousPoolMembers = collectRoundRobinPoolMemberIndices(project, selectedZone.roundRobin->poolId);
-        previousPoolMembers.erase(
-            std::remove(previousPoolMembers.begin(), previousPoolMembers.end(), *selectedZoneIndex),
-            previousPoolMembers.end());
-        if (!previousPoolMembers.empty())
-            normalizeRoundRobinPool(project, previousPoolMembers, selectedZone.roundRobin->poolId);
-    }
-
-    applyRoundRobinAssignment(selectedZone, allocateRoundRobinPoolId(project), 1, 1);
+    createRoundRobinPoolForAnchor(project, *selectedZoneIndex);
     alignSelectedGroupToSelectedZone(project);
-
-    std::vector<std::string> changedPaths { "authoring.zones" };
-    if (usesExplicitZoneGroupsSchema(project))
-    {
-        changedPaths.push_back("authoring.groups");
-        changedPaths.push_back("authoring.selectedGroupId");
-    }
-
-    return documentController.commitSnapshot(project, label, changedPaths);
+    return documentController.commitSnapshot(project, label, buildRoundRobinChangedPaths(project));
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::addCompatibleZonesToSelectedRoundRobinPool(const std::string& label)
@@ -876,76 +1010,9 @@ RuntimeProjectDocumentActionResult AuthoringSession::addCompatibleZonesToSelecte
                                   "No zone is currently selected for Round Robin editing.");
 
     auto project = getProject();
-    const auto anchorZone = project.authoring.zones[*selectedZoneIndex];
-
-    std::string poolId;
-    std::vector<std::size_t> memberIndices;
-    if (anchorZone.roundRobin.has_value())
-    {
-        poolId = anchorZone.roundRobin->poolId;
-        memberIndices = collectRoundRobinPoolMemberIndices(project, poolId);
-    }
-    else
-    {
-        poolId = allocateRoundRobinPoolId(project);
-        memberIndices.push_back(*selectedZoneIndex);
-    }
-
-    for (std::size_t index = 0; index < project.authoring.zones.size(); ++index)
-    {
-        if (std::find(memberIndices.begin(), memberIndices.end(), index) != memberIndices.end())
-            continue;
-
-        const auto& candidate = project.authoring.zones[index];
-        if (!isRoundRobinGroupingCompatible(anchorZone, candidate))
-            continue;
-        if (candidate.roundRobin.has_value())
-            continue;
-
-        memberIndices.push_back(index);
-    }
-
-    if (memberIndices.empty())
-        memberIndices.push_back(*selectedZoneIndex);
-
-    std::stable_sort(memberIndices.begin(),
-                     memberIndices.end(),
-                     [&](std::size_t leftIndex, std::size_t rightIndex)
-                     {
-                         if (!anchorZone.roundRobin.has_value())
-                         {
-                             if (leftIndex == *selectedZoneIndex)
-                                 return true;
-                             if (rightIndex == *selectedZoneIndex)
-                                 return false;
-                         }
-
-                         const auto& left = project.authoring.zones[leftIndex];
-                         const auto& right = project.authoring.zones[rightIndex];
-                         const auto leftSlot = left.roundRobin.has_value() ? left.roundRobin->slotIndex : 0;
-                         const auto rightSlot = right.roundRobin.has_value() ? right.roundRobin->slotIndex : 0;
-                         if (leftSlot != rightSlot)
-                         {
-                             if (leftSlot == 0)
-                                 return false;
-                             if (rightSlot == 0)
-                                 return true;
-                             return leftSlot < rightSlot;
-                         }
-                         return leftIndex < rightIndex;
-                     });
-
-    normalizeRoundRobinPool(project, memberIndices, poolId);
+    addCompatibleZonesToAnchorRoundRobinPool(project, *selectedZoneIndex);
     alignSelectedGroupToSelectedZone(project);
-
-    std::vector<std::string> changedPaths { "authoring.zones" };
-    if (usesExplicitZoneGroupsSchema(project))
-    {
-        changedPaths.push_back("authoring.groups");
-        changedPaths.push_back("authoring.selectedGroupId");
-    }
-
-    return documentController.commitSnapshot(project, label, changedPaths);
+    return documentController.commitSnapshot(project, label, buildRoundRobinChangedPaths(project));
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::normalizeSelectedRoundRobinPool(const std::string& label)
@@ -965,15 +1032,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::normalizeSelectedRoundRobin
 
     normalizeRoundRobinPool(project, memberIndices, selectedZone->roundRobin->poolId);
     alignSelectedGroupToSelectedZone(project);
-
-    std::vector<std::string> changedPaths { "authoring.zones" };
-    if (usesExplicitZoneGroupsSchema(project))
-    {
-        changedPaths.push_back("authoring.groups");
-        changedPaths.push_back("authoring.selectedGroupId");
-    }
-
-    return documentController.commitSnapshot(project, label, changedPaths);
+    return documentController.commitSnapshot(project, label, buildRoundRobinChangedPaths(project));
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::removeSelectedZoneFromRoundRobinPool(const std::string& label)
@@ -1001,15 +1060,89 @@ RuntimeProjectDocumentActionResult AuthoringSession::removeSelectedZoneFromRound
         normalizeRoundRobinPool(project, remainingMembers, previousPoolId);
 
     alignSelectedGroupToSelectedZone(project);
+    return documentController.commitSnapshot(project, label, buildRoundRobinChangedPaths(project));
+}
 
-    std::vector<std::string> changedPaths { "authoring.zones" };
-    if (usesExplicitZoneGroupsSchema(project))
-    {
-        changedPaths.push_back("authoring.groups");
-        changedPaths.push_back("authoring.selectedGroupId");
-    }
+RuntimeProjectDocumentActionResult AuthoringSession::createRoundRobinPoolForSelectedGroup(const std::string& label)
+{
+    auto project = getProject();
+    const auto anchorIndex = findSelectedGroupRoundRobinAnchorIndex(project);
+    if (!anchorIndex.has_value())
+        return makeRejectedResult(getDocumentState(),
+                                  "Group Round Robin pool creation rejected",
+                                  "The selected group does not have an audition anchor zone available for Round Robin editing.");
 
-    return documentController.commitSnapshot(project, label, changedPaths);
+    createRoundRobinPoolForAnchor(project, *anchorIndex);
+    alignSelectedGroupToSelectedZone(project);
+    return documentController.commitSnapshot(project, label, buildRoundRobinChangedPaths(project));
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::addCompatibleZonesToSelectedGroupRoundRobinPool(const std::string& label)
+{
+    auto project = getProject();
+    const auto anchorIndex = findSelectedGroupRoundRobinAnchorIndex(project);
+    if (!anchorIndex.has_value())
+        return makeRejectedResult(getDocumentState(),
+                                  "Group Round Robin grouping rejected",
+                                  "The selected group does not have an audition anchor zone available for Round Robin editing.");
+
+    addCompatibleZonesToAnchorRoundRobinPool(project, *anchorIndex);
+    alignSelectedGroupToSelectedZone(project);
+    return documentController.commitSnapshot(project, label, buildRoundRobinChangedPaths(project));
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::normalizeSelectedGroupRoundRobinPool(const std::string& label)
+{
+    auto project = getProject();
+    const auto anchorIndex = findSelectedGroupRoundRobinAnchorIndex(project);
+    if (!anchorIndex.has_value())
+        return makeRejectedResult(getDocumentState(),
+                                  "Group Round Robin normalization rejected",
+                                  "The selected group does not have an audition anchor zone available for Round Robin editing.");
+
+    const auto& anchorZone = project.authoring.zones[*anchorIndex];
+    if (!anchorZone.roundRobin.has_value())
+        return makeRejectedResult(getDocumentState(),
+                                  "Group Round Robin normalization rejected",
+                                  "The selected group's audition anchor is not part of a Round Robin pool.");
+
+    auto memberIndices = collectRoundRobinPoolMemberIndices(project, anchorZone.roundRobin->poolId);
+    if (memberIndices.empty())
+        return makeRejectedResult(getDocumentState(),
+                                  "Group Round Robin normalization rejected",
+                                  "The selected group's Round Robin pool could not be resolved.");
+
+    normalizeRoundRobinPool(project, memberIndices, anchorZone.roundRobin->poolId);
+    alignSelectedGroupToSelectedZone(project);
+    return documentController.commitSnapshot(project, label, buildRoundRobinChangedPaths(project));
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::removeSelectedGroupAnchorFromRoundRobinPool(const std::string& label)
+{
+    auto project = getProject();
+    const auto anchorIndex = findSelectedGroupRoundRobinAnchorIndex(project);
+    if (!anchorIndex.has_value())
+        return makeRejectedResult(getDocumentState(),
+                                  "Group Round Robin removal rejected",
+                                  "The selected group does not have an audition anchor zone available for Round Robin editing.");
+
+    auto& anchorZone = project.authoring.zones[*anchorIndex];
+    if (!anchorZone.roundRobin.has_value())
+        return makeRejectedResult(getDocumentState(),
+                                  "Group Round Robin removal rejected",
+                                  "The selected group's audition anchor is not part of a Round Robin pool.");
+
+    auto remainingMembers = collectRoundRobinPoolMemberIndices(project, anchorZone.roundRobin->poolId);
+    remainingMembers.erase(std::remove(remainingMembers.begin(), remainingMembers.end(), *anchorIndex),
+                           remainingMembers.end());
+    const auto previousPoolId = anchorZone.roundRobin->poolId;
+    clearRoundRobinAssignment(anchorZone);
+
+    if (!remainingMembers.empty())
+        normalizeRoundRobinPool(project, remainingMembers, previousPoolId);
+
+    alignSelectedGroupToSelectedZone(project);
+    return documentController.commitSnapshot(project, label, buildRoundRobinChangedPaths(project));
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::deleteSelectedSample()

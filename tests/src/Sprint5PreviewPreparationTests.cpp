@@ -79,16 +79,22 @@ drs::engine::PlaybackActivationPayloadPtr preparePreview(
 drs::engine::AuthoringPreviewRequest makeRequest(
     drs::engine::AuthoringPreviewScope scope,
     std::size_t revision,
-    std::string selectedZoneId = {})
+    std::string selectedZoneId = {},
+    std::string selectedGroupId = {})
 {
     drs::engine::AuthoringPreviewRequest request;
-    request.identity.requestId = scope == drs::engine::AuthoringPreviewScope::selectedZone ? 1 : 2;
+    request.identity.requestId = scope == drs::engine::AuthoringPreviewScope::selectedZone
+        ? 1
+        : (scope == drs::engine::AuthoringPreviewScope::selectedGroup ? 2 : 3);
     request.identity.draftRevision = revision;
     request.identity.scope = scope;
     request.identity.selectedZoneId = std::move(selectedZoneId);
+    request.identity.selectedGroupId = std::move(selectedGroupId);
     request.reason = scope == drs::engine::AuthoringPreviewScope::selectedZone
         ? drs::engine::AuthoringPreviewRequestReason::explicitSelectedZoneAudition
-        : drs::engine::AuthoringPreviewRequestReason::explicitCurrentDraftAudition;
+        : (scope == drs::engine::AuthoringPreviewScope::selectedGroup
+               ? drs::engine::AuthoringPreviewRequestReason::explicitSelectedGroupAudition
+               : drs::engine::AuthoringPreviewRequestReason::explicitCurrentDraftAudition);
     return request;
 }
 
@@ -169,6 +175,17 @@ int main()
                     && repeatedSelected.model->getRoutes().front().zoneId
                         == selected.model->getRoutes().front().zoneId,
                 "Equivalent selected-zone preparation must have deterministic immutable identity.");
+
+        const auto selectedGroup = prepareAuthoringPreviewRenderModel(
+            payload,
+            makeRequest(AuthoringPreviewScope::selectedGroup, 101, "pad-a3-low", "pad-core"));
+        require(selectedGroup.prepared && selectedGroup.validatedZoneCount == 3
+                    && selectedGroup.retainedZoneCount == 2
+                    && selectedGroup.retainedSampleCount == 1
+                    && selectedGroup.scopedPayload->snapshot->selectedGroupId == "pad-core"
+                    && selectedGroup.scopedPayload->snapshot->zones.size() == 2
+                    && selectedGroup.model->getRoutes().size() == 2,
+                "Selected-group preparation must retain the whole selected group while keeping Preview scoped.");
 
         const auto currentDraft = prepareAuthoringPreviewRenderModel(
             payload, makeRequest(AuthoringPreviewScope::currentDraft, 101));

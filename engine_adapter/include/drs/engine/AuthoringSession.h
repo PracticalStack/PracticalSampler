@@ -40,6 +40,16 @@ struct AuthoringZonePreviewRequest
     std::string state;
 };
 
+struct AuthoringGroupPreviewRequest
+{
+    bool available = false;
+    int midiNote = 60;
+    int velocity = 96;
+    std::string groupId;
+    std::string anchorZoneId;
+    std::string state;
+};
+
 class AuthoringSession
 {
 public:
@@ -54,6 +64,7 @@ public:
     std::optional<RuntimeProjectGroupDefinition> getSelectedGroup() const;
     std::optional<RuntimeProjectPerformanceBankDefinition> getSelectedPerformanceBank() const;
     AuthoringZonePreviewRequest buildSelectedZonePreviewRequest() const;
+    AuthoringGroupPreviewRequest buildSelectedGroupPreviewRequest() const;
 
     RuntimeProjectDocumentActionResult selectZone(const std::string& zoneId);
     RuntimeProjectDocumentActionResult selectGroup(const std::string& groupId);
@@ -77,6 +88,10 @@ public:
     RuntimeProjectDocumentActionResult addCompatibleZonesToSelectedRoundRobinPool(const std::string& label);
     RuntimeProjectDocumentActionResult normalizeSelectedRoundRobinPool(const std::string& label);
     RuntimeProjectDocumentActionResult removeSelectedZoneFromRoundRobinPool(const std::string& label);
+    RuntimeProjectDocumentActionResult createRoundRobinPoolForSelectedGroup(const std::string& label);
+    RuntimeProjectDocumentActionResult addCompatibleZonesToSelectedGroupRoundRobinPool(const std::string& label);
+    RuntimeProjectDocumentActionResult normalizeSelectedGroupRoundRobinPool(const std::string& label);
+    RuntimeProjectDocumentActionResult removeSelectedGroupAnchorFromRoundRobinPool(const std::string& label);
     RuntimeProjectDocumentActionResult deleteSelectedSample();
     RuntimeProjectDocumentActionResult appendImportedContent(std::vector<RuntimeProjectSampleSource> sampleSources,
                                                             std::vector<RuntimeProjectZoneDefinition> zones,

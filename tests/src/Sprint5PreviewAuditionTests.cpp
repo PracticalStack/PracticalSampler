@@ -91,6 +91,22 @@ void runCommandOwnershipContract()
     require(!adapter.dispatch(missingSelection).accepted,
             "Selected-zone audition must require an explicit selection identity.");
 
+    auto missingGroup = makeCommand(AuthoringPreviewCommandType::auditionSelectedGroup,
+                                    AuthoringPreviewAuditionSource::summaryPreview);
+    require(!adapter.dispatch(missingGroup).accepted,
+            "Selected-group audition must require an explicit group identity.");
+
+    auto selectedGroup = makeCommand(AuthoringPreviewCommandType::auditionSelectedGroup,
+                                     AuthoringPreviewAuditionSource::inspector);
+    selectedGroup.emitNote = false;
+    selectedGroup.selectedGroupId = "pad-core";
+    selectedGroup.selectedZoneId = "pad-a3-low";
+    const auto groupDispatch = adapter.dispatch(selectedGroup);
+    require(groupDispatch.accepted && groupDispatch.preparationRequested
+                && groupDispatch.requestedScope == AuthoringPreviewScope::selectedGroup
+                && !groupDispatch.hasEvent,
+            "Selected-group audition must request group-scoped preparation without inventing a note event.");
+
     auto currentDraft = makeCommand(AuthoringPreviewCommandType::auditionCurrentDraft,
                                     AuthoringPreviewAuditionSource::inspector);
     currentDraft.emitNote = false;

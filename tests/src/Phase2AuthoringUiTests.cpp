@@ -742,10 +742,6 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
 
     int commitRequests = 0;
     int restoreRequests = 0;
-    int createRoundRobinPoolRequests = 0;
-    int addCompatibleRoundRobinRequests = 0;
-    int normalizeRoundRobinRequests = 0;
-    int removeRoundRobinRequests = 0;
     std::string lastCommitLabel;
     drs::app::authoring::ZoneFieldValuesViewModel lastCommittedValues;
 
@@ -760,22 +756,6 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     callbacks.onRestoreRootKeyRequested = [&restoreRequests]
     {
         ++restoreRequests;
-    };
-    callbacks.onCreateRoundRobinPoolRequested = [&createRoundRobinPoolRequests]
-    {
-        ++createRoundRobinPoolRequests;
-    };
-    callbacks.onAddCompatibleZonesToRoundRobinPoolRequested = [&addCompatibleRoundRobinRequests]
-    {
-        ++addCompatibleRoundRobinRequests;
-    };
-    callbacks.onNormalizeRoundRobinPoolRequested = [&normalizeRoundRobinRequests]
-    {
-        ++normalizeRoundRobinRequests;
-    };
-    callbacks.onRemoveSelectedZoneFromRoundRobinPoolRequested = [&removeRoundRobinRequests]
-    {
-        ++removeRoundRobinRequests;
     };
     editor.setCallbacks(std::move(callbacks));
 
@@ -820,14 +800,6 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
             "Zone mapping editor should expose one loop toggle after removing old mapping rows.");
     require(countDescendantsById(editor, "authoringTriggerModeSelector") == 1,
             "Zone mapping editor should expose one trigger-mode selector.");
-    require(countDescendantsById(editor, "authoringCreateRoundRobinPoolRow") == 1,
-            "Zone mapping editor should expose one create-pool action.");
-    require(countDescendantsById(editor, "authoringAddCompatibleZonesRow") == 1,
-            "Zone mapping editor should expose one add-compatible-zones action.");
-    require(countDescendantsById(editor, "authoringNormalizeRoundRobinPoolRow") == 1,
-            "Zone mapping editor should expose one normalize-pool action.");
-    require(countDescendantsById(editor, "authoringRemoveRoundRobinPoolRow") == 1,
-            "Zone mapping editor should expose one remove-pool action.");
     require(countDescendantsById(editor, "authoringRestoreRootKeyButton") == 1,
             "Zone mapping editor should expose one restore-root-key action after removing old mapping rows.");
 
@@ -839,12 +811,6 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
              juce::String("authoringKeyHighSlider"),
              juce::String("authoringSampleInspectorSection"),
              juce::String("authoringSampleInspectorSectionDisclosure"),
-             juce::String("authoringRoundRobinInspectorSection"),
-             juce::String("authoringRoundRobinInspectorSectionDisclosure"),
-             juce::String("authoringCreateRoundRobinPoolButton"),
-             juce::String("authoringAddCompatibleZonesButton"),
-             juce::String("authoringNormalizeRoundRobinPoolButton"),
-             juce::String("authoringRemoveRoundRobinPoolButton"),
              juce::String("authoringMixInspectorSection"),
              juce::String("authoringMixInspectorSectionDisclosure"),
              juce::String("authoringAdvancedInspectorSection"),
@@ -871,11 +837,6 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
                                     "authoringSampleInspectorSectionDisclosure",
                                     "authoringVelocityLowSlider",
                                     "authoringVelocityHighSlider",
-                                    "authoringRoundRobinInspectorSectionDisclosure",
-                                    "authoringCreateRoundRobinPoolButton",
-                                    "authoringAddCompatibleZonesButton",
-                                    "authoringNormalizeRoundRobinPoolButton",
-                                    "authoringRemoveRoundRobinPoolButton",
                                     "authoringMixInspectorSectionDisclosure",
                                     "authoringGainSlider",
                                     "authoringPanSlider",
@@ -892,10 +853,6 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     requireAccessibilityHandlerState(editor, "authoringKeyHighSlider", true);
     requireAccessibilityHandlerState(editor, "authoringVelocityLowSlider", false);
     requireAccessibilityHandlerState(editor, "authoringVelocityHighSlider", false);
-    requireAccessibilityHandlerState(editor, "authoringCreateRoundRobinPoolButton", false);
-    requireAccessibilityHandlerState(editor, "authoringAddCompatibleZonesButton", false);
-    requireAccessibilityHandlerState(editor, "authoringNormalizeRoundRobinPoolButton", false);
-    requireAccessibilityHandlerState(editor, "authoringRemoveRoundRobinPoolButton", false);
     requireAccessibilityHandlerState(editor, "authoringGainSlider", false);
     requireAccessibilityHandlerState(editor, "authoringPanSlider", false);
     requireAccessibilityHandlerState(editor, "authoringLoopEnabledToggle", false);
@@ -905,12 +862,10 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     for (const auto& componentId : {
              juce::String("authoringMapInspectorSection"),
              juce::String("authoringSampleInspectorSection"),
-             juce::String("authoringRoundRobinInspectorSection"),
              juce::String("authoringMixInspectorSection"),
              juce::String("authoringAdvancedInspectorSection"),
              juce::String("authoringMapInspectorSectionDisclosure"),
              juce::String("authoringSampleInspectorSectionDisclosure"),
-             juce::String("authoringRoundRobinInspectorSectionDisclosure"),
              juce::String("authoringMixInspectorSectionDisclosure"),
              juce::String("authoringAdvancedInspectorSectionDisclosure")
          })
@@ -936,28 +891,6 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     requireButton(editor, "authoringSampleInspectorSectionDisclosure").onClick();
     requireAccessibilityHandlerState(editor, "authoringVelocityLowSlider", false);
     requireAccessibilityHandlerState(editor, "authoringVelocityHighSlider", false);
-
-    if (findDescendantById(editor, "authoringCreateRoundRobinPoolRow")->getBounds().isEmpty())
-        requireButton(editor, "authoringRoundRobinInspectorSectionDisclosure").onClick();
-    requireComponentVisibleWithin(editor, "authoringRoundRobinPoolMessage", bounds);
-    requireComponentVisibleWithin(editor, "authoringRoundRobinSlotMessage", bounds);
-    requireComponentVisibleWithin(editor, "authoringRoundRobinHintMessage", bounds);
-    requireComponentVisibleWithin(editor, "authoringCreateRoundRobinPoolRow", bounds);
-    requireComponentVisibleWithin(editor, "authoringAddCompatibleZonesRow", bounds);
-    requireComponentVisibleWithin(editor, "authoringNormalizeRoundRobinPoolRow", bounds);
-    requireComponentVisibleWithin(editor, "authoringRemoveRoundRobinPoolRow", bounds);
-    require(requireMessageText(editor, "authoringRoundRobinPoolMessage") == "Pool: rr-main",
-            "Zone mapping editor should show the Round Robin pool identity.");
-    require(requireMessageText(editor, "authoringRoundRobinSlotMessage") == "Slot: 1 of 3 | Mode: sequential",
-            "Zone mapping editor should show the Round Robin slot and mode.");
-    require(requireMessageText(editor, "authoringRoundRobinHintMessage") == "Pool members: 3 | Unpooled matches: 1",
-            "Zone mapping editor should show Round Robin grouping guidance.");
-    requireAccessibilityHandlerState(editor, "authoringCreateRoundRobinPoolButton", true);
-    requireAccessibilityHandlerState(editor, "authoringAddCompatibleZonesButton", true);
-    requireAccessibilityHandlerState(editor, "authoringNormalizeRoundRobinPoolButton", true);
-    requireAccessibilityHandlerState(editor, "authoringRemoveRoundRobinPoolButton", true);
-    require(requireButton(editor, "authoringCreateRoundRobinPoolButton").getButtonText() == "Split to New Pool",
-            "Round Robin pool creation should relabel itself when the selected zone is already pooled.");
     require(requireButton(editor, "authoringInspectorPreviewButton").getButtonText() == "Preview / Advance",
             "Round Robin zones should advertise preview slot advancement.");
 
@@ -1065,18 +998,6 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
 
     requireButton(editor, "authoringRestoreRootKeyButton").onClick();
     require(restoreRequests == 1, "Zone mapping editor should emit restore-root-key callbacks.");
-    requireButton(editor, "authoringCreateRoundRobinPoolButton").onClick();
-    require(createRoundRobinPoolRequests == 1,
-            "Zone mapping editor should emit create-pool callbacks.");
-    requireButton(editor, "authoringAddCompatibleZonesButton").onClick();
-    require(addCompatibleRoundRobinRequests == 1,
-            "Zone mapping editor should emit add-compatible-zones callbacks.");
-    requireButton(editor, "authoringNormalizeRoundRobinPoolButton").onClick();
-    require(normalizeRoundRobinRequests == 1,
-            "Zone mapping editor should emit normalize-pool callbacks.");
-    requireButton(editor, "authoringRemoveRoundRobinPoolButton").onClick();
-    require(removeRoundRobinRequests == 1,
-            "Zone mapping editor should emit remove-pool callbacks.");
 
     saveComponentPng(editor, outputDirectory / "leaf-zone-mapping-editor.png");
 }
@@ -1091,7 +1012,7 @@ void writeReachabilityChecklist(std::ostream& inventory)
     inventory << "- Zone Map context menu: Delete Selected Sample\n";
     inventory << "- Drawer host: authoringDrawer, authoringDrawerTabStrip, authoringDrawerToggleButton\n";
     inventory << "- Drawer tabs: authoringDrawerWaveformTab, authoringDrawerMacrosTab, authoringDrawerRoutingTab, authoringDrawerPerformanceTab\n";
-    inventory << "- Mapping inspector: authoringRootKeySlider, authoringKeyLowSlider, authoringKeyHighSlider, authoringVelocityLowSlider, authoringVelocityHighSlider, authoringCreateRoundRobinPoolButton, authoringAddCompatibleZonesButton, authoringNormalizeRoundRobinPoolButton, authoringRemoveRoundRobinPoolButton, authoringGainSlider, authoringPanSlider, authoringLoopEnabledToggle, authoringTriggerModeSelector, authoringRestoreRootKeyButton\n";
+    inventory << "- Mapping inspector: authoringRootKeySlider, authoringKeyLowSlider, authoringKeyHighSlider, authoringVelocityLowSlider, authoringVelocityHighSlider, authoringGainSlider, authoringPanSlider, authoringLoopEnabledToggle, authoringTriggerModeSelector, authoringRestoreRootKeyButton\n";
     inventory << "- Drawer context: authoringDrawerTitleLabel, authoringDrawerScopeLabel, authoringDrawerBreadcrumbLabel\n";
     inventory << "- Waveform drawer content: authoringWaveformPreview, authoringWaveformStatusLabel, authoringWaveformInfoLabel, authoringWaveformLoopLabel, authoringWaveformImportLabel\n";
     inventory << "- Macros drawer content: authoringMacroList, authoringMacroListBox, authoringMacroAssignmentSelector, authoringMacroRoleSelector, authoringMacroDefaultSlider, authoringMacroMinSlider, authoringMacroMaxSlider, authoringMacroMoveUpButton, authoringMacroMoveDownButton\n";
@@ -1579,6 +1500,10 @@ void exerciseGroupUi(drs::app::AuthoringPanel& panel,
     auto& groupVisibilityButton = requireButton(panel, "authoringGroupVisibilityButton");
     auto& groupPreviewAnchorButton = requireButton(panel, "authoringGroupPreviewAnchorButton");
     auto& groupsTabButton = requireButton(panel, "authoringDrawerGroupsTab");
+    auto& groupCreateRoundRobinPoolButton = requireButton(panel, "authoringGroupCreateRoundRobinPoolButton");
+    auto& groupAddCompatibleZonesButton = requireButton(panel, "authoringGroupAddCompatibleZonesButton");
+    auto& groupNormalizeRoundRobinPoolButton = requireButton(panel, "authoringGroupNormalizeRoundRobinPoolButton");
+    auto& groupRemoveRoundRobinAnchorButton = requireButton(panel, "authoringGroupRemoveRoundRobinAnchorButton");
     auto* groupNameEditor = dynamic_cast<juce::TextEditor*>(findDescendantById(panel, "authoringGroupNameEditor"));
     require(groupNameEditor != nullptr, "Group UI checks require the group-name editor.");
 
@@ -1637,6 +1562,10 @@ void exerciseGroupUi(drs::app::AuthoringPanel& panel,
     requireComponentVisibleWithin(panel, "authoringGroupAnchorSelector", panelBounds);
     requireComponentVisibleWithin(panel, "authoringGroupSummaryLabel", panelBounds);
     requireComponentVisibleWithin(panel, "authoringGroupRoundRobinLabel", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringGroupCreateRoundRobinPoolButton", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringGroupAddCompatibleZonesButton", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringGroupNormalizeRoundRobinPoolButton", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringGroupRemoveRoundRobinAnchorButton", panelBounds);
 
     groupNameEditor->setText("Lead Core UI");
     if (groupNameEditor->onReturnKey)
@@ -1652,6 +1581,20 @@ void exerciseGroupUi(drs::app::AuthoringPanel& panel,
     groupGainSlider.onDragEnd();
     require(std::abs(session.getSelectedGroup()->gainDb - nextGroupGain) < 0.001,
             "Group inspector gain edits should persist through the authoring session.");
+    require(groupCreateRoundRobinPoolButton.isEnabled()
+                && !groupAddCompatibleZonesButton.isEnabled()
+                && !groupNormalizeRoundRobinPoolButton.isEnabled()
+                && !groupRemoveRoundRobinAnchorButton.isEnabled(),
+            "Single-zone groups should expose pool creation while leaving add/normalize/remove disabled.");
+    groupCreateRoundRobinPoolButton.onClick();
+    require(session.getSelectedZone()->roundRobin.has_value(),
+            "Group RR pool creation should assign Round Robin metadata to the selected group's anchor zone.");
+    require(groupNormalizeRoundRobinPoolButton.isEnabled()
+                && groupRemoveRoundRobinAnchorButton.isEnabled(),
+            "Once a group RR pool exists, normalize and remove actions should become available.");
+    groupRemoveRoundRobinAnchorButton.onClick();
+    require(!session.getSelectedZone()->roundRobin.has_value(),
+            "Removing the group RR anchor should clear Round Robin metadata from the anchor zone.");
 
     inventory << shellName << " / groups\n";
     inventory << "  " << describeBounds(panel, "authoringGroupList") << "\n";

@@ -9,6 +9,7 @@ namespace drs::engine
 enum class AuthoringPreviewScope : std::uint8_t
 {
     selectedZone = 0,
+    selectedGroup,
     currentDraft
 };
 
@@ -58,6 +59,7 @@ enum class AuthoringPreviewRequestReason : std::uint8_t
     authoringChanged,
     selectionChanged,
     explicitSelectedZoneAudition,
+    explicitSelectedGroupAudition,
     explicitCurrentDraftAudition,
     recovery
 };
@@ -119,6 +121,7 @@ struct AuthoringPreviewRequestIdentity
     std::size_t draftRevision = 0;
     AuthoringPreviewScope scope = AuthoringPreviewScope::selectedZone;
     std::string selectedZoneId;
+    std::string selectedGroupId;
 
     bool operator==(const AuthoringPreviewRequestIdentity& other) const noexcept
     {
@@ -126,7 +129,8 @@ struct AuthoringPreviewRequestIdentity
             && cancellationGeneration == other.cancellationGeneration
             && draftRevision == other.draftRevision
             && scope == other.scope
-            && selectedZoneId == other.selectedZoneId;
+            && selectedZoneId == other.selectedZoneId
+            && selectedGroupId == other.selectedGroupId;
     }
 
     bool operator!=(const AuthoringPreviewRequestIdentity& other) const noexcept
@@ -148,18 +152,23 @@ inline std::string buildAuthoringPreviewRequestSignature(
     AuthoringPreviewScope scope,
     const std::string& selectedZoneId,
     AuthoringPreviewInvalidationCategory invalidationCategory,
-    const std::string& authoredContentFingerprint)
+    const std::string& authoredContentFingerprint,
+    const std::string& selectedGroupId = {})
 {
     return std::to_string(static_cast<unsigned int>(scope)) + "|"
+        + selectedGroupId + "|"
         + selectedZoneId + "|"
         + std::to_string(static_cast<unsigned int>(invalidationCategory)) + "|"
         + authoredContentFingerprint;
 }
 
 constexpr bool authoringPreviewScopeIsEligible(AuthoringPreviewScope scope,
-                                                bool hasSelectedZone) noexcept
+                                                bool hasSelectedZone,
+                                                bool hasSelectedGroup = false) noexcept
 {
-    return scope == AuthoringPreviewScope::currentDraft || hasSelectedZone;
+    return scope == AuthoringPreviewScope::currentDraft
+        || (scope == AuthoringPreviewScope::selectedZone && hasSelectedZone)
+        || (scope == AuthoringPreviewScope::selectedGroup && hasSelectedGroup);
 }
 
 constexpr bool isAuthoringPreviewPreparationTransitionAllowed(

@@ -253,6 +253,10 @@ private:
     juce::TextButton groupDeleteButton;
     juce::Label groupRoundRobinLabel;
     juce::Label groupRoundRobinHintLabel;
+    juce::TextButton groupCreateRoundRobinPoolButton;
+    juce::TextButton groupAddCompatibleZonesButton;
+    juce::TextButton groupNormalizeRoundRobinPoolButton;
+    juce::TextButton groupRemoveRoundRobinAnchorButton;
 
     juce::ComboBox performanceBankSelector;
     juce::ComboBox triggerSlotSelector;

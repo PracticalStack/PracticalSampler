@@ -108,7 +108,8 @@ public:
                                           AuthoringPreviewRequestReason reason,
                                           AuthoringPreviewInvalidationCategory invalidationCategory,
                                           std::string requestSignature,
-                                          std::uint64_t nowMicros);
+                                          std::uint64_t nowMicros,
+                                          std::string selectedGroupId = {});
     AuthoringPreviewLaunchResult launchIfEligible(std::uint64_t nowMicros,
                                                   bool directAuditionContentPrepared = false);
     bool acceptPrepared(const AuthoringPreviewRequestIdentity& identity,
@@ -139,6 +140,7 @@ private:
     {
         AuthoringPreviewScope scope = AuthoringPreviewScope::selectedZone;
         std::string selectedZoneId;
+        std::string selectedGroupId;
         std::string requestSignature;
         std::uint64_t preparedBuildId = 0;
     };
@@ -150,6 +152,7 @@ private:
                           bool accepted);
     std::uint64_t findReusablePreparedBuildId(AuthoringPreviewScope scope,
                                               const std::string& selectedZoneId,
+                                              const std::string& selectedGroupId,
                                               const std::string& requestSignature) const;
     void rememberPreparedResult(const AuthoringPreviewRequest& request,
                                 std::uint64_t preparedBuildId);

@@ -16,6 +16,7 @@ enum class AuthoringPreviewCommandType : std::uint8_t
     stopAll,
     emergencyReset,
     auditionSelectedZone,
+    auditionSelectedGroup,
     auditionCurrentDraft
 };
 
@@ -36,6 +37,7 @@ struct AuthoringPreviewCommand
     std::uint32_t sampleOffset = 0;
     bool emitNote = true;
     std::string selectedZoneId;
+    std::string selectedGroupId;
 };
 
 struct AuthoringPreviewEventCommand

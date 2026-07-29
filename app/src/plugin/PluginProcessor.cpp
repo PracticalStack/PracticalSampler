@@ -146,6 +146,22 @@ std::optional<drs::engine::RuntimeProjectSampleSource> findProjectSampleSource(
     const drs::engine::RuntimeProjectModel& project,
     const std::string& sampleSourceId);
 
+std::optional<drs::engine::RuntimeProjectZoneDefinition> findProjectZone(
+    const drs::engine::RuntimeProjectModel& project,
+    const std::string& zoneId)
+{
+    const auto iterator = std::find_if(project.authoring.zones.begin(),
+                                       project.authoring.zones.end(),
+                                       [&](const drs::engine::RuntimeProjectZoneDefinition& zone)
+                                       {
+                                           return zone.id == zoneId;
+                                       });
+    if (iterator == project.authoring.zones.end())
+        return std::nullopt;
+
+    return *iterator;
+}
+
 std::string buildSelectedZonePreviewFingerprint(
     const drs::engine::RuntimeProjectModel& project,
     const std::optional<drs::engine::RuntimeProjectZoneDefinition>& selectedZone)
@@ -189,6 +205,16 @@ std::string buildCurrentDraftPreviewFingerprint(const drs::engine::RuntimeProjec
         hash >>= 4;
     }
     return result;
+}
+
+std::string buildSelectedGroupPreviewFingerprint(
+    const drs::engine::RuntimeProjectModel& project,
+    const std::optional<drs::engine::RuntimeProjectGroupDefinition>& selectedGroup)
+{
+    if (!selectedGroup.has_value())
+        return "no-group";
+
+    return selectedGroup->id + "|" + buildCurrentDraftPreviewFingerprint(project);
 }
 
 int computeToneRenderVelocity(const drs::engine::RuntimeSessionStateSnapshot& sessionState)
@@ -671,7 +697,9 @@ void Processor::requestAuthoringPreview(drs::engine::AuthoringPreviewScope scope
     drs::engine::AuthoringPreviewCommand command;
     command.type = scope == drs::engine::AuthoringPreviewScope::currentDraft
         ? drs::engine::AuthoringPreviewCommandType::auditionCurrentDraft
-        : drs::engine::AuthoringPreviewCommandType::auditionSelectedZone;
+        : (scope == drs::engine::AuthoringPreviewScope::selectedGroup
+               ? drs::engine::AuthoringPreviewCommandType::auditionSelectedGroup
+               : drs::engine::AuthoringPreviewCommandType::auditionSelectedZone);
     command.emitNote = false;
     submitAuthoringPreviewCommand(command);
 }
@@ -696,6 +724,24 @@ bool Processor::submitAuthoringPreviewCommand(
         if (selectedZone.has_value())
             command.selectedZoneId = selectedZone->id;
     }
+    else if (command.type == drs::engine::AuthoringPreviewCommandType::auditionSelectedGroup)
+    {
+        if (command.selectedGroupId.empty())
+        {
+            const auto selectedGroup = authoringSession.getSelectedGroup();
+            if (selectedGroup.has_value())
+                command.selectedGroupId = selectedGroup->id;
+        }
+        if (command.selectedZoneId.empty())
+        {
+            const auto previewRequest = authoringSession.buildSelectedGroupPreviewRequest();
+            if (previewRequest.available
+                && previewRequest.groupId == command.selectedGroupId)
+            {
+                command.selectedZoneId = previewRequest.anchorZoneId;
+            }
+        }
+    }
 
     const auto dispatch = authoringPreviewCommandAdapter.dispatch(command);
     if (!dispatch.accepted)
@@ -705,6 +751,8 @@ bool Processor::submitAuthoringPreviewCommand(
     {
         authoringPreviewRequestedScope = dispatch.requestedScope;
         authoringPreviewDirectAuditionRequested = true;
+        pendingAuthoringPreviewZoneId = command.selectedZoneId;
+        pendingAuthoringPreviewGroupId = command.selectedGroupId;
         serviceMessageThreadWork();
     }
 
@@ -813,6 +861,7 @@ void Processor::publishAuthoringPreviewStatus()
     const auto controller = authoringPreviewController.getSnapshot();
     const auto command = authoringPreviewCommandAdapter.getSnapshot();
     const auto selectedZone = authoringSession.getSelectedZone();
+    const auto selectedGroup = authoringSession.getSelectedGroup();
 
     drs::app::AuthoringPreviewStatusSnapshot status;
     status.available = diagnostics.available;
@@ -834,7 +883,9 @@ void Processor::publishAuthoringPreviewStatus()
     status.failedRevision = controller.hasFailedRequest
         ? controller.failedRequestIdentity.draftRevision : 0;
     status.audibleRevision = status.activeRevision;
-    status.selectedZoneId = selectedZone.has_value() ? selectedZone->id : std::string {};
+    status.selectedZoneId = controller.hasRequest
+        ? controller.currentRequest.identity.selectedZoneId
+        : (selectedZone.has_value() ? selectedZone->id : std::string {});
     status.requestedPreparedBuildId = controller.acceptedPreparedBuildId;
     status.activePreparedBuildId = controller.activePreparedBuildId;
     status.requestedSnapshotDigest = controller.acceptedSnapshotDigest;
@@ -843,7 +894,10 @@ void Processor::publishAuthoringPreviewStatus()
     status.activePreparedDigest = controller.activePreparedDigest;
     status.auditionAvailable = engineFacade.getDraftPlaybackStatus().projectOpen
         && (status.scope == drs::engine::AuthoringPreviewScope::currentDraft
-            || selectedZone.has_value());
+            || (status.scope == drs::engine::AuthoringPreviewScope::selectedZone
+                && selectedZone.has_value())
+            || (status.scope == drs::engine::AuthoringPreviewScope::selectedGroup
+                && selectedGroup.has_value()));
     status.stopAvailable = command.ownedNoteCount > 0
         || diagnostics.authoringPreviewActiveVoiceCount > 0;
     status.usingLastKnownGood = controller.hasActiveRequest
@@ -891,6 +945,13 @@ void Processor::publishAuthoringPreviewStatus()
         status.stateLabel = status.usingLastKnownGood
             ? "No Selection — Last Good Active" : "No Selection";
         status.creatorGuidance = "Select a zone to enable selected-zone Preview.";
+    }
+    else if (status.scope == drs::engine::AuthoringPreviewScope::selectedGroup
+             && !selectedGroup.has_value())
+    {
+        status.stateLabel = status.usingLastKnownGood
+            ? "No Group â€” Last Good Active" : "No Group";
+        status.creatorGuidance = "Select a group to enable selected-group Preview.";
     }
     else
     {
@@ -994,6 +1055,8 @@ void Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
     }
     authoringPreviewDirectAuditionRequested = false;
     authoringPreviewRequestedScope = drs::engine::AuthoringPreviewScope::selectedZone;
+    pendingAuthoringPreviewZoneId.clear();
+    pendingAuthoringPreviewGroupId.clear();
     observedDraftPlaybackProjectRevision = authoringSession.getDocumentState().revision;
     initializeAuthoringImportMetrics();
     serviceMessageThreadWork();
@@ -1013,6 +1076,8 @@ void Processor::closeAuthoringProject(drs::engine::RuntimeProjectModel unloadedP
     authoringPreviewCloseRequested.store(true, std::memory_order_release);
     authoringPreviewDirectAuditionRequested = false;
     authoringPreviewRequestedScope = drs::engine::AuthoringPreviewScope::selectedZone;
+    pendingAuthoringPreviewZoneId.clear();
+    pendingAuthoringPreviewGroupId.clear();
     observedDraftPlaybackProjectRevision = authoringSession.getDocumentState().revision;
     initializeAuthoringImportMetrics();
     updateRealtimeSafetyState();
@@ -1166,22 +1231,42 @@ bool Processor::serviceMessageThreadWork()
     const auto previewContextSnapshot = authoringPreviewPlaybackContext.getSnapshot();
     const auto& authoredProject = authoringSession.getProject();
     const auto selectedZone = authoringSession.getSelectedZone();
+    const auto selectedGroup = authoringSession.getSelectedGroup();
     const auto selectedZoneId = selectedZone.has_value() ? selectedZone->id : std::string {};
+    const auto selectedGroupId = selectedGroup.has_value() ? selectedGroup->id : std::string {};
     const auto requestedScope = authoringPreviewRequestedScope;
-    const auto requestSelectedZoneId = requestedScope
-            == drs::engine::AuthoringPreviewScope::selectedZone
-        ? selectedZoneId
-        : std::string {};
+    const auto requestSelectedZoneId
+        = authoringPreviewDirectAuditionRequested && !pendingAuthoringPreviewZoneId.empty()
+            ? pendingAuthoringPreviewZoneId
+            : (requestedScope == drs::engine::AuthoringPreviewScope::selectedZone
+                   ? selectedZoneId
+                   : (requestedScope == drs::engine::AuthoringPreviewScope::selectedGroup
+                          ? authoringSession.buildSelectedGroupPreviewRequest().anchorZoneId
+                          : std::string {}));
+    const auto requestSelectedGroupId
+        = authoringPreviewDirectAuditionRequested && !pendingAuthoringPreviewGroupId.empty()
+            ? pendingAuthoringPreviewGroupId
+            : (requestedScope == drs::engine::AuthoringPreviewScope::selectedGroup
+                   ? selectedGroupId
+                   : std::string {});
     const auto controllerBeforeRequest = authoringPreviewController.getSnapshot();
     const auto scopeChanged = controllerBeforeRequest.hasRequest
         && controllerBeforeRequest.currentRequest.identity.scope != requestedScope;
-    const auto selectionChanged = requestedScope == drs::engine::AuthoringPreviewScope::selectedZone
-        && controllerBeforeRequest.hasRequest
-        && controllerBeforeRequest.currentRequest.identity.selectedZoneId != selectedZoneId;
+    const auto selectionChanged = controllerBeforeRequest.hasRequest
+        && ((requestedScope == drs::engine::AuthoringPreviewScope::selectedZone
+                && controllerBeforeRequest.currentRequest.identity.selectedZoneId
+                    != requestSelectedZoneId)
+            || (requestedScope == drs::engine::AuthoringPreviewScope::selectedGroup
+                && (controllerBeforeRequest.currentRequest.identity.selectedGroupId
+                        != requestSelectedGroupId
+                    || controllerBeforeRequest.currentRequest.identity.selectedZoneId
+                        != requestSelectedZoneId)));
     const auto requestReason = authoringPreviewDirectAuditionRequested
         ? (requestedScope == drs::engine::AuthoringPreviewScope::currentDraft
                ? drs::engine::AuthoringPreviewRequestReason::explicitCurrentDraftAudition
-               : drs::engine::AuthoringPreviewRequestReason::explicitSelectedZoneAudition)
+               : (requestedScope == drs::engine::AuthoringPreviewScope::selectedGroup
+                      ? drs::engine::AuthoringPreviewRequestReason::explicitSelectedGroupAudition
+                      : drs::engine::AuthoringPreviewRequestReason::explicitSelectedZoneAudition))
         : (!controllerBeforeRequest.hasRequest
         ? drs::engine::AuthoringPreviewRequestReason::projectOpened
         : (selectionChanged
@@ -1198,12 +1283,17 @@ bool Processor::serviceMessageThreadWork()
     const auto authoredContentFingerprint
         = requestedScope == drs::engine::AuthoringPreviewScope::currentDraft
         ? buildCurrentDraftPreviewFingerprint(authoredProject)
-        : buildSelectedZonePreviewFingerprint(authoredProject, selectedZone);
+        : (requestedScope == drs::engine::AuthoringPreviewScope::selectedGroup
+               ? buildSelectedGroupPreviewFingerprint(authoredProject, selectedGroup)
+               : buildSelectedZonePreviewFingerprint(authoredProject,
+                                                    findProjectZone(authoredProject,
+                                                                    requestSelectedZoneId)));
     const auto requestSignature = drs::engine::buildAuthoringPreviewRequestSignature(
         requestedScope,
         requestSelectedZoneId,
         invalidationCategory,
-        authoredContentFingerprint);
+        authoredContentFingerprint,
+        requestSelectedGroupId);
     const auto requestResult = authoringPreviewController.request(
         requestedScope,
         authoringRevision,
@@ -1211,8 +1301,11 @@ bool Processor::serviceMessageThreadWork()
         requestReason,
         invalidationCategory,
         requestSignature,
-        serviceTimeMicros);
+        serviceTimeMicros,
+        requestSelectedGroupId);
     authoringPreviewDirectAuditionRequested = false;
+    pendingAuthoringPreviewZoneId.clear();
+    pendingAuthoringPreviewGroupId.clear();
     const auto canceledSupersededWork = requestResult.supersededPrevious
         && engineFacade.cancelPreviewPreparation();
     if (canceledSupersededWork && !requestResult.cancellationRequested)

@@ -21,15 +21,20 @@ void addError(AuthoringPreviewPreparationResult& result,
                                 std::move(code), std::move(path), std::move(message) });
 }
 
+bool containsZoneId(const std::vector<std::string>& zoneIds, const std::string& zoneId)
+{
+    return std::find(zoneIds.begin(), zoneIds.end(), zoneId) != zoneIds.end();
+}
+
 template <typename Route>
-void retainSelectedZone(std::vector<Route>& routes, const std::string& selectedZoneId)
+void retainSelectedZones(std::vector<Route>& routes, const std::vector<std::string>& retainedZoneIds)
 {
     for (auto iterator = routes.begin(); iterator != routes.end();)
     {
         iterator->zoneIds.erase(std::remove_if(iterator->zoneIds.begin(), iterator->zoneIds.end(),
                                               [&](const std::string& zoneId)
                                               {
-                                                  return zoneId != selectedZoneId;
+                                                  return !containsZoneId(retainedZoneIds, zoneId);
                                               }),
                                 iterator->zoneIds.end());
         if (iterator->zoneIds.empty())
@@ -83,90 +88,172 @@ AuthoringPreviewPreparationResult prepareAuthoringPreviewRenderModel(
         return result;
     }
 
-    if (request.identity.selectedZoneId.empty())
+    const auto selectedZoneScope = request.identity.scope == AuthoringPreviewScope::selectedZone;
+    const auto selectedGroupScope = request.identity.scope == AuthoringPreviewScope::selectedGroup;
+
+    if (selectedZoneScope && request.identity.selectedZoneId.empty())
     {
         addError(result, "preview-selected-zone-missing", "request.selectedZoneId",
                  "Selected-zone Preview requires an explicit selected-zone identity.");
         return result;
     }
-
-    const auto& sourceSnapshot = *preparedDraftPayload->snapshot;
-    const auto& sourcePrepared = *preparedDraftPayload->prepared;
-    const auto snapshotZone = std::find_if(sourceSnapshot.zones.begin(), sourceSnapshot.zones.end(),
-                                           [&](const PlaybackSnapshotZone& zone)
-                                           {
-                                               return zone.id == request.identity.selectedZoneId;
-                                           });
-    const auto preparedZone = std::find_if(sourcePrepared.zones.begin(), sourcePrepared.zones.end(),
-                                           [&](const PreparedPlaybackZoneHandle& zone)
-                                           {
-                                               return zone.zoneId == request.identity.selectedZoneId;
-                                           });
-    if (snapshotZone == sourceSnapshot.zones.end() || preparedZone == sourcePrepared.zones.end())
+    if (selectedGroupScope && request.identity.selectedGroupId.empty())
     {
-        addError(result, "preview-selected-zone-unprepared", "request.selectedZoneId",
-                 "The selected zone is not present in the validated prepared draft.");
+        addError(result, "preview-selected-group-missing", "request.selectedGroupId",
+                 "Selected-group Preview requires an explicit selected-group identity.");
         return result;
     }
 
-    const auto oldSampleIndex = preparedZone->preparedSampleIndex;
-    const auto oldStreamIndex = preparedZone->preparedStreamIndex;
-    if (oldSampleIndex >= sourcePrepared.samples.size())
+    const auto& sourceSnapshot = *preparedDraftPayload->snapshot;
+    const auto& sourcePrepared = *preparedDraftPayload->prepared;
+    std::vector<std::string> retainedZoneIds;
+    if (selectedZoneScope)
     {
-        addError(result, "preview-selected-sample-index-invalid", "payload.prepared.zones",
-                 "The selected zone does not reference a retained prepared sample.");
+        retainedZoneIds.push_back(request.identity.selectedZoneId);
+    }
+    else
+    {
+        for (const auto& zone : sourceSnapshot.zones)
+        {
+            if (zone.groupId == request.identity.selectedGroupId)
+                retainedZoneIds.push_back(zone.id);
+        }
+    }
+    if (retainedZoneIds.empty())
+    {
+        addError(result,
+                 selectedZoneScope ? "preview-selected-zone-unprepared"
+                                   : "preview-selected-group-unprepared",
+                 selectedZoneScope ? "request.selectedZoneId"
+                                   : "request.selectedGroupId",
+                 selectedZoneScope
+                     ? "The selected zone is not present in the validated prepared draft."
+                     : "The selected group is not present in the validated prepared draft.");
+        return result;
+    }
+
+    const auto firstRetainedSnapshotZone = std::find_if(
+        sourceSnapshot.zones.begin(),
+        sourceSnapshot.zones.end(),
+        [&](const PlaybackSnapshotZone& zone)
+        {
+            return containsZoneId(retainedZoneIds, zone.id);
+        });
+    if (firstRetainedSnapshotZone == sourceSnapshot.zones.end())
+    {
+        addError(result,
+                 selectedZoneScope ? "preview-selected-zone-unprepared"
+                                   : "preview-selected-group-unprepared",
+                 selectedZoneScope ? "request.selectedZoneId"
+                                   : "request.selectedGroupId",
+                 "The requested Preview scope does not resolve to validated snapshot routes.");
         return result;
     }
 
     auto scopedSnapshot = sourceSnapshot;
-    scopedSnapshot.zones = { *snapshotZone };
+    scopedSnapshot.zones.erase(
+        std::remove_if(scopedSnapshot.zones.begin(),
+                       scopedSnapshot.zones.end(),
+                       [&](const PlaybackSnapshotZone& zone)
+                       {
+                           return !containsZoneId(retainedZoneIds, zone.id);
+                       }),
+        scopedSnapshot.zones.end());
     scopedSnapshot.selectedZoneId = request.identity.selectedZoneId;
+    scopedSnapshot.selectedGroupId = selectedGroupScope
+        ? request.identity.selectedGroupId
+        : firstRetainedSnapshotZone->groupId;
     scopedSnapshot.sampleIdentities.erase(
         std::remove_if(scopedSnapshot.sampleIdentities.begin(), scopedSnapshot.sampleIdentities.end(),
                        [&](const PlaybackSnapshotSampleIdentity& sample)
                        {
-                           return sample.sampleSourceId != snapshotZone->sampleSourceId;
+                           return std::none_of(scopedSnapshot.zones.begin(),
+                                               scopedSnapshot.zones.end(),
+                                               [&](const PlaybackSnapshotZone& zone)
+                                               {
+                                                   return zone.sampleSourceId == sample.sampleSourceId;
+                                               });
                        }),
         scopedSnapshot.sampleIdentities.end());
-    retainSelectedZone(scopedSnapshot.articulationRoutes, request.identity.selectedZoneId);
-    retainSelectedZone(scopedSnapshot.groupRoutes, request.identity.selectedZoneId);
+    retainSelectedZones(scopedSnapshot.articulationRoutes, retainedZoneIds);
+    retainSelectedZones(scopedSnapshot.groupRoutes, retainedZoneIds);
     scopedSnapshot.contentDigest = computePlaybackSnapshotContentDigest(scopedSnapshot);
 
     auto scopedPrepared = sourcePrepared;
-    const auto selectedSample = sourcePrepared.samples[oldSampleIndex];
-    scopedPrepared.samples = { selectedSample };
+    scopedPrepared.selectedGroupId = scopedSnapshot.selectedGroupId;
+    scopedPrepared.samples.clear();
     scopedPrepared.streams.clear();
-    if (oldStreamIndex < sourcePrepared.streams.size())
-        scopedPrepared.streams.push_back(sourcePrepared.streams[oldStreamIndex]);
+    scopedPrepared.zones.clear();
 
-    std::vector<PreparedPlaybackOwnershipRecord> selectedOwnership;
+    std::unordered_map<std::size_t, std::size_t> sampleIndexMap;
+    std::unordered_map<std::size_t, std::size_t> streamIndexMap;
     std::unordered_map<std::size_t, std::size_t> ownershipIndexMap;
-    const auto retainOwnership = [&](std::size_t oldIndex)
+    std::vector<PreparedPlaybackOwnershipRecord> retainedOwnership;
+    const auto retainOwnership = [&](std::size_t oldIndex) -> std::size_t
     {
-        if (oldIndex >= sourcePrepared.ownershipRecords.size()
-            || ownershipIndexMap.find(oldIndex) != ownershipIndexMap.end())
-            return;
-        ownershipIndexMap.emplace(oldIndex, selectedOwnership.size());
-        selectedOwnership.push_back(sourcePrepared.ownershipRecords[oldIndex]);
+        if (oldIndex >= sourcePrepared.ownershipRecords.size())
+            return 0;
+        if (const auto existing = ownershipIndexMap.find(oldIndex);
+            existing != ownershipIndexMap.end())
+        {
+            return existing->second;
+        }
+        ownershipIndexMap.emplace(oldIndex, retainedOwnership.size());
+        retainedOwnership.push_back(sourcePrepared.ownershipRecords[oldIndex]);
+        return retainedOwnership.size() - 1;
     };
-    retainOwnership(selectedSample.ownershipRecordIndex);
-    if (!scopedPrepared.streams.empty())
-        retainOwnership(scopedPrepared.streams.front().ownershipRecordIndex);
-    scopedPrepared.ownershipRecords = std::move(selectedOwnership);
-    if (const auto mapped = ownershipIndexMap.find(scopedPrepared.samples.front().ownershipRecordIndex);
-        mapped != ownershipIndexMap.end())
-        scopedPrepared.samples.front().ownershipRecordIndex = mapped->second;
-    if (!scopedPrepared.streams.empty())
-    {
-        if (const auto mapped = ownershipIndexMap.find(scopedPrepared.streams.front().ownershipRecordIndex);
-            mapped != ownershipIndexMap.end())
-            scopedPrepared.streams.front().ownershipRecordIndex = mapped->second;
-    }
 
-    auto selectedPreparedZone = *preparedZone;
-    selectedPreparedZone.preparedSampleIndex = 0;
-    selectedPreparedZone.preparedStreamIndex = 0;
-    scopedPrepared.zones = { std::move(selectedPreparedZone) };
+    for (const auto& zone : sourcePrepared.zones)
+    {
+        if (!containsZoneId(retainedZoneIds, zone.zoneId))
+            continue;
+
+        if (zone.preparedSampleIndex >= sourcePrepared.samples.size())
+        {
+            addError(result, "preview-selected-sample-index-invalid", "payload.prepared.zones",
+                     "A retained Preview zone does not reference a retained prepared sample.");
+            return result;
+        }
+
+        auto selectedPreparedZone = zone;
+        if (const auto mappedSample = sampleIndexMap.find(zone.preparedSampleIndex);
+            mappedSample != sampleIndexMap.end())
+        {
+            selectedPreparedZone.preparedSampleIndex = mappedSample->second;
+        }
+        else
+        {
+            auto sample = sourcePrepared.samples[zone.preparedSampleIndex];
+            sample.ownershipRecordIndex = retainOwnership(sample.ownershipRecordIndex);
+            selectedPreparedZone.preparedSampleIndex = scopedPrepared.samples.size();
+            sampleIndexMap.emplace(zone.preparedSampleIndex, selectedPreparedZone.preparedSampleIndex);
+            scopedPrepared.samples.push_back(std::move(sample));
+        }
+
+        if (zone.preparedStreamIndex < sourcePrepared.streams.size())
+        {
+            if (const auto mappedStream = streamIndexMap.find(zone.preparedStreamIndex);
+                mappedStream != streamIndexMap.end())
+            {
+                selectedPreparedZone.preparedStreamIndex = mappedStream->second;
+            }
+            else
+            {
+                auto stream = sourcePrepared.streams[zone.preparedStreamIndex];
+                stream.ownershipRecordIndex = retainOwnership(stream.ownershipRecordIndex);
+                selectedPreparedZone.preparedStreamIndex = scopedPrepared.streams.size();
+                streamIndexMap.emplace(zone.preparedStreamIndex, selectedPreparedZone.preparedStreamIndex);
+                scopedPrepared.streams.push_back(std::move(stream));
+            }
+        }
+        else
+        {
+            selectedPreparedZone.preparedStreamIndex = 0;
+        }
+
+        scopedPrepared.zones.push_back(std::move(selectedPreparedZone));
+    }
+    scopedPrepared.ownershipRecords = std::move(retainedOwnership);
     scopedPrepared.snapshotContentDigest = scopedSnapshot.contentDigest;
     scopedPrepared.preparedContentDigest = computePreparedPlaybackContentDigest(scopedPrepared);
 
@@ -186,8 +273,11 @@ AuthoringPreviewPreparationResult prepareAuthoringPreviewRenderModel(
         = std::make_shared<const ImmutablePreparedPlayback>(std::move(scopedPrepared));
 
     SamplerRenderModelBuildOptions options;
-    options.selectedZoneId = request.identity.selectedZoneId;
-    options.auditionSelectedZone = true;
+    if (selectedZoneScope)
+    {
+        options.selectedZoneId = request.identity.selectedZoneId;
+        options.auditionSelectedZone = true;
+    }
     auto scopedModel = buildSamplerRenderModel(scopedPayload, options);
     if (!scopedModel.built || scopedModel.model == nullptr)
     {
