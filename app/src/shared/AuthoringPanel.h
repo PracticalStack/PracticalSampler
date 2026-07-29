@@ -92,6 +92,7 @@ private:
     };
 
     void rebuildZoneSelector();
+    void rebuildGroupList();
     void rebuildMacroList();
     void rebuildFxSelector();
     void rebuildRoutingBusSelector();
@@ -104,6 +105,13 @@ private:
     void refreshDraftPlaybackBanner();
     void refreshFromSession();
     void applySelectedZoneEdit(const authoring::ZoneFieldValuesViewModel& values, const juce::String& label);
+    void applySelectedGroupNameEdit();
+    void applySelectedGroupMixEdit(const juce::String& label);
+    void createGroup();
+    void deleteSelectedGroup();
+    void moveSelectedGroup(int direction);
+    void toggleSelectedGroupVisibility();
+    void previewSelectedGroupAnchor();
     void applySelectedMacroEdit(const juce::String& label);
     void moveSelectedMacro(int direction);
     void applySelectedFxSlotEdit(const juce::String& label);
@@ -122,6 +130,7 @@ private:
     void undoLastEdit();
     void redoLastEdit();
     void markSavedCheckpoint();
+    std::vector<drs::engine::AuthoringZoneSummary> buildVisibleZoneSummaries() const;
     void setDrawerOpen(bool shouldOpen);
     void setActiveDrawerTab(authoring::DrawerTab nextTab);
     void configureAccessibilityAndFocus();
@@ -149,6 +158,7 @@ private:
     };
     std::array<TimedPreviewNote, 4> timedPreviewNotes {};
     bool isRefreshing = false;
+    int selectedGroupIndex = 0;
     int selectedMacroIndex = 0;
     int selectedFxSlotIndex = 0;
     int selectedRoutingBusIndex = 0;
@@ -176,6 +186,7 @@ private:
     juce::Component drawerContentHost;
     juce::TextButton drawerToggleButton;
     juce::TextButton drawerWaveformTabButton;
+    juce::TextButton drawerGroupsTabButton;
     juce::TextButton drawerMacrosTabButton;
     juce::TextButton drawerRoutingTabButton;
     juce::TextButton drawerPerformanceTabButton;
@@ -186,6 +197,16 @@ private:
     authoring::ZoneMapCanvas zoneMap;
     authoring::ZoneMappingEditor zoneMappingEditor;
     authoring::WaveformDetailView waveformPreview;
+    juce::Label groupSectionLabel;
+    juce::Label groupNameLabel;
+    juce::TextEditor groupNameEditor;
+    juce::TextButton groupCreateButton;
+    juce::TextButton groupPreviewAnchorButton;
+    authoring::RepeatedStructureList groupList;
+    juce::TextButton groupMoveUpButton;
+    juce::TextButton groupMoveDownButton;
+    juce::TextButton groupVisibilityButton;
+    juce::Label groupVisibilityHintLabel;
 
     authoring::RepeatedStructureList macroList;
     juce::Label macroAssignmentLabel;
@@ -218,6 +239,20 @@ private:
     juce::Label routingInsertTwoLabel;
     juce::ComboBox routingInsertTwoSelector;
     juce::Label routingSummaryLabel;
+    juce::Label groupSummaryLabel;
+    juce::Label groupVisibilityLabel;
+    juce::ToggleButton groupVisibilityToggle;
+    juce::Label groupGainLabel;
+    juce::Slider groupGainSlider;
+    juce::Label groupPanLabel;
+    juce::Slider groupPanSlider;
+    juce::Label groupRoutingLabel;
+    juce::ComboBox groupRoutingSelector;
+    juce::Label groupAnchorLabel;
+    juce::ComboBox groupAnchorSelector;
+    juce::TextButton groupDeleteButton;
+    juce::Label groupRoundRobinLabel;
+    juce::Label groupRoundRobinHintLabel;
 
     juce::ComboBox performanceBankSelector;
     juce::ComboBox triggerSlotSelector;
@@ -234,6 +269,9 @@ private:
     juce::TextButton phraseImportButton;
     juce::Label performanceSummaryLabel;
     juce::Label phraseSummaryLabel;
+    std::vector<std::string> routingInputSourceIds;
+    std::vector<std::string> groupRoutingBusIds;
+    std::vector<std::string> groupAnchorZoneIds;
 
 };
 } // namespace drs::app

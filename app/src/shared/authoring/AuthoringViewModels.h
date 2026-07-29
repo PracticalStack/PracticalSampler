@@ -11,6 +11,7 @@ namespace drs::app::authoring
 enum class DrawerTab
 {
     waveform,
+    groups,
     macros,
     routing,
     performance

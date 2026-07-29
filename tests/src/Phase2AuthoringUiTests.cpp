@@ -1568,6 +1568,98 @@ void exerciseDrawerEditorTransactions(drs::app::AuthoringPanel& panel,
             "Routing drawer edits should persist through the authoring session.");
 }
 
+void exerciseGroupUi(drs::app::AuthoringPanel& panel,
+                     drs::engine::AuthoringSession& session,
+                     const std::string& shellName,
+                     const fs::path& outputDirectory,
+                     std::ostream& inventory)
+{
+    const auto panelBounds = panel.getLocalBounds();
+    auto& groupList = requireRepeatedStructureList(panel, "authoringGroupList");
+    auto& groupVisibilityButton = requireButton(panel, "authoringGroupVisibilityButton");
+    auto& groupPreviewAnchorButton = requireButton(panel, "authoringGroupPreviewAnchorButton");
+    auto& groupsTabButton = requireButton(panel, "authoringDrawerGroupsTab");
+    auto* groupNameEditor = dynamic_cast<juce::TextEditor*>(findDescendantById(panel, "authoringGroupNameEditor"));
+    require(groupNameEditor != nullptr, "Group UI checks require the group-name editor.");
+
+    requireComponentVisibleWithin(panel, "authoringGroupSectionLabel", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringGroupCreateButton", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringGroupPreviewAnchorButton", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringGroupList", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringGroupVisibilityButton", panelBounds);
+    require(groupList.getRowCount() >= 2,
+            "Group UI checks require the Phase 2 fixture to expose at least two groups.");
+    auto requireGroupVisibility = [&](const std::string& groupId, bool expectedVisible, const std::string& message)
+    {
+        const auto& groups = session.getProject().authoring.groups;
+        const auto iterator = std::find_if(groups.begin(),
+                                           groups.end(),
+                                           [&](const auto& group)
+                                           {
+                                               return group.id == groupId;
+                                           });
+        require(iterator != groups.end() && iterator->workspaceVisible == expectedVisible, message);
+    };
+
+    auto& groupListBox = groupList.getListBox();
+    groupListBox.selectRow(1);
+    require(session.getSelectedGroup().has_value() && session.getSelectedGroup()->id == "lead-core",
+            "Selecting a group-manager row should retarget the selected authored group.");
+    require(session.getSelectedZone().has_value() && session.getSelectedZone()->groupId == "lead-core",
+            "Selecting a group-manager row should keep the selected zone aligned to the selected group.");
+    require(groupPreviewAnchorButton.isEnabled(),
+            "Group manager should expose an enabled anchor-preview entry point for groups with members.");
+
+    const auto initialUndoDepth = session.getDocumentState().undoDepth;
+    groupVisibilityButton.onClick();
+    requireGroupVisibility("lead-core",
+                           false,
+                           "Group manager visibility toggle should hide the selected group without deleting it.");
+    require(requireLabel(panel, "authoringGroupVisibilityHintLabel").getText().contains("1 hidden group"),
+            "Group manager should surface a hidden-group recovery cue when a group is hidden.");
+    require(session.getDocumentState().undoDepth == initialUndoDepth + 1,
+            "Group manager visibility toggles should create normal undoable transactions.");
+    groupListBox.selectRow(1);
+    groupVisibilityButton.onClick();
+    requireGroupVisibility("lead-core",
+                           true,
+            "Group manager visibility toggle should restore the selected group.");
+
+    groupsTabButton.onClick();
+    requireAccessibilityTitleEquals(panel, "authoringDrawerTitleLabel", "Group Inspector");
+    requireAccessibilityDescriptionContains(panel, "authoringDrawerScopeLabel", "Group-scoped");
+    requireAccessibilityDescriptionContains(panel, "authoringDrawerBreadcrumbLabel", "Project > Groups >");
+    requireComponentVisibleWithin(panel, "authoringGroupNameEditor", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringGroupVisibilityToggle", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringGroupGainSlider", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringGroupPanSlider", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringGroupRoutingSelector", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringGroupAnchorSelector", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringGroupSummaryLabel", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringGroupRoundRobinLabel", panelBounds);
+
+    groupNameEditor->setText("Lead Core UI");
+    if (groupNameEditor->onReturnKey)
+        groupNameEditor->onReturnKey();
+    require(session.getSelectedGroup()->displayName == "Lead Core UI",
+            "Group inspector rename edits should persist through the authoring session.");
+
+    auto& groupGainSlider = requireSlider(panel, "authoringGroupGainSlider");
+    const auto nextGroupGain = juce::jlimit(groupGainSlider.getMinimum(),
+                                            groupGainSlider.getMaximum(),
+                                            groupGainSlider.getValue() + 0.5);
+    groupGainSlider.setValue(nextGroupGain, juce::dontSendNotification);
+    groupGainSlider.onDragEnd();
+    require(std::abs(session.getSelectedGroup()->gainDb - nextGroupGain) < 0.001,
+            "Group inspector gain edits should persist through the authoring session.");
+
+    inventory << shellName << " / groups\n";
+    inventory << "  " << describeBounds(panel, "authoringGroupList") << "\n";
+    inventory << "  " << describeBounds(panel, "authoringGroupNameEditor") << "\n";
+    inventory << "  " << describeBounds(panel, "authoringGroupGainSlider") << "\n\n";
+    saveComponentPng(panel, outputDirectory / (shellName + "-groups.png"));
+}
+
 void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
                                            const std::string& shellName)
 {
@@ -1613,6 +1705,7 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
              juce::String("authoringZoneMap"),
              juce::String("authoringDrawerToggleButton"),
              juce::String("authoringDrawerWaveformTab"),
+             juce::String("authoringDrawerGroupsTab"),
              juce::String("authoringDrawerMacrosTab"),
              juce::String("authoringDrawerRoutingTab"),
              juce::String("authoringDrawerPerformanceTab")
@@ -1650,6 +1743,7 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
                                     "authoringZoneMap",
                                     "authoringDrawerToggleButton",
                                     "authoringDrawerWaveformTab",
+                                    "authoringDrawerGroupsTab",
                                     "authoringDrawerMacrosTab",
                                     "authoringDrawerRoutingTab",
                                     "authoringDrawerPerformanceTab"
@@ -2700,6 +2794,7 @@ int main()
             exerciseDrawerBehavior(panel, shellName, baselineFindings);
             exerciseAccessibilityAndFocusBehavior(panel, shellName);
             exerciseDrawerEditorTransactions(panel, session);
+            exerciseGroupUi(panel, session, shellName, outputDirectory, inventory);
             exerciseSurface(panel, 1, shellName, "mapping", outputDirectory, inventory, baselineFindings);
             exerciseSurface(panel, 2, shellName, "macros", outputDirectory, inventory, baselineFindings);
             exerciseSurface(panel, 3, shellName, "routing", outputDirectory, inventory, baselineFindings);

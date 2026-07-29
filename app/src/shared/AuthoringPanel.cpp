@@ -356,6 +356,87 @@ juce::String buildMacroListStatusText(const drs::engine::RuntimeProjectMacroDefi
     return status;
 }
 
+std::size_t countZonesInGroup(const drs::engine::RuntimeProjectModel& project,
+                              const std::string& groupId)
+{
+    return static_cast<std::size_t>(std::count_if(project.authoring.zones.begin(),
+                                                  project.authoring.zones.end(),
+                                                  [&](const auto& zone)
+                                                  {
+                                                      return zone.groupId == groupId;
+                                                  }));
+}
+
+juce::String findZoneDisplayName(const drs::engine::RuntimeProjectModel& project,
+                                 const std::string& zoneId)
+{
+    const auto iterator = std::find_if(project.authoring.zones.begin(),
+                                       project.authoring.zones.end(),
+                                       [&](const auto& zone)
+                                       {
+                                           return zone.id == zoneId;
+                                       });
+    return iterator != project.authoring.zones.end()
+        ? juce::String::fromUTF8(iterator->displayName.c_str())
+        : juce::String::fromUTF8(zoneId.c_str());
+}
+
+juce::String findGroupDisplayName(const drs::engine::RuntimeProjectModel& project,
+                                  const std::string& groupId)
+{
+    const auto iterator = std::find_if(project.authoring.groups.begin(),
+                                       project.authoring.groups.end(),
+                                       [&](const auto& group)
+                                       {
+                                           return group.id == groupId;
+                                       });
+    return iterator != project.authoring.groups.end()
+        ? juce::String::fromUTF8(iterator->displayName.c_str())
+        : juce::String::fromUTF8(groupId.c_str());
+}
+
+juce::String findRoutingBusDisplayName(const drs::engine::RuntimeProjectModel& project,
+                                       const std::string& routingBusId)
+{
+    const auto iterator = std::find_if(project.authoring.routingBuses.begin(),
+                                       project.authoring.routingBuses.end(),
+                                       [&](const auto& routingBus)
+                                       {
+                                           return routingBus.id == routingBusId;
+                                       });
+    return iterator != project.authoring.routingBuses.end()
+        ? juce::String::fromUTF8(iterator->displayName.c_str())
+        : juce::String::fromUTF8(routingBusId.c_str());
+}
+
+juce::String formatRoutingInputSourceLabel(const drs::engine::RuntimeProjectModel& project,
+                                           const std::string& inputSourceId)
+{
+    if (inputSourceId.empty())
+        return "(none)";
+
+    if (inputSourceId == "master")
+        return "Master";
+
+    constexpr auto groupPrefix = "groups/";
+    if (inputSourceId.rfind(groupPrefix, 0) == 0)
+        return "Group: " + findGroupDisplayName(project, inputSourceId.substr(std::char_traits<char>::length(groupPrefix)));
+
+    return "Zone: " + findZoneDisplayName(project, inputSourceId);
+}
+
+juce::String buildGroupListStatusText(const drs::engine::RuntimeProjectModel& project,
+                                      const drs::engine::RuntimeProjectGroupDefinition& group)
+{
+    juce::String status = group.workspaceVisible ? "Shown" : "Hidden";
+    status << " | " << static_cast<int>(countZonesInGroup(project, group.id)) << " zones";
+
+    if (!group.routingBusId.empty())
+        status << " | " << findRoutingBusDisplayName(project, group.routingBusId);
+
+    return status;
+}
+
 struct DraftPlaybackGuidance
 {
     std::string statusText;
@@ -609,6 +690,9 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
       onPublishDraftPlaybackRequested(std::move(publishDraftPlaybackRequested)),
       previewCommandCallback(std::move(nextPreviewCommandCallback)),
       sampleFilesDroppedCallback(std::move(nextSampleFilesDroppedCallback)),
+      groupList("authoringGroupList",
+                "authoringGroupListBox",
+                "authoringGroupListEmptyState"),
       macroList("authoringMacroList",
                 "authoringMacroListBox",
                 "authoringMacroListEmptyState")
@@ -634,20 +718,31 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     macroSummaryLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
     fxSummaryLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
     routingSummaryLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
+    groupSummaryLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
+    groupVisibilityHintLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
+    groupRoundRobinLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
+    groupRoundRobinHintLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
     performanceSummaryLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
     phraseSummaryLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
 
     configureSectionLabel(waveformLabel, "Waveform Detail");
     configureSectionLabel(zoneLabel, "Selected Zone");
+    configureSectionLabel(groupSectionLabel, "Zone Groups");
     configureSectionLabel(fxSectionLabel, "Selected FX");
     configureSectionLabel(routingSectionLabel, "Selected Bus");
 
+    configureFieldLabel(groupNameLabel, "Group Name");
     configureFieldLabel(macroAssignmentLabel, "Parameter");
     configureFieldLabel(macroRoleLabel, "Role");
     configureFieldLabel(macroDefaultLabel, "Default");
     configureFieldLabel(macroMinLabel, "Min");
     configureFieldLabel(macroMaxLabel, "Max");
     configureFieldLabel(fxTypeLabel, "Type");
+    configureFieldLabel(groupVisibilityLabel, "Visibility");
+    configureFieldLabel(groupGainLabel, "Gain");
+    configureFieldLabel(groupPanLabel, "Pan");
+    configureFieldLabel(groupRoutingLabel, "Routing Bus");
+    configureFieldLabel(groupAnchorLabel, "Audition Anchor");
     configureFieldLabel(routingInputLabel, "Input Source");
     configureFieldLabel(routingInsertOneLabel, "Insert A");
     configureFieldLabel(routingInsertTwoLabel, "Insert B");
@@ -660,6 +755,10 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     configureEditorSlider(macroDefaultSlider, 0.0, 1.0, 0.01);
     configureEditorSlider(macroMinSlider, 0.0, 1.0, 0.01);
     configureEditorSlider(macroMaxSlider, 0.0, 1.0, 0.01);
+    configureMetadataLabel(groupVisibilityHintLabel);
+    configureMetadataLabel(groupSummaryLabel);
+    configureMetadataLabel(groupRoundRobinLabel);
+    configureMetadataLabel(groupRoundRobinHintLabel);
 
     zoneSelector.setComponentID("authoringZoneSelector");
     previewEnabledToggle.setComponentID("authoringPreviewEnabledToggle");
@@ -668,11 +767,21 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     previewEnabledToggle.setToggleState(true, juce::dontSendNotification);
     previewStopButton.setButtonText("Stop");
     zoneMap.setComponentID("authoringZoneMap");
+    groupSectionLabel.setComponentID("authoringGroupSectionLabel");
+    groupNameLabel.setComponentID("authoringGroupNameLabel");
+    groupNameEditor.setComponentID("authoringGroupNameEditor");
+    groupCreateButton.setComponentID("authoringGroupCreateButton");
+    groupPreviewAnchorButton.setComponentID("authoringGroupPreviewAnchorButton");
+    groupMoveUpButton.setComponentID("authoringGroupMoveUpButton");
+    groupMoveDownButton.setComponentID("authoringGroupMoveDownButton");
+    groupVisibilityButton.setComponentID("authoringGroupVisibilityButton");
+    groupVisibilityHintLabel.setComponentID("authoringGroupVisibilityHintLabel");
     drawerRegion.setComponentID("authoringDrawer");
     drawerTabStrip.setComponentID("authoringDrawerTabStrip");
     drawerContentHost.setComponentID("authoringDrawerContentHost");
     drawerToggleButton.setComponentID("authoringDrawerToggleButton");
     drawerWaveformTabButton.setComponentID("authoringDrawerWaveformTab");
+    drawerGroupsTabButton.setComponentID("authoringDrawerGroupsTab");
     drawerMacrosTabButton.setComponentID("authoringDrawerMacrosTab");
     drawerRoutingTabButton.setComponentID("authoringDrawerRoutingTab");
     drawerPerformanceTabButton.setComponentID("authoringDrawerPerformanceTab");
@@ -698,6 +807,20 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     routingInputSelector.setComponentID("authoringRoutingInputSelector");
     routingInsertOneSelector.setComponentID("authoringRoutingInsertOneSelector");
     routingInsertTwoSelector.setComponentID("authoringRoutingInsertTwoSelector");
+    groupSummaryLabel.setComponentID("authoringGroupSummaryLabel");
+    groupVisibilityLabel.setComponentID("authoringGroupVisibilityLabel");
+    groupVisibilityToggle.setComponentID("authoringGroupVisibilityToggle");
+    groupGainLabel.setComponentID("authoringGroupGainLabel");
+    groupGainSlider.setComponentID("authoringGroupGainSlider");
+    groupPanLabel.setComponentID("authoringGroupPanLabel");
+    groupPanSlider.setComponentID("authoringGroupPanSlider");
+    groupRoutingLabel.setComponentID("authoringGroupRoutingLabel");
+    groupRoutingSelector.setComponentID("authoringGroupRoutingSelector");
+    groupAnchorLabel.setComponentID("authoringGroupAnchorLabel");
+    groupAnchorSelector.setComponentID("authoringGroupAnchorSelector");
+    groupDeleteButton.setComponentID("authoringGroupDeleteButton");
+    groupRoundRobinLabel.setComponentID("authoringGroupRoundRobinLabel");
+    groupRoundRobinHintLabel.setComponentID("authoringGroupRoundRobinHintLabel");
     performanceBankSelector.setComponentID("authoringPerformanceBankSelector");
     triggerSlotSelector.setComponentID("authoringTriggerSlotSelector");
     triggerEventSelector.setComponentID("authoringTriggerEventSelector");
@@ -713,10 +836,12 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         setDrawerOpen(!drawerState.open);
     };
     drawerWaveformTabButton.setButtonText("Waveform");
+    drawerGroupsTabButton.setButtonText("Groups");
     drawerMacrosTabButton.setButtonText("Macros");
     drawerRoutingTabButton.setButtonText("Routing");
     drawerPerformanceTabButton.setButtonText("Performance");
     drawerWaveformTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::waveform); };
+    drawerGroupsTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::groups); };
     drawerMacrosTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::macros); };
     drawerRoutingTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::routing); };
     drawerPerformanceTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::performance); };
@@ -836,6 +961,63 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         values.triggerMode = zone.triggerMode;
         applySelectedZoneEdit(values, juce::String::fromUTF8(label.c_str()));
     });
+    groupList.setOnSelectionChanged([this](int nextIndex)
+    {
+        if (isRefreshing)
+            return;
+
+        const auto& groups = authoringSession.getProject().authoring.groups;
+        if (nextIndex < 0 || static_cast<std::size_t>(nextIndex) >= groups.size())
+            return;
+
+        selectedGroupIndex = nextIndex;
+        authoringSession.selectGroup(groups[static_cast<std::size_t>(nextIndex)].id);
+        refreshFromSession();
+    });
+
+    groupCreateButton.setButtonText("New Group");
+    groupCreateButton.onClick = [this] { createGroup(); };
+    groupPreviewAnchorButton.setButtonText("Preview Anchor");
+    groupPreviewAnchorButton.onClick = [this] { previewSelectedGroupAnchor(); };
+    groupMoveUpButton.setButtonText("Move Up");
+    groupMoveUpButton.onClick = [this] { moveSelectedGroup(-1); };
+    groupMoveDownButton.setButtonText("Move Down");
+    groupMoveDownButton.onClick = [this] { moveSelectedGroup(1); };
+    groupVisibilityButton.onClick = [this] { toggleSelectedGroupVisibility(); };
+
+    groupNameEditor.setMultiLine(false);
+    groupNameEditor.setReturnKeyStartsNewLine(false);
+    groupNameEditor.onReturnKey = [this] { applySelectedGroupNameEdit(); };
+    groupNameEditor.onFocusLost = [this] { applySelectedGroupNameEdit(); };
+
+    configureEditorSlider(groupGainSlider, -24.0, 24.0, 0.1);
+    configureEditorSlider(groupPanSlider, -1.0, 1.0, 0.01);
+    groupGainSlider.onDragEnd = [this] { applySelectedGroupMixEdit("Update group gain"); };
+    groupPanSlider.onDragEnd = [this] { applySelectedGroupMixEdit("Update group pan"); };
+    groupVisibilityToggle.setButtonText("Visible In Workspace");
+    groupVisibilityToggle.onClick = [this]
+    {
+        if (isRefreshing)
+            return;
+
+        applySelectedGroupMixEdit("Toggle group visibility");
+    };
+    groupRoutingSelector.onChange = [this]
+    {
+        if (isRefreshing)
+            return;
+
+        applySelectedGroupMixEdit("Update group routing");
+    };
+    groupAnchorSelector.onChange = [this]
+    {
+        if (isRefreshing)
+            return;
+
+        applySelectedGroupMixEdit("Update group audition anchor");
+    };
+    groupDeleteButton.setButtonText("Delete Group");
+    groupDeleteButton.onClick = [this] { deleteSelectedGroup(); };
 
     zoneSelector.onChange = [this]
     {
@@ -1070,8 +1252,19 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&previewEnabledToggle),
              static_cast<juce::Component*>(&previewStopButton),
              static_cast<juce::Component*>(&zoneMap),
+             static_cast<juce::Component*>(&groupSectionLabel),
+             static_cast<juce::Component*>(&groupNameLabel),
+             static_cast<juce::Component*>(&groupNameEditor),
+             static_cast<juce::Component*>(&groupCreateButton),
+             static_cast<juce::Component*>(&groupPreviewAnchorButton),
+             static_cast<juce::Component*>(&groupList),
+             static_cast<juce::Component*>(&groupMoveUpButton),
+             static_cast<juce::Component*>(&groupMoveDownButton),
+             static_cast<juce::Component*>(&groupVisibilityButton),
+             static_cast<juce::Component*>(&groupVisibilityHintLabel),
              static_cast<juce::Component*>(&zoneMappingEditor),
              static_cast<juce::Component*>(&waveformPreview),
+             static_cast<juce::Component*>(&drawerGroupsTabButton),
              static_cast<juce::Component*>(&macroList),
              static_cast<juce::Component*>(&macroAssignmentLabel),
              static_cast<juce::Component*>(&macroAssignmentSelector),
@@ -1101,6 +1294,20 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&routingInsertTwoLabel),
              static_cast<juce::Component*>(&routingInsertTwoSelector),
              static_cast<juce::Component*>(&routingSummaryLabel),
+             static_cast<juce::Component*>(&groupSummaryLabel),
+             static_cast<juce::Component*>(&groupVisibilityLabel),
+             static_cast<juce::Component*>(&groupVisibilityToggle),
+             static_cast<juce::Component*>(&groupGainLabel),
+             static_cast<juce::Component*>(&groupGainSlider),
+             static_cast<juce::Component*>(&groupPanLabel),
+             static_cast<juce::Component*>(&groupPanSlider),
+             static_cast<juce::Component*>(&groupRoutingLabel),
+             static_cast<juce::Component*>(&groupRoutingSelector),
+             static_cast<juce::Component*>(&groupAnchorLabel),
+             static_cast<juce::Component*>(&groupAnchorSelector),
+             static_cast<juce::Component*>(&groupDeleteButton),
+             static_cast<juce::Component*>(&groupRoundRobinLabel),
+             static_cast<juce::Component*>(&groupRoundRobinHintLabel),
              static_cast<juce::Component*>(&performanceBankSelector),
              static_cast<juce::Component*>(&triggerSlotSelector),
              static_cast<juce::Component*>(&triggerEventLabel),
@@ -1164,6 +1371,43 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "Chooses the active zone for map and inspector editing.",
                                 "Open the list or use arrow keys to change the selected zone.");
     zoneSelector.setExplicitFocusOrder(24);
+    configureAccessibleMetadata(groupSectionLabel,
+                                "Zone group manager",
+                                "Shows the persistent zone-group manager above the map workspace.");
+    configureAccessibleMetadata(groupNameEditor,
+                                "Group name",
+                                "Renames the selected group from the persistent group manager.",
+                                "Type a new group name and press Enter to rename the selected group.");
+    configureAccessibleMetadata(groupCreateButton,
+                                "Create group",
+                                "Creates a new empty group in the authoring workspace.",
+                                "Press to create a new group.");
+    configureAccessibleMetadata(groupPreviewAnchorButton,
+                                "Preview group anchor",
+                                "Auditions the selected group's anchor zone as a group-preview entry point.",
+                                "Press to preview the selected group's anchor zone.");
+    configureAccessibleMetadata(groupList,
+                                "Zone group list",
+                                "Lists authored zone groups and their workspace visibility state.");
+    configureAccessibleMetadata(groupVisibilityButton,
+                                "Toggle group visibility",
+                                "Shows or hides the selected group on the workspace map without changing audio.",
+                                "Press to toggle whether the selected group is visible on the workspace map.");
+    configureAccessibleMetadata(groupMoveUpButton,
+                                "Move group up",
+                                "Moves the selected group earlier in group order.",
+                                "Press to move the selected group up.");
+    configureAccessibleMetadata(groupMoveDownButton,
+                                "Move group down",
+                                "Moves the selected group later in group order.",
+                                "Press to move the selected group down.");
+    groupNameEditor.setExplicitFocusOrder(27);
+    groupCreateButton.setExplicitFocusOrder(28);
+    groupPreviewAnchorButton.setExplicitFocusOrder(29);
+    groupList.getListBox().setExplicitFocusOrder(30);
+    groupVisibilityButton.setExplicitFocusOrder(31);
+    groupMoveUpButton.setExplicitFocusOrder(32);
+    groupMoveDownButton.setExplicitFocusOrder(33);
     configureAccessibleMetadata(previewEnabledToggle,
                                 "Preview enabled",
                                 "Enables or disables authoring-only audition commands.",
@@ -1201,6 +1445,10 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "Waveform drawer tab",
                                 "Shows zone-scoped waveform detail.",
                                 "Press to switch the drawer to waveform detail.");
+    configureAccessibleMetadata(drawerGroupsTabButton,
+                                "Groups drawer tab",
+                                "Shows group-scoped mixing, routing, and visibility detail.",
+                                "Press to switch the drawer to group detail.");
     configureAccessibleMetadata(drawerMacrosTabButton,
                                 "Macros drawer tab",
                                 "Shows project-scoped macro assignments.",
@@ -1214,9 +1462,10 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "Shows bank-scoped performance and trigger detail.",
                                 "Press to switch the drawer to performance detail.");
     drawerWaveformTabButton.setExplicitFocusOrder(61);
-    drawerMacrosTabButton.setExplicitFocusOrder(62);
-    drawerRoutingTabButton.setExplicitFocusOrder(63);
-    drawerPerformanceTabButton.setExplicitFocusOrder(64);
+    drawerGroupsTabButton.setExplicitFocusOrder(62);
+    drawerMacrosTabButton.setExplicitFocusOrder(63);
+    drawerRoutingTabButton.setExplicitFocusOrder(64);
+    drawerPerformanceTabButton.setExplicitFocusOrder(65);
 
     configureAccessibleMetadata(waveformLabel,
                                 "Drawer title",
@@ -1318,6 +1567,45 @@ void AuthoringPanel::configureAccessibilityAndFocus()
     routingInputSelector.setExplicitFocusOrder(84);
     routingInsertOneSelector.setExplicitFocusOrder(85);
     routingInsertTwoSelector.setExplicitFocusOrder(86);
+    configureAccessibleMetadata(groupVisibilityToggle,
+                                "Group workspace visibility",
+                                "Toggles whether the selected group is visible on the workspace map.",
+                                "Press to toggle selected-group visibility without changing audio.");
+    configureAccessibleMetadata(groupGainSlider,
+                                "Group gain",
+                                "Adjusts the selected group's gain.",
+                                "Drag the slider or enter a numeric gain value.");
+    configureAccessibleMetadata(groupPanSlider,
+                                "Group pan",
+                                "Adjusts the selected group's pan.",
+                                "Drag the slider or enter a numeric pan value.");
+    configureAccessibleMetadata(groupRoutingSelector,
+                                "Group routing bus",
+                                "Chooses the routing bus fed by the selected group.",
+                                "Open the list to choose a routing bus for the selected group.");
+    configureAccessibleMetadata(groupAnchorSelector,
+                                "Group audition anchor",
+                                "Chooses the zone used as the selected group's audition anchor.",
+                                "Open the list to choose an audition anchor zone.");
+    configureAccessibleMetadata(groupDeleteButton,
+                                "Delete group",
+                                "Deletes the selected group when it has no remaining member zones.",
+                                "Press to delete the selected empty group.");
+    configureAccessibleMetadata(groupSummaryLabel,
+                                "Group summary",
+                                "Summarizes the current selected-group state.");
+    configureAccessibleMetadata(groupRoundRobinLabel,
+                                "Group round robin summary",
+                                "Summarizes round-robin state for the selected group's member zones.");
+    configureAccessibleMetadata(groupRoundRobinHintLabel,
+                                "Group round robin guidance",
+                                "Guides how round-robin edits currently relate to the selected group.");
+    groupVisibilityToggle.setExplicitFocusOrder(71);
+    groupGainSlider.setExplicitFocusOrder(72);
+    groupPanSlider.setExplicitFocusOrder(73);
+    groupRoutingSelector.setExplicitFocusOrder(74);
+    groupAnchorSelector.setExplicitFocusOrder(75);
+    groupDeleteButton.setExplicitFocusOrder(76);
 
     configureAccessibleMetadata(performanceBankSelector,
                                 "Performance bank selector",
@@ -1499,14 +1787,21 @@ void AuthoringPanel::resized()
     drawerToggleButton.setBounds(toggleArea.removeFromRight(110));
 
     auto tabArea = drawerTabStrip.getBounds().reduced(0, 4);
-    const auto tabWidth = expanded ? 104 : 96;
+    constexpr auto tabGap = 8;
+    const auto tabCount = 5;
+    const auto desiredTabWidth = expanded ? 104 : 96;
+    const auto tabWidth = juce::jlimit(72,
+                                       desiredTabWidth,
+                                       (tabArea.getWidth() - (tabGap * (tabCount - 1)) - 114) / tabCount);
     drawerWaveformTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
-    tabArea.removeFromLeft(8);
+    tabArea.removeFromLeft(tabGap);
+    drawerGroupsTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
+    tabArea.removeFromLeft(tabGap);
     drawerMacrosTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
-    tabArea.removeFromLeft(8);
+    tabArea.removeFromLeft(tabGap);
     drawerRoutingTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
-    tabArea.removeFromLeft(8);
-    drawerPerformanceTabButton.setBounds(tabArea.removeFromLeft(tabWidth + 10));
+    tabArea.removeFromLeft(tabGap);
+    drawerPerformanceTabButton.setBounds(tabArea.removeFromLeft(tabWidth + (expanded ? 8 : 2)));
 
     auto drawerEditorArea = drawerContentHost.getBounds().reduced(12, 10);
     waveformLabel.setBounds(drawerEditorArea.removeFromTop(22));
@@ -1533,7 +1828,47 @@ void AuthoringPanel::resized()
         importMetricsLabel.setBounds(drawerEditorArea.removeFromTop(24));
     }
 
-    if (drawerState.activeTab == authoring::DrawerTab::macros)
+    if (drawerState.activeTab == authoring::DrawerTab::groups)
+    {
+        auto row = drawerEditorArea.removeFromTop(24);
+        layoutLabelAndField(row, groupNameLabel, groupNameEditor, 92);
+        drawerEditorArea.removeFromTop(2);
+
+        row = drawerEditorArea.removeFromTop(24);
+        auto deleteArea = row.removeFromRight(136);
+        deleteArea.removeFromLeft(8);
+        layoutLabelAndField(row, groupVisibilityLabel, groupVisibilityToggle, 74);
+        groupDeleteButton.setBounds(deleteArea);
+        drawerEditorArea.removeFromTop(2);
+
+        row = drawerEditorArea.removeFromTop(24);
+        layoutDualLabelAndFieldRow(row,
+                                   groupGainLabel,
+                                   groupGainSlider,
+                                   42,
+                                   groupPanLabel,
+                                   groupPanSlider,
+                                   36);
+        drawerEditorArea.removeFromTop(2);
+
+        row = drawerEditorArea.removeFromTop(24);
+        layoutDualLabelAndFieldRow(row,
+                                   groupRoutingLabel,
+                                   groupRoutingSelector,
+                                   84,
+                                   groupAnchorLabel,
+                                   groupAnchorSelector,
+                                   96);
+        drawerEditorArea.removeFromTop(2);
+        groupSummaryLabel.setBounds(drawerEditorArea.removeFromTop(18));
+        drawerEditorArea.removeFromTop(2);
+        groupRoundRobinLabel.setBounds(drawerEditorArea.removeFromTop(18));
+        drawerEditorArea.removeFromTop(2);
+        groupRoundRobinHintLabel.setBounds(expanded
+                                               ? drawerEditorArea.removeFromTop(20)
+                                               : juce::Rectangle<int> {});
+    }
+    else if (drawerState.activeTab == authoring::DrawerTab::macros)
     {
         constexpr auto macroListHeight = 48;
         auto selectorRow = drawerEditorArea.removeFromTop(macroListHeight);
@@ -1683,6 +2018,50 @@ void AuthoringPanel::resized()
 
     auto inspector = shellArea.removeFromRight(inspectorWidth);
     shellArea.removeFromRight(14);
+
+    auto layoutGroupManager = [&](juce::Rectangle<int> groupManagerArea)
+    {
+        groupSectionLabel.setBounds(groupManagerArea.removeFromTop(22));
+        groupManagerArea.removeFromTop(4);
+        auto managerTopRow = groupManagerArea.removeFromTop(28);
+        const auto showVisibilityHint = groupManagerArea.getHeight() >= 70;
+        auto managerActionRow = groupManagerArea.removeFromTop(showVisibilityHint
+                                                                   ? std::max(40, groupManagerArea.getHeight() - 18)
+                                                                   : groupManagerArea.getHeight());
+        groupVisibilityHintLabel.setBounds(showVisibilityHint
+                                               ? groupManagerArea.removeFromTop(18)
+                                               : juce::Rectangle<int> {});
+
+        auto managerButtons = managerTopRow.removeFromRight(std::min(240, managerTopRow.getWidth()));
+        groupPreviewAnchorButton.setBounds(managerButtons.removeFromRight(118));
+        managerButtons.removeFromRight(std::min(8, managerButtons.getWidth()));
+        groupCreateButton.setBounds(managerButtons);
+
+        auto listArea = managerActionRow.removeFromLeft(std::max(160, managerActionRow.getWidth() - 116));
+        groupList.setBounds(listArea);
+        managerActionRow.removeFromLeft(8);
+        auto managerButtonColumn = managerActionRow.removeFromLeft(108);
+        groupVisibilityButton.setBounds(managerButtonColumn.removeFromTop(20));
+        managerButtonColumn.removeFromTop(8);
+        groupMoveUpButton.setBounds(managerButtonColumn.removeFromTop(20));
+        managerButtonColumn.removeFromTop(8);
+        groupMoveDownButton.setBounds(managerButtonColumn.removeFromTop(20));
+    };
+
+    const auto desiredGroupManagerHeight = expanded ? 112 : 124;
+    const auto canStackGroupManager = shellArea.getHeight() >= authoring::minimumMapVisibleHeight + desiredGroupManagerHeight + 8;
+    if (canStackGroupManager)
+    {
+        layoutGroupManager(shellArea.removeFromTop(desiredGroupManagerHeight));
+    }
+    else
+    {
+        const auto groupManagerWidth = std::min(expanded ? 248 : 224,
+                                                std::max(188, shellArea.getWidth() / 3));
+        layoutGroupManager(shellArea.removeFromLeft(groupManagerWidth));
+        shellArea.removeFromLeft(std::min(10, shellArea.getWidth()));
+    }
+
     zoneMap.setBounds(shellArea);
     zoneMappingEditor.setBounds(inspector);
 }
@@ -1923,6 +2302,39 @@ void AuthoringPanel::rebuildZoneSelector()
     zoneSelector.setSelectedId(selectedItemId, juce::dontSendNotification);
 }
 
+void AuthoringPanel::rebuildGroupList()
+{
+    const auto& project = authoringSession.getProject();
+    const auto selectedGroup = authoringSession.getSelectedGroup();
+    authoring::RepeatedStructureListViewModel viewModel;
+    viewModel.emptyStateText = "No groups are authored in this project yet.";
+
+    if (project.authoring.groups.empty())
+    {
+        selectedGroupIndex = -1;
+        groupList.setViewModel(std::move(viewModel));
+        return;
+    }
+
+    selectedGroupIndex = 0;
+    viewModel.rows.reserve(project.authoring.groups.size());
+    for (std::size_t index = 0; index < project.authoring.groups.size(); ++index)
+    {
+        const auto& group = project.authoring.groups[index];
+        auto row = authoring::RepeatedStructureRowViewModel {};
+        row.key = group.id;
+        row.title = group.displayName;
+        row.statusText = buildGroupListStatusText(project, group).toStdString();
+        viewModel.rows.push_back(std::move(row));
+
+        if (selectedGroup.has_value() && selectedGroup->id == group.id)
+            selectedGroupIndex = static_cast<int>(index);
+    }
+
+    viewModel.selectedIndex = selectedGroupIndex;
+    groupList.setViewModel(std::move(viewModel));
+}
+
 void AuthoringPanel::rebuildMacroList()
 {
     const auto& macros = authoringSession.getProject().authoring.macros;
@@ -2097,6 +2509,7 @@ void AuthoringPanel::timerCallback(int timerId)
 void AuthoringPanel::refreshDrawerVisibility()
 {
     const auto waveformTab = drawerState.activeTab == authoring::DrawerTab::waveform;
+    const auto groupsTab = drawerState.activeTab == authoring::DrawerTab::groups;
     const auto macrosTab = drawerState.activeTab == authoring::DrawerTab::macros;
     const auto routingTab = drawerState.activeTab == authoring::DrawerTab::routing;
     const auto performanceTab = drawerState.activeTab == authoring::DrawerTab::performance;
@@ -2108,6 +2521,13 @@ void AuthoringPanel::refreshDrawerVisibility()
         || isComponentFocusedWithin(focusedComponent, waveformInfoLabel)
         || isComponentFocusedWithin(focusedComponent, loopInfoLabel)
         || isComponentFocusedWithin(focusedComponent, importMetricsLabel);
+    const auto focusWithinGroups = isComponentFocusedWithin(focusedComponent, groupNameEditor)
+        || isComponentFocusedWithin(focusedComponent, groupVisibilityToggle)
+        || isComponentFocusedWithin(focusedComponent, groupGainSlider)
+        || isComponentFocusedWithin(focusedComponent, groupPanSlider)
+        || isComponentFocusedWithin(focusedComponent, groupRoutingSelector)
+        || isComponentFocusedWithin(focusedComponent, groupAnchorSelector)
+        || isComponentFocusedWithin(focusedComponent, groupDeleteButton);
     const auto focusWithinMacros = isComponentFocusedWithin(focusedComponent, macroList)
         || isComponentFocusedWithin(focusedComponent, macroAssignmentSelector)
         || isComponentFocusedWithin(focusedComponent, macroRoleSelector)
@@ -2145,6 +2565,23 @@ void AuthoringPanel::refreshDrawerVisibility()
     setVisibleAndAccessible(waveformInfoLabel, drawerContentVisible && waveformTab);
     setVisibleAndAccessible(loopInfoLabel, drawerContentVisible && waveformTab);
     setVisibleAndAccessible(importMetricsLabel, drawerContentVisible && waveformTab);
+
+    setVisibleAndAccessible(groupNameLabel, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupNameEditor, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupVisibilityLabel, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupVisibilityToggle, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupGainLabel, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupGainSlider, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupPanLabel, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupPanSlider, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupRoutingLabel, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupRoutingSelector, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupAnchorLabel, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupAnchorSelector, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupDeleteButton, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupSummaryLabel, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupRoundRobinLabel, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupRoundRobinHintLabel, drawerContentVisible && groupsTab);
 
     setVisibleAndAccessible(macroList, drawerContentVisible && macrosTab);
     setVisibleAndAccessible(macroAssignmentLabel, drawerContentVisible && macrosTab);
@@ -2194,16 +2631,18 @@ void AuthoringPanel::refreshDrawerVisibility()
     setVisibleAndAccessible(phraseSummaryLabel, drawerContentVisible && performanceTab && expanded);
 
     drawerWaveformTabButton.setToggleState(waveformTab, juce::dontSendNotification);
+    drawerGroupsTabButton.setToggleState(groupsTab, juce::dontSendNotification);
     drawerMacrosTabButton.setToggleState(macrosTab, juce::dontSendNotification);
     drawerRoutingTabButton.setToggleState(routingTab, juce::dontSendNotification);
     drawerPerformanceTabButton.setToggleState(performanceTab, juce::dontSendNotification);
 
     const auto focusedDrawerContentBecameHidden = !drawerContentVisible
-        ? (focusWithinWaveform || focusWithinMacros || focusWithinRouting || focusWithinPerformance)
-        : (waveformTab ? (focusWithinMacros || focusWithinRouting || focusWithinPerformance)
-                       : macrosTab ? (focusWithinWaveform || focusWithinRouting || focusWithinPerformance)
-                                   : routingTab ? (focusWithinWaveform || focusWithinMacros || focusWithinPerformance)
-                                                : (focusWithinWaveform || focusWithinMacros || focusWithinRouting));
+        ? (focusWithinWaveform || focusWithinGroups || focusWithinMacros || focusWithinRouting || focusWithinPerformance)
+        : (waveformTab ? (focusWithinGroups || focusWithinMacros || focusWithinRouting || focusWithinPerformance)
+                       : groupsTab ? (focusWithinWaveform || focusWithinMacros || focusWithinRouting || focusWithinPerformance)
+                                   : macrosTab ? (focusWithinWaveform || focusWithinGroups || focusWithinRouting || focusWithinPerformance)
+                                               : routingTab ? (focusWithinWaveform || focusWithinGroups || focusWithinMacros || focusWithinPerformance)
+                                                            : (focusWithinWaveform || focusWithinGroups || focusWithinMacros || focusWithinRouting));
 
     if (focusedDrawerContentBecameHidden)
     {
@@ -2211,6 +2650,8 @@ void AuthoringPanel::refreshDrawerVisibility()
             drawerToggleButton.grabKeyboardFocus();
         else if (waveformTab)
             drawerWaveformTabButton.grabKeyboardFocus();
+        else if (groupsTab)
+            drawerGroupsTabButton.grabKeyboardFocus();
         else if (macrosTab)
             drawerMacrosTabButton.grabKeyboardFocus();
         else if (routingTab)
@@ -2228,6 +2669,134 @@ void AuthoringPanel::refreshContextualAccessibility()
         const auto trimmed = value.trim();
         return trimmed.isNotEmpty() ? trimmed : fallback;
     };
+    const auto selectedGroup = authoringSession.getSelectedGroup();
+    const auto hasSelectedGroup = selectedGroup.has_value();
+    const auto groupName = hasSelectedGroup
+        ? juce::String::fromUTF8(selectedGroup->displayName.c_str())
+        : juce::String("the selected group");
+    const auto groupMemberCount = hasSelectedGroup
+        ? static_cast<int>(countZonesInGroup(project, selectedGroup->id))
+        : 0;
+
+    updateAccessibleDescriptionAndHelpText(groupNameEditor,
+                                           hasSelectedGroup
+                                               ? "Renames " + groupName + "."
+                                               : "Unavailable because no group is selected.",
+                                           hasSelectedGroup
+                                               ? "Type a new name for " + groupName + " and press Enter."
+                                               : "Create or select a group before renaming it.");
+    updateAccessibleDescriptionAndHelpText(groupCreateButton,
+                                           "Creates a new empty group in the authored group list.",
+                                           "Press to create a new empty group.");
+    updateAccessibleDescriptionAndHelpText(groupPreviewAnchorButton,
+                                           hasSelectedGroup
+                                               ? "Auditions the anchor zone for " + groupName + "."
+                                               : "Unavailable because no group is selected.",
+                                           hasSelectedGroup
+                                               ? "Press to preview the current audition anchor for " + groupName + "."
+                                               : "Select a group before previewing its anchor zone.");
+    updateAccessibleDescriptionAndHelpText(groupVisibilityButton,
+                                           hasSelectedGroup
+                                               ? (selectedGroup->workspaceVisible
+                                                      ? "Hides " + groupName + " on the workspace map without changing audio."
+                                                      : "Shows " + groupName + " on the workspace map without changing audio.")
+                                               : "Unavailable because no group is selected.",
+                                           hasSelectedGroup
+                                               ? "Press to toggle the selected group's map visibility."
+                                               : "Select a group before toggling visibility.");
+    updateAccessibleDescriptionAndHelpText(groupMoveUpButton,
+                                           hasSelectedGroup
+                                               ? (groupMoveUpButton.isEnabled()
+                                                      ? "Moves " + groupName + " earlier in group order."
+                                                      : groupName + " is already the first group.")
+                                               : "Unavailable because no group is selected.",
+                                           hasSelectedGroup
+                                               ? (groupMoveUpButton.isEnabled()
+                                                      ? "Press to move " + groupName + " upward in group order."
+                                                      : "Select a later group to move upward.")
+                                               : "Select a group before reordering it.");
+    updateAccessibleDescriptionAndHelpText(groupMoveDownButton,
+                                           hasSelectedGroup
+                                               ? (groupMoveDownButton.isEnabled()
+                                                      ? "Moves " + groupName + " later in group order."
+                                                      : groupName + " is already the last group.")
+                                               : "Unavailable because no group is selected.",
+                                           hasSelectedGroup
+                                               ? (groupMoveDownButton.isEnabled()
+                                                      ? "Press to move " + groupName + " downward in group order."
+                                                      : "Select an earlier group to move downward.")
+                                               : "Select a group before reordering it.");
+
+    updateAccessibleDescriptionAndHelpText(groupVisibilityToggle,
+                                           hasSelectedGroup
+                                               ? "Toggles whether " + groupName + " is visible on the workspace map."
+                                               : "Unavailable because no group is selected.",
+                                           hasSelectedGroup
+                                               ? "Press to toggle visibility for " + groupName + "."
+                                               : "Select a group before changing workspace visibility.");
+    updateAccessibleDescriptionAndHelpText(groupGainSlider,
+                                           hasSelectedGroup
+                                               ? "Adjusts gain for " + groupName + "."
+                                               : "Unavailable because no group is selected.",
+                                           hasSelectedGroup
+                                               ? "Drag the slider or enter a gain value for " + groupName + "."
+                                               : "Select a group before adjusting gain.");
+    updateAccessibleDescriptionAndHelpText(groupPanSlider,
+                                           hasSelectedGroup
+                                               ? "Adjusts pan for " + groupName + "."
+                                               : "Unavailable because no group is selected.",
+                                           hasSelectedGroup
+                                               ? "Drag the slider or enter a pan value for " + groupName + "."
+                                               : "Select a group before adjusting pan.");
+    updateAccessibleDescriptionAndHelpText(groupRoutingSelector,
+                                           hasSelectedGroup
+                                               ? "Chooses the routing bus fed by " + groupName + ". Current bus: "
+                                                     + describeCurrentValue(groupRoutingSelector.getText(), "(direct)") + "."
+                                               : "Unavailable because no group is selected.",
+                                           hasSelectedGroup
+                                               ? "Open the list to choose a routing bus for " + groupName + "."
+                                               : "Select a group before choosing a routing bus.");
+    updateAccessibleDescriptionAndHelpText(groupAnchorSelector,
+                                           hasSelectedGroup
+                                               ? "Chooses the audition anchor zone for " + groupName + ". Current anchor: "
+                                                     + describeCurrentValue(groupAnchorSelector.getText(), "(none)") + "."
+                                               : "Unavailable because no group is selected.",
+                                           hasSelectedGroup
+                                               ? "Open the list to choose an audition anchor for " + groupName + "."
+                                               : "Select a group before choosing an audition anchor.");
+    updateAccessibleDescriptionAndHelpText(groupDeleteButton,
+                                           hasSelectedGroup
+                                               ? (groupDeleteButton.isEnabled()
+                                                      ? "Deletes " + groupName + " because it has no member zones."
+                                                      : groupName + " cannot be deleted while it still owns member zones.")
+                                               : "Unavailable because no group is selected.",
+                                           hasSelectedGroup
+                                               ? (groupDeleteButton.isEnabled()
+                                                      ? "Press to delete the selected empty group."
+                                                      : "Reassign every member zone before deleting this group.")
+                                               : "Select a group before deleting it.");
+    updateAccessibleDescriptionAndHelpText(groupSummaryLabel,
+                                           hasSelectedGroup
+                                               ? groupName + " currently owns " + juce::String(groupMemberCount) + " zones."
+                                               : "No group is selected.",
+                                           hasSelectedGroup
+                                               ? "Review the selected group's summary before changing its mix or routing."
+                                               : "Select a group to review its summary.");
+    updateAccessibleDescriptionAndHelpText(groupRoundRobinLabel,
+                                           hasSelectedGroup
+                                               ? "Summarizes round-robin state for " + groupName + "."
+                                               : "No group is selected.",
+                                           hasSelectedGroup
+                                               ? "Review the selected group's round-robin summary."
+                                               : "Select a group to review round-robin state.");
+    updateAccessibleDescriptionAndHelpText(groupRoundRobinHintLabel,
+                                           hasSelectedGroup
+                                               ? "Guides round-robin editing for " + groupName + "."
+                                               : "No group is selected.",
+                                           hasSelectedGroup
+                                               ? "Read the selected group's round-robin guidance."
+                                               : "Select a group to review round-robin guidance.");
+
     const auto hasSelectedMacro = !project.authoring.macros.empty()
         && selectedMacroIndex >= 0
         && static_cast<std::size_t>(selectedMacroIndex) < project.authoring.macros.size();
@@ -2337,8 +2906,7 @@ void AuthoringPanel::refreshContextualAccessibility()
         ? juce::String::fromUTF8(project.authoring.routingBuses[static_cast<std::size_t>(selectedRoutingBusIndex)].displayName.c_str())
         : juce::String("the selected routing bus");
     const auto inputSource = hasSelectedRoutingBus
-        ? describeCurrentValue(juce::String::fromUTF8(project.authoring.routingBuses[static_cast<std::size_t>(selectedRoutingBusIndex)].inputSourceId.c_str()),
-                               "(none)")
+        ? describeCurrentValue(routingInputSelector.getText(), "(none)")
         : juce::String{};
     const auto insertOne = hasSelectedRoutingBus
         ? (project.authoring.routingBuses[static_cast<std::size_t>(selectedRoutingBusIndex)].fxSlotIds.empty()
@@ -2535,6 +3103,18 @@ void AuthoringPanel::refreshDrawerContextLabels()
             drawerBreadcrumbLabel.setText(breadcrumb, juce::dontSendNotification);
             break;
         }
+        case authoring::DrawerTab::groups:
+        {
+            waveformLabel.setText("Group Inspector", juce::dontSendNotification);
+            waveformScopeLabel.setText("Group-scoped mix and visibility detail", juce::dontSendNotification);
+
+            juce::String breadcrumb = "Project > Groups";
+            if (const auto selectedGroup = authoringSession.getSelectedGroup(); selectedGroup.has_value())
+                breadcrumb << " > " << juce::String::fromUTF8(selectedGroup->displayName.c_str());
+
+            drawerBreadcrumbLabel.setText(breadcrumb, juce::dontSendNotification);
+            break;
+        }
         case authoring::DrawerTab::routing:
         {
             waveformLabel.setText("Routing Detail", juce::dontSendNotification);
@@ -2686,12 +3266,13 @@ void AuthoringPanel::refreshFromSession()
     const juce::ScopedValueSetter<bool> refreshGuard(isRefreshing, true);
 
     rebuildZoneSelector();
+    rebuildGroupList();
     rebuildMacroList();
     rebuildFxSelector();
     rebuildRoutingBusSelector();
     rebuildPerformanceBankSelector();
     rebuildTriggerSlotSelector();
-    zoneMap.setZoneSummaries(authoringSession.getZoneSummaries());
+    zoneMap.setZoneSummaries(buildVisibleZoneSummaries());
 
     const auto& project = authoringSession.getProject();
     selectionSummaryViewModel = buildSelectionSummaryViewModel();
@@ -2700,6 +3281,115 @@ void AuthoringPanel::refreshFromSession()
     summaryStrip.setViewModel(selectionSummaryViewModel);
     refreshDraftPlaybackBanner();
     zoneMappingEditor.setViewModel(zoneFieldValuesViewModel);
+
+    if (const auto selectedGroup = authoringSession.getSelectedGroup(); selectedGroup.has_value())
+    {
+        groupNameEditor.setText(juce::String::fromUTF8(selectedGroup->displayName.c_str()),
+                                juce::dontSendNotification);
+        groupVisibilityToggle.setToggleState(selectedGroup->workspaceVisible, juce::dontSendNotification);
+        groupGainSlider.setValue(selectedGroup->gainDb, juce::dontSendNotification);
+        groupPanSlider.setValue(selectedGroup->pan, juce::dontSendNotification);
+        groupVisibilityButton.setButtonText(selectedGroup->workspaceVisible ? "Hide Group" : "Show Group");
+        groupVisibilityButton.setEnabled(true);
+        groupPreviewAnchorButton.setEnabled(!selectedGroup->auditionAnchorZoneId.empty());
+        groupMoveUpButton.setEnabled(selectedGroupIndex > 0);
+        groupMoveDownButton.setEnabled(selectedGroupIndex + 1 < static_cast<int>(project.authoring.groups.size()));
+
+        groupRoutingBusIds.clear();
+        groupRoutingSelector.clear(juce::dontSendNotification);
+        groupRoutingBusIds.push_back({});
+        groupRoutingSelector.addItem("(direct)", 1);
+        auto selectedRoutingId = 1;
+        for (std::size_t index = 0; index < project.authoring.routingBuses.size(); ++index)
+        {
+            const auto itemId = static_cast<int>(index) + 2;
+            groupRoutingBusIds.push_back(project.authoring.routingBuses[index].id);
+            groupRoutingSelector.addItem(juce::String::fromUTF8(project.authoring.routingBuses[index].displayName.c_str()),
+                                         itemId);
+            if (selectedGroup->routingBusId == project.authoring.routingBuses[index].id)
+                selectedRoutingId = itemId;
+        }
+        groupRoutingSelector.setSelectedId(selectedRoutingId, juce::dontSendNotification);
+
+        groupAnchorZoneIds.clear();
+        groupAnchorSelector.clear(juce::dontSendNotification);
+        auto selectedAnchorId = 0;
+        int anchorItemId = 1;
+        for (const auto& zone : project.authoring.zones)
+        {
+            if (zone.groupId != selectedGroup->id)
+                continue;
+
+            groupAnchorZoneIds.push_back(zone.id);
+            groupAnchorSelector.addItem(juce::String::fromUTF8(zone.displayName.c_str()), anchorItemId);
+            if (selectedGroup->auditionAnchorZoneId == zone.id)
+                selectedAnchorId = anchorItemId;
+            ++anchorItemId;
+        }
+        groupAnchorSelector.setSelectedId(selectedAnchorId > 0 ? selectedAnchorId : 1, juce::dontSendNotification);
+
+        const auto memberCount = static_cast<int>(countZonesInGroup(project, selectedGroup->id));
+        const auto hiddenGroupCount = static_cast<int>(std::count_if(project.authoring.groups.begin(),
+                                                                     project.authoring.groups.end(),
+                                                                     [](const auto& group)
+                                                                     {
+                                                                         return !group.workspaceVisible;
+                                                                     }));
+        groupSummaryLabel.setText(
+            juce::String::fromUTF8(selectedGroup->displayName.c_str())
+                + " | " + juce::String(memberCount) + " zones"
+                + " | routing " + (selectedGroup->routingBusId.empty()
+                                       ? juce::String("direct")
+                                       : findRoutingBusDisplayName(project, selectedGroup->routingBusId)),
+            juce::dontSendNotification);
+        groupVisibilityHintLabel.setText(
+            hiddenGroupCount > 0
+                ? juce::String(hiddenGroupCount) + " hidden group(s) are filtered from the zone map."
+                : "All authored groups are currently visible on the zone map.",
+            juce::dontSendNotification);
+        groupDeleteButton.setEnabled(memberCount == 0);
+
+        auto roundRobinGroupZones = 0;
+        auto unpooledGroupZones = 0;
+        for (const auto& zone : project.authoring.zones)
+        {
+            if (zone.groupId != selectedGroup->id)
+                continue;
+            if (zone.roundRobin.has_value())
+                ++roundRobinGroupZones;
+            else
+                ++unpooledGroupZones;
+        }
+        groupRoundRobinLabel.setText(
+            "Round Robin | pooled zones " + juce::String(roundRobinGroupZones)
+                + " | standalone zones " + juce::String(unpooledGroupZones),
+            juce::dontSendNotification);
+        groupRoundRobinHintLabel.setText(
+            selectedGroup->auditionAnchorZoneId.empty()
+                ? "Choose an audition anchor before managing anchor-driven preview or RR entry points."
+                : "Use the selected group's anchor zone in the zone inspector below for current RR edits.",
+            juce::dontSendNotification);
+    }
+    else
+    {
+        groupNameEditor.setText({}, juce::dontSendNotification);
+        groupVisibilityToggle.setToggleState(false, juce::dontSendNotification);
+        groupGainSlider.setValue(0.0, juce::dontSendNotification);
+        groupPanSlider.setValue(0.0, juce::dontSendNotification);
+        groupRoutingSelector.clear(juce::dontSendNotification);
+        groupAnchorSelector.clear(juce::dontSendNotification);
+        groupSummaryLabel.setText("No group is selected.", juce::dontSendNotification);
+        groupRoundRobinLabel.setText("Round Robin unavailable until a group is selected.", juce::dontSendNotification);
+        groupRoundRobinHintLabel.setText("Create or select a group to inspect its visibility, routing, and RR entry points.",
+                                         juce::dontSendNotification);
+        groupVisibilityHintLabel.setText("No group is selected.", juce::dontSendNotification);
+        groupVisibilityButton.setButtonText("Hide Group");
+        groupVisibilityButton.setEnabled(false);
+        groupPreviewAnchorButton.setEnabled(false);
+        groupMoveUpButton.setEnabled(false);
+        groupMoveDownButton.setEnabled(false);
+        groupDeleteButton.setEnabled(false);
+    }
 
     if (!project.authoring.macros.empty())
     {
@@ -2809,23 +3499,23 @@ void AuthoringPanel::refreshFromSession()
     if (!project.authoring.routingBuses.empty())
     {
         const auto& routingBus = project.authoring.routingBuses[static_cast<std::size_t>(selectedRoutingBusIndex)];
-        std::vector<std::string> inputSources;
-        inputSources.push_back("master");
+        routingInputSourceIds.clear();
+        routingInputSourceIds.push_back("master");
         for (const auto& group : project.authoring.groups)
         {
             if (!group.id.empty())
-                inputSources.push_back("groups/" + group.id);
+                routingInputSourceIds.push_back("groups/" + group.id);
         }
         for (const auto& zone : project.authoring.zones)
-            inputSources.push_back(zone.id);
+            routingInputSourceIds.push_back(zone.id);
 
         routingInputSelector.clear(juce::dontSendNotification);
         int selectedInputId = 0;
-        for (std::size_t index = 0; index < inputSources.size(); ++index)
+        for (std::size_t index = 0; index < routingInputSourceIds.size(); ++index)
         {
-            routingInputSelector.addItem(juce::String::fromUTF8(inputSources[index].c_str()),
+            routingInputSelector.addItem(formatRoutingInputSourceLabel(project, routingInputSourceIds[index]),
                                          static_cast<int>(index) + 1);
-            if (routingBus.inputSourceId == inputSources[index])
+            if (routingBus.inputSourceId == routingInputSourceIds[index])
                 selectedInputId = static_cast<int>(index) + 1;
         }
         routingInputSelector.setSelectedId(selectedInputId > 0 ? selectedInputId : 1, juce::dontSendNotification);
@@ -2854,6 +3544,7 @@ void AuthoringPanel::refreshFromSession()
 
         routingSummaryLabel.setText(
             "Bus " + juce::String::fromUTF8(routingBus.id.c_str())
+                + " | source " + formatRoutingInputSourceLabel(project, routingBus.inputSourceId)
                 + " | chain " + joinIdList(routingBus.fxSlotIds),
             juce::dontSendNotification);
     }
@@ -3011,6 +3702,161 @@ void AuthoringPanel::applySelectedZoneEdit(const authoring::ZoneFieldValuesViewM
     refreshFromSession();
 }
 
+void AuthoringPanel::applySelectedGroupNameEdit()
+{
+    if (isRefreshing)
+        return;
+
+    const auto selectedGroup = authoringSession.getSelectedGroup();
+    if (!selectedGroup.has_value())
+        return;
+
+    auto editedGroup = *selectedGroup;
+    const auto editedName = groupNameEditor.getText().trim();
+    if (editedName.isEmpty() || editedName == juce::String::fromUTF8(selectedGroup->displayName.c_str()))
+        return;
+
+    editedGroup.displayName = editedName.toStdString();
+    authoringSession.updateGroup(static_cast<std::size_t>(selectedGroupIndex),
+                                 editedGroup,
+                                 "Rename group");
+    refreshFromSession();
+}
+
+void AuthoringPanel::applySelectedGroupMixEdit(const juce::String& label)
+{
+    const auto selectedGroup = authoringSession.getSelectedGroup();
+    if (!selectedGroup.has_value())
+        return;
+
+    auto editedGroup = *selectedGroup;
+    editedGroup.workspaceVisible = groupVisibilityToggle.getToggleState();
+    editedGroup.gainDb = groupGainSlider.getValue();
+    editedGroup.pan = groupPanSlider.getValue();
+
+    const auto selectedRoutingIndex = std::max(0, groupRoutingSelector.getSelectedId() - 1);
+    editedGroup.routingBusId = selectedRoutingIndex >= 0
+            && static_cast<std::size_t>(selectedRoutingIndex) < groupRoutingBusIds.size()
+        ? groupRoutingBusIds[static_cast<std::size_t>(selectedRoutingIndex)]
+        : std::string {};
+
+    const auto selectedAnchorIndex = std::max(0, groupAnchorSelector.getSelectedId() - 1);
+    editedGroup.auditionAnchorZoneId = selectedAnchorIndex >= 0
+            && static_cast<std::size_t>(selectedAnchorIndex) < groupAnchorZoneIds.size()
+        ? groupAnchorZoneIds[static_cast<std::size_t>(selectedAnchorIndex)]
+        : std::string {};
+
+    authoringSession.updateGroup(static_cast<std::size_t>(selectedGroupIndex),
+                                 editedGroup,
+                                 label.toStdString());
+    refreshFromSession();
+}
+
+void AuthoringPanel::createGroup()
+{
+    const auto& groups = authoringSession.getProject().authoring.groups;
+    auto nextIndex = groups.size() + 1;
+    std::string nextId;
+    do
+    {
+        nextId = "group-" + std::to_string(nextIndex++);
+    }
+    while (std::any_of(groups.begin(),
+                       groups.end(),
+                       [&](const auto& group)
+                       {
+                           return group.id == nextId;
+                       }));
+
+    drs::engine::RuntimeProjectGroupDefinition group;
+    group.id = nextId;
+    group.displayName = "New Group " + std::to_string(groups.size() + 1);
+    group.displayOrder = static_cast<int>(groups.size());
+    group.workspaceVisible = true;
+
+    if (authoringSession.createGroup(group, "Create group").applied)
+    {
+        setActiveDrawerTab(authoring::DrawerTab::groups);
+        refreshFromSession();
+    }
+}
+
+void AuthoringPanel::deleteSelectedGroup()
+{
+    const auto selectedGroup = authoringSession.getSelectedGroup();
+    if (!selectedGroup.has_value())
+        return;
+
+    if (authoringSession.deleteGroup(selectedGroup->id, "Delete group").applied)
+        refreshFromSession();
+}
+
+void AuthoringPanel::moveSelectedGroup(int direction)
+{
+    if (selectedGroupIndex < 0)
+        return;
+
+    if (authoringSession.moveGroup(static_cast<std::size_t>(selectedGroupIndex),
+                                   direction,
+                                   direction < 0 ? "Move group earlier" : "Move group later").applied)
+    {
+        selectedGroupIndex = std::max(0, selectedGroupIndex + direction);
+        refreshFromSession();
+    }
+}
+
+void AuthoringPanel::toggleSelectedGroupVisibility()
+{
+    const auto selectedGroup = authoringSession.getSelectedGroup();
+    if (!selectedGroup.has_value())
+        return;
+
+    auto editedGroup = *selectedGroup;
+    editedGroup.workspaceVisible = !editedGroup.workspaceVisible;
+    if (authoringSession.updateGroup(static_cast<std::size_t>(selectedGroupIndex),
+                                     editedGroup,
+                                     editedGroup.workspaceVisible ? "Show group on map" : "Hide group on map").applied)
+    {
+        refreshFromSession();
+    }
+}
+
+void AuthoringPanel::previewSelectedGroupAnchor()
+{
+    if (!previewEnabledToggle.getToggleState())
+        return;
+
+    const auto selectedGroup = authoringSession.getSelectedGroup();
+    if (!selectedGroup.has_value() || selectedGroup->auditionAnchorZoneId.empty() || !previewCommandCallback)
+        return;
+
+    const auto zoneIterator = std::find_if(authoringSession.getProject().authoring.zones.begin(),
+                                           authoringSession.getProject().authoring.zones.end(),
+                                           [&](const auto& zone)
+                                           {
+                                               return zone.id == selectedGroup->auditionAnchorZoneId;
+                                           });
+    if (zoneIterator == authoringSession.getProject().authoring.zones.end())
+        return;
+
+    constexpr auto source = drs::engine::AuthoringPreviewAuditionSource::inspector;
+    const auto sourceIndex = std::min<std::size_t>(static_cast<std::size_t>(source),
+                                                   timedPreviewNotes.size() - 1);
+    releaseTimedPreview(sourceIndex);
+
+    drs::engine::AuthoringPreviewCommand command;
+    command.type = drs::engine::AuthoringPreviewCommandType::auditionSelectedZone;
+    command.source = source;
+    command.midiNote = zoneIterator->rootKey;
+    command.velocity = static_cast<float>(std::clamp((zoneIterator->velocityLow + zoneIterator->velocityHigh) / 2, 1, 127)) / 127.0f;
+    command.selectedZoneId = zoneIterator->id;
+    previewCommandCallback(command);
+
+    timedPreviewNotes[sourceIndex] = { true, zoneIterator->rootKey,
+                                       juce::Time::getMillisecondCounterHiRes() + 180.0 };
+    startTimer(previewReleaseTimerId, 10);
+}
+
 void AuthoringPanel::previewSelectedZone(
     drs::engine::AuthoringPreviewAuditionSource source,
     int explicitMidiNote,
@@ -3099,6 +3945,36 @@ void AuthoringPanel::markSavedCheckpoint()
     refreshFromSession();
 }
 
+std::vector<drs::engine::AuthoringZoneSummary> AuthoringPanel::buildVisibleZoneSummaries() const
+{
+    const auto zoneSummaries = authoringSession.getZoneSummaries();
+    const auto& project = authoringSession.getProject();
+    std::vector<drs::engine::AuthoringZoneSummary> visibleZones;
+    visibleZones.reserve(zoneSummaries.size());
+
+    for (const auto& zone : zoneSummaries)
+    {
+        const auto projectZoneIterator = std::find_if(project.authoring.zones.begin(),
+                                                      project.authoring.zones.end(),
+                                                      [&](const auto& projectZone)
+                                                      {
+                                                          return projectZone.id == zone.id;
+                                                      });
+        const auto groupIterator = projectZoneIterator == project.authoring.zones.end()
+            ? project.authoring.groups.end()
+            : std::find_if(project.authoring.groups.begin(),
+                           project.authoring.groups.end(),
+                           [&](const auto& group)
+                           {
+                               return group.id == projectZoneIterator->groupId;
+                           });
+        if (groupIterator == project.authoring.groups.end() || groupIterator->workspaceVisible || zone.selected)
+            visibleZones.push_back(zone);
+    }
+
+    return visibleZones;
+}
+
 void AuthoringPanel::applySelectedMacroEdit(const juce::String& label)
 {
     const auto& macros = authoringSession.getProject().authoring.macros;
@@ -3179,7 +4055,11 @@ void AuthoringPanel::applySelectedRoutingBusEdit(const juce::String& label)
     }
 
     auto editedRoutingBus = routingBuses[static_cast<std::size_t>(selectedRoutingBusIndex)];
-    editedRoutingBus.inputSourceId = routingInputSelector.getText().toStdString();
+    const auto selectedInputIndex = std::max(0, routingInputSelector.getSelectedId() - 1);
+    editedRoutingBus.inputSourceId = selectedInputIndex >= 0
+            && static_cast<std::size_t>(selectedInputIndex) < routingInputSourceIds.size()
+        ? routingInputSourceIds[static_cast<std::size_t>(selectedInputIndex)]
+        : std::string("master");
     editedRoutingBus.fxSlotIds.clear();
 
     auto appendFxId = [&](const juce::ComboBox& selector)
