@@ -36,6 +36,15 @@ struct RenderModelFixture
     {
         snapshot.draftRevision = revision;
         snapshot.contentDigest = snapshotDigest;
+        drs::engine::PlaybackSnapshotGroupRoute snapshotGroup;
+        snapshotGroup.groupId = "group-a";
+        snapshotGroup.articulationIds = { "sustain" };
+        snapshotGroup.zoneIds = { "zone-a" };
+        snapshotGroup.displayName = "Group A";
+        snapshotGroup.routingSourceId = "groups/group-a";
+        snapshotGroup.gainDb = -6.0;
+        snapshotGroup.pan = -0.1;
+        snapshot.groupRoutes.push_back(std::move(snapshotGroup));
         drs::engine::PlaybackSnapshotZone snapshotZone;
         snapshotZone.id = "zone-a";
         snapshotZone.sampleSourceId = "sample-a";
@@ -74,6 +83,15 @@ struct RenderModelFixture
         prepared.snapshotContentDigest = snapshotDigest;
         prepared.draftRevision = revision;
         prepared.preparedContentDigest = preparedDigest;
+        drs::engine::PreparedPlaybackGroupRoute preparedGroup;
+        preparedGroup.groupId = "group-a";
+        preparedGroup.articulationIds = { "sustain" };
+        preparedGroup.zoneIds = { "zone-a" };
+        preparedGroup.displayName = "Group A";
+        preparedGroup.routingSourceId = "groups/group-a";
+        preparedGroup.gainDb = -6.0;
+        preparedGroup.pan = -0.1;
+        prepared.groupRoutes.push_back(std::move(preparedGroup));
         drs::engine::PreparedPlaybackZoneHandle preparedZone;
         preparedZone.zoneId = "zone-a";
         preparedZone.sampleSourceId = "sample-a";
@@ -162,10 +180,12 @@ void runImmutableModelContract()
     require(result.model->getRoutes().size() == 1
                 && result.model->getRoutes().front().zoneId == "zone-a"
                 && result.model->getRoutes().front().preparedSampleIndex == 0
+                && std::abs(result.model->getRoutes().front().gainDb - (-9.0)) < 1.0e-9
+                && std::abs(result.model->getRoutes().front().pan - 0.15) < 1.0e-9
                 && result.model->getRoutes().front().loopEnabled
                 && result.model->getRoutes().front().loopStartFrame == 2
                 && result.model->getRoutes().front().loopEndFrame == 6,
-            "Render model must expose normalized, prevalidated renderer topology.");
+            "Render model must expose normalized, prevalidated renderer topology with group mix folded into route gain and pan.");
 
     payload.reset();
     require(!weakPayload.expired()
@@ -337,6 +357,14 @@ void runRouteTopologyFailures()
     expectRejected("render-model-route-topology-mismatch", [](RenderModelFixture& value)
     {
         value.prepared.zones[0].pan = -0.5;
+    });
+    expectRejected("render-model-group-route-missing", [](RenderModelFixture& value)
+    {
+        value.snapshot.groupRoutes.clear();
+    });
+    expectRejected("render-model-prepared-group-route-missing", [](RenderModelFixture& value)
+    {
+        value.prepared.groupRoutes.clear();
     });
     expectRejected("render-model-zone-id-duplicate", [](RenderModelFixture& value)
     {

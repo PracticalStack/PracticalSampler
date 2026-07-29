@@ -1,6 +1,7 @@
 #include "drs/engine/PerformancePublishPreparation.h"
 
 #include <algorithm>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -58,6 +59,19 @@ bool groupRoutesMatch(const PlaybackSnapshotGroupRoute& authored, const Prepared
         && authored.pan == prepared.pan
         && authored.routingBusId == prepared.routingBusId
         && authored.auditionAnchorZoneId == prepared.auditionAnchorZoneId;
+}
+
+bool isGroupRoutingSourceId(std::string_view sourceId) noexcept
+{
+    return sourceId.rfind("groups/", 0) == 0;
+}
+
+std::string extractGroupIdFromRoutingSourceId(std::string_view sourceId)
+{
+    if (!isGroupRoutingSourceId(sourceId) || sourceId.size() <= std::string_view("groups/").size())
+        return {};
+
+    return std::string(sourceId.substr(std::string_view("groups/").size()));
 }
 } // namespace
 
@@ -269,6 +283,7 @@ PerformancePublishPreparationResult validatePerformancePublishPreparation(
     for (const auto& slot : snapshot.fxSlots)
         fxSlotIds.insert(slot.id);
     std::unordered_set<std::string> busIds;
+    std::unordered_map<std::string, const PlaybackSnapshotRoutingBusReference*> busesById;
     for (std::size_t index = 0; index < snapshot.routingBuses.size(); ++index)
     {
         const auto& bus = snapshot.routingBuses[index];
@@ -276,10 +291,68 @@ PerformancePublishPreparationResult validatePerformancePublishPreparation(
         if (bus.id.empty() || !busIds.insert(bus.id).second)
             addError(result, "publish-routing-bus-identity-invalid", path + ".id",
                      "Routing bus ids must be non-empty and unique.");
+        else
+            busesById.emplace(bus.id, &bus);
+
+        if (bus.inputSourceId.empty())
+        {
+            addError(result, "publish-routing-input-source-missing", path + ".inputSourceId",
+                     "Routing buses must declare an immutable input source.");
+        }
+        else if (bus.inputSourceId != "master" && !authoredZoneIds.count(bus.inputSourceId))
+        {
+            const auto groupId = extractGroupIdFromRoutingSourceId(bus.inputSourceId);
+            if (groupId.empty() || !groupIds.count(groupId))
+            {
+                addError(result, "publish-routing-input-source-invalid", path + ".inputSourceId",
+                         "Routing buses may only source audio from master, authored zones, or authored groups.");
+            }
+        }
+
         for (const auto& fxSlotId : bus.fxSlotIds)
             if (!fxSlotIds.count(fxSlotId))
                 addError(result, "publish-routing-fx-slot-invalid", path + ".fxSlotIds",
                          "Routing buses may only reference captured FX slots.");
+    }
+
+    std::unordered_set<std::string> claimedGroupBusIds;
+    for (std::size_t index = 0; index < snapshot.groupRoutes.size(); ++index)
+    {
+        const auto& route = snapshot.groupRoutes[index];
+        const auto path = "snapshot.groupRoutes[" + std::to_string(index) + "]";
+        if (route.routingBusId.empty())
+            continue;
+
+        const auto bus = busesById.find(route.routingBusId);
+        if (bus == busesById.end())
+        {
+            addError(result, "publish-group-routing-bus-invalid", path + ".routingBusId",
+                     "Group routes may only reference captured routing buses.");
+            continue;
+        }
+
+        if (bus->second->inputSourceId != route.routingSourceId)
+        {
+            addError(result, "publish-group-routing-bus-mismatch", path + ".routingBusId",
+                     "Group routes must own a routing bus sourced from their own groups/<groupId> source.");
+        }
+        else if (!claimedGroupBusIds.insert(route.routingBusId).second)
+        {
+            addError(result, "publish-group-routing-bus-duplicate", path + ".routingBusId",
+                     "Routing buses must not be claimed by more than one group route.");
+        }
+    }
+
+    for (std::size_t index = 0; index < snapshot.routingBuses.size(); ++index)
+    {
+        const auto& bus = snapshot.routingBuses[index];
+        const auto groupId = extractGroupIdFromRoutingSourceId(bus.inputSourceId);
+        if (!groupId.empty() && !claimedGroupBusIds.count(bus.id))
+        {
+            addError(result, "publish-orphaned-group-routing-bus",
+                     "snapshot.routingBuses[" + std::to_string(index) + "].inputSourceId",
+                     "Group-targeted routing buses must be claimed by exactly one group route.");
+        }
     }
 
     std::unordered_map<std::string, const PreparedPlaybackZoneHandle*> zones;

@@ -141,17 +141,28 @@ int main()
                                 "authoring.zones[0].groupId"),
                 "Snapshot validation should report a structured finding when a zone references a missing authored group.");
 
-        auto illegalRoutingProject = phase2Project.project;
-        illegalRoutingProject.authoring.routingBuses[0].inputSourceId =
-            "groups/" + illegalRoutingProject.authoring.groups[0].id;
-        const auto illegalRoutingResult = builder.buildSnapshot(builder.requestBuild(7, true), illegalRoutingProject);
-        require(!illegalRoutingResult.built,
-                "Group routing input sources must remain ineligible until Sprint 4 routing support lands.");
-        require(containsFinding(illegalRoutingResult,
+        auto groupRoutingProject = phase2Project.project;
+        groupRoutingProject.authoring.routingBuses[0].inputSourceId =
+            "groups/" + groupRoutingProject.authoring.groups[0].id;
+        groupRoutingProject.authoring.groups[0].routingBusId =
+            groupRoutingProject.authoring.routingBuses[0].id;
+        const auto groupRoutingResult = builder.buildSnapshot(builder.requestBuild(7, true), groupRoutingProject);
+        require(groupRoutingResult.built && groupRoutingResult.activationEligible,
+                "Sprint 4 group routing input sources should build when they resolve to an authored group.");
+        require(groupRoutingResult.findings.empty(),
+                "Valid Sprint 4 group routing sources should not produce snapshot findings.");
+
+        auto unknownGroupRoutingProject = phase2Project.project;
+        unknownGroupRoutingProject.authoring.routingBuses[0].inputSourceId = "groups/ghost-group";
+        const auto unknownGroupRoutingResult = builder.buildSnapshot(
+            builder.requestBuild(8, true), unknownGroupRoutingProject);
+        require(!unknownGroupRoutingResult.built,
+                "Unknown group routing input sources must fail snapshot validation.");
+        require(containsFinding(unknownGroupRoutingResult,
                                 drs::engine::PlaybackSnapshotFindingSeverity::error,
-                                "illegal-routing-input-source",
+                                "unknown-group-routing-input-source",
                                 "authoring.routingBuses[0].inputSourceId"),
-                "Snapshot validation should report a structured finding for unsupported group routing inputs.");
+                "Snapshot validation should report a structured finding for unknown group routing inputs.");
 
         auto invalidProject = phase2Project.project;
         invalidProject.authoring.zones[0].sampleSourceId = "missing-source";

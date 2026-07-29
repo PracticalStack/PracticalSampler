@@ -33,6 +33,45 @@ const PlaybackSnapshotZone* findSnapshotZone(const ImmutablePlaybackSnapshot& sn
     return iterator == snapshot.zones.end() ? nullptr : &(*iterator);
 }
 
+const PlaybackSnapshotGroupRoute* findSnapshotGroupRoute(const ImmutablePlaybackSnapshot& snapshot,
+                                                         const std::string& groupId)
+{
+    const auto iterator = std::find_if(snapshot.groupRoutes.begin(),
+                                       snapshot.groupRoutes.end(),
+                                       [&](const PlaybackSnapshotGroupRoute& route)
+                                       {
+                                           return route.groupId == groupId;
+                                       });
+    return iterator == snapshot.groupRoutes.end() ? nullptr : &(*iterator);
+}
+
+const PreparedPlaybackGroupRoute* findPreparedGroupRoute(const ImmutablePreparedPlayback& prepared,
+                                                         const std::string& groupId)
+{
+    const auto iterator = std::find_if(prepared.groupRoutes.begin(),
+                                       prepared.groupRoutes.end(),
+                                       [&](const PreparedPlaybackGroupRoute& route)
+                                       {
+                                           return route.groupId == groupId;
+                                       });
+    return iterator == prepared.groupRoutes.end() ? nullptr : &(*iterator);
+}
+
+bool containsZoneId(const std::vector<std::string>& zoneIds, const std::string& zoneId)
+{
+    return std::find(zoneIds.begin(), zoneIds.end(), zoneId) != zoneIds.end();
+}
+
+double combineGroupGainDb(double zoneGainDb, double groupGainDb) noexcept
+{
+    return zoneGainDb + groupGainDb;
+}
+
+double combineGroupPan(double zonePan, double groupPan) noexcept
+{
+    return std::clamp(zonePan + groupPan, -1.0, 1.0);
+}
+
 std::uint64_t computeFnv1a64(std::string_view text) noexcept
 {
     std::uint64_t hash = 14695981039346656037ull;
@@ -329,6 +368,39 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
         else if (!sameTopology(*snapshotZone, zone))
             addError(result, "render-model-route-topology-mismatch", path,
                      "Snapshot and prepared route topology must agree before rendering.");
+        else
+        {
+            const auto* snapshotGroupRoute = findSnapshotGroupRoute(snapshot, snapshotZone->groupId);
+            if (snapshotGroupRoute == nullptr)
+            {
+                addError(result, "render-model-group-route-missing", path + ".zoneId",
+                         "Prepared routes must resolve through an authored group route.");
+            }
+            else
+            {
+                if (!containsZoneId(snapshotGroupRoute->zoneIds, zone.zoneId))
+                {
+                    addError(result, "render-model-group-membership-invalid", path + ".zoneId",
+                             "Authored group routes must contain each routed zone exactly where its groupId points.");
+                }
+
+                const auto* preparedGroupRoute = findPreparedGroupRoute(prepared, snapshotGroupRoute->groupId);
+                if (preparedGroupRoute == nullptr)
+                {
+                    addError(result, "render-model-prepared-group-route-missing", path + ".zoneId",
+                             "Prepared content must retain the immutable group route for every rendered zone.");
+                }
+                else if (!containsZoneId(preparedGroupRoute->zoneIds, zone.zoneId)
+                         || preparedGroupRoute->gainDb != snapshotGroupRoute->gainDb
+                         || preparedGroupRoute->pan != snapshotGroupRoute->pan
+                         || preparedGroupRoute->routingBusId != snapshotGroupRoute->routingBusId
+                         || preparedGroupRoute->routingSourceId != snapshotGroupRoute->routingSourceId)
+                {
+                    addError(result, "render-model-prepared-group-route-mismatch", path + ".zoneId",
+                             "Prepared group routing metadata must match the immutable authored group route.");
+                }
+            }
+        }
     }
 
     std::vector<VelocityCrossfadeTopologyZoneDefinition> crossfadeTopologyZones;
@@ -412,6 +484,16 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
         const auto& zone = prepared.zones[index];
         if (!routeSelected(zone))
             continue;
+        const auto* snapshotZone = findSnapshotZone(snapshot, zone.zoneId);
+        const auto* snapshotGroupRoute = snapshotZone == nullptr
+            ? nullptr
+            : findSnapshotGroupRoute(snapshot, snapshotZone->groupId);
+        const auto gainDb = snapshotGroupRoute == nullptr
+            ? zone.gainDb
+            : combineGroupGainDb(zone.gainDb, snapshotGroupRoute->gainDb);
+        const auto pan = snapshotGroupRoute == nullptr
+            ? zone.pan
+            : combineGroupPan(zone.pan, snapshotGroupRoute->pan);
         model->routes.push_back({ index,
                                   zone.preparedSampleIndex,
                                   zone.zoneId,
@@ -421,8 +503,8 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
                                   options.auditionSelectedZone ? 127 : zone.keyHigh,
                                   options.auditionSelectedZone ? 1 : zone.velocityLow,
                                   options.auditionSelectedZone ? 127 : zone.velocityHigh,
-                                  zone.gainDb,
-                                  zone.pan,
+                                  gainDb,
+                                  pan,
                                   zone.sampleStartFrame,
                                   zone.loopEnabled,
                                   zone.loopStartFrame,

@@ -153,7 +153,7 @@ Fixture makeFixture()
     snapshot.snapshot.articulationRoutes.push_back({ "sustain", { "kick-zone", "strings-zone" } });
     snapshot.snapshot.groupRoutes = {
         { "drums", { "sustain" }, { "kick-zone" } },
-        { "main", { "sustain" }, { "strings-zone" } }
+        { "main", { "sustain" }, { "strings-zone" }, "Main", 0, "groups/main", true, 0.0, 0.0, "main" }
     };
     snapshot.snapshot.contentDigest = computePlaybackSnapshotContentDigest(snapshot.snapshot);
 
@@ -197,7 +197,7 @@ Fixture makeFixture()
     };
     result.prepared.groupRoutes = {
         { "drums", { "sustain" }, { "kick-zone" } },
-        { "main", { "sustain" }, { "strings-zone" } }
+        { "main", { "sustain" }, { "strings-zone" }, "Main", 0, "groups/main", true, 0.0, 0.0, "main" }
     };
     result.metrics.preparedSampleCount = 2;
     result.metrics.preparedStreamCount = 2;
@@ -303,6 +303,41 @@ int main()
         require(!malformedRouteResult.activationEligible
                     && containsCode(malformedRouteResult, "publish-group-route-invalid"),
                 "Malformed authored group routing must produce a path-scoped ineligible result.");
+
+        auto unknownGroupBus = fixture.snapshot;
+        unknownGroupBus.snapshot.routingBuses[0].inputSourceId = "groups/ghost-group";
+        unknownGroupBus.snapshot.contentDigest = computePlaybackSnapshotContentDigest(unknownGroupBus.snapshot);
+        auto unknownGroupIdentity = fixture.identity;
+        unknownGroupIdentity.authoredContentDigest = unknownGroupBus.snapshot.contentDigest;
+        auto unknownGroupPrepared = fixture.prepared;
+        unknownGroupPrepared.prepared.snapshotContentDigest = unknownGroupBus.snapshot.contentDigest;
+        unknownGroupPrepared.prepared.routeDigest = computePreparedPlaybackRouteDigest(
+            unknownGroupBus.snapshot, unknownGroupPrepared.prepared);
+        unknownGroupPrepared.prepared.preparedContentDigest = computePreparedPlaybackContentDigest(
+            unknownGroupPrepared.prepared);
+        const auto unknownGroupBusResult = validatePerformancePublishPreparation(
+            unknownGroupIdentity, unknownGroupBus, unknownGroupPrepared);
+        require(!unknownGroupBusResult.activationEligible
+                    && containsCode(unknownGroupBusResult, "publish-routing-input-source-invalid"),
+                "Unknown group routing sources must invalidate performance preparation.");
+
+        auto mismatchedGroupBus = fixture.snapshot;
+        mismatchedGroupBus.snapshot.groupRoutes[0].routingBusId = "main";
+        mismatchedGroupBus.snapshot.contentDigest = computePlaybackSnapshotContentDigest(mismatchedGroupBus.snapshot);
+        auto mismatchedGroupIdentity = fixture.identity;
+        mismatchedGroupIdentity.authoredContentDigest = mismatchedGroupBus.snapshot.contentDigest;
+        auto mismatchedGroupPrepared = fixture.prepared;
+        mismatchedGroupPrepared.prepared.groupRoutes[0].routingBusId = "main";
+        mismatchedGroupPrepared.prepared.snapshotContentDigest = mismatchedGroupBus.snapshot.contentDigest;
+        mismatchedGroupPrepared.prepared.routeDigest = computePreparedPlaybackRouteDigest(
+            mismatchedGroupBus.snapshot, mismatchedGroupPrepared.prepared);
+        mismatchedGroupPrepared.prepared.preparedContentDigest = computePreparedPlaybackContentDigest(
+            mismatchedGroupPrepared.prepared);
+        const auto mismatchedGroupBusResult = validatePerformancePublishPreparation(
+            mismatchedGroupIdentity, mismatchedGroupBus, mismatchedGroupPrepared);
+        require(!mismatchedGroupBusResult.activationEligible
+                    && containsCode(mismatchedGroupBusResult, "publish-group-routing-bus-mismatch"),
+                "Group routes must only claim buses sourced from their own groups/<groupId> inputs.");
 
         auto macroMismatch = fixture.prepared;
         macroMismatch.prepared.macroSchemaDigest = "fnv1a64:wrong";

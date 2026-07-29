@@ -6,6 +6,7 @@
 #include <chrono>
 #include <filesystem>
 #include <sstream>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -78,6 +79,19 @@ ordered_json serializeStringArray(const std::vector<std::string>& values)
 std::string buildGroupRoutingSourceId(const std::string& groupId)
 {
     return groupId.empty() ? std::string {} : "groups/" + groupId;
+}
+
+bool isGroupRoutingSourceId(std::string_view sourceId) noexcept
+{
+    return sourceId.rfind("groups/", 0) == 0;
+}
+
+std::string extractGroupIdFromRoutingSourceId(std::string_view sourceId)
+{
+    if (!isGroupRoutingSourceId(sourceId) || sourceId.size() <= std::string_view("groups/").size())
+        return {};
+
+    return std::string(sourceId.substr(std::string_view("groups/").size()));
 }
 
 ordered_json serializeGroupRoute(const PlaybackSnapshotGroupRoute& route, bool includeWorkspaceVisible)
@@ -546,12 +560,26 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
         result.snapshot.fxSlots.push_back({ fxSlot.id, fxSlot.displayName, fxSlot.effectType, fxSlot.bypassed });
     }
 
+    const auto usesExplicitGroupDefinitions = project.schemaVersion >= 4
+        && project.authoring.schemaVersion >= 3;
+
     std::unordered_set<std::string> authoredZoneIds;
     authoredZoneIds.reserve(project.authoring.zones.size());
     for (const auto& zone : project.authoring.zones)
     {
         if (!zone.id.empty())
             authoredZoneIds.insert(zone.id);
+    }
+
+    std::unordered_set<std::string> authoredGroupIds;
+    if (usesExplicitGroupDefinitions)
+    {
+        authoredGroupIds.reserve(project.authoring.groups.size());
+        for (const auto& group : project.authoring.groups)
+        {
+            if (!group.id.empty())
+                authoredGroupIds.insert(group.id);
+        }
     }
 
     std::unordered_map<std::string, std::size_t> routingBusIndices;
@@ -582,17 +610,23 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
         }
         else if (routingBus.inputSourceId != "master" && !authoredZoneIds.count(routingBus.inputSourceId))
         {
-            const auto usesGroupSource = routingBus.inputSourceId.rfind("groups/", 0) == 0;
-            addFinding(result,
-                       PlaybackSnapshotFindingSeverity::error,
-                       usesGroupSource ? "illegal-routing-input-source" : "unknown-routing-input-source",
-                       path + ".inputSourceId",
-                       usesGroupSource
-                           ? "Routing bus '" + routingBus.id
-                               + "' references group input source '" + routingBus.inputSourceId
-                               + "' before Sprint 4 routing support."
-                           : "Routing bus '" + routingBus.id + "' references unknown input source '"
-                               + routingBus.inputSourceId + "'.");
+            const auto groupId = extractGroupIdFromRoutingSourceId(routingBus.inputSourceId);
+            if (!groupId.empty() && usesExplicitGroupDefinitions && authoredGroupIds.count(groupId))
+            {
+                // Group input sources are legal in Sprint 4 when they resolve to an authored group.
+            }
+            else
+            {
+                addFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           groupId.empty() ? "unknown-routing-input-source" : "unknown-group-routing-input-source",
+                           path + ".inputSourceId",
+                           groupId.empty()
+                               ? "Routing bus '" + routingBus.id + "' references unknown input source '"
+                                   + routingBus.inputSourceId + "'."
+                               : "Routing bus '" + routingBus.id + "' references unknown group input source '"
+                                   + routingBus.inputSourceId + "'.");
+            }
         }
 
         for (const auto& fxSlotId : routingBus.fxSlotIds)
@@ -618,8 +652,6 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
     std::unordered_map<std::string, std::size_t> articulationRouteIndices;
     std::unordered_map<std::string, std::size_t> groupRouteIndices;
     std::unordered_map<std::string, std::size_t> zoneIndices;
-    const auto usesExplicitGroupDefinitions = project.schemaVersion >= 4
-        && project.authoring.schemaVersion >= 3;
     if (usesExplicitGroupDefinitions)
     {
         result.snapshot.groupRoutes.reserve(project.authoring.groups.size());
@@ -677,6 +709,59 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
             route.routingBusId = group.routingBusId;
             route.auditionAnchorZoneId = group.auditionAnchorZoneId;
             result.snapshot.groupRoutes.push_back(std::move(route));
+        }
+
+        std::unordered_set<std::string> claimedRoutingBusIds;
+        for (std::size_t index = 0; index < project.authoring.groups.size(); ++index)
+        {
+            const auto& group = project.authoring.groups[index];
+            const auto path = "authoring.groups[" + std::to_string(index) + "]";
+            if (group.routingBusId.empty())
+                continue;
+
+            const auto busIndex = routingBusIndices.find(group.routingBusId);
+            if (busIndex == routingBusIndices.end())
+                continue;
+
+            const auto& bus = project.authoring.routingBuses[busIndex->second];
+            const auto expectedSourceId = buildGroupRoutingSourceId(group.id);
+            if (bus.inputSourceId != expectedSourceId)
+            {
+                addFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           "mismatched-group-routing-bus-source",
+                           path + ".routingBusId",
+                           "Group '" + group.id + "' must reference a routing bus sourced from '"
+                               + expectedSourceId + "'.");
+            }
+            else if (!claimedRoutingBusIds.insert(group.routingBusId).second)
+            {
+                addFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           "duplicate-group-routing-bus-assignment",
+                           path + ".routingBusId",
+                           "Routing bus '" + group.routingBusId
+                               + "' is already assigned to another group route.");
+            }
+        }
+
+        for (std::size_t index = 0; index < project.authoring.routingBuses.size(); ++index)
+        {
+            const auto& routingBus = project.authoring.routingBuses[index];
+            const auto groupId = extractGroupIdFromRoutingSourceId(routingBus.inputSourceId);
+            if (groupId.empty())
+                continue;
+
+            if (!claimedRoutingBusIds.count(routingBus.id))
+            {
+                addFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           "orphaned-group-routing-bus",
+                           "authoring.routingBuses[" + std::to_string(index) + "].inputSourceId",
+                           "Routing bus '" + routingBus.id + "' targets group source '"
+                               + routingBus.inputSourceId
+                               + "' but no authored group claims that bus.");
+            }
         }
     }
 

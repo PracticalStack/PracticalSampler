@@ -10,6 +10,7 @@
 #include <fstream>
 #include <optional>
 #include <sstream>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -42,6 +43,19 @@ std::uint64_t computeFnv1a64(const std::string& text)
     }
 
     return hash;
+}
+
+bool isGroupRoutingSourceId(std::string_view sourceId) noexcept
+{
+    return sourceId.rfind("groups/", 0) == 0;
+}
+
+std::string extractGroupIdFromRoutingSourceId(std::string_view sourceId)
+{
+    if (!isGroupRoutingSourceId(sourceId) || sourceId.size() <= std::string_view("groups/").size())
+        return {};
+
+    return std::string(sourceId.substr(std::string_view("groups/").size()));
 }
 
 std::string readTextFile(const fs::path& filePath)
@@ -1811,6 +1825,7 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
                          + authoring.selectedPerformanceBankId + "'.");
 
         std::unordered_set<std::string> routingBusIds;
+        std::unordered_set<std::string> groupOwnedRoutingBusIds;
         for (const auto& bus : authoring.routingBuses)
         {
             if (bus.id.empty())
@@ -1823,6 +1838,16 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
             if (bus.inputSourceId.empty())
                 addIssue(result, "Project routing bus '" + bus.id + "' must have an inputSourceId.");
+            else if (bus.inputSourceId != "master" && !zoneIds.count(bus.inputSourceId))
+            {
+                const auto groupId = extractGroupIdFromRoutingSourceId(bus.inputSourceId);
+                if (groupId.empty() || !explicitGroupsRequired || !groupIds.count(groupId))
+                {
+                    addIssue(result,
+                             "Project routing bus '" + bus.id + "' references unknown inputSourceId '"
+                                 + bus.inputSourceId + "'.");
+                }
+            }
 
             for (const auto& fxSlotId : bus.fxSlotIds)
             {
@@ -1841,6 +1866,31 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
                              "Project group '" + group.id + "' references unknown routingBusId '"
                                  + group.routingBusId + "'.");
                 }
+                else if (!group.routingBusId.empty())
+                {
+                    const auto busIterator = std::find_if(authoring.routingBuses.begin(),
+                                                          authoring.routingBuses.end(),
+                                                          [&](const auto& bus)
+                                                          {
+                                                              return bus.id == group.routingBusId;
+                                                          });
+                    if (busIterator != authoring.routingBuses.end())
+                    {
+                        const auto expectedInputSourceId = "groups/" + group.id;
+                        if (busIterator->inputSourceId != expectedInputSourceId)
+                        {
+                            addIssue(result,
+                                     "Project group '" + group.id + "' must reference a routingBusId whose inputSourceId is '"
+                                         + expectedInputSourceId + "'.");
+                        }
+                        else if (!groupOwnedRoutingBusIds.insert(group.routingBusId).second)
+                        {
+                            addIssue(result,
+                                     "Project routingBusId '" + group.routingBusId
+                                         + "' must not be assigned to more than one group.");
+                        }
+                    }
+                }
 
                 if (!group.auditionAnchorZoneId.empty())
                 {
@@ -1857,6 +1907,17 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
                                  "Project group '" + group.id + "' auditionAnchorZoneId '"
                                      + group.auditionAnchorZoneId + "' must belong to the same group.");
                     }
+                }
+            }
+
+            for (const auto& bus : authoring.routingBuses)
+            {
+                const auto groupId = extractGroupIdFromRoutingSourceId(bus.inputSourceId);
+                if (!groupId.empty() && !groupOwnedRoutingBusIds.count(bus.id))
+                {
+                    addIssue(result,
+                             "Project routing bus '" + bus.id + "' targets group source '"
+                                 + bus.inputSourceId + "' but no group claims that routingBusId.");
                 }
             }
         }

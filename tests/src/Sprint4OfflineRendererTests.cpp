@@ -46,6 +46,9 @@ struct ModelSpec
 {
     std::vector<std::vector<float>> channels;
     double sourceSampleRate = 48000.0;
+    std::string groupId = "offline-group";
+    double groupGainDb = 0.0;
+    double groupPan = 0.0;
     int rootKey = 60;
     double gainDb = 0.0;
     double pan = 0.0;
@@ -55,70 +58,110 @@ struct ModelSpec
     std::uint64_t loopEndFrame = 0;
 };
 
-drs::engine::SamplerRenderModelPtr makeModel(const std::string& id, const ModelSpec& spec)
+drs::engine::SamplerRenderModelPtr makeGroupedModel(const std::string& id,
+                                                    const std::vector<ModelSpec>& specs)
 {
-    require(!spec.channels.empty() && spec.channels.size() <= 2 && !spec.channels.front().empty(),
-            id + " requires one or two non-empty sample channels.");
-    const auto frameCount = spec.channels.front().size();
-    for (const auto& channel : spec.channels)
-        require(channel.size() == frameCount, id + " sample channels must have equal frame counts.");
+    require(!specs.empty(), id + " requires at least one zone.");
 
     drs::engine::ImmutablePlaybackSnapshot snapshot;
     snapshot.draftRevision = 1;
     snapshot.contentDigest = "offline-snapshot-" + id;
-    drs::engine::PlaybackSnapshotZone snapshotZone;
-    snapshotZone.id = "zone-" + id;
-    snapshotZone.sampleSourceId = "sample-" + id;
-    snapshotZone.displayName = id;
-    snapshotZone.groupId = "offline-group";
-    snapshotZone.articulationId = "offline-articulation";
-    snapshotZone.rootKey = spec.rootKey;
-    snapshotZone.keyLow = 0;
-    snapshotZone.keyHigh = 127;
-    snapshotZone.velocityLow = 1;
-    snapshotZone.velocityHigh = 127;
-    snapshotZone.gainDb = spec.gainDb;
-    snapshotZone.pan = spec.pan;
-    snapshotZone.sampleStartFrame = spec.sampleStartFrame;
-    snapshotZone.loopEnabled = spec.loopEnabled;
-    snapshotZone.loopStartFrame = spec.loopStartFrame;
-    snapshotZone.loopEndFrame = spec.loopEndFrame;
-    snapshot.zones.push_back(std::move(snapshotZone));
-
-    auto decoded = std::make_shared<drs::engine::PreparedPlaybackDecodedSampleData>();
-    decoded->normalizedChannels = spec.channels;
-    drs::engine::PreparedPlaybackSampleHandle sample;
-    sample.sampleSourceId = "sample-" + id;
-    sample.streamSampleId = "stream-" + id;
-    sample.sampleRate = spec.sourceSampleRate;
-    sample.frameCount = frameCount;
-    sample.channelCount = spec.channels.size();
-    sample.decodedSampleData = std::move(decoded);
 
     drs::engine::ImmutablePreparedPlayback prepared;
     prepared.snapshotBuildId = 1001;
     prepared.snapshotContentDigest = snapshot.contentDigest;
     prepared.draftRevision = 1;
     prepared.preparedContentDigest = "offline-prepared-" + id;
-    prepared.samples.push_back(std::move(sample));
-    drs::engine::PreparedPlaybackZoneHandle preparedZone;
-    preparedZone.zoneId = "zone-" + id;
-    preparedZone.sampleSourceId = "sample-" + id;
-    preparedZone.streamSampleId = "stream-" + id;
-    preparedZone.preparedSampleIndex = 0;
-    preparedZone.preparedStreamIndex = 0;
-    preparedZone.rootKey = spec.rootKey;
-    preparedZone.keyLow = 0;
-    preparedZone.keyHigh = 127;
-    preparedZone.velocityLow = 1;
-    preparedZone.velocityHigh = 127;
-    preparedZone.gainDb = spec.gainDb;
-    preparedZone.pan = spec.pan;
-    preparedZone.sampleStartFrame = spec.sampleStartFrame;
-    preparedZone.loopEnabled = spec.loopEnabled;
-    preparedZone.loopStartFrame = spec.loopStartFrame;
-    preparedZone.loopEndFrame = spec.loopEndFrame;
-    prepared.zones.push_back(std::move(preparedZone));
+
+    std::map<std::string, std::size_t> groupRouteIndices;
+    for (std::size_t index = 0; index < specs.size(); ++index)
+    {
+        const auto& spec = specs[index];
+        require(!spec.channels.empty() && spec.channels.size() <= 2 && !spec.channels.front().empty(),
+                id + " requires one or two non-empty sample channels.");
+        const auto frameCount = spec.channels.front().size();
+        for (const auto& channel : spec.channels)
+            require(channel.size() == frameCount, id + " sample channels must have equal frame counts.");
+
+        const auto zoneId = "zone-" + id + "-" + std::to_string(index + 1);
+        const auto sampleId = "sample-" + id + "-" + std::to_string(index + 1);
+        const auto streamId = "stream-" + id + "-" + std::to_string(index + 1);
+
+        auto groupRoute = groupRouteIndices.find(spec.groupId);
+        if (groupRoute == groupRouteIndices.end())
+        {
+            drs::engine::PlaybackSnapshotGroupRoute snapshotGroup;
+            snapshotGroup.groupId = spec.groupId;
+            snapshotGroup.articulationIds = { "offline-articulation" };
+            snapshotGroup.displayName = spec.groupId;
+            snapshotGroup.routingSourceId = "groups/" + spec.groupId;
+            snapshotGroup.gainDb = spec.groupGainDb;
+            snapshotGroup.pan = spec.groupPan;
+            groupRoute = groupRouteIndices.emplace(spec.groupId, snapshot.groupRoutes.size()).first;
+            snapshot.groupRoutes.push_back(std::move(snapshotGroup));
+
+            drs::engine::PreparedPlaybackGroupRoute preparedGroup;
+            preparedGroup.groupId = spec.groupId;
+            preparedGroup.articulationIds = { "offline-articulation" };
+            preparedGroup.displayName = spec.groupId;
+            preparedGroup.routingSourceId = "groups/" + spec.groupId;
+            preparedGroup.gainDb = spec.groupGainDb;
+            preparedGroup.pan = spec.groupPan;
+            prepared.groupRoutes.push_back(std::move(preparedGroup));
+        }
+
+        snapshot.groupRoutes[groupRoute->second].zoneIds.push_back(zoneId);
+        prepared.groupRoutes[groupRoute->second].zoneIds.push_back(zoneId);
+
+        drs::engine::PlaybackSnapshotZone snapshotZone;
+        snapshotZone.id = zoneId;
+        snapshotZone.sampleSourceId = sampleId;
+        snapshotZone.displayName = zoneId;
+        snapshotZone.groupId = spec.groupId;
+        snapshotZone.articulationId = "offline-articulation";
+        snapshotZone.rootKey = spec.rootKey;
+        snapshotZone.keyLow = 0;
+        snapshotZone.keyHigh = 127;
+        snapshotZone.velocityLow = 1;
+        snapshotZone.velocityHigh = 127;
+        snapshotZone.gainDb = spec.gainDb;
+        snapshotZone.pan = spec.pan;
+        snapshotZone.sampleStartFrame = spec.sampleStartFrame;
+        snapshotZone.loopEnabled = spec.loopEnabled;
+        snapshotZone.loopStartFrame = spec.loopStartFrame;
+        snapshotZone.loopEndFrame = spec.loopEndFrame;
+        snapshot.zones.push_back(std::move(snapshotZone));
+
+        auto decoded = std::make_shared<drs::engine::PreparedPlaybackDecodedSampleData>();
+        decoded->normalizedChannels = spec.channels;
+        drs::engine::PreparedPlaybackSampleHandle sample;
+        sample.sampleSourceId = sampleId;
+        sample.streamSampleId = streamId;
+        sample.sampleRate = spec.sourceSampleRate;
+        sample.frameCount = frameCount;
+        sample.channelCount = spec.channels.size();
+        sample.decodedSampleData = std::move(decoded);
+        prepared.samples.push_back(std::move(sample));
+
+        drs::engine::PreparedPlaybackZoneHandle preparedZone;
+        preparedZone.zoneId = zoneId;
+        preparedZone.sampleSourceId = sampleId;
+        preparedZone.streamSampleId = streamId;
+        preparedZone.preparedSampleIndex = index;
+        preparedZone.preparedStreamIndex = index;
+        preparedZone.rootKey = spec.rootKey;
+        preparedZone.keyLow = 0;
+        preparedZone.keyHigh = 127;
+        preparedZone.velocityLow = 1;
+        preparedZone.velocityHigh = 127;
+        preparedZone.gainDb = spec.gainDb;
+        preparedZone.pan = spec.pan;
+        preparedZone.sampleStartFrame = spec.sampleStartFrame;
+        preparedZone.loopEnabled = spec.loopEnabled;
+        preparedZone.loopStartFrame = spec.loopStartFrame;
+        preparedZone.loopEndFrame = spec.loopEndFrame;
+        prepared.zones.push_back(std::move(preparedZone));
+    }
 
     auto payload = std::make_shared<drs::engine::PlaybackActivationPayload>();
     payload->lane = drs::engine::PlaybackActivationLane::performance;
@@ -129,7 +172,9 @@ drs::engine::SamplerRenderModelPtr makeModel(const std::string& id, const ModelS
     payload->activationEligible = true;
     payload->snapshotContentDigest = snapshot.contentDigest;
     payload->preparedContentDigest = prepared.preparedContentDigest;
-    payload->retainedPreparedBytes = frameCount * spec.channels.size() * sizeof(float);
+    payload->retainedPreparedBytes = 0;
+    for (const auto& spec : specs)
+        payload->retainedPreparedBytes += spec.channels.front().size() * spec.channels.size() * sizeof(float);
     payload->snapshot = std::make_shared<const drs::engine::ImmutablePlaybackSnapshot>(std::move(snapshot));
     payload->prepared = std::make_shared<const drs::engine::ImmutablePreparedPlayback>(std::move(prepared));
 
@@ -137,6 +182,11 @@ drs::engine::SamplerRenderModelPtr makeModel(const std::string& id, const ModelS
     require(result.built && result.model != nullptr,
             id + " should build a valid immutable offline render model.");
     return result.model;
+}
+
+drs::engine::SamplerRenderModelPtr makeModel(const std::string& id, const ModelSpec& spec)
+{
+    return makeGroupedModel(id, { spec });
 }
 
 drs::tests::OfflineTimelineEvent noteOn(std::uint64_t frame, int note = 60, int velocity = 127)
@@ -238,6 +288,24 @@ std::vector<drs::tests::OfflineRenderArtifact> runGoldenBehaviorMatrix()
     requireFrame(panArtifact, 0, 0, 0.125, "Positive pan left attenuation");
     requireFrame(panArtifact, 1, 0, 0.25, "Positive pan right preservation");
     artifacts.push_back(std::move(panArtifact));
+
+    const auto grouped = drs::tests::renderOffline(
+        { "grouped-mix-balance",
+          makeGroupedModel("grouped-mix-balance",
+                           {
+                               ModelSpec { { std::vector<float>(8, 1.0f) }, 48000.0, "stack", -6.0, 0.5 },
+                               ModelSpec { { std::vector<float>(8, 1.0f) }, 48000.0, "stack", -6.0, 0.5 },
+                               ModelSpec { { std::vector<float>(8, 1.0f) }, 48000.0, "solo", 0.0, 0.0 }
+                           }),
+          48000.0,
+          4,
+          64,
+          { noteOn(0) } });
+    requireFrame(grouped, 0, 0, 0.25 + 2.0 * 0.25 * std::pow(10.0, -6.0 / 20.0) * 0.5,
+                 "Group gain/pan left mix");
+    requireFrame(grouped, 1, 0, 0.25 + 2.0 * 0.25 * std::pow(10.0, -6.0 / 20.0),
+                 "Group gain/pan right mix");
+    artifacts.push_back(std::move(grouped));
 
     ModelSpec shortSample { { { 1.0f, 0.5f, 0.25f } } };
     auto completion = render("sample-completion", shortSample, 7, { noteOn(0) });

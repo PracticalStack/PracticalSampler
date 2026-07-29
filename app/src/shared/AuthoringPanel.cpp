@@ -2811,6 +2811,11 @@ void AuthoringPanel::refreshFromSession()
         const auto& routingBus = project.authoring.routingBuses[static_cast<std::size_t>(selectedRoutingBusIndex)];
         std::vector<std::string> inputSources;
         inputSources.push_back("master");
+        for (const auto& group : project.authoring.groups)
+        {
+            if (!group.id.empty())
+                inputSources.push_back("groups/" + group.id);
+        }
         for (const auto& zone : project.authoring.zones)
             inputSources.push_back(zone.id);
 

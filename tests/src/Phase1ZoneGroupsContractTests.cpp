@@ -106,8 +106,10 @@ int main()
 
         for (const auto& bus : project.authoring.routingBuses)
         {
-            require(bus.inputSourceId == "master" || zoneIds.count(bus.inputSourceId) != 0,
-                    "Sprint 2 routing inputs should still resolve only to master or a direct zone id.");
+            require(bus.inputSourceId == "master"
+                        || zoneIds.count(bus.inputSourceId) != 0
+                        || bus.inputSourceId.rfind("groups/", 0) == 0,
+                    "Sprint 4 routing inputs should resolve to master, a direct zone id, or a groups/<groupId> source.");
         }
 
         PlaybackSnapshotBuilder builder;
@@ -150,6 +152,14 @@ int main()
                     && serializedSnapshot.find("\"routingSourceId\"") != std::string::npos
                     && serializedSnapshot.find("\"workspaceVisible\"") != std::string::npos,
                 "Sprint 3 playback snapshots must serialize explicit group metadata.");
+
+        auto sprint4Project = project;
+        sprint4Project.authoring.routingBuses.front().inputSourceId =
+            "groups/" + sprint4Project.authoring.groups.front().id;
+        sprint4Project.authoring.groups[0].routingBusId = sprint4Project.authoring.routingBuses.front().id;
+        const auto sprint4SnapshotResult = buildSnapshot(builder, sprint4Project);
+        require(sprint4SnapshotResult.built && sprint4SnapshotResult.findings.empty(),
+                "Sprint 4 Zone Groups fixtures should accept group-scoped routing inputs when the group owns the bus.");
 
         const auto manifestDirectory =
             std::filesystem::path(projectLoad.manifestPath.empty() ? "." : projectLoad.manifestPath).parent_path();
