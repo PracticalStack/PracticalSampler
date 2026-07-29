@@ -1665,6 +1665,22 @@ add_test(
     COMMAND drs_phase2_zone_group_transaction_tests
 )
 
+add_executable(drs_sprint8_zone_group_hardening_tests
+    src/Sprint8ZoneGroupHardeningTests.cpp
+)
+
+target_link_libraries(drs_sprint8_zone_group_hardening_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_features(drs_sprint8_zone_group_hardening_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint8.zone_group_hardening
+    COMMAND drs_sprint8_zone_group_hardening_tests
+)
+
 juce_add_console_app(drs_phase2_waveform_preview_tests
     PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Waveform Preview Tests"
 )
@@ -2412,6 +2428,7 @@ add_dependencies(drs_all_tests
     drs_phase2_authoring_foundation_tests
     drs_phase2_authoring_import_tests
     drs_phase2_mapping_workspace_tests
+    drs_sprint8_zone_group_hardening_tests
     drs_phase2_waveform_preview_tests
     drs_phase2_macro_routing_tests
     drs_phase2_performance_bank_tests

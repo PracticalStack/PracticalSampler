@@ -349,6 +349,26 @@ std::vector<std::size_t> collectRoundRobinPoolMemberIndices(const RuntimeProject
     return indices;
 }
 
+std::vector<std::size_t> collectCompatibleRoundRobinPoolMemberIndices(const RuntimeProjectModel& project,
+                                                                      std::size_t anchorIndex,
+                                                                      const std::string& poolId)
+{
+    std::vector<std::size_t> indices;
+    const auto& anchorZone = project.authoring.zones[anchorIndex];
+    for (const auto memberIndex : collectRoundRobinPoolMemberIndices(project, poolId))
+    {
+        if (isRoundRobinGroupingCompatible(anchorZone, project.authoring.zones[memberIndex]))
+            indices.push_back(memberIndex);
+    }
+
+    if (std::find(indices.begin(), indices.end(), anchorIndex) == indices.end())
+        indices.push_back(anchorIndex);
+
+    return indices;
+}
+
+std::string allocateRoundRobinPoolId(const RuntimeProjectModel& project);
+
 void normalizeRoundRobinPool(RuntimeProjectModel& project,
                              std::vector<std::size_t> memberIndices,
                              const std::string& poolId)
@@ -374,6 +394,37 @@ void normalizeRoundRobinPool(RuntimeProjectModel& project,
                                   poolId,
                                   slotCount,
                                   static_cast<int>(ordinal) + 1);
+}
+
+void isolateMalformedRoundRobinPoolMembers(RuntimeProjectModel& project, std::size_t anchorIndex)
+{
+    auto& anchorZone = project.authoring.zones[anchorIndex];
+    if (!anchorZone.roundRobin.has_value())
+        return;
+
+    const auto poolId = anchorZone.roundRobin->poolId;
+    auto compatibleMemberIndices = collectCompatibleRoundRobinPoolMemberIndices(project,
+                                                                                anchorIndex,
+                                                                                poolId);
+    auto malformedMemberIndices = collectRoundRobinPoolMemberIndices(project, poolId);
+    malformedMemberIndices.erase(std::remove_if(malformedMemberIndices.begin(),
+                                                malformedMemberIndices.end(),
+                                                [&](const std::size_t memberIndex)
+                                                {
+                                                    return std::find(compatibleMemberIndices.begin(),
+                                                                     compatibleMemberIndices.end(),
+                                                                     memberIndex)
+                                                        != compatibleMemberIndices.end();
+                                                }),
+                                 malformedMemberIndices.end());
+
+    if (malformedMemberIndices.empty())
+        return;
+
+    normalizeRoundRobinPool(project, compatibleMemberIndices, poolId);
+    normalizeRoundRobinPool(project,
+                            malformedMemberIndices,
+                            allocateRoundRobinPoolId(project));
 }
 
 std::string allocateRoundRobinPoolId(const RuntimeProjectModel& project)
@@ -1072,6 +1123,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::createRoundRobinPoolForSele
                                   "Group Round Robin pool creation rejected",
                                   "The selected group does not have an audition anchor zone available for Round Robin editing.");
 
+    isolateMalformedRoundRobinPoolMembers(project, *anchorIndex);
     createRoundRobinPoolForAnchor(project, *anchorIndex);
     alignSelectedGroupToSelectedZone(project);
     return documentController.commitSnapshot(project, label, buildRoundRobinChangedPaths(project));
@@ -1086,6 +1138,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::addCompatibleZonesToSelecte
                                   "Group Round Robin grouping rejected",
                                   "The selected group does not have an audition anchor zone available for Round Robin editing.");
 
+    isolateMalformedRoundRobinPoolMembers(project, *anchorIndex);
     addCompatibleZonesToAnchorRoundRobinPool(project, *anchorIndex);
     alignSelectedGroupToSelectedZone(project);
     return documentController.commitSnapshot(project, label, buildRoundRobinChangedPaths(project));
@@ -1100,6 +1153,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::normalizeSelectedGroupRound
                                   "Group Round Robin normalization rejected",
                                   "The selected group does not have an audition anchor zone available for Round Robin editing.");
 
+    isolateMalformedRoundRobinPoolMembers(project, *anchorIndex);
     const auto& anchorZone = project.authoring.zones[*anchorIndex];
     if (!anchorZone.roundRobin.has_value())
         return makeRejectedResult(getDocumentState(),
@@ -1126,6 +1180,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::removeSelectedGroupAnchorFr
                                   "Group Round Robin removal rejected",
                                   "The selected group does not have an audition anchor zone available for Round Robin editing.");
 
+    isolateMalformedRoundRobinPoolMembers(project, *anchorIndex);
     auto& anchorZone = project.authoring.zones[*anchorIndex];
     if (!anchorZone.roundRobin.has_value())
         return makeRejectedResult(getDocumentState(),
