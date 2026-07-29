@@ -23,10 +23,26 @@ public:
         velocityLow
     };
 
+    enum class SelectionMode
+    {
+        replace,
+        toggle,
+        additive
+    };
+
+    struct SelectionState
+    {
+        std::vector<std::string> zoneIds;
+        std::string primaryZoneId;
+    };
+
     ZoneMapCanvas();
 
     void setZoneSummaries(std::vector<drs::engine::AuthoringZoneSummary> summaries);
+    void setSelectionState(SelectionState nextSelectionState);
+    SelectionState getSelectionState() const;
     void setOnZoneSelectionRequested(std::function<void(const std::string& zoneId)> nextCallback);
+    void setOnZoneSelectionStateRequested(std::function<void(const SelectionState& selectionState)> nextCallback);
     void setOnZoneRangeCommitRequested(
         std::function<void(const drs::engine::AuthoringZoneSummary& zone, const std::string& label)> nextCallback);
     void setOnZoneAuditionRequested(
@@ -37,7 +53,8 @@ public:
     void fileDragEnter(const juce::StringArray& files, int x, int y) override;
     void fileDragExit(const juce::StringArray& files) override;
     void filesDropped(const juce::StringArray& files, int x, int y) override;
-    bool requestSelectionAt(juce::Point<float> position);
+    bool requestSelectionAt(juce::Point<float> position, SelectionMode mode = SelectionMode::replace);
+    bool requestSelectionInBounds(juce::Rectangle<float> bounds, SelectionMode mode = SelectionMode::replace);
     bool requestAuditionAt(juce::Point<float> position);
     bool requestDeleteSelectedSample();
     bool moveSelection(int direction);
@@ -70,27 +87,43 @@ private:
         drs::engine::AuthoringZoneSummary previewZone;
     };
 
+    struct MarqueeGesture
+    {
+        juce::Point<float> start;
+        juce::Point<float> current;
+        bool ctrlDown = false;
+        bool dragged = false;
+    };
+
     juce::Rectangle<float> getInnerBounds() const;
     drs::engine::AuthoringZoneSummary getDisplayZoneSummary(std::size_t index) const;
     juce::Rectangle<float> computeZoneBounds(const drs::engine::AuthoringZoneSummary& zone) const;
     std::vector<ZoneLayout> buildZoneLayouts() const;
     std::vector<std::size_t> buildPaintOrder() const;
+    std::optional<std::size_t> findZoneIndexAt(juce::Point<float> position) const;
     std::optional<std::size_t> findSelectedZoneIndex() const;
+    std::vector<std::size_t> findSecondarySelectedZoneIndices() const;
     std::vector<std::pair<RangeHandle, juce::Point<float>>> buildHandleCenters(const juce::Rectangle<float>& zoneBounds) const;
     RangeHandle findRangeHandleAt(juce::Point<float> position, std::size_t& zoneIndex) const;
     drs::engine::AuthoringZoneSummary buildRangePreview(const RangeGesture& gesture, juce::Point<float> position) const;
     int positionToMidiKey(juce::Point<float> position) const;
     int positionToMidiVelocity(juce::Point<float> position) const;
-    bool requestSelectionByIndex(std::size_t index);
+    SelectionState buildSelectionStateForZoneIndex(std::size_t index, SelectionMode mode) const;
+    SelectionState buildSelectionStateForBounds(juce::Rectangle<float> bounds, SelectionMode mode) const;
+    bool requestSelectionByIndex(std::size_t index, SelectionMode mode = SelectionMode::replace);
+    bool requestSelectionState(const SelectionState& selectionState);
     void showContextMenuAt(juce::Point<int> screenPosition);
 
     std::vector<drs::engine::AuthoringZoneSummary> zoneSummaries;
+    SelectionState selectionState;
     std::function<void(const std::string& zoneId)> onZoneSelectionRequested;
+    std::function<void(const SelectionState& selectionState)> onZoneSelectionStateRequested;
     std::function<void(const drs::engine::AuthoringZoneSummary& zone, const std::string& label)> onZoneRangeCommitRequested;
     std::function<void(const std::string& zoneId, int midiNote, int velocity)> onZoneAuditionRequested;
     std::function<void(std::vector<juce::File>)> onSampleFilesDropped;
     std::function<void()> onDeleteSelectedSampleRequested;
     std::optional<RangeGesture> activeGesture;
+    std::optional<MarqueeGesture> activeMarqueeGesture;
     bool sampleFileDragActive = false;
 };
 } // namespace drs::app::authoring

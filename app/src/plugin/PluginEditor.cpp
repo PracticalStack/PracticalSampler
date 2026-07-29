@@ -916,6 +916,7 @@ void Editor::importSampleFiles(std::vector<juce::File> selectedFiles)
                     }
 
                     const auto importedCount = state->importedSampleSources.size();
+                    drs::engine::reconcileBatchInferredRoundRobinDescriptors(state->importedZones);
                     const auto importResult = safeThis->processor.getAuthoringSession().appendImportedContent(
                         std::move(state->importedSampleSources),
                         std::move(state->importedZones),

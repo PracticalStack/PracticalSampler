@@ -168,6 +168,75 @@ int main()
         require(hasFindingCode(sparseHeuristics.findings, "round_robin.sparse_slots"),
                 "Sparse round-robin sibling pools should surface a typed review finding.");
 
+        const auto cleanSiblingOneHeuristics =
+            drs::engine::parseSampleFilenameHeuristics(cleanSiblingOnePath.generic_string());
+        const auto cleanSiblingThreeHeuristics =
+            drs::engine::parseSampleFilenameHeuristics(cleanSiblingThreePath.generic_string());
+        require(cleanSiblingOneHeuristics.suggestedZone.zone.roundRobin.has_value()
+                    && cleanSiblingThreeHeuristics.suggestedZone.zone.roundRobin.has_value(),
+                "Complete round-robin sibling fixtures should infer descriptors before batch reconciliation.");
+
+        std::vector<drs::engine::RuntimeProjectZoneDefinition> acceptedRoundRobinSubset {
+            directHeuristics.suggestedZone.zone,
+            cleanSiblingThreeHeuristics.suggestedZone.zone
+        };
+        drs::engine::reconcileBatchInferredRoundRobinDescriptors(acceptedRoundRobinSubset);
+        require(acceptedRoundRobinSubset[0].roundRobin.has_value()
+                    && acceptedRoundRobinSubset[1].roundRobin.has_value(),
+                "Accepted multi-zone round-robin subsets should stay grouped after reconciliation.");
+        require(acceptedRoundRobinSubset[0].roundRobin->slotCount == 2
+                    && acceptedRoundRobinSubset[0].roundRobin->slotIndex == 1
+                    && acceptedRoundRobinSubset[1].roundRobin->slotCount == 2
+                    && acceptedRoundRobinSubset[1].roundRobin->slotIndex == 2,
+                "Accepted multi-zone round-robin subsets should be renumbered into dense contiguous slots.");
+        require(acceptedRoundRobinSubset[0].roundRobin->poolId == acceptedRoundRobinSubset[1].roundRobin->poolId,
+                "Accepted multi-zone round-robin subsets should stay in the same reconciled pool.");
+        require(acceptedRoundRobinSubset[0].roundRobinLength == 2
+                    && acceptedRoundRobinSubset[0].roundRobinPosition == 1
+                    && acceptedRoundRobinSubset[1].roundRobinLength == 2
+                    && acceptedRoundRobinSubset[1].roundRobinPosition == 2,
+                "Accepted multi-zone round-robin subsets should keep scalar metadata aligned after reconciliation.");
+
+        std::vector<drs::engine::RuntimeProjectZoneDefinition> soloRoundRobinZone {
+            directHeuristics.suggestedZone.zone
+        };
+        drs::engine::reconcileBatchInferredRoundRobinDescriptors(soloRoundRobinZone);
+        require(!soloRoundRobinZone[0].roundRobin.has_value()
+                    && soloRoundRobinZone[0].roundRobinLength == 0
+                    && soloRoundRobinZone[0].roundRobinPosition == 0,
+                "Single accepted round-robin zones should collapse back to a plain zone after reconciliation.");
+
+        auto alternateRoundRobinOne = cleanSiblingOneHeuristics.suggestedZone.zone;
+        auto alternateRoundRobinTwo = directHeuristics.suggestedZone.zone;
+        alternateRoundRobinOne.rootKey = 62;
+        alternateRoundRobinOne.keyLow = 62;
+        alternateRoundRobinOne.keyHigh = 62;
+        alternateRoundRobinTwo.rootKey = 62;
+        alternateRoundRobinTwo.keyLow = 62;
+        alternateRoundRobinTwo.keyHigh = 62;
+
+        std::vector<drs::engine::RuntimeProjectZoneDefinition> splitRoundRobinPools {
+            cleanSiblingOneHeuristics.suggestedZone.zone,
+            directHeuristics.suggestedZone.zone,
+            alternateRoundRobinOne,
+            alternateRoundRobinTwo
+        };
+        drs::engine::reconcileBatchInferredRoundRobinDescriptors(splitRoundRobinPools);
+        require(splitRoundRobinPools[0].roundRobin.has_value()
+                    && splitRoundRobinPools[1].roundRobin.has_value()
+                    && splitRoundRobinPools[2].roundRobin.has_value()
+                    && splitRoundRobinPools[3].roundRobin.has_value(),
+                "Split accepted round-robin pools should remain grouped within each compatible pairing key.");
+        require(splitRoundRobinPools[0].roundRobin->poolId == splitRoundRobinPools[1].roundRobin->poolId
+                    && splitRoundRobinPools[2].roundRobin->poolId == splitRoundRobinPools[3].roundRobin->poolId
+                    && splitRoundRobinPools[0].roundRobin->poolId != splitRoundRobinPools[2].roundRobin->poolId,
+                "Compatible round-robin subgroups should receive distinct pool ids when one inferred pool splits.");
+        require(splitRoundRobinPools[0].roundRobin->slotCount == 2
+                    && splitRoundRobinPools[1].roundRobin->slotCount == 2
+                    && splitRoundRobinPools[2].roundRobin->slotCount == 2
+                    && splitRoundRobinPools[3].roundRobin->slotCount == 2,
+                "Split accepted round-robin pools should be renumbered independently inside each compatible subgroup.");
+
         const auto ambiguousRootInference = drs::engine::inferSampleRootKey(ambiguousPath.generic_string());
         require(!ambiguousRootInference.resolved, "Ambiguous root-key inference should require manual confirmation.");
         require(ambiguousRootInference.source == "manual",

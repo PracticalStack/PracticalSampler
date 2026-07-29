@@ -9,15 +9,20 @@ namespace
 {
 const auto zoneMapGrid = juce::Colour::fromRGB(230, 220, 207);
 const auto zoneMapSelected = juce::Colour::fromRGB(28, 108, 88);
+const auto zoneMapSecondarySelected = juce::Colour::fromRGB(71, 132, 117);
 const auto zoneMapAccent = juce::Colour::fromRGB(181, 96, 21);
 const auto zoneMapSelectedFill = zoneMapSelected.withAlpha(0.62f);
+const auto zoneMapSecondarySelectedFill = zoneMapSecondarySelected.withAlpha(0.46f);
 const auto zoneMapAccentFill = zoneMapAccent.withAlpha(0.5f);
 const auto zoneMapLabelFill = juce::Colour::fromRGBA(20, 25, 31, 168);
 const auto zoneMapOutline = juce::Colour::fromRGBA(24, 29, 33, 92);
 const auto zoneMapFocusRing = juce::Colour::fromRGB(24, 29, 33);
 const auto zoneMapFocusHalo = juce::Colour::fromRGBA(255, 255, 255, 232);
+const auto zoneMapMarqueeFill = zoneMapSelected.withAlpha(0.16f);
+const auto zoneMapMarqueeOutline = zoneMapSelected.withAlpha(0.92f);
 constexpr float rangeHandleRadius = 6.0f;
 constexpr float rangeHandleHitRadius = 12.0f;
+constexpr float marqueeDragThreshold = 4.0f;
 constexpr int deleteSelectedSampleMenuItemId = 1;
 
 bool isSupportedSampleFile(const juce::String& path)
@@ -52,9 +57,26 @@ void ZoneMapCanvas::setZoneSummaries(std::vector<drs::engine::AuthoringZoneSumma
     repaint();
 }
 
+void ZoneMapCanvas::setSelectionState(SelectionState nextSelectionState)
+{
+    selectionState = std::move(nextSelectionState);
+    repaint();
+}
+
+ZoneMapCanvas::SelectionState ZoneMapCanvas::getSelectionState() const
+{
+    return selectionState;
+}
+
 void ZoneMapCanvas::setOnZoneSelectionRequested(std::function<void(const std::string& zoneId)> nextCallback)
 {
     onZoneSelectionRequested = std::move(nextCallback);
+}
+
+void ZoneMapCanvas::setOnZoneSelectionStateRequested(
+    std::function<void(const SelectionState& selectionState)> nextCallback)
+{
+    onZoneSelectionStateRequested = std::move(nextCallback);
 }
 
 void ZoneMapCanvas::setOnZoneRangeCommitRequested(
@@ -115,37 +137,27 @@ void ZoneMapCanvas::filesDropped(const juce::StringArray& files, int, int)
         onSampleFilesDropped(std::move(sampleFiles));
 }
 
-bool ZoneMapCanvas::requestSelectionAt(juce::Point<float> position)
+bool ZoneMapCanvas::requestSelectionAt(juce::Point<float> position, SelectionMode mode)
+{
+    if (activeGesture.has_value() || activeMarqueeGesture.has_value())
+        return false;
+
+    const auto hitZoneIndex = findZoneIndexAt(position);
+    if (!hitZoneIndex.has_value())
+        return false;
+
+    return requestSelectionByIndex(*hitZoneIndex, mode);
+}
+
+bool ZoneMapCanvas::requestSelectionInBounds(juce::Rectangle<float> bounds, SelectionMode mode)
 {
     if (activeGesture.has_value())
         return false;
 
-    const auto zoneLayouts = buildZoneLayouts();
-    std::vector<ZoneLayout> hits;
-
-    for (const auto& layout : zoneLayouts)
-    {
-        if (layout.bounds.contains(position))
-            hits.push_back(layout);
-    }
-
-    if (hits.empty())
+    if (bounds.isEmpty())
         return false;
 
-    std::sort(hits.begin(),
-              hits.end(),
-              [&](const ZoneLayout& left, const ZoneLayout& right)
-              {
-                  const auto leftArea = left.bounds.getWidth() * left.bounds.getHeight();
-                  const auto rightArea = right.bounds.getWidth() * right.bounds.getHeight();
-
-                  if (!juce::approximatelyEqual(leftArea, rightArea))
-                      return leftArea < rightArea;
-
-                  return zoneSummaries[left.index].selected && !zoneSummaries[right.index].selected;
-              });
-
-    return requestSelectionByIndex(hits.front().index);
+    return requestSelectionState(buildSelectionStateForBounds(bounds, mode));
 }
 
 bool ZoneMapCanvas::requestAuditionAt(juce::Point<float> position)
@@ -169,8 +181,17 @@ bool ZoneMapCanvas::requestAuditionAt(juce::Point<float> position)
     // Selection refreshes the authoring view model synchronously, so retain a
     // value copy across that callback instead of a reference into zoneSummaries.
     const auto zone = zoneSummaries[hits.front().index];
-    if (!zone.selected && onZoneSelectionRequested)
-        onZoneSelectionRequested(zone.id);
+    if (zone.id != selectionState.primaryZoneId)
+    {
+        auto nextSelectionState = getSelectionState();
+        if (std::find(nextSelectionState.zoneIds.begin(), nextSelectionState.zoneIds.end(), zone.id)
+            == nextSelectionState.zoneIds.end())
+        {
+            nextSelectionState.zoneIds.push_back(zone.id);
+        }
+        nextSelectionState.primaryZoneId = zone.id;
+        requestSelectionState(nextSelectionState);
+    }
     onZoneAuditionRequested(zone.id, zone.rootKey,
                             std::clamp((zone.velocityLow + zone.velocityHigh) / 2, 1, 127));
     return true;
@@ -178,7 +199,7 @@ bool ZoneMapCanvas::requestAuditionAt(juce::Point<float> position)
 
 bool ZoneMapCanvas::requestDeleteSelectedSample()
 {
-    if (!findSelectedZoneIndex().has_value() || !onDeleteSelectedSampleRequested)
+    if (selectionState.zoneIds.empty() || !onDeleteSelectedSampleRequested)
         return false;
 
     onDeleteSelectedSampleRequested();
@@ -194,7 +215,7 @@ bool ZoneMapCanvas::moveSelection(int direction)
     const auto nextIndex = juce::jlimit(0,
                                         static_cast<int>(zoneSummaries.size()) - 1,
                                         currentIndex + (direction < 0 ? -1 : 1));
-    return requestSelectionByIndex(static_cast<std::size_t>(nextIndex));
+    return requestSelectionByIndex(static_cast<std::size_t>(nextIndex), SelectionMode::replace);
 }
 
 void ZoneMapCanvas::paint(juce::Graphics& g)
@@ -238,26 +259,37 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
             continue;
 
         const auto zoneBounds = layoutIterator->bounds;
-        g.setColour(zone.selected ? zoneMapSelectedFill : zoneMapAccentFill);
+        const auto primarySelected = selectionState.primaryZoneId == zone.id;
+        const auto secondarySelected = !primarySelected
+            && std::find(selectionState.zoneIds.begin(),
+                         selectionState.zoneIds.end(),
+                         zone.id) != selectionState.zoneIds.end();
+        g.setColour(primarySelected
+                        ? zoneMapSelectedFill
+                        : (secondarySelected ? zoneMapSecondarySelectedFill : zoneMapAccentFill));
         g.fillRoundedRectangle(zoneBounds, 8.0f);
 
-        g.setColour(zone.selected ? juce::Colours::white : zoneMapOutline);
-        g.drawRoundedRectangle(zoneBounds.reduced(0.75f), 8.0f, zone.selected ? 2.0f : 1.0f);
+        g.setColour(primarySelected
+                        ? juce::Colours::white
+                        : (secondarySelected ? zoneMapSecondarySelected : zoneMapOutline));
+        g.drawRoundedRectangle(zoneBounds.reduced(0.75f), 8.0f, primarySelected ? 2.0f : 1.2f);
 
         auto labelBounds = zoneBounds.toNearestInt().reduced(6, 4);
         labelBounds.setWidth(std::min(labelBounds.getWidth(), 132));
         labelBounds.setHeight(std::min(labelBounds.getHeight(), 20));
-        g.setColour(zone.selected ? zoneMapLabelFill.brighter(0.12f) : zoneMapLabelFill);
+        g.setColour(primarySelected
+                        ? zoneMapLabelFill.brighter(0.12f)
+                        : (secondarySelected ? zoneMapLabelFill.brighter(0.04f) : zoneMapLabelFill));
         g.fillRoundedRectangle(labelBounds.toFloat(), 5.0f);
 
-        g.setColour(juce::Colours::white.withAlpha(zone.selected ? 1.0f : 0.92f));
+        g.setColour(juce::Colours::white.withAlpha(primarySelected || secondarySelected ? 1.0f : 0.92f));
         g.setFont(juce::FontOptions(12.0f, juce::Font::bold));
         g.drawFittedText(juce::String::fromUTF8(zone.displayName.c_str()),
                          labelBounds.reduced(6, 2),
                          juce::Justification::centredLeft,
                          1);
 
-        if (zone.selected)
+        if (primarySelected)
         {
             const auto handleCenters = buildHandleCenters(zoneBounds);
             for (const auto& [handle, center] : handleCenters)
@@ -293,6 +325,16 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
                          juce::Justification::centred,
                          1);
     }
+
+    if (activeMarqueeGesture.has_value() && activeMarqueeGesture->dragged)
+    {
+        const auto marqueeBounds = juce::Rectangle<float>(activeMarqueeGesture->start,
+                                                          activeMarqueeGesture->current).getSmallestIntegerContainer().toFloat();
+        g.setColour(zoneMapMarqueeFill);
+        g.fillRoundedRectangle(marqueeBounds, 6.0f);
+        g.setColour(zoneMapMarqueeOutline);
+        g.drawRoundedRectangle(marqueeBounds, 6.0f, 1.5f);
+    }
 }
 
 void ZoneMapCanvas::mouseDown(const juce::MouseEvent& event)
@@ -301,13 +343,24 @@ void ZoneMapCanvas::mouseDown(const juce::MouseEvent& event)
     if (event.mods.isPopupMenu())
     {
         cancelActiveRangeGesture();
-        requestSelectionAt(event.position);
+        if (const auto hitZoneIndex = findZoneIndexAt(event.position); hitZoneIndex.has_value())
+        {
+            const auto& hitZoneId = zoneSummaries[*hitZoneIndex].id;
+            if (std::find(selectionState.zoneIds.begin(),
+                          selectionState.zoneIds.end(),
+                          hitZoneId) == selectionState.zoneIds.end())
+            {
+                requestSelectionByIndex(*hitZoneIndex, SelectionMode::replace);
+            }
+        }
         showContextMenuAt(event.getScreenPosition());
         return;
     }
 
     if (!beginRangeGestureAt(event.position))
-        requestSelectionAt(event.position);
+    {
+        activeMarqueeGesture = MarqueeGesture { event.position, event.position, event.mods.isCtrlDown(), false };
+    }
 }
 
 void ZoneMapCanvas::mouseDoubleClick(const juce::MouseEvent& event)
@@ -321,10 +374,11 @@ void ZoneMapCanvas::mouseDoubleClick(const juce::MouseEvent& event)
 
 void ZoneMapCanvas::showContextMenuAt(juce::Point<int> screenPosition)
 {
+    const auto selectionCount = selectionState.zoneIds.size();
     juce::PopupMenu menu;
     menu.addItem(deleteSelectedSampleMenuItemId,
-                 "Delete Selected Sample",
-                 findSelectedZoneIndex().has_value() && onDeleteSelectedSampleRequested != nullptr);
+                 selectionCount > 1 ? "Delete Selected Zones" : "Delete Selected Sample",
+                 selectionCount > 0 && onDeleteSelectedSampleRequested != nullptr);
 
     auto safeThis = juce::Component::SafePointer<ZoneMapCanvas>(this);
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea(
@@ -338,12 +392,49 @@ void ZoneMapCanvas::showContextMenuAt(juce::Point<int> screenPosition)
 
 void ZoneMapCanvas::mouseDrag(const juce::MouseEvent& event)
 {
-    updateActiveRangeGesture(event.position);
+    if (activeGesture.has_value())
+    {
+        updateActiveRangeGesture(event.position);
+        return;
+    }
+
+    if (!activeMarqueeGesture.has_value())
+        return;
+
+    activeMarqueeGesture->current = event.position;
+    if (!activeMarqueeGesture->dragged
+        && activeMarqueeGesture->start.getDistanceFrom(activeMarqueeGesture->current) >= marqueeDragThreshold)
+    {
+        activeMarqueeGesture->dragged = true;
+    }
+    repaint();
 }
 
 void ZoneMapCanvas::mouseUp(const juce::MouseEvent& event)
 {
-    endActiveRangeGesture(event.position);
+    if (activeGesture.has_value())
+    {
+        endActiveRangeGesture(event.position);
+        return;
+    }
+
+    if (!activeMarqueeGesture.has_value())
+        return;
+
+    const auto gesture = *activeMarqueeGesture;
+    activeMarqueeGesture.reset();
+    repaint();
+
+    if (gesture.dragged)
+    {
+        const auto marqueeBounds = juce::Rectangle<float>(gesture.start, gesture.current);
+        requestSelectionInBounds(marqueeBounds,
+                                 gesture.ctrlDown ? SelectionMode::additive : SelectionMode::replace);
+        return;
+    }
+
+    requestSelectionAt(event.position,
+                       gesture.ctrlDown ? SelectionMode::toggle : SelectionMode::replace);
 }
 
 bool ZoneMapCanvas::keyPressed(const juce::KeyPress& key)
@@ -420,9 +511,12 @@ std::vector<std::size_t> ZoneMapCanvas::buildPaintOrder() const
 
     for (std::size_t index = 0; index < zoneSummaries.size(); ++index)
     {
-        if (!zoneSummaries[index].selected)
+        if (!zoneSummaries[index].selected && !zoneSummaries[index].additionallySelected)
             order.push_back(index);
     }
+
+    for (const auto selectedIndex : findSecondarySelectedZoneIndices())
+        order.push_back(selectedIndex);
 
     if (const auto selectedIndex = findSelectedZoneIndex(); selectedIndex.has_value())
         order.push_back(*selectedIndex);
@@ -430,8 +524,51 @@ std::vector<std::size_t> ZoneMapCanvas::buildPaintOrder() const
     return order;
 }
 
+std::optional<std::size_t> ZoneMapCanvas::findZoneIndexAt(juce::Point<float> position) const
+{
+    const auto zoneLayouts = buildZoneLayouts();
+    std::vector<ZoneLayout> hits;
+
+    for (const auto& layout : zoneLayouts)
+    {
+        if (layout.bounds.contains(position))
+            hits.push_back(layout);
+    }
+
+    if (hits.empty())
+        return std::nullopt;
+
+    std::sort(hits.begin(),
+              hits.end(),
+              [&](const ZoneLayout& left, const ZoneLayout& right)
+              {
+                  const auto leftArea = left.bounds.getWidth() * left.bounds.getHeight();
+                  const auto rightArea = right.bounds.getWidth() * right.bounds.getHeight();
+
+                  if (!juce::approximatelyEqual(leftArea, rightArea))
+                      return leftArea < rightArea;
+
+                  return zoneSummaries[left.index].id == selectionState.primaryZoneId
+                      && zoneSummaries[right.index].id != selectionState.primaryZoneId;
+              });
+
+    return hits.front().index;
+}
+
 std::optional<std::size_t> ZoneMapCanvas::findSelectedZoneIndex() const
 {
+    if (!selectionState.primaryZoneId.empty())
+    {
+        const auto iterator = std::find_if(zoneSummaries.begin(),
+                                           zoneSummaries.end(),
+                                           [&](const auto& zone)
+                                           {
+                                               return zone.id == selectionState.primaryZoneId;
+                                           });
+        if (iterator != zoneSummaries.end())
+            return static_cast<std::size_t>(std::distance(zoneSummaries.begin(), iterator));
+    }
+
     for (std::size_t index = 0; index < zoneSummaries.size(); ++index)
     {
         if (getDisplayZoneSummary(index).selected)
@@ -439,6 +576,37 @@ std::optional<std::size_t> ZoneMapCanvas::findSelectedZoneIndex() const
     }
 
     return std::nullopt;
+}
+
+std::vector<std::size_t> ZoneMapCanvas::findSecondarySelectedZoneIndices() const
+{
+    std::vector<std::size_t> indices;
+    if (!selectionState.zoneIds.empty())
+    {
+        for (std::size_t index = 0; index < zoneSummaries.size(); ++index)
+        {
+            const auto& zoneId = zoneSummaries[index].id;
+            if (zoneId == selectionState.primaryZoneId)
+                continue;
+
+            if (std::find(selectionState.zoneIds.begin(),
+                          selectionState.zoneIds.end(),
+                          zoneId) != selectionState.zoneIds.end())
+            {
+                indices.push_back(index);
+            }
+        }
+
+        return indices;
+    }
+
+    for (std::size_t index = 0; index < zoneSummaries.size(); ++index)
+    {
+        if (getDisplayZoneSummary(index).additionallySelected)
+            indices.push_back(index);
+    }
+
+    return indices;
 }
 
 std::vector<std::pair<ZoneMapCanvas::RangeHandle, juce::Point<float>>>
@@ -519,7 +687,122 @@ int ZoneMapCanvas::positionToMidiVelocity(juce::Point<float> position) const
     return juce::jlimit(1, 127, static_cast<int>(std::lround((1.0f - proportion) * 127.0f)));
 }
 
-bool ZoneMapCanvas::requestSelectionByIndex(std::size_t index)
+ZoneMapCanvas::SelectionState ZoneMapCanvas::buildSelectionStateForZoneIndex(std::size_t index,
+                                                                             SelectionMode mode) const
+{
+    SelectionState nextSelectionState = getSelectionState();
+    if (index >= zoneSummaries.size())
+        return nextSelectionState;
+
+    const auto& zoneId = zoneSummaries[index].id;
+    const auto selectedIterator = std::find(nextSelectionState.zoneIds.begin(),
+                                            nextSelectionState.zoneIds.end(),
+                                            zoneId);
+    const auto alreadySelected = selectedIterator != nextSelectionState.zoneIds.end();
+
+    switch (mode)
+    {
+        case SelectionMode::replace:
+            nextSelectionState.zoneIds = { zoneId };
+            nextSelectionState.primaryZoneId = zoneId;
+            break;
+        case SelectionMode::toggle:
+            if (alreadySelected)
+            {
+                if (nextSelectionState.zoneIds.size() == 1)
+                    break;
+
+                nextSelectionState.zoneIds.erase(selectedIterator);
+                if (nextSelectionState.primaryZoneId == zoneId)
+                    nextSelectionState.primaryZoneId = nextSelectionState.zoneIds.front();
+            }
+            else
+            {
+                nextSelectionState.zoneIds.push_back(zoneId);
+                nextSelectionState.primaryZoneId = zoneId;
+            }
+            break;
+        case SelectionMode::additive:
+            if (!alreadySelected)
+                nextSelectionState.zoneIds.push_back(zoneId);
+            if (nextSelectionState.primaryZoneId.empty())
+                nextSelectionState.primaryZoneId = zoneId;
+            break;
+    }
+
+    return nextSelectionState;
+}
+
+ZoneMapCanvas::SelectionState ZoneMapCanvas::buildSelectionStateForBounds(juce::Rectangle<float> bounds,
+                                                                          SelectionMode mode) const
+{
+    SelectionState nextSelectionState = getSelectionState();
+    std::vector<std::string> hitZoneIds;
+    const auto layouts = buildZoneLayouts();
+
+    for (const auto& layout : layouts)
+    {
+        if (layout.bounds.intersects(bounds))
+            hitZoneIds.push_back(zoneSummaries[layout.index].id);
+    }
+
+    if (hitZoneIds.empty())
+        return nextSelectionState;
+
+    switch (mode)
+    {
+        case SelectionMode::replace:
+            nextSelectionState.zoneIds = hitZoneIds;
+            if (nextSelectionState.primaryZoneId.empty()
+                || std::find(hitZoneIds.begin(), hitZoneIds.end(), nextSelectionState.primaryZoneId)
+                    == hitZoneIds.end())
+            {
+                nextSelectionState.primaryZoneId = hitZoneIds.front();
+            }
+            break;
+        case SelectionMode::additive:
+        {
+            for (const auto& zoneId : hitZoneIds)
+            {
+                if (std::find(nextSelectionState.zoneIds.begin(),
+                              nextSelectionState.zoneIds.end(),
+                              zoneId) == nextSelectionState.zoneIds.end())
+                {
+                    nextSelectionState.zoneIds.push_back(zoneId);
+                }
+            }
+            if (nextSelectionState.primaryZoneId.empty())
+                nextSelectionState.primaryZoneId = hitZoneIds.front();
+            break;
+        }
+        case SelectionMode::toggle:
+            for (const auto& zoneId : hitZoneIds)
+            {
+                const auto iterator = std::find(nextSelectionState.zoneIds.begin(),
+                                                nextSelectionState.zoneIds.end(),
+                                                zoneId);
+                if (iterator == nextSelectionState.zoneIds.end())
+                {
+                    nextSelectionState.zoneIds.push_back(zoneId);
+                    continue;
+                }
+
+                if (nextSelectionState.zoneIds.size() == 1)
+                    continue;
+
+                nextSelectionState.zoneIds.erase(iterator);
+                if (nextSelectionState.primaryZoneId == zoneId && !nextSelectionState.zoneIds.empty())
+                    nextSelectionState.primaryZoneId = nextSelectionState.zoneIds.front();
+            }
+            if (nextSelectionState.primaryZoneId.empty() && !nextSelectionState.zoneIds.empty())
+                nextSelectionState.primaryZoneId = nextSelectionState.zoneIds.front();
+            break;
+    }
+
+    return nextSelectionState;
+}
+
+bool ZoneMapCanvas::requestSelectionByIndex(std::size_t index, SelectionMode mode)
 {
     if (activeGesture.has_value())
         return false;
@@ -527,13 +810,27 @@ bool ZoneMapCanvas::requestSelectionByIndex(std::size_t index)
     if (index >= zoneSummaries.size())
         return false;
 
-    if (zoneSummaries[index].selected)
+    return requestSelectionState(buildSelectionStateForZoneIndex(index, mode));
+}
+
+bool ZoneMapCanvas::requestSelectionState(const SelectionState& nextSelectionState)
+{
+    if (nextSelectionState.zoneIds.empty() || nextSelectionState.primaryZoneId.empty())
         return false;
 
-    if (onZoneSelectionRequested)
-        onZoneSelectionRequested(zoneSummaries[index].id);
+    if (onZoneSelectionStateRequested)
+    {
+        onZoneSelectionStateRequested(nextSelectionState);
+        return true;
+    }
 
-    return onZoneSelectionRequested != nullptr;
+    if (onZoneSelectionRequested && nextSelectionState.primaryZoneId != selectionState.primaryZoneId)
+    {
+        onZoneSelectionRequested(nextSelectionState.primaryZoneId);
+        return true;
+    }
+
+    return false;
 }
 
 bool ZoneMapCanvas::beginRangeGestureAt(juce::Point<float> position)

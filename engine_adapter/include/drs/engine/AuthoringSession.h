@@ -28,6 +28,7 @@ struct AuthoringZoneSummary
     int roundRobinPosition = 0;
     ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;
     bool selected = false;
+    bool additionallySelected = false;
 };
 
 struct AuthoringZonePreviewRequest
@@ -92,6 +93,8 @@ public:
     RuntimeProjectDocumentActionResult addCompatibleZonesToSelectedGroupRoundRobinPool(const std::string& label);
     RuntimeProjectDocumentActionResult normalizeSelectedGroupRoundRobinPool(const std::string& label);
     RuntimeProjectDocumentActionResult removeSelectedGroupAnchorFromRoundRobinPool(const std::string& label);
+    RuntimeProjectDocumentActionResult deleteZones(const std::vector<std::string>& zoneIds,
+                                                   const std::string& label);
     RuntimeProjectDocumentActionResult deleteSelectedSample();
     RuntimeProjectDocumentActionResult appendImportedContent(std::vector<RuntimeProjectSampleSource> sampleSources,
                                                             std::vector<RuntimeProjectZoneDefinition> zones,

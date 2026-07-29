@@ -884,17 +884,13 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         previewSelectedZone(drs::engine::AuthoringPreviewAuditionSource::inspector);
     };
     zoneMappingEditor.setCallbacks(std::move(zoneCallbacks));
-    zoneMap.setOnZoneSelectionRequested([this](const std::string& zoneId)
+    zoneMap.setOnZoneSelectionStateRequested([this](const authoring::ZoneMapCanvas::SelectionState& selectionState)
     {
         if (isRefreshing)
             return;
 
-        const auto selectedZone = authoringSession.getSelectedZone();
-        if (selectedZone.has_value() && selectedZone->id == zoneId)
-            return;
-
-        authoringSession.selectZone(zoneId);
-        refreshFromSession();
+        if (applyZoneMapSelectionState(selectionState))
+            refreshFromSession();
     });
     zoneMap.setOnZoneAuditionRequested([this](const std::string& zoneId,
                                                int midiNote,
@@ -913,7 +909,10 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         if (isRefreshing)
             return;
 
-        const auto result = authoringSession.deleteSelectedSample();
+        const auto result = authoringSession.deleteZones(zoneMapSelectedZoneIds,
+                                                         zoneMapSelectedZoneIds.size() > 1
+                                                             ? "Delete selected zones"
+                                                             : "Delete selected sample");
         if (result.applied)
             refreshFromSession();
     });
@@ -1434,7 +1433,7 @@ void AuthoringPanel::configureAccessibilityAndFocus()
     configureAccessibleMetadata(zoneMap,
                                 "Zone map",
                                 "Displays project zones across key and velocity ranges.",
-                                "Use arrow keys to move selection, drag handles to edit ranges, or right-click to delete the selected sample.");
+                                "Use arrow keys to move the primary selection, hold Control to toggle extra zones, drag a box to multi-select, drag handles to edit ranges, or right-click to delete the selected sample.");
     zoneMap.setExplicitFocusOrder(30);
 
     configureAccessibleMetadata(drawerRegion,
@@ -1836,12 +1835,24 @@ void AuthoringPanel::resized()
     drawerPerformanceTabButton.setBounds(tabArea.removeFromLeft(tabWidth + (expanded ? 8 : 2)));
 
     auto drawerEditorArea = drawerContentHost.getBounds().reduced(12, 10);
-    waveformLabel.setBounds(drawerEditorArea.removeFromTop(22));
-    drawerEditorArea.removeFromTop(2);
-    waveformScopeLabel.setBounds(drawerEditorArea.removeFromTop(14));
-    drawerEditorArea.removeFromTop(1);
-    drawerBreadcrumbLabel.setBounds(drawerEditorArea.removeFromTop(14));
-    drawerEditorArea.removeFromTop(3);
+    if (drawerState.activeTab == authoring::DrawerTab::groups)
+    {
+        auto headingRow = drawerEditorArea.removeFromTop(22);
+        waveformLabel.setBounds(headingRow.removeFromLeft(std::min(160, headingRow.getWidth())));
+        waveformScopeLabel.setBounds(headingRow);
+        drawerEditorArea.removeFromTop(1);
+        drawerBreadcrumbLabel.setBounds(drawerEditorArea.removeFromTop(14));
+        drawerEditorArea.removeFromTop(3);
+    }
+    else
+    {
+        waveformLabel.setBounds(drawerEditorArea.removeFromTop(22));
+        drawerEditorArea.removeFromTop(2);
+        waveformScopeLabel.setBounds(drawerEditorArea.removeFromTop(14));
+        drawerEditorArea.removeFromTop(1);
+        drawerBreadcrumbLabel.setBounds(drawerEditorArea.removeFromTop(14));
+        drawerEditorArea.removeFromTop(3);
+    }
 
     if (drawerState.activeTab == authoring::DrawerTab::waveform)
     {
@@ -1896,18 +1907,16 @@ void AuthoringPanel::resized()
                                    groupAnchorSelector,
                                    96);
         drawerEditorArea.removeFromTop(2);
-        groupSummaryLabel.setBounds(drawerEditorArea.removeFromTop(summaryRowHeight));
-        drawerEditorArea.removeFromTop(2);
-        groupRoundRobinLabel.setBounds(drawerEditorArea.removeFromTop(summaryRowHeight));
-        drawerEditorArea.removeFromTop(2);
-        groupRoundRobinHintLabel.setBounds(expanded
-                                               ? drawerEditorArea.removeFromTop(20)
-                                               : juce::Rectangle<int> {});
-        const auto showTwoActionRows = expanded
-            && drawerEditorArea.getHeight() >= actionRowHeight * 2 + 2;
-        if (showTwoActionRows)
+        auto summaryRow = drawerEditorArea.removeFromTop(summaryRowHeight);
+        auto groupSummaryArea = summaryRow.removeFromLeft((summaryRow.getWidth() - 12) / 2);
+        summaryRow.removeFromLeft(12);
+        groupSummaryLabel.setBounds(groupSummaryArea);
+        groupRoundRobinLabel.setBounds(summaryRow);
+        groupRoundRobinHintLabel.setBounds({});
+        drawerEditorArea.removeFromTop(4);
+
+        if (expanded)
         {
-            drawerEditorArea.removeFromTop(2);
             auto actionRow = drawerEditorArea.removeFromTop(actionRowHeight);
             auto leftAction = actionRow.removeFromLeft((actionRow.getWidth() - 8) / 2);
             actionRow.removeFromLeft(8);
@@ -2286,6 +2295,13 @@ authoring::SelectionSummaryViewModel AuthoringPanel::buildSelectionSummaryViewMo
         viewModel.canRestoreRootKey = true;
     }
 
+    const auto mapSelectionCount = getZoneMapSelectionCount();
+    if (mapSelectionCount > 1)
+    {
+        viewModel.statusText += " | map selection=" + std::to_string(mapSelectionCount);
+        viewModel.playbackText += " | inspector edits primary zone";
+    }
+
     return viewModel;
 }
 
@@ -2650,7 +2666,7 @@ void AuthoringPanel::refreshDrawerVisibility()
     setVisibleAndAccessible(groupDeleteButton, drawerContentVisible && groupsTab);
     setVisibleAndAccessible(groupSummaryLabel, drawerContentVisible && groupsTab);
     setVisibleAndAccessible(groupRoundRobinLabel, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(groupRoundRobinHintLabel, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupRoundRobinHintLabel, false);
     setVisibleAndAccessible(groupCreateRoundRobinPoolButton, drawerContentVisible && groupsTab);
     setVisibleAndAccessible(groupAddCompatibleZonesButton, drawerContentVisible && groupsTab);
     setVisibleAndAccessible(groupNormalizeRoundRobinPoolButton, drawerContentVisible && groupsTab);
@@ -3373,7 +3389,12 @@ void AuthoringPanel::refreshFromSession()
     rebuildRoutingBusSelector();
     rebuildPerformanceBankSelector();
     rebuildTriggerSlotSelector();
+    syncZoneMapSelectionState();
     zoneMap.setZoneSummaries(buildVisibleZoneSummaries());
+    zoneMap.setSelectionState({ zoneMapSelectedZoneIds,
+                                authoringSession.getSelectedZone().has_value()
+                                    ? authoringSession.getSelectedZone()->id
+                                    : std::string {} });
 
     const auto& project = authoringSession.getProject();
     selectionSummaryViewModel = buildSelectionSummaryViewModel();
@@ -3484,6 +3505,8 @@ void AuthoringPanel::refreshFromSession()
                 ? "Choose an audition anchor before managing group-owned Round Robin actions."
                 : "Group RR actions use the selected group's audition anchor and preserve exact-match compatibility.",
             juce::dontSendNotification);
+        groupSummaryLabel.setTooltip(groupSummaryLabel.getText());
+        groupRoundRobinLabel.setTooltip(groupRoundRobinLabel.getText() + "\n" + groupRoundRobinHintLabel.getText());
         groupCreateRoundRobinPoolButton.setButtonText(anchorZonePooled ? "Split RR Pool" : "New RR Pool");
         groupCreateRoundRobinPoolButton.setEnabled(!selectedGroup->auditionAnchorZoneId.empty());
         groupAddCompatibleZonesButton.setEnabled(!selectedGroup->auditionAnchorZoneId.empty()
@@ -3503,6 +3526,8 @@ void AuthoringPanel::refreshFromSession()
         groupRoundRobinLabel.setText("Round Robin unavailable until a group is selected.", juce::dontSendNotification);
         groupRoundRobinHintLabel.setText("Create or select a group to inspect its visibility, routing, and RR entry points.",
                                          juce::dontSendNotification);
+        groupSummaryLabel.setTooltip(groupSummaryLabel.getText());
+        groupRoundRobinLabel.setTooltip(groupRoundRobinLabel.getText() + "\n" + groupRoundRobinHintLabel.getText());
         groupVisibilityHintLabel.setText("No group is selected.", juce::dontSendNotification);
         groupVisibilityButton.setButtonText("Hide Group");
         groupVisibilityButton.setEnabled(false);
@@ -4066,16 +4091,24 @@ std::vector<drs::engine::AuthoringZoneSummary> AuthoringPanel::buildVisibleZoneS
 {
     const auto zoneSummaries = authoringSession.getZoneSummaries();
     const auto& project = authoringSession.getProject();
+    const auto selectedZone = authoringSession.getSelectedZone();
     std::vector<drs::engine::AuthoringZoneSummary> visibleZones;
     visibleZones.reserve(zoneSummaries.size());
 
     for (const auto& zone : zoneSummaries)
     {
+        auto visibleZone = zone;
+        visibleZone.selected = selectedZone.has_value() && selectedZone->id == zone.id;
+        visibleZone.additionallySelected
+            = std::find(zoneMapSelectedZoneIds.begin(), zoneMapSelectedZoneIds.end(), zone.id)
+            != zoneMapSelectedZoneIds.end()
+            && !visibleZone.selected;
+
         const auto projectZoneIterator = std::find_if(project.authoring.zones.begin(),
                                                       project.authoring.zones.end(),
                                                       [&](const auto& projectZone)
                                                       {
-                                                          return projectZone.id == zone.id;
+                                                          return projectZone.id == visibleZone.id;
                                                       });
         const auto groupIterator = projectZoneIterator == project.authoring.zones.end()
             ? project.authoring.groups.end()
@@ -4085,11 +4118,115 @@ std::vector<drs::engine::AuthoringZoneSummary> AuthoringPanel::buildVisibleZoneS
                            {
                                return group.id == projectZoneIterator->groupId;
                            });
-        if (groupIterator == project.authoring.groups.end() || groupIterator->workspaceVisible || zone.selected)
-            visibleZones.push_back(zone);
+        if (groupIterator == project.authoring.groups.end()
+            || groupIterator->workspaceVisible
+            || visibleZone.selected
+            || visibleZone.additionallySelected)
+        {
+            visibleZones.push_back(std::move(visibleZone));
+        }
     }
 
     return visibleZones;
+}
+
+void AuthoringPanel::syncZoneMapSelectionState()
+{
+    const auto selectedZone = authoringSession.getSelectedZone();
+    if (!selectedZone.has_value())
+    {
+        zoneMapSelectedZoneIds.clear();
+        return;
+    }
+
+    if (std::find(zoneMapSelectedZoneIds.begin(),
+                  zoneMapSelectedZoneIds.end(),
+                  selectedZone->id) == zoneMapSelectedZoneIds.end())
+    {
+        zoneMapSelectedZoneIds = { selectedZone->id };
+        return;
+    }
+
+    std::vector<std::string> normalizedSelectionIds { selectedZone->id };
+    normalizedSelectionIds.reserve(zoneMapSelectedZoneIds.size());
+
+    for (const auto& zone : authoringSession.getProject().authoring.zones)
+    {
+        if (zone.id == selectedZone->id)
+            continue;
+
+        if (std::find(zoneMapSelectedZoneIds.begin(), zoneMapSelectedZoneIds.end(), zone.id)
+            != zoneMapSelectedZoneIds.end())
+        {
+            normalizedSelectionIds.push_back(zone.id);
+        }
+    }
+
+    zoneMapSelectedZoneIds = std::move(normalizedSelectionIds);
+}
+
+bool AuthoringPanel::applyZoneMapSelectionState(const authoring::ZoneMapCanvas::SelectionState& selectionState)
+{
+    const auto& zones = authoringSession.getProject().authoring.zones;
+    std::vector<std::string> normalizedSelectionIds;
+    normalizedSelectionIds.reserve(selectionState.zoneIds.size());
+
+    for (const auto& requestedZoneId : selectionState.zoneIds)
+    {
+        const auto exists = std::any_of(zones.begin(),
+                                        zones.end(),
+                                        [&](const auto& zone)
+                                        {
+                                            return zone.id == requestedZoneId;
+                                        });
+        if (!exists)
+            continue;
+
+        if (std::find(normalizedSelectionIds.begin(),
+                      normalizedSelectionIds.end(),
+                      requestedZoneId) == normalizedSelectionIds.end())
+        {
+            normalizedSelectionIds.push_back(requestedZoneId);
+        }
+    }
+
+    if (normalizedSelectionIds.empty())
+        return false;
+
+    auto primaryZoneId = selectionState.primaryZoneId;
+    if (std::find(normalizedSelectionIds.begin(),
+                  normalizedSelectionIds.end(),
+                  primaryZoneId) == normalizedSelectionIds.end())
+    {
+        primaryZoneId = normalizedSelectionIds.front();
+    }
+
+    normalizedSelectionIds.erase(std::remove(normalizedSelectionIds.begin(),
+                                             normalizedSelectionIds.end(),
+                                             primaryZoneId),
+                                 normalizedSelectionIds.end());
+    normalizedSelectionIds.insert(normalizedSelectionIds.begin(), primaryZoneId);
+
+    const auto currentSelectedZone = authoringSession.getSelectedZone();
+    const auto currentPrimaryZoneId = currentSelectedZone.has_value() ? currentSelectedZone->id : std::string {};
+    const auto selectionChanged = zoneMapSelectedZoneIds != normalizedSelectionIds;
+    const auto primaryChanged = currentPrimaryZoneId != primaryZoneId;
+
+    zoneMapSelectedZoneIds = normalizedSelectionIds;
+
+    if (primaryChanged)
+    {
+        const auto result = authoringSession.selectZone(primaryZoneId);
+        if (!result.applied)
+            return selectionChanged;
+    }
+
+    return selectionChanged || primaryChanged;
+}
+
+std::size_t AuthoringPanel::getZoneMapSelectionCount() const
+{
+    return zoneMapSelectedZoneIds.size();
 }
 
 void AuthoringPanel::applySelectedMacroEdit(const juce::String& label)

@@ -186,6 +186,7 @@ SampleRootKeyInferenceResult inferSampleRootKey(const std::string& samplePath,
                                                 const ImportedSampleMetadata* metadata = nullptr);
 ParsedSampleFilenameHeuristics parseSampleFilenameHeuristics(const std::string& samplePath,
                                                              const ImportedSampleMetadata* metadata = nullptr);
+void reconcileBatchInferredRoundRobinDescriptors(std::vector<RuntimeProjectZoneDefinition>& zones);
 AuthoringImportQueue createAuthoringImportQueue(const std::vector<std::string>& samplePaths,
                                                 const std::string& contentRootPath);
 AuthoringImportProcessResult processNextAuthoringImportQueueItem(AuthoringImportQueue& queue);

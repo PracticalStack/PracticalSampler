@@ -396,6 +396,20 @@ juce::Point<float> computeZoneMapPoint(const juce::Component& zoneMap,
     return {x + (width * 0.5f), y + (height * 0.5f)};
 }
 
+juce::Rectangle<float> computeZoneMapBounds(const juce::Component& zoneMap,
+                                            const drs::engine::AuthoringZoneSummary& zone)
+{
+    const auto inner = zoneMap.getLocalBounds().toFloat().reduced(12.0f);
+    const auto x = inner.getX() + inner.getWidth() * (static_cast<float>(zone.keyLow) / 127.0f);
+    const auto width = std::max(10.0f,
+                                inner.getWidth() * (static_cast<float>(zone.keyHigh - zone.keyLow + 1) / 128.0f));
+    const auto normalizedVelocityLow = 1.0f - (static_cast<float>(zone.velocityHigh) / 127.0f);
+    const auto normalizedVelocityHigh = 1.0f - (static_cast<float>(zone.velocityLow) / 127.0f);
+    const auto y = inner.getY() + inner.getHeight() * normalizedVelocityLow;
+    const auto height = std::max(14.0f, inner.getHeight() * (normalizedVelocityHigh - normalizedVelocityLow));
+    return {x, y, width, height};
+}
+
 drs::engine::AuthoringZoneSummary makeZoneSummary(const drs::engine::RuntimeProjectZoneDefinition& zone)
 {
     drs::engine::AuthoringZoneSummary summary;
@@ -2308,7 +2322,14 @@ void exerciseMapSelectionBehavior(drs::app::AuthoringPanel& panel,
                                           {
                                               return zone.id == "pad-a3-high";
                                           });
+    const auto padLowIterator = std::find_if(summaries.begin(),
+                                             summaries.end(),
+                                             [](const auto& zone)
+                                             {
+                                                 return zone.id == "pad-a3-low";
+                                             });
     require(padIterator != summaries.end(), "Map selection checks require the pad-a3-high zone.");
+    require(padLowIterator != summaries.end(), "Map selection checks require the pad-a3-low zone.");
 
     const auto padIndex = static_cast<int>(std::distance(summaries.begin(), padIterator));
     require(zoneMap.requestSelectionAt(computeZoneMapPoint(zoneMap, *padIterator)),
@@ -2324,11 +2345,57 @@ void exerciseMapSelectionBehavior(drs::app::AuthoringPanel& panel,
                                                + juce::String::fromUTF8(session.getSelectedZone()->sampleSourceId.c_str())),
             "Summary strip should refresh its sample-source text after map click selection.");
 
+    const auto padLowIndex = static_cast<int>(std::distance(summaries.begin(), padLowIterator));
+    require(zoneMap.requestSelectionAt(computeZoneMapPoint(zoneMap, *padLowIterator),
+                                       drs::app::authoring::ZoneMapCanvas::SelectionMode::toggle),
+            "Control-style zone-map selection should add another zone into the map selection.");
+    auto selectionState = zoneMap.getSelectionState();
+    require(session.getSelectedZone()->id == "pad-a3-low"
+                && selectionState.primaryZoneId == "pad-a3-low"
+                && selectionState.zoneIds.size() == 2
+                && std::find(selectionState.zoneIds.begin(), selectionState.zoneIds.end(), "pad-a3-high")
+                    != selectionState.zoneIds.end(),
+            "Control-style zone-map selection should retarget the primary zone while preserving prior map selections.");
+    require(zoneSelector.getSelectedId() == padLowIndex + 1,
+            "Zone selector should stay synchronized with control-style map selection changes.");
+
+    require(zoneMap.requestSelectionAt(computeZoneMapPoint(zoneMap, *padIterator),
+                                       drs::app::authoring::ZoneMapCanvas::SelectionMode::toggle),
+            "Control-style zone-map selection should remove a secondary zone when toggled again.");
+    selectionState = zoneMap.getSelectionState();
+    require(selectionState.zoneIds.size() == 1
+                && selectionState.primaryZoneId == "pad-a3-low"
+                && selectionState.zoneIds.front() == "pad-a3-low",
+            "Toggling a secondary zone should remove it while preserving the primary selection.");
+
+    const auto marqueeBounds = computeZoneMapBounds(zoneMap, *padIterator)
+        .getUnion(computeZoneMapBounds(zoneMap, *padLowIterator))
+        .expanded(6.0f);
+    require(zoneMap.requestSelectionInBounds(marqueeBounds),
+            "Zone map should support marquee selection across multiple zone bounds.");
+    selectionState = zoneMap.getSelectionState();
+    std::string marqueeSelectionDescription = "primary=" + selectionState.primaryZoneId
+        + " count=" + std::to_string(selectionState.zoneIds.size());
+    for (const auto& zoneId : selectionState.zoneIds)
+        marqueeSelectionDescription += " | " + zoneId;
+    require(selectionState.zoneIds.size() >= 2
+                && selectionState.primaryZoneId == "pad-a3-low"
+                && std::find(selectionState.zoneIds.begin(), selectionState.zoneIds.end(), "pad-a3-high")
+                    != selectionState.zoneIds.end()
+                && std::find(selectionState.zoneIds.begin(), selectionState.zoneIds.end(), "pad-a3-low")
+                    != selectionState.zoneIds.end(),
+            "Marquee selection should select every intersecting zone while preserving the in-bounds primary zone. Actual: "
+                + marqueeSelectionDescription);
+
     require(zoneMap.keyPressed(juce::KeyPress(juce::KeyPress::rightKey)),
             "Zone map should accept right-arrow keyboard navigation.");
-    require(session.getSelectedZone()->id == "lead-a4-sustain",
-            "Zone map keyboard navigation should advance to the next zone.");
-    require(zoneSelector.getSelectedId() == static_cast<int>(summaries.size()),
+    require(session.getSelectedZone()->id == "pad-a3-high",
+            "Zone map keyboard navigation should advance from the current primary zone.");
+    selectionState = zoneMap.getSelectionState();
+    require(selectionState.zoneIds.size() == 1
+                && selectionState.primaryZoneId == "pad-a3-high",
+            "Keyboard navigation should collapse a multi-selection back to the new primary zone.");
+    require(zoneSelector.getSelectedId() == padIndex + 1,
             "Zone selector should stay synchronized with map keyboard navigation.");
     require(static_cast<int>(rootKeySlider.getValue()) == session.getSelectedZone()->rootKey,
             "Zone inspector should refresh after keyboard-driven map selection changes.");
@@ -2336,8 +2403,8 @@ void exerciseMapSelectionBehavior(drs::app::AuthoringPanel& panel,
                                            "Sample source: "
                                                + juce::String::fromUTF8(session.getSelectedZone()->sampleSourceId.c_str())),
             "Summary strip should refresh after keyboard-driven map selection changes.");
-    require(session.getDocumentState().undoDepth == initialUndoDepth + 2,
-            "Map click and keyboard selection should each create one selection transaction.");
+    require(session.getDocumentState().undoDepth == initialUndoDepth + 3,
+            "Map click, control-toggle primary changes, and keyboard selection should each create one selection transaction.");
 
     const auto selectedZoneBeforeDrag = makeZoneSummary(*session.getSelectedZone());
     const auto keyLowHandle = computeZoneMapHandlePoint(zoneMap,
@@ -2354,7 +2421,7 @@ void exerciseMapSelectionBehavior(drs::app::AuthoringPanel& panel,
             "Zone map should finish a key-range gesture on release.");
     require(!zoneMap.isRangeGestureActive(),
             "Zone map should clear its active gesture state after commit.");
-    require(session.getDocumentState().undoDepth == initialUndoDepth + 3,
+    require(session.getDocumentState().undoDepth == initialUndoDepth + 4,
             "Completing one map range drag should create exactly one additional undo transaction.");
     require(session.getSelectedZone()->keyLow == 72,
             "Zone map key-range drags should persist the committed low-key boundary.");
@@ -2376,7 +2443,7 @@ void exerciseMapSelectionBehavior(drs::app::AuthoringPanel& panel,
             "Zone map should cancel an in-flight drag without committing.");
     require(!zoneMap.isRangeGestureActive(),
             "Zone map should clear its active gesture state after cancel.");
-    require(session.getDocumentState().undoDepth == initialUndoDepth + 3,
+    require(session.getDocumentState().undoDepth == initialUndoDepth + 4,
             "Cancelling a map range drag should not create a new undo transaction.");
     require(session.getSelectedZone()->velocityLow == zoneBeforeCancel.velocityLow,
             "Cancelling a map range drag should preserve the original velocity range.");
@@ -2745,16 +2812,64 @@ int main()
             exerciseHostedFocusTransitions(panel, shellName);
 
             auto& contextMenuZoneMap = requireZoneMapCanvas(panel, "authoringZoneMap");
+            const auto contextMenuSummaries = session.getZoneSummaries();
+            const auto contextPadHigh = std::find_if(contextMenuSummaries.begin(),
+                                                     contextMenuSummaries.end(),
+                                                     [](const auto& zone)
+                                                     {
+                                                         return zone.id == "pad-a3-high";
+                                                     });
+            const auto contextPadLow = std::find_if(contextMenuSummaries.begin(),
+                                                    contextMenuSummaries.end(),
+                                                    [](const auto& zone)
+                                                    {
+                                                        return zone.id == "pad-a3-low";
+                                                    });
+            require(contextPadHigh != contextMenuSummaries.end() && contextPadLow != contextMenuSummaries.end(),
+                    "Context-menu deletion coverage requires both pad reference zones.");
+            require(contextMenuZoneMap.requestSelectionAt(computeZoneMapPoint(contextMenuZoneMap, *contextPadHigh)),
+                    "Context-menu deletion coverage should be able to select pad-a3-high.");
+            require(contextMenuZoneMap.requestSelectionAt(computeZoneMapPoint(contextMenuZoneMap, *contextPadLow),
+                                                          drs::app::authoring::ZoneMapCanvas::SelectionMode::toggle),
+                    "Context-menu deletion coverage should be able to multi-select pad-a3-low.");
+            auto contextMenuSelectionState = contextMenuZoneMap.getSelectionState();
+            require(contextMenuSelectionState.zoneIds.size() == 2
+                        && std::find(contextMenuSelectionState.zoneIds.begin(),
+                                     contextMenuSelectionState.zoneIds.end(),
+                                     "pad-a3-high") != contextMenuSelectionState.zoneIds.end()
+                        && std::find(contextMenuSelectionState.zoneIds.begin(),
+                                     contextMenuSelectionState.zoneIds.end(),
+                                     "pad-a3-low") != contextMenuSelectionState.zoneIds.end(),
+                    "Context-menu deletion coverage should begin with a two-zone map selection.");
+
+            const auto popupPosition = computeZoneMapPoint(contextMenuZoneMap, *contextPadHigh);
+            const auto eventTime = juce::Time::getCurrentTime();
+            const auto mouseSource = juce::Desktop::getInstance().getMainMouseSource();
+            const juce::MouseEvent popupMouseDown(mouseSource,
+                                                  popupPosition,
+                                                  juce::ModifierKeys::rightButtonModifier,
+                                                  1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                                  &contextMenuZoneMap, &contextMenuZoneMap,
+                                                  eventTime, popupPosition, eventTime, 1, false);
+            contextMenuZoneMap.mouseDown(popupMouseDown);
+            pumpMessages();
+            contextMenuSelectionState = contextMenuZoneMap.getSelectionState();
+            require(contextMenuSelectionState.zoneIds.size() == 2
+                        && contextMenuSelectionState.primaryZoneId == "pad-a3-low",
+                    "Right-clicking within an active multi-selection should preserve that selection.");
+            juce::PopupMenu::dismissAllActiveMenus();
+            pumpMessages();
+
             const auto zoneCountBeforeDelete = session.getProject().authoring.zones.size();
             require(contextMenuZoneMap.requestDeleteSelectedSample(),
                     "Zone Map context-menu deletion should be enabled for a selected sample.");
-            require(session.getProject().authoring.zones.size() + 1 == zoneCountBeforeDelete,
-                    "Zone Map context-menu deletion should remove the selected sample from the session.");
+            require(session.getProject().authoring.zones.size() + 2 == zoneCountBeforeDelete,
+                    "Zone Map context-menu deletion should remove every selected zone from the session.");
             require(session.undo().applied,
                     "Zone Map context-menu deletion should remain undoable.");
             panel.reloadFromSession();
             require(session.getProject().authoring.zones.size() == zoneCountBeforeDelete,
-                    "Undo should restore the sample deleted from the Zone Map context menu.");
+                    "Undo should restore the zones deleted from the Zone Map context menu.");
         };
 
         runShell("compact",

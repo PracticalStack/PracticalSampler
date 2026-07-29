@@ -1208,53 +1208,161 @@ RuntimeProjectDocumentActionResult AuthoringSession::deleteSelectedSample()
                                   "Sample deletion rejected",
                                   "No sample is currently selected for deletion.");
 
-    auto project = getProject();
-    const auto deletedZone = project.authoring.zones[*selectedZoneIndex];
-    const auto sampleSourceId = deletedZone.sampleSourceId;
-    project.authoring.zones.erase(project.authoring.zones.begin()
-                                  + static_cast<std::ptrdiff_t>(*selectedZoneIndex));
+    return deleteZones({ getProject().authoring.zones[*selectedZoneIndex].id },
+                       "Delete selected sample");
+}
 
-    for (auto& routingBus : project.authoring.routingBuses)
+RuntimeProjectDocumentActionResult AuthoringSession::deleteZones(const std::vector<std::string>& zoneIds,
+                                                                 const std::string& label)
+{
+    if (zoneIds.empty())
+        return makeRejectedResult(getDocumentState(),
+                                  "Zone deletion rejected",
+                                  "At least one zone must be specified for deletion.");
+
+    auto project = getProject();
+    std::vector<std::string> normalizedZoneIds;
+    normalizedZoneIds.reserve(zoneIds.size());
+    for (const auto& zoneId : zoneIds)
     {
-        if (routingBus.inputSourceId != deletedZone.id)
+        if (!findZoneIndexById(project, zoneId).has_value())
             continue;
 
-        const auto replacementZone = std::find_if(project.authoring.zones.begin(),
-                                                  project.authoring.zones.end(),
-                                                  [&](const RuntimeProjectZoneDefinition& zone)
-                                                  {
-                                                      return zone.groupId == deletedZone.groupId;
-                                                  });
-        routingBus.inputSourceId = replacementZone != project.authoring.zones.end()
-            ? replacementZone->id
-            : std::string { "master" };
+        if (std::find(normalizedZoneIds.begin(), normalizedZoneIds.end(), zoneId)
+            == normalizedZoneIds.end())
+        {
+            normalizedZoneIds.push_back(zoneId);
+        }
     }
 
-    const auto sourceStillUsed = std::any_of(project.authoring.zones.begin(),
-                                             project.authoring.zones.end(),
-                                             [&](const RuntimeProjectZoneDefinition& zone)
-                                             {
-                                                 return zone.sampleSourceId == sampleSourceId;
-                                             });
-    if (!sourceStillUsed)
+    if (normalizedZoneIds.empty())
+        return makeRejectedResult(getDocumentState(),
+                                  "Zone deletion rejected",
+                                  "None of the requested zones could be resolved for deletion.");
+
+    const auto selectedZoneIndex = findSelectedZoneIndex(project);
+    const auto selectedZoneId = project.authoring.selectedZoneId;
+    std::vector<std::size_t> deletedZoneIndices;
+    std::vector<RuntimeProjectZoneDefinition> deletedZones;
+    deletedZoneIndices.reserve(normalizedZoneIds.size());
+    deletedZones.reserve(normalizedZoneIds.size());
+
+    for (std::size_t index = 0; index < project.authoring.zones.size(); ++index)
     {
-        project.sampleSources.erase(
-            std::remove_if(project.sampleSources.begin(),
-                           project.sampleSources.end(),
-                           [&](const RuntimeProjectSampleSource& source)
-                           {
-                               return source.id == sampleSourceId;
-                           }),
-            project.sampleSources.end());
+        const auto& zone = project.authoring.zones[index];
+        if (std::find(normalizedZoneIds.begin(), normalizedZoneIds.end(), zone.id)
+            == normalizedZoneIds.end())
+        {
+            continue;
+        }
+
+        deletedZoneIndices.push_back(index);
+        deletedZones.push_back(zone);
     }
 
-    if (project.authoring.zones.empty())
+    project.authoring.zones.erase(
+        std::remove_if(project.authoring.zones.begin(),
+                       project.authoring.zones.end(),
+                       [&](const RuntimeProjectZoneDefinition& zone)
+                       {
+                           return std::find(normalizedZoneIds.begin(),
+                                            normalizedZoneIds.end(),
+                                            zone.id) != normalizedZoneIds.end();
+                       }),
+        project.authoring.zones.end());
+
+    for (const auto& deletedZone : deletedZones)
+    {
+        for (auto& routingBus : project.authoring.routingBuses)
+        {
+            if (routingBus.inputSourceId != deletedZone.id)
+                continue;
+
+            const auto replacementZone = std::find_if(project.authoring.zones.begin(),
+                                                      project.authoring.zones.end(),
+                                                      [&](const RuntimeProjectZoneDefinition& zone)
+                                                      {
+                                                          return zone.groupId == deletedZone.groupId;
+                                                      });
+            routingBus.inputSourceId = replacementZone != project.authoring.zones.end()
+                ? replacementZone->id
+                : std::string { "master" };
+        }
+    }
+
+    std::vector<std::string> affectedRoundRobinPoolIds;
+    for (const auto& deletedZone : deletedZones)
+    {
+        if (!deletedZone.roundRobin.has_value())
+            continue;
+
+        const auto& poolId = deletedZone.roundRobin->poolId;
+        if (std::find(affectedRoundRobinPoolIds.begin(), affectedRoundRobinPoolIds.end(), poolId)
+            == affectedRoundRobinPoolIds.end())
+        {
+            affectedRoundRobinPoolIds.push_back(poolId);
+        }
+    }
+
+    for (const auto& poolId : affectedRoundRobinPoolIds)
+    {
+        auto remainingMembers = collectRoundRobinPoolMemberIndices(project, poolId);
+        if (!remainingMembers.empty())
+            normalizeRoundRobinPool(project, std::move(remainingMembers), poolId);
+    }
+
+    std::vector<std::string> deletedSampleSourceIds;
+    for (const auto& deletedZone : deletedZones)
+    {
+        if (std::find(deletedSampleSourceIds.begin(),
+                      deletedSampleSourceIds.end(),
+                      deletedZone.sampleSourceId) == deletedSampleSourceIds.end())
+        {
+            deletedSampleSourceIds.push_back(deletedZone.sampleSourceId);
+        }
+    }
+
+    const auto sampleSourceCountBeforeCleanup = project.sampleSources.size();
+    project.sampleSources.erase(
+        std::remove_if(project.sampleSources.begin(),
+                       project.sampleSources.end(),
+                       [&](const RuntimeProjectSampleSource& source)
+                       {
+                           if (std::find(deletedSampleSourceIds.begin(),
+                                         deletedSampleSourceIds.end(),
+                                         source.id) == deletedSampleSourceIds.end())
+                           {
+                               return false;
+                           }
+
+                           return std::none_of(project.authoring.zones.begin(),
+                                               project.authoring.zones.end(),
+                                               [&](const RuntimeProjectZoneDefinition& zone)
+                                               {
+                                                   return zone.sampleSourceId == source.id;
+                                               });
+                       }),
+        project.sampleSources.end());
+
+    const auto selectedZoneSurvived = !selectedZoneId.empty()
+        && std::find(normalizedZoneIds.begin(), normalizedZoneIds.end(), selectedZoneId)
+            == normalizedZoneIds.end()
+        && findZoneIndexById(project, selectedZoneId).has_value();
+
+    if (selectedZoneSurvived)
+    {
+        project.authoring.selectedZoneId = selectedZoneId;
+    }
+    else if (project.authoring.zones.empty())
     {
         project.authoring.selectedZoneId.clear();
     }
     else
     {
-        const auto nextIndex = std::min(*selectedZoneIndex, project.authoring.zones.size() - 1);
+        const auto fallbackIndex = selectedZoneIndex.has_value()
+            ? *selectedZoneIndex
+            : (deletedZoneIndices.empty() ? std::size_t {} : deletedZoneIndices.front());
+        const auto nextIndex = std::min(fallbackIndex, project.authoring.zones.size() - 1);
         project.authoring.selectedZoneId = project.authoring.zones[nextIndex].id;
     }
 
@@ -1270,12 +1378,10 @@ RuntimeProjectDocumentActionResult AuthoringSession::deleteSelectedSample()
         changedPaths.push_back("authoring.groups");
     }
     changedPaths.push_back("authoring.routingBuses");
-    if (!sourceStillUsed)
+    if (project.sampleSources.size() != sampleSourceCountBeforeCleanup)
         changedPaths.push_back("sampleSources");
 
-    return documentController.commitSnapshot(project,
-                                             "Delete selected sample",
-                                             std::move(changedPaths));
+    return documentController.commitSnapshot(project, label, std::move(changedPaths));
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(

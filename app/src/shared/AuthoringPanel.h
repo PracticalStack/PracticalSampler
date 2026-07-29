@@ -131,6 +131,9 @@ private:
     void redoLastEdit();
     void markSavedCheckpoint();
     std::vector<drs::engine::AuthoringZoneSummary> buildVisibleZoneSummaries() const;
+    void syncZoneMapSelectionState();
+    bool applyZoneMapSelectionState(const authoring::ZoneMapCanvas::SelectionState& selectionState);
+    std::size_t getZoneMapSelectionCount() const;
     void setDrawerOpen(bool shouldOpen);
     void setActiveDrawerTab(authoring::DrawerTab nextTab);
     void configureAccessibilityAndFocus();
@@ -167,6 +170,7 @@ private:
     authoring::DrawerState drawerState;
     authoring::SelectionSummaryViewModel selectionSummaryViewModel;
     authoring::ZoneFieldValuesViewModel zoneFieldValuesViewModel;
+    std::vector<std::string> zoneMapSelectedZoneIds;
     AuthoringControlLookAndFeel authoringLookAndFeel;
 
     authoring::AuthoringSummaryStrip summaryStrip;
