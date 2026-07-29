@@ -14,6 +14,18 @@ void require(bool condition, const std::string& message)
         throw std::runtime_error(message);
 }
 
+std::string joinIssues(const std::vector<std::string>& issues)
+{
+    std::string joined;
+    for (std::size_t index = 0; index < issues.size(); ++index)
+    {
+        if (index != 0)
+            joined += " | ";
+        joined += issues[index];
+    }
+    return joined;
+}
+
 drs::engine::RuntimeProjectModel makeRoundRobinAuthoringFixture()
 {
     const auto loaded = drs::engine::loadPhase2ReferenceProjectManifest();
@@ -115,7 +127,8 @@ int main()
         drs::engine::AuthoringSession uniqueSourceDeletionSession(projectLoad.project);
         const auto uniqueSourceDeletion = uniqueSourceDeletionSession.deleteSelectedSample();
         require(uniqueSourceDeletion.applied,
-                "Deleting the selected sample should create an undoable project transaction.");
+                "Deleting the selected sample should create an undoable project transaction. Issues: "
+                    + joinIssues(uniqueSourceDeletion.issues));
         require(uniqueSourceDeletionSession.getProject().authoring.zones.size() == 2,
                 "Deleting a selected sample should remove its zone mapping.");
         require(uniqueSourceDeletionSession.getProject().sampleSources.size() == 1,
@@ -140,8 +153,11 @@ int main()
                 "Deletion should select the zone now occupying the deleted zone's position.");
 
         drs::engine::AuthoringSession roundRobinSession(makeRoundRobinAuthoringFixture());
-        require(roundRobinSession.createRoundRobinPoolForSelectedZone("Create Round Robin pool").applied,
-                "Creating a Round Robin pool should produce an undoable authoring edit.");
+        const auto createPoolResult =
+            roundRobinSession.createRoundRobinPoolForSelectedZone("Create Round Robin pool");
+        require(createPoolResult.applied,
+                "Creating a Round Robin pool should produce an undoable authoring edit. Issues: "
+                    + joinIssues(createPoolResult.issues));
         const auto firstPoolZone = roundRobinSession.getSelectedZone().value();
         require(firstPoolZone.roundRobin.has_value()
                     && firstPoolZone.roundRobin->slotCount == 1

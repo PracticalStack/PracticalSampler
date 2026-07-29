@@ -48,7 +48,95 @@ bool usesExplicitZoneGroupsSchema(const RuntimeProjectModel& project) noexcept
     return project.schemaVersion >= 4 && project.authoring.schemaVersion >= 3;
 }
 
-void synchronizeExplicitZoneGroups(RuntimeProjectModel& project)
+std::optional<std::size_t> findGroupIndexById(const RuntimeProjectModel& project,
+                                              const std::string& groupId)
+{
+    const auto iterator = std::find_if(project.authoring.groups.begin(),
+                                       project.authoring.groups.end(),
+                                       [&](const RuntimeProjectGroupDefinition& group)
+                                       {
+                                           return group.id == groupId;
+                                       });
+    if (iterator == project.authoring.groups.end())
+        return std::nullopt;
+
+    return static_cast<std::size_t>(std::distance(project.authoring.groups.begin(), iterator));
+}
+
+std::optional<std::size_t> findZoneIndexById(const RuntimeProjectModel& project,
+                                             const std::string& zoneId)
+{
+    const auto iterator = std::find_if(project.authoring.zones.begin(),
+                                       project.authoring.zones.end(),
+                                       [&](const RuntimeProjectZoneDefinition& zone)
+                                       {
+                                           return zone.id == zoneId;
+                                       });
+    if (iterator == project.authoring.zones.end())
+        return std::nullopt;
+
+    return static_cast<std::size_t>(std::distance(project.authoring.zones.begin(), iterator));
+}
+
+bool groupHasMembers(const RuntimeProjectModel& project, const std::string& groupId)
+{
+    return std::any_of(project.authoring.zones.begin(),
+                       project.authoring.zones.end(),
+                       [&](const RuntimeProjectZoneDefinition& zone)
+                       {
+                           return zone.groupId == groupId;
+                       });
+}
+
+std::optional<std::string> findRepresentativeZoneIdForGroup(const RuntimeProjectModel& project,
+                                                            const std::string& groupId)
+{
+    const auto groupIndex = findGroupIndexById(project, groupId);
+    if (!groupIndex.has_value())
+        return std::nullopt;
+
+    const auto& group = project.authoring.groups[*groupIndex];
+    const auto anchorIndex = findZoneIndexById(project, group.auditionAnchorZoneId);
+    if (anchorIndex.has_value() && project.authoring.zones[*anchorIndex].groupId == groupId)
+        return project.authoring.zones[*anchorIndex].id;
+
+    const auto iterator = std::find_if(project.authoring.zones.begin(),
+                                       project.authoring.zones.end(),
+                                       [&](const RuntimeProjectZoneDefinition& zone)
+                                       {
+                                           return zone.groupId == groupId;
+                                       });
+    if (iterator == project.authoring.zones.end())
+        return std::nullopt;
+
+    return iterator->id;
+}
+
+void normalizeGroupDisplayOrder(RuntimeProjectModel& project)
+{
+    for (std::size_t index = 0; index < project.authoring.groups.size(); ++index)
+        project.authoring.groups[index].displayOrder = static_cast<int>(index);
+}
+
+void sortAndNormalizeGroupDisplayOrder(RuntimeProjectModel& project)
+{
+    if (!usesExplicitZoneGroupsSchema(project))
+        return;
+
+    std::stable_sort(project.authoring.groups.begin(),
+                     project.authoring.groups.end(),
+                     [](const RuntimeProjectGroupDefinition& left,
+                        const RuntimeProjectGroupDefinition& right)
+                     {
+                         if (left.displayOrder != right.displayOrder)
+                             return left.displayOrder < right.displayOrder;
+                         return left.id < right.id;
+                     });
+
+    normalizeGroupDisplayOrder(project);
+}
+
+void ensureExplicitZoneGroups(RuntimeProjectModel& project)
 {
     if (!usesExplicitZoneGroupsSchema(project))
         return;
@@ -107,34 +195,114 @@ void synchronizeExplicitZoneGroups(RuntimeProjectModel& project)
         group.auditionAnchorZoneId = firstMember != authoring.zones.end() ? firstMember->id : std::string {};
     }
 
-    if (!authoring.selectedZoneId.empty())
+    sortAndNormalizeGroupDisplayOrder(project);
+}
+
+void alignSelectedGroupToSelectedZone(RuntimeProjectModel& project)
+{
+    if (!usesExplicitZoneGroupsSchema(project))
+        return;
+
+    ensureExplicitZoneGroups(project);
+    const auto zoneIndex = findZoneIndexById(project, project.authoring.selectedZoneId);
+    if (zoneIndex.has_value())
     {
-        const auto selectedZone = std::find_if(authoring.zones.begin(),
-                                               authoring.zones.end(),
-                                               [&](const RuntimeProjectZoneDefinition& zone)
-                                               {
-                                                   return zone.id == authoring.selectedZoneId;
-                                               });
-        if (selectedZone != authoring.zones.end())
+        project.authoring.selectedGroupId = project.authoring.zones[*zoneIndex].groupId;
+        return;
+    }
+
+    const auto groupIndex = findGroupIndexById(project, project.authoring.selectedGroupId);
+    if (groupIndex.has_value())
+        return;
+
+    project.authoring.selectedGroupId = project.authoring.groups.empty()
+        ? std::string {}
+        : project.authoring.groups.front().id;
+}
+
+std::string chooseFallbackSelectedGroupId(const RuntimeProjectModel& project,
+                                          const std::string& preferredGroupId = {})
+{
+    if (!usesExplicitZoneGroupsSchema(project) || project.authoring.groups.empty())
+        return {};
+
+    const auto accept = [&](const RuntimeProjectGroupDefinition& group,
+                            bool requireVisible,
+                            bool requireMembers)
+    {
+        return (!requireVisible || group.workspaceVisible)
+            && (!requireMembers || groupHasMembers(project, group.id));
+    };
+
+    const auto tryGroupId = [&](const std::string& candidateId,
+                                bool requireVisible,
+                                bool requireMembers) -> std::string
+    {
+        const auto groupIndex = findGroupIndexById(project, candidateId);
+        if (!groupIndex.has_value())
+            return {};
+
+        const auto& group = project.authoring.groups[*groupIndex];
+        return accept(group, requireVisible, requireMembers) ? group.id : std::string {};
+    };
+
+    if (!preferredGroupId.empty())
+    {
+        if (const auto preferred = tryGroupId(preferredGroupId, true, true); !preferred.empty())
+            return preferred;
+    }
+
+    if (const auto zoneIndex = findZoneIndexById(project, project.authoring.selectedZoneId); zoneIndex.has_value())
+    {
+        const auto zoneGroupId = project.authoring.zones[*zoneIndex].groupId;
+        if (const auto zoneGroup = tryGroupId(zoneGroupId, true, true); !zoneGroup.empty())
+            return zoneGroup;
+    }
+
+    for (const auto& group : project.authoring.groups)
+        if (accept(group, true, true))
+            return group.id;
+
+    if (!preferredGroupId.empty())
+    {
+        if (const auto preferred = tryGroupId(preferredGroupId, true, false); !preferred.empty())
+            return preferred;
+    }
+
+    for (const auto& group : project.authoring.groups)
+        if (accept(group, true, false))
+            return group.id;
+
+    if (const auto zoneIndex = findZoneIndexById(project, project.authoring.selectedZoneId); zoneIndex.has_value())
+    {
+        if (const auto zoneGroup = tryGroupId(project.authoring.zones[*zoneIndex].groupId, false, false);
+            !zoneGroup.empty())
         {
-            authoring.selectedGroupId = selectedZone->groupId;
-            return;
+            return zoneGroup;
         }
     }
 
-    if (!authoring.selectedGroupId.empty())
+    if (!preferredGroupId.empty())
     {
-        const auto selectedGroup = std::find_if(authoring.groups.begin(),
-                                                authoring.groups.end(),
-                                                [&](const RuntimeProjectGroupDefinition& group)
-                                                {
-                                                    return group.id == authoring.selectedGroupId;
-                                                });
-        if (selectedGroup != authoring.groups.end())
-            return;
+        if (const auto preferred = tryGroupId(preferredGroupId, false, false); !preferred.empty())
+            return preferred;
     }
 
-    authoring.selectedGroupId = authoring.groups.empty() ? std::string {} : authoring.groups.front().id;
+    return project.authoring.groups.front().id;
+}
+
+void applyFallbackGroupSelection(RuntimeProjectModel& project, const std::string& preferredGroupId = {})
+{
+    if (!usesExplicitZoneGroupsSchema(project))
+        return;
+
+    ensureExplicitZoneGroups(project);
+    project.authoring.selectedGroupId = chooseFallbackSelectedGroupId(project, preferredGroupId);
+    if (const auto representativeZoneId = findRepresentativeZoneIdForGroup(project, project.authoring.selectedGroupId);
+        representativeZoneId.has_value())
+    {
+        project.authoring.selectedZoneId = *representativeZoneId;
+    }
 }
 
 void clearRoundRobinAssignment(RuntimeProjectZoneDefinition& zone)
@@ -314,6 +482,18 @@ std::optional<RuntimeProjectZoneDefinition> AuthoringSession::getSelectedZone() 
     return getProject().authoring.zones[*selectedZoneIndex];
 }
 
+std::optional<RuntimeProjectGroupDefinition> AuthoringSession::getSelectedGroup() const
+{
+    if (!usesExplicitZoneGroupsSchema(getProject()))
+        return std::nullopt;
+
+    const auto groupIndex = findGroupIndexById(getProject(), getProject().authoring.selectedGroupId);
+    if (!groupIndex.has_value())
+        return std::nullopt;
+
+    return getProject().authoring.groups[*groupIndex];
+}
+
 std::optional<RuntimeProjectPerformanceBankDefinition> AuthoringSession::getSelectedPerformanceBank() const
 {
     const auto selectedPerformanceBankIndex = findSelectedPerformanceBankIndex(getProject());
@@ -357,7 +537,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::selectZone(const std::strin
                                   "Zone '" + zoneId + "' does not exist in the current authoring project.");
 
     project.authoring.selectedZoneId = zoneId;
-    synchronizeExplicitZoneGroups(project);
+    alignSelectedGroupToSelectedZone(project);
 
     std::vector<std::string> changedPaths { "authoring.selectedZoneId" };
     if (usesExplicitZoneGroupsSchema(project))
@@ -398,7 +578,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::updateSelectedZone(const Ru
     auto project = getProject();
     project.authoring.zones[*selectedZoneIndex] = zone;
     project.authoring.selectedZoneId = zone.id;
-    synchronizeExplicitZoneGroups(project);
+    alignSelectedGroupToSelectedZone(project);
 
     std::vector<std::string> changedPaths {
         "authoring.zones[" + std::to_string(*selectedZoneIndex) + "]",
@@ -406,6 +586,249 @@ RuntimeProjectDocumentActionResult AuthoringSession::updateSelectedZone(const Ru
     };
     if (usesExplicitZoneGroupsSchema(project))
         changedPaths.push_back("authoring.selectedGroupId");
+
+    return documentController.commitSnapshot(project, label, changedPaths);
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::selectGroup(const std::string& groupId)
+{
+    auto project = getProject();
+    if (!usesExplicitZoneGroupsSchema(project))
+        return makeRejectedResult(getDocumentState(),
+                                  "Group selection rejected",
+                                  "This project schema does not support explicit group selection.");
+
+    ensureExplicitZoneGroups(project);
+    const auto groupIndex = findGroupIndexById(project, groupId);
+    if (!groupIndex.has_value())
+        return makeRejectedResult(getDocumentState(),
+                                  "Group selection rejected",
+                                  "Group '" + groupId + "' does not exist in the current authoring project.");
+
+    project.authoring.selectedGroupId = groupId;
+    std::vector<std::string> changedPaths { "authoring.selectedGroupId" };
+    if (const auto representativeZoneId = findRepresentativeZoneIdForGroup(project, groupId);
+        representativeZoneId.has_value()
+        && project.authoring.selectedZoneId != *representativeZoneId)
+    {
+        project.authoring.selectedZoneId = *representativeZoneId;
+        changedPaths.push_back("authoring.selectedZoneId");
+    }
+
+    return documentController.commitSnapshot(project, "Select group", changedPaths);
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::createGroup(const RuntimeProjectGroupDefinition& group,
+                                                                 const std::string& label)
+{
+    auto project = getProject();
+    if (!usesExplicitZoneGroupsSchema(project))
+        return makeRejectedResult(getDocumentState(),
+                                  "Group creation rejected",
+                                  "This project schema does not support explicit authored groups.");
+
+    ensureExplicitZoneGroups(project);
+    if (group.id.empty())
+        return makeRejectedResult(getDocumentState(),
+                                  "Group creation rejected",
+                                  "Group ids must be non-empty.");
+    if (group.displayName.empty())
+        return makeRejectedResult(getDocumentState(),
+                                  "Group creation rejected",
+                                  "Group display names must be non-empty.");
+    if (findGroupIndexById(project, group.id).has_value())
+        return makeRejectedResult(getDocumentState(),
+                                  "Group creation rejected",
+                                  "Group id '" + group.id + "' already exists.");
+
+    auto createdGroup = group;
+    createdGroup.displayOrder = static_cast<int>(project.authoring.groups.size());
+    if (!createdGroup.auditionAnchorZoneId.empty())
+    {
+        const auto anchorIndex = findZoneIndexById(project, createdGroup.auditionAnchorZoneId);
+        if (!anchorIndex.has_value() || project.authoring.zones[*anchorIndex].groupId != createdGroup.id)
+            createdGroup.auditionAnchorZoneId.clear();
+    }
+
+    project.authoring.groups.push_back(std::move(createdGroup));
+    normalizeGroupDisplayOrder(project);
+    project.authoring.selectedGroupId = group.id;
+
+    return documentController.commitSnapshot(project,
+                                             label,
+                                             { "authoring.groups",
+                                               "authoring.selectedGroupId" });
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::updateGroup(std::size_t groupIndex,
+                                                                 const RuntimeProjectGroupDefinition& group,
+                                                                 const std::string& label)
+{
+    auto project = getProject();
+    if (!usesExplicitZoneGroupsSchema(project))
+        return makeRejectedResult(getDocumentState(),
+                                  "Group edit rejected",
+                                  "This project schema does not support explicit authored groups.");
+    if (groupIndex >= project.authoring.groups.size())
+        return makeRejectedResult(getDocumentState(),
+                                  "Group edit rejected",
+                                  "Group index " + std::to_string(groupIndex) + " is out of range.");
+    if (group.id.empty())
+        return makeRejectedResult(getDocumentState(),
+                                  "Group edit rejected",
+                                  "Group ids must be non-empty.");
+    if (group.displayName.empty())
+        return makeRejectedResult(getDocumentState(),
+                                  "Group edit rejected",
+                                  "Group display names must be non-empty.");
+    if (group.id != project.authoring.groups[groupIndex].id)
+        return makeRejectedResult(getDocumentState(),
+                                  "Group edit rejected",
+                                  "Group ids are immutable once created.");
+
+    ensureExplicitZoneGroups(project);
+    const auto previousGroup = project.authoring.groups[groupIndex];
+    project.authoring.groups[groupIndex] = group;
+    project.authoring.groups[groupIndex].displayOrder = previousGroup.displayOrder;
+    ensureExplicitZoneGroups(project);
+
+    std::vector<std::string> changedPaths {
+        "authoring.groups[" + std::to_string(groupIndex) + "]"
+    };
+    if (previousGroup.workspaceVisible && !project.authoring.groups[groupIndex].workspaceVisible
+        && project.authoring.selectedGroupId == project.authoring.groups[groupIndex].id)
+    {
+        applyFallbackGroupSelection(project);
+        changedPaths.push_back("authoring.selectedGroupId");
+        changedPaths.push_back("authoring.selectedZoneId");
+    }
+
+    return documentController.commitSnapshot(project, label, changedPaths);
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::moveGroup(std::size_t groupIndex,
+                                                               int direction,
+                                                               const std::string& label)
+{
+    auto project = getProject();
+    if (!usesExplicitZoneGroupsSchema(project))
+        return makeRejectedResult(getDocumentState(),
+                                  "Group reorder rejected",
+                                  "This project schema does not support explicit authored groups.");
+    if (groupIndex >= project.authoring.groups.size())
+        return makeRejectedResult(getDocumentState(),
+                                  "Group reorder rejected",
+                                  "Group index " + std::to_string(groupIndex) + " is out of range.");
+    if (direction != -1 && direction != 1)
+        return makeRejectedResult(getDocumentState(),
+                                  "Group reorder rejected",
+                                  "Group reordering only supports directions of -1 or 1.");
+
+    const auto targetIndexSigned = static_cast<int>(groupIndex) + direction;
+    if (targetIndexSigned < 0
+        || targetIndexSigned >= static_cast<int>(project.authoring.groups.size()))
+    {
+        return makeRejectedResult(getDocumentState(),
+                                  "Group reorder rejected",
+                                  "Group cannot move beyond the current authoring surface bounds.");
+    }
+
+    const auto targetIndex = static_cast<std::size_t>(targetIndexSigned);
+    std::swap(project.authoring.groups[groupIndex], project.authoring.groups[targetIndex]);
+    normalizeGroupDisplayOrder(project);
+
+    return documentController.commitSnapshot(project,
+                                             label,
+                                             { "authoring.groups[" + std::to_string(groupIndex) + "]",
+                                               "authoring.groups[" + std::to_string(targetIndex) + "]" });
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::deleteGroup(const std::string& groupId,
+                                                                 const std::string& label)
+{
+    auto project = getProject();
+    if (!usesExplicitZoneGroupsSchema(project))
+        return makeRejectedResult(getDocumentState(),
+                                  "Group deletion rejected",
+                                  "This project schema does not support explicit authored groups.");
+
+    const auto groupIndex = findGroupIndexById(project, groupId);
+    if (!groupIndex.has_value())
+        return makeRejectedResult(getDocumentState(),
+                                  "Group deletion rejected",
+                                  "Group '" + groupId + "' does not exist in the current authoring project.");
+    if (groupHasMembers(project, groupId))
+        return makeRejectedResult(getDocumentState(),
+                                  "Group deletion rejected",
+                                  "Group '" + groupId + "' still owns zones and cannot be deleted.");
+
+    project.authoring.groups.erase(project.authoring.groups.begin()
+                                   + static_cast<std::ptrdiff_t>(*groupIndex));
+    normalizeGroupDisplayOrder(project);
+
+    std::vector<std::string> changedPaths { "authoring.groups" };
+    if (project.authoring.selectedGroupId == groupId)
+    {
+        applyFallbackGroupSelection(project);
+        changedPaths.push_back("authoring.selectedGroupId");
+        changedPaths.push_back("authoring.selectedZoneId");
+    }
+
+    return documentController.commitSnapshot(project, label, changedPaths);
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::reassignZoneToGroup(const std::string& zoneId,
+                                                                         const std::string& groupId,
+                                                                         const std::string& label)
+{
+    auto project = getProject();
+    if (!usesExplicitZoneGroupsSchema(project))
+        return makeRejectedResult(getDocumentState(),
+                                  "Zone reassignment rejected",
+                                  "This project schema does not support explicit authored groups.");
+    if (groupId.empty())
+        return makeRejectedResult(getDocumentState(),
+                                  "Zone reassignment rejected",
+                                  "Zones must always belong to a non-empty target group id.");
+
+    const auto zoneIndex = findZoneIndexById(project, zoneId);
+    if (!zoneIndex.has_value())
+        return makeRejectedResult(getDocumentState(),
+                                  "Zone reassignment rejected",
+                                  "Zone '" + zoneId + "' does not exist in the current authoring project.");
+
+    const auto targetGroupIndex = findGroupIndexById(project, groupId);
+    if (!targetGroupIndex.has_value())
+        return makeRejectedResult(getDocumentState(),
+                                  "Zone reassignment rejected",
+                                  "Target group '" + groupId + "' does not exist in the current authoring project.");
+
+    auto& zone = project.authoring.zones[*zoneIndex];
+    if (zone.groupId == groupId)
+        return makeRejectedResult(getDocumentState(),
+                                  "Zone reassignment rejected",
+                                  "Zone '" + zoneId + "' is already assigned to group '" + groupId + "'.");
+
+    const auto previousGroupId = zone.groupId;
+    zone.groupId = groupId;
+    ensureExplicitZoneGroups(project);
+
+    std::vector<std::string> changedPaths {
+        "authoring.zones[" + std::to_string(*zoneIndex) + "]",
+        "authoring.groups"
+    };
+    if (project.authoring.selectedZoneId == zoneId)
+    {
+        project.authoring.selectedGroupId = groupId;
+        changedPaths.push_back("authoring.selectedGroupId");
+    }
+    else if (project.authoring.selectedGroupId == previousGroupId
+             && !groupHasMembers(project, previousGroupId))
+    {
+        applyFallbackGroupSelection(project, groupId);
+        changedPaths.push_back("authoring.selectedGroupId");
+        changedPaths.push_back("authoring.selectedZoneId");
+    }
 
     return documentController.commitSnapshot(project, label, changedPaths);
 }
@@ -432,7 +855,16 @@ RuntimeProjectDocumentActionResult AuthoringSession::createRoundRobinPoolForSele
     }
 
     applyRoundRobinAssignment(selectedZone, allocateRoundRobinPoolId(project), 1, 1);
-    return documentController.commitSnapshot(project, label, { "authoring.zones" });
+    alignSelectedGroupToSelectedZone(project);
+
+    std::vector<std::string> changedPaths { "authoring.zones" };
+    if (usesExplicitZoneGroupsSchema(project))
+    {
+        changedPaths.push_back("authoring.groups");
+        changedPaths.push_back("authoring.selectedGroupId");
+    }
+
+    return documentController.commitSnapshot(project, label, changedPaths);
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::addCompatibleZonesToSelectedRoundRobinPool(const std::string& label)
@@ -504,7 +936,16 @@ RuntimeProjectDocumentActionResult AuthoringSession::addCompatibleZonesToSelecte
                      });
 
     normalizeRoundRobinPool(project, memberIndices, poolId);
-    return documentController.commitSnapshot(project, label, { "authoring.zones" });
+    alignSelectedGroupToSelectedZone(project);
+
+    std::vector<std::string> changedPaths { "authoring.zones" };
+    if (usesExplicitZoneGroupsSchema(project))
+    {
+        changedPaths.push_back("authoring.groups");
+        changedPaths.push_back("authoring.selectedGroupId");
+    }
+
+    return documentController.commitSnapshot(project, label, changedPaths);
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::normalizeSelectedRoundRobinPool(const std::string& label)
@@ -523,7 +964,16 @@ RuntimeProjectDocumentActionResult AuthoringSession::normalizeSelectedRoundRobin
                                   "The selected Round Robin pool could not be resolved.");
 
     normalizeRoundRobinPool(project, memberIndices, selectedZone->roundRobin->poolId);
-    return documentController.commitSnapshot(project, label, { "authoring.zones" });
+    alignSelectedGroupToSelectedZone(project);
+
+    std::vector<std::string> changedPaths { "authoring.zones" };
+    if (usesExplicitZoneGroupsSchema(project))
+    {
+        changedPaths.push_back("authoring.groups");
+        changedPaths.push_back("authoring.selectedGroupId");
+    }
+
+    return documentController.commitSnapshot(project, label, changedPaths);
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::removeSelectedZoneFromRoundRobinPool(const std::string& label)
@@ -550,7 +1000,16 @@ RuntimeProjectDocumentActionResult AuthoringSession::removeSelectedZoneFromRound
     if (!remainingMembers.empty())
         normalizeRoundRobinPool(project, remainingMembers, previousPoolId);
 
-    return documentController.commitSnapshot(project, label, { "authoring.zones" });
+    alignSelectedGroupToSelectedZone(project);
+
+    std::vector<std::string> changedPaths { "authoring.zones" };
+    if (usesExplicitZoneGroupsSchema(project))
+    {
+        changedPaths.push_back("authoring.groups");
+        changedPaths.push_back("authoring.selectedGroupId");
+    }
+
+    return documentController.commitSnapshot(project, label, changedPaths);
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::deleteSelectedSample()
@@ -562,9 +1021,26 @@ RuntimeProjectDocumentActionResult AuthoringSession::deleteSelectedSample()
                                   "No sample is currently selected for deletion.");
 
     auto project = getProject();
-    const auto sampleSourceId = project.authoring.zones[*selectedZoneIndex].sampleSourceId;
+    const auto deletedZone = project.authoring.zones[*selectedZoneIndex];
+    const auto sampleSourceId = deletedZone.sampleSourceId;
     project.authoring.zones.erase(project.authoring.zones.begin()
                                   + static_cast<std::ptrdiff_t>(*selectedZoneIndex));
+
+    for (auto& routingBus : project.authoring.routingBuses)
+    {
+        if (routingBus.inputSourceId != deletedZone.id)
+            continue;
+
+        const auto replacementZone = std::find_if(project.authoring.zones.begin(),
+                                                  project.authoring.zones.end(),
+                                                  [&](const RuntimeProjectZoneDefinition& zone)
+                                                  {
+                                                      return zone.groupId == deletedZone.groupId;
+                                                  });
+        routingBus.inputSourceId = replacementZone != project.authoring.zones.end()
+            ? replacementZone->id
+            : std::string { "master" };
+    }
 
     const auto sourceStillUsed = std::any_of(project.authoring.zones.begin(),
                                              project.authoring.zones.end(),
@@ -594,7 +1070,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::deleteSelectedSample()
         project.authoring.selectedZoneId = project.authoring.zones[nextIndex].id;
     }
 
-    synchronizeExplicitZoneGroups(project);
+    alignSelectedGroupToSelectedZone(project);
 
     std::vector<std::string> changedPaths {
         "authoring.zones",
@@ -605,6 +1081,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::deleteSelectedSample()
         changedPaths.push_back("authoring.selectedGroupId");
         changedPaths.push_back("authoring.groups");
     }
+    changedPaths.push_back("authoring.routingBuses");
     if (!sourceStillUsed)
         changedPaths.push_back("sampleSources");
 
@@ -671,7 +1148,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
         project = migration.project;
     }
 
-    synchronizeExplicitZoneGroups(project);
+    alignSelectedGroupToSelectedZone(project);
 
     std::vector<std::string> changedPaths {
         "sampleSources[" + std::to_string(originalSampleSourceCount) + "]",

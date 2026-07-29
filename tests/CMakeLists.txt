@@ -1649,6 +1649,22 @@ add_test(
     COMMAND drs_phase2_mapping_workspace_tests
 )
 
+add_executable(drs_phase2_zone_group_transaction_tests
+    src/Phase2ZoneGroupTransactionsTests.cpp
+)
+
+target_link_libraries(drs_phase2_zone_group_transaction_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_features(drs_phase2_zone_group_transaction_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase2.zone_group_transactions
+    COMMAND drs_phase2_zone_group_transaction_tests
+)
+
 juce_add_console_app(drs_phase2_waveform_preview_tests
     PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Waveform Preview Tests"
 )

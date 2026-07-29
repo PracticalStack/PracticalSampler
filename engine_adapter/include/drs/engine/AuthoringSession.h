@@ -51,13 +51,28 @@ public:
 
     std::vector<AuthoringZoneSummary> getZoneSummaries() const;
     std::optional<RuntimeProjectZoneDefinition> getSelectedZone() const;
+    std::optional<RuntimeProjectGroupDefinition> getSelectedGroup() const;
     std::optional<RuntimeProjectPerformanceBankDefinition> getSelectedPerformanceBank() const;
     AuthoringZonePreviewRequest buildSelectedZonePreviewRequest() const;
 
     RuntimeProjectDocumentActionResult selectZone(const std::string& zoneId);
+    RuntimeProjectDocumentActionResult selectGroup(const std::string& groupId);
     RuntimeProjectDocumentActionResult selectPerformanceBank(const std::string& performanceBankId);
     RuntimeProjectDocumentActionResult updateSelectedZone(const RuntimeProjectZoneDefinition& zone,
                                                           const std::string& label);
+    RuntimeProjectDocumentActionResult createGroup(const RuntimeProjectGroupDefinition& group,
+                                                   const std::string& label);
+    RuntimeProjectDocumentActionResult updateGroup(std::size_t groupIndex,
+                                                   const RuntimeProjectGroupDefinition& group,
+                                                   const std::string& label);
+    RuntimeProjectDocumentActionResult moveGroup(std::size_t groupIndex,
+                                                 int direction,
+                                                 const std::string& label);
+    RuntimeProjectDocumentActionResult deleteGroup(const std::string& groupId,
+                                                   const std::string& label);
+    RuntimeProjectDocumentActionResult reassignZoneToGroup(const std::string& zoneId,
+                                                           const std::string& groupId,
+                                                           const std::string& label);
     RuntimeProjectDocumentActionResult createRoundRobinPoolForSelectedZone(const std::string& label);
     RuntimeProjectDocumentActionResult addCompatibleZonesToSelectedRoundRobinPool(const std::string& label);
     RuntimeProjectDocumentActionResult normalizeSelectedRoundRobinPool(const std::string& label);
