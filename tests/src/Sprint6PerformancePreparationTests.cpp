@@ -48,6 +48,74 @@ PreparedPlaybackSampleHandle makeSample(std::string id, std::string path,
     return sample;
 }
 
+PlaybackSnapshotZone makeSnapshotZone(std::string id,
+                                      std::string sampleSourceId,
+                                      std::string displayName,
+                                      std::string groupId,
+                                      int rootKey,
+                                      int keyLow,
+                                      int keyHigh,
+                                      double gainDb,
+                                      double pan,
+                                      std::uint64_t sampleStartFrame,
+                                      bool loopEnabled,
+                                      std::uint64_t loopStartFrame,
+                                      std::uint64_t loopEndFrame)
+{
+    PlaybackSnapshotZone zone;
+    zone.id = std::move(id);
+    zone.sampleSourceId = std::move(sampleSourceId);
+    zone.displayName = std::move(displayName);
+    zone.groupId = std::move(groupId);
+    zone.articulationId = "sustain";
+    zone.rootKey = rootKey;
+    zone.keyLow = keyLow;
+    zone.keyHigh = keyHigh;
+    zone.velocityLow = 1;
+    zone.velocityHigh = 127;
+    zone.gainDb = gainDb;
+    zone.pan = pan;
+    zone.sampleStartFrame = sampleStartFrame;
+    zone.loopEnabled = loopEnabled;
+    zone.loopStartFrame = loopStartFrame;
+    zone.loopEndFrame = loopEndFrame;
+    return zone;
+}
+
+PreparedPlaybackZoneHandle makePreparedZone(std::string zoneId,
+                                            std::string sampleSourceId,
+                                            std::size_t preparedSampleIndex,
+                                            std::size_t preparedStreamIndex,
+                                            int rootKey,
+                                            int keyLow,
+                                            int keyHigh,
+                                            double gainDb,
+                                            double pan,
+                                            std::uint64_t sampleStartFrame,
+                                            bool loopEnabled,
+                                            std::uint64_t loopStartFrame,
+                                            std::uint64_t loopEndFrame)
+{
+    PreparedPlaybackZoneHandle zone;
+    zone.zoneId = std::move(zoneId);
+    zone.sampleSourceId = std::move(sampleSourceId);
+    zone.streamSampleId = zone.sampleSourceId;
+    zone.preparedSampleIndex = preparedSampleIndex;
+    zone.preparedStreamIndex = preparedStreamIndex;
+    zone.rootKey = rootKey;
+    zone.keyLow = keyLow;
+    zone.keyHigh = keyHigh;
+    zone.velocityLow = 1;
+    zone.velocityHigh = 127;
+    zone.gainDb = gainDb;
+    zone.pan = pan;
+    zone.sampleStartFrame = sampleStartFrame;
+    zone.loopEnabled = loopEnabled;
+    zone.loopStartFrame = loopStartFrame;
+    zone.loopEndFrame = loopEndFrame;
+    return zone;
+}
+
 Fixture makeFixture()
 {
     Fixture value;
@@ -79,10 +147,8 @@ Fixture makeFixture()
     snapshot.snapshot.fxSlots.push_back({ "room", "Room", "reverb", false });
     snapshot.snapshot.routingBuses.push_back({ "main", "Main", "groups/main", { "room" } });
     snapshot.snapshot.zones = {
-        { "kick-zone", "wav-source", "Kick", "drums", "sustain", 36, 36, 36, 1, 127,
-          -1.0, -0.2, 0, false, 0, 0 },
-        { "strings-zone", "flac-source", "Strings", "main", "sustain", 60, 48, 84, 1, 127,
-          -3.0, 0.25, 4, true, 16, 96 }
+        makeSnapshotZone("kick-zone", "wav-source", "Kick", "drums", 36, 36, 36, -1.0, -0.2, 0, false, 0, 0),
+        makeSnapshotZone("strings-zone", "flac-source", "Strings", "main", 60, 48, 84, -3.0, 0.25, 4, true, 16, 96)
     };
     snapshot.snapshot.articulationRoutes.push_back({ "sustain", { "kick-zone", "strings-zone" } });
     snapshot.snapshot.groupRoutes = {
@@ -126,10 +192,12 @@ Fixture makeFixture()
         result.prepared.samples[index].ownershipRecordIndex = index;
     }
     result.prepared.zones = {
-        { "kick-zone", "wav-source", "wav-source", 0, 0, 36, 36, 36, 1, 127,
-          -1.0, -0.2, 0, false, 0, 0 },
-        { "strings-zone", "flac-source", "flac-source", 1, 1, 60, 48, 84, 1, 127,
-          -3.0, 0.25, 4, true, 16, 96 }
+        makePreparedZone("kick-zone", "wav-source", 0, 0, 36, 36, 36, -1.0, -0.2, 0, false, 0, 0),
+        makePreparedZone("strings-zone", "flac-source", 1, 1, 60, 48, 84, -3.0, 0.25, 4, true, 16, 96)
+    };
+    result.prepared.groupRoutes = {
+        { "drums", { "sustain" }, { "kick-zone" } },
+        { "main", { "sustain" }, { "strings-zone" } }
     };
     result.metrics.preparedSampleCount = 2;
     result.metrics.preparedStreamCount = 2;

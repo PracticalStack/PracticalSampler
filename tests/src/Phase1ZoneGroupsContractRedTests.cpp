@@ -36,18 +36,11 @@ int main()
     try
     {
         const auto root = resolveStudioRoot();
-        const auto runtimeModel = readText(root / "engine_adapter/include/drs/engine/RuntimeModel.h");
-        const auto runtimeLoader = readText(root / "engine_adapter/src/RuntimeLoader.cpp");
-        const auto playbackSnapshot = readText(root / "engine_adapter/src/PlaybackSnapshot.cpp");
         const auto authoringSession = readText(root / "engine_adapter/src/AuthoringSession.cpp");
         const auto authoringPanel = readText(root / "app/src/shared/AuthoringPanel.cpp");
         const auto zoneMappingEditor = readText(root / "app/src/shared/authoring/ZoneMappingEditor.cpp");
 
         const std::vector<std::pair<std::string, bool>> openGaps {
-            { "snapshot group routes are still synthesized from zone.groupId membership only",
-              playbackSnapshot.find("const auto groupIterator = groupRouteIndices.find(zone.groupId);")
-                      != std::string::npos
-                  || playbackSnapshot.find("routeObject[\"gainDb\"]") == std::string::npos },
             { "routing input selection still has no groups/<groupId> source option",
               authoringPanel.find("groups/") == std::string::npos },
             { "Round Robin editing still lives on zone surfaces instead of group surfaces",
@@ -76,17 +69,17 @@ int main()
 
         if (openGapCount == 0)
         {
-            std::cout << "Phase 1 Zone Groups Sprint 1 open-gap audit passed." << std::endl;
+            std::cout << "Phase 1 Zone Groups Sprint 3 open-gap audit passed." << std::endl;
             return 0;
         }
 
-        std::cerr << "Phase 1 Zone Groups Sprint 1 open-gap audit found " << openGapCount
+        std::cerr << "Phase 1 Zone Groups Sprint 3 open-gap audit found " << openGapCount
                   << " remaining implementation gap(s)." << std::endl;
         return 1;
     }
     catch (const std::exception& exception)
     {
-        std::cerr << "Phase 1 Zone Groups Sprint 1 open-gap audit failed unexpectedly: "
+        std::cerr << "Phase 1 Zone Groups Sprint 3 open-gap audit failed unexpectedly: "
                   << exception.what() << std::endl;
         return 2;
     }

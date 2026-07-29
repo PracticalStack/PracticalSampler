@@ -54,13 +54,13 @@ int main()
     try
     {
         const auto projectLoad = loadPhase2ReferenceProjectManifest();
-        require(projectLoad.loaded, "Phase 2 reference project must load for Zone Groups Sprint 2 coverage.");
+        require(projectLoad.loaded, "Phase 2 reference project must load for Zone Groups Sprint 3 coverage.");
 
         const auto& project = projectLoad.project;
         require(!project.authoring.zones.empty(),
-                "Phase 2 reference project must expose authored zones for Zone Groups Sprint 2 coverage.");
+                "Phase 2 reference project must expose authored zones for Zone Groups Sprint 3 coverage.");
         require(project.schemaVersion == 4 && project.authoring.schemaVersion == 3,
-                "Sprint 2 Zone Groups contract fixture should use the explicit group schema.");
+                "Sprint 3 Zone Groups contract fixture should use the explicit group schema.");
 
         std::set<std::string> zoneIds;
         std::vector<std::string> expectedGroupOrder;
@@ -85,23 +85,23 @@ int main()
                                                          ? std::string("phase2-reference.project.json")
                                                          : projectLoad.manifestPath);
         require(serializedProject.find("\"groupId\"") != std::string::npos,
-                "Sprint 2 authored project manifests must persist per-zone groupId membership.");
+                "Sprint 3 authored project manifests must persist per-zone groupId membership.");
         require(serializedProject.find("\"groups\"") != std::string::npos,
-                "Sprint 2 authored project manifests must persist explicit groups.");
+                "Sprint 3 authored project manifests must persist explicit groups.");
         require(serializedProject.find("\"selectedGroupId\"") != std::string::npos,
-                "Sprint 2 authored project manifests must persist selectedGroupId.");
+                "Sprint 3 authored project manifests must persist selectedGroupId.");
         require(project.authoring.groups.size() == expectedGroupOrder.size(),
-                "Sprint 2 authored groups should cover every distinct zone-owned group id.");
+                "Sprint 3 authored groups should cover every distinct zone-owned group id.");
         require(project.authoring.selectedGroupId == "lead-core",
-                "Sprint 2 contract fixture selectedGroupId changed unexpectedly.");
+                "Sprint 3 contract fixture selectedGroupId changed unexpectedly.");
 
         for (std::size_t index = 0; index < project.authoring.groups.size(); ++index)
         {
             const auto& group = project.authoring.groups[index];
             require(group.id == expectedGroupOrder[index],
-                    "Sprint 2 authored group ordering should remain deterministic.");
+                    "Sprint 3 authored group ordering should remain deterministic.");
             require(!group.displayName.empty(),
-                    "Sprint 2 authored groups must carry creator-facing display names.");
+                    "Sprint 3 authored groups must carry creator-facing display names.");
         }
 
         for (const auto& bus : project.authoring.routingBuses)
@@ -112,13 +112,15 @@ int main()
 
         PlaybackSnapshotBuilder builder;
         const auto snapshotResult = buildSnapshot(builder, project);
-        require(snapshotResult.built, "Phase 2 reference project should build a snapshot for Zone Groups Sprint 2.");
+        require(snapshotResult.built, "Phase 2 reference project should build a snapshot for Zone Groups Sprint 3.");
         require(snapshotResult.activationEligible,
-                "Zone Groups Sprint 2 contract fixture should remain activation-eligible.");
+                "Zone Groups Sprint 3 contract fixture should remain activation-eligible.");
         require(snapshotResult.findings.empty(),
-                "Zone Groups Sprint 2 contract fixture should not surface snapshot findings.");
+                "Zone Groups Sprint 3 contract fixture should not surface snapshot findings.");
         require(snapshotResult.snapshot.groupRoutes.size() == expectedGroupOrder.size(),
                 "Snapshot group route count should stay aligned with distinct authored group ids.");
+        require(snapshotResult.snapshot.selectedGroupId == project.authoring.selectedGroupId,
+                "Sprint 3 snapshots should preserve selectedGroupId.");
 
         for (std::size_t index = 0; index < expectedGroupOrder.size(); ++index)
         {
@@ -129,63 +131,70 @@ int main()
 
             const auto& route = snapshotResult.snapshot.groupRoutes[index];
             require(route.groupId == expectedGroupId,
-                    "Snapshot group route ordering should remain first-seen zone group order in Sprint 2.");
+                    "Snapshot group route ordering should follow authored group order in Sprint 3.");
             require(route.zoneIds == expectedIterator->second.zoneIds,
-                    "Snapshot group route membership should remain derived directly from zone membership in Sprint 2.");
+                    "Snapshot group route membership should remain derived from authored zone membership in Sprint 3.");
             require(route.articulationIds == expectedIterator->second.articulationIds,
-                    "Snapshot group articulation membership should remain derived directly from grouped zones in Sprint 2.");
+                    "Snapshot group articulation membership should remain derived directly from grouped zones in Sprint 3.");
+            require(route.displayName == project.authoring.groups[index].displayName
+                        && route.routingSourceId == "groups/" + route.groupId
+                        && route.gainDb == project.authoring.groups[index].gainDb
+                        && route.pan == project.authoring.groups[index].pan,
+                    "Sprint 3 snapshot group routes should retain immutable group metadata.");
         }
 
         const auto serializedSnapshot = serializeImmutablePlaybackSnapshot(snapshotResult.snapshot);
         require(serializedSnapshot.find("\"groupRoutes\"") != std::string::npos,
-                "Sprint 2 playback snapshots must continue to serialize groupRoutes.");
-        require(serializedSnapshot.find("\"groups\"") == std::string::npos,
-                "Sprint 2 playback snapshots must remain route-focused until Sprint 3 expands snapshot group metadata.");
+                "Sprint 3 playback snapshots must continue to serialize groupRoutes.");
+        require(serializedSnapshot.find("\"selectedGroupId\"") != std::string::npos
+                    && serializedSnapshot.find("\"routingSourceId\"") != std::string::npos
+                    && serializedSnapshot.find("\"workspaceVisible\"") != std::string::npos,
+                "Sprint 3 playback snapshots must serialize explicit group metadata.");
 
         const auto manifestDirectory =
             std::filesystem::path(projectLoad.manifestPath.empty() ? "." : projectLoad.manifestPath).parent_path();
         const auto tempPath = manifestDirectory / "drs-phase1-zone-groups-contract-roundtrip.json";
         {
             std::ofstream output(tempPath, std::ios::binary | std::ios::trunc);
-            require(output.good(), "Could not open the temporary Zone Groups Sprint 2 manifest path.");
+            require(output.good(), "Could not open the temporary Zone Groups Sprint 3 manifest path.");
             output << serializedProject;
         }
 
         const auto roundTripLoad = loadRuntimeProjectManifest(tempPath.generic_string());
         std::filesystem::remove(tempPath);
 
-        require(roundTripLoad.loaded, "Sprint 2 project contract manifest should round-trip through the loader.");
+        require(roundTripLoad.loaded, "Sprint 3 project contract manifest should round-trip through the loader.");
         require(roundTripLoad.project.authoring.zones.size() == project.authoring.zones.size(),
-                "Sprint 2 project round-trip should preserve authored zone count.");
+                "Sprint 3 project round-trip should preserve authored zone count.");
         require(roundTripLoad.project.authoring.groups.size() == project.authoring.groups.size(),
-                "Sprint 2 project round-trip should preserve authored group count.");
+                "Sprint 3 project round-trip should preserve authored group count.");
         require(roundTripLoad.project.authoring.selectedGroupId == project.authoring.selectedGroupId,
-                "Sprint 2 project round-trip should preserve selectedGroupId.");
+                "Sprint 3 project round-trip should preserve selectedGroupId.");
 
         for (std::size_t index = 0; index < project.authoring.zones.size(); ++index)
         {
             require(roundTripLoad.project.authoring.zones[index].id == project.authoring.zones[index].id,
-                    "Sprint 2 project round-trip should preserve zone ordering.");
+                    "Sprint 3 project round-trip should preserve zone ordering.");
             require(roundTripLoad.project.authoring.zones[index].groupId
                         == project.authoring.zones[index].groupId,
-                    "Sprint 2 project round-trip should preserve per-zone group membership exactly.");
+                    "Sprint 3 project round-trip should preserve per-zone group membership exactly.");
         }
 
         for (std::size_t index = 0; index < project.authoring.groups.size(); ++index)
         {
             require(roundTripLoad.project.authoring.groups[index].id == project.authoring.groups[index].id,
-                    "Sprint 2 project round-trip should preserve group ordering.");
+                    "Sprint 3 project round-trip should preserve group ordering.");
             require(roundTripLoad.project.authoring.groups[index].displayName
                         == project.authoring.groups[index].displayName,
-                    "Sprint 2 project round-trip should preserve authored group display names.");
+                    "Sprint 3 project round-trip should preserve authored group display names.");
         }
 
-        std::cout << "Phase 1 Zone Groups Sprint 2 contract tests passed." << std::endl;
+        std::cout << "Phase 1 Zone Groups Sprint 3 contract tests passed." << std::endl;
         return 0;
     }
     catch (const std::exception& exception)
     {
-        std::cerr << "Phase 1 Zone Groups Sprint 2 contract tests failed: "
+        std::cerr << "Phase 1 Zone Groups Sprint 3 contract tests failed: "
                   << exception.what() << std::endl;
         return 1;
     }

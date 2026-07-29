@@ -78,6 +78,14 @@ struct PlaybackSnapshotGroupRoute
     std::string groupId;
     std::vector<std::string> articulationIds;
     std::vector<std::string> zoneIds;
+    std::string displayName;
+    int displayOrder = 0;
+    std::string routingSourceId;
+    bool workspaceVisible = true;
+    double gainDb = 0.0;
+    double pan = 0.0;
+    std::string routingBusId;
+    std::string auditionAnchorZoneId;
 };
 
 struct PlaybackSnapshotZone
@@ -123,6 +131,7 @@ struct ImmutablePlaybackSnapshot
     int sourceAuthoringSchemaVersion = 0;
     std::size_t draftRevision = 0;
     std::string selectedZoneId;
+    std::string selectedGroupId;
     std::string selectedPerformanceBankId;
     std::string contentDigest;
     std::vector<PlaybackSnapshotSampleIdentity> sampleIdentities;

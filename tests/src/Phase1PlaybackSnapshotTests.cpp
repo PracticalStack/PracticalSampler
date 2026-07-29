@@ -68,6 +68,8 @@ int main()
                 "Playback snapshot should record the requested draft revision.");
         require(firstResult.snapshot.selectedZoneId == phase2Project.project.authoring.selectedZoneId,
                 "Playback snapshot should preserve the selected zone identity.");
+        require(firstResult.snapshot.selectedGroupId == phase2Project.project.authoring.selectedGroupId,
+                "Playback snapshot should preserve the selected group identity.");
         require(firstResult.snapshot.selectedPerformanceBankId == phase2Project.project.authoring.selectedPerformanceBankId,
                 "Playback snapshot should preserve the selected performance-bank identity.");
         require(firstResult.snapshot.sampleIdentities.size() == phase2Project.project.sampleSources.size(),
@@ -76,12 +78,18 @@ int main()
                 "Playback snapshot macro-default count changed unexpectedly.");
         require(firstResult.snapshot.routingBuses.size() == phase2Project.project.authoring.routingBuses.size(),
                 "Playback snapshot routing-bus count changed unexpectedly.");
+        require(firstResult.snapshot.groupRoutes.size() == phase2Project.project.authoring.groups.size(),
+                "Playback snapshot group-route count should stay aligned with authored groups.");
         require(firstResult.snapshot.zones.size() == phase2Project.project.authoring.zones.size(),
                 "Playback snapshot zone count changed unexpectedly.");
         require(!firstResult.snapshot.contentDigest.empty(),
                 "Successful playback snapshot builds must carry a stable content digest.");
 
         const auto firstSerialized = drs::engine::serializeImmutablePlaybackSnapshot(firstResult.snapshot);
+        require(firstSerialized.find("\"selectedGroupId\"") != std::string::npos
+                    && firstSerialized.find("\"routingSourceId\"") != std::string::npos
+                    && firstSerialized.find("\"workspaceVisible\"") != std::string::npos,
+                "Sprint 3 playback snapshots must serialize explicit group selection and route metadata.");
         require(firstSerialized.find("roundRobin") == std::string::npos,
                 "Sprint 2 playback snapshots must not invent Round Robin entities early.");
         require(firstSerialized.find("micPosition") == std::string::npos,
@@ -96,6 +104,16 @@ int main()
                 "Identical draft revisions should produce the same playback snapshot digest.");
         require(drs::engine::serializeImmutablePlaybackSnapshot(secondResult.snapshot) == firstSerialized,
                 "Identical draft revisions should produce byte-equivalent playback snapshots.");
+
+        auto visibilityOnlyProject = phase2Project.project;
+        visibilityOnlyProject.authoring.groups[0].workspaceVisible = !visibilityOnlyProject.authoring.groups[0].workspaceVisible;
+        const auto visibilityRequest = builder.requestBuild(0, true);
+        const auto visibilityResult = builder.buildSnapshot(visibilityRequest, visibilityOnlyProject);
+        require(visibilityResult.built, "Visibility-only group changes should still build a snapshot.");
+        require(visibilityResult.snapshot.contentDigest == firstResult.snapshot.contentDigest,
+                "Group workspace visibility must not affect the immutable snapshot digest.");
+        require(drs::engine::serializeImmutablePlaybackSnapshot(visibilityResult.snapshot) != firstSerialized,
+                "Group workspace visibility should remain visible in the serialized snapshot payload.");
 
         drs::engine::RuntimeProjectDocumentController controller(phase2Project.project);
         auto editedProject = controller.getProject();
@@ -112,6 +130,28 @@ int main()
                 "Snapshot digest should change predictably when the authored draft changes.");
         require(editedResult.snapshot.zones[0].gainDb == controller.getProject().authoring.zones[0].gainDb,
                 "Playback snapshot should carry the edited zone normalization values.");
+
+        auto unknownGroupProject = phase2Project.project;
+        unknownGroupProject.authoring.zones[0].groupId = "ghost-group";
+        const auto unknownGroupResult = builder.buildSnapshot(builder.requestBuild(6, true), unknownGroupProject);
+        require(!unknownGroupResult.built, "Zones that reference missing authored groups must fail snapshot validation.");
+        require(containsFinding(unknownGroupResult,
+                                drs::engine::PlaybackSnapshotFindingSeverity::error,
+                                "unknown-zone-group-reference",
+                                "authoring.zones[0].groupId"),
+                "Snapshot validation should report a structured finding when a zone references a missing authored group.");
+
+        auto illegalRoutingProject = phase2Project.project;
+        illegalRoutingProject.authoring.routingBuses[0].inputSourceId =
+            "groups/" + illegalRoutingProject.authoring.groups[0].id;
+        const auto illegalRoutingResult = builder.buildSnapshot(builder.requestBuild(7, true), illegalRoutingProject);
+        require(!illegalRoutingResult.built,
+                "Group routing input sources must remain ineligible until Sprint 4 routing support lands.");
+        require(containsFinding(illegalRoutingResult,
+                                drs::engine::PlaybackSnapshotFindingSeverity::error,
+                                "illegal-routing-input-source",
+                                "authoring.routingBuses[0].inputSourceId"),
+                "Snapshot validation should report a structured finding for unsupported group routing inputs.");
 
         auto invalidProject = phase2Project.project;
         invalidProject.authoring.zones[0].sampleSourceId = "missing-source";

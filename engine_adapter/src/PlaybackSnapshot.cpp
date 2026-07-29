@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace drs::engine
 {
@@ -72,6 +73,29 @@ ordered_json serializeStringArray(const std::vector<std::string>& values)
     for (const auto& value : values)
         array.push_back(value);
     return array;
+}
+
+std::string buildGroupRoutingSourceId(const std::string& groupId)
+{
+    return groupId.empty() ? std::string {} : "groups/" + groupId;
+}
+
+ordered_json serializeGroupRoute(const PlaybackSnapshotGroupRoute& route, bool includeWorkspaceVisible)
+{
+    ordered_json routeObject;
+    routeObject["groupId"] = route.groupId;
+    routeObject["articulationIds"] = serializeStringArray(route.articulationIds);
+    routeObject["zoneIds"] = serializeStringArray(route.zoneIds);
+    routeObject["displayName"] = route.displayName;
+    routeObject["displayOrder"] = route.displayOrder;
+    routeObject["routingSourceId"] = route.routingSourceId;
+    if (includeWorkspaceVisible)
+        routeObject["workspaceVisible"] = route.workspaceVisible;
+    routeObject["gainDb"] = route.gainDb;
+    routeObject["pan"] = route.pan;
+    routeObject["routingBusId"] = route.routingBusId;
+    routeObject["auditionAnchorZoneId"] = route.auditionAnchorZoneId;
+    return routeObject;
 }
 
 ordered_json serializeVelocityCrossfade(const VelocityCrossfadeDescriptor& crossfade)
@@ -270,6 +294,7 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
     root["sourceAuthoringSchemaVersion"] = snapshot.sourceAuthoringSchemaVersion;
     root["draftRevision"] = snapshot.draftRevision;
     root["selectedZoneId"] = snapshot.selectedZoneId;
+    root["selectedGroupId"] = snapshot.selectedGroupId;
     root["selectedPerformanceBankId"] = snapshot.selectedPerformanceBankId;
 
     if (includeDigest)
@@ -347,13 +372,7 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
 
     ordered_json groupRoutes = ordered_json::array();
     for (const auto& route : snapshot.groupRoutes)
-    {
-        ordered_json routeObject;
-        routeObject["groupId"] = route.groupId;
-        routeObject["articulationIds"] = serializeStringArray(route.articulationIds);
-        routeObject["zoneIds"] = serializeStringArray(route.zoneIds);
-        groupRoutes.push_back(std::move(routeObject));
-    }
+        groupRoutes.push_back(serializeGroupRoute(route, includeDigest));
     root["groupRoutes"] = std::move(groupRoutes);
 
     ordered_json zones = ordered_json::array();
@@ -438,6 +457,7 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
     result.snapshot.sourceAuthoringSchemaVersion = project.authoring.schemaVersion;
     result.snapshot.draftRevision = request.requestedDraftRevision;
     result.snapshot.selectedZoneId = project.authoring.selectedZoneId;
+    result.snapshot.selectedGroupId = project.authoring.selectedGroupId;
     result.snapshot.selectedPerformanceBankId = project.authoring.selectedPerformanceBankId;
     result.snapshot.notes = project.notes;
     result.snapshot.notes.insert(result.snapshot.notes.end(),
@@ -526,11 +546,54 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
         result.snapshot.fxSlots.push_back({ fxSlot.id, fxSlot.displayName, fxSlot.effectType, fxSlot.bypassed });
     }
 
+    std::unordered_set<std::string> authoredZoneIds;
+    authoredZoneIds.reserve(project.authoring.zones.size());
+    for (const auto& zone : project.authoring.zones)
+    {
+        if (!zone.id.empty())
+            authoredZoneIds.insert(zone.id);
+    }
+
+    std::unordered_map<std::string, std::size_t> routingBusIndices;
     result.snapshot.routingBuses.reserve(project.authoring.routingBuses.size());
     for (std::size_t index = 0; index < project.authoring.routingBuses.size(); ++index)
     {
         const auto& routingBus = project.authoring.routingBuses[index];
         const auto path = "authoring.routingBuses[" + std::to_string(index) + "]";
+
+        if (routingBus.id.empty())
+        {
+            addFinding(result, PlaybackSnapshotFindingSeverity::error, "missing-routing-bus-id", path + ".id",
+                       "Routing bus ids must be non-empty.");
+        }
+        else if (!routingBusIndices.emplace(routingBus.id, index).second)
+        {
+            addFinding(result, PlaybackSnapshotFindingSeverity::error, "duplicate-routing-bus-id", path + ".id",
+                       "Routing bus id '" + routingBus.id + "' is duplicated.");
+        }
+
+        if (routingBus.inputSourceId.empty())
+        {
+            addFinding(result,
+                       PlaybackSnapshotFindingSeverity::error,
+                       "missing-routing-input-source",
+                       path + ".inputSourceId",
+                       "Routing buses must declare an input source.");
+        }
+        else if (routingBus.inputSourceId != "master" && !authoredZoneIds.count(routingBus.inputSourceId))
+        {
+            const auto usesGroupSource = routingBus.inputSourceId.rfind("groups/", 0) == 0;
+            addFinding(result,
+                       PlaybackSnapshotFindingSeverity::error,
+                       usesGroupSource ? "illegal-routing-input-source" : "unknown-routing-input-source",
+                       path + ".inputSourceId",
+                       usesGroupSource
+                           ? "Routing bus '" + routingBus.id
+                               + "' references group input source '" + routingBus.inputSourceId
+                               + "' before Sprint 4 routing support."
+                           : "Routing bus '" + routingBus.id + "' references unknown input source '"
+                               + routingBus.inputSourceId + "'.");
+        }
 
         for (const auto& fxSlotId : routingBus.fxSlotIds)
         {
@@ -555,6 +618,77 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
     std::unordered_map<std::string, std::size_t> articulationRouteIndices;
     std::unordered_map<std::string, std::size_t> groupRouteIndices;
     std::unordered_map<std::string, std::size_t> zoneIndices;
+    const auto usesExplicitGroupDefinitions = project.schemaVersion >= 4
+        && project.authoring.schemaVersion >= 3;
+    if (usesExplicitGroupDefinitions)
+    {
+        result.snapshot.groupRoutes.reserve(project.authoring.groups.size());
+        for (std::size_t index = 0; index < project.authoring.groups.size(); ++index)
+        {
+            const auto& group = project.authoring.groups[index];
+            const auto path = "authoring.groups[" + std::to_string(index) + "]";
+
+            if (group.id.empty())
+            {
+                addFinding(result, PlaybackSnapshotFindingSeverity::error, "missing-group-id", path + ".id",
+                           "Group ids must be non-empty.");
+            }
+            else if (!groupRouteIndices.emplace(group.id, result.snapshot.groupRoutes.size()).second)
+            {
+                addFinding(result, PlaybackSnapshotFindingSeverity::error, "duplicate-group-id", path + ".id",
+                           "Group id '" + group.id + "' is duplicated.");
+            }
+
+            if (group.displayName.empty())
+            {
+                addFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           "missing-group-display-name",
+                           path + ".displayName",
+                           "Groups must declare a display name.");
+            }
+
+            if (group.displayOrder < 0)
+            {
+                addFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           "invalid-group-display-order",
+                           path + ".displayOrder",
+                           "Group displayOrder must not be negative.");
+            }
+
+            if (!group.routingBusId.empty() && !routingBusIndices.count(group.routingBusId))
+            {
+                addFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           "unknown-group-routing-bus",
+                           path + ".routingBusId",
+                           "Group '" + group.id + "' references unknown routing bus '" + group.routingBusId + "'.");
+            }
+
+            PlaybackSnapshotGroupRoute route;
+            route.groupId = group.id;
+            route.displayName = group.displayName;
+            route.displayOrder = group.displayOrder;
+            route.routingSourceId = buildGroupRoutingSourceId(group.id);
+            route.workspaceVisible = group.workspaceVisible;
+            route.gainDb = group.gainDb;
+            route.pan = group.pan;
+            route.routingBusId = group.routingBusId;
+            route.auditionAnchorZoneId = group.auditionAnchorZoneId;
+            result.snapshot.groupRoutes.push_back(std::move(route));
+        }
+    }
+
+    if (usesExplicitGroupDefinitions && !project.authoring.zones.empty() && project.authoring.groups.empty())
+    {
+        addFinding(result,
+                   PlaybackSnapshotFindingSeverity::error,
+                   "missing-group-definitions",
+                   "authoring.groups",
+                   "Projects with playable zones must carry explicit authored groups in the immutable snapshot build.");
+    }
+
     result.snapshot.zones.reserve(project.authoring.zones.size());
     const auto crossfadeRuntimeDescriptors = buildSnapshotCrossfadeRuntimeDescriptors(project);
     std::vector<VelocityCrossfadeTopologyZoneDefinition> crossfadeTopologyZones;
@@ -719,13 +853,27 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
             const auto groupIterator = groupRouteIndices.find(zone.groupId);
             if (groupIterator == groupRouteIndices.end())
             {
-                PlaybackSnapshotGroupRoute route;
-                route.groupId = zone.groupId;
-                route.zoneIds.push_back(zone.id);
-                if (!zone.articulationId.empty())
-                    route.articulationIds.push_back(zone.articulationId);
-                groupRouteIndices.emplace(zone.groupId, result.snapshot.groupRoutes.size());
-                result.snapshot.groupRoutes.push_back(std::move(route));
+                if (usesExplicitGroupDefinitions)
+                {
+                    addFinding(result,
+                               PlaybackSnapshotFindingSeverity::error,
+                               "unknown-zone-group-reference",
+                               path + ".groupId",
+                               "Zone '" + zone.id + "' references unknown authored group '" + zone.groupId + "'.");
+                }
+                else
+                {
+                    PlaybackSnapshotGroupRoute route;
+                    route.groupId = zone.groupId;
+                    route.displayName = zone.groupId;
+                    route.displayOrder = static_cast<int>(result.snapshot.groupRoutes.size());
+                    route.routingSourceId = buildGroupRoutingSourceId(zone.groupId);
+                    route.zoneIds.push_back(zone.id);
+                    if (!zone.articulationId.empty())
+                        route.articulationIds.push_back(zone.articulationId);
+                    groupRouteIndices.emplace(zone.groupId, result.snapshot.groupRoutes.size());
+                    result.snapshot.groupRoutes.push_back(std::move(route));
+                }
             }
             else
             {
@@ -751,10 +899,51 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
                    buildCrossfadeTopologyMessage(zone.id, finding.issue));
     }
 
+    std::unordered_set<std::string> routedGroupZoneIds;
+    for (std::size_t index = 0; index < result.snapshot.groupRoutes.size(); ++index)
+    {
+        const auto& route = result.snapshot.groupRoutes[index];
+        const auto path = usesExplicitGroupDefinitions
+            ? "authoring.groups[" + std::to_string(index) + "]"
+            : "snapshot.groupRoutes[" + std::to_string(index) + "]";
+
+        for (const auto& zoneId : route.zoneIds)
+        {
+            if (!routedGroupZoneIds.insert(zoneId).second)
+            {
+                addFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           "duplicate-group-zone-coverage",
+                           path + ".id",
+                           "Zone '" + zoneId + "' appears more than once across authored group routes.");
+            }
+        }
+
+        if (usesExplicitGroupDefinitions
+            && !route.auditionAnchorZoneId.empty()
+            && !containsValue(route.zoneIds, route.auditionAnchorZoneId))
+        {
+            addFinding(result,
+                       PlaybackSnapshotFindingSeverity::error,
+                       "invalid-group-audition-anchor",
+                       path + ".auditionAnchorZoneId",
+                       "Group '" + route.groupId + "' audition anchor '" + route.auditionAnchorZoneId
+                           + "' must reference a zone assigned to that group.");
+        }
+    }
+
     if (!project.authoring.selectedZoneId.empty() && !zoneIndices.count(project.authoring.selectedZoneId))
     {
         addFinding(result, PlaybackSnapshotFindingSeverity::warning, "unknown-selected-zone", "authoring.selectedZoneId",
                    "Selected zone '" + project.authoring.selectedZoneId + "' does not exist in the snapshot zone set.");
+    }
+
+    if (usesExplicitGroupDefinitions
+        && !project.authoring.selectedGroupId.empty()
+        && !groupRouteIndices.count(project.authoring.selectedGroupId))
+    {
+        addFinding(result, PlaybackSnapshotFindingSeverity::warning, "unknown-selected-group", "authoring.selectedGroupId",
+                   "Selected group '" + project.authoring.selectedGroupId + "' does not exist in the snapshot group set.");
     }
 
     if (result.snapshot.zones.empty())

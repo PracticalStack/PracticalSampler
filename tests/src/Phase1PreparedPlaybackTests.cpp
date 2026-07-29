@@ -295,6 +295,10 @@ int main()
         require(firstPrepared.prepared.preparedContentDigest
                     == drs::engine::computePreparedPlaybackContentDigest(firstPrepared.prepared),
                 "Prepared playback builds must expose a digest derived from deterministic prepared serialization.");
+        require(firstPrepared.prepared.selectedGroupId == firstSnapshot.snapshot.selectedGroupId,
+                "Prepared playback should preserve the selected group identity from the immutable snapshot.");
+        require(firstPrepared.prepared.groupRoutes.size() == firstSnapshot.snapshot.groupRoutes.size(),
+                "Prepared playback should retain one immutable group route per snapshot group.");
         require(firstPrepared.metrics.preparedOwnershipRecordCount == firstPrepared.prepared.ownershipRecords.size(),
                 "Prepared playback metrics should expose ownership-record counts.");
         require(firstPrepared.metrics.preparedOwnershipBytes == firstPrepared.metrics.preparedBytes,
@@ -317,6 +321,14 @@ int main()
                 "Prepared playback serialization should be deterministic when repeated for the same immutable payload.");
         require(firstPreparedContentSerialization == drs::engine::serializePreparedPlaybackContent(firstPrepared.prepared),
                 "Prepared playback content serialization should be deterministic when repeated for the same immutable payload.");
+        require(firstPreparedSerialization.find("\"groupRoutes\"") != std::string::npos
+                    && firstPreparedSerialization.find("\"routingSourceId\"") != std::string::npos
+                    && firstPreparedSerialization.find("\"workspaceVisible\"") != std::string::npos,
+                "Sprint 3 prepared playback serialization must retain group route metadata.");
+        require(firstPrepared.prepared.groupRoutes[0].groupId == firstSnapshot.snapshot.groupRoutes[0].groupId
+                    && firstPrepared.prepared.groupRoutes[0].gainDb == firstSnapshot.snapshot.groupRoutes[0].gainDb
+                    && firstPrepared.prepared.groupRoutes[0].pan == firstSnapshot.snapshot.groupRoutes[0].pan,
+                "Prepared playback should preserve immutable group route mix metadata.");
         require(firstPrepared.prepared.samples[0].canonicalSourcePath
                     == normalizePath(firstPrepared.prepared.samples[0].sourcePath),
                 "Prepared sample handles should expose a normalized canonical source path.");
@@ -523,6 +535,31 @@ int main()
                 "Full prepared playback serialization should preserve unique snapshot-build identity across repeated builds.");
         require(secondPreparedContentSerialization == firstPreparedContentSerialization,
                 "Repeated preparation of the same snapshot should preserve deterministic content serialization.");
+
+        auto visibilityProject = phase2Project.project;
+        visibilityProject.authoring.groups[0].workspaceVisible = !visibilityProject.authoring.groups[0].workspaceVisible;
+        const auto visibilitySnapshotRequest = snapshotBuilder.requestBuild(0, true);
+        const auto visibilitySnapshot = snapshotBuilder.buildSnapshot(visibilitySnapshotRequest, visibilityProject);
+        require(visibilitySnapshot.built,
+                "Visibility-only authored group edits should still produce an immutable snapshot.");
+        require(visibilitySnapshot.snapshot.contentDigest == firstSnapshot.snapshot.contentDigest,
+                "Group workspace visibility must not alter the immutable snapshot digest.");
+        const auto visibilityPreparedRequest = preparedService.requestBuild(visibilitySnapshot, referenceStream);
+        require(visibilityPreparedRequest.accepted,
+                "Prepared playback should accept visibility-only authored group edits.");
+        const auto visibilityPrepared = preparedService.prepare(visibilityPreparedRequest, visibilitySnapshot, referenceStream);
+        require(visibilityPrepared.built,
+                "Visibility-only authored group edits should still prepare successfully.");
+        require(visibilityPrepared.prepared.preparedContentDigest == firstPrepared.prepared.preparedContentDigest,
+                "Group workspace visibility must not alter prepared playback content digests.");
+        require(visibilityPrepared.metrics.cacheHitCount == phase2Project.project.sampleSources.size()
+                    && visibilityPrepared.metrics.cacheMissCount == 0
+                    && visibilityPrepared.metrics.decodedBytes == 0,
+                "Visibility-only authored group edits should fully reuse warm prepared assets.");
+        require(drs::engine::serializeImmutablePreparedPlayback(visibilityPrepared.prepared)
+                    != firstPreparedSerialization,
+                "Serialized prepared playback should still expose visibility-only group state changes.");
+
         const auto firstPreparedCacheKeys = collectPreparedCacheKeys(firstPrepared.prepared);
 
         drs::engine::RuntimeProjectDocumentController zoneOnlyController(phase2Project.project);

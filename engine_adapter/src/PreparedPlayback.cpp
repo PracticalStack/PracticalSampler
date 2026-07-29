@@ -11,6 +11,7 @@
 #include <sstream>
 #include <tuple>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace drs::engine
 {
@@ -106,12 +107,48 @@ ordered_json serializeRoundRobin(const RoundRobinDescriptor& roundRobin)
     return value;
 }
 
+ordered_json serializeGroupRoute(const PreparedPlaybackGroupRoute& route, bool includeWorkspaceVisible)
+{
+    ordered_json routeObject;
+    routeObject["groupId"] = route.groupId;
+    routeObject["articulationIds"] = route.articulationIds;
+    routeObject["zoneIds"] = route.zoneIds;
+    routeObject["displayName"] = route.displayName;
+    routeObject["displayOrder"] = route.displayOrder;
+    routeObject["routingSourceId"] = route.routingSourceId;
+    if (includeWorkspaceVisible)
+        routeObject["workspaceVisible"] = route.workspaceVisible;
+    routeObject["gainDb"] = route.gainDb;
+    routeObject["pan"] = route.pan;
+    routeObject["routingBusId"] = route.routingBusId;
+    routeObject["auditionAnchorZoneId"] = route.auditionAnchorZoneId;
+    return routeObject;
+}
+
+PreparedPlaybackGroupRoute toPreparedGroupRoute(const PlaybackSnapshotGroupRoute& route)
+{
+    PreparedPlaybackGroupRoute preparedRoute;
+    preparedRoute.groupId = route.groupId;
+    preparedRoute.articulationIds = route.articulationIds;
+    preparedRoute.zoneIds = route.zoneIds;
+    preparedRoute.displayName = route.displayName;
+    preparedRoute.displayOrder = route.displayOrder;
+    preparedRoute.routingSourceId = route.routingSourceId;
+    preparedRoute.workspaceVisible = route.workspaceVisible;
+    preparedRoute.gainDb = route.gainDb;
+    preparedRoute.pan = route.pan;
+    preparedRoute.routingBusId = route.routingBusId;
+    preparedRoute.auditionAnchorZoneId = route.auditionAnchorZoneId;
+    return preparedRoute;
+}
+
 ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool includeDigest)
 {
     ordered_json root;
     root["snapshotContentDigest"] = prepared.snapshotContentDigest;
     root["compilerVersion"] = prepared.compilerVersion;
     root["draftRevision"] = prepared.draftRevision;
+    root["selectedGroupId"] = prepared.selectedGroupId;
     root["containerId"] = prepared.containerId;
     root["containerPath"] = prepared.containerPath;
     root["payloadEncoding"] = prepared.payloadEncoding;
@@ -217,6 +254,11 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
         streams.push_back(std::move(streamObject));
     }
     root["streams"] = std::move(streams);
+
+    ordered_json groupRoutes = ordered_json::array();
+    for (const auto& route : prepared.groupRoutes)
+        groupRoutes.push_back(serializeGroupRoute(route, includeDigest));
+    root["groupRoutes"] = std::move(groupRoutes);
 
     ordered_json zones = ordered_json::array();
     for (const auto& zone : prepared.zones)
@@ -733,6 +775,7 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     result.prepared.snapshotContentDigest = snapshotResult.snapshot.contentDigest;
     result.prepared.compilerVersion = compilerVersion;
     result.prepared.draftRevision = snapshotResult.snapshot.draftRevision;
+    result.prepared.selectedGroupId = snapshotResult.snapshot.selectedGroupId;
     result.prepared.containerId = streamResult.container.containerId;
     result.prepared.containerPath = streamResult.containerPath;
     result.prepared.payloadEncoding = streamResult.container.payloadEncoding;
@@ -744,6 +787,7 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     result.prepared.ownershipRecords.reserve(resolvedRequest.sampleResolutions.size());
     result.prepared.samples.reserve(resolvedRequest.sampleResolutions.size());
     result.prepared.streams.reserve(resolvedRequest.sampleResolutions.size());
+    result.prepared.groupRoutes.reserve(snapshotResult.snapshot.groupRoutes.size());
     result.prepared.zones.reserve(snapshotResult.snapshot.zones.size());
 
     for (const auto& sampleResolution : resolvedRequest.sampleResolutions)
@@ -979,6 +1023,34 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             zone.roundRobinPosition,
             zone.triggerMode
         });
+    }
+
+    std::unordered_set<std::string> preparedZoneIds;
+    preparedZoneIds.reserve(result.prepared.zones.size());
+    for (const auto& zone : result.prepared.zones)
+        preparedZoneIds.insert(zone.zoneId);
+
+    for (std::size_t index = 0; index < snapshotResult.snapshot.groupRoutes.size(); ++index)
+    {
+        if (isCancellationRequested(request))
+            return finishCanceled();
+
+        const auto& snapshotGroupRoute = snapshotResult.snapshot.groupRoutes[index];
+        result.prepared.groupRoutes.push_back(toPreparedGroupRoute(snapshotGroupRoute));
+
+        const auto path = "groupRoutes[" + std::to_string(index) + "]";
+        for (const auto& zoneId : snapshotGroupRoute.zoneIds)
+        {
+            if (!preparedZoneIds.count(zoneId))
+            {
+                addFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           "missing-prepared-group-zone",
+                           path + ".zoneIds",
+                           "Prepared playback did not retain zone '" + zoneId
+                               + "' required by group '" + snapshotGroupRoute.groupId + "'.");
+            }
+        }
     }
 
     result.metrics.preparedSampleCount = result.prepared.samples.size();
@@ -1706,9 +1778,42 @@ std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& 
     {
         std::sort(route.articulationIds.begin(), route.articulationIds.end());
         std::sort(route.zoneIds.begin(), route.zoneIds.end());
-        root["groupRoutes"].push_back({ { "id", route.groupId },
-                                         { "articulations", route.articulationIds },
-                                         { "zones", route.zoneIds } });
+        root["groupRoutes"].push_back({
+            { "id", route.groupId },
+            { "articulations", route.articulationIds },
+            { "zones", route.zoneIds },
+            { "displayName", route.displayName },
+            { "displayOrder", route.displayOrder },
+            { "routingSourceId", route.routingSourceId },
+            { "gainDb", route.gainDb },
+            { "pan", route.pan },
+            { "routingBusId", route.routingBusId },
+            { "auditionAnchorZoneId", route.auditionAnchorZoneId }
+        });
+    }
+
+    auto preparedGroupRoutes = prepared.groupRoutes;
+    std::sort(preparedGroupRoutes.begin(), preparedGroupRoutes.end(), [](const auto& left, const auto& right)
+    {
+        return left.groupId < right.groupId;
+    });
+    root["preparedGroupRoutes"] = ordered_json::array();
+    for (auto& route : preparedGroupRoutes)
+    {
+        std::sort(route.articulationIds.begin(), route.articulationIds.end());
+        std::sort(route.zoneIds.begin(), route.zoneIds.end());
+        root["preparedGroupRoutes"].push_back({
+            { "id", route.groupId },
+            { "articulations", route.articulationIds },
+            { "zones", route.zoneIds },
+            { "displayName", route.displayName },
+            { "displayOrder", route.displayOrder },
+            { "routingSourceId", route.routingSourceId },
+            { "gainDb", route.gainDb },
+            { "pan", route.pan },
+            { "routingBusId", route.routingBusId },
+            { "auditionAnchorZoneId", route.auditionAnchorZoneId }
+        });
     }
 
     auto buses = snapshot.routingBuses;
@@ -1886,12 +1991,28 @@ bool operator==(const PreparedPlaybackZoneHandle& left, const PreparedPlaybackZo
         && left.triggerMode == right.triggerMode;
 }
 
+bool operator==(const PreparedPlaybackGroupRoute& left, const PreparedPlaybackGroupRoute& right)
+{
+    return left.groupId == right.groupId
+        && left.articulationIds == right.articulationIds
+        && left.zoneIds == right.zoneIds
+        && left.displayName == right.displayName
+        && left.displayOrder == right.displayOrder
+        && left.routingSourceId == right.routingSourceId
+        && left.workspaceVisible == right.workspaceVisible
+        && left.gainDb == right.gainDb
+        && left.pan == right.pan
+        && left.routingBusId == right.routingBusId
+        && left.auditionAnchorZoneId == right.auditionAnchorZoneId;
+}
+
 bool operator==(const ImmutablePreparedPlayback& left, const ImmutablePreparedPlayback& right)
 {
     return left.snapshotBuildId == right.snapshotBuildId
         && left.snapshotContentDigest == right.snapshotContentDigest
         && left.compilerVersion == right.compilerVersion
         && left.draftRevision == right.draftRevision
+        && left.selectedGroupId == right.selectedGroupId
         && left.containerId == right.containerId
         && left.containerPath == right.containerPath
         && left.payloadEncoding == right.payloadEncoding
@@ -1903,6 +2024,7 @@ bool operator==(const ImmutablePreparedPlayback& left, const ImmutablePreparedPl
         && left.ownershipRecords == right.ownershipRecords
         && left.samples == right.samples
         && left.streams == right.streams
+        && left.groupRoutes == right.groupRoutes
         && left.zones == right.zones
         && left.notes == right.notes;
 }

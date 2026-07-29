@@ -120,6 +120,21 @@ struct PreparedPlaybackZoneHandle
     ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;
 };
 
+struct PreparedPlaybackGroupRoute
+{
+    std::string groupId;
+    std::vector<std::string> articulationIds;
+    std::vector<std::string> zoneIds;
+    std::string displayName;
+    int displayOrder = 0;
+    std::string routingSourceId;
+    bool workspaceVisible = true;
+    double gainDb = 0.0;
+    double pan = 0.0;
+    std::string routingBusId;
+    std::string auditionAnchorZoneId;
+};
+
 // S3.7-T5 deferral note: this remains a public aggregate for current prepared-cache plumbing,
 // facade wiring, and regression tests. Treat it as a write-once build product after preparation
 // completes; a dedicated encapsulation pass should hide mutable storage behind const views once
@@ -130,6 +145,7 @@ struct ImmutablePreparedPlayback
     std::string snapshotContentDigest;
     std::string compilerVersion;
     std::size_t draftRevision = 0;
+    std::string selectedGroupId;
     std::string containerId;
     std::string containerPath;
     std::string payloadEncoding;
@@ -144,6 +160,7 @@ struct ImmutablePreparedPlayback
     std::vector<PreparedPlaybackOwnershipRecord> ownershipRecords;
     std::vector<PreparedPlaybackSampleHandle> samples;
     std::vector<PreparedPlaybackStreamHandle> streams;
+    std::vector<PreparedPlaybackGroupRoute> groupRoutes;
     std::vector<PreparedPlaybackZoneHandle> zones;
     std::vector<std::string> notes;
 };
@@ -333,6 +350,7 @@ bool operator==(const PreparedPlaybackOwnershipRecord& left, const PreparedPlayb
 bool operator==(const PreparedPlaybackSampleHandle& left, const PreparedPlaybackSampleHandle& right);
 bool operator==(const PreparedPlaybackStreamHandle& left, const PreparedPlaybackStreamHandle& right);
 bool operator==(const PreparedPlaybackZoneHandle& left, const PreparedPlaybackZoneHandle& right);
+bool operator==(const PreparedPlaybackGroupRoute& left, const PreparedPlaybackGroupRoute& right);
 bool operator==(const ImmutablePreparedPlayback& left, const ImmutablePreparedPlayback& right);
 
 class PreparedPlaybackService

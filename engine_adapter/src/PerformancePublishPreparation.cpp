@@ -45,6 +45,20 @@ bool zonesMatch(const PlaybackSnapshotZone& authored, const PreparedPlaybackZone
         && authored.roundRobinPosition == prepared.roundRobinPosition
         && authored.triggerMode == prepared.triggerMode;
 }
+
+bool groupRoutesMatch(const PlaybackSnapshotGroupRoute& authored, const PreparedPlaybackGroupRoute& prepared)
+{
+    return authored.groupId == prepared.groupId
+        && authored.articulationIds == prepared.articulationIds
+        && authored.zoneIds == prepared.zoneIds
+        && authored.displayName == prepared.displayName
+        && authored.displayOrder == prepared.displayOrder
+        && authored.routingSourceId == prepared.routingSourceId
+        && authored.gainDb == prepared.gainDb
+        && authored.pan == prepared.pan
+        && authored.routingBusId == prepared.routingBusId
+        && authored.auditionAnchorZoneId == prepared.auditionAnchorZoneId;
+}
 } // namespace
 
 PerformancePublishPreparationResult validatePerformancePublishPreparation(
@@ -125,6 +139,9 @@ PerformancePublishPreparationResult validatePerformancePublishPreparation(
     if (snapshot.zones.size() != prepared.zones.size())
         addError(result, "publish-zone-coverage-incomplete", "prepared.zones",
                  "Every authored zone must have exactly one immutable prepared route.");
+    if (snapshot.groupRoutes.size() != prepared.groupRoutes.size())
+        addError(result, "publish-group-coverage-incomplete", "prepared.groupRoutes",
+                 "Every authored group route must have exactly one immutable prepared group route.");
 
     std::unordered_map<std::string, const PreparedPlaybackSampleHandle*> samples;
     for (std::size_t index = 0; index < prepared.samples.size(); ++index)
@@ -224,6 +241,29 @@ PerformancePublishPreparationResult validatePerformancePublishPreparation(
     if (routedGroupZones != authoredZoneIds)
         addError(result, "publish-group-coverage-incomplete", "snapshot.groupRoutes",
                  "Group routes must cover the complete authored zone set exactly once.");
+
+    std::unordered_map<std::string, const PreparedPlaybackGroupRoute*> preparedGroupRoutes;
+    for (std::size_t index = 0; index < prepared.groupRoutes.size(); ++index)
+    {
+        const auto& route = prepared.groupRoutes[index];
+        const auto path = "prepared.groupRoutes[" + std::to_string(index) + "]";
+        if (route.groupId.empty() || !preparedGroupRoutes.emplace(route.groupId, &route).second)
+        {
+            addError(result, "publish-prepared-group-route-identity-invalid", path + ".groupId",
+                     "Prepared group route ids must be non-empty and unique.");
+        }
+    }
+    for (std::size_t index = 0; index < snapshot.groupRoutes.size(); ++index)
+    {
+        const auto& route = snapshot.groupRoutes[index];
+        const auto found = preparedGroupRoutes.find(route.groupId);
+        if (found == preparedGroupRoutes.end() || !groupRoutesMatch(route, *found->second))
+        {
+            addError(result, "publish-prepared-group-route-mismatch",
+                     "snapshot.groupRoutes[" + std::to_string(index) + "]",
+                     "Prepared group metadata or membership does not match the authored immutable snapshot.");
+        }
+    }
 
     std::unordered_set<std::string> fxSlotIds;
     for (const auto& slot : snapshot.fxSlots)
