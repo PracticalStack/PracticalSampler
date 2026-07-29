@@ -1088,6 +1088,23 @@ add_test(
     COMMAND drs_phase3_round_robin_contract_tests
 )
 
+# Phase 1 Zone Groups Sprint 1 contract and migration baseline.
+add_executable(drs_phase1_zone_groups_contract_tests
+    src/Phase1ZoneGroupsContractTests.cpp
+)
+
+target_link_libraries(drs_phase1_zone_groups_contract_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_features(drs_phase1_zone_groups_contract_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase1.zone_groups_contract
+    COMMAND drs_phase1_zone_groups_contract_tests
+)
+
 add_executable(drs_phase3_round_robin_fixture_characterization_tests
     src/Phase3RoundRobinFixtureCharacterizationTests.cpp
 )
@@ -1183,6 +1200,17 @@ target_compile_definitions(drs_phase3_round_robin_contract_red_tests
 )
 
 target_compile_features(drs_phase3_round_robin_contract_red_tests PRIVATE cxx_std_17)
+
+add_executable(drs_phase1_zone_groups_contract_red_tests
+    src/Phase1ZoneGroupsContractRedTests.cpp
+)
+
+target_compile_definitions(drs_phase1_zone_groups_contract_red_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_phase1_zone_groups_contract_red_tests PRIVATE cxx_std_17)
 
 # Direct-only expected-red audit for the parser/report/UI seams intentionally left open by Sprint 3.1.1.
 add_executable(drs_sprint31_sfz_contract_red_tests
@@ -2318,11 +2346,13 @@ add_dependencies(drs_all_tests
     drs_phase3_crossfade_fixture_characterization_tests
     drs_phase3_crossfade_persistence_tests
     drs_phase3_crossfade_prepared_playback_tests
+    drs_phase1_zone_groups_contract_tests
     drs_phase3_round_robin_contract_tests
     drs_phase3_round_robin_fixture_characterization_tests
     drs_phase3_round_robin_schema_persistence_tests
     drs_phase3_round_robin_prepared_playback_tests
     drs_phase3_round_robin_hardening_tests
+    drs_phase1_zone_groups_contract_red_tests
     drs_phase3_round_robin_contract_red_tests
     drs_sprint6_publish_contract_tests
     drs_sprint6_publish_contract_seam_tests
