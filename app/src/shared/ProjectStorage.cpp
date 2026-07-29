@@ -196,6 +196,19 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
     std::unordered_map<std::string, std::size_t> articulationIndexes;
     std::unordered_map<std::string, std::size_t> groupIndexes;
 
+    instrument.groups.reserve(project.authoring.groups.size());
+    for (const auto& projectGroup : project.authoring.groups)
+    {
+        if (projectGroup.id.empty() || groupIndexes.count(projectGroup.id))
+            continue;
+
+        drs::engine::RuntimeGroupDefinition group;
+        group.id = projectGroup.id;
+        group.name = projectGroup.displayName.empty() ? projectGroup.id : projectGroup.displayName;
+        groupIndexes.emplace(group.id, instrument.groups.size());
+        instrument.groups.push_back(std::move(group));
+    }
+
     for (const auto& projectZone : project.authoring.zones)
     {
         if (!projectZone.articulationId.empty() && !articulationIndexes.count(projectZone.articulationId))

@@ -43,6 +43,100 @@ bool isRoundRobinGroupingCompatible(const RuntimeProjectZoneDefinition& anchor,
         && anchor.triggerMode == candidate.triggerMode;
 }
 
+bool usesExplicitZoneGroupsSchema(const RuntimeProjectModel& project) noexcept
+{
+    return project.schemaVersion >= 4 && project.authoring.schemaVersion >= 3;
+}
+
+void synchronizeExplicitZoneGroups(RuntimeProjectModel& project)
+{
+    if (!usesExplicitZoneGroupsSchema(project))
+        return;
+
+    auto& authoring = project.authoring;
+    auto nextDisplayOrder = static_cast<int>(authoring.groups.size());
+    for (const auto& group : authoring.groups)
+        nextDisplayOrder = std::max(nextDisplayOrder, group.displayOrder + 1);
+
+    for (const auto& zone : authoring.zones)
+    {
+        if (zone.groupId.empty())
+            continue;
+
+        const auto iterator = std::find_if(authoring.groups.begin(),
+                                           authoring.groups.end(),
+                                           [&](const RuntimeProjectGroupDefinition& group)
+                                           {
+                                               return group.id == zone.groupId;
+                                           });
+        if (iterator != authoring.groups.end())
+            continue;
+
+        RuntimeProjectGroupDefinition group;
+        group.id = zone.groupId;
+        group.displayName = zone.groupId;
+        group.displayOrder = nextDisplayOrder++;
+        group.workspaceVisible = true;
+        group.gainDb = 0.0;
+        group.pan = 0.0;
+        group.auditionAnchorZoneId = zone.id;
+        authoring.groups.push_back(std::move(group));
+    }
+
+    for (auto& group : authoring.groups)
+    {
+        if (group.displayName.empty())
+            group.displayName = group.id;
+
+        const auto anchorIterator = std::find_if(authoring.zones.begin(),
+                                                 authoring.zones.end(),
+                                                 [&](const RuntimeProjectZoneDefinition& zone)
+                                                 {
+                                                     return zone.id == group.auditionAnchorZoneId
+                                                         && zone.groupId == group.id;
+                                                 });
+        if (anchorIterator != authoring.zones.end())
+            continue;
+
+        const auto firstMember = std::find_if(authoring.zones.begin(),
+                                              authoring.zones.end(),
+                                              [&](const RuntimeProjectZoneDefinition& zone)
+                                              {
+                                                  return zone.groupId == group.id;
+                                              });
+        group.auditionAnchorZoneId = firstMember != authoring.zones.end() ? firstMember->id : std::string {};
+    }
+
+    if (!authoring.selectedZoneId.empty())
+    {
+        const auto selectedZone = std::find_if(authoring.zones.begin(),
+                                               authoring.zones.end(),
+                                               [&](const RuntimeProjectZoneDefinition& zone)
+                                               {
+                                                   return zone.id == authoring.selectedZoneId;
+                                               });
+        if (selectedZone != authoring.zones.end())
+        {
+            authoring.selectedGroupId = selectedZone->groupId;
+            return;
+        }
+    }
+
+    if (!authoring.selectedGroupId.empty())
+    {
+        const auto selectedGroup = std::find_if(authoring.groups.begin(),
+                                                authoring.groups.end(),
+                                                [&](const RuntimeProjectGroupDefinition& group)
+                                                {
+                                                    return group.id == authoring.selectedGroupId;
+                                                });
+        if (selectedGroup != authoring.groups.end())
+            return;
+    }
+
+    authoring.selectedGroupId = authoring.groups.empty() ? std::string {} : authoring.groups.front().id;
+}
+
 void clearRoundRobinAssignment(RuntimeProjectZoneDefinition& zone)
 {
     zone.roundRobin.reset();
@@ -263,7 +357,13 @@ RuntimeProjectDocumentActionResult AuthoringSession::selectZone(const std::strin
                                   "Zone '" + zoneId + "' does not exist in the current authoring project.");
 
     project.authoring.selectedZoneId = zoneId;
-    return documentController.commitSnapshot(project, "Select zone", {"authoring.selectedZoneId"});
+    synchronizeExplicitZoneGroups(project);
+
+    std::vector<std::string> changedPaths { "authoring.selectedZoneId" };
+    if (usesExplicitZoneGroupsSchema(project))
+        changedPaths.push_back("authoring.selectedGroupId");
+
+    return documentController.commitSnapshot(project, "Select zone", changedPaths);
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::selectPerformanceBank(const std::string& performanceBankId)
@@ -298,13 +398,16 @@ RuntimeProjectDocumentActionResult AuthoringSession::updateSelectedZone(const Ru
     auto project = getProject();
     project.authoring.zones[*selectedZoneIndex] = zone;
     project.authoring.selectedZoneId = zone.id;
+    synchronizeExplicitZoneGroups(project);
 
-    return documentController.commitSnapshot(project,
-                                             label,
-                                             {
-                                                 "authoring.zones[" + std::to_string(*selectedZoneIndex) + "]",
-                                                 "authoring.selectedZoneId"
-                                             });
+    std::vector<std::string> changedPaths {
+        "authoring.zones[" + std::to_string(*selectedZoneIndex) + "]",
+        "authoring.selectedZoneId"
+    };
+    if (usesExplicitZoneGroupsSchema(project))
+        changedPaths.push_back("authoring.selectedGroupId");
+
+    return documentController.commitSnapshot(project, label, changedPaths);
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::createRoundRobinPoolForSelectedZone(const std::string& label)
@@ -491,10 +594,17 @@ RuntimeProjectDocumentActionResult AuthoringSession::deleteSelectedSample()
         project.authoring.selectedZoneId = project.authoring.zones[nextIndex].id;
     }
 
+    synchronizeExplicitZoneGroups(project);
+
     std::vector<std::string> changedPaths {
         "authoring.zones",
         "authoring.selectedZoneId"
     };
+    if (usesExplicitZoneGroupsSchema(project))
+    {
+        changedPaths.push_back("authoring.selectedGroupId");
+        changedPaths.push_back("authoring.groups");
+    }
     if (!sourceStillUsed)
         changedPaths.push_back("sampleSources");
 
@@ -561,11 +671,18 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
         project = migration.project;
     }
 
+    synchronizeExplicitZoneGroups(project);
+
     std::vector<std::string> changedPaths {
         "sampleSources[" + std::to_string(originalSampleSourceCount) + "]",
         "authoring.zones[" + std::to_string(originalZoneCount) + "]",
         "authoring.selectedZoneId"
     };
+    if (usesExplicitZoneGroupsSchema(project))
+    {
+        changedPaths.push_back("authoring.selectedGroupId");
+        changedPaths.push_back("authoring.groups");
+    }
     if (!projectNotes.empty())
         changedPaths.push_back("notes");
     if (!authoringNotes.empty())

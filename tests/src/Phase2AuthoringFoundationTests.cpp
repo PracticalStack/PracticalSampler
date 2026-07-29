@@ -78,24 +78,30 @@ int main()
 
         const auto phase2Project = drs::engine::loadPhase2ReferenceProjectManifest();
         require(phase2Project.loaded, "Phase 2 authoring foundation fixture must load successfully.");
-        require(phase2Project.project.schemaVersion == 2, "Phase 2 authoring fixture schemaVersion changed unexpectedly.");
+        require(phase2Project.project.schemaVersion == 4, "Phase 2 authoring fixture schemaVersion changed unexpectedly.");
+        require(phase2Project.project.authoring.schemaVersion == 3,
+                "Phase 2 authoring fixture authoring schemaVersion changed unexpectedly.");
         require(phase2Project.project.authoring.zones.size() == 3, "Phase 2 authoring fixture zone count changed unexpectedly.");
+        require(phase2Project.project.authoring.groups.size() == 2,
+                "Phase 2 authoring fixture group count changed unexpectedly.");
         require(phase2Project.project.authoring.macros.size() == 2, "Phase 2 authoring fixture macro count changed unexpectedly.");
         require(phase2Project.project.authoring.fxSlots.size() == 2, "Phase 2 authoring fixture FX slot count changed unexpectedly.");
         require(phase2Project.project.authoring.routingBuses.size() == 2,
                 "Phase 2 authoring fixture routing-bus count changed unexpectedly.");
         require(phase2Project.project.authoring.performanceBanks.size() == 1,
                 "Phase 2 authoring fixture performance-bank count changed unexpectedly.");
+        require(phase2Project.project.authoring.selectedGroupId == "lead-core",
+                "Phase 2 authoring fixture selectedGroupId changed unexpectedly.");
 
         drs::engine::RuntimeProjectModel blankProject;
         blankProject.schemaName = "drs.project";
-        blankProject.schemaVersion = 2;
+        blankProject.schemaVersion = 4;
         blankProject.projectId = "phase2.blank-project";
         blankProject.displayName = "Blank Project";
         blankProject.contentRootPath = phase2Project.project.contentRootPath;
         blankProject.defaultInstrumentManifestPath = phase2Project.project.defaultInstrumentManifestPath;
         blankProject.authoring.schemaName = "drs.authoring";
-        blankProject.authoring.schemaVersion = 1;
+        blankProject.authoring.schemaVersion = 3;
         blankProject.notes.push_back("Blank project validation fixture.");
 
         const auto blankValidation = drs::engine::validateRuntimeProjectModel(blankProject);
@@ -127,8 +133,12 @@ int main()
                 "Imported draft content should append a sample source.");
         require(blankSession.getProject().authoring.zones.size() == 1,
                 "Imported draft content should append an authoring zone.");
+        require(blankSession.getProject().authoring.groups.size() == 1,
+                "Imported draft content should synthesize one explicit authored group.");
         require(blankSession.getProject().authoring.selectedZoneId == "imported-pad-a3",
                 "Imported draft content should select the first imported zone.");
+        require(blankSession.getProject().authoring.selectedGroupId == "imported-group",
+                "Imported draft content should select the imported group for schemaVersion 4 projects.");
         require(blankSession.getDocumentState().dirty,
                 "Imported draft content should mark the authoring project dirty.");
 
@@ -143,6 +153,7 @@ int main()
 
         auto firstEdit = controller.getProject();
         firstEdit.authoring.selectedZoneId = "pad-a3-high";
+        firstEdit.authoring.selectedGroupId = "pad-core";
         firstEdit.authoring.zones[2].gainDb = 2.0;
         firstEdit.authoring.zones[2].triggerMode = drs::engine::ZoneTriggerMode::oneShot;
         firstEdit.authoring.notes.push_back("First transaction for Sprint 1 history coverage.");
@@ -150,7 +161,7 @@ int main()
         const auto firstCommit = controller.commitSnapshot(
             firstEdit,
             "Select alternate zone and trim lead gain",
-            {"authoring.selectedZoneId", "authoring.zones[2].gainDb",
+            {"authoring.selectedZoneId", "authoring.selectedGroupId", "authoring.zones[2].gainDb",
              "authoring.zones[2].triggerMode", "authoring.notes"});
         require(firstCommit.applied, "First authoring project transaction should commit successfully.");
         require(firstCommit.documentState.revision == 1, "First authoring project transaction should increment revision.");
@@ -205,6 +216,8 @@ int main()
                 "Saved Phase 2 authoring project must preserve the edited FX bypass state.");
         require(roundTripLoad.project.authoring.selectedZoneId == "pad-a3-high",
                 "Saved Phase 2 authoring project must preserve the edited selected zone.");
+        require(roundTripLoad.project.authoring.selectedGroupId == "pad-core",
+                "Saved Phase 2 authoring project must preserve the edited selected group.");
         require(roundTripLoad.project.authoring.zones[2].triggerMode == drs::engine::ZoneTriggerMode::oneShot,
                 "Saved Phase 2 authoring project must preserve one-shot trigger mode.");
         require(roundTripJson.find("\"triggerMode\": \"one-shot\"") != std::string::npos,
@@ -219,6 +232,8 @@ int main()
                 "Blank Phase 2 authoring project should preserve an empty sample-source list.");
         require(blankRoundTrip.project.authoring.zones.empty(),
                 "Blank Phase 2 authoring project should preserve an empty authoring-zone list.");
+        require(blankRoundTrip.project.authoring.groups.empty(),
+                "Blank Phase 2 authoring project should preserve an empty authored-group list.");
 
         auto invalidEdit = controller.getProject();
         invalidEdit.authoring.zones[0].sampleSourceId = "missing-source";

@@ -24,6 +24,7 @@ RuntimeManifestLoadResult loadPhase1ReferenceInstrumentManifest();
 RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectModel& project);
 RuntimeProjectMigrationResult migrateRuntimeProjectToPhase2Authoring(const RuntimeProjectModel& project);
 RuntimeProjectMigrationResult migrateRuntimeProjectToPhase3RoundRobinSchema(const RuntimeProjectModel& project);
+RuntimeProjectMigrationResult migrateRuntimeProjectToZoneGroupsSchema(const RuntimeProjectModel& project);
 
 std::string serializeRuntimeProjectManifest(const RuntimeProjectModel& project, const std::string& manifestPath);
 std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& instrument, const std::string& manifestPath);

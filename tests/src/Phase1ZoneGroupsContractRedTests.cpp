@@ -44,13 +44,6 @@ int main()
         const auto zoneMappingEditor = readText(root / "app/src/shared/authoring/ZoneMappingEditor.cpp");
 
         const std::vector<std::pair<std::string, bool>> openGaps {
-            { "authored project state still has no explicit groups collection or selectedGroupId",
-              runtimeModel.find("selectedGroupId") == std::string::npos
-                  || runtimeModel.find("std::vector<RuntimeProjectGroupDefinition> groups")
-                      == std::string::npos },
-            { "project load/save still persists only zone-owned group membership",
-              runtimeLoader.find("authoring[\"groups\"]") == std::string::npos
-                  || runtimeLoader.find("authoring[\"selectedGroupId\"]") == std::string::npos },
             { "snapshot group routes are still synthesized from zone.groupId membership only",
               playbackSnapshot.find("const auto groupIterator = groupRouteIndices.find(zone.groupId);")
                       != std::string::npos
@@ -66,7 +59,9 @@ int main()
                          "sameVelocityCrossfadeDescriptor(anchor.velocityCrossfade, candidate.velocityCrossfade)")
                          != std::string::npos
                   && authoringSession.find("anchor.triggerMode == candidate.triggerMode")
-                         != std::string::npos }
+                         != std::string::npos },
+            { "there is still no creator-facing group manager or group inspector surface",
+              authoringPanel.find("authoringGroup") == std::string::npos }
         };
 
         auto openGapCount = std::size_t { 0 };

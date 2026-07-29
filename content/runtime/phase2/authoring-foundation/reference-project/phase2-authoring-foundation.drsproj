@@ -1,6 +1,6 @@
 {
   "schemaName": "drs.project",
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "projectId": "drs.phase2.authoring-foundation",
   "displayName": "DRS Phase 2 Authoring Foundation",
   "contentRoot": "../../../../hise_project",
@@ -19,8 +19,9 @@
   ],
   "authoring": {
     "schemaName": "drs.authoring",
-    "schemaVersion": 1,
+    "schemaVersion": 3,
     "selectedZoneId": "lead-a4-sustain",
+    "selectedGroupId": "lead-core",
     "selectedPerformanceBankId": "writer-bank",
     "zones": [
       {
@@ -39,7 +40,8 @@
         "sampleStartFrame": 0,
         "loopEnabled": true,
         "loopStartFrame": 512,
-        "loopEndFrame": 22016
+        "loopEndFrame": 22016,
+        "releaseSeconds": 0.0
       },
       {
         "id": "pad-a3-high",
@@ -57,7 +59,8 @@
         "sampleStartFrame": 96,
         "loopEnabled": true,
         "loopStartFrame": 512,
-        "loopEndFrame": 22016
+        "loopEndFrame": 22016,
+        "releaseSeconds": 0.0
       },
       {
         "id": "lead-a4-sustain",
@@ -75,7 +78,28 @@
         "sampleStartFrame": 128,
         "loopEnabled": false,
         "loopStartFrame": 0,
-        "loopEndFrame": 0
+        "loopEndFrame": 0,
+        "releaseSeconds": 0.0
+      }
+    ],
+    "groups": [
+      {
+        "id": "pad-core",
+        "displayName": "Pad Core",
+        "displayOrder": 0,
+        "workspaceVisible": true,
+        "gainDb": 0.0,
+        "pan": 0.0,
+        "auditionAnchorZoneId": "pad-a3-low"
+      },
+      {
+        "id": "lead-core",
+        "displayName": "Lead Core",
+        "displayOrder": 1,
+        "workspaceVisible": true,
+        "gainDb": 0.0,
+        "pan": 0.0,
+        "auditionAnchorZoneId": "lead-a4-sustain"
       }
     ],
     "macros": [

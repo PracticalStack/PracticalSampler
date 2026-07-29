@@ -91,6 +91,18 @@ struct RuntimeProjectMacroDefinition
     std::vector<RuntimeProjectMacroTargetDefinition> targets;
 };
 
+struct RuntimeProjectGroupDefinition
+{
+    std::string id;
+    std::string displayName;
+    int displayOrder = 0;
+    bool workspaceVisible = true;
+    double gainDb = 0.0;
+    double pan = 0.0;
+    std::string routingBusId;
+    std::string auditionAnchorZoneId;
+};
+
 struct RuntimeProjectFxSlotDefinition
 {
     std::string id;
@@ -152,8 +164,10 @@ struct RuntimeProjectAuthoringState
     std::string schemaName;
     int schemaVersion = 0;
     std::string selectedZoneId;
+    std::string selectedGroupId;
     std::string selectedPerformanceBankId;
     std::vector<RuntimeProjectZoneDefinition> zones;
+    std::vector<RuntimeProjectGroupDefinition> groups;
     std::vector<RuntimeProjectMacroDefinition> macros;
     std::vector<RuntimeProjectFxSlotDefinition> fxSlots;
     std::vector<RuntimeProjectRoutingBusDefinition> routingBuses;

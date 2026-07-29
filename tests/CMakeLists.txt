@@ -1105,6 +1105,23 @@ add_test(
     COMMAND drs_phase1_zone_groups_contract_tests
 )
 
+add_executable(drs_phase1_zone_groups_schema_persistence_tests
+    src/Phase1ZoneGroupsSchemaPersistenceTests.cpp
+)
+
+target_link_libraries(drs_phase1_zone_groups_schema_persistence_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+)
+
+target_compile_features(drs_phase1_zone_groups_schema_persistence_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.phase1.zone_groups_schema_persistence
+    COMMAND drs_phase1_zone_groups_schema_persistence_tests
+)
+
 add_executable(drs_phase3_round_robin_fixture_characterization_tests
     src/Phase3RoundRobinFixtureCharacterizationTests.cpp
 )
@@ -2347,6 +2364,7 @@ add_dependencies(drs_all_tests
     drs_phase3_crossfade_persistence_tests
     drs_phase3_crossfade_prepared_playback_tests
     drs_phase1_zone_groups_contract_tests
+    drs_phase1_zone_groups_schema_persistence_tests
     drs_phase3_round_robin_contract_tests
     drs_phase3_round_robin_fixture_characterization_tests
     drs_phase3_round_robin_schema_persistence_tests

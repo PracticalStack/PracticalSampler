@@ -270,6 +270,59 @@ RuntimeProjectAuthoringState buildDefaultPhase2AuthoringState()
     return authoring;
 }
 
+RuntimeProjectAuthoringState buildDefaultZoneGroupsAuthoringState()
+{
+    auto authoring = buildDefaultPhase2AuthoringState();
+    authoring.schemaVersion = 3;
+    return authoring;
+}
+
+std::vector<RuntimeProjectGroupDefinition> synthesizeProjectGroupsFromZones(
+    const std::vector<RuntimeProjectZoneDefinition>& zones)
+{
+    std::vector<RuntimeProjectGroupDefinition> groups;
+    std::unordered_set<std::string> groupIds;
+
+    for (const auto& zone : zones)
+    {
+        if (zone.groupId.empty() || groupIds.count(zone.groupId))
+            continue;
+
+        RuntimeProjectGroupDefinition group;
+        group.id = zone.groupId;
+        group.displayName = zone.groupId;
+        group.displayOrder = static_cast<int>(groups.size());
+        group.workspaceVisible = true;
+        group.gainDb = 0.0;
+        group.pan = 0.0;
+        group.auditionAnchorZoneId = zone.id;
+        groups.push_back(std::move(group));
+        groupIds.insert(zone.groupId);
+    }
+
+    return groups;
+}
+
+std::string resolveSelectedGroupIdFromSelectedZone(const RuntimeProjectAuthoringState& authoring)
+{
+    if (!authoring.selectedZoneId.empty())
+    {
+        const auto iterator = std::find_if(authoring.zones.begin(),
+                                           authoring.zones.end(),
+                                           [&](const RuntimeProjectZoneDefinition& zone)
+                                           {
+                                               return zone.id == authoring.selectedZoneId;
+                                           });
+        if (iterator != authoring.zones.end())
+            return iterator->groupId;
+    }
+
+    if (!authoring.groups.empty())
+        return authoring.groups.front().id;
+
+    return {};
+}
+
 std::string toRoundRobinModeString(RoundRobinMode mode)
 {
     switch (mode)
@@ -755,6 +808,29 @@ ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinitio
     return array;
 }
 
+ordered_json serializeProjectGroups(const std::vector<RuntimeProjectGroupDefinition>& groups)
+{
+    ordered_json array = ordered_json::array();
+
+    for (const auto& group : groups)
+    {
+        ordered_json groupObject;
+        groupObject["id"] = group.id;
+        groupObject["displayName"] = group.displayName;
+        groupObject["displayOrder"] = group.displayOrder;
+        groupObject["workspaceVisible"] = group.workspaceVisible;
+        groupObject["gainDb"] = group.gainDb;
+        groupObject["pan"] = group.pan;
+        if (!group.routingBusId.empty())
+            groupObject["routingBusId"] = group.routingBusId;
+        if (!group.auditionAnchorZoneId.empty())
+            groupObject["auditionAnchorZoneId"] = group.auditionAnchorZoneId;
+        array.push_back(std::move(groupObject));
+    }
+
+    return array;
+}
+
 ordered_json serializeFxSlots(const std::vector<RuntimeProjectFxSlotDefinition>& fxSlots)
 {
     ordered_json array = ordered_json::array();
@@ -1017,7 +1093,7 @@ RuntimeProjectLoadResult loadRuntimeProjectManifest(const std::string& manifestP
 
     project.notes = readRequiredStringArray(root, result, "notes", "Project");
 
-    if (project.schemaVersion == 2 || project.schemaVersion == 3)
+    if (project.schemaVersion >= 2 && project.schemaVersion <= 4)
     {
         const auto authoringIterator = root.find("authoring");
         if (authoringIterator == root.end() || !authoringIterator->is_object())
@@ -1036,6 +1112,9 @@ RuntimeProjectLoadResult loadRuntimeProjectManifest(const std::string& manifestP
 
             if (const auto selectedZoneId = readOptional<RuntimeProjectLoadResult, std::string>(*authoringIterator, result, "selectedZoneId", "Project authoring"))
                 authoring.selectedZoneId = *selectedZoneId;
+
+            if (const auto selectedGroupId = readOptional<RuntimeProjectLoadResult, std::string>(*authoringIterator, result, "selectedGroupId", "Project authoring"))
+                authoring.selectedGroupId = *selectedGroupId;
 
             if (const auto selectedPerformanceBankId = readOptional<RuntimeProjectLoadResult, std::string>(*authoringIterator, result, "selectedPerformanceBankId", "Project authoring"))
                 authoring.selectedPerformanceBankId = *selectedPerformanceBankId;
@@ -1143,6 +1222,45 @@ RuntimeProjectLoadResult loadRuntimeProjectManifest(const std::string& manifestP
                     }
 
                     authoring.zones.push_back(std::move(zone));
+                }
+            }
+
+            if (project.schemaVersion >= 4 && authoring.schemaVersion >= 3)
+            {
+                const auto groupsIterator = authoringIterator->find("groups");
+                if (groupsIterator == authoringIterator->end() || !isObjectArray(*groupsIterator))
+                {
+                    addIssue(result, "Project authoring field 'groups' must be an array of objects.");
+                }
+                else
+                {
+                    authoring.groups.reserve(groupsIterator->size());
+
+                    for (std::size_t index = 0; index < groupsIterator->size(); ++index)
+                    {
+                        const auto& groupObject = groupsIterator->at(index);
+                        const auto context = "ProjectGroup[" + std::to_string(index) + "]";
+                        RuntimeProjectGroupDefinition group;
+
+                        if (const auto id = readRequired<RuntimeProjectLoadResult, std::string>(groupObject, result, "id", context.c_str()))
+                            group.id = *id;
+                        if (const auto displayName = readRequired<RuntimeProjectLoadResult, std::string>(groupObject, result, "displayName", context.c_str()))
+                            group.displayName = *displayName;
+                        if (const auto displayOrder = readRequired<RuntimeProjectLoadResult, int>(groupObject, result, "displayOrder", context.c_str()))
+                            group.displayOrder = *displayOrder;
+                        if (const auto workspaceVisible = readRequired<RuntimeProjectLoadResult, bool>(groupObject, result, "workspaceVisible", context.c_str()))
+                            group.workspaceVisible = *workspaceVisible;
+                        if (const auto gainDb = readRequired<RuntimeProjectLoadResult, double>(groupObject, result, "gainDb", context.c_str()))
+                            group.gainDb = *gainDb;
+                        if (const auto pan = readRequired<RuntimeProjectLoadResult, double>(groupObject, result, "pan", context.c_str()))
+                            group.pan = *pan;
+                        if (const auto routingBusId = readOptional<RuntimeProjectLoadResult, std::string>(groupObject, result, "routingBusId", context.c_str()))
+                            group.routingBusId = *routingBusId;
+                        if (const auto auditionAnchorZoneId = readOptional<RuntimeProjectLoadResult, std::string>(groupObject, result, "auditionAnchorZoneId", context.c_str()))
+                            group.auditionAnchorZoneId = *auditionAnchorZoneId;
+
+                        authoring.groups.push_back(std::move(group));
+                    }
                 }
             }
 
@@ -1410,8 +1528,11 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
     if (project.schemaName != "drs.project")
         addIssue(result, "Project schemaName must be 'drs.project'.");
 
-    if (project.schemaVersion != 1 && project.schemaVersion != 2 && project.schemaVersion != 3)
-        addIssue(result, "Project schemaVersion must be 1, 2, or 3.");
+    if (project.schemaVersion != 1 && project.schemaVersion != 2 && project.schemaVersion != 3
+        && project.schemaVersion != 4)
+    {
+        addIssue(result, "Project schemaVersion must be 1, 2, 3, or 4.");
+    }
 
     if (project.projectId.empty())
         addIssue(result, "Project projectId must not be empty.");
@@ -1445,10 +1566,11 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         }
     }
 
-    if (project.schemaVersion == 2 || project.schemaVersion == 3)
+    if (project.schemaVersion >= 2 && project.schemaVersion <= 4)
     {
         const auto& authoring = project.authoring;
         const auto explicitRoundRobinRequired = project.schemaVersion >= 3;
+        const auto explicitGroupsRequired = project.schemaVersion >= 4;
 
         if (authoring.schemaName != "drs.authoring")
             addIssue(result, "Project authoring schemaName must be 'drs.authoring'.");
@@ -1459,8 +1581,14 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         if (project.schemaVersion == 3 && authoring.schemaVersion != 2)
             addIssue(result, "Project authoring schemaVersion must be 2 for schemaVersion 3 projects.");
 
+        if (project.schemaVersion == 4 && authoring.schemaVersion != 3)
+            addIssue(result, "Project authoring schemaVersion must be 3 for schemaVersion 4 projects.");
+
         if (hasDuplicateIds(authoring.zones))
             addIssue(result, "Project authoring zone ids must be unique.");
+
+        if (explicitGroupsRequired && hasDuplicateIds(authoring.groups))
+            addIssue(result, "Project authoring group ids must be unique.");
 
         if (hasDuplicateIds(authoring.macros))
             addIssue(result, "Project authoring macro ids must be unique.");
@@ -1478,11 +1606,33 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         for (const auto& sampleSource : project.sampleSources)
             sampleSourceIds.insert(sampleSource.id);
 
+        std::unordered_map<std::string, std::string> zoneGroupIds;
+        std::unordered_set<std::string> groupIds;
+        if (explicitGroupsRequired)
+        {
+            for (const auto& group : authoring.groups)
+            {
+                if (group.id.empty())
+                    addIssue(result, "Project groups must have non-empty ids.");
+                else
+                    groupIds.insert(group.id);
+
+                if (group.displayName.empty())
+                    addIssue(result, "Project group '" + group.id + "' must have a displayName.");
+
+                if (group.displayOrder < 0)
+                    addIssue(result, "Project group '" + group.id + "' must not have a negative displayOrder.");
+            }
+        }
+
         std::unordered_set<std::string> zoneIds;
         for (const auto& zone : authoring.zones)
         {
             if (!zone.id.empty())
+            {
                 zoneIds.insert(zone.id);
+                zoneGroupIds.emplace(zone.id, zone.groupId);
+            }
 
             if (zone.sampleSourceId.empty())
                 addIssue(result, "Project zone '" + zone.id + "' must reference a sampleSourceId.");
@@ -1494,6 +1644,8 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
             if (zone.groupId.empty())
                 addIssue(result, "Project zone '" + zone.id + "' must have a groupId.");
+            else if (explicitGroupsRequired && !groupIds.count(zone.groupId))
+                addIssue(result, "Project zone '" + zone.id + "' references unknown groupId '" + zone.groupId + "'.");
 
             if (zone.articulationId.empty())
                 addIssue(result, "Project zone '" + zone.id + "' must have an articulationId.");
@@ -1539,6 +1691,10 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
         if (!authoring.selectedZoneId.empty() && !zoneIds.count(authoring.selectedZoneId))
             addIssue(result, "Project authoring selectedZoneId references unknown zone '" + authoring.selectedZoneId + "'.");
+
+        if (explicitGroupsRequired && !authoring.selectedGroupId.empty() && !groupIds.count(authoring.selectedGroupId))
+            addIssue(result,
+                     "Project authoring selectedGroupId references unknown group '" + authoring.selectedGroupId + "'.");
 
         std::unordered_set<std::string> fxSlotIds;
         for (const auto& fxSlot : authoring.fxSlots)
@@ -1654,10 +1810,13 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
                      "Project authoring selectedPerformanceBankId references unknown bank '"
                          + authoring.selectedPerformanceBankId + "'.");
 
+        std::unordered_set<std::string> routingBusIds;
         for (const auto& bus : authoring.routingBuses)
         {
             if (bus.id.empty())
                 addIssue(result, "Project routing buses must have non-empty ids.");
+            else
+                routingBusIds.insert(bus.id);
 
             if (bus.displayName.empty())
                 addIssue(result, "Project routing bus '" + bus.id + "' must have a displayName.");
@@ -1669,6 +1828,36 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
             {
                 if (!fxSlotIds.count(fxSlotId))
                     addIssue(result, "Project routing bus '" + bus.id + "' references unknown FX slot '" + fxSlotId + "'.");
+            }
+        }
+
+        if (explicitGroupsRequired)
+        {
+            for (const auto& group : authoring.groups)
+            {
+                if (!group.routingBusId.empty() && !routingBusIds.count(group.routingBusId))
+                {
+                    addIssue(result,
+                             "Project group '" + group.id + "' references unknown routingBusId '"
+                                 + group.routingBusId + "'.");
+                }
+
+                if (!group.auditionAnchorZoneId.empty())
+                {
+                    const auto zoneIterator = zoneGroupIds.find(group.auditionAnchorZoneId);
+                    if (zoneIterator == zoneGroupIds.end())
+                    {
+                        addIssue(result,
+                                 "Project group '" + group.id + "' references unknown auditionAnchorZoneId '"
+                                     + group.auditionAnchorZoneId + "'.");
+                    }
+                    else if (zoneIterator->second != group.id)
+                    {
+                        addIssue(result,
+                                 "Project group '" + group.id + "' auditionAnchorZoneId '"
+                                     + group.auditionAnchorZoneId + "' must belong to the same group.");
+                    }
+                }
             }
         }
     }
@@ -1764,6 +1953,73 @@ RuntimeProjectMigrationResult migrateRuntimeProjectToPhase3RoundRobinSchema(cons
     result.migrated = validation.valid;
     result.state = validation.valid
         ? "Project migrated to the Phase 3 Round Robin schema"
+        : validation.state;
+    return result;
+}
+
+RuntimeProjectMigrationResult migrateRuntimeProjectToZoneGroupsSchema(const RuntimeProjectModel& project)
+{
+    RuntimeProjectMigrationResult result;
+    result.state = "Project zone-group migration failed";
+
+    if (project.schemaVersion == 4 && project.authoring.schemaVersion == 3)
+    {
+        result.project = project;
+        const auto validation = validateRuntimeProjectModel(result.project);
+        result.issues = validation.issues;
+        result.valid = validation.valid;
+        result.state = validation.valid
+            ? "Project already uses the Zone Groups schema"
+            : validation.state;
+        return result;
+    }
+
+    RuntimeProjectModel migratedProject = project;
+
+    if (migratedProject.schemaVersion == 1)
+    {
+        const auto phase2Migration = migrateRuntimeProjectToPhase2Authoring(migratedProject);
+        if (!phase2Migration.valid)
+        {
+            result.issues = phase2Migration.issues;
+            return result;
+        }
+
+        migratedProject = phase2Migration.project;
+    }
+
+    if (migratedProject.schemaVersion == 2 && migratedProject.authoring.schemaVersion == 1)
+    {
+        const auto phase3Migration = migrateRuntimeProjectToPhase3RoundRobinSchema(migratedProject);
+        if (!phase3Migration.valid)
+        {
+            result.issues = phase3Migration.issues;
+            return result;
+        }
+
+        migratedProject = phase3Migration.project;
+    }
+
+    if (migratedProject.schemaVersion != 3 || migratedProject.authoring.schemaVersion != 2)
+    {
+        addIssue(result,
+                 "Only Project schemaVersion 3 with authoring schemaVersion 2 can be migrated into the Zone Groups schema.");
+        return result;
+    }
+
+    migratedProject.schemaVersion = 4;
+    migratedProject.authoring.schemaVersion = 3;
+    migratedProject.authoring.groups = synthesizeProjectGroupsFromZones(migratedProject.authoring.zones);
+    migratedProject.authoring.selectedGroupId =
+        resolveSelectedGroupIdFromSelectedZone(migratedProject.authoring);
+
+    const auto validation = validateRuntimeProjectModel(migratedProject);
+    result.project = std::move(migratedProject);
+    result.issues = validation.issues;
+    result.valid = validation.valid;
+    result.migrated = validation.valid;
+    result.state = validation.valid
+        ? "Project migrated to the Zone Groups schema"
         : validation.state;
     return result;
 }
@@ -2190,8 +2446,12 @@ std::string serializeRuntimeProjectManifest(const RuntimeProjectModel& project, 
         authoring["schemaName"] = project.authoring.schemaName;
         authoring["schemaVersion"] = project.authoring.schemaVersion;
         authoring["selectedZoneId"] = project.authoring.selectedZoneId;
+        if (project.schemaVersion >= 4)
+            authoring["selectedGroupId"] = project.authoring.selectedGroupId;
         authoring["selectedPerformanceBankId"] = project.authoring.selectedPerformanceBankId;
         authoring["zones"] = serializeProjectZones(project.authoring.zones, project.schemaVersion >= 3);
+        if (project.schemaVersion >= 4)
+            authoring["groups"] = serializeProjectGroups(project.authoring.groups);
         authoring["macros"] = serializeProjectMacros(project.authoring.macros);
         authoring["fxSlots"] = serializeFxSlots(project.authoring.fxSlots);
         authoring["routingBuses"] = serializeRoutingBuses(project.authoring.routingBuses);
