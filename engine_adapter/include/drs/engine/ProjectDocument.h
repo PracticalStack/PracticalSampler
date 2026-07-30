@@ -24,6 +24,27 @@ struct RuntimeProjectDocumentState
     std::string lastChangeLabel;
 };
 
+struct RuntimeProjectDocumentCheckpoint
+{
+    RuntimeProjectModel project;
+    std::size_t revision = 0;
+    std::size_t savedRevision = 0;
+    bool dirty = false;
+    std::string lastChangeLabel;
+};
+
+struct RuntimeProjectDocumentCheckpointConstraints
+{
+    std::string expectedProjectId;
+    std::string manifestPath;
+};
+
+struct RuntimeProjectDocumentCheckpointValidationResult
+{
+    bool valid = false;
+    std::vector<std::string> issues;
+};
+
 struct RuntimeProjectDocumentActionResult
 {
     bool applied = false;
@@ -39,6 +60,10 @@ public:
 
     const RuntimeProjectModel& getProject() const { return currentProject; }
     const RuntimeProjectDocumentState& getDocumentState() const { return documentState; }
+    RuntimeProjectDocumentCheckpoint exportCheckpoint() const;
+    RuntimeProjectDocumentActionResult restoreCheckpoint(
+        RuntimeProjectDocumentCheckpoint checkpoint,
+        RuntimeProjectDocumentCheckpointConstraints constraints = {});
 
     RuntimeProjectDocumentActionResult commitSnapshot(const RuntimeProjectModel& nextProject,
                                                       const std::string& label,
@@ -65,4 +90,8 @@ private:
     std::vector<Snapshot> undoStack;
     std::vector<Snapshot> redoStack;
 };
+
+RuntimeProjectDocumentCheckpointValidationResult validateRuntimeProjectDocumentCheckpoint(
+    const RuntimeProjectDocumentCheckpoint& checkpoint,
+    const RuntimeProjectDocumentCheckpointConstraints& constraints = {});
 } // namespace drs::engine

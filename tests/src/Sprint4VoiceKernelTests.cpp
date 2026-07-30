@@ -61,22 +61,23 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<std::vector<float>> ch
     drs::engine::ImmutablePlaybackSnapshot snapshot;
     snapshot.draftRevision = 4;
     snapshot.contentDigest = "sprint4-voice-snapshot";
-    snapshot.zones.push_back({ "voice-zone",
-                               "voice-sample",
-                               "Voice Zone",
-                               "voice-group",
-                               "sustain",
-                               options.rootKey,
-                               0,
-                               127,
-                               1,
-                               127,
-                               options.gainDb,
-                               options.pan,
-                               options.sampleStartFrame,
-                               false,
-                               0,
-                               0 });
+    drs::engine::PlaybackSnapshotZone snapshotZone;
+    snapshotZone.id = "voice-zone";
+    snapshotZone.sampleSourceId = "voice-sample";
+    snapshotZone.displayName = "Voice Zone";
+    snapshotZone.groupId = "voice-group";
+    snapshotZone.articulationId = "sustain";
+    snapshotZone.rootKey = options.rootKey;
+    snapshotZone.gainDb = options.gainDb;
+    snapshotZone.pan = options.pan;
+    snapshotZone.sampleStartFrame = options.sampleStartFrame;
+    snapshot.zones.push_back(std::move(snapshotZone));
+    drs::engine::PlaybackSnapshotGroupRoute snapshotGroup;
+    snapshotGroup.groupId = "voice-group";
+    snapshotGroup.articulationIds = { "sustain" };
+    snapshotGroup.zoneIds = { "voice-zone" };
+    snapshotGroup.displayName = "Voice Group";
+    snapshot.groupRoutes.push_back(std::move(snapshotGroup));
 
     auto decoded = std::make_shared<drs::engine::PreparedPlaybackDecodedSampleData>();
     decoded->normalizedChannels = std::move(channels);
@@ -94,22 +95,21 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<std::vector<float>> ch
     prepared.draftRevision = snapshot.draftRevision;
     prepared.preparedContentDigest = "sprint4-voice-prepared";
     prepared.samples.push_back(std::move(sample));
-    prepared.zones.push_back({ "voice-zone",
-                               "voice-sample",
-                               "voice-stream",
-                               0,
-                               0,
-                               options.rootKey,
-                               0,
-                               127,
-                               1,
-                               127,
-                               options.gainDb,
-                               options.pan,
-                               options.sampleStartFrame,
-                               false,
-                               0,
-                               0 });
+    drs::engine::PreparedPlaybackZoneHandle preparedZone;
+    preparedZone.zoneId = "voice-zone";
+    preparedZone.sampleSourceId = "voice-sample";
+    preparedZone.streamSampleId = "voice-stream";
+    preparedZone.rootKey = options.rootKey;
+    preparedZone.gainDb = options.gainDb;
+    preparedZone.pan = options.pan;
+    preparedZone.sampleStartFrame = options.sampleStartFrame;
+    prepared.zones.push_back(std::move(preparedZone));
+    drs::engine::PreparedPlaybackGroupRoute preparedGroup;
+    preparedGroup.groupId = "voice-group";
+    preparedGroup.articulationIds = { "sustain" };
+    preparedGroup.zoneIds = { "voice-zone" };
+    preparedGroup.displayName = "Voice Group";
+    prepared.groupRoutes.push_back(std::move(preparedGroup));
 
     auto payload = std::make_shared<drs::engine::PlaybackActivationPayload>();
     payload->lane = drs::engine::PlaybackActivationLane::preview;
@@ -129,10 +129,17 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<std::vector<float>> ch
 }
 
 drs::engine::SamplerVoiceStartRequest makeStart(int note = 60,
-                                                int velocity = 127,
-                                                double outputSampleRate = 48000.0)
+                                                 int velocity = 127,
+                                                 double outputSampleRate = 48000.0)
 {
-    return { 1, 0, note, note, velocity, outputSampleRate };
+    drs::engine::SamplerVoiceStartRequest request;
+    request.voiceId = 1;
+    request.routeIndex = 0;
+    request.sourceMidiNote = note;
+    request.effectiveMidiNote = note;
+    request.effectiveVelocity = velocity;
+    request.outputSampleRate = outputSampleRate;
+    return request;
 }
 
 struct StereoOutput

@@ -58,6 +58,10 @@ public:
 
     const RuntimeProjectModel& getProject() const;
     const RuntimeProjectDocumentState& getDocumentState() const;
+    RuntimeProjectDocumentCheckpoint exportCheckpoint() const;
+    RuntimeProjectDocumentActionResult restoreCheckpoint(
+        RuntimeProjectDocumentCheckpoint checkpoint,
+        RuntimeProjectDocumentCheckpointConstraints constraints = {});
     void replaceProject(RuntimeProjectModel project);
 
     std::vector<AuthoringZoneSummary> getZoneSummaries() const;
@@ -106,7 +110,8 @@ public:
                                                             std::vector<RuntimeProjectZoneDefinition> zones,
                                                             std::vector<std::string> projectNotes,
                                                             std::vector<std::string> authoringNotes,
-                                                            const std::string& label);
+                                                            const std::string& label,
+                                                            bool reconcileInferredRoundRobin = true);
     RuntimeProjectDocumentActionResult updateMacro(std::size_t macroIndex,
                                                    const RuntimeProjectMacroDefinition& macro,
                                                    const std::string& label);

@@ -4,7 +4,9 @@
 #include "drs/engine/AuthoringPreviewCommandAdapter.h"
 #include "drs/engine/AuthoringPreviewController.h"
 #include "drs/engine/EngineFacade.h"
+#include "drs/engine/HostSessionState.h"
 #include "drs/engine/PerformancePublishCommandAdapter.h"
+#include "drs/engine/ProjectRestoreCoordinator.h"
 #include "drs/engine/SampleImport.h"
 #include "drs/engine/SamplerPlaybackContext.h"
 #include "plugin/RealtimeGuard.h"
@@ -19,6 +21,7 @@
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -120,7 +123,8 @@ struct ProcessorRealtimeSafetySnapshot
 };
 
 class Processor final : public juce::AudioProcessor,
-                        private juce::AudioProcessorValueTreeState::Listener
+                        private juce::AudioProcessorValueTreeState::Listener,
+                        private juce::Timer
 {
 public:
     Processor();
@@ -166,10 +170,22 @@ public:
         return engineFacade.getPerformancePublishControllerSnapshot();
     }
     drs::app::AuthoringImportResponsivenessSnapshot getAuthoringImportResponsivenessSnapshot() const;
-    void replaceAuthoringProject(drs::engine::RuntimeProjectModel project);
+    bool replaceAuthoringProject(drs::engine::RuntimeProjectModel project,
+                                 juce::File resolvedProjectFile = {});
     void closeAuthoringProject(drs::engine::RuntimeProjectModel unloadedProject);
-    const juce::File& getAuthoringProjectFile() const { return authoringProjectFile; }
-    void setAuthoringProjectFile(juce::File file) { authoringProjectFile = std::move(file); }
+    bool bindAuthoringProjectFile(const juce::File& resolvedProjectFile);
+    void clearAuthoringProjectFileBinding();
+    juce::File getAuthoringProjectFile() const;
+    const drs::engine::HostProjectBinding& getAuthoringProjectBinding() const
+    {
+        return authoringProjectBinding;
+    }
+    std::shared_ptr<const drs::engine::ProjectRestoreSnapshot> getProjectRestoreSnapshot() const
+    {
+        return projectRestoreCoordinator.getSnapshot();
+    }
+    bool retryProjectRestore();
+    bool retryProjectRestoreWithFile(const juce::File& locatedProjectFile);
     void setMacroValueFromShell(const std::string& macroId, double value);
     void requestAuthoringPreview(drs::engine::AuthoringPreviewScope scope);
     bool submitAuthoringPreviewCommand(const drs::engine::AuthoringPreviewCommand& command);
@@ -241,6 +257,7 @@ private:
     bool stageAuthoringPreviewActivation(const drs::engine::AuthoringPreviewRequest& request,
                                          bool installImmediately);
     bool synchronizePerformanceActivation(bool installImmediately);
+    void timerCallback() override;
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     void syncEngineFromParameters();
     void syncParametersFromEngine();
@@ -249,6 +266,17 @@ private:
                                                                      std::uint64_t loopStartFrame,
                                                                      std::uint64_t loopEndFrame) const;
     void initializeAuthoringImportMetrics();
+    std::optional<drs::engine::HostProjectBinding> buildValidatedAuthoringProjectBinding(
+        const juce::File& resolvedProjectFile,
+        const drs::engine::RuntimeProjectModel& project) const;
+    bool applyValidatedProjectRestore(
+        const drs::engine::ProjectRestoreSnapshot& restore);
+    bool serviceProjectRestore();
+    void refreshSerializedHostStatePublication(bool force = false);
+    std::string buildHostStatePublicationKey() const;
+    void setPendingRestoreAudioPolicy(bool pending) noexcept;
+    bool restorePublishIdentityMatches(
+        const drs::engine::PerformancePublishControllerSnapshot& published) const;
     void publishAuthoringPreviewStatus();
     void primeRealtimeSafetyState(int samplesPerBlock);
     void updateRealtimeSafetyState();
@@ -380,7 +408,16 @@ private:
     std::atomic<int> diagnosticActivePublishedMacroFixedVelocity { 0 };
     std::atomic<int> diagnosticActivePublishedMacroMidiNoteOffset { 0 };
     drs::app::AuthoringImportResponsivenessSnapshot authoringImportResponsivenessSnapshot;
-    juce::File authoringProjectFile;
+    drs::engine::HostProjectBinding authoringProjectBinding;
+    drs::engine::ProjectRestoreCoordinator projectRestoreCoordinator;
+    std::shared_ptr<const std::string> serializedHostStatePublication;
+    std::shared_ptr<const std::string> latestSubmittedHostState;
+    std::string hostStatePublicationKey;
+    std::uint64_t handledRestoreGeneration = 0;
+    std::uint64_t awaitingRestoreActivationGeneration = 0;
+    std::optional<drs::engine::HostPublishedCheckpoint> expectedRestoredPublishedState;
+    std::atomic<bool> pendingRestoreAudioSilence { false };
+    std::atomic<bool> restoreAudioSilenceApplied { false };
     std::shared_ptr<const ProcessorRealtimeSafetySnapshot> publishedRealtimeSafetySnapshot;
     AudioDiagnosticsPublication audioDiagnosticsPublication;
     std::atomic<std::size_t> diagnosticsProcessBlockCount { 0 };

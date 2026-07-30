@@ -57,22 +57,24 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<float> source,
     drs::engine::ImmutablePlaybackSnapshot snapshot;
     snapshot.draftRevision = 44;
     snapshot.contentDigest = "sprint4-lifecycle-snapshot";
-    snapshot.zones.push_back({ "lifecycle-zone",
-                               "lifecycle-sample",
-                               "Lifecycle Zone",
-                               "lifecycle-group",
-                               "sustain",
-                               options.rootKey,
-                               0,
-                               127,
-                               1,
-                               127,
-                               0.0,
-                               0.0,
-                               options.sampleStartFrame,
-                               options.loopEnabled,
-                               options.loopStartFrame,
-                               options.loopEndFrame });
+    drs::engine::PlaybackSnapshotZone snapshotZone;
+    snapshotZone.id = "lifecycle-zone";
+    snapshotZone.sampleSourceId = "lifecycle-sample";
+    snapshotZone.displayName = "Lifecycle Zone";
+    snapshotZone.groupId = "lifecycle-group";
+    snapshotZone.articulationId = "sustain";
+    snapshotZone.rootKey = options.rootKey;
+    snapshotZone.sampleStartFrame = options.sampleStartFrame;
+    snapshotZone.loopEnabled = options.loopEnabled;
+    snapshotZone.loopStartFrame = options.loopStartFrame;
+    snapshotZone.loopEndFrame = options.loopEndFrame;
+    snapshot.zones.push_back(std::move(snapshotZone));
+    drs::engine::PlaybackSnapshotGroupRoute snapshotGroup;
+    snapshotGroup.groupId = "lifecycle-group";
+    snapshotGroup.articulationIds = { "sustain" };
+    snapshotGroup.zoneIds = { "lifecycle-zone" };
+    snapshotGroup.displayName = "Lifecycle Group";
+    snapshot.groupRoutes.push_back(std::move(snapshotGroup));
 
     auto decoded = std::make_shared<drs::engine::PreparedPlaybackDecodedSampleData>();
     decoded->normalizedChannels = { std::move(source) };
@@ -90,22 +92,22 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<float> source,
     prepared.draftRevision = snapshot.draftRevision;
     prepared.preparedContentDigest = "sprint4-lifecycle-prepared";
     prepared.samples.push_back(std::move(sample));
-    prepared.zones.push_back({ "lifecycle-zone",
-                               "lifecycle-sample",
-                               "lifecycle-stream",
-                               0,
-                               0,
-                               options.rootKey,
-                               0,
-                               127,
-                               1,
-                               127,
-                               0.0,
-                               0.0,
-                               options.sampleStartFrame,
-                               options.loopEnabled,
-                               options.loopStartFrame,
-                               options.loopEndFrame });
+    drs::engine::PreparedPlaybackZoneHandle preparedZone;
+    preparedZone.zoneId = "lifecycle-zone";
+    preparedZone.sampleSourceId = "lifecycle-sample";
+    preparedZone.streamSampleId = "lifecycle-stream";
+    preparedZone.rootKey = options.rootKey;
+    preparedZone.sampleStartFrame = options.sampleStartFrame;
+    preparedZone.loopEnabled = options.loopEnabled;
+    preparedZone.loopStartFrame = options.loopStartFrame;
+    preparedZone.loopEndFrame = options.loopEndFrame;
+    prepared.zones.push_back(std::move(preparedZone));
+    drs::engine::PreparedPlaybackGroupRoute preparedGroup;
+    preparedGroup.groupId = "lifecycle-group";
+    preparedGroup.articulationIds = { "sustain" };
+    preparedGroup.zoneIds = { "lifecycle-zone" };
+    preparedGroup.displayName = "Lifecycle Group";
+    prepared.groupRoutes.push_back(std::move(preparedGroup));
 
     auto payload = std::make_shared<drs::engine::PlaybackActivationPayload>();
     payload->lane = drs::engine::PlaybackActivationLane::preview;
@@ -124,10 +126,17 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<float> source,
 }
 
 drs::engine::SamplerVoiceStartRequest startRequest(int note = 60,
-                                                   double outputSampleRate = 48000.0,
-                                                   std::uint64_t voiceId = 1)
+                                                    double outputSampleRate = 48000.0,
+                                                    std::uint64_t voiceId = 1)
 {
-    return { voiceId, 0, note, note, 127, outputSampleRate };
+    drs::engine::SamplerVoiceStartRequest request;
+    request.voiceId = voiceId;
+    request.routeIndex = 0;
+    request.sourceMidiNote = note;
+    request.effectiveMidiNote = note;
+    request.effectiveVelocity = 127;
+    request.outputSampleRate = outputSampleRate;
+    return request;
 }
 
 struct StereoOutput

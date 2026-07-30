@@ -1,0 +1,60 @@
+{
+  "schemaName": "drs.hostState",
+  "schemaVersion": 1,
+  "presetState": {
+    "schemaName": "drs.presetState",
+    "schemaVersion": 1,
+    "presetId": "drs.host-state.identity-mismatch",
+    "targetInstrumentId": "drs.phase1.tiny-open-instrument",
+    "targetInstrumentSchemaName": "drs.instrument",
+    "targetInstrumentSchemaVersion": 1,
+    "loadProfileId": "balanced",
+    "selectedArticulationId": "sustain",
+    "macroValues": [
+      {
+        "id": "tone",
+        "value": 0.35
+      },
+      {
+        "id": "motion",
+        "value": 0.15
+      }
+    ],
+    "notes": []
+  },
+  "projectBinding": {
+    "projectId": "drs.host-state.expected-project",
+    "manifestFileName": "Expected Project.drsproj",
+    "manifestDigest": "fnv1a64:bfbbacb1a4deb409"
+  },
+  "authoringState": {
+    "revision": 1,
+    "savedRevision": 0,
+    "dirty": true,
+    "projectSnapshot": {
+      "schemaName": "drs.project",
+      "schemaVersion": 4,
+      "projectId": "drs.host-state.different-project",
+      "displayName": "Different Project",
+      "contentRoot": ".",
+      "defaultInstrumentManifest": "Different Project.drinst",
+      "sampleSources": [],
+      "authoring": {
+        "schemaName": "drs.authoring",
+        "schemaVersion": 3,
+        "selectedZoneId": "",
+        "selectedGroupId": "",
+        "selectedPerformanceBankId": "",
+        "zones": [],
+        "groups": [],
+        "macros": [],
+        "fxSlots": [],
+        "routingBuses": [],
+        "performanceBanks": [],
+        "notes": []
+      },
+      "notes": []
+    }
+  },
+  "publishedState": {}
+}

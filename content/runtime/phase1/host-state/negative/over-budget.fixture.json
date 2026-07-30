@@ -1,0 +1,12 @@
+{
+  "fixtureSchemaName": "drs.hostStateTestFixture",
+  "fixtureSchemaVersion": 1,
+  "baseFixture": "../reference/saved-project.hoststate.json",
+  "paddingField": "padding",
+  "targetUtf8Bytes": 2097153,
+  "expectedFindingCode": "host-state-payload-too-large",
+  "notes": [
+    "The test synthesizes this input in memory so the repository does not carry a multi-megabyte fixture.",
+    "The payload budget must reject the request before unknown-field validation."
+  ]
+}

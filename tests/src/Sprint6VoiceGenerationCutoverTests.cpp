@@ -42,22 +42,25 @@ ModelFixture buildModel(drs::engine::PlaybackActivationLane lane,
     ImmutablePlaybackSnapshot snapshot;
     snapshot.draftRevision = revision;
     snapshot.contentDigest = "s6.6-snapshot-" + std::to_string(revision);
-    snapshot.zones.push_back({ "zone-" + std::to_string(revision),
-                               "sample-" + std::to_string(revision),
-                               "Generation Zone",
-                               "main",
-                               "sustain",
-                               rootKey,
-                               keyLow,
-                               keyHigh,
-                               1,
-                               127,
-                               gainDb,
-                               0.0,
-                               0,
-                               loopEnabled,
-                               0,
-                               8192 });
+    PlaybackSnapshotZone snapshotZone;
+    snapshotZone.id = "zone-" + std::to_string(revision);
+    snapshotZone.sampleSourceId = "sample-" + std::to_string(revision);
+    snapshotZone.displayName = "Generation Zone";
+    snapshotZone.groupId = "main";
+    snapshotZone.articulationId = "sustain";
+    snapshotZone.rootKey = rootKey;
+    snapshotZone.keyLow = keyLow;
+    snapshotZone.keyHigh = keyHigh;
+    snapshotZone.gainDb = gainDb;
+    snapshotZone.loopEnabled = loopEnabled;
+    snapshotZone.loopEndFrame = 8192;
+    snapshot.zones.push_back(std::move(snapshotZone));
+    PlaybackSnapshotGroupRoute snapshotGroup;
+    snapshotGroup.groupId = "main";
+    snapshotGroup.articulationIds = { "sustain" };
+    snapshotGroup.zoneIds = { "zone-" + std::to_string(revision) };
+    snapshotGroup.displayName = "Main";
+    snapshot.groupRoutes.push_back(std::move(snapshotGroup));
 
     auto decoded = std::make_shared<PreparedPlaybackDecodedSampleData>();
     decoded->normalizedChannels = { std::vector<float>(8192, sampleValue) };
@@ -76,22 +79,23 @@ ModelFixture buildModel(drs::engine::PlaybackActivationLane lane,
     sample.channelCount = 1;
     sample.decodedSampleData = decoded;
     prepared.samples.push_back(std::move(sample));
-    prepared.zones.push_back({ "zone-" + std::to_string(revision),
-                               "sample-" + std::to_string(revision),
-                               "stream-" + std::to_string(revision),
-                               0,
-                               0,
-                               rootKey,
-                               keyLow,
-                               keyHigh,
-                               1,
-                               127,
-                               gainDb,
-                               0.0,
-                               0,
-                               loopEnabled,
-                               0,
-                               8192 });
+    PreparedPlaybackZoneHandle preparedZone;
+    preparedZone.zoneId = "zone-" + std::to_string(revision);
+    preparedZone.sampleSourceId = "sample-" + std::to_string(revision);
+    preparedZone.streamSampleId = "stream-" + std::to_string(revision);
+    preparedZone.rootKey = rootKey;
+    preparedZone.keyLow = keyLow;
+    preparedZone.keyHigh = keyHigh;
+    preparedZone.gainDb = gainDb;
+    preparedZone.loopEnabled = loopEnabled;
+    preparedZone.loopEndFrame = 8192;
+    prepared.zones.push_back(std::move(preparedZone));
+    PreparedPlaybackGroupRoute preparedGroup;
+    preparedGroup.groupId = "main";
+    preparedGroup.articulationIds = { "sustain" };
+    preparedGroup.zoneIds = { "zone-" + std::to_string(revision) };
+    preparedGroup.displayName = "Main";
+    prepared.groupRoutes.push_back(std::move(preparedGroup));
 
     auto payload = std::make_shared<PlaybackActivationPayload>();
     payload->lane = lane;

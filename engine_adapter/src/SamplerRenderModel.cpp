@@ -89,7 +89,8 @@ std::uint64_t buildCrossfadePairingKey(const PreparedPlaybackZoneHandle& zone)
     std::ostringstream stream;
     stream << zone.rootKey
            << "|" << zone.keyLow
-           << "|" << zone.keyHigh;
+           << "|" << zone.keyHigh
+           << "|" << static_cast<int>(zone.triggerMode);
     return computeFnv1a64(stream.str());
 }
 

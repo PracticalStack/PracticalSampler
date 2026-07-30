@@ -57,6 +57,27 @@ The Phase 0 smoke test now does all of the following:
 
 If Reaper still does not discover the plugin after installation or scan-path correction, the next useful artifact is Reaper's scan result for this bundle.
 
+## DAW project-recall validation
+
+Project-aware recall is documented in [daw-host-state-recall.md](daw-host-state-recall.md).
+The checked host matrix and signed artifacts are recorded in
+[host-state-reaper-validation-evidence.md](host-state-reaper-validation-evidence.md).
+
+For recall validation, do not stop after confirming that macro parameters return. Verify that the
+reserialized VST3 chunk contains `drs.hostState`, the expected project ID and manifest digest, and
+a complete published checkpoint after transport has exercised block-boundary activation.
+
+The required matrix is:
+
+- editor open and editor closed;
+- moved project locator;
+- matching project ID with a changed manifest digest;
+- missing sample/content preparation failure; and
+- duplicated instances restored independently.
+
+Missing, moved, changed, and invalid content must preserve the safe startup state and expose
+non-modal recovery. They must never present the reference instrument as the recalled project.
+
 ## Sprint 4 diagnostics spot-check
 
 Once the plugin or standalone shell opens, the Status panel should now also expose a developer diagnostics block.

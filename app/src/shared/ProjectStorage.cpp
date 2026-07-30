@@ -62,7 +62,8 @@ std::uint64_t buildCrossfadePairingKey(const drs::engine::RuntimeZoneDefinition&
     stream << zone.articulationId
            << "|" << zone.rootKey
            << "|" << zone.keyLow
-           << "|" << zone.keyHigh;
+           << "|" << zone.keyHigh
+           << "|" << static_cast<int>(zone.triggerMode);
     return computeFnv1a64(stream.str());
 }
 

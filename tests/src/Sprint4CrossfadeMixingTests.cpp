@@ -140,6 +140,22 @@ drs::engine::SamplerRenderModelPtr buildModel(const std::vector<RouteSpec>& spec
         prepared.zones.push_back(std::move(preparedZone));
     }
 
+    drs::engine::PlaybackSnapshotGroupRoute snapshotGroup;
+    snapshotGroup.groupId = "crossfade-group";
+    snapshotGroup.articulationIds = { "sustain" };
+    snapshotGroup.displayName = "Crossfade Group";
+    drs::engine::PreparedPlaybackGroupRoute preparedGroup;
+    preparedGroup.groupId = snapshotGroup.groupId;
+    preparedGroup.articulationIds = snapshotGroup.articulationIds;
+    preparedGroup.displayName = snapshotGroup.displayName;
+    for (const auto& spec : specs)
+    {
+        snapshotGroup.zoneIds.push_back(spec.zoneId);
+        preparedGroup.zoneIds.push_back(spec.zoneId);
+    }
+    snapshot.groupRoutes.push_back(std::move(snapshotGroup));
+    prepared.groupRoutes.push_back(std::move(preparedGroup));
+
     auto payload = std::make_shared<drs::engine::PlaybackActivationPayload>();
     payload->lane = drs::engine::PlaybackActivationLane::preview;
     payload->revision = snapshot.draftRevision;

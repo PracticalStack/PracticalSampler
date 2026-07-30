@@ -182,6 +182,21 @@ drs::engine::SamplerRenderModelPtr buildModel(std::size_t frameCount = 4096,
         prepared.zones.push_back(std::move(preparedZone));
     }
 
+    drs::engine::PlaybackSnapshotGroupRoute snapshotGroup;
+    snapshotGroup.groupId = "pool-group";
+    snapshotGroup.articulationIds = { "sustain" };
+    snapshotGroup.displayName = "Pool Group";
+    drs::engine::PreparedPlaybackGroupRoute preparedGroup;
+    preparedGroup.groupId = snapshotGroup.groupId;
+    preparedGroup.articulationIds = snapshotGroup.articulationIds;
+    preparedGroup.displayName = snapshotGroup.displayName;
+    for (const auto& zone : snapshot.zones)
+        snapshotGroup.zoneIds.push_back(zone.id);
+    for (const auto& zone : prepared.zones)
+        preparedGroup.zoneIds.push_back(zone.zoneId);
+    snapshot.groupRoutes.push_back(std::move(snapshotGroup));
+    prepared.groupRoutes.push_back(std::move(preparedGroup));
+
     auto payload = std::make_shared<drs::engine::PlaybackActivationPayload>();
     payload->lane = drs::engine::PlaybackActivationLane::preview;
     payload->revision = snapshot.draftRevision;
@@ -286,6 +301,21 @@ drs::engine::SamplerRenderModelPtr buildRoundRobinModel(
         preparedZone.roundRobinPosition = route.slotIndex;
         prepared.zones.push_back(std::move(preparedZone));
     }
+
+    drs::engine::PlaybackSnapshotGroupRoute snapshotGroup;
+    snapshotGroup.groupId = "rr-group";
+    snapshotGroup.articulationIds = { "sustain" };
+    snapshotGroup.displayName = "Round Robin Group";
+    drs::engine::PreparedPlaybackGroupRoute preparedGroup;
+    preparedGroup.groupId = snapshotGroup.groupId;
+    preparedGroup.articulationIds = snapshotGroup.articulationIds;
+    preparedGroup.displayName = snapshotGroup.displayName;
+    for (const auto& zone : snapshot.zones)
+        snapshotGroup.zoneIds.push_back(zone.id);
+    for (const auto& zone : prepared.zones)
+        preparedGroup.zoneIds.push_back(zone.zoneId);
+    snapshot.groupRoutes.push_back(std::move(snapshotGroup));
+    prepared.groupRoutes.push_back(std::move(preparedGroup));
 
     auto payload = std::make_shared<drs::engine::PlaybackActivationPayload>();
     payload->lane = lane;

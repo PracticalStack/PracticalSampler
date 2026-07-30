@@ -1,0 +1,72 @@
+{
+  "schemaName": "drs.hostState",
+  "schemaVersion": 1,
+  "presetState": {
+    "schemaName": "drs.presetState",
+    "schemaVersion": 1,
+    "presetId": "drs.host-state.dirty-project",
+    "targetInstrumentId": "drs.phase1.tiny-open-instrument",
+    "targetInstrumentSchemaName": "drs.instrument",
+    "targetInstrumentSchemaVersion": 1,
+    "loadProfileId": "balanced",
+    "selectedArticulationId": "sustain",
+    "macroValues": [
+      {
+        "id": "tone",
+        "value": 0.47
+      },
+      {
+        "id": "motion",
+        "value": 0.21
+      }
+    ],
+    "notes": [
+      "Dirty host-state fixture."
+    ]
+  },
+  "projectBinding": {
+    "projectId": "drs.host-state.unsaved-project",
+    "manifestFileName": "Unsaved Project.drsproj",
+    "manifestDigest": "fnv1a64:70517ee9917fb985"
+  },
+  "authoringState": {
+    "revision": 5,
+    "savedRevision": 3,
+    "dirty": true,
+    "projectSnapshot": {
+      "schemaName": "drs.project",
+      "schemaVersion": 4,
+      "projectId": "drs.host-state.unsaved-project",
+      "displayName": "Unsaved Host-State Project",
+      "contentRoot": ".",
+      "defaultInstrumentManifest": "Unsaved Project.drinst",
+      "sampleSources": [],
+      "authoring": {
+        "schemaName": "drs.authoring",
+        "schemaVersion": 3,
+        "selectedZoneId": "",
+        "selectedGroupId": "",
+        "selectedPerformanceBankId": "",
+        "zones": [],
+        "groups": [],
+        "macros": [],
+        "fxSlots": [],
+        "routingBuses": [],
+        "performanceBanks": [],
+        "notes": [
+          "An unsaved authoring note that must survive DAW recall."
+        ]
+      },
+      "notes": [
+        "Embedded project metadata and paths only; no sample bytes."
+      ]
+    }
+  },
+  "publishedState": {
+    "revision": 3,
+    "projectGeneration": 2,
+    "authoredContentDigest": "fnv1a64:6d7ad704a7ef80e1",
+    "macroSchemaDigest": "fnv1a64:cbf29ce484222325",
+    "preparedContentDigest": "fnv1a64:1783e8a6f22e9fb4"
+  }
+}

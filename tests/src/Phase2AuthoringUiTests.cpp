@@ -2672,6 +2672,7 @@ int main()
         contextMenuZone.displayName = "Context Menu Zone";
         contextMenuZone.selected = true;
         dropTargetZoneMap.setZoneSummaries({contextMenuZone});
+        dropTargetZoneMap.setSelectionState({ { contextMenuZone.id }, contextMenuZone.id });
         dropTargetZoneMap.setOnDeleteSelectedSampleRequested([&deleteSelectedSampleRequests]
         {
             ++deleteSelectedSampleRequests;

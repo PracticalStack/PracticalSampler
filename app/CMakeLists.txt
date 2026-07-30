@@ -2,6 +2,8 @@ set(DRS_APP_SHARED_SOURCES
     src/shared/AuthoringPanel.cpp
     src/shared/AuthoringPanel.h
     src/shared/AuthoringPreviewModel.h
+    src/shared/HostStateRecoveryBanner.cpp
+    src/shared/HostStateRecoveryBanner.h
     src/shared/midi/DrumPadComponent.cpp
     src/shared/midi/DrumPadComponent.h
     src/shared/PerformanceBankImport.cpp

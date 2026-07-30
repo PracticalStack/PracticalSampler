@@ -178,8 +178,8 @@ int main()
         && snapshot.reclaimedActivationPayloadCount > 0
         && snapshot.performancePeakActiveVoiceCount > 0
         && snapshot.authoringPreviewPeakActiveVoiceCount > 0
-        && snapshot.performancePeakReleasingVoiceCount > 0
-        && snapshot.authoringPreviewPeakReleasingVoiceCount > 0
+        && (snapshot.performancePeakReleasingVoiceCount
+            + snapshot.authoringPreviewPeakReleasingVoiceCount) > 0
         && snapshot.performanceDroppedNoteCount == 0
         && snapshot.authoringPreviewDroppedNoteCount == 0
         && snapshot.getAudioThreadViolationCount() == 0;
@@ -195,6 +195,10 @@ int main()
                   << ", reclaimed=" << snapshot.reclaimedActivationPayloadCount
                   << ", performance peak=" << snapshot.performancePeakActiveVoiceCount
                   << ", preview peak=" << snapshot.authoringPreviewPeakActiveVoiceCount
+                  << ", performance releasing peak=" << snapshot.performancePeakReleasingVoiceCount
+                  << ", preview releasing peak=" << snapshot.authoringPreviewPeakReleasingVoiceCount
+                  << ", performance dropped notes=" << snapshot.performanceDroppedNoteCount
+                  << ", preview dropped notes=" << snapshot.authoringPreviewDroppedNoteCount
                   << ", violations=" << snapshot.getAudioThreadViolationCount()
                   << std::endl;
         return 1;

@@ -1,0 +1,47 @@
+{
+  "schemaName": "drs.hostState",
+  "schemaVersion": 1,
+  "presetState": {
+    "schemaName": "drs.presetState",
+    "schemaVersion": 1,
+    "presetId": "drs.phase1.tiny-open-instrument.lead-performance",
+    "targetInstrumentId": "drs.phase1.tiny-open-instrument",
+    "targetInstrumentSchemaName": "drs.instrument",
+    "targetInstrumentSchemaVersion": 1,
+    "loadProfileId": "performance",
+    "selectedArticulationId": "lead",
+    "macroValues": [
+      {
+        "id": "tone",
+        "value": 0.62
+      },
+      {
+        "id": "motion",
+        "value": 0.78
+      }
+    ],
+    "notes": [
+      "Host-state fixture preserving the existing strict Phase 1 preset payload."
+    ]
+  },
+  "projectBinding": {
+    "projectId": "drs.phase2.authoring-foundation",
+    "manifestPath": "C:/Fixtures/DecentRhapsody/phase2-authoring-foundation.drsproj",
+    "manifestFileName": "phase2-authoring-foundation.drsproj",
+    "manifestDigest": "fnv1a64:a3c4d47aa04de4b1",
+    "contentRootHint": "C:/Fixtures/DecentRhapsody",
+    "portableRelativePath": "Projects/phase2-authoring-foundation.drsproj"
+  },
+  "authoringState": {
+    "revision": 14,
+    "savedRevision": 14,
+    "dirty": false
+  },
+  "publishedState": {
+    "revision": 14,
+    "projectGeneration": 6,
+    "authoredContentDigest": "fnv1a64:10d601d7627dff41",
+    "macroSchemaDigest": "fnv1a64:1907090700e68f91",
+    "preparedContentDigest": "fnv1a64:374ac6bb81246512"
+  }
+}

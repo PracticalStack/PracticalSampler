@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Decent Rhapsody Studio — Code Review</title>
+  <style>
+    :root {
+      --paper: #f5f1e8;
+      --surface: #fffdf8;
+      --ink: #22282d;
+      --muted: #646b70;
+      --line: #d8d1c5;
+      --accent: #a73d2a;
+      --accent-soft: #f4ded7;
+      --amber: #9a6517;
+      --amber-soft: #f5e8cc;
+      --green: #1f6a4b;
+      --green-soft: #dcece3;
+      --blue: #315c75;
+      --blue-soft: #deebf1;
+      --code: #20272d;
+      --code-ink: #e9eee9;
+      --shadow: 0 18px 45px rgba(42, 37, 30, 0.09);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 3%, rgba(167, 61, 42, 0.08), transparent 23rem),
+        linear-gradient(180deg, #ece6da 0, var(--paper) 34rem);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+
+    a { color: var(--blue); }
+
+    .plan-link {
+      display: inline-flex;
+      align-items: center;
+      margin-top: 8px;
+      padding: 10px 14px;
+      color: #fffaf1;
+      background: var(--blue);
+      border-radius: 9px;
+      font-size: 0.86rem;
+      font-weight: 800;
+      text-decoration: none;
+    }
+
+    .plan-link:hover { background: #244b61; }
+
+    .page {
+      width: min(1120px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 48px 0 72px;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 42px;
+      color: #fffaf1;
+      background: #242a2e;
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      top: -120px;
+      right: -90px;
+      width: 340px;
+      height: 340px;
+      border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 50%;
+      box-shadow: 0 0 0 42px rgba(255,255,255,0.035), 0 0 0 92px rgba(255,255,255,0.025);
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: #e7b4a6;
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 {
+      position: relative;
+      z-index: 1;
+      max-width: 780px;
+      margin-bottom: 16px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(2.45rem, 6vw, 4.7rem);
+      font-weight: 500;
+      letter-spacing: -0.045em;
+      line-height: 0.98;
+    }
+
+    .hero-copy {
+      position: relative;
+      z-index: 1;
+      max-width: 730px;
+      margin-bottom: 28px;
+      color: #d7dbd8;
+      font-size: 1.08rem;
+    }
+
+    .meta {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .meta li {
+      padding: 8px 12px;
+      color: #e9ede9;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 999px;
+      font-size: 0.82rem;
+    }
+
+    .section {
+      margin-top: 44px;
+    }
+
+    .section-heading {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .section-heading h2 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(1.8rem, 3vw, 2.55rem);
+      font-weight: 500;
+      letter-spacing: -0.025em;
+    }
+
+    .section-heading::after {
+      content: "";
+      height: 1px;
+      background: var(--line);
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .summary-card,
+    .finding,
+    .initiative,
+    .validation {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 8px 24px rgba(42, 37, 30, 0.045);
+    }
+
+    .summary-card { padding: 21px; }
+
+    .summary-card strong {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--accent);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 2rem;
+      font-weight: 500;
+      line-height: 1;
+    }
+
+    .summary-card span {
+      color: var(--muted);
+      font-size: 0.91rem;
+    }
+
+    .findings {
+      display: grid;
+      gap: 18px;
+      counter-reset: finding;
+    }
+
+    .finding {
+      position: relative;
+      overflow: hidden;
+      padding: 28px;
+      counter-increment: finding;
+    }
+
+    .finding::before {
+      content: counter(finding, decimal-leading-zero);
+      position: absolute;
+      top: 16px;
+      right: 22px;
+      color: #e9e3d9;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 4.5rem;
+      line-height: 1;
+    }
+
+    .finding-header {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      padding-right: 80px;
+    }
+
+    .finding h3 {
+      flex: 1 1 520px;
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(1.35rem, 2.4vw, 1.85rem);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 1.18;
+    }
+
+    .severity {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 850;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    .critical { color: #7f2418; background: var(--accent-soft); }
+    .high { color: #76500e; background: var(--amber-soft); }
+
+    .finding-body {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+      gap: 24px;
+      margin-top: 20px;
+    }
+
+    .finding p:last-child { margin-bottom: 0; }
+
+    .label {
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 0.74rem;
+      font-weight: 850;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    .evidence {
+      margin: 0 0 14px;
+      padding: 14px 16px;
+      color: var(--code-ink);
+      background: var(--code);
+      border-radius: 12px;
+      font: 0.82rem/1.55 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      overflow-wrap: anywhere;
+    }
+
+    .impact {
+      padding: 16px;
+      background: #f7f3eb;
+      border-left: 3px solid var(--accent);
+      border-radius: 0 10px 10px 0;
+    }
+
+    .fix-list {
+      margin: 0;
+      padding-left: 1.15rem;
+    }
+
+    .fix-list li + li { margin-top: 7px; }
+
+    .initiative {
+      overflow: hidden;
+      border-color: #bfcfd6;
+    }
+
+    .initiative-top {
+      padding: 28px 30px;
+      background: var(--blue-soft);
+      border-bottom: 1px solid #bfcfd6;
+    }
+
+    .initiative-top h2 {
+      max-width: 820px;
+      margin-bottom: 8px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(1.75rem, 3vw, 2.55rem);
+      font-weight: 500;
+      letter-spacing: -0.025em;
+    }
+
+    .initiative-top p {
+      max-width: 850px;
+      margin-bottom: 0;
+      color: #3f5968;
+    }
+
+    .initiative-body {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1px;
+      background: var(--line);
+    }
+
+    .initiative-step {
+      padding: 24px 28px;
+      background: var(--surface);
+    }
+
+    .initiative-step strong {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--blue);
+    }
+
+    .validation {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      overflow: hidden;
+    }
+
+    .validation > div { padding: 26px 28px; }
+    .validation > div + div { border-left: 1px solid var(--line); }
+
+    .check {
+      display: inline-block;
+      margin-right: 7px;
+      color: var(--green);
+      font-weight: 900;
+    }
+
+    .note {
+      margin-top: 20px;
+      padding: 18px 20px;
+      color: #4f575b;
+      background: var(--green-soft);
+      border: 1px solid #bed8c9;
+      border-radius: 14px;
+    }
+
+    footer {
+      margin-top: 38px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      text-align: center;
+    }
+
+    @media (max-width: 800px) {
+      .page { width: min(100% - 24px, 1120px); padding-top: 20px; }
+      .hero { padding: 28px 24px; border-radius: 18px; }
+      .summary-grid, .finding-body, .initiative-body, .validation { grid-template-columns: 1fr; }
+      .validation > div + div { border-top: 1px solid var(--line); border-left: 0; }
+      .finding { padding: 24px 20px; }
+      .finding-header { padding-right: 54px; }
+      .finding::before { right: 12px; font-size: 3.3rem; }
+    }
+
+    @media print {
+      body { background: #fff; }
+      .page { width: 100%; padding: 0; }
+      .hero, .summary-card, .finding, .initiative, .validation { box-shadow: none; }
+      .finding { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <p class="eyebrow">Engineering review · July 29, 2026</p>
+      <h1>Five risks holding back the next phase</h1>
+      <p class="hero-copy">
+        A focused review of Decent Rhapsody Studio’s product-owned C++ surfaces, emphasizing host
+        recall, lifecycle safety, data integrity, responsiveness, and hostile or malformed input.
+      </p>
+      <ul class="meta" aria-label="Review metadata">
+        <li>Commit a90a7037</li>
+        <li>Scope: app, engine_adapter, tests, build/CI</li>
+        <li>Excluded: vendored third_party code</li>
+        <li>Worktree clean at review time</li>
+      </ul>
+    </header>
+
+    <section class="section" aria-labelledby="summary-title">
+      <div class="section-heading"><h2 id="summary-title">Executive summary</h2></div>
+      <div class="summary-grid">
+        <article class="summary-card">
+          <strong>2</strong>
+          <span>critical lifecycle and recall gaps</span>
+        </article>
+        <article class="summary-card">
+          <strong>3</strong>
+          <span>high-impact reliability and data-integrity risks</span>
+        </article>
+        <article class="summary-card">
+          <strong>3/3</strong>
+          <span>targeted baseline tests passed; the gaps are largely untested failure modes</span>
+        </article>
+      </div>
+      <p class="note">
+        The audio callback architecture is notably disciplined: bounded queues, retirement staging,
+        and dedicated real-time diagnostics are already in place. The largest remaining risks sit
+        around the callback—project ownership, asynchronous jobs, file transactions, and import limits.
+      </p>
+    </section>
+
+    <section class="section" aria-labelledby="findings-title">
+      <div class="section-heading"><h2 id="findings-title">Top five findings</h2></div>
+      <div class="findings">
+        <article class="finding">
+          <div class="finding-header">
+            <span class="severity critical">Critical</span>
+            <h3>DAW host state does not identify or restore the authored project</h3>
+          </div>
+          <div class="finding-body">
+            <div>
+              <p>
+                The processor serializes only the Phase 1 runtime preset payload. The current
+                <code>authoringProjectFile</code>, authored document, draft revision, and published
+                playback identity are absent. A fresh processor therefore starts from
+                <code>buildInitialAuthoringProject()</code> and restores macros/articulation without
+                reconnecting the instrument the user authored.
+              </p>
+              <div class="impact">
+                <p class="label">User impact</p>
+                <p>
+                  A DAW session can reopen with the right control values but the wrong project/content.
+                  Unsaved edits are lost, and even a saved project is not automatically reopened.
+                </p>
+              </div>
+            </div>
+            <div>
+              <p class="label">Evidence</p>
+              <p class="evidence">app/src/plugin/PluginProcessor.cpp:656–670<br>app/src/plugin/PluginProcessor.h:171–172, 383<br>engine_adapter/src/EngineFacade.cpp:2091–2097</p>
+              <p class="label">Recommended change</p>
+              <ul class="fix-list">
+                <li>Add a versioned host-state envelope around the preset payload.</li>
+                <li>Persist a project locator, project/content digest, and active published revision—not a duplicate copy of all samples.</li>
+                <li>Implement moved/missing-content recovery and an explicit degraded state.</li>
+                <li>Add a round-trip test that loads a non-reference <code>.drsproj</code> into a fresh processor.</li>
+              </ul>
+              <a class="plan-link" href="daw-host-state-development-plan.html">Open the detailed implementation plan &rarr;</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="finding">
+          <div class="finding-header">
+            <span class="severity critical">Critical</span>
+            <h3>Detached SFZ import threads have no owner, cancellation, or shutdown barrier</h3>
+          </div>
+          <div class="finding-body">
+            <div>
+              <p>
+                Both shells start an anonymous <code>std::thread</code> and immediately detach it.
+                <code>Component::SafePointer</code> protects the eventual UI callback, but it does not
+                stop the worker, cap concurrency, or guarantee that plug-in code remains loaded while
+                the thread is still executing.
+              </p>
+              <div class="impact">
+                <p class="label">Failure mode</p>
+                <p>
+                  Closing an editor, unloading a plug-in instance, or exiting during a large import can
+                  leave work running beyond its owning object. Multiple clicks can also create
+                  unbounded concurrent analyses.
+                </p>
+              </div>
+            </div>
+            <div>
+              <p class="label">Evidence</p>
+              <p class="evidence">app/src/plugin/PluginEditor.cpp:985–1029<br>app/src/standalone/MainComponent.cpp:1044–1088<br>Editor::~Editor():537–541<br>MainComponent::~MainComponent():515–521</p>
+              <p class="label">Recommended change</p>
+              <ul class="fix-list">
+                <li>Move imports into an owned job service with a stop token and generation ID.</li>
+                <li>Cancel and join jobs during editor/application destruction and processor unload.</li>
+                <li>Allow only one active review per shell, with progress and cancellation UI.</li>
+                <li>Post immutable results back to the message thread.</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <article class="finding">
+          <div class="finding-header">
+            <span class="severity high">High</span>
+            <h3>WAV imports and startup metrics decode complete samples on the message/constructor path</h3>
+          </div>
+          <div class="finding-body">
+            <div>
+              <p>
+                The WAV workflow creates directories, copies every selected file, and drains the
+                decoding queue synchronously from the UI callback. Processor construction also drains
+                an import queue to initialize metrics. Each item decodes the entire file into a JUCE
+                buffer and then copies it again into normalized channel vectors.
+              </p>
+              <div class="impact">
+                <p class="label">User impact</p>
+                <p>
+                  Large multisample batches can freeze the editor, trigger host “plug-in not
+                  responding” behavior, and slow scanning/instantiation before the UI is even available.
+                </p>
+              </div>
+            </div>
+            <div>
+              <p class="label">Evidence</p>
+              <p class="evidence">app/src/plugin/PluginEditor.cpp:749–827<br>app/src/standalone/MainComponent.cpp:810–887<br>app/src/plugin/PluginProcessor.cpp:1583–1599<br>engine_adapter/src/SampleImport.cpp:848–935</p>
+              <p class="label">Recommended change</p>
+              <ul class="fix-list">
+                <li>Run copy, fingerprint, metadata read, and decode on the managed import service.</li>
+                <li>Publish per-item progress and keep only lightweight metadata on the message thread.</li>
+                <li>Generate waveform peaks incrementally instead of retaining a second full decoded copy.</li>
+                <li>Make processor construction side-effect-free with respect to sample decoding.</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <article class="finding">
+          <div class="finding-header">
+            <span class="severity high">High</span>
+            <h3>Project save is atomic per file, but not atomic across the project/instrument pair</h3>
+          </div>
+          <div class="finding-body">
+            <div>
+              <p>
+                Saving stages both files in temporaries, then commits <code>.drinst</code> first and
+                <code>.drsproj</code> second. If the second replacement fails, the new instrument is
+                left beside the old project. The UI reports failure, but disk state has already changed.
+              </p>
+              <div class="impact">
+                <p class="label">Data integrity impact</p>
+                <p>
+                  Disk-full, antivirus, permission, or transient rename failures can create a
+                  mismatched project bundle that appears valid until the next open or publish.
+                </p>
+              </div>
+            </div>
+            <div>
+              <p class="label">Evidence</p>
+              <p class="evidence">app/src/shared/ProjectStorage.cpp:283–330<br>Instrument commit:317–321<br>Project commit:323–327</p>
+              <p class="label">Recommended change</p>
+              <ul class="fix-list">
+                <li>Save a versioned bundle directory and atomically switch a single manifest pointer, or use a journaled two-phase commit.</li>
+                <li>Keep recoverable backups until both replacements and a read-back validation succeed.</li>
+                <li>Include a shared generation/content digest in both manifests and reject mismatched pairs on load.</li>
+                <li>Add injected-failure tests for each write and rename boundary.</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <article class="finding">
+          <div class="finding-header">
+            <span class="severity high">High</span>
+            <h3>Importers trust file size, decoded dimensions, and include depth without budgets</h3>
+          </div>
+          <div class="finding-body">
+            <div>
+              <p>
+                Manifest and stream loaders read entire files before parsing. Sample import accepts up
+                to <code>INT_MAX</code> frames, multiplies by the reported channel count, allocates the
+                full audio buffer, and duplicates it. SFZ cycle detection is present, but recursive
+                includes have no maximum depth, file count, line count, section count, or total-byte budget.
+              </p>
+              <div class="impact">
+                <p class="label">Reliability and security impact</p>
+                <p>
+                  A malformed or merely oversized file can exhaust memory or stack space and terminate
+                  the standalone app or host process. The current checks reject invalid values only
+                  after potentially expensive input has already been consumed.
+                </p>
+              </div>
+            </div>
+            <div>
+              <p class="label">Evidence</p>
+              <p class="evidence">engine_adapter/src/RuntimeLoader.cpp:61–67, 1024–1035<br>engine_adapter/src/RuntimeStream.cpp:31–37, 189–200<br>engine_adapter/src/SampleImport.cpp:874–935<br>engine_adapter/src/SfzImport.cpp:168–230, 410–428</p>
+              <p class="label">Recommended change</p>
+              <ul class="fix-list">
+                <li>Define central import budgets for bytes, samples, channels, sections, includes, and diagnostics.</li>
+                <li>Check file sizes and safe multiplication before allocation.</li>
+                <li>Use iterative SFZ traversal with depth and aggregate limits.</li>
+                <li>Return structured “budget exceeded” findings and add adversarial fixtures.</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="next-title">
+      <article class="initiative">
+        <div class="initiative-top">
+          <p class="eyebrow">Recommended next major item</p>
+          <h2 id="next-title">Build a unified Project Lifecycle &amp; Import Service</h2>
+          <p>
+            Make one product-owned service responsible for project identity, host recall, bounded
+            background jobs, and transactional persistence. The standalone and plug-in shells should
+            become thin clients of this service instead of maintaining parallel project workflows.
+          </p>
+          <a class="plan-link" href="daw-host-state-development-plan.html">Start with the DAW host-state plan &rarr;</a>
+        </div>
+        <div class="initiative-body">
+          <div class="initiative-step">
+            <strong>1 · Host-state envelope</strong>
+            Add project locator/digest, published revision, and recovery status around the existing
+            strict preset payload.
+          </div>
+          <div class="initiative-step">
+            <strong>2 · Managed job ownership</strong>
+            Introduce a bounded worker queue with cancellation, progress snapshots, generation checks,
+            and deterministic shutdown.
+          </div>
+          <div class="initiative-step">
+            <strong>3 · Transactional storage</strong>
+            Save and validate a coherent project generation, with rollback/recovery for interrupted writes.
+          </div>
+          <div class="initiative-step">
+            <strong>4 · One shell contract</strong>
+            Move duplicated open/save/import logic out of the roughly 1.4k-line plug-in and standalone
+            shell components into shared orchestration.
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="section" aria-labelledby="validation-title">
+      <div class="section-heading"><h2 id="validation-title">Validation and scope</h2></div>
+      <div class="validation">
+        <div>
+          <p class="label">Checks completed</p>
+          <p><span class="check">✓</span><code>drs.phase1.state_recall</code></p>
+          <p><span class="check">✓</span><code>drs.phase2.authoring_foundation</code></p>
+          <p><span class="check">✓</span><code>drs.phase1.sample_import</code></p>
+          <p><span class="check">✓</span>All three targeted tests passed in the VS2022 Debug build.</p>
+        </div>
+        <div>
+          <p class="label">Review boundary</p>
+          <p>
+            Static review covered product-owned C++ under <code>app/</code> and
+            <code>engine_adapter/</code>, plus relevant tests, documentation, and CI configuration.
+            Vendored JUCE/HISE sources were intentionally excluded.
+          </p>
+          <p>
+            Passing baseline tests do not invalidate these findings: the current recall test asserts
+            the narrow Phase 1 preset contract, while cancellation, partial-save failure, oversized
+            inputs, and project-aware host reload are not represented by those tests.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      Decent Rhapsody Studio code review · generated from commit a90a7037 · July 29, 2026
+    </footer>
+  </main>
+</body>
+</html>

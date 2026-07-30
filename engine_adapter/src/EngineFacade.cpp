@@ -1658,6 +1658,19 @@ bool EngineFacade::replaceDraftPlaybackAuthoringProject(RuntimeProjectModel proj
     return true;
 }
 
+bool EngineFacade::restorePerformancePublishProjectGeneration(
+    const std::uint64_t projectGeneration)
+{
+    const auto controller = performancePublishController.getSnapshot();
+    if (projectGeneration == 0
+        || controller.preparationState == PerformancePublishPreparationState::preparing
+        || controller.activationState == PerformancePublishActivationState::pending)
+        return false;
+
+    performancePublishProjectGeneration = projectGeneration;
+    return true;
+}
+
 PlaybackSnapshotBuildResult EngineFacade::buildCurrentPlaybackSnapshot(bool activationRequested)
 {
     if (!authoringProject.loaded)

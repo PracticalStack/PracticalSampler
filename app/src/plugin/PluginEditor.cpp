@@ -493,7 +493,9 @@ Editor::Editor(Processor& owner)
                      [this](std::vector<juce::File> files)
                      {
                          importSampleFiles(std::move(files));
-                     })
+                     }),
+      restoreBanner([this] { locateProjectForRestore(); },
+                    [&owner] { owner.retryProjectRestore(); })
 {
     juce::PropertiesFile::Options appSettingsOptions;
     appSettingsOptions.applicationName = "DecentRhapsodyStudio";
@@ -528,6 +530,8 @@ Editor::Editor(Processor& owner)
     workspaceTabs.addTab("Perform", juce::Colour::fromRGB(28, 126, 214), &performancePanel, false);
     workspaceTabs.addTab("Map", juce::Colour::fromRGB(181, 96, 21), &authoringPanel, false);
     workspaceShell.addAndMakeVisible(workspaceTabs);
+    workspaceShell.addAndMakeVisible(restoreBanner);
+    restoreBanner.update(processor.getProjectRestoreSnapshot());
 
     setSize(drs::app::authoring::compactShellWidth, drs::app::authoring::compactShellHeight);
     refreshProjectViews();
@@ -555,6 +559,10 @@ void Editor::resized()
     menuRow.removeFromLeft(menuButtonSpacing);
     projectStatusLabel.setBounds(menuRow);
 
+    if (restoreBanner.isVisible())
+        restoreBanner.setBounds(area.removeFromTop(42));
+    else
+        restoreBanner.setBounds({});
     workspaceTabs.setBounds(area);
 }
 
@@ -646,7 +654,6 @@ void Editor::createNewProject()
                                                 return;
 
                                             const auto projectFile = drs::app::makeSelfContainedProjectFile(selectedFile);
-                                            safeThis->processor.setAuthoringProjectFile({});
                                             safeThis->processor.replaceAuthoringProject(safeThis->buildEmptyProjectTemplate());
                                             safeThis->saveProjectToFile(projectFile);
                                         });
@@ -682,7 +689,6 @@ void Editor::closeProject()
                                     if (!shouldProceed || safeThis == nullptr)
                                         return;
 
-                                    safeThis->processor.setAuthoringProjectFile({});
                                     safeThis->processor.closeAuthoringProject(safeThis->buildUnloadedProjectState());
                                     safeThis->refreshProjectViews();
                                 });
@@ -1154,9 +1160,19 @@ bool Editor::saveProjectToFile(const juce::File& file)
         return false;
     }
 
-    processor.setAuthoringProjectFile(targetFile);
-    if (savingUnsavedProject)
-        processor.replaceAuthoringProject(project);
+    const auto bindingAccepted = savingUnsavedProject
+        ? processor.replaceAuthoringProject(project, targetFile)
+        : processor.bindAuthoringProjectFile(targetFile);
+    if (!bindingAccepted)
+    {
+        juce::AlertWindow::showMessageBoxAsync(
+            juce::AlertWindow::WarningIcon,
+            "Save Project Failed",
+            "The project files were written, but the saved manifest did not match the authored project. "
+            "The current project binding was left unchanged.");
+        return false;
+    }
+
     setRecentProjectDirectory(targetFile.getParentDirectory());
     processor.getAuthoringSession().markSaved();
     refreshProjectViews();
@@ -1185,9 +1201,16 @@ bool Editor::loadProjectFromFile(const juce::File& file)
         return false;
     }
 
-    processor.setAuthoringProjectFile(targetFile);
+    if (!processor.replaceAuthoringProject(*upgradedProject, targetFile))
+    {
+        juce::AlertWindow::showMessageBoxAsync(
+            juce::AlertWindow::WarningIcon,
+            "Open Project Failed",
+            "The manifest was loaded but did not match the authored project identity or canonical content.");
+        return false;
+    }
+
     setRecentProjectDirectory(targetFile.getParentDirectory());
-    processor.replaceAuthoringProject(*upgradedProject);
     refreshProjectViews();
     return true;
 }
@@ -1230,9 +1253,23 @@ void Editor::confirmSafeToDiscardChanges(const juce::String& nextAction,
 void Editor::timerCallback()
 {
     processor.serviceMessageThreadWork();
+    if (restoreBanner.update(processor.getProjectRestoreSnapshot()))
+        resized();
     performancePanel.refreshNow();
     authoringPanel.refreshNow();
     updateProjectStatusLabel();
+}
+
+void Editor::locateProjectForRestore()
+{
+    auto safeThis = juce::Component::SafePointer<Editor>(this);
+    launchOpenProjectChooser(
+        [safeThis](juce::File selectedFile)
+        {
+            if (safeThis == nullptr || selectedFile == juce::File())
+                return;
+            safeThis->processor.retryProjectRestoreWithFile(selectedFile);
+        });
 }
 
 void Editor::refreshProjectViews()

@@ -36,6 +36,23 @@ void require(bool condition, const std::string& message)
         throw std::runtime_error(message);
 }
 
+void serviceRestore(drs::plugin::Processor& processor)
+{
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (std::chrono::steady_clock::now() < deadline)
+    {
+        processor.serviceMessageThreadWork();
+        const auto restore = processor.getProjectRestoreSnapshot();
+        if (restore != nullptr
+            && (restore->state == drs::engine::ProjectRestoreState::active
+                || restore->state == drs::engine::ProjectRestoreState::ready
+                || restore->state == drs::engine::ProjectRestoreState::needsLocation
+                || restore->state == drs::engine::ProjectRestoreState::failed))
+            return;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+}
+
 std::string readTextFile(const fs::path& path)
 {
     std::ifstream input(path, std::ios::binary);
@@ -1037,26 +1054,33 @@ int main(int argc, char* argv[])
 
         drs::standalone::MainComponent standaloneSource;
         const auto standaloneRestore = standaloneSource.restoreStateJson(leadPresetJson);
+        serviceRestore(standaloneSource.getProcessor());
         standaloneFixtureRestored = standaloneRestore.restored;
 
         const auto standaloneExportedState = standaloneSource.exportStateJson();
-        standaloneExportMatchesFixture = standaloneExportedState == leadPresetJson;
+        standaloneExportMatchesFixture =
+            standaloneExportedState == standaloneSource.getEngineFacade().exportPresetStateJson();
 
         drs::standalone::MainComponent standaloneReloaded;
-        standaloneReloadMatchesFixture = standaloneReloaded.restoreStateJson(standaloneExportedState).restored
+        const auto standaloneReload = standaloneReloaded.restoreStateJson(standaloneExportedState);
+        serviceRestore(standaloneReloaded.getProcessor());
+        standaloneReloadMatchesFixture = standaloneReload.restored
             && sessionMatchesLeadPerformance(standaloneReloaded.getEngineFacade().getCurrentSessionState());
 
         drs::plugin::Processor sourceProcessor;
         sourceProcessor.setStateInformation(leadPresetJson.data(), static_cast<int>(leadPresetJson.size()));
+        serviceRestore(sourceProcessor);
         pluginFixtureRestored = sessionMatchesLeadPerformance(sourceProcessor.getEngineFacade().getCurrentSessionState());
 
         juce::MemoryBlock pluginState;
         sourceProcessor.getStateInformation(pluginState);
         const auto pluginStateJson = std::string(static_cast<const char*>(pluginState.getData()), pluginState.getSize());
-        pluginExportMatchesFixture = pluginStateJson == leadPresetJson;
+        pluginExportMatchesFixture =
+            pluginStateJson == sourceProcessor.getEngineFacade().exportPresetStateJson();
 
         drs::plugin::Processor restoredProcessor;
         restoredProcessor.setStateInformation(pluginState.getData(), static_cast<int>(pluginState.getSize()));
+        serviceRestore(restoredProcessor);
         pluginReloadMatchesFixture = sessionMatchesLeadPerformance(restoredProcessor.getEngineFacade().getCurrentSessionState());
 
         const auto restoredToneValue = findMacroValue(restoredProcessor.getEngineFacade(), "tone");
@@ -1082,8 +1106,11 @@ int main(int argc, char* argv[])
 
         const auto previousPluginState = restoredProcessor.getEngineFacade().exportPresetStateJson();
         restoredProcessor.setStateInformation(negativePresetJson.data(), static_cast<int>(negativePresetJson.size()));
+        serviceRestore(restoredProcessor);
+        const auto rejectedRestore = restoredProcessor.getProjectRestoreSnapshot();
         invalidRestorePreservedLastGoodState = restoredProcessor.getEngineFacade().exportPresetStateJson() == previousPluginState
-            && !restoredProcessor.getEngineFacade().getCurrentSessionState().transientMetrics.lastFailure.empty();
+            && rejectedRestore != nullptr
+            && rejectedRestore->state == drs::engine::ProjectRestoreState::failed;
 
         stateRecallSection["standaloneFixtureRestored"] = standaloneFixtureRestored;
         stateRecallSection["standaloneExportMatchesFixture"] = standaloneExportMatchesFixture;

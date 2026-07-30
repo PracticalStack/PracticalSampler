@@ -3,10 +3,12 @@
 
 #include <juce_audio_processors_headless/juce_audio_processors_headless.h>
 
+#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 
 namespace
 {
@@ -20,6 +22,24 @@ void requireNear(double actual, double expected, double tolerance, const std::st
 {
     if (std::abs(actual - expected) > tolerance)
         throw std::runtime_error(message);
+}
+
+void serviceRestore(drs::plugin::Processor& processor, const std::string& context)
+{
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (std::chrono::steady_clock::now() < deadline)
+    {
+        processor.serviceMessageThreadWork();
+        const auto restore = processor.getProjectRestoreSnapshot();
+        if (restore != nullptr
+            && (restore->state == drs::engine::ProjectRestoreState::active
+                || restore->state == drs::engine::ProjectRestoreState::ready
+                || restore->state == drs::engine::ProjectRestoreState::needsLocation
+                || restore->state == drs::engine::ProjectRestoreState::failed))
+            return;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    throw std::runtime_error(context + " timed out.");
 }
 
 double findMacroValue(const drs::engine::EngineFacade& engineFacade, const std::string& macroId)
@@ -86,6 +106,7 @@ int main()
         drs::standalone::MainComponent restoredStandalone(false);
         require(restoredStandalone.restoreStateJson(standaloneState).restored,
                 "Standalone shell should restore its exported macro state.");
+        serviceRestore(restoredStandalone.getProcessor(), "Standalone macro restore");
         requireNear(findMacroValue(restoredStandalone.getEngineFacade(), "tone"), 0.88, 0.0001,
                     "Standalone shell tone macro did not persist across reload.");
         requireNear(findMacroValue(restoredStandalone.getEngineFacade(), "motion"), 0.73, 0.0001,
@@ -128,11 +149,13 @@ int main()
         require(pluginPreview.effectiveVelocity >= 96,
                 "Plugin tone macro should drive an accent-range preview velocity.");
 
+        processor.serviceMessageThreadWork();
         juce::MemoryBlock stateBlock;
         processor.getStateInformation(stateBlock);
 
         drs::plugin::Processor restoredProcessor;
         restoredProcessor.setStateInformation(stateBlock.getData(), static_cast<int>(stateBlock.getSize()));
+        serviceRestore(restoredProcessor, "Plugin macro restore");
         requireNear(findMacroValue(restoredProcessor.getEngineFacade(), "tone"), 0.88, 0.0001,
                     "Plugin tone macro did not persist across reload.");
         requireNear(findMacroValue(restoredProcessor.getEngineFacade(), "motion"), 0.69, 0.0001,

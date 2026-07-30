@@ -2,6 +2,7 @@
 
 #include "plugin/PluginProcessor.h"
 #include "shared/AuthoringPanel.h"
+#include "shared/HostStateRecoveryBanner.h"
 #include "shared/PerformancePanel.h"
 
 #include <juce_audio_utils/juce_audio_utils.h>
@@ -70,6 +71,7 @@ private:
     void reviewSfzImportFile(const juce::File& selectedFile);
     void showAudioDeviceSettingsDialog();
     void showPreferencesDialog();
+    void locateProjectForRestore();
     void restoreSelectedZoneRootKey();
     bool saveProjectToFile(const juce::File& file);
     bool loadProjectFromFile(const juce::File& file);
@@ -109,6 +111,7 @@ private:
     juce::TabbedComponent workspaceTabs { juce::TabbedButtonBar::TabsAtTop };
     drs::app::PerformancePanel performancePanel;
     drs::app::AuthoringPanel authoringPanel;
+    drs::app::HostStateRecoveryBanner restoreBanner;
     juce::AudioDeviceManager audioDeviceManager;
     juce::AudioProcessorPlayer audioProcessorPlayer;
     mutable juce::ApplicationProperties appProperties;

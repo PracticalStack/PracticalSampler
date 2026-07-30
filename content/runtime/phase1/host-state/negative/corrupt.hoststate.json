@@ -1,0 +1,6 @@
+{
+  "schemaName": "drs.hostState",
+  "schemaVersion": 1,
+  "presetState": {
+    "schemaName": "drs.presetState",
+    "schemaVersion": 1

@@ -733,6 +733,7 @@ RuntimeProjectDocumentActionResult applySfzImportProjection(AuthoringSession& au
                                                   std::move(projection.zones),
                                                   std::move(projection.projectNotes),
                                                   std::move(projection.authoringNotes),
-                                                  label);
+                                                  label,
+                                                  false);
 }
 } // namespace drs::engine

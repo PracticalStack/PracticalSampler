@@ -234,7 +234,9 @@ int main()
                                                          projectionFirst,
                                                          "Apply Phase 3 Round Robin Sprint 8 hardening fixture");
         require(firstApply.applied,
-                "The mixed RR-plus-crossfade hardening fixture should apply through the authoring session.");
+                "The mixed RR-plus-crossfade hardening fixture should apply through the authoring session."
+                    + (firstApply.issues.empty() ? std::string()
+                                                : " First issue: " + firstApply.issues.front()));
 
         AuthoringSession secondSession(baseProject);
         const auto secondApply = applySfzImportProjection(secondSession,

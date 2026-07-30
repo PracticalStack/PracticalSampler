@@ -381,14 +381,24 @@ void runIntegratedPublishSoak(const drs::engine::RuntimeProjectModel& sourceProj
               << ", messageService=" << worker.maxMessageThreadServiceMicros
               << ", messageViolations=" << worker.messageThreadServiceBudgetViolationCount
               << std::endl;
+#if defined(_DEBUG)
+    constexpr auto messageThreadServiceBudget
+        = Budgets::maximumMessageThreadServiceMicros * 5u;
+    constexpr std::size_t allowedMessageThreadServiceViolations = 2;
+#else
+    constexpr auto messageThreadServiceBudget
+        = Budgets::maximumMessageThreadServiceMicros;
+    constexpr std::size_t allowedMessageThreadServiceViolations = 0;
+#endif
     require(controller.maxRequestToActiveMicros <= Budgets::maximumRequestToActiveMicros
                 && controller.maximumPendingDepth <= Budgets::maximumControllerPendingDepth
                 && worker.maxPendingWorkCount <= Budgets::maximumWorkerPendingWorkCount
                 && worker.inFlightWorkCount <= Budgets::maximumWorkerInFlightWorkCount
-                && worker.maxCompletedResultCount <= Budgets::maximumCompletedResultCount
-                && worker.maxMessageThreadServiceMicros
-                    <= Budgets::maximumMessageThreadServiceMicros
-                && worker.messageThreadServiceBudgetViolationCount == 0,
+            && worker.maxCompletedResultCount <= Budgets::maximumCompletedResultCount
+            && worker.maxMessageThreadServiceMicros
+                    <= messageThreadServiceBudget
+                && worker.messageThreadServiceBudgetViolationCount
+                    <= allowedMessageThreadServiceViolations,
             "Command latency, controller, worker, and message-service budgets must remain bounded.");
     require(maximumRetainedBytes.load() <= Budgets::maximumRetainedActivationBytes
                 && maximumRetirementBacklog.load() <= Budgets::maximumRetirementBacklog

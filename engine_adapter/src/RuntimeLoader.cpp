@@ -694,7 +694,8 @@ std::uint64_t buildVelocityCrossfadePairingKey(const TZone& zone)
     stream << zone.articulationId
            << "|" << zone.rootKey
            << "|" << zone.keyLow
-           << "|" << zone.keyHigh;
+           << "|" << zone.keyHigh
+           << "|" << static_cast<int>(zone.triggerMode);
     return computeFnv1a64(stream.str());
 }
 
@@ -1003,29 +1004,20 @@ std::string getPhase2ReferenceProjectManifestPath()
     return generated::workspacePhase2ReferenceProject;
 }
 
-RuntimeProjectLoadResult loadRuntimeProjectManifest(const std::string& manifestPath)
+RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
+                                                     const std::string& manifestPath,
+                                                     const bool validateReferencedPaths)
 {
     RuntimeProjectLoadResult result;
     result.manifestPath = manifestPath;
-    result.state = "Project load not attempted";
-
-    const fs::path manifestFsPath(manifestPath);
-    std::error_code errorCode;
-
-    if (!fs::exists(manifestFsPath, errorCode))
-    {
-        result.state = "Project missing";
-        addIssue(result, "Project file was not found at " + manifestPath + ".");
-        return result;
-    }
-
+    result.state = "Project parse not attempted";
     result.manifestFound = true;
 
-    const auto rawText = readTextFile(manifestFsPath);
+    const fs::path manifestFsPath(manifestPath);
     if (rawText.empty())
     {
         result.state = "Project unreadable";
-        addIssue(result, "Project file was empty or unreadable.");
+        addIssue(result, "Project JSON text was empty.");
         return result;
     }
 
@@ -1064,13 +1056,17 @@ RuntimeProjectLoadResult loadRuntimeProjectManifest(const std::string& manifestP
 
     if (const auto contentRoot = readRequired<RuntimeProjectLoadResult, std::string>(root, result, "contentRoot", "Project"))
     {
-        const auto resolved = validateRequiredDirectory(result, manifestFsPath, *contentRoot, "Project content root");
+        const auto resolved = validateReferencedPaths
+            ? validateRequiredDirectory(result, manifestFsPath, *contentRoot, "Project content root")
+            : std::optional<fs::path> { resolveRelativePath(manifestFsPath, *contentRoot) };
         project.contentRootPath = resolved ? toDisplayPath(*resolved) : *contentRoot;
     }
 
     if (const auto defaultInstrument = readRequired<RuntimeProjectLoadResult, std::string>(root, result, "defaultInstrumentManifest", "Project"))
     {
-        const auto resolved = validateRequiredFile(result, manifestFsPath, *defaultInstrument, "Default instrument manifest");
+        const auto resolved = validateReferencedPaths
+            ? validateRequiredFile(result, manifestFsPath, *defaultInstrument, "Default instrument manifest")
+            : std::optional<fs::path> { resolveRelativePath(manifestFsPath, *defaultInstrument) };
         project.defaultInstrumentManifestPath = resolved ? toDisplayPath(*resolved) : *defaultInstrument;
     }
 
@@ -1094,7 +1090,9 @@ RuntimeProjectLoadResult loadRuntimeProjectManifest(const std::string& manifestP
 
             if (const auto path = readRequired<RuntimeProjectLoadResult, std::string>(sampleObject, result, "path", context.c_str()))
             {
-                const auto resolved = validateRequiredFile(result, manifestFsPath, *path, "Sample source");
+                const auto resolved = validateReferencedPaths
+                    ? validateRequiredFile(result, manifestFsPath, *path, "Sample source")
+                    : std::optional<fs::path> { resolveRelativePath(manifestFsPath, *path) };
                 sampleSource.path = resolved ? toDisplayPath(*resolved) : *path;
             }
 
@@ -1522,6 +1520,34 @@ RuntimeProjectLoadResult loadRuntimeProjectManifest(const std::string& manifestP
     result.loaded = result.issues.empty();
     result.state = result.loaded ? "Project loaded" : "Project invalid";
     return result;
+}
+
+RuntimeProjectLoadResult loadRuntimeProjectManifest(const std::string& manifestPath)
+{
+    RuntimeProjectLoadResult result;
+    result.manifestPath = manifestPath;
+    result.state = "Project load not attempted";
+
+    const fs::path manifestFsPath(manifestPath);
+    std::error_code errorCode;
+
+    if (!fs::exists(manifestFsPath, errorCode))
+    {
+        result.state = "Project missing";
+        addIssue(result, "Project file was not found at " + manifestPath + ".");
+        return result;
+    }
+
+    const auto rawText = readTextFile(manifestFsPath);
+    if (rawText.empty())
+    {
+        result.manifestFound = true;
+        result.state = "Project unreadable";
+        addIssue(result, "Project file was empty or unreadable.");
+        return result;
+    }
+
+    return parseRuntimeProjectManifest(rawText, manifestPath, true);
 }
 
 RuntimeProjectLoadResult loadPhase1ReferenceProjectManifest()

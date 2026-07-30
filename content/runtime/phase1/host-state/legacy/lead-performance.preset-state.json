@@ -1,0 +1,23 @@
+{
+  "schemaName": "drs.presetState",
+  "schemaVersion": 1,
+  "presetId": "drs.phase1.tiny-open-instrument.lead-performance",
+  "targetInstrumentId": "drs.phase1.tiny-open-instrument",
+  "targetInstrumentSchemaName": "drs.instrument",
+  "targetInstrumentSchemaVersion": 1,
+  "loadProfileId": "performance",
+  "selectedArticulationId": "lead",
+  "macroValues": [
+    {
+      "id": "tone",
+      "value": 0.62
+    },
+    {
+      "id": "motion",
+      "value": 0.78
+    }
+  ],
+  "notes": [
+    "Legacy raw preset-state input retained for host-state migration coverage."
+  ]
+}

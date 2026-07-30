@@ -78,7 +78,8 @@ std::uint64_t buildCrossfadePairingKey(const RuntimeCompileZoneDefinition& zone)
     stream << zone.articulationId
            << "|" << zone.rootKey
            << "|" << zone.keyLow
-           << "|" << zone.keyHigh;
+           << "|" << zone.keyHigh
+           << "|" << static_cast<int>(zone.triggerMode);
     return computeFnv1a64(stream.str());
 }
 
@@ -264,8 +265,19 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         result.project.sampleSources.push_back(std::move(projectSource));
     }
 
+    const auto requiresExtendedInstrumentSchema = std::any_of(
+        plan.zones.begin(),
+        plan.zones.end(),
+        [](const RuntimeCompileZoneDefinition& zone)
+        {
+            return hasAnyVelocityCrossfadeValue(zone.velocityCrossfade)
+                || zone.roundRobin.has_value()
+                || zone.roundRobinLength > 0
+                || zone.roundRobinPosition > 0
+                || zone.triggerMode != ZoneTriggerMode::gated;
+        });
     result.instrument.schemaName = "drs.instrument";
-    result.instrument.schemaVersion = 2;
+    result.instrument.schemaVersion = requiresExtendedInstrumentSchema ? 2 : 1;
     result.instrument.instrumentId = plan.instrumentId;
     result.instrument.displayName = plan.instrumentDisplayName;
     result.instrument.sourceProjectPath = plan.outputProjectPath;
@@ -449,6 +461,7 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         zone.roundRobin = roundRobin;
         zone.roundRobinLength = zonePlan.roundRobinLength;
         zone.roundRobinPosition = zonePlan.roundRobinPosition;
+        zone.triggerMode = zonePlan.triggerMode;
         result.instrument.zones.push_back(std::move(zone));
     }
 

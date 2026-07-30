@@ -485,7 +485,9 @@ MainComponent::MainComponent(bool enableAudioOutput)
                      [this](std::vector<juce::File> files)
                      {
                          importSampleFiles(std::move(files));
-                     })
+                     }),
+      restoreBanner([this] { locateProjectForRestore(); },
+                    [this] { processor.retryProjectRestore(); })
 {
     juce::PropertiesFile::Options appSettingsOptions;
     appSettingsOptions.applicationName = "DecentRhapsodyStudio";
@@ -502,6 +504,8 @@ MainComponent::MainComponent(bool enableAudioOutput)
     workspaceTabs.addTab("Perform", juce::Colour::fromRGB(28, 126, 214), &performancePanel, false);
     workspaceTabs.addTab("Map", juce::Colour::fromRGB(181, 96, 21), &authoringPanel, false);
     addAndMakeVisible(workspaceTabs);
+    addAndMakeVisible(restoreBanner);
+    restoreBanner.update(processor.getProjectRestoreSnapshot());
     setSize(drs::app::authoring::expandedTargetShellWidth,
             drs::app::authoring::expandedTargetShellHeight);
 
@@ -524,6 +528,10 @@ void MainComponent::resized()
 {
     auto area = getLocalBounds();
     menuBar.setBounds(area.removeFromTop(28));
+    if (restoreBanner.isVisible())
+        restoreBanner.setBounds(area.removeFromTop(42));
+    else
+        restoreBanner.setBounds({});
     workspaceTabs.setBounds(area);
 }
 
@@ -536,12 +544,21 @@ std::string MainComponent::exportStateJson() const
 
 drs::engine::EnginePresetStateRestoreResult MainComponent::restoreStateJson(const std::string& stateJson)
 {
-    const auto validationResult = processor.getEngineFacade().restorePresetStateJson(stateJson);
-    if (!validationResult.restored)
-        return validationResult;
+    const auto parsed = drs::engine::parseHostSessionState(stateJson);
+    if (!parsed.isValidHostState() && !parsed.isLegacyPreset())
+    {
+        drs::engine::EnginePresetStateRestoreResult rejected;
+        rejected.state = parsed.state;
+        for (const auto& finding : parsed.findings)
+            rejected.issues.push_back(finding.message);
+        return rejected;
+    }
 
     processor.setStateInformation(stateJson.data(), static_cast<int>(stateJson.size()));
-    return validationResult;
+    drs::engine::EnginePresetStateRestoreResult queued;
+    queued.restored = true;
+    queued.state = "State restore queued";
+    return queued;
 }
 
 bool MainComponent::setMacroValue(const std::string& macroId, double value)
@@ -551,6 +568,7 @@ bool MainComponent::setMacroValue(const std::string& macroId, double value)
         return false;
 
     processor.setMacroValueFromShell(macroId, value);
+    processor.serviceMessageThreadWork();
     return true;
 }
 
@@ -636,9 +654,23 @@ void MainComponent::menuItemSelected(int menuItemID, int)
 void MainComponent::timerCallback()
 {
     processor.serviceMessageThreadWork();
+    if (restoreBanner.update(processor.getProjectRestoreSnapshot()))
+        resized();
     performancePanel.refreshNow();
     authoringPanel.refreshNow();
     updateWindowTitle();
+}
+
+void MainComponent::locateProjectForRestore()
+{
+    auto safeThis = juce::Component::SafePointer<MainComponent>(this);
+    launchOpenProjectChooser(
+        [safeThis](juce::File selectedFile)
+        {
+            if (safeThis == nullptr || selectedFile == juce::File())
+                return;
+            safeThis->processor.retryProjectRestoreWithFile(selectedFile);
+        });
 }
 
 void MainComponent::changeListenerCallback(juce::ChangeBroadcaster* source)
@@ -1269,9 +1301,20 @@ bool MainComponent::saveProjectToFile(const juce::File& file)
         return false;
     }
 
+    const auto bindingAccepted = savingUnsavedProject
+        ? processor.replaceAuthoringProject(project, targetFile)
+        : processor.bindAuthoringProjectFile(targetFile);
+    if (!bindingAccepted)
+    {
+        juce::AlertWindow::showMessageBoxAsync(
+            juce::AlertWindow::WarningIcon,
+            "Save Project Failed",
+            "The project files were written, but the saved manifest did not match the authored project. "
+            "The current project binding was left unchanged.");
+        return false;
+    }
+
     currentProjectFile = targetFile;
-    if (savingUnsavedProject)
-        processor.replaceAuthoringProject(project);
     setRecentProjectDirectory(targetFile.getParentDirectory());
     processor.getAuthoringSession().markSaved();
     refreshProjectViews();
@@ -1300,9 +1343,17 @@ bool MainComponent::loadProjectFromFile(const juce::File& file)
         return false;
     }
 
+    if (!processor.replaceAuthoringProject(*upgradedProject, targetFile))
+    {
+        juce::AlertWindow::showMessageBoxAsync(
+            juce::AlertWindow::WarningIcon,
+            "Open Project Failed",
+            "The manifest was loaded but did not match the authored project identity or canonical content.");
+        return false;
+    }
+
     currentProjectFile = targetFile;
     setRecentProjectDirectory(targetFile.getParentDirectory());
-    processor.replaceAuthoringProject(*upgradedProject);
     refreshProjectViews();
     return true;
 }

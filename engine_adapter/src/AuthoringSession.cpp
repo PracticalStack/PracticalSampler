@@ -641,6 +641,18 @@ const RuntimeProjectDocumentState& AuthoringSession::getDocumentState() const
     return documentController.getDocumentState();
 }
 
+RuntimeProjectDocumentCheckpoint AuthoringSession::exportCheckpoint() const
+{
+    return documentController.exportCheckpoint();
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::restoreCheckpoint(
+    RuntimeProjectDocumentCheckpoint checkpoint,
+    RuntimeProjectDocumentCheckpointConstraints constraints)
+{
+    return documentController.restoreCheckpoint(std::move(checkpoint), std::move(constraints));
+}
+
 void AuthoringSession::replaceProject(RuntimeProjectModel project)
 {
     documentController = RuntimeProjectDocumentController(std::move(project));
@@ -1441,7 +1453,8 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
     std::vector<RuntimeProjectZoneDefinition> zones,
     std::vector<std::string> projectNotes,
     std::vector<std::string> authoringNotes,
-    const std::string& label)
+    const std::string& label,
+    const bool reconcileInferredRoundRobin)
 {
     if (zones.empty())
         return makeRejectedResult(getDocumentState(),
@@ -1458,7 +1471,8 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
     project.authoring.zones.insert(project.authoring.zones.end(),
                                    std::make_move_iterator(zones.begin()),
                                    std::make_move_iterator(zones.end()));
-    reconcileBatchInferredRoundRobinDescriptors(project.authoring.zones);
+    if (reconcileInferredRoundRobin)
+        reconcileBatchInferredRoundRobinDescriptors(project.authoring.zones);
     project.notes.insert(project.notes.end(),
                          std::make_move_iterator(projectNotes.begin()),
                          std::make_move_iterator(projectNotes.end()));

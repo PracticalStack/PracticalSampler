@@ -28,6 +28,24 @@ using Clock = std::chrono::steady_clock;
 using json = nlohmann::json;
 using ordered_json = nlohmann::ordered_json;
 
+void serviceRestore(drs::plugin::Processor& processor, const std::string& context)
+{
+    const auto deadline = Clock::now() + std::chrono::seconds(5);
+    while (Clock::now() < deadline)
+    {
+        processor.serviceMessageThreadWork();
+        const auto restore = processor.getProjectRestoreSnapshot();
+        if (restore != nullptr
+            && (restore->state == drs::engine::ProjectRestoreState::active
+                || restore->state == drs::engine::ProjectRestoreState::ready
+                || restore->state == drs::engine::ProjectRestoreState::needsLocation
+                || restore->state == drs::engine::ProjectRestoreState::failed))
+            return;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    throw std::runtime_error(context + " timed out.");
+}
+
 struct SceneMacroExpectation
 {
     std::string id;
@@ -432,10 +450,12 @@ int main(int argc, char* argv[])
             drs::standalone::MainComponent sourceComponent;
             const auto presetJson = readTextFile(scene.referencePresetStatePath);
             const auto restored = sourceComponent.restoreStateJson(presetJson);
+            serviceRestore(sourceComponent.getProcessor(), "Benchmark source preset restore");
             const auto exportedStateJson = sourceComponent.exportStateJson();
 
             drs::standalone::MainComponent reloadedComponent;
             const auto reloaded = reloadedComponent.restoreStateJson(exportedStateJson);
+            serviceRestore(reloadedComponent.getProcessor(), "Benchmark reloaded preset restore");
             const auto& reloadedSession = reloadedComponent.getEngineFacade().getCurrentSessionState();
             const bool sessionMatches = reloaded.restored && sessionMatchesExpected(reloadedSession, scene);
 

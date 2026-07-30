@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <limits>
 #include <optional>
+#include <sstream>
 #include <string_view>
 #include <utility>
 
@@ -421,11 +422,15 @@ Processor::Processor()
     initializePublishedMacroRealtimeState();
     syncParametersFromEngine();
     serviceMessageThreadWork();
+    refreshSerializedHostStatePublication(true);
     updateRealtimeSafetyState();
 }
 
 Processor::~Processor()
 {
+    stopTimer();
+    projectRestoreCoordinator.shutdown();
+
     for (const auto& macro : engineFacade.getMacroDescriptors())
         parameterState.removeParameterListener(buildMacroParameterId(macro.id), this);
 
@@ -434,6 +439,23 @@ Processor::~Processor()
     performancePlaybackContext.serviceRetirements();
     authoringPreviewPlaybackContext.serviceRetirements();
     delete[] realtimeGuardTestAllocation;
+}
+
+void Processor::timerCallback()
+{
+    serviceMessageThreadWork();
+
+    const auto restore = projectRestoreCoordinator.getSnapshot();
+    if (restore == nullptr
+        || restore->state == drs::engine::ProjectRestoreState::idle
+        || restore->state == drs::engine::ProjectRestoreState::needsLocation
+        || restore->state == drs::engine::ProjectRestoreState::ready
+        || restore->state == drs::engine::ProjectRestoreState::active
+        || restore->state == drs::engine::ProjectRestoreState::degraded
+        || restore->state == drs::engine::ProjectRestoreState::failed)
+    {
+        stopTimer();
+    }
 }
 
 void Processor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -482,6 +504,16 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
 
     for (auto channel = 0; channel < buffer.getNumChannels(); ++channel)
         buffer.clear(channel, 0, buffer.getNumSamples());
+
+    if (pendingRestoreAudioSilence.load(std::memory_order_acquire))
+    {
+        if (!restoreAudioSilenceApplied.exchange(true, std::memory_order_acq_rel))
+            performancePlaybackContext.closeAtBlockBoundary();
+    }
+    else
+    {
+        restoreAudioSilenceApplied.store(false, std::memory_order_release);
+    }
 
     drs::engine::SamplerEventBlock performanceEvents;
     drs::engine::SamplerEventBlock authoringPreviewEvents;
@@ -635,7 +667,15 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
         std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - blockStartTime).count());
     diagnosticsLastProcessBlockMicros.store(elapsedMicros, std::memory_order_relaxed);
     updateAtomicMaximum(diagnosticsMaxProcessBlockMicros, elapsedMicros);
-    if (elapsedMicros > callbackBudgetMicros)
+#if JUCE_DEBUG
+    // Debug CRT checks and unoptimised render code are intentionally instrumented.
+    // Keep reporting the real host deadline, but use a small diagnostic allowance
+    // so the guard detects pathological stalls rather than debugger overhead.
+    const auto enforcementBudgetMicros = callbackBudgetMicros * 4u;
+#else
+    const auto enforcementBudgetMicros = callbackBudgetMicros;
+#endif
+    if (elapsedMicros > enforcementBudgetMicros)
     {
         diagnosticsOverBudgetCallbackCount.fetch_add(1, std::memory_order_relaxed);
         recordRealtimeGuardOperation(RealtimeGuardOperation::overBudget);
@@ -655,20 +695,77 @@ const juce::String Processor::getName() const
 
 void Processor::getStateInformation(juce::MemoryBlock& destinationData)
 {
-    syncEngineFromParameters();
-    const auto presetStateJson = engineFacade.exportPresetStateJson();
-    destinationData.replaceWith(presetStateJson.data(), presetStateJson.size());
+    const auto serialized = std::atomic_load_explicit(&serializedHostStatePublication,
+                                                      std::memory_order_acquire);
+    if (serialized == nullptr || serialized->empty())
+    {
+        destinationData.reset();
+        return;
+    }
+
+    destinationData.replaceWith(serialized->data(), serialized->size());
 }
 
 void Processor::setStateInformation(const void* data, int sizeInBytes)
 {
-    if (data == nullptr || sizeInBytes <= 0)
+    if (data == nullptr
+        || sizeInBytes <= 0
+        || static_cast<std::size_t>(sizeInBytes) > drs::engine::hostSessionStateMaxBytes)
         return;
 
     const auto* bytes = static_cast<const char*>(data);
-    engineFacade.restorePresetStateJson(std::string(bytes, bytes + sizeInBytes));
-    syncParametersFromEngine();
-    serviceMessageThreadWork();
+    auto copiedState = std::make_shared<const std::string>(bytes, bytes + sizeInBytes);
+    std::atomic_store_explicit(&latestSubmittedHostState,
+                               copiedState,
+                               std::memory_order_release);
+    setPendingRestoreAudioPolicy(true);
+    const auto generation = projectRestoreCoordinator.submit({ *copiedState, {}, {} });
+    if (generation == 0)
+        setPendingRestoreAudioPolicy(false);
+    else
+        startTimer(20);
+}
+
+bool Processor::retryProjectRestoreWithFile(const juce::File& locatedProjectFile)
+{
+    if (locatedProjectFile == juce::File())
+        return false;
+
+    const auto serialized = std::atomic_load_explicit(&latestSubmittedHostState,
+                                                      std::memory_order_acquire);
+    if (serialized == nullptr || serialized->empty())
+        return false;
+
+    setPendingRestoreAudioPolicy(true);
+    const auto generation = projectRestoreCoordinator.submit(
+        { *serialized, {}, locatedProjectFile.getFullPathName().toStdString() });
+    if (generation == 0)
+    {
+        setPendingRestoreAudioPolicy(false);
+        return false;
+    }
+
+    startTimer(20);
+    return true;
+}
+
+bool Processor::retryProjectRestore()
+{
+    const auto serialized = std::atomic_load_explicit(&latestSubmittedHostState,
+                                                      std::memory_order_acquire);
+    if (serialized == nullptr || serialized->empty())
+        return false;
+
+    setPendingRestoreAudioPolicy(true);
+    const auto generation = projectRestoreCoordinator.submit({ *serialized, {}, {} });
+    if (generation == 0)
+    {
+        setPendingRestoreAudioPolicy(false);
+        return false;
+    }
+
+    startTimer(20);
+    return true;
 }
 
 void Processor::setMacroValueFromShell(const std::string& macroId, double value)
@@ -1031,17 +1128,85 @@ drs::app::AuthoringImportResponsivenessSnapshot Processor::getAuthoringImportRes
     return authoringImportResponsivenessSnapshot;
 }
 
-void Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project)
+std::optional<drs::engine::HostProjectBinding> Processor::buildValidatedAuthoringProjectBinding(
+    const juce::File& resolvedProjectFile,
+    const drs::engine::RuntimeProjectModel& project) const
 {
+    if (resolvedProjectFile == juce::File()
+        || !resolvedProjectFile.hasFileExtension(".drsproj")
+        || !resolvedProjectFile.existsAsFile())
+        return std::nullopt;
+
+    const auto manifestPath = resolvedProjectFile.getFullPathName().toStdString();
+    const auto loaded = drs::engine::loadRuntimeProjectManifest(manifestPath);
+    if (!loaded.loaded
+        || loaded.project.projectId.empty()
+        || loaded.project.projectId != project.projectId)
+        return std::nullopt;
+
+    const auto manifestDigest
+        = drs::engine::computeHostProjectManifestDigest(project, manifestPath);
+    if (manifestDigest
+        != drs::engine::computeHostProjectManifestDigest(loaded.project, manifestPath))
+        return std::nullopt;
+
+    drs::engine::HostProjectBinding binding;
+    binding.projectId = project.projectId;
+    binding.manifestPath = manifestPath;
+    binding.manifestFileName = resolvedProjectFile.getFileName().toStdString();
+    binding.manifestDigest = manifestDigest;
+    binding.contentRootHint = resolvedProjectFile.getParentDirectory().getFullPathName().toStdString();
+    return binding;
+}
+
+juce::File Processor::getAuthoringProjectFile() const
+{
+    if (authoringProjectBinding.manifestPath.empty())
+        return {};
+
+    return juce::File(juce::String::fromUTF8(authoringProjectBinding.manifestPath.c_str()));
+}
+
+bool Processor::bindAuthoringProjectFile(const juce::File& resolvedProjectFile)
+{
+    const auto binding = buildValidatedAuthoringProjectBinding(
+        resolvedProjectFile,
+        authoringSession.getProject());
+    if (!binding.has_value())
+        return false;
+
+    authoringProjectBinding = *binding;
+    refreshSerializedHostStatePublication(true);
+    return true;
+}
+
+void Processor::clearAuthoringProjectFileBinding()
+{
+    authoringProjectBinding = {};
+    refreshSerializedHostStatePublication(true);
+}
+
+bool Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project,
+                                        juce::File resolvedProjectFile)
+{
+    std::optional<drs::engine::HostProjectBinding> replacementBinding;
+    if (resolvedProjectFile != juce::File())
+    {
+        replacementBinding = buildValidatedAuthoringProjectBinding(resolvedProjectFile, project);
+        if (!replacementBinding.has_value())
+            return false;
+    }
+
     const auto& previousProject = authoringSession.getProject();
     const auto replacingDifferentProject = !previousProject.projectId.empty()
         && !project.projectId.empty()
         && previousProject.projectId != project.projectId;
     auto draftPlaybackProject = project;
     if (!engineFacade.replaceDraftPlaybackAuthoringProject(std::move(draftPlaybackProject)))
-        return;
+        return false;
 
     authoringSession.replaceProject(std::move(project));
+    authoringProjectBinding = replacementBinding.value_or(drs::engine::HostProjectBinding {});
     performancePlaybackContext.cancelPendingActivation();
     pendingPerformanceActivation.reset();
     engineFacade.closeDraftPlaybackProject(true);
@@ -1061,6 +1226,8 @@ void Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
     initializeAuthoringImportMetrics();
     serviceMessageThreadWork();
     updateRealtimeSafetyState();
+    refreshSerializedHostStatePublication(true);
+    return true;
 }
 
 void Processor::closeAuthoringProject(drs::engine::RuntimeProjectModel unloadedProject)
@@ -1070,6 +1237,7 @@ void Processor::closeAuthoringProject(drs::engine::RuntimeProjectModel unloadedP
     pendingPerformanceActivation.reset();
     engineFacade.closeDraftPlaybackProject();
     authoringSession.replaceProject(std::move(unloadedProject));
+    clearAuthoringProjectFileBinding();
     authoringWaveformPreviewCache.clear();
     authoringPreviewController.reset();
     authoringPreviewCommandAdapter.clearOwnership();
@@ -1082,6 +1250,7 @@ void Processor::closeAuthoringProject(drs::engine::RuntimeProjectModel unloadedP
     initializeAuthoringImportMetrics();
     updateRealtimeSafetyState();
     publishAuthoringPreviewStatus();
+    refreshSerializedHostStatePublication(true);
 }
 
 void Processor::queuePerformanceSurfaceNoteOn(int midiNoteNumber, float velocity)
@@ -1153,8 +1322,353 @@ void Processor::runRealtimeGuardTestInjection()
     }
 }
 
+std::string Processor::buildHostStatePublicationKey() const
+{
+    const auto& document = authoringSession.getDocumentState();
+    const auto publish = engineFacade.getPerformancePublishControllerSnapshot();
+    std::ostringstream key;
+    key << engineFacade.getStateRevision()
+        << '|' << document.revision
+        << '|' << document.savedRevision
+        << '|' << document.dirty
+        << '|' << authoringSession.getProject().projectId
+        << '|' << authoringProjectBinding.projectId
+        << '|' << authoringProjectBinding.manifestPath
+        << '|' << authoringProjectBinding.manifestDigest
+        << '|' << publish.hasActiveRequest
+        << '|' << publish.activeRequestIdentity.projectGeneration
+        << '|' << publish.activeRequestIdentity.draftRevision
+        << '|' << publish.activeRequestIdentity.authoredContentDigest
+        << '|' << publish.activeRequestIdentity.macroSchemaDigest
+        << '|' << publish.activePreparedDigest;
+    return key.str();
+}
+
+void Processor::refreshSerializedHostStatePublication(const bool force)
+{
+    const auto key = buildHostStatePublicationKey();
+    if (!force && key == hostStatePublicationKey)
+        return;
+
+    const auto& project = authoringSession.getProject();
+    const auto presetState = drs::engine::captureRuntimePresetState(
+        engineFacade.getCurrentSessionState());
+    if (project.projectId.empty())
+    {
+        auto immutable = std::make_shared<const std::string>(
+            drs::engine::serializeRuntimePresetState(presetState));
+        std::atomic_store_explicit(&serializedHostStatePublication,
+                                   std::move(immutable),
+                                   std::memory_order_release);
+        hostStatePublicationKey = key;
+        return;
+    }
+
+    drs::engine::HostSessionState state;
+    state.presetState = presetState;
+    state.projectBinding = authoringProjectBinding;
+    if (state.projectBinding.projectId != project.projectId
+        || state.projectBinding.manifestFileName.empty())
+    {
+        state.projectBinding = {};
+        state.projectBinding.projectId = project.projectId;
+        state.projectBinding.manifestFileName = "unsaved-project.drsproj";
+        state.projectBinding.contentRootHint = project.contentRootPath;
+    }
+
+    const auto digestPath = state.projectBinding.manifestPath.empty()
+        ? state.projectBinding.manifestFileName
+        : state.projectBinding.manifestPath;
+    state.projectBinding.manifestDigest
+        = drs::engine::computeHostProjectManifestDigest(project, digestPath);
+
+    const auto checkpoint = authoringSession.exportCheckpoint();
+    state.authoringState.revision = checkpoint.revision;
+    state.authoringState.savedRevision = checkpoint.savedRevision;
+    state.authoringState.dirty = checkpoint.dirty;
+    if (checkpoint.dirty || state.projectBinding.manifestPath.empty())
+        state.authoringState.projectSnapshot = checkpoint.project;
+
+    const auto publish = engineFacade.getPerformancePublishControllerSnapshot();
+    if (publish.hasActiveRequest
+        && publish.activeRequestIdentity.projectGeneration != 0
+        && !publish.activeRequestIdentity.authoredContentDigest.empty()
+        && !publish.activeRequestIdentity.macroSchemaDigest.empty()
+        && !publish.activePreparedDigest.empty())
+    {
+        drs::engine::HostPublishedCheckpoint published;
+        published.revision = publish.activeRequestIdentity.draftRevision;
+        published.projectGeneration = publish.activeRequestIdentity.projectGeneration;
+        published.authoredContentDigest
+            = publish.activeRequestIdentity.authoredContentDigest;
+        published.macroSchemaDigest
+            = publish.activeRequestIdentity.macroSchemaDigest;
+        published.preparedContentDigest = publish.activePreparedDigest;
+        state.publishedState = std::move(published);
+    }
+
+    const auto serialized = drs::engine::serializeHostSessionState(state, digestPath);
+    if (!serialized.serialized)
+        return;
+
+    auto immutable = std::make_shared<const std::string>(serialized.text);
+    std::atomic_store_explicit(&serializedHostStatePublication,
+                               std::move(immutable),
+                               std::memory_order_release);
+    hostStatePublicationKey = key;
+}
+
+void Processor::setPendingRestoreAudioPolicy(const bool pending) noexcept
+{
+    pendingRestoreAudioSilence.store(pending, std::memory_order_release);
+    if (pending)
+        restoreAudioSilenceApplied.store(false, std::memory_order_release);
+}
+
+bool Processor::restorePublishIdentityMatches(
+    const drs::engine::PerformancePublishControllerSnapshot& published) const
+{
+    if (!expectedRestoredPublishedState.has_value() || !published.hasActiveRequest)
+        return false;
+
+    const auto& expected = *expectedRestoredPublishedState;
+    const auto& active = published.activeRequestIdentity;
+    return active.projectGeneration == expected.projectGeneration
+        && active.draftRevision == expected.revision
+        && active.authoredContentDigest == expected.authoredContentDigest
+        && active.macroSchemaDigest == expected.macroSchemaDigest
+        && published.activePreparedDigest == expected.preparedContentDigest;
+}
+
+bool Processor::applyValidatedProjectRestore(
+    const drs::engine::ProjectRestoreSnapshot& restore)
+{
+    if (!restore.hostState.has_value() || !restore.checkpoint.has_value())
+        return false;
+
+    const auto& hostState = *restore.hostState;
+    const auto& checkpoint = *restore.checkpoint;
+    const auto reference = engineFacade.loadPhase1ReferenceInstrument();
+    const auto presetValidation = drs::engine::validateRuntimePresetState(
+        hostState.presetState,
+        reference.instrument);
+    if (!reference.loaded || !presetValidation.valid)
+        return false;
+
+    drs::engine::RuntimeProjectDocumentCheckpointConstraints constraints;
+    constraints.expectedProjectId = hostState.projectBinding.projectId;
+    constraints.manifestPath = restore.resolvedManifestPath.empty()
+        ? hostState.projectBinding.manifestPath
+        : restore.resolvedManifestPath;
+    const auto checkpointValidation
+        = drs::engine::validateRuntimeProjectDocumentCheckpoint(checkpoint, constraints);
+    if (!checkpointValidation.valid)
+        return false;
+
+    auto restoredSession = drs::engine::AuthoringSession(checkpoint.project);
+    if (!restoredSession.restoreCheckpoint(checkpoint, constraints).applied)
+        return false;
+
+    auto restoredBinding = hostState.projectBinding;
+    if (!restore.resolvedManifestPath.empty())
+    {
+        restoredBinding.manifestPath = restore.resolvedManifestPath;
+        restoredBinding.manifestFileName
+            = fs::u8path(restore.resolvedManifestPath).filename().string();
+        restoredBinding.contentRootHint
+            = fs::u8path(restore.resolvedManifestPath).parent_path().string();
+    }
+    const auto bindingPath = restoredBinding.manifestPath.empty()
+        ? restoredBinding.manifestFileName
+        : restoredBinding.manifestPath;
+    if (!drs::engine::verifyHostProjectBinding(
+             restoredBinding,
+             checkpoint.project,
+             bindingPath).matched())
+        return false;
+
+    auto playbackProject = checkpoint.project;
+    if (!engineFacade.replaceDraftPlaybackAuthoringProject(std::move(playbackProject)))
+        return false;
+
+    performancePlaybackContext.cancelPendingActivation();
+    pendingPerformanceActivation.reset();
+    engineFacade.closeDraftPlaybackProject(false);
+    if (!engineFacade.reopenDraftPlaybackProject(checkpoint.revision, false))
+        return false;
+
+    authoringSession = std::move(restoredSession);
+    authoringProjectBinding = std::move(restoredBinding);
+    authoringWaveformPreviewCache.clear();
+    authoringPreviewController.reset();
+    authoringPreviewCommandAdapter.clearOwnership();
+    authoringPreviewCloseRequested.store(true, std::memory_order_release);
+    authoringPreviewDirectAuditionRequested = false;
+    authoringPreviewRequestedScope = drs::engine::AuthoringPreviewScope::selectedZone;
+    pendingAuthoringPreviewZoneId.clear();
+    pendingAuthoringPreviewGroupId.clear();
+    observedDraftPlaybackProjectRevision = checkpoint.revision;
+    initializeAuthoringImportMetrics();
+
+    const auto presetRestore = engineFacade.restorePresetStateJson(
+        drs::engine::serializeRuntimePresetState(hostState.presetState));
+    if (!presetRestore.restored)
+        return false;
+    syncParametersFromEngine();
+
+    expectedRestoredPublishedState = hostState.publishedState;
+    awaitingRestoreActivationGeneration = 0;
+    if (expectedRestoredPublishedState.has_value())
+    {
+        if (!engineFacade.restorePerformancePublishProjectGeneration(
+                expectedRestoredPublishedState->projectGeneration))
+            return false;
+        if (!engineFacade.publishCurrentDraft())
+            return false;
+        awaitingRestoreActivationGeneration = restore.generation;
+        projectRestoreCoordinator.publishLifecycleState(
+            restore.generation,
+            drs::engine::ProjectRestoreState::preparing,
+            {},
+            "Rebuilding the exact published Performance identity");
+    }
+
+    refreshSerializedHostStatePublication(true);
+    updateRealtimeSafetyState();
+    publishAuthoringPreviewStatus();
+    return true;
+}
+
+bool Processor::serviceProjectRestore()
+{
+    const auto restore = projectRestoreCoordinator.getSnapshot();
+    if (restore == nullptr || restore->generation == 0)
+        return false;
+
+    if (awaitingRestoreActivationGeneration == restore->generation
+        && expectedRestoredPublishedState.has_value())
+    {
+        const auto published = engineFacade.getPerformancePublishControllerSnapshot();
+        if (published.activationState
+                == drs::engine::PerformancePublishActivationState::active)
+        {
+            if (restorePublishIdentityMatches(published))
+            {
+                projectRestoreCoordinator.publishLifecycleState(
+                    restore->generation,
+                    drs::engine::ProjectRestoreState::active,
+                    {},
+                    "Exact restored Performance identity is active");
+                awaitingRestoreActivationGeneration = 0;
+                expectedRestoredPublishedState.reset();
+                setPendingRestoreAudioPolicy(false);
+                refreshSerializedHostStatePublication(true);
+                return true;
+            }
+
+            projectRestoreCoordinator.publishLifecycleState(
+                restore->generation,
+                drs::engine::ProjectRestoreState::failed,
+                drs::engine::ProjectRestoreFinding::preparationFailed,
+                "The rebuilt Performance identity did not match the saved host checkpoint "
+                "(generation " + std::to_string(published.activeRequestIdentity.projectGeneration)
+                    + "/" + std::to_string(expectedRestoredPublishedState->projectGeneration)
+                    + ", revision "
+                    + std::to_string(published.activeRequestIdentity.draftRevision)
+                    + "/" + std::to_string(expectedRestoredPublishedState->revision)
+                    + ", authored "
+                    + published.activeRequestIdentity.authoredContentDigest
+                    + "/" + expectedRestoredPublishedState->authoredContentDigest
+                    + ", macro " + published.activeRequestIdentity.macroSchemaDigest
+                    + "/" + expectedRestoredPublishedState->macroSchemaDigest
+                    + ", prepared " + published.activePreparedDigest
+                    + "/" + expectedRestoredPublishedState->preparedContentDigest + ").");
+            awaitingRestoreActivationGeneration = 0;
+            expectedRestoredPublishedState.reset();
+            return true;
+        }
+
+        if (published.hasFailedRequest)
+        {
+            projectRestoreCoordinator.publishLifecycleState(
+                restore->generation,
+                drs::engine::ProjectRestoreState::failed,
+                drs::engine::ProjectRestoreFinding::preparationFailed,
+                published.failureFinding.message.empty()
+                    ? std::string("Restored Performance preparation failed.")
+                    : published.failureFinding.message);
+            awaitingRestoreActivationGeneration = 0;
+            expectedRestoredPublishedState.reset();
+            return true;
+        }
+        return false;
+    }
+
+    if (restore->generation == handledRestoreGeneration)
+        return false;
+
+    if (restore->state == drs::engine::ProjectRestoreState::failed)
+    {
+        handledRestoreGeneration = restore->generation;
+        if (restore->expectedProjectId.empty())
+            setPendingRestoreAudioPolicy(false);
+        return true;
+    }
+
+    if (restore->state != drs::engine::ProjectRestoreState::ready)
+        return false;
+
+    if (restore->legacyPresetOnly && restore->legacyPreset.has_value())
+    {
+        const auto result = engineFacade.restorePresetStateJson(
+            drs::engine::serializeRuntimePresetState(*restore->legacyPreset));
+        handledRestoreGeneration = restore->generation;
+        if (!result.restored)
+        {
+            projectRestoreCoordinator.publishLifecycleState(
+                restore->generation,
+                drs::engine::ProjectRestoreState::failed,
+                drs::engine::ProjectRestoreFinding::invalidHostState,
+                result.state);
+            return true;
+        }
+
+        syncParametersFromEngine();
+        setPendingRestoreAudioPolicy(false);
+        projectRestoreCoordinator.publishLifecycleState(
+            restore->generation,
+            drs::engine::ProjectRestoreState::active,
+            drs::engine::ProjectRestoreFinding::legacyUnboundProject,
+            "Legacy preset restored without inferring a project");
+        refreshSerializedHostStatePublication(true);
+        return true;
+    }
+
+    handledRestoreGeneration = restore->generation;
+    if (!applyValidatedProjectRestore(*restore))
+    {
+        projectRestoreCoordinator.publishLifecycleState(
+            restore->generation,
+            drs::engine::ProjectRestoreState::failed,
+            drs::engine::ProjectRestoreFinding::checkpointInvalid,
+            "The validated restore checkpoint could not be applied atomically.");
+        return true;
+    }
+
+    if (!restore->hostState->publishedState.has_value())
+    {
+        projectRestoreCoordinator.publishLifecycleState(
+            restore->generation,
+            drs::engine::ProjectRestoreState::ready,
+            {},
+            "Authored project and preset restored; no published Performance checkpoint was saved");
+    }
+    return true;
+}
+
 bool Processor::serviceMessageThreadWork()
 {
+    auto servicedProjectRestore = serviceProjectRestore();
     const auto serviceTimeMicros = monotonicMicros();
     const auto authoringRevision = authoringSession.getDocumentState().revision;
     auto synchronizedDraftPlaybackProject = false;
@@ -1220,7 +1734,9 @@ bool Processor::serviceMessageThreadWork()
 
     auto synchronizedActivation = false;
     const auto stateRevision = engineFacade.getStateRevision();
-    if (stateRevision != observedEngineStateRevision)
+    if (stateRevision != observedEngineStateRevision
+        && (!pendingRestoreAudioSilence.load(std::memory_order_acquire)
+            || awaitingRestoreActivationGeneration != 0))
     {
         observedEngineStateRevision = stateRevision;
         const auto performanceSnapshot = performancePlaybackContext.getSnapshot();
@@ -1381,9 +1897,12 @@ bool Processor::serviceMessageThreadWork()
         }
     }
 
+    servicedProjectRestore = serviceProjectRestore() || servicedProjectRestore;
+    refreshSerializedHostStatePublication();
     updateRealtimeSafetyState();
     publishAuthoringPreviewStatus();
-    return servicedBackgroundWork
+    return servicedProjectRestore
+        || servicedBackgroundWork
         || synchronizedDraftPlaybackProject
         || requestResult.accepted
         || requestResult.expeditedCurrent

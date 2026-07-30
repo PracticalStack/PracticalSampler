@@ -94,6 +94,19 @@ ModelLifetime buildModel(drs::engine::PlaybackActivationLane lane,
     preparedZone.loopEndFrame = 4;
     prepared.zones.push_back(std::move(preparedZone));
 
+    drs::engine::PlaybackSnapshotGroupRoute snapshotGroup;
+    snapshotGroup.groupId = "context-group";
+    snapshotGroup.articulationIds = { "sustain" };
+    snapshotGroup.zoneIds = { snapshot.zones.front().id };
+    snapshotGroup.displayName = "Context Group";
+    snapshot.groupRoutes.push_back(snapshotGroup);
+    drs::engine::PreparedPlaybackGroupRoute preparedGroup;
+    preparedGroup.groupId = snapshotGroup.groupId;
+    preparedGroup.articulationIds = snapshotGroup.articulationIds;
+    preparedGroup.zoneIds = { prepared.zones.front().zoneId };
+    preparedGroup.displayName = snapshotGroup.displayName;
+    prepared.groupRoutes.push_back(std::move(preparedGroup));
+
     auto payload = std::make_shared<drs::engine::PlaybackActivationPayload>();
     payload->lane = lane;
     payload->revision = revision;
@@ -195,6 +208,21 @@ ModelLifetime buildRoundRobinModel(drs::engine::PlaybackActivationLane lane,
         preparedZone.roundRobinPosition = slotNumber;
         prepared.zones.push_back(std::move(preparedZone));
     }
+
+    drs::engine::PlaybackSnapshotGroupRoute snapshotGroup;
+    snapshotGroup.groupId = "context-group";
+    snapshotGroup.articulationIds = { "sustain" };
+    snapshotGroup.displayName = "Context Group";
+    drs::engine::PreparedPlaybackGroupRoute preparedGroup;
+    preparedGroup.groupId = snapshotGroup.groupId;
+    preparedGroup.articulationIds = snapshotGroup.articulationIds;
+    preparedGroup.displayName = snapshotGroup.displayName;
+    for (const auto& zone : snapshot.zones)
+        snapshotGroup.zoneIds.push_back(zone.id);
+    for (const auto& zone : prepared.zones)
+        preparedGroup.zoneIds.push_back(zone.zoneId);
+    snapshot.groupRoutes.push_back(std::move(snapshotGroup));
+    prepared.groupRoutes.push_back(std::move(preparedGroup));
 
     auto payload = std::make_shared<drs::engine::PlaybackActivationPayload>();
     payload->lane = lane;

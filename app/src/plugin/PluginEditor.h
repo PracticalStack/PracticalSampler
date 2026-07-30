@@ -1,6 +1,7 @@
 #pragma once
 
 #include "shared/AuthoringPanel.h"
+#include "shared/HostStateRecoveryBanner.h"
 #include "plugin/PluginProcessor.h"
 #include "shared/PerformancePanel.h"
 
@@ -45,6 +46,7 @@ private:
     void importSampleFiles(std::vector<juce::File> selectedFiles);
     void reviewSfzImportFile(const juce::File& selectedFile);
     void showPreferencesDialog();
+    void locateProjectForRestore();
     void restoreSelectedZoneRootKey();
     bool saveProjectToFile(const juce::File& file);
     bool loadProjectFromFile(const juce::File& file);
@@ -84,6 +86,7 @@ private:
     juce::TabbedComponent workspaceTabs { juce::TabbedButtonBar::TabsAtTop };
     drs::app::PerformancePanel performancePanel;
     drs::app::AuthoringPanel authoringPanel;
+    drs::app::HostStateRecoveryBanner restoreBanner;
     mutable juce::ApplicationProperties appProperties;
     std::unique_ptr<juce::FileChooser> activeFileChooser;
 };

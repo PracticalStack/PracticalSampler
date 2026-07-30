@@ -32,6 +32,7 @@ struct RuntimeCompileZoneDefinition
     std::optional<RoundRobinDescriptor> roundRobin;
     int roundRobinLength = 0;
     int roundRobinPosition = 0;
+    ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;
     std::uint64_t prefetchBytes = 16384;
 };
 

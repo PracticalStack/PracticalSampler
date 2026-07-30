@@ -1567,6 +1567,122 @@ add_test(
     COMMAND drs_phase1_state_recall_tests
 )
 
+# Registered green contract target for the project-aware host-state codec.
+add_executable(drs_host_session_state_contract_tests
+    src/HostSessionStateContractTests.cpp
+)
+
+target_compile_definitions(drs_host_session_state_contract_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_host_session_state_contract_tests PRIVATE cxx_std_17)
+
+target_link_libraries(drs_host_session_state_contract_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+add_test(
+    NAME drs.host_state.contract
+    COMMAND drs_host_session_state_contract_tests
+)
+
+add_executable(drs_project_restore_coordinator_tests
+    src/ProjectRestoreCoordinatorTests.cpp
+)
+
+target_compile_definitions(drs_project_restore_coordinator_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_project_restore_coordinator_tests PRIVATE cxx_std_17)
+
+target_link_libraries(drs_project_restore_coordinator_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+add_test(
+    NAME drs.host_state.restore_coordinator
+    COMMAND drs_project_restore_coordinator_tests
+)
+
+juce_add_console_app(drs_host_state_recovery_ui_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Host State Recovery UI Tests"
+)
+
+target_sources(drs_host_state_recovery_ui_tests
+    PRIVATE
+        src/HostStateRecoveryUiTests.cpp
+)
+
+target_link_libraries(drs_host_state_recovery_ui_tests
+    PRIVATE
+        drs_app_shared
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_host_state_recovery_ui_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.host_state.recovery_ui
+    COMMAND drs_host_state_recovery_ui_tests
+)
+
+add_executable(drs_host_state_restore_stress_tests
+    src/HostStateRestoreStressTests.cpp
+)
+
+target_compile_definitions(drs_host_state_restore_stress_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_host_state_restore_stress_tests PRIVATE cxx_std_17)
+
+target_link_libraries(drs_host_state_restore_stress_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+add_test(
+    NAME drs.host_state.restore_stress
+    COMMAND drs_host_state_restore_stress_tests
+)
+
+# Permanent project-aware processor capture/restore integration target.
+juce_add_console_app(drs_host_project_recall_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Host Project Recall Tests"
+)
+
+target_sources(drs_host_project_recall_tests
+    PRIVATE
+        src/HostProjectRecallTests.cpp
+)
+
+target_link_libraries(drs_host_project_recall_tests
+    PRIVATE
+        drs_plugin_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_host_project_recall_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.host_state.project_recall
+    COMMAND drs_host_project_recall_tests
+)
+
 juce_add_console_app(drs_phase2_authoring_foundation_tests
     PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Authoring Foundation Tests"
 )
@@ -2359,6 +2475,11 @@ add_custom_target(drs_all_tests)
 
 add_dependencies(drs_all_tests
     DecentRhapsodyStudioPlugin
+    drs_host_session_state_contract_tests
+    drs_host_project_recall_tests
+    drs_host_state_recovery_ui_tests
+    drs_host_state_restore_stress_tests
+    drs_project_restore_coordinator_tests
     drs_sprint4_entry_authored_input_tests
     drs_sprint4_entry_activation_payload_tests
     drs_sprint4_entry_diagnostics_concurrency_tests
@@ -2471,6 +2592,22 @@ set_target_properties(drs_phase1_preset_state_tests PROPERTIES
 )
 
 set_target_properties(drs_phase1_state_recall_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_project_restore_coordinator_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_host_project_recall_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_host_state_recovery_ui_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_host_state_restore_stress_tests PROPERTIES
     FOLDER "Tests"
 )
 

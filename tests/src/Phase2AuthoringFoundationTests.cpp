@@ -3,11 +3,13 @@
 #include "drs/engine/RuntimeLoader.h"
 #include "drs/engine/SampleImport.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace
 {
@@ -259,6 +261,180 @@ int main()
         require(controller.getDocumentState().revision == 2, "Redo should restore the later revision id.");
         require(controller.getDocumentState().dirty,
                 "Redo away from the saved checkpoint should re-mark the document dirty.");
+
+        const auto exportedCheckpoint = controller.exportCheckpoint();
+        require(exportedCheckpoint.project.projectId == phase2Project.project.projectId,
+                "Exported checkpoint must contain the current project model.");
+        require(exportedCheckpoint.revision == 2
+                    && exportedCheckpoint.savedRevision == 1
+                    && exportedCheckpoint.dirty,
+                "Exported checkpoint must preserve document revision metadata exactly.");
+
+        drs::engine::RuntimeProjectDocumentController restoredController(blankProject);
+        auto temporaryEdit = restoredController.getProject();
+        temporaryEdit.displayName = "Temporary destination edit";
+        require(restoredController.commitSnapshot(temporaryEdit, "Temporary destination history").applied,
+                "Checkpoint destination must establish undo history before replacement.");
+        require(restoredController.undo().applied
+                    && restoredController.getDocumentState().redoDepth == 1,
+                "Checkpoint destination must establish redo history before replacement.");
+
+        const auto restoreCheckpointResult = restoredController.restoreCheckpoint(exportedCheckpoint);
+        require(restoreCheckpointResult.applied,
+                "A valid project document checkpoint must restore atomically.");
+        require(restoredController.getProject().projectId == phase2Project.project.projectId
+                    && !restoredController.getProject().authoring.fxSlots[1].bypassed,
+                "Checkpoint restore must replace the complete current project model.");
+        require(restoredController.getDocumentState().revision == 2
+                    && restoredController.getDocumentState().savedRevision == 1
+                    && restoredController.getDocumentState().dirty,
+                "Checkpoint restore must preserve revision, saved revision, and dirty state exactly.");
+        require(restoredController.getDocumentState().lastChangeLabel
+                    == exportedCheckpoint.lastChangeLabel,
+                "Checkpoint restore must preserve the last change label.");
+        require(restoredController.getDocumentState().undoDepth == 0
+                    && restoredController.getDocumentState().redoDepth == 0,
+                "Checkpoint restore must intentionally reset undo and redo history.");
+        require(!restoredController.undo().applied && !restoredController.redo().applied,
+                "Restored checkpoints must not manufacture unavailable undo or redo entries.");
+
+        const auto stableCheckpoint = restoredController.exportCheckpoint();
+        auto invalidMetadataCheckpoint = stableCheckpoint;
+        invalidMetadataCheckpoint.savedRevision = invalidMetadataCheckpoint.revision + 1;
+        invalidMetadataCheckpoint.dirty = true;
+        require(!restoredController.restoreCheckpoint(invalidMetadataCheckpoint).applied,
+                "A checkpoint with savedRevision above revision must be rejected.");
+        require(restoredController.getDocumentState().revision == stableCheckpoint.revision
+                    && restoredController.getProject().projectId == stableCheckpoint.project.projectId,
+                "Rejected checkpoint metadata must preserve the prior document atomically.");
+
+        auto invalidProjectCheckpoint = stableCheckpoint;
+        invalidProjectCheckpoint.project.projectId.clear();
+        require(!restoredController.restoreCheckpoint(invalidProjectCheckpoint).applied,
+                "A checkpoint with an invalid project model must be rejected.");
+        require(restoredController.getProject().projectId == stableCheckpoint.project.projectId,
+                "Rejected checkpoint project content must preserve the prior valid project.");
+
+        const auto requireMalformedCheckpointRejected =
+            [&](drs::engine::RuntimeProjectDocumentCheckpoint checkpoint,
+                drs::engine::RuntimeProjectDocumentCheckpointConstraints constraints,
+                const std::string& expectedIssue,
+                const std::string& context)
+            {
+                const auto result = restoredController.restoreCheckpoint(
+                    std::move(checkpoint),
+                    std::move(constraints));
+                require(!result.applied, context + " must be rejected.");
+                require(std::any_of(result.issues.begin(),
+                                    result.issues.end(),
+                                    [&](const std::string& issue)
+                                    {
+                                        return issue.find(expectedIssue) != std::string::npos;
+                                    }),
+                        context + " must report its typed validation category.");
+                require(restoredController.getProject().projectId
+                            == stableCheckpoint.project.projectId
+                            && restoredController.getProject().authoring.selectedZoneId
+                                == stableCheckpoint.project.authoring.selectedZoneId
+                            && restoredController.getDocumentState().revision
+                                == stableCheckpoint.revision,
+                        context + " must preserve the prior session atomically.");
+            };
+
+        auto unknownSelectedZoneCheckpoint = stableCheckpoint;
+        unknownSelectedZoneCheckpoint.project.authoring.selectedZoneId = "missing-zone";
+        requireMalformedCheckpointRejected(
+            std::move(unknownSelectedZoneCheckpoint),
+            {},
+            "selectedZoneId references unknown zone",
+            "A checkpoint with an unknown selected zone");
+
+        auto unknownSelectedGroupCheckpoint = stableCheckpoint;
+        unknownSelectedGroupCheckpoint.project.authoring.selectedGroupId = "missing-group";
+        requireMalformedCheckpointRejected(
+            std::move(unknownSelectedGroupCheckpoint),
+            {},
+            "selectedGroupId references unknown group",
+            "A checkpoint with an unknown selected group");
+
+        auto unknownSelectedBankCheckpoint = stableCheckpoint;
+        unknownSelectedBankCheckpoint.project.authoring.selectedPerformanceBankId = "missing-bank";
+        requireMalformedCheckpointRejected(
+            std::move(unknownSelectedBankCheckpoint),
+            {},
+            "selectedPerformanceBankId references unknown bank",
+            "A checkpoint with an unknown selected performance bank");
+
+        auto incompatibleSchemaCheckpoint = stableCheckpoint;
+        incompatibleSchemaCheckpoint.project.authoring.schemaVersion = 2;
+        requireMalformedCheckpointRejected(
+            std::move(incompatibleSchemaCheckpoint),
+            {},
+            "authoring schemaVersion must be 3",
+            "A checkpoint with incompatible nested schema versions");
+
+        auto malformedPathCheckpoint = stableCheckpoint;
+        malformedPathCheckpoint.project.contentRootPath
+            = std::string("invalid\0content-root", 20);
+        requireMalformedCheckpointRejected(
+            std::move(malformedPathCheckpoint),
+            {},
+            "contentRootPath is not a valid bounded filesystem path",
+            "A checkpoint with a malformed project path");
+
+        auto dirtyMismatchCheckpoint = stableCheckpoint;
+        dirtyMismatchCheckpoint.dirty = false;
+        requireMalformedCheckpointRejected(
+            std::move(dirtyMismatchCheckpoint),
+            {},
+            "dirty must equal revision != savedRevision",
+            "A checkpoint with inconsistent dirty metadata");
+
+        drs::engine::RuntimeProjectDocumentCheckpointConstraints wrongIdentityConstraints;
+        wrongIdentityConstraints.expectedProjectId = "drs.unrelated-project";
+        wrongIdentityConstraints.manifestPath = phase2ProjectPath.generic_string();
+        requireMalformedCheckpointRejected(
+            stableCheckpoint,
+            std::move(wrongIdentityConstraints),
+            "does not match the expected host-state project identity",
+            "A checkpoint with a mismatched expected project identity");
+
+        drs::engine::RuntimeProjectDocumentCheckpointConstraints malformedManifestConstraints;
+        malformedManifestConstraints.expectedProjectId = stableCheckpoint.project.projectId;
+        malformedManifestConstraints.manifestPath = "C:/Projects/not-a-project.txt";
+        requireMalformedCheckpointRejected(
+            stableCheckpoint,
+            std::move(malformedManifestConstraints),
+            "manifestPath must use the .drsproj extension",
+            "A checkpoint with a malformed manifest locator");
+
+        drs::engine::AuthoringSession checkpointSourceSession(phase2Project.project);
+        require(checkpointSourceSession.selectZone("pad-a3-high").applied,
+                "AuthoringSession checkpoint source must commit a distinct selection.");
+        checkpointSourceSession.markSaved();
+        require(checkpointSourceSession.selectZone("lead-a4-sustain").applied,
+                "AuthoringSession checkpoint source must commit a dirty post-save selection.");
+        const auto sessionCheckpoint = checkpointSourceSession.exportCheckpoint();
+        require(sessionCheckpoint.revision == 2
+                    && sessionCheckpoint.savedRevision == 1
+                    && sessionCheckpoint.dirty,
+                "AuthoringSession export must forward exact document checkpoint metadata.");
+
+        drs::engine::AuthoringSession checkpointDestinationSession(blankProject);
+        const auto sessionRestore = checkpointDestinationSession.restoreCheckpoint(sessionCheckpoint);
+        require(sessionRestore.applied,
+                "AuthoringSession must atomically restore a valid document checkpoint.");
+        require(checkpointDestinationSession.getProject().projectId
+                    == checkpointSourceSession.getProject().projectId
+                    && checkpointDestinationSession.getProject().authoring.selectedZoneId
+                        == "lead-a4-sustain",
+                "AuthoringSession checkpoint restore must replace the full project and selection.");
+        require(checkpointDestinationSession.getDocumentState().revision == 2
+                    && checkpointDestinationSession.getDocumentState().savedRevision == 1
+                    && checkpointDestinationSession.getDocumentState().dirty
+                    && checkpointDestinationSession.getDocumentState().undoDepth == 0
+                    && checkpointDestinationSession.getDocumentState().redoDepth == 0,
+                "AuthoringSession checkpoint restore must preserve metadata and reset history.");
 
         const auto tempDirectory = fs::temp_directory_path() / "drs-phase2-authoring-foundation-tests";
         const auto tempProjectPath = tempDirectory / "phase2-authoring-roundtrip.drsproj";

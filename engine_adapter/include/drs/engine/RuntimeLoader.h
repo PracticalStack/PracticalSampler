@@ -17,6 +17,9 @@ std::string getPhase2RuntimeRootPath();
 std::string getPhase2ReferenceProjectManifestPath();
 
 RuntimeProjectLoadResult loadRuntimeProjectManifest(const std::string& manifestPath);
+RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& text,
+                                                     const std::string& manifestPath,
+                                                     bool validateReferencedPaths = true);
 RuntimeProjectLoadResult loadPhase1ReferenceProjectManifest();
 RuntimeProjectLoadResult loadPhase2ReferenceProjectManifest();
 RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manifestPath);

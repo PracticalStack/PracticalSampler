@@ -1,0 +1,242 @@
+{
+    "schemaName":  "drs.project",
+    "schemaVersion":  4,
+    "projectId":  "drs.phase2.authoring-foundation",
+    "displayName":  "DRS Phase 2 Authoring Foundation changed after DAW save",
+    "contentRoot":  "../../../../hise_project",
+    "defaultInstrumentManifest":  "../../../phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drinst",
+    "sampleSources":  [
+                          {
+                              "id":  "sine-a3",
+                              "path":  "../../../../hise_project/Samples/DRS_Sine_A3.wav",
+                              "role":  "core-sustain"
+                          },
+                          {
+                              "id":  "triangle-a4",
+                              "path":  "../../../../hise_project/Samples/DRS_TriangleLead_A4.wav",
+                              "role":  "core-lead"
+                          }
+                      ],
+    "authoring":  {
+                      "schemaName":  "drs.authoring",
+                      "schemaVersion":  3,
+                      "selectedZoneId":  "lead-a4-sustain",
+                      "selectedGroupId":  "lead-core",
+                      "selectedPerformanceBankId":  "writer-bank",
+                      "zones":  [
+                                    {
+                                        "id":  "pad-a3-low",
+                                        "sampleSourceId":  "sine-a3",
+                                        "displayName":  "Pad Low",
+                                        "groupId":  "pad-core",
+                                        "articulationId":  "sustain",
+                                        "rootKey":  57,
+                                        "keyLow":  36,
+                                        "keyHigh":  59,
+                                        "velocityLow":  1,
+                                        "velocityHigh":  100,
+                                        "gainDb":  -1.5,
+                                        "pan":  -0.15,
+                                        "sampleStartFrame":  0,
+                                        "loopEnabled":  true,
+                                        "loopStartFrame":  512,
+                                        "loopEndFrame":  22016,
+                                        "releaseSeconds":  0.0
+                                    },
+                                    {
+                                        "id":  "pad-a3-high",
+                                        "sampleSourceId":  "sine-a3",
+                                        "displayName":  "Pad High",
+                                        "groupId":  "pad-core",
+                                        "articulationId":  "sustain",
+                                        "rootKey":  57,
+                                        "keyLow":  60,
+                                        "keyHigh":  76,
+                                        "velocityLow":  1,
+                                        "velocityHigh":  100,
+                                        "gainDb":  -0.5,
+                                        "pan":  0.1,
+                                        "sampleStartFrame":  96,
+                                        "loopEnabled":  true,
+                                        "loopStartFrame":  512,
+                                        "loopEndFrame":  22016,
+                                        "releaseSeconds":  0.0
+                                    },
+                                    {
+                                        "id":  "lead-a4-sustain",
+                                        "sampleSourceId":  "triangle-a4",
+                                        "displayName":  "Triangle Lead",
+                                        "groupId":  "lead-core",
+                                        "articulationId":  "lead",
+                                        "rootKey":  69,
+                                        "keyLow":  60,
+                                        "keyHigh":  96,
+                                        "velocityLow":  1,
+                                        "velocityHigh":  127,
+                                        "gainDb":  1.5,
+                                        "pan":  0.0,
+                                        "sampleStartFrame":  128,
+                                        "loopEnabled":  false,
+                                        "loopStartFrame":  0,
+                                        "loopEndFrame":  0,
+                                        "releaseSeconds":  0.0
+                                    }
+                                ],
+                      "groups":  [
+                                     {
+                                         "id":  "pad-core",
+                                         "displayName":  "Pad Core",
+                                         "displayOrder":  0,
+                                         "workspaceVisible":  true,
+                                         "gainDb":  0.0,
+                                         "pan":  0.0,
+                                         "auditionAnchorZoneId":  "pad-a3-low"
+                                     },
+                                     {
+                                         "id":  "lead-core",
+                                         "displayName":  "Lead Core",
+                                         "displayOrder":  1,
+                                         "workspaceVisible":  true,
+                                         "gainDb":  0.0,
+                                         "pan":  0.0,
+                                         "auditionAnchorZoneId":  "lead-a4-sustain"
+                                     }
+                                 ],
+                      "macros":  [
+                                     {
+                                         "id":  "tone",
+                                         "name":  "Tone",
+                                         "defaultValue":  0.35,
+                                         "minValue":  0.0,
+                                         "maxValue":  1.0,
+                                         "targets":  [
+                                                         {
+                                                             "parameterId":  "filter-cutoff",
+                                                             "parameterPath":  "engine.filter.main.cutoff",
+                                                             "role":  "timbre"
+                                                         }
+                                                     ]
+                                     },
+                                     {
+                                         "id":  "motion",
+                                         "name":  "Motion",
+                                         "defaultValue":  0.15,
+                                         "minValue":  0.0,
+                                         "maxValue":  1.0,
+                                         "targets":  [
+                                                         {
+                                                             "parameterId":  "voice-pitch",
+                                                             "parameterPath":  "engine.pitch.main.semitones",
+                                                             "role":  "motion"
+                                                         }
+                                                     ]
+                                     }
+                                 ],
+                      "fxSlots":  [
+                                      {
+                                          "id":  "color-eq",
+                                          "displayName":  "Color EQ",
+                                          "effectType":  "eq",
+                                          "bypassed":  false
+                                      },
+                                      {
+                                          "id":  "shimmer-delay",
+                                          "displayName":  "Shimmer Delay",
+                                          "effectType":  "delay",
+                                          "bypassed":  true
+                                      }
+                                  ],
+                      "routingBuses":  [
+                                           {
+                                               "id":  "main-bus",
+                                               "displayName":  "Main Bus",
+                                               "inputSourceId":  "master",
+                                               "fxSlotIds":  [
+                                                                 "color-eq"
+                                                             ]
+                                           },
+                                           {
+                                               "id":  "lead-send",
+                                               "displayName":  "Lead Send",
+                                               "inputSourceId":  "lead-a4-sustain",
+                                               "fxSlotIds":  [
+                                                                 "shimmer-delay"
+                                                             ]
+                                           }
+                                       ],
+                      "performanceBanks":  [
+                                               {
+                                                   "id":  "writer-bank",
+                                                   "displayName":  "Writer Bank",
+                                                   "triggerSlots":  [
+                                                                        {
+                                                                            "id":  "slot-1",
+                                                                            "displayName":  "Phrase Trigger",
+                                                                            "triggerEvent":  "phrase-trigger",
+                                                                            "targetArticulationId":  "lead",
+                                                                            "phraseAssetId":  "writer-bank-c-major",
+                                                                            "chordMode":  "follow-root"
+                                                                        },
+                                                                        {
+                                                                            "id":  "slot-2",
+                                                                            "displayName":  "Key Switch",
+                                                                            "triggerEvent":  "key-switch",
+                                                                            "targetArticulationId":  "sustain"
+                                                                        }
+                                                                    ],
+                                                   "phraseAssets":  [
+                                                                        {
+                                                                            "id":  "writer-bank-c-major",
+                                                                            "displayName":  "Writer Bank C Major",
+                                                                            "sourcePath":  "generated://phase2/reference/writer-bank-c-major.mid",
+                                                                            "ticksPerQuarter":  960,
+                                                                            "lengthBeats":  2.0,
+                                                                            "chordHint":  "C major",
+                                                                            "normalizationState":  "Reference phrase asset placeholder for Sprint 6",
+                                                                            "issues":  [
+
+                                                                                       ],
+                                                                            "notes":  [
+                                                                                          {
+                                                                                              "midiNote":  60,
+                                                                                              "velocity":  96,
+                                                                                              "startBeat":  0.0,
+                                                                                              "durationBeats":  0.5
+                                                                                          },
+                                                                                          {
+                                                                                              "midiNote":  64,
+                                                                                              "velocity":  96,
+                                                                                              "startBeat":  0.5,
+                                                                                              "durationBeats":  0.5
+                                                                                          },
+                                                                                          {
+                                                                                              "midiNote":  67,
+                                                                                              "velocity":  96,
+                                                                                              "startBeat":  1.0,
+                                                                                              "durationBeats":  0.5
+                                                                                          },
+                                                                                          {
+                                                                                              "midiNote":  72,
+                                                                                              "velocity":  100,
+                                                                                              "startBeat":  1.5,
+                                                                                              "durationBeats":  0.5
+                                                                                          }
+                                                                                      ]
+                                                                        }
+                                                                    ],
+                                                   "notes":  [
+                                                                 "Performance bank upgraded in Sprint 6 with a real phrase asset and explicit trigger-slot wiring.",
+                                                                 "Phrase-trigger slots now persist phrase imports, chord-follow rules, and trigger-slot editing state."
+                                                             ]
+                                               }
+                                           ],
+                      "notes":  [
+                                    "Phase 2 Sprint 1 fixture proving that authoring state can live in the project document.",
+                                    "Keeps zones, macro targets, routing buses, and performance-bank placeholders in one serializable model."
+                                ]
+                  },
+    "notes":  [
+                  "Phase 2 Sprint 1 project fixture used to validate authoring save/load and undo foundations.",
+                  "Reuses the Phase 1 reference instrument and sample assets so project persistence can be tested without new runtime dependencies."
+              ]
+}

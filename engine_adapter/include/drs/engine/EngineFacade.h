@@ -385,6 +385,11 @@ public:
     bool reopenDraftPlaybackProject(std::size_t revision,
                                     bool preservePublishedPerformance = false);
     bool replaceDraftPlaybackAuthoringProject(RuntimeProjectModel project);
+    bool restorePerformancePublishProjectGeneration(std::uint64_t projectGeneration);
+    std::uint64_t getPerformancePublishProjectGeneration() const noexcept
+    {
+        return performancePublishProjectGeneration;
+    }
     bool beginDraftPlaybackDeviceRestart();
     bool completeDraftPlaybackDeviceRestart(bool restored);
     bool waitForPreparedPlaybackIdle(std::chrono::milliseconds timeout = std::chrono::milliseconds(1000));
