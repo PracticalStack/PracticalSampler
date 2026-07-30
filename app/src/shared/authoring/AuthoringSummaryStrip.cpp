@@ -172,11 +172,17 @@ void AuthoringSummaryStrip::resized()
     auto hero = getLocalBounds();
     auto heroLeft = hero.removeFromLeft(hero.proportionOfWidth(0.54f));
     titleLabel.setBounds(heroLeft.removeFromTop(30));
-    heroLeft.removeFromTop(6);
+    heroLeft.removeFromTop(2);
     statusLabel.setBounds(heroLeft.removeFromTop(20));
-    sourceLabel.setBounds(heroLeft.removeFromTop(20));
-    articulationLabel.setBounds(heroLeft.removeFromTop(20));
-    playbackLabel.setBounds(heroLeft.removeFromTop(20));
+    heroLeft.removeFromTop(2);
+    auto detailRow = heroLeft;
+    constexpr auto detailGap = 6;
+    const auto detailWidth = std::max(1, (detailRow.getWidth() - (detailGap * 2)) / 3);
+    sourceLabel.setBounds(detailRow.removeFromLeft(detailWidth));
+    detailRow.removeFromLeft(std::min(detailGap, detailRow.getWidth()));
+    articulationLabel.setBounds(detailRow.removeFromLeft(detailWidth));
+    detailRow.removeFromLeft(std::min(detailGap, detailRow.getWidth()));
+    playbackLabel.setBounds(detailRow);
 
     auto heroButtons = hero.removeFromRight(350);
     auto topRow = heroButtons.removeFromTop(28);

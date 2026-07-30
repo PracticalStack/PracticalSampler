@@ -92,7 +92,10 @@ void requireComponentVisibleWithin(juce::Component& root,
     require(component != nullptr, "Missing component ID: " + componentId.toStdString());
     require(component->isVisible(), "Component should be visible: " + componentId.toStdString());
     require(!component->getBounds().isEmpty(), "Component bounds should not be empty: " + componentId.toStdString());
-    require(containerBounds.contains(component->getBounds()),
+    const auto componentBoundsInRoot = component == &root
+        ? root.getLocalBounds()
+        : root.getLocalArea(component, component->getLocalBounds());
+    require(containerBounds.contains(componentBoundsInRoot),
             "Component should remain inside the panel bounds: " + componentId.toStdString());
 }
 
@@ -162,6 +165,13 @@ juce::ComboBox& requireComboBox(juce::Component& root, const juce::String& compo
     auto* combo = dynamic_cast<juce::ComboBox*>(findDescendantById(root, componentId));
     require(combo != nullptr, "Missing combo box ID: " + componentId.toStdString());
     return *combo;
+}
+
+juce::Viewport& requireViewport(juce::Component& root, const juce::String& componentId)
+{
+    auto* viewport = dynamic_cast<juce::Viewport*>(findDescendantById(root, componentId));
+    require(viewport != nullptr, "Missing viewport ID: " + componentId.toStdString());
+    return *viewport;
 }
 
 juce::ListBox& requireListBox(juce::Component& root, const juce::String& componentId)
@@ -628,6 +638,11 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
     requireComponentVisibleWithin(strip, "authoringUndoButton", bounds);
     requireComponentVisibleWithin(strip, "authoringRedoButton", bounds);
     requireComponentVisibleWithin(strip, "authoringSaveButton", bounds);
+    requireComponentVisibleWithin(strip, "authoringSummaryTitleLabel", bounds);
+    requireComponentVisibleWithin(strip, "authoringSummaryStatusLabel", bounds);
+    requireComponentVisibleWithin(strip, "authoringSummarySourceLabel", bounds);
+    requireComponentVisibleWithin(strip, "authoringSummaryArticulationLabel", bounds);
+    requireComponentVisibleWithin(strip, "authoringSummaryPlaybackLabel", bounds);
     requireAccessibilityTitleEquals(strip, "authoringSummaryTitleLabel", "Lead Sustain");
     requireAccessibilityTitleEquals(strip, "authoringSummaryStatusLabel", "Selected zone is ready to preview");
     requireAccessibilityTitleEquals(strip,
@@ -1503,10 +1518,98 @@ void exerciseDrawerEditorTransactions(drs::app::AuthoringPanel& panel,
             "Routing drawer edits should persist through the authoring session.");
 }
 
+void exerciseRoutingViewportReachability(drs::app::AuthoringPanel& panel,
+                                         bool requireMinimumMapHeight)
+{
+    requireButton(panel, "authoringDrawerRoutingTab").onClick();
+    auto& viewport = requireViewport(panel, "authoringRoutingViewport");
+    auto* content = findDescendantById(panel, "authoringRoutingContent");
+    require(viewport.isVisible() && content != nullptr && viewport.getViewedComponent() == content,
+            "Routing drawer should expose its controls through the routing viewport.");
+    require(content->getHeight() > viewport.getHeight()
+                && viewport.getVerticalScrollBar().isVisible(),
+            "Expanded routing controls should expose a visible vertical scroll path.");
+
+    if (requireMinimumMapHeight)
+    {
+        auto* zoneMap = findDescendantById(panel, "authoringZoneMap");
+        require(zoneMap != nullptr
+                    && zoneMap->getHeight() >= drs::app::authoring::minimumMapVisibleHeight,
+                "Open Routing drawer should preserve the minimum usable map height.");
+    }
+
+    const auto contentBounds = content->getLocalBounds();
+    for (const auto& componentId : {
+             juce::String("authoringFxSectionLabel"),
+             juce::String("authoringDspScopeSelector"),
+             juce::String("authoringFxSelector"),
+             juce::String("authoringFxTypeSelector"),
+             juce::String("authoringFxBypassedToggle"),
+             juce::String("authoringRoutingSelector"),
+             juce::String("authoringRoutingInputSelector"),
+             juce::String("authoringRoutingInsertOneSelector"),
+             juce::String("authoringRoutingInsertTwoSelector"),
+             juce::String("authoringFxNameEditor"),
+             juce::String("authoringFxAddButton"),
+             juce::String("authoringFxDuplicateButton"),
+             juce::String("authoringFxMoveUpButton"),
+             juce::String("authoringFxMoveDownButton"),
+             juce::String("authoringFxDeleteButton"),
+             juce::String("authoringFxOwnerSelector"),
+             juce::String("authoringFxMoveOwnerButton"),
+             juce::String("authoringFxParameterSelector"),
+             juce::String("authoringFxParameterSlider"),
+             juce::String("authoringFxParameterResetButton"),
+             juce::String("authoringFxAssignMacroButton"),
+             juce::String("authoringFxParameterValueLabel"),
+             juce::String("authoringFxSummaryLabel"),
+             juce::String("authoringFxDiagnosticsLabel"),
+             juce::String("authoringRoutingSummaryLabel")
+         })
+    {
+        auto* component = findDescendantById(panel, componentId);
+        require(component != nullptr && component->getParentComponent() == content,
+                "Routing control should be hosted by the scrollable routing content: "
+                    + componentId.toStdString());
+        require(contentBounds.contains(component->getBounds()),
+                "Routing control should remain inside the scrollable content bounds: "
+                    + componentId.toStdString());
+    }
+
+    auto requireIntersectsViewport = [&](const juce::String& componentId,
+                                         const std::string& message)
+    {
+        auto* component = findDescendantById(panel, componentId);
+        require(component != nullptr, "Missing routing component: " + componentId.toStdString());
+        const auto viewportBoundsInPanel = panel.getLocalArea(&viewport, viewport.getLocalBounds());
+        const auto componentBoundsInPanel = panel.getLocalArea(component, component->getLocalBounds());
+        require(viewportBoundsInPanel.intersects(componentBoundsInPanel), message);
+    };
+
+    viewport.setViewPosition(0, 0);
+    requireIntersectsViewport("authoringDspScopeSelector",
+                              "Routing scope should be visible at the top of the inspector.");
+    requireIntersectsViewport("authoringRoutingSelector",
+                              "Routing bus selection should be visible at the top of the inspector.");
+
+    viewport.setViewPosition(0, content->getHeight());
+    require(viewport.getViewPositionY() > 0,
+            "Routing viewport should scroll to its advanced-control region.");
+    requireIntersectsViewport("authoringFxParameterSlider",
+                              "FX parameter editing should be reachable after scrolling.");
+    requireIntersectsViewport("authoringFxAssignMacroButton",
+                              "FX macro assignment should be reachable after scrolling.");
+    requireIntersectsViewport("authoringFxDiagnosticsLabel",
+                              "FX diagnostics should be reachable after scrolling.");
+    requireIntersectsViewport("authoringRoutingSummaryLabel",
+                              "Routing summary should be reachable after scrolling.");
+    viewport.setViewPosition(0, 0);
+}
+
 void exerciseScopedDspWorkflow(drs::app::AuthoringPanel& panel,
                                drs::engine::AuthoringSession& session)
 {
-    requireButton(panel, "authoringDrawerRoutingTab").onClick();
+    exerciseRoutingViewportReachability(panel, true);
     auto& scopeSelector = requireComboBox(panel, "authoringDspScopeSelector");
     auto& addButton = requireButton(panel, "authoringFxAddButton");
     auto& duplicateButton = requireButton(panel, "authoringFxDuplicateButton");
@@ -1660,6 +1763,68 @@ void exerciseGroupUi(drs::app::AuthoringPanel& panel,
     requireComponentVisibleWithin(panel, "authoringGroupRoundRobinToggle", panelBounds);
     requireComponentVisibleWithin(panel, "authoringGroupRoundRobinModeSelector", panelBounds);
 
+    auto* drawerContent = findDescendantById(panel, "authoringDrawerContentHost");
+    require(drawerContent != nullptr, "Group inspector layout checks require the drawer content host.");
+    const auto drawerContentBounds = drawerContent->getBounds();
+    for (const auto& componentId : {
+             juce::String("authoringDrawerTitleLabel"),
+             juce::String("authoringDrawerScopeLabel"),
+             juce::String("authoringDrawerBreadcrumbLabel"),
+             juce::String("authoringGroupNameLabel"),
+             juce::String("authoringGroupNameEditor"),
+             juce::String("authoringGroupVisibilityLabel"),
+             juce::String("authoringGroupVisibilityToggle"),
+             juce::String("authoringGroupGainLabel"),
+             juce::String("authoringGroupGainSlider"),
+             juce::String("authoringGroupPanLabel"),
+             juce::String("authoringGroupPanSlider"),
+             juce::String("authoringGroupRoutingLabel"),
+             juce::String("authoringGroupRoutingSelector"),
+             juce::String("authoringGroupAnchorLabel"),
+             juce::String("authoringGroupAnchorSelector"),
+             juce::String("authoringGroupSummaryLabel"),
+             juce::String("authoringGroupRoundRobinLabel"),
+             juce::String("authoringGroupRoundRobinToggle"),
+             juce::String("authoringGroupRoundRobinModeSelector"),
+             juce::String("authoringGroupDeleteButton")
+         })
+    {
+        requireComponentVisibleWithin(panel, componentId, drawerContentBounds);
+    }
+
+    for (const auto& componentId : {
+             juce::String("authoringGroupNameEditor"),
+             juce::String("authoringGroupVisibilityToggle"),
+             juce::String("authoringGroupGainSlider"),
+             juce::String("authoringGroupPanSlider"),
+             juce::String("authoringGroupRoutingSelector"),
+             juce::String("authoringGroupAnchorSelector"),
+             juce::String("authoringGroupRoundRobinToggle"),
+             juce::String("authoringGroupRoundRobinModeSelector"),
+             juce::String("authoringGroupDeleteButton")
+         })
+    {
+        auto* component = findDescendantById(panel, componentId);
+        require(component != nullptr && component->getHeight() >= 24,
+                "Group inspector controls should retain a usable minimum height: " + componentId.toStdString());
+    }
+
+    const auto roundRobinToggleBounds
+        = findDescendantById(panel, "authoringGroupRoundRobinToggle")->getBounds();
+    const auto roundRobinModeBounds
+        = findDescendantById(panel, "authoringGroupRoundRobinModeSelector")->getBounds();
+    const auto deleteButtonBounds
+        = findDescendantById(panel, "authoringGroupDeleteButton")->getBounds();
+    require(roundRobinToggleBounds.getY() == roundRobinModeBounds.getY()
+                && roundRobinToggleBounds.getY() == deleteButtonBounds.getY()
+                && roundRobinToggleBounds.getHeight() == roundRobinModeBounds.getHeight()
+                && roundRobinToggleBounds.getHeight() == deleteButtonBounds.getHeight(),
+            "Group inspector actions should share one aligned, space-efficient row.");
+    require(!roundRobinToggleBounds.intersects(roundRobinModeBounds)
+                && !roundRobinToggleBounds.intersects(deleteButtonBounds)
+                && !roundRobinModeBounds.intersects(deleteButtonBounds),
+            "Group inspector action controls should not overlap.");
+
     groupNameEditor->setText("Lead Core UI");
     if (groupNameEditor->onReturnKey)
         groupNameEditor->onReturnKey();
@@ -1692,6 +1857,81 @@ void exerciseGroupUi(drs::app::AuthoringPanel& panel,
     inventory << "  " << describeBounds(panel, "authoringGroupNameEditor") << "\n";
     inventory << "  " << describeBounds(panel, "authoringGroupGainSlider") << "\n\n";
     saveComponentPng(panel, outputDirectory / (shellName + "-groups.png"));
+}
+
+void exerciseShortHeightGroupLayout(drs::app::AuthoringPanel& panel,
+                                    const fs::path& outputDirectory)
+{
+    require(panel.getHeight() < drs::app::authoring::shortHeightBreakpoint,
+            "Short-height group coverage requires a panel below the responsive breakpoint.");
+
+    requireButton(panel, "authoringDrawerGroupsTab").onClick();
+    const auto panelBounds = panel.getLocalBounds();
+
+    for (const auto& componentId : {
+             juce::String("authoringGroupSectionLabel"),
+             juce::String("authoringGroupCreateButton"),
+             juce::String("authoringGroupAssignZonesButton"),
+             juce::String("authoringGroupPreviewAnchorButton"),
+             juce::String("authoringGroupList"),
+             juce::String("authoringGroupVisibilityButton"),
+             juce::String("authoringGroupMoveUpButton"),
+             juce::String("authoringGroupMoveDownButton"),
+             juce::String("authoringZoneMap")
+         })
+    {
+        requireComponentVisibleWithin(panel, componentId, panelBounds);
+    }
+
+    auto* zoneMap = findDescendantById(panel, "authoringZoneMap");
+    require(zoneMap != nullptr
+                && zoneMap->getHeight() >= drs::app::authoring::minimumMapVisibleHeight,
+            "Short-height Map layout should preserve the minimum usable map height.");
+
+    auto* drawerContent = findDescendantById(panel, "authoringDrawerContentHost");
+    require(drawerContent != nullptr
+                && drawerContent->getHeight() == drs::app::authoring::shortInspectorDrawerOpenHeight,
+            "Short-height Group Inspector should use its compact responsive drawer height.");
+    const auto drawerContentBounds = drawerContent->getBounds();
+    for (const auto& componentId : {
+             juce::String("authoringDrawerTitleLabel"),
+             juce::String("authoringDrawerScopeLabel"),
+             juce::String("authoringDrawerBreadcrumbLabel"),
+             juce::String("authoringGroupNameEditor"),
+             juce::String("authoringGroupVisibilityToggle"),
+             juce::String("authoringGroupGainSlider"),
+             juce::String("authoringGroupPanSlider"),
+             juce::String("authoringGroupRoutingSelector"),
+             juce::String("authoringGroupAnchorSelector"),
+             juce::String("authoringGroupSummaryLabel"),
+             juce::String("authoringGroupRoundRobinLabel"),
+             juce::String("authoringGroupRoundRobinToggle"),
+             juce::String("authoringGroupRoundRobinModeSelector"),
+             juce::String("authoringGroupDeleteButton")
+         })
+    {
+        requireComponentVisibleWithin(panel, componentId, drawerContentBounds);
+    }
+
+    for (const auto& componentId : {
+             juce::String("authoringGroupNameEditor"),
+             juce::String("authoringGroupVisibilityToggle"),
+             juce::String("authoringGroupGainSlider"),
+             juce::String("authoringGroupPanSlider"),
+             juce::String("authoringGroupRoutingSelector"),
+             juce::String("authoringGroupAnchorSelector"),
+             juce::String("authoringGroupRoundRobinToggle"),
+             juce::String("authoringGroupRoundRobinModeSelector"),
+             juce::String("authoringGroupDeleteButton")
+         })
+    {
+        auto* component = findDescendantById(panel, componentId);
+        require(component != nullptr && component->getHeight() >= 21,
+                "Short-height Group Inspector controls should remain clearly usable: "
+                    + componentId.toStdString());
+    }
+
+    saveComponentPng(panel, outputDirectory / "short-host-groups.png");
 }
 
 void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
@@ -2937,6 +3177,13 @@ int main()
             requireRetiredTemporaryIdsAbsent(panel);
             requireUniqueNonEmptyComponentIds(panel);
 
+            if (shellName == "short-host")
+            {
+                exerciseShortHeightGroupLayout(panel, outputDirectory);
+                exerciseRoutingViewportReachability(panel, true);
+                return;
+            }
+
             exerciseMapSelectionBehavior(panel, session);
             exerciseGateAWorkflow(panel,
                                   session,
@@ -3036,6 +3283,11 @@ int main()
                  drs::app::AuthoringPanel::LayoutMode::expanded,
                  drs::app::authoring::expandedMinimumShellWidth,
                  drs::app::authoring::minimumShellHeight);
+
+        runShell("short-host",
+                 drs::app::AuthoringPanel::LayoutMode::expanded,
+                 drs::app::authoring::expandedMinimumShellWidth,
+                 564);
 
         inventory << "Baseline findings\n";
         for (const auto& finding : baselineFindings)

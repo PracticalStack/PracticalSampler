@@ -246,6 +246,8 @@ private:
     juce::TextButton macroMoveUpButton;
     juce::TextButton macroMoveDownButton;
 
+    juce::Component routingDrawerContent;
+    juce::Viewport routingDrawerViewport;
     juce::Label fxSectionLabel;
     juce::Label fxScopeLabel;
     juce::ComboBox fxScopeSelector;

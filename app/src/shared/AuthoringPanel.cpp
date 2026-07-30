@@ -5,6 +5,8 @@
 
 #include <algorithm>
 #include <array>
+#include <tuple>
+#include <utility>
 
 namespace drs::app
 {
@@ -849,6 +851,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     drawerRegion.setComponentID("authoringDrawer");
     drawerTabStrip.setComponentID("authoringDrawerTabStrip");
     drawerContentHost.setComponentID("authoringDrawerContentHost");
+    routingDrawerContent.setComponentID("authoringRoutingContent");
+    routingDrawerViewport.setComponentID("authoringRoutingViewport");
     drawerToggleButton.setComponentID("authoringDrawerToggleButton");
     drawerWaveformTabButton.setComponentID("authoringDrawerWaveformTab");
     drawerGroupsTabButton.setComponentID("authoringDrawerGroupsTab");
@@ -870,6 +874,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     macroMaxSlider.setComponentID("authoringMacroMaxSlider");
     macroMoveUpButton.setComponentID("authoringMacroMoveUpButton");
     macroMoveDownButton.setComponentID("authoringMacroMoveDownButton");
+    fxSectionLabel.setComponentID("authoringFxSectionLabel");
     fxSelector.setComponentID("authoringFxSelector");
     fxScopeSelector.setComponentID("authoringDspScopeSelector");
     fxScopeBreadcrumbLabel.setComponentID("authoringDspScopeBreadcrumb");
@@ -894,6 +899,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     routingInputSelector.setComponentID("authoringRoutingInputSelector");
     routingInsertOneSelector.setComponentID("authoringRoutingInsertOneSelector");
     routingInsertTwoSelector.setComponentID("authoringRoutingInsertTwoSelector");
+    routingSummaryLabel.setComponentID("authoringRoutingSummaryLabel");
     groupSummaryLabel.setComponentID("authoringGroupSummaryLabel");
     groupVisibilityLabel.setComponentID("authoringGroupVisibilityLabel");
     groupVisibilityToggle.setComponentID("authoringGroupVisibilityToggle");
@@ -1424,6 +1430,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&macroSummaryLabel),
              static_cast<juce::Component*>(&macroMoveUpButton),
              static_cast<juce::Component*>(&macroMoveDownButton),
+             static_cast<juce::Component*>(&routingDrawerViewport),
              static_cast<juce::Component*>(&fxSectionLabel),
              static_cast<juce::Component*>(&fxScopeLabel),
              static_cast<juce::Component*>(&fxScopeSelector),
@@ -1490,6 +1497,49 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
          })
     {
         addAndMakeVisible(component);
+    }
+
+    routingDrawerViewport.setViewedComponent(&routingDrawerContent, false);
+    routingDrawerViewport.setScrollBarsShown(true, false);
+    routingDrawerViewport.setScrollBarThickness(12);
+    routingDrawerViewport.setWantsKeyboardFocus(false);
+    routingDrawerContent.setSize(1, 1);
+    for (auto* component : {
+             static_cast<juce::Component*>(&fxSectionLabel),
+             static_cast<juce::Component*>(&fxScopeLabel),
+             static_cast<juce::Component*>(&fxScopeSelector),
+             static_cast<juce::Component*>(&fxScopeBreadcrumbLabel),
+             static_cast<juce::Component*>(&fxSelector),
+             static_cast<juce::Component*>(&fxNameEditor),
+             static_cast<juce::Component*>(&fxTypeLabel),
+             static_cast<juce::Component*>(&fxTypeSelector),
+             static_cast<juce::Component*>(&fxBypassedToggle),
+             static_cast<juce::Component*>(&fxAddButton),
+             static_cast<juce::Component*>(&fxDuplicateButton),
+             static_cast<juce::Component*>(&fxMoveUpButton),
+             static_cast<juce::Component*>(&fxMoveDownButton),
+             static_cast<juce::Component*>(&fxDeleteButton),
+             static_cast<juce::Component*>(&fxOwnerSelector),
+             static_cast<juce::Component*>(&fxMoveOwnerButton),
+             static_cast<juce::Component*>(&fxParameterSelector),
+             static_cast<juce::Component*>(&fxParameterSlider),
+             static_cast<juce::Component*>(&fxParameterResetButton),
+             static_cast<juce::Component*>(&fxAssignMacroButton),
+             static_cast<juce::Component*>(&fxParameterValueLabel),
+             static_cast<juce::Component*>(&fxSummaryLabel),
+             static_cast<juce::Component*>(&fxDiagnosticsLabel),
+             static_cast<juce::Component*>(&routingSectionLabel),
+             static_cast<juce::Component*>(&routingBusSelector),
+             static_cast<juce::Component*>(&routingInputLabel),
+             static_cast<juce::Component*>(&routingInputSelector),
+             static_cast<juce::Component*>(&routingInsertOneLabel),
+             static_cast<juce::Component*>(&routingInsertOneSelector),
+             static_cast<juce::Component*>(&routingInsertTwoLabel),
+             static_cast<juce::Component*>(&routingInsertTwoSelector),
+             static_cast<juce::Component*>(&routingSummaryLabel)
+         })
+    {
+        routingDrawerContent.addAndMakeVisible(component);
     }
 
     refreshFromSession();
@@ -1598,6 +1648,10 @@ void AuthoringPanel::configureAccessibilityAndFocus()
     configureAccessibleMetadata(drawerContentHost,
                                 "Drawer content",
                                 "Displays the active drawer body when the drawer is open.");
+    configureAccessibleMetadata(routingDrawerViewport,
+                                "Scrollable routing inspector",
+                                "Provides access to project routing, FX chain, ownership, and parameter controls.",
+                                "Scroll vertically to reach the advanced FX controls.");
 
     configureAccessibleMetadata(drawerToggleButton,
                                 "Drawer visibility",
@@ -1896,7 +1950,7 @@ void AuthoringPanel::paint(juce::Graphics& g)
     g.setColour(authoringPanelCard);
     g.fillRoundedRectangle(bounds.reduced(4.0f), 18.0f);
 
-    if (playbackBanner.isVisible())
+    if (playbackBanner.isVisible() && !playbackBanner.getBounds().isEmpty())
     {
         auto bannerBounds = playbackBanner.getBounds().toFloat().expanded(2.0f, 1.0f);
         auto text = playbackBannerLabel.getText();
@@ -1919,10 +1973,11 @@ void AuthoringPanel::paint(juce::Graphics& g)
 void AuthoringPanel::resized()
 {
     auto area = getLocalBounds().reduced(28);
+    const auto shortHeightLayout = getHeight() < authoring::shortHeightBreakpoint;
 
     summaryStrip.setBounds(area.removeFromTop(authoring::heroHeight));
 
-    area.removeFromTop(12);
+    area.removeFromTop(shortHeightLayout ? 8 : 12);
     auto toolbarRow = area.removeFromTop(28);
     zoneLabel.setBounds(toolbarRow.removeFromLeft(96));
     toolbarRow.removeFromLeft(8);
@@ -1933,9 +1988,10 @@ void AuthoringPanel::resized()
     toolbarRow.removeFromRight(std::min(8, toolbarRow.getWidth()));
     zoneSelector.setBounds(toolbarRow.removeFromLeft(std::min(360, toolbarRow.getWidth())));
 
-    if (playbackBanner.isVisible())
+    const auto showPlaybackBannerInLayout = playbackBanner.isVisible() && !shortHeightLayout;
+    if (showPlaybackBannerInLayout)
     {
-        area.removeFromTop(8);
+        area.removeFromTop(shortHeightLayout ? 6 : 8);
         auto bannerRow = area.removeFromTop(32);
         playbackBanner.setBounds(bannerRow);
         auto bannerContent = bannerRow.reduced(12, 4);
@@ -2003,10 +2059,17 @@ void AuthoringPanel::resized()
         layoutLabelAndField(right, rightLabel, rightField, rightLabelWidth);
     };
 
-    area.removeFromTop(12);
+    area.removeFromTop(shortHeightLayout ? 8 : 12);
     const auto expanded = isExpandedLayout(layoutMode);
-    const auto drawerOpenHeight = expanded ? authoring::expandedDrawerOpenHeight
-                                           : authoring::compactDrawerOpenHeight;
+    const auto groupDrawerInShortLayout = shortHeightLayout
+        && drawerState.activeTab == authoring::DrawerTab::groups;
+    const auto routingDrawerInShortLayout = shortHeightLayout
+        && drawerState.activeTab == authoring::DrawerTab::routing;
+    const auto inspectorDrawerInShortLayout = groupDrawerInShortLayout || routingDrawerInShortLayout;
+    const auto drawerOpenHeight = inspectorDrawerInShortLayout
+        ? authoring::shortInspectorDrawerOpenHeight
+        : (expanded ? authoring::expandedDrawerOpenHeight
+                    : authoring::compactDrawerOpenHeight);
     const auto drawerHeight = authoring::drawerTabStripHeight + (drawerState.open ? drawerOpenHeight : 0);
     auto drawerArea = area.removeFromBottom(std::min(drawerHeight, area.getHeight()));
     drawerRegion.setBounds(drawerArea);
@@ -2033,15 +2096,15 @@ void AuthoringPanel::resized()
     tabArea.removeFromLeft(tabGap);
     drawerPerformanceTabButton.setBounds(tabArea.removeFromLeft(tabWidth + (expanded ? 8 : 2)));
 
-    auto drawerEditorArea = drawerContentHost.getBounds().reduced(12, 10);
+    auto drawerEditorArea = drawerContentHost.getBounds().reduced(12, inspectorDrawerInShortLayout ? 6 : 10);
     if (drawerState.activeTab == authoring::DrawerTab::groups)
     {
-        auto headingRow = drawerEditorArea.removeFromTop(22);
+        auto headingRow = drawerEditorArea.removeFromTop(groupDrawerInShortLayout ? 20 : 22);
         waveformLabel.setBounds(headingRow.removeFromLeft(std::min(160, headingRow.getWidth())));
         waveformScopeLabel.setBounds(headingRow);
-        drawerEditorArea.removeFromTop(1);
+        drawerEditorArea.removeFromTop(groupDrawerInShortLayout ? 0 : 1);
         drawerBreadcrumbLabel.setBounds(drawerEditorArea.removeFromTop(14));
-        drawerEditorArea.removeFromTop(3);
+        drawerEditorArea.removeFromTop(groupDrawerInShortLayout ? 2 : 3);
     }
     else
     {
@@ -2072,19 +2135,16 @@ void AuthoringPanel::resized()
 
     if (drawerState.activeTab == authoring::DrawerTab::groups)
     {
-        const auto fieldRowHeight = expanded ? 24 : 20;
-        const auto summaryRowHeight = expanded ? 18 : 16;
-        const auto actionRowHeight = expanded ? 24 : 20;
+        const auto fieldRowHeight = groupDrawerInShortLayout ? 21 : (expanded ? 26 : 24);
+        const auto summaryRowHeight = groupDrawerInShortLayout ? 16 : (expanded ? 20 : 18);
+        const auto actionRowHeight = groupDrawerInShortLayout ? 24 : (expanded ? 30 : 28);
 
         auto row = drawerEditorArea.removeFromTop(fieldRowHeight);
         layoutLabelAndField(row, groupNameLabel, groupNameEditor, 92);
         drawerEditorArea.removeFromTop(2);
 
         row = drawerEditorArea.removeFromTop(fieldRowHeight);
-        auto deleteArea = row.removeFromRight(136);
-        deleteArea.removeFromLeft(8);
         layoutLabelAndField(row, groupVisibilityLabel, groupVisibilityToggle, 74);
-        groupDeleteButton.setBounds(deleteArea);
         drawerEditorArea.removeFromTop(2);
 
         row = drawerEditorArea.removeFromTop(fieldRowHeight);
@@ -2112,32 +2172,18 @@ void AuthoringPanel::resized()
         groupSummaryLabel.setBounds(groupSummaryArea);
         groupRoundRobinLabel.setBounds(summaryRow);
         groupRoundRobinHintLabel.setBounds({});
-        drawerEditorArea.removeFromTop(4);
+        drawerEditorArea.removeFromTop(groupDrawerInShortLayout ? 3 : (expanded ? 6 : 4));
 
-        if (expanded)
-        {
-            auto actionRow = drawerEditorArea.removeFromTop(actionRowHeight);
-            groupAssignZonesButton.setBounds(actionRow);
-            drawerEditorArea.removeFromTop(2);
-
-            actionRow = drawerEditorArea.removeFromTop(actionRowHeight);
-            auto leftAction = actionRow.removeFromLeft((actionRow.getWidth() - 8) / 2);
-            actionRow.removeFromLeft(8);
-            groupRoundRobinToggle.setBounds(leftAction);
-            groupRoundRobinModeSelector.setBounds(actionRow);
-        }
-        else
-        {
-            auto actionRow = drawerEditorArea.removeFromTop(actionRowHeight);
-            groupAssignZonesButton.setBounds(actionRow);
-            drawerEditorArea.removeFromTop(2);
-
-            actionRow = drawerEditorArea.removeFromTop(actionRowHeight);
-            auto toggleArea = actionRow.removeFromLeft((actionRow.getWidth() - 6) / 2);
-            actionRow.removeFromLeft(6);
-            groupRoundRobinToggle.setBounds(toggleArea);
-            groupRoundRobinModeSelector.setBounds(actionRow);
-        }
+        auto actionRow = drawerEditorArea.removeFromTop(actionRowHeight);
+        constexpr auto actionGap = 8;
+        const auto deleteButtonWidth = expanded ? 136 : 128;
+        auto deleteArea = actionRow.removeFromRight(std::min(deleteButtonWidth, actionRow.getWidth()));
+        actionRow.removeFromRight(std::min(actionGap, actionRow.getWidth()));
+        auto toggleArea = actionRow.removeFromLeft(std::max(1, (actionRow.getWidth() - actionGap) / 2));
+        actionRow.removeFromLeft(std::min(actionGap, actionRow.getWidth()));
+        groupRoundRobinToggle.setBounds(toggleArea);
+        groupRoundRobinModeSelector.setBounds(actionRow);
+        groupDeleteButton.setBounds(deleteArea);
     }
     else if (drawerState.activeTab == authoring::DrawerTab::macros)
     {
@@ -2183,93 +2229,88 @@ void AuthoringPanel::resized()
     }
     else if (drawerState.activeTab == authoring::DrawerTab::routing)
     {
-        auto headerRow = drawerEditorArea.removeFromTop(24);
-        auto leftHeader = headerRow.removeFromLeft((headerRow.getWidth() - 12) / 2);
-        headerRow.removeFromLeft(12);
-        fxSectionLabel.setBounds(leftHeader);
-        routingSectionLabel.setBounds(headerRow);
-        drawerEditorArea.removeFromTop(4);
+        routingDrawerViewport.setBounds(drawerEditorArea);
+        const auto routingContentWidth = std::max(320,
+                                                  routingDrawerViewport.getWidth()
+                                                      - routingDrawerViewport.getScrollBarThickness());
+        const auto routingContentHeight = expanded ? 364 : 160;
+        routingDrawerContent.setSize(routingContentWidth, routingContentHeight);
 
-        auto row = drawerEditorArea.removeFromTop(28);
-        auto left = row.removeFromLeft((row.getWidth() - 12) / 2);
-        row.removeFromLeft(12);
-        auto right = row;
+        auto routingEditorArea = routingDrawerContent.getLocalBounds().reduced(0, 0);
+        constexpr auto routingColumnGap = 12;
+        auto splitRoutingRow = [=](juce::Rectangle<int> row)
+        {
+            auto left = row.removeFromLeft((row.getWidth() - routingColumnGap) / 2);
+            row.removeFromLeft(std::min(routingColumnGap, row.getWidth()));
+            return std::pair { left, row };
+        };
+        auto takeRoutingRow = [&](int height = 28, int gapAfter = 4)
+        {
+            auto row = routingEditorArea.removeFromTop(height);
+            routingEditorArea.removeFromTop(std::min(gapAfter, routingEditorArea.getHeight()));
+            return row;
+        };
+
+        auto headerRow = takeRoutingRow(24);
+        auto [leftHeader, rightHeader] = splitRoutingRow(headerRow);
+        fxSectionLabel.setBounds(leftHeader);
+        routingSectionLabel.setBounds(rightHeader);
+
         if (expanded)
         {
+            auto [left, right] = splitRoutingRow(takeRoutingRow());
             layoutLabelAndField(left, fxScopeLabel, fxScopeSelector, 44);
             fxScopeBreadcrumbLabel.setBounds(right);
-            drawerEditorArea.removeFromTop(4);
-            row = drawerEditorArea.removeFromTop(28);
-            left = row.removeFromLeft((row.getWidth() - 12) / 2);
-            row.removeFromLeft(12);
-            right = row;
         }
+
+        auto [left, right] = splitRoutingRow(takeRoutingRow());
         fxSelector.setBounds(left);
         routingBusSelector.setBounds(right);
-        drawerEditorArea.removeFromTop(4);
 
-        row = drawerEditorArea.removeFromTop(28);
-        left = row.removeFromLeft((row.getWidth() - 12) / 2);
-        row.removeFromLeft(12);
-        right = row;
+        std::tie(left, right) = splitRoutingRow(takeRoutingRow());
         layoutLabelAndField(left, fxTypeLabel, fxTypeSelector, 44);
         layoutLabelAndField(right, routingInputLabel, routingInputSelector, 44);
-        drawerEditorArea.removeFromTop(4);
 
-        row = drawerEditorArea.removeFromTop(28);
-        left = row.removeFromLeft((row.getWidth() - 12) / 2);
-        row.removeFromLeft(12);
-        right = row;
+        std::tie(left, right) = splitRoutingRow(takeRoutingRow());
         fxBypassedToggle.setBounds(left);
         layoutLabelAndField(right, routingInsertOneLabel, routingInsertOneSelector, 44);
-        drawerEditorArea.removeFromTop(4);
 
-        row = drawerEditorArea.removeFromTop(28);
-        layoutLabelAndField(row, routingInsertTwoLabel, routingInsertTwoSelector, 56);
+        layoutLabelAndField(takeRoutingRow(28, expanded ? 6 : 0),
+                            routingInsertTwoLabel,
+                            routingInsertTwoSelector,
+                            56);
+
         if (expanded)
         {
-            drawerEditorArea.removeFromTop(4);
-            fxSummaryLabel.setBounds(drawerEditorArea.removeFromTop(20));
-            drawerEditorArea.removeFromTop(2);
-            routingSummaryLabel.setBounds(drawerEditorArea.removeFromTop(20));
-        }
-        if (expanded)
-        {
-            drawerEditorArea.removeFromTop(4);
-            row = drawerEditorArea.removeFromTop(28);
-            left = row.removeFromLeft((row.getWidth() - 12) / 2);
-            row.removeFromLeft(12);
-            right = row;
+            std::tie(left, right) = splitRoutingRow(takeRoutingRow());
             fxNameEditor.setBounds(left);
             fxOwnerSelector.setBounds(right);
-            drawerEditorArea.removeFromTop(4);
-            row = drawerEditorArea.removeFromTop(28);
+
+            auto row = takeRoutingRow();
             const auto buttonWidth = std::max(64, (row.getWidth() - 20) / 5);
             fxAddButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
             fxDuplicateButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
             fxMoveUpButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
             fxMoveDownButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
             fxDeleteButton.setBounds(row);
-            drawerEditorArea.removeFromTop(4);
-            row = drawerEditorArea.removeFromTop(28);
-            left = row.removeFromLeft((row.getWidth() - 12) / 2);
-            row.removeFromLeft(12);
-            right = row;
+
+            std::tie(left, right) = splitRoutingRow(takeRoutingRow());
             fxMoveOwnerButton.setBounds(left);
             fxParameterSelector.setBounds(right);
-            drawerEditorArea.removeFromTop(4);
-            row = drawerEditorArea.removeFromTop(28);
-            left = row.removeFromLeft((row.getWidth() - 12) / 2);
-            row.removeFromLeft(12);
-            right = row;
+
+            std::tie(left, right) = splitRoutingRow(takeRoutingRow());
             fxParameterSlider.setBounds(left);
             fxParameterResetButton.setBounds(right.removeFromLeft((right.getWidth() - 5) / 2));
             right.removeFromLeft(5);
             fxAssignMacroButton.setBounds(right);
-            drawerEditorArea.removeFromTop(3);
-            fxParameterValueLabel.setBounds(drawerEditorArea.removeFromTop(18));
-            drawerEditorArea.removeFromTop(2);
-            fxDiagnosticsLabel.setBounds(drawerEditorArea.removeFromTop(18));
+
+            std::tie(left, right) = splitRoutingRow(takeRoutingRow(18, 2));
+            fxParameterValueLabel.setBounds(left);
+            fxSummaryLabel.setBounds(right);
+
+            std::tie(left, right) = splitRoutingRow(takeRoutingRow(18, 0));
+            fxDiagnosticsLabel.setBounds(left);
+            routingSummaryLabel.setBounds(right);
         }
     }
     else if (drawerState.activeTab == authoring::DrawerTab::performance)
@@ -2323,7 +2364,7 @@ void AuthoringPanel::resized()
         }
     }
 
-    area.removeFromTop(8);
+    area.removeFromTop(inspectorDrawerInShortLayout ? 4 : 8);
     auto shellArea = area;
     const auto desiredInspectorWidth = expanded ? authoring::expandedInspectorPreferredWidth
                                                 : authoring::compactInspectorPreferredWidth;
@@ -2349,7 +2390,7 @@ void AuthoringPanel::resized()
         auto managerSecondaryRow = wrapGroupManagerButtons
             ? managerTopArea.removeFromTop(28)
             : juce::Rectangle<int> {};
-        const auto showVisibilityHint = groupManagerArea.getHeight() >= 70;
+        const auto showVisibilityHint = !shortHeightLayout && groupManagerArea.getHeight() >= 70;
         auto managerActionRow = groupManagerArea.removeFromTop(showVisibilityHint
                                                                    ? std::max(40, groupManagerArea.getHeight() - 18)
                                                                    : groupManagerArea.getHeight());
@@ -2395,8 +2436,10 @@ void AuthoringPanel::resized()
     }
     else
     {
-        const auto groupManagerWidth = std::min(expanded ? 248 : 224,
-                                                std::max(188, shellArea.getWidth() / 3));
+        const auto groupManagerWidth = shortHeightLayout
+            ? std::min(280, std::max(240, shellArea.getWidth() - 200))
+            : std::min(expanded ? 248 : 224,
+                       std::max(188, shellArea.getWidth() / 3));
         layoutGroupManager(shellArea.removeFromLeft(groupManagerWidth));
         shellArea.removeFromLeft(std::min(10, shellArea.getWidth()));
     }
@@ -3025,6 +3068,7 @@ void AuthoringPanel::refreshDrawerVisibility()
     setVisibleAndAccessible(macroMoveDownButton, drawerContentVisible && macrosTab);
     setVisibleAndAccessible(macroSummaryLabel, drawerContentVisible && macrosTab && expanded);
 
+    setVisibleAndAccessible(routingDrawerViewport, drawerContentVisible && routingTab);
     setVisibleAndAccessible(fxSectionLabel, drawerContentVisible && routingTab);
     setVisibleAndAccessible(fxScopeLabel, drawerContentVisible && routingTab && expanded);
     setVisibleAndAccessible(fxScopeSelector, drawerContentVisible && routingTab && expanded);
