@@ -63,11 +63,18 @@ public:
     bool endActiveRangeGesture(juce::Point<float> position);
     bool cancelActiveRangeGesture();
     bool isRangeGestureActive() const { return activeGesture.has_value(); }
+    bool requestZoomAt(juce::Point<float> position, float wheelDelta);
+    bool requestPanBy(juce::Point<float> pixelDelta);
+    void resetViewport();
+    float getZoomFactor() const noexcept { return viewportZoom; }
+    juce::Point<float> getViewportOrigin() const noexcept { return viewportOrigin; }
     void paint(juce::Graphics& g) override;
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDoubleClick(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
     void mouseUp(const juce::MouseEvent& event) override;
+    void mouseWheelMove(const juce::MouseEvent& event,
+                        const juce::MouseWheelDetails& wheel) override;
     bool keyPressed(const juce::KeyPress& key) override;
     void focusGained(FocusChangeType cause) override;
     void focusLost(FocusChangeType cause) override;
@@ -95,7 +102,15 @@ private:
         bool dragged = false;
     };
 
+    struct PanGesture
+    {
+        juce::Point<float> start;
+        juce::Point<float> initialViewportOrigin;
+    };
+
     juce::Rectangle<float> getInnerBounds() const;
+    juce::Point<float> clampViewportOrigin(juce::Point<float> origin) const;
+    juce::Point<float> normalizedContentToCanvas(juce::Point<float> position) const;
     drs::engine::AuthoringZoneSummary getDisplayZoneSummary(std::size_t index) const;
     juce::Rectangle<float> computeZoneBounds(const drs::engine::AuthoringZoneSummary& zone) const;
     std::vector<ZoneLayout> buildZoneLayouts() const;
@@ -124,6 +139,9 @@ private:
     std::function<void()> onDeleteSelectedSampleRequested;
     std::optional<RangeGesture> activeGesture;
     std::optional<MarqueeGesture> activeMarqueeGesture;
+    std::optional<PanGesture> activePanGesture;
+    float viewportZoom = 1.0f;
+    juce::Point<float> viewportOrigin;
     bool sampleFileDragActive = false;
 };
 } // namespace drs::app::authoring

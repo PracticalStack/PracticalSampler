@@ -4,6 +4,7 @@
 #include "drs/engine/RuntimeStream.h"
 
 #include <algorithm>
+#include <string_view>
 
 namespace drs::engine
 {
@@ -127,6 +128,32 @@ int resolveSequentialRoundRobinSlot(std::uint64_t triggerOrdinal, int slotCount)
     return static_cast<int>((triggerOrdinal - 1) - cycleStart) + 1;
 }
 
+std::uint64_t computeFnv1a64(std::string_view text) noexcept
+{
+    std::uint64_t hash = 14695981039346656037ull;
+    for (const auto character : text)
+    {
+        hash ^= static_cast<unsigned char>(character);
+        hash *= 1099511628211ull;
+    }
+    return hash;
+}
+
+int resolveRandomRoundRobinSlot(std::uint64_t triggerOrdinal,
+                                int slotCount,
+                                std::string_view poolId) noexcept
+{
+    if (slotCount <= 0 || triggerOrdinal == 0)
+        return 0;
+
+    auto value = triggerOrdinal ^ computeFnv1a64(poolId);
+    value += 0x9e3779b97f4a7c15ull;
+    value = (value ^ (value >> 30u)) * 0xbf58476d1ce4e5b9ull;
+    value = (value ^ (value >> 27u)) * 0x94d049bb133111ebull;
+    value ^= value >> 31u;
+    return static_cast<int>(value % static_cast<std::uint64_t>(slotCount)) + 1;
+}
+
 bool zoneMatchesRoundRobinSlot(const RuntimeZoneDefinition& zone, std::uint64_t triggerOrdinal)
 {
     const auto slotCount = resolveRoundRobinSlotCount(zone);
@@ -134,7 +161,10 @@ bool zoneMatchesRoundRobinSlot(const RuntimeZoneDefinition& zone, std::uint64_t 
     if (slotCount <= 0 || slotIndex <= 0)
         return true;
 
-    const auto selectedSlot = resolveSequentialRoundRobinSlot(triggerOrdinal, slotCount);
+    const auto selectedSlot = zone.roundRobin.has_value()
+            && zone.roundRobin->mode == RoundRobinMode::random
+        ? resolveRandomRoundRobinSlot(triggerOrdinal, slotCount, zone.roundRobin->poolId)
+        : resolveSequentialRoundRobinSlot(triggerOrdinal, slotCount);
     return selectedSlot <= 0 || selectedSlot == slotIndex;
 }
 

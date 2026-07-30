@@ -833,10 +833,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     groupDeleteButton.setComponentID("authoringGroupDeleteButton");
     groupRoundRobinLabel.setComponentID("authoringGroupRoundRobinLabel");
     groupRoundRobinHintLabel.setComponentID("authoringGroupRoundRobinHintLabel");
-    groupCreateRoundRobinPoolButton.setComponentID("authoringGroupCreateRoundRobinPoolButton");
-    groupAddCompatibleZonesButton.setComponentID("authoringGroupAddCompatibleZonesButton");
-    groupNormalizeRoundRobinPoolButton.setComponentID("authoringGroupNormalizeRoundRobinPoolButton");
-    groupRemoveRoundRobinAnchorButton.setComponentID("authoringGroupRemoveRoundRobinAnchorButton");
+    groupRoundRobinToggle.setComponentID("authoringGroupRoundRobinToggle");
+    groupRoundRobinModeSelector.setComponentID("authoringGroupRoundRobinModeSelector");
     performanceBankSelector.setComponentID("authoringPerformanceBankSelector");
     triggerSlotSelector.setComponentID("authoringTriggerSlotSelector");
     triggerEventSelector.setComponentID("authoringTriggerEventSelector");
@@ -1007,40 +1005,50 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     };
     groupDeleteButton.setButtonText("Delete Group");
     groupDeleteButton.onClick = [this] { deleteSelectedGroup(); };
-    groupCreateRoundRobinPoolButton.setButtonText("New RR Pool");
-    groupCreateRoundRobinPoolButton.onClick = [this]
+    groupRoundRobinToggle.setButtonText("Round Robin");
+    groupRoundRobinToggle.onClick = [this]
     {
         if (isRefreshing)
             return;
 
-        if (authoringSession.createRoundRobinPoolForSelectedGroup("Create selected-group Round Robin pool").applied)
+        const auto shouldEnable = groupRoundRobinToggle.getToggleState();
+        const auto mode = groupRoundRobinModeSelector.getSelectedId() == 2
+            ? drs::engine::RoundRobinMode::random
+            : drs::engine::RoundRobinMode::sequential;
+        const auto result = authoringSession.setSelectedGroupRoundRobinEnabled(
+            shouldEnable,
+            mode,
+            shouldEnable ? "Enable selected-group Round Robin" : "Disable selected-group Round Robin");
+        if (result.applied)
+        {
             refreshFromSession();
+            return;
+        }
+
+        groupRoundRobinToggle.setToggleState(!shouldEnable, juce::dontSendNotification);
+        juce::AlertWindow::showMessageBoxAsync(
+            juce::AlertWindow::WarningIcon,
+            "Round Robin Unavailable",
+            buildIssueSummary(result.issues));
     };
-    groupAddCompatibleZonesButton.setButtonText("Add Compatible");
-    groupAddCompatibleZonesButton.onClick = [this]
+    groupRoundRobinModeSelector.addItem("Cycle", 1);
+    groupRoundRobinModeSelector.addItem("Random", 2);
+    groupRoundRobinModeSelector.setSelectedId(1, juce::dontSendNotification);
+    groupRoundRobinModeSelector.onChange = [this]
     {
         if (isRefreshing)
             return;
 
-        if (authoringSession.addCompatibleZonesToSelectedGroupRoundRobinPool("Add compatible zones to selected-group Round Robin pool").applied)
-            refreshFromSession();
-    };
-    groupNormalizeRoundRobinPoolButton.setButtonText("Normalize");
-    groupNormalizeRoundRobinPoolButton.onClick = [this]
-    {
-        if (isRefreshing)
+        const auto status = authoringSession.getSelectedGroupRoundRobinStatus();
+        if (!status.enabled)
             return;
 
-        if (authoringSession.normalizeSelectedGroupRoundRobinPool("Normalize selected-group Round Robin slot numbering").applied)
-            refreshFromSession();
-    };
-    groupRemoveRoundRobinAnchorButton.setButtonText("Remove Anchor");
-    groupRemoveRoundRobinAnchorButton.onClick = [this]
-    {
-        if (isRefreshing)
-            return;
-
-        if (authoringSession.removeSelectedGroupAnchorFromRoundRobinPool("Remove selected-group audition anchor from Round Robin pool").applied)
+        const auto mode = groupRoundRobinModeSelector.getSelectedId() == 2
+            ? drs::engine::RoundRobinMode::random
+            : drs::engine::RoundRobinMode::sequential;
+        const auto result = authoringSession.setSelectedGroupRoundRobinMode(
+            mode, "Change selected-group Round Robin mode");
+        if (result.applied)
             refreshFromSession();
     };
 
@@ -1334,10 +1342,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&groupDeleteButton),
              static_cast<juce::Component*>(&groupRoundRobinLabel),
              static_cast<juce::Component*>(&groupRoundRobinHintLabel),
-             static_cast<juce::Component*>(&groupCreateRoundRobinPoolButton),
-             static_cast<juce::Component*>(&groupAddCompatibleZonesButton),
-             static_cast<juce::Component*>(&groupNormalizeRoundRobinPoolButton),
-             static_cast<juce::Component*>(&groupRemoveRoundRobinAnchorButton),
+             static_cast<juce::Component*>(&groupRoundRobinToggle),
+             static_cast<juce::Component*>(&groupRoundRobinModeSelector),
              static_cast<juce::Component*>(&performanceBankSelector),
              static_cast<juce::Component*>(&triggerSlotSelector),
              static_cast<juce::Component*>(&triggerEventLabel),
@@ -1452,7 +1458,7 @@ void AuthoringPanel::configureAccessibilityAndFocus()
     configureAccessibleMetadata(zoneMap,
                                 "Zone map",
                                 "Displays project zones across key and velocity ranges.",
-                                "Use arrow keys to move the primary selection, hold Control to toggle extra zones, drag a box to multi-select, drag handles to edit ranges, or right-click to delete the selected sample.");
+                                "Hold Control while scrolling to zoom around the pointer. When zoomed, drag empty map space to pan. Use arrow keys to move the primary selection, hold Control to toggle extra zones, drag a box to multi-select, drag handles to edit ranges, or right-click to delete the selected sample.");
     zoneMap.setExplicitFocusOrder(30);
 
     configureAccessibleMetadata(drawerRegion,
@@ -1634,22 +1640,14 @@ void AuthoringPanel::configureAccessibilityAndFocus()
     configureAccessibleMetadata(groupRoundRobinHintLabel,
                                 "Group round robin guidance",
                                 "Guides how round-robin edits currently relate to the selected group.");
-    configureAccessibleMetadata(groupCreateRoundRobinPoolButton,
-                                "Create group round robin pool",
-                                "Creates a new Round Robin pool for the selected group's audition anchor.",
-                                "Press to create a new pool for the selected group's audition anchor.");
-    configureAccessibleMetadata(groupAddCompatibleZonesButton,
-                                "Add compatible group zones",
-                                "Adds exact-match compatible zones into the selected group's anchor-owned Round Robin pool.",
-                                "Press to add compatible zones to the selected group's pool.");
-    configureAccessibleMetadata(groupNormalizeRoundRobinPoolButton,
-                                "Normalize group round robin",
-                                "Renumbers the selected group's anchor-owned Round Robin pool.",
-                                "Press to normalize the selected group's pool slot numbering.");
-    configureAccessibleMetadata(groupRemoveRoundRobinAnchorButton,
-                                "Remove group round robin anchor",
-                                "Removes the selected group's audition anchor from its Round Robin pool.",
-                                "Press to remove the selected group's audition anchor from its pool.");
+    configureAccessibleMetadata(groupRoundRobinToggle,
+                                "Group round robin",
+                                "Enables or disables all-or-nothing Round Robin for the selected group.",
+                                "Every mapping in the group must have at least two exact-match zones.");
+    configureAccessibleMetadata(groupRoundRobinModeSelector,
+                                "Group round robin mode",
+                                "Chooses cycle or random selection for the selected group's Round Robin pools.",
+                                "Enable Round Robin before changing its mode.");
     groupVisibilityToggle.setExplicitFocusOrder(71);
     groupGainSlider.setExplicitFocusOrder(72);
     groupPanSlider.setExplicitFocusOrder(73);
@@ -1657,10 +1655,8 @@ void AuthoringPanel::configureAccessibilityAndFocus()
     groupAnchorSelector.setExplicitFocusOrder(75);
     groupDeleteButton.setExplicitFocusOrder(76);
     groupAssignZonesButton.setExplicitFocusOrder(77);
-    groupCreateRoundRobinPoolButton.setExplicitFocusOrder(78);
-    groupAddCompatibleZonesButton.setExplicitFocusOrder(79);
-    groupNormalizeRoundRobinPoolButton.setExplicitFocusOrder(80);
-    groupRemoveRoundRobinAnchorButton.setExplicitFocusOrder(81);
+    groupRoundRobinToggle.setExplicitFocusOrder(78);
+    groupRoundRobinModeSelector.setExplicitFocusOrder(79);
 
     configureAccessibleMetadata(performanceBankSelector,
                                 "Performance bank selector",
@@ -1948,15 +1944,8 @@ void AuthoringPanel::resized()
             actionRow = drawerEditorArea.removeFromTop(actionRowHeight);
             auto leftAction = actionRow.removeFromLeft((actionRow.getWidth() - 8) / 2);
             actionRow.removeFromLeft(8);
-            groupCreateRoundRobinPoolButton.setBounds(leftAction);
-            groupAddCompatibleZonesButton.setBounds(actionRow);
-            drawerEditorArea.removeFromTop(2);
-
-            actionRow = drawerEditorArea.removeFromTop(actionRowHeight);
-            leftAction = actionRow.removeFromLeft((actionRow.getWidth() - 8) / 2);
-            actionRow.removeFromLeft(8);
-            groupNormalizeRoundRobinPoolButton.setBounds(leftAction);
-            groupRemoveRoundRobinAnchorButton.setBounds(actionRow);
+            groupRoundRobinToggle.setBounds(leftAction);
+            groupRoundRobinModeSelector.setBounds(actionRow);
         }
         else
         {
@@ -1965,14 +1954,10 @@ void AuthoringPanel::resized()
             drawerEditorArea.removeFromTop(2);
 
             actionRow = drawerEditorArea.removeFromTop(actionRowHeight);
-            const auto buttonWidth = std::max(1, (actionRow.getWidth() - 9) / 4);
-            groupCreateRoundRobinPoolButton.setBounds(actionRow.removeFromLeft(buttonWidth));
-            actionRow.removeFromLeft(3);
-            groupAddCompatibleZonesButton.setBounds(actionRow.removeFromLeft(buttonWidth));
-            actionRow.removeFromLeft(3);
-            groupNormalizeRoundRobinPoolButton.setBounds(actionRow.removeFromLeft(buttonWidth));
-            actionRow.removeFromLeft(3);
-            groupRemoveRoundRobinAnchorButton.setBounds(actionRow);
+            auto toggleArea = actionRow.removeFromLeft((actionRow.getWidth() - 6) / 2);
+            actionRow.removeFromLeft(6);
+            groupRoundRobinToggle.setBounds(toggleArea);
+            groupRoundRobinModeSelector.setBounds(actionRow);
         }
     }
     else if (drawerState.activeTab == authoring::DrawerTab::macros)
@@ -2662,10 +2647,8 @@ void AuthoringPanel::refreshDrawerVisibility()
         || isComponentFocusedWithin(focusedComponent, groupRoutingSelector)
         || isComponentFocusedWithin(focusedComponent, groupAnchorSelector)
         || isComponentFocusedWithin(focusedComponent, groupDeleteButton)
-        || isComponentFocusedWithin(focusedComponent, groupCreateRoundRobinPoolButton)
-        || isComponentFocusedWithin(focusedComponent, groupAddCompatibleZonesButton)
-        || isComponentFocusedWithin(focusedComponent, groupNormalizeRoundRobinPoolButton)
-        || isComponentFocusedWithin(focusedComponent, groupRemoveRoundRobinAnchorButton);
+        || isComponentFocusedWithin(focusedComponent, groupRoundRobinToggle)
+        || isComponentFocusedWithin(focusedComponent, groupRoundRobinModeSelector);
     const auto focusWithinMacros = isComponentFocusedWithin(focusedComponent, macroList)
         || isComponentFocusedWithin(focusedComponent, macroAssignmentSelector)
         || isComponentFocusedWithin(focusedComponent, macroRoleSelector)
@@ -2721,10 +2704,8 @@ void AuthoringPanel::refreshDrawerVisibility()
     setVisibleAndAccessible(groupSummaryLabel, drawerContentVisible && groupsTab);
     setVisibleAndAccessible(groupRoundRobinLabel, drawerContentVisible && groupsTab);
     setVisibleAndAccessible(groupRoundRobinHintLabel, false);
-    setVisibleAndAccessible(groupCreateRoundRobinPoolButton, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(groupAddCompatibleZonesButton, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(groupNormalizeRoundRobinPoolButton, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(groupRemoveRoundRobinAnchorButton, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupRoundRobinToggle, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupRoundRobinModeSelector, drawerContentVisible && groupsTab);
 
     setVisibleAndAccessible(macroList, drawerContentVisible && macrosTab);
     setVisibleAndAccessible(macroAssignmentLabel, drawerContentVisible && macrosTab);
@@ -2967,34 +2948,20 @@ void AuthoringPanel::refreshContextualAccessibility()
                                            hasSelectedGroup
                                                ? "Read the selected group's round-robin guidance."
                                                : "Select a group to review round-robin guidance.");
-    updateAccessibleDescriptionAndHelpText(groupCreateRoundRobinPoolButton,
+    updateAccessibleDescriptionAndHelpText(groupRoundRobinToggle,
                                            hasSelectedGroup
-                                               ? "Creates a new Round Robin pool for " + groupName + "'s audition anchor."
+                                               ? "Enables all-or-nothing Round Robin for " + groupName + "."
                                                : "Unavailable because no group is selected.",
                                            hasSelectedGroup
-                                               ? "Press to create or split a pool from the selected group's audition anchor."
-                                               : "Select a group before creating a Round Robin pool.");
-    updateAccessibleDescriptionAndHelpText(groupAddCompatibleZonesButton,
+                                               ? "Every mapping must contain at least two exact-match zones."
+                                               : "Select a group before enabling Round Robin.");
+    updateAccessibleDescriptionAndHelpText(groupRoundRobinModeSelector,
                                            hasSelectedGroup
-                                               ? "Adds exact-match compatible zones into " + groupName + "'s anchor-owned pool."
+                                               ? "Chooses cycle or random Round Robin for " + groupName + "."
                                                : "Unavailable because no group is selected.",
                                            hasSelectedGroup
-                                               ? "Press to add compatible zones to the selected group's Round Robin pool."
-                                               : "Select a group before adding compatible zones.");
-    updateAccessibleDescriptionAndHelpText(groupNormalizeRoundRobinPoolButton,
-                                           hasSelectedGroup
-                                               ? "Normalizes slot numbering for " + groupName + "'s anchor-owned pool."
-                                               : "Unavailable because no group is selected.",
-                                           hasSelectedGroup
-                                               ? "Press to normalize the selected group's Round Robin slot numbering."
-                                               : "Select a group before normalizing Round Robin slots.");
-    updateAccessibleDescriptionAndHelpText(groupRemoveRoundRobinAnchorButton,
-                                           hasSelectedGroup
-                                               ? "Removes " + groupName + "'s audition anchor from its Round Robin pool."
-                                               : "Unavailable because no group is selected.",
-                                           hasSelectedGroup
-                                               ? "Press to remove the selected group's audition anchor from its pool."
-                                               : "Select a group before removing an anchor from Round Robin.");
+                                               ? "Enable Round Robin before changing its mode."
+                                               : "Select a group before choosing a Round Robin mode.");
 
     const auto hasSelectedMacro = !project.authoring.macros.empty()
         && selectedMacroIndex >= 0
@@ -3569,48 +3536,26 @@ void AuthoringPanel::refreshFromSession()
             juce::dontSendNotification);
         groupDeleteButton.setEnabled(memberCount == 0);
 
-        auto roundRobinGroupZones = 0;
-        auto unpooledGroupZones = 0;
-        auto compatibleUnpooledGroupZones = 0;
-        auto anchorZonePooled = false;
-        for (const auto& zone : project.authoring.zones)
-        {
-            if (zone.groupId != selectedGroup->id)
-                continue;
-            if (zone.roundRobin.has_value())
-                ++roundRobinGroupZones;
-            else
-                ++unpooledGroupZones;
-
-            if (zone.id == selectedGroup->auditionAnchorZoneId)
-            {
-                anchorZonePooled = zone.roundRobin.has_value();
-                for (const auto& candidate : project.authoring.zones)
-                {
-                    if (candidate.id == zone.id || candidate.roundRobin.has_value())
-                        continue;
-                    if (isRoundRobinGroupingCompatible(zone, candidate))
-                        ++compatibleUnpooledGroupZones;
-                }
-            }
-        }
+        const auto roundRobinStatus = authoringSession.getSelectedGroupRoundRobinStatus();
         groupRoundRobinLabel.setText(
-            "Round Robin | pooled zones " + juce::String(roundRobinGroupZones)
-                + " | standalone zones " + juce::String(unpooledGroupZones),
+            roundRobinStatus.enabled
+                ? "Round Robin | On | "
+                    + juce::String(roundRobinStatus.mode == drs::engine::RoundRobinMode::random
+                                       ? "Random"
+                                       : "Cycle")
+                : "Round Robin | Off",
             juce::dontSendNotification);
         groupRoundRobinHintLabel.setText(
-            selectedGroup->auditionAnchorZoneId.empty()
-                ? "Choose an audition anchor before managing group-owned Round Robin actions."
-                : "Group RR actions use the selected group's audition anchor and preserve exact-match compatibility.",
+            juce::String::fromUTF8(roundRobinStatus.state.c_str()),
             juce::dontSendNotification);
         groupSummaryLabel.setTooltip(groupSummaryLabel.getText());
         groupRoundRobinLabel.setTooltip(groupRoundRobinLabel.getText() + "\n" + groupRoundRobinHintLabel.getText());
-        groupCreateRoundRobinPoolButton.setButtonText(anchorZonePooled ? "Split RR Pool" : "New RR Pool");
-        groupCreateRoundRobinPoolButton.setEnabled(!selectedGroup->auditionAnchorZoneId.empty());
-        groupAddCompatibleZonesButton.setEnabled(!selectedGroup->auditionAnchorZoneId.empty()
-                                                 && compatibleUnpooledGroupZones > 0);
-        groupNormalizeRoundRobinPoolButton.setEnabled(anchorZonePooled);
-        groupRemoveRoundRobinAnchorButton.setEnabled(anchorZonePooled);
+        groupRoundRobinToggle.setToggleState(roundRobinStatus.enabled, juce::dontSendNotification);
+        groupRoundRobinToggle.setEnabled(true);
+        groupRoundRobinModeSelector.setSelectedId(
+            roundRobinStatus.mode == drs::engine::RoundRobinMode::random ? 2 : 1,
+            juce::dontSendNotification);
+        groupRoundRobinModeSelector.setEnabled(roundRobinStatus.enabled);
     }
     else
     {
@@ -3634,10 +3579,10 @@ void AuthoringPanel::refreshFromSession()
         groupMoveDownButton.setEnabled(false);
         groupDeleteButton.setEnabled(false);
         groupAssignZonesButton.setEnabled(false);
-        groupCreateRoundRobinPoolButton.setEnabled(false);
-        groupAddCompatibleZonesButton.setEnabled(false);
-        groupNormalizeRoundRobinPoolButton.setEnabled(false);
-        groupRemoveRoundRobinAnchorButton.setEnabled(false);
+        groupRoundRobinToggle.setToggleState(false, juce::dontSendNotification);
+        groupRoundRobinToggle.setEnabled(false);
+        groupRoundRobinModeSelector.setSelectedId(1, juce::dontSendNotification);
+        groupRoundRobinModeSelector.setEnabled(false);
     }
 
     if (!project.authoring.macros.empty())

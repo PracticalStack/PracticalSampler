@@ -51,6 +51,15 @@ struct AuthoringGroupPreviewRequest
     std::string state;
 };
 
+struct AuthoringGroupRoundRobinStatus
+{
+    bool enabled = false;
+    bool eligible = false;
+    RoundRobinMode mode = RoundRobinMode::sequential;
+    std::vector<std::string> incompatibleZoneIds;
+    std::string state;
+};
+
 class AuthoringSession
 {
 public:
@@ -67,6 +76,7 @@ public:
     std::vector<AuthoringZoneSummary> getZoneSummaries() const;
     std::optional<RuntimeProjectZoneDefinition> getSelectedZone() const;
     std::optional<RuntimeProjectGroupDefinition> getSelectedGroup() const;
+    AuthoringGroupRoundRobinStatus getSelectedGroupRoundRobinStatus() const;
     std::optional<RuntimeProjectPerformanceBankDefinition> getSelectedPerformanceBank() const;
     AuthoringZonePreviewRequest buildSelectedZonePreviewRequest() const;
     AuthoringGroupPreviewRequest buildSelectedGroupPreviewRequest() const;
@@ -96,10 +106,16 @@ public:
     RuntimeProjectDocumentActionResult addCompatibleZonesToSelectedRoundRobinPool(const std::string& label);
     RuntimeProjectDocumentActionResult normalizeSelectedRoundRobinPool(const std::string& label);
     RuntimeProjectDocumentActionResult removeSelectedZoneFromRoundRobinPool(const std::string& label);
+    // Compatibility aliases retained for existing callers; group operations now apply to every member.
     RuntimeProjectDocumentActionResult createRoundRobinPoolForSelectedGroup(const std::string& label);
     RuntimeProjectDocumentActionResult addCompatibleZonesToSelectedGroupRoundRobinPool(const std::string& label);
     RuntimeProjectDocumentActionResult normalizeSelectedGroupRoundRobinPool(const std::string& label);
     RuntimeProjectDocumentActionResult removeSelectedGroupAnchorFromRoundRobinPool(const std::string& label);
+    RuntimeProjectDocumentActionResult setSelectedGroupRoundRobinEnabled(bool enabled,
+                                                                         RoundRobinMode mode,
+                                                                         const std::string& label);
+    RuntimeProjectDocumentActionResult setSelectedGroupRoundRobinMode(RoundRobinMode mode,
+                                                                      const std::string& label);
     RuntimeProjectDocumentActionResult deleteZones(const std::vector<std::string>& zoneIds,
                                                    const std::string& label);
     RuntimeProjectDocumentActionResult deleteSelectedSample();

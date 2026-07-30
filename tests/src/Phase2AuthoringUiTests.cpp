@@ -1514,10 +1514,8 @@ void exerciseGroupUi(drs::app::AuthoringPanel& panel,
     auto& groupVisibilityButton = requireButton(panel, "authoringGroupVisibilityButton");
     auto& groupPreviewAnchorButton = requireButton(panel, "authoringGroupPreviewAnchorButton");
     auto& groupsTabButton = requireButton(panel, "authoringDrawerGroupsTab");
-    auto& groupCreateRoundRobinPoolButton = requireButton(panel, "authoringGroupCreateRoundRobinPoolButton");
-    auto& groupAddCompatibleZonesButton = requireButton(panel, "authoringGroupAddCompatibleZonesButton");
-    auto& groupNormalizeRoundRobinPoolButton = requireButton(panel, "authoringGroupNormalizeRoundRobinPoolButton");
-    auto& groupRemoveRoundRobinAnchorButton = requireButton(panel, "authoringGroupRemoveRoundRobinAnchorButton");
+    auto& groupRoundRobinToggle = requireButton(panel, "authoringGroupRoundRobinToggle");
+    auto& groupRoundRobinModeSelector = requireComboBox(panel, "authoringGroupRoundRobinModeSelector");
     auto* groupNameEditor = dynamic_cast<juce::TextEditor*>(findDescendantById(panel, "authoringGroupNameEditor"));
     require(groupNameEditor != nullptr, "Group UI checks require the group-name editor.");
 
@@ -1576,10 +1574,8 @@ void exerciseGroupUi(drs::app::AuthoringPanel& panel,
     requireComponentVisibleWithin(panel, "authoringGroupAnchorSelector", panelBounds);
     requireComponentVisibleWithin(panel, "authoringGroupSummaryLabel", panelBounds);
     requireComponentVisibleWithin(panel, "authoringGroupRoundRobinLabel", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringGroupCreateRoundRobinPoolButton", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringGroupAddCompatibleZonesButton", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringGroupNormalizeRoundRobinPoolButton", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringGroupRemoveRoundRobinAnchorButton", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringGroupRoundRobinToggle", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringGroupRoundRobinModeSelector", panelBounds);
 
     groupNameEditor->setText("Lead Core UI");
     if (groupNameEditor->onReturnKey)
@@ -1595,20 +1591,18 @@ void exerciseGroupUi(drs::app::AuthoringPanel& panel,
     groupGainSlider.onDragEnd();
     require(std::abs(session.getSelectedGroup()->gainDb - nextGroupGain) < 0.001,
             "Group inspector gain edits should persist through the authoring session.");
-    require(groupCreateRoundRobinPoolButton.isEnabled()
-                && !groupAddCompatibleZonesButton.isEnabled()
-                && !groupNormalizeRoundRobinPoolButton.isEnabled()
-                && !groupRemoveRoundRobinAnchorButton.isEnabled(),
-            "Single-zone groups should expose pool creation while leaving add/normalize/remove disabled.");
-    groupCreateRoundRobinPoolButton.onClick();
-    require(session.getSelectedZone()->roundRobin.has_value(),
-            "Group RR pool creation should assign Round Robin metadata to the selected group's anchor zone.");
-    require(groupNormalizeRoundRobinPoolButton.isEnabled()
-                && groupRemoveRoundRobinAnchorButton.isEnabled(),
-            "Once a group RR pool exists, normalize and remove actions should become available.");
-    groupRemoveRoundRobinAnchorButton.onClick();
-    require(!session.getSelectedZone()->roundRobin.has_value(),
-            "Removing the group RR anchor should clear Round Robin metadata from the anchor zone.");
+    require(groupRoundRobinToggle.isEnabled()
+                && !groupRoundRobinToggle.getToggleState()
+                && !groupRoundRobinModeSelector.isEnabled(),
+            "Ineligible groups should keep the group Round Robin toggle off and mode selector disabled.");
+    const auto rejectedRoundRobin = session.setSelectedGroupRoundRobinEnabled(
+        true,
+        drs::engine::RoundRobinMode::sequential,
+        "Reject ineligible group Round Robin");
+    require(!rejectedRoundRobin.applied
+                && !session.getSelectedGroupRoundRobinStatus().enabled
+                && !rejectedRoundRobin.issues.empty(),
+            "A single-zone group must reject Round Robin and report corrective guidance.");
 
     inventory << shellName << " / groups\n";
     inventory << "  " << describeBounds(panel, "authoringGroupList") << "\n";
@@ -2656,6 +2650,75 @@ void exerciseCrossfadeDebugVisibility()
     require(crossfadeVisible,
             "Zone selector debug text should surface authored velocity crossfade ranges for inspection.");
 }
+
+void exerciseZoneMapViewportGestures()
+{
+    using drs::app::authoring::ZoneMapCanvas;
+
+    ZoneMapCanvas zoneMap;
+    zoneMap.setBounds(0, 0, 800, 320);
+    const auto centre = zoneMap.getLocalBounds().getCentre().toFloat();
+    require(std::abs(zoneMap.getZoomFactor() - 1.0f) < 0.001f
+                && zoneMap.getViewportOrigin() == juce::Point<float> {},
+            "Zone Map should begin at the full key/velocity extent.");
+
+    const auto mouseSource = juce::Desktop::getInstance().getMainMouseSource();
+    const auto eventTime = juce::Time::getCurrentTime();
+    const juce::MouseEvent plainWheelEvent(mouseSource,
+                                           centre,
+                                           juce::ModifierKeys {},
+                                           1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                           &zoneMap, &zoneMap,
+                                           eventTime, centre, eventTime, 1, false);
+    juce::MouseWheelDetails wheel;
+    wheel.deltaY = 0.5f;
+    zoneMap.mouseWheelMove(plainWheelEvent, wheel);
+    require(std::abs(zoneMap.getZoomFactor() - 1.0f) < 0.001f,
+            "Scrolling without Control must leave the Zone Map viewport unchanged.");
+
+    const juce::MouseEvent ctrlWheelEvent(mouseSource,
+                                          centre,
+                                          juce::ModifierKeys::ctrlModifier,
+                                          1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                          &zoneMap, &zoneMap,
+                                          eventTime, centre, eventTime, 1, false);
+    zoneMap.mouseWheelMove(ctrlWheelEvent, wheel);
+    const auto zoomedFactor = zoneMap.getZoomFactor();
+    const auto zoomedOrigin = zoneMap.getViewportOrigin();
+    require(zoomedFactor > 1.0f
+                && zoomedOrigin.x > 0.0f
+                && zoomedOrigin.y > 0.0f,
+            "Control-scroll should zoom around the pointer and move the viewport origin.");
+    require(std::abs((zoomedOrigin.x + 0.5f / zoomedFactor) - 0.5f) < 0.001f
+                && std::abs((zoomedOrigin.y + 0.5f / zoomedFactor) - 0.5f) < 0.001f,
+            "Pointer-centred zoom must keep the same mapping coordinate under the cursor.");
+
+    const auto dragStart = juce::Point<float> { 300.0f, 180.0f };
+    const auto dragEnd = juce::Point<float> { 380.0f, 210.0f };
+    const juce::MouseEvent panMouseDown(mouseSource,
+                                        dragStart,
+                                        juce::ModifierKeys::leftButtonModifier,
+                                        1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                        &zoneMap, &zoneMap,
+                                        eventTime, dragStart, eventTime, 1, false);
+    const juce::MouseEvent panMouseDrag(mouseSource,
+                                        dragEnd,
+                                        juce::ModifierKeys::leftButtonModifier,
+                                        1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                        &zoneMap, &zoneMap,
+                                        eventTime, dragStart, eventTime, 1, true);
+    zoneMap.mouseDown(panMouseDown);
+    zoneMap.mouseDrag(panMouseDrag);
+    zoneMap.mouseUp(panMouseDrag);
+    const auto pannedOrigin = zoneMap.getViewportOrigin();
+    require(pannedOrigin.x < zoomedOrigin.x && pannedOrigin.y < zoomedOrigin.y,
+            "Dragging empty space while zoomed should pan the mapping focus with the pointer.");
+
+    zoneMap.resetViewport();
+    require(std::abs(zoneMap.getZoomFactor() - 1.0f) < 0.001f
+                && zoneMap.getViewportOrigin() == juce::Point<float> {},
+            "Resetting the Zone Map viewport should restore the complete mapping extent.");
+}
 } // namespace
 
 int main()
@@ -2663,6 +2726,7 @@ int main()
     try
     {
         juce::ScopedJuceInitialiser_GUI gui;
+        exerciseZoneMapViewportGestures();
 
         drs::app::authoring::ZoneMapCanvas dropTargetZoneMap;
         std::vector<juce::File> droppedSampleFiles;

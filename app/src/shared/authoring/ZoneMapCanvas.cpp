@@ -23,6 +23,9 @@ const auto zoneMapMarqueeOutline = zoneMapSelected.withAlpha(0.92f);
 constexpr float rangeHandleRadius = 6.0f;
 constexpr float rangeHandleHitRadius = 12.0f;
 constexpr float marqueeDragThreshold = 4.0f;
+constexpr float minimumViewportZoom = 1.0f;
+constexpr float maximumViewportZoom = 8.0f;
+constexpr float viewportZoomSensitivity = 1.5f;
 constexpr int deleteSelectedSampleMenuItemId = 1;
 
 bool isSupportedSampleFile(const juce::String& path)
@@ -139,7 +142,7 @@ void ZoneMapCanvas::filesDropped(const juce::StringArray& files, int, int)
 
 bool ZoneMapCanvas::requestSelectionAt(juce::Point<float> position, SelectionMode mode)
 {
-    if (activeGesture.has_value() || activeMarqueeGesture.has_value())
+    if (activeGesture.has_value() || activeMarqueeGesture.has_value() || activePanGesture.has_value())
         return false;
 
     const auto hitZoneIndex = findZoneIndexAt(position);
@@ -151,7 +154,7 @@ bool ZoneMapCanvas::requestSelectionAt(juce::Point<float> position, SelectionMod
 
 bool ZoneMapCanvas::requestSelectionInBounds(juce::Rectangle<float> bounds, SelectionMode mode)
 {
-    if (activeGesture.has_value())
+    if (activeGesture.has_value() || activePanGesture.has_value())
         return false;
 
     if (bounds.isEmpty())
@@ -162,7 +165,7 @@ bool ZoneMapCanvas::requestSelectionInBounds(juce::Rectangle<float> bounds, Sele
 
 bool ZoneMapCanvas::requestAuditionAt(juce::Point<float> position)
 {
-    if (activeGesture.has_value() || !onZoneAuditionRequested)
+    if (activeGesture.has_value() || activePanGesture.has_value() || !onZoneAuditionRequested)
         return false;
 
     const auto layouts = buildZoneLayouts();
@@ -218,6 +221,74 @@ bool ZoneMapCanvas::moveSelection(int direction)
     return requestSelectionByIndex(static_cast<std::size_t>(nextIndex), SelectionMode::replace);
 }
 
+bool ZoneMapCanvas::requestZoomAt(juce::Point<float> position, float wheelDelta)
+{
+    const auto inner = getInnerBounds();
+    if (!inner.contains(position)
+        || juce::approximatelyEqual(wheelDelta, 0.0f)
+        || activeGesture.has_value()
+        || activeMarqueeGesture.has_value()
+        || activePanGesture.has_value())
+    {
+        return false;
+    }
+
+    const auto nextZoom = juce::jlimit(
+        minimumViewportZoom,
+        maximumViewportZoom,
+        viewportZoom * std::exp(wheelDelta * viewportZoomSensitivity));
+    if (juce::approximatelyEqual(nextZoom, viewportZoom))
+        return false;
+
+    const auto pointerProportion = juce::Point<float> {
+        juce::jlimit(0.0f, 1.0f, (position.x - inner.getX()) / inner.getWidth()),
+        juce::jlimit(0.0f, 1.0f, (position.y - inner.getY()) / inner.getHeight())
+    };
+    const auto contentAtPointer = viewportOrigin + pointerProportion / viewportZoom;
+    viewportZoom = nextZoom;
+    viewportOrigin = clampViewportOrigin(contentAtPointer - pointerProportion / viewportZoom);
+    if (juce::approximatelyEqual(viewportZoom, minimumViewportZoom))
+    {
+        viewportZoom = minimumViewportZoom;
+        viewportOrigin = {};
+    }
+    repaint();
+    return true;
+}
+
+bool ZoneMapCanvas::requestPanBy(juce::Point<float> pixelDelta)
+{
+    if (viewportZoom <= minimumViewportZoom
+        || (juce::approximatelyEqual(pixelDelta.x, 0.0f)
+            && juce::approximatelyEqual(pixelDelta.y, 0.0f)))
+    {
+        return false;
+    }
+
+    const auto inner = getInnerBounds();
+    const auto nextOrigin = clampViewportOrigin(
+        viewportOrigin
+        - juce::Point<float> {
+            pixelDelta.x / (inner.getWidth() * viewportZoom),
+            pixelDelta.y / (inner.getHeight() * viewportZoom)
+        });
+    if (nextOrigin == viewportOrigin)
+        return false;
+
+    viewportOrigin = nextOrigin;
+    repaint();
+    return true;
+}
+
+void ZoneMapCanvas::resetViewport()
+{
+    viewportZoom = minimumViewportZoom;
+    viewportOrigin = {};
+    activePanGesture.reset();
+    setMouseCursor(juce::MouseCursor::NormalCursor);
+    repaint();
+}
+
 void ZoneMapCanvas::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
@@ -231,16 +302,20 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
     const auto inner = getInnerBounds();
     g.setColour(juce::Colour::fromRGBA(24, 29, 33, 24));
 
-    for (int key = 0; key <= 8; ++key)
+    for (int key = 0; key <= 127; key += 12)
     {
-        const auto x = inner.getX() + (inner.getWidth() * static_cast<float>(key) / 8.0f);
-        g.drawVerticalLine(static_cast<int>(x), inner.getY(), inner.getBottom());
+        const auto x = normalizedContentToCanvas(
+            { static_cast<float>(key) / 127.0f, 0.0f }).x;
+        if (x >= inner.getX() && x <= inner.getRight())
+            g.drawVerticalLine(static_cast<int>(x), inner.getY(), inner.getBottom());
     }
 
-    for (int velocity = 0; velocity <= 4; ++velocity)
+    for (int velocity = 1; velocity <= 127; velocity += 16)
     {
-        const auto y = inner.getY() + (inner.getHeight() * static_cast<float>(velocity) / 4.0f);
-        g.drawHorizontalLine(static_cast<int>(y), inner.getX(), inner.getRight());
+        const auto y = normalizedContentToCanvas(
+            { 0.0f, 1.0f - static_cast<float>(velocity) / 127.0f }).y;
+        if (y >= inner.getY() && y <= inner.getBottom())
+            g.drawHorizontalLine(static_cast<int>(y), inner.getX(), inner.getRight());
     }
 
     const auto paintOrder = buildPaintOrder();
@@ -291,9 +366,11 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
 
         if (primarySelected)
         {
-            const auto handleCenters = buildHandleCenters(zoneBounds);
+            const auto handleCenters = buildHandleCenters(computeZoneBounds(getDisplayZoneSummary(zoneIndex)));
             for (const auto& [handle, center] : handleCenters)
             {
+                if (!inner.contains(center))
+                    continue;
                 const auto activeHandle = activeGesture.has_value()
                     && activeGesture->zoneIndex == zoneIndex
                     && activeGesture->handle == handle;
@@ -335,6 +412,18 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
         g.setColour(zoneMapMarqueeOutline);
         g.drawRoundedRectangle(marqueeBounds, 6.0f, 1.5f);
     }
+
+    const auto zoomText = viewportZoom > minimumViewportZoom
+        ? juce::String(std::lround(viewportZoom * 100.0f)) + "%  |  Drag empty space to pan"
+        : juce::String("Ctrl + scroll to zoom");
+    g.setFont(juce::FontOptions(11.0f, juce::Font::bold));
+    const auto zoomTextWidth = std::min(getWidth() - 24,
+                                        viewportZoom > minimumViewportZoom ? 220 : 142);
+    auto zoomBounds = getLocalBounds().reduced(12).removeFromTop(22).removeFromRight(zoomTextWidth);
+    g.setColour(zoneMapLabelFill);
+    g.fillRoundedRectangle(zoomBounds.toFloat(), 6.0f);
+    g.setColour(juce::Colours::white.withAlpha(0.9f));
+    g.drawFittedText(zoomText, zoomBounds.reduced(8, 2), juce::Justification::centredRight, 1);
 }
 
 void ZoneMapCanvas::mouseDown(const juce::MouseEvent& event)
@@ -357,10 +446,19 @@ void ZoneMapCanvas::mouseDown(const juce::MouseEvent& event)
         return;
     }
 
-    if (!beginRangeGestureAt(event.position))
+    if (beginRangeGestureAt(event.position))
+        return;
+
+    if (viewportZoom > minimumViewportZoom
+        && event.mods.isLeftButtonDown()
+        && !findZoneIndexAt(event.position).has_value())
     {
-        activeMarqueeGesture = MarqueeGesture { event.position, event.position, event.mods.isCtrlDown(), false };
+        activePanGesture = PanGesture { event.position, viewportOrigin };
+        setMouseCursor(juce::MouseCursor::DraggingHandCursor);
+        return;
     }
+
+    activeMarqueeGesture = MarqueeGesture { event.position, event.position, event.mods.isCtrlDown(), false };
 }
 
 void ZoneMapCanvas::mouseDoubleClick(const juce::MouseEvent& event)
@@ -398,6 +496,20 @@ void ZoneMapCanvas::mouseDrag(const juce::MouseEvent& event)
         return;
     }
 
+    if (activePanGesture.has_value())
+    {
+        const auto inner = getInnerBounds();
+        const auto pixelDelta = event.position - activePanGesture->start;
+        viewportOrigin = clampViewportOrigin(
+            activePanGesture->initialViewportOrigin
+            - juce::Point<float> {
+                pixelDelta.x / (inner.getWidth() * viewportZoom),
+                pixelDelta.y / (inner.getHeight() * viewportZoom)
+            });
+        repaint();
+        return;
+    }
+
     if (!activeMarqueeGesture.has_value())
         return;
 
@@ -418,6 +530,14 @@ void ZoneMapCanvas::mouseUp(const juce::MouseEvent& event)
         return;
     }
 
+    if (activePanGesture.has_value())
+    {
+        activePanGesture.reset();
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+        repaint();
+        return;
+    }
+
     if (!activeMarqueeGesture.has_value())
         return;
 
@@ -435,6 +555,21 @@ void ZoneMapCanvas::mouseUp(const juce::MouseEvent& event)
 
     requestSelectionAt(event.position,
                        gesture.ctrlDown ? SelectionMode::toggle : SelectionMode::replace);
+}
+
+void ZoneMapCanvas::mouseWheelMove(const juce::MouseEvent& event,
+                                   const juce::MouseWheelDetails& wheel)
+{
+    if (!event.mods.isCtrlDown())
+    {
+        juce::Component::mouseWheelMove(event, wheel);
+        return;
+    }
+
+    const auto wheelDelta = !juce::approximatelyEqual(wheel.deltaY, 0.0f)
+        ? wheel.deltaY
+        : wheel.deltaX;
+    requestZoomAt(event.position, wheelDelta);
 }
 
 bool ZoneMapCanvas::keyPressed(const juce::KeyPress& key)
@@ -472,6 +607,24 @@ juce::Rectangle<float> ZoneMapCanvas::getInnerBounds() const
     return getLocalBounds().toFloat().reduced(12.0f);
 }
 
+juce::Point<float> ZoneMapCanvas::clampViewportOrigin(juce::Point<float> origin) const
+{
+    const auto maximumOrigin = 1.0f - 1.0f / viewportZoom;
+    return {
+        juce::jlimit(0.0f, maximumOrigin, origin.x),
+        juce::jlimit(0.0f, maximumOrigin, origin.y)
+    };
+}
+
+juce::Point<float> ZoneMapCanvas::normalizedContentToCanvas(juce::Point<float> position) const
+{
+    const auto inner = getInnerBounds();
+    return {
+        inner.getX() + (position.x - viewportOrigin.x) * viewportZoom * inner.getWidth(),
+        inner.getY() + (position.y - viewportOrigin.y) * viewportZoom * inner.getHeight()
+    };
+}
+
 drs::engine::AuthoringZoneSummary ZoneMapCanvas::getDisplayZoneSummary(std::size_t index) const
 {
     if (activeGesture.has_value() && activeGesture->zoneIndex == index)
@@ -483,14 +636,17 @@ drs::engine::AuthoringZoneSummary ZoneMapCanvas::getDisplayZoneSummary(std::size
 juce::Rectangle<float> ZoneMapCanvas::computeZoneBounds(const drs::engine::AuthoringZoneSummary& zone) const
 {
     const auto inner = getInnerBounds();
-    const auto x = inner.getX() + inner.getWidth() * (static_cast<float>(zone.keyLow) / 127.0f);
+    const auto topLeft = normalizedContentToCanvas({
+        static_cast<float>(zone.keyLow) / 127.0f,
+        1.0f - static_cast<float>(zone.velocityHigh) / 127.0f
+    });
+    const auto x = topLeft.x;
     const auto width = std::max(10.0f,
-                                inner.getWidth() * (static_cast<float>(zone.keyHigh - zone.keyLow + 1) / 128.0f));
-    const auto normalizedVelocityLow = 1.0f - (static_cast<float>(zone.velocityHigh) / 127.0f);
-    const auto normalizedVelocityHigh = 1.0f - (static_cast<float>(zone.velocityLow) / 127.0f);
-    const auto y = inner.getY() + inner.getHeight() * normalizedVelocityLow;
-    const auto height = std::max(14.0f, inner.getHeight() * (normalizedVelocityHigh - normalizedVelocityLow));
-    return {x, y, width, height};
+                                inner.getWidth() * viewportZoom
+                                    * (static_cast<float>(zone.keyHigh - zone.keyLow + 1) / 128.0f));
+    const auto normalizedVelocityHeight = static_cast<float>(zone.velocityHigh - zone.velocityLow) / 127.0f;
+    const auto height = std::max(14.0f, inner.getHeight() * viewportZoom * normalizedVelocityHeight);
+    return {x, topLeft.y, width, height};
 }
 
 std::vector<ZoneMapCanvas::ZoneLayout> ZoneMapCanvas::buildZoneLayouts() const
@@ -498,8 +654,13 @@ std::vector<ZoneMapCanvas::ZoneLayout> ZoneMapCanvas::buildZoneLayouts() const
     std::vector<ZoneLayout> layouts;
     layouts.reserve(zoneSummaries.size());
 
+    const auto inner = getInnerBounds();
     for (std::size_t index = 0; index < zoneSummaries.size(); ++index)
-        layouts.push_back({index, computeZoneBounds(getDisplayZoneSummary(index))});
+    {
+        const auto visibleBounds = computeZoneBounds(getDisplayZoneSummary(index)).getIntersection(inner);
+        if (!visibleBounds.isEmpty())
+            layouts.push_back({index, visibleBounds});
+    }
 
     return layouts;
 }
@@ -630,9 +791,12 @@ ZoneMapCanvas::RangeHandle ZoneMapCanvas::findRangeHandleAt(juce::Point<float> p
     const auto handleCenters = buildHandleCenters(zoneBounds);
     auto nearestHandle = RangeHandle::none;
     auto nearestDistance = rangeHandleHitRadius;
+    const auto inner = getInnerBounds();
 
     for (const auto& [handle, center] : handleCenters)
     {
+        if (!inner.contains(center))
+            continue;
         const auto distance = center.getDistanceFrom(position);
         if (distance <= nearestDistance)
         {
@@ -676,15 +840,19 @@ drs::engine::AuthoringZoneSummary ZoneMapCanvas::buildRangePreview(const RangeGe
 int ZoneMapCanvas::positionToMidiKey(juce::Point<float> position) const
 {
     const auto inner = getInnerBounds();
-    const auto proportion = juce::jlimit(0.0f, 1.0f, (position.x - inner.getX()) / inner.getWidth());
-    return juce::jlimit(0, 127, static_cast<int>(std::lround(proportion * 127.0f)));
+    const auto viewportProportion = juce::jlimit(
+        0.0f, 1.0f, (position.x - inner.getX()) / inner.getWidth());
+    const auto contentProportion = viewportOrigin.x + viewportProportion / viewportZoom;
+    return juce::jlimit(0, 127, static_cast<int>(std::lround(contentProportion * 127.0f)));
 }
 
 int ZoneMapCanvas::positionToMidiVelocity(juce::Point<float> position) const
 {
     const auto inner = getInnerBounds();
-    const auto proportion = juce::jlimit(0.0f, 1.0f, (position.y - inner.getY()) / inner.getHeight());
-    return juce::jlimit(1, 127, static_cast<int>(std::lround((1.0f - proportion) * 127.0f)));
+    const auto viewportProportion = juce::jlimit(
+        0.0f, 1.0f, (position.y - inner.getY()) / inner.getHeight());
+    const auto contentProportion = viewportOrigin.y + viewportProportion / viewportZoom;
+    return juce::jlimit(1, 127, static_cast<int>(std::lround((1.0f - contentProportion) * 127.0f)));
 }
 
 ZoneMapCanvas::SelectionState ZoneMapCanvas::buildSelectionStateForZoneIndex(std::size_t index,
@@ -804,7 +972,7 @@ ZoneMapCanvas::SelectionState ZoneMapCanvas::buildSelectionStateForBounds(juce::
 
 bool ZoneMapCanvas::requestSelectionByIndex(std::size_t index, SelectionMode mode)
 {
-    if (activeGesture.has_value())
+    if (activeGesture.has_value() || activePanGesture.has_value())
         return false;
 
     if (index >= zoneSummaries.size())

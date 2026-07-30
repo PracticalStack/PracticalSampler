@@ -343,6 +343,8 @@ std::string toRoundRobinModeString(RoundRobinMode mode)
     {
         case RoundRobinMode::sequential:
             return "sequential";
+        case RoundRobinMode::random:
+            return "random";
     }
 
     return "sequential";
@@ -396,9 +398,12 @@ std::optional<RoundRobinDescriptor> readOptionalRoundRobin(const json& object,
     {
         if (*mode == "sequential")
             descriptor.mode = RoundRobinMode::sequential;
+        else if (*mode == "random")
+            descriptor.mode = RoundRobinMode::random;
         else
         {
-            addIssue(result, std::string(context) + " field '" + propertyName + ".mode' must be 'sequential'.");
+            addIssue(result, std::string(context) + " field '" + propertyName
+                                 + ".mode' must be 'sequential' or 'random'.");
             valid = false;
         }
     }
@@ -490,9 +495,6 @@ void validateRoundRobinDescriptor(TResult& result,
     {
         addIssue(result, context + " roundRobin.slotIndex must stay within roundRobin.slotCount.");
     }
-
-    if (roundRobin->mode != RoundRobinMode::sequential)
-        addIssue(result, context + " roundRobin.mode must be sequential for the first-release contract.");
 
     if (requireScalarMirror && roundRobinLength != roundRobin->slotCount)
         addIssue(result, context + " roundRobinLength must mirror roundRobin.slotCount.");

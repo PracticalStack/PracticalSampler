@@ -115,27 +115,112 @@ void runMalformedGroupRoundRobinRepairCoverage()
     project.authoring.selectedZoneId = "pad-a3-low";
 
     AuthoringSession session(project);
-    require(session.addCompatibleZonesToSelectedGroupRoundRobinPool(
-                "Repair malformed selected-group RR pool").applied,
-            "Group-owned RR add-compatible should repair malformed foreign ownership before expanding the pool.");
-
     const auto& repairedProject = session.getProject();
     const auto& repairedAnchor = repairedProject.authoring.zones[requireZoneIndex(repairedProject, "pad-a3-low")];
     const auto& repairedCompatible = repairedProject.authoring.zones[requireZoneIndex(repairedProject, "pad-a3-low-alt")];
     const auto& repairedForeign = repairedProject.authoring.zones[requireZoneIndex(repairedProject, "lead-a4-sustain")];
 
-    require(repairedAnchor.roundRobin.has_value()
-                && repairedCompatible.roundRobin.has_value()
-                && repairedForeign.roundRobin.has_value(),
-            "Sprint 8 RR repair coverage expects all authored RR descriptors to remain explicit.");
-    require(repairedAnchor.roundRobin->poolId == repairedCompatible.roundRobin->poolId
-                && repairedAnchor.roundRobin->slotCount == 2
-                && repairedCompatible.roundRobin->slotCount == 2,
-            "Compatible group members should remain pooled together after malformed RR repair.");
-    require(repairedForeign.roundRobin->poolId != repairedAnchor.roundRobin->poolId
-                && repairedForeign.roundRobin->slotCount == 1
-                && repairedForeign.roundRobin->slotIndex == 1,
-            "Malformed foreign RR ownership should be isolated into its own single-zone pool.");
+    require(!repairedAnchor.roundRobin.has_value()
+                && !repairedCompatible.roundRobin.has_value()
+                && !repairedForeign.roundRobin.has_value(),
+            "Opening malformed partial or cross-group pools must clear Round Robin from every affected group.");
+}
+
+void runAllOrNothingGroupRoundRobinCoverage()
+{
+    using namespace drs::engine;
+
+    const auto loaded = loadPhase2ReferenceProjectManifest();
+    require(loaded.loaded, "Group RR contract coverage requires the Phase 2 reference project.");
+
+    auto project = loaded.project;
+    for (const auto sourceZoneId : { std::string("pad-a3-low"), std::string("pad-a3-high") })
+    {
+        auto alternate = project.authoring.zones[requireZoneIndex(project, sourceZoneId)];
+        alternate.id += "-alt";
+        alternate.displayName += " Alt";
+        alternate.roundRobin.reset();
+        alternate.roundRobinLength = 0;
+        alternate.roundRobinPosition = 0;
+        project.authoring.zones.push_back(std::move(alternate));
+    }
+    project.authoring.selectedGroupId = "pad-core";
+    project.authoring.selectedZoneId = "pad-a3-low";
+
+    AuthoringSession session(project);
+    const auto initialStatus = session.getSelectedGroupRoundRobinStatus();
+    require(initialStatus.eligible && !initialStatus.enabled,
+            "A group whose every mapping has an alternate should be eligible while its toggle remains off.");
+
+    require(session.setSelectedGroupRoundRobinEnabled(
+                true, RoundRobinMode::sequential, "Enable group Round Robin").applied,
+            "An eligible group should enable Round Robin as one transaction.");
+    const auto enabledStatus = session.getSelectedGroupRoundRobinStatus();
+    require(enabledStatus.enabled && enabledStatus.mode == RoundRobinMode::sequential,
+            "Enabling group Round Robin should pool every member in cycle mode.");
+    for (const auto& zone : session.getProject().authoring.zones)
+    {
+        if (zone.groupId == "pad-core")
+            require(zone.roundRobin.has_value(),
+                    "Every member of an enabled Round Robin group must carry a descriptor.");
+    }
+
+    require(session.setSelectedGroupRoundRobinMode(
+                RoundRobinMode::random, "Use random group Round Robin").applied,
+            "An enabled group should switch from cycle to random mode.");
+    require(session.getSelectedGroupRoundRobinStatus().mode == RoundRobinMode::random,
+            "The selected group should report random mode after the mode transaction.");
+
+    auto compatibleImport = session.getProject().authoring.zones[
+        requireZoneIndex(session.getProject(), "pad-a3-low")];
+    compatibleImport.id = "pad-a3-low-imported";
+    compatibleImport.displayName = "Pad Low Imported";
+    compatibleImport.roundRobin.reset();
+    compatibleImport.roundRobinLength = 0;
+    compatibleImport.roundRobinPosition = 0;
+    require(session.appendImportedContent({},
+                                          { compatibleImport },
+                                          {},
+                                          {},
+                                          "Import compatible zone into enabled group",
+                                          false).applied,
+            "Importing into a schema-4 group project should not attempt a legacy Round Robin migration.");
+    require(session.getProject().schemaVersion == 4
+                && session.getProject().authoring.schemaVersion == 3
+                && session.getSelectedGroupRoundRobinStatus().enabled
+                && session.getSelectedGroupRoundRobinStatus().mode == RoundRobinMode::random,
+            "A compatible import should preserve the group schema and rebuild the enabled random pool.");
+
+    require(session.selectZone("pad-a3-low-alt").applied,
+            "Invalidation coverage should select one member of the enabled group.");
+    auto incompatibleZone = *session.getSelectedZone();
+    incompatibleZone.rootKey += 1;
+    require(session.updateSelectedZone(incompatibleZone, "Break group Round Robin eligibility").applied,
+            "Editing an enabled group member should remain an undoable transaction.");
+
+    const auto invalidatedStatus = session.getSelectedGroupRoundRobinStatus();
+    require(!invalidatedStatus.enabled
+                && !invalidatedStatus.eligible
+                && std::find(invalidatedStatus.incompatibleZoneIds.begin(),
+                             invalidatedStatus.incompatibleZoneIds.end(),
+                             "pad-a3-low-alt") != invalidatedStatus.incompatibleZoneIds.end(),
+            "An incompatible member must disable the whole group and identify the offending zone.");
+    for (const auto& zone : session.getProject().authoring.zones)
+    {
+        if (zone.groupId == "pad-core")
+            require(!zone.roundRobin.has_value()
+                        && zone.roundRobinLength == 0
+                        && zone.roundRobinPosition == 0,
+                    "Invalidating one member must remove Round Robin metadata from the whole group.");
+    }
+
+    const auto rejectedEnable = session.setSelectedGroupRoundRobinEnabled(
+        true, RoundRobinMode::random, "Reject invalid group Round Robin");
+    require(!rejectedEnable.applied
+                && !rejectedEnable.issues.empty()
+                && rejectedEnable.issues.front().find("pad-a3-low-alt") != std::string::npos
+                && !session.getSelectedGroupRoundRobinStatus().enabled,
+            "Re-enabling an invalid group must warn about incorrect zones and keep the toggle off.");
 }
 
 drs::engine::RuntimeProjectModel makeLargeHiddenGroupFixture()
@@ -233,6 +318,7 @@ int main()
     {
         runDeletedAnchorRecoveryCoverage();
         runMalformedGroupRoundRobinRepairCoverage();
+        runAllOrNothingGroupRoundRobinCoverage();
         runLargeProjectVisibilityStabilityCoverage();
 
         std::cout << "Sprint 8 Zone Group hardening tests passed." << std::endl;

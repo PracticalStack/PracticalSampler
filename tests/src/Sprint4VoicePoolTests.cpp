@@ -1,6 +1,7 @@
 #include "drs/engine/SamplerRenderModel.h"
 #include "drs/engine/SamplerVoicePool.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdlib>
@@ -224,6 +225,7 @@ struct RoundRobinRouteSpec
     std::string poolId;
     int slotCount = 0;
     int slotIndex = 0;
+    drs::engine::RoundRobinMode mode = drs::engine::RoundRobinMode::sequential;
 };
 
 drs::engine::SamplerRenderModelPtr buildRoundRobinModel(
@@ -263,7 +265,7 @@ drs::engine::SamplerRenderModelPtr buildRoundRobinModel(
             route.poolId,
             route.slotCount,
             route.slotIndex,
-            drs::engine::RoundRobinMode::sequential
+            route.mode
         };
         snapshotZone.roundRobinLength = route.slotCount;
         snapshotZone.roundRobinPosition = route.slotIndex;
@@ -295,7 +297,7 @@ drs::engine::SamplerRenderModelPtr buildRoundRobinModel(
             route.poolId,
             route.slotCount,
             route.slotIndex,
-            drs::engine::RoundRobinMode::sequential
+            route.mode
         };
         preparedZone.roundRobinLength = route.slotCount;
         preparedZone.roundRobinPosition = route.slotIndex;
@@ -636,6 +638,27 @@ void runRoundRobinRoutingMatrix()
     renderResult = renderSingleFrameNoteOn(multiPool, 60, mixedSample);
     requireNear(mixedSample, 5.25f,
                 "Pool B must not phase-lock to pool A when it misses an intervening note.");
+
+    const auto randomModel = buildRoundRobinModel({
+        { "random-1", 60, 60, 1, 127, 1.0f, "rr-random", 4, 1, drs::engine::RoundRobinMode::random },
+        { "random-2", 60, 60, 1, 127, 2.0f, "rr-random", 4, 2, drs::engine::RoundRobinMode::random },
+        { "random-3", 60, 60, 1, 127, 3.0f, "rr-random", 4, 3, drs::engine::RoundRobinMode::random },
+        { "random-4", 60, 60, 1, 127, 4.0f, "rr-random", 4, 4, drs::engine::RoundRobinMode::random }
+    }, 46);
+    drs::engine::SamplerVoicePool randomPool;
+    require(randomPool.prepare(*randomModel, 48000.0),
+            "Random RR pool should prepare.");
+    std::vector<int> randomSlots;
+    for (auto trigger = 0; trigger < 12; ++trigger)
+    {
+        renderResult = renderSingleFrameNoteOn(randomPool, 60, mixedSample);
+        randomSlots.push_back(static_cast<int>(std::lround(mixedSample * 4.0f)));
+    }
+    const std::vector<int> sequentialSlots { 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4 };
+    require(randomSlots != sequentialSlots
+                && std::all_of(randomSlots.begin(), randomSlots.end(),
+                               [](const int slot) { return slot >= 1 && slot <= 4; }),
+            "Random RR mode must select valid slots without following the cycle sequence.");
 }
 
 void runCapacityAndStealMatrix()

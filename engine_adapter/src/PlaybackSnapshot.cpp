@@ -151,6 +151,8 @@ std::string toRoundRobinModeString(RoundRobinMode mode)
     {
         case RoundRobinMode::sequential:
             return "sequential";
+        case RoundRobinMode::random:
+            return "random";
     }
 
     return "sequential";

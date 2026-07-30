@@ -94,12 +94,14 @@ private:
         std::string_view poolId;
         int slotCount = 0;
         bool usesLegacyScalarKey = false;
+        RoundRobinMode mode = RoundRobinMode::sequential;
     };
 
     struct RoundRobinPoolState
     {
         RoundRobinPoolKey key;
         int nextSlotIndex = 1;
+        std::uint64_t randomState = 0;
     };
 
     static constexpr std::size_t roundRobinPoolCapacity = 256;
@@ -123,10 +125,12 @@ private:
     bool peekRoundRobinSlot(std::string_view poolId,
                             int slotCount,
                             bool usesLegacyScalarKey,
+                            RoundRobinMode mode,
                             int& slotIndex) const noexcept;
     bool advanceRoundRobinSlot(std::string_view poolId,
                                int slotCount,
-                               bool usesLegacyScalarKey) noexcept;
+                               bool usesLegacyScalarKey,
+                               RoundRobinMode mode) noexcept;
     std::size_t acquireSlot(bool& stolen,
                             bool& generationStolen,
                             bool& releasingStolen) noexcept;

@@ -203,6 +203,13 @@ int main()
         compatiblePadZone.roundRobinLength = 0;
         compatiblePadZone.roundRobinPosition = 0;
         groupRoundRobinProject.authoring.zones.push_back(compatiblePadZone);
+        auto compatibleHighPadZone = groupRoundRobinProject.authoring.zones[1];
+        compatibleHighPadZone.id = "pad-a3-high-alt";
+        compatibleHighPadZone.displayName = "Pad High Alt";
+        compatibleHighPadZone.roundRobin.reset();
+        compatibleHighPadZone.roundRobinLength = 0;
+        compatibleHighPadZone.roundRobinPosition = 0;
+        groupRoundRobinProject.authoring.zones.push_back(compatibleHighPadZone);
         AuthoringSession groupRoundRobinSession(groupRoundRobinProject);
         require(groupRoundRobinSession.selectGroup("pad-core").applied,
                 "Group Round Robin coverage requires selecting the pad group.");
@@ -220,21 +227,35 @@ int main()
                                                      {
                                                          return zone.id == "pad-a3-low-alt";
                                                      });
-        const auto incompatibleIterator = std::find_if(groupedZones.begin(), groupedZones.end(),
-                                                       [](const auto& zone)
-                                                       {
-                                                           return zone.id == "pad-a3-high";
-                                                       });
+        const auto highIterator = std::find_if(groupedZones.begin(), groupedZones.end(),
+                                               [](const auto& zone)
+                                               {
+                                                   return zone.id == "pad-a3-high";
+                                               });
+        const auto compatibleHighIterator = std::find_if(groupedZones.begin(), groupedZones.end(),
+                                                         [](const auto& zone)
+                                                         {
+                                                             return zone.id == "pad-a3-high-alt";
+                                                         });
         require(anchorIterator != groupedZones.end()
                     && compatibleIterator != groupedZones.end()
+                    && highIterator != groupedZones.end()
+                    && compatibleHighIterator != groupedZones.end()
                     && anchorIterator->roundRobin.has_value()
                     && compatibleIterator->roundRobin.has_value()
                     && anchorIterator->roundRobin->poolId == compatibleIterator->roundRobin->poolId
-                    && !incompatibleIterator->roundRobin.has_value(),
-                "Group-owned Round Robin grouping must only include exact-match compatible zones and leave incompatible siblings unpooled.");
+                    && highIterator->roundRobin.has_value()
+                    && compatibleHighIterator->roundRobin.has_value()
+                    && highIterator->roundRobin->poolId == compatibleHighIterator->roundRobin->poolId
+                    && highIterator->roundRobin->poolId != anchorIterator->roundRobin->poolId,
+                "Group-owned Round Robin must include every zone while keeping distinct mappings in separate pools.");
         require(groupRoundRobinSession.normalizeSelectedGroupRoundRobinPool(
                     "Normalize selected-group Round Robin").applied,
                 "Group-owned Round Robin pools should support normalization from the group surface.");
+        require(groupRoundRobinSession.setSelectedGroupRoundRobinMode(
+                    RoundRobinMode::random,
+                    "Use random selected-group Round Robin").applied,
+                "Group-owned Round Robin should support switching from cycle to random mode.");
 
         const auto roundRobinPath = fs::temp_directory_path() / "drs-phase2-zone-group-round-robin.drsproj";
         const auto roundRobinText = serializeRuntimeProjectManifest(groupRoundRobinSession.getProject(),
@@ -262,8 +283,10 @@ int main()
                     && loadedCompatible != roundRobinLoad.project.authoring.zones.end()
                     && loadedAnchor->roundRobin.has_value()
                     && loadedCompatible->roundRobin.has_value()
-                    && loadedAnchor->roundRobin->poolId == loadedCompatible->roundRobin->poolId,
-                "Group-owned Round Robin save/load coverage should preserve pooled compatible zones.");
+                    && loadedAnchor->roundRobin->poolId == loadedCompatible->roundRobin->poolId
+                    && loadedAnchor->roundRobin->mode == RoundRobinMode::random
+                    && loadedCompatible->roundRobin->mode == RoundRobinMode::random,
+                "Group-owned Round Robin save/load coverage should preserve pooled zones and random mode.");
 
         const auto tempPath = fs::temp_directory_path() / "drs-phase2-zone-group-transactions.drsproj";
         const auto roundTripText = serializeRuntimeProjectManifest(reassignSession.getProject(),

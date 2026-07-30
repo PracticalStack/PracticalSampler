@@ -17,7 +17,8 @@ enum class ZoneTriggerMode : std::uint8_t
 
 enum class RoundRobinMode : std::uint8_t
 {
-    sequential
+    sequential,
+    random
 };
 
 struct RoundRobinDescriptor

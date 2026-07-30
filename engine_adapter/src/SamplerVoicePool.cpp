@@ -52,15 +52,25 @@ bool usesLegacyRoundRobinKey(const SamplerRenderRoute& route) noexcept
     return routeUsesRoundRobin(route) && resolveRoundRobinPoolId(route).empty();
 }
 
+RoundRobinMode resolveRoundRobinMode(const SamplerRenderRoute& route) noexcept
+{
+    return hasExplicitRoundRobin(route)
+        ? route.roundRobin->mode
+        : RoundRobinMode::sequential;
+}
+
 bool sameRoundRobinPool(std::string_view leftPoolId,
                         int leftSlotCount,
                         bool leftUsesLegacyScalarKey,
+                        RoundRobinMode leftMode,
                         std::string_view rightPoolId,
                         int rightSlotCount,
-                        bool rightUsesLegacyScalarKey) noexcept
+                        bool rightUsesLegacyScalarKey,
+                        RoundRobinMode rightMode) noexcept
 {
     return leftSlotCount == rightSlotCount
         && leftUsesLegacyScalarKey == rightUsesLegacyScalarKey
+        && leftMode == rightMode
         && (leftUsesLegacyScalarKey || leftPoolId == rightPoolId);
 }
 
@@ -90,11 +100,31 @@ int advanceRoundRobinSlotIndex(int currentSlotIndex, int slotCount) noexcept
     return currentSlotIndex;
 }
 
+std::uint64_t computeFnv1a64(std::string_view text) noexcept
+{
+    std::uint64_t hash = 14695981039346656037ull;
+    for (const auto character : text)
+    {
+        hash ^= static_cast<unsigned char>(character);
+        hash *= 1099511628211ull;
+    }
+    return hash;
+}
+
+std::uint64_t advanceRandomState(std::uint64_t state) noexcept
+{
+    state += 0x9e3779b97f4a7c15ull;
+    state = (state ^ (state >> 30u)) * 0xbf58476d1ce4e5b9ull;
+    state = (state ^ (state >> 27u)) * 0x94d049bb133111ebull;
+    return state ^ (state >> 31u);
+}
+
 struct SelectedRoundRobinSlot
 {
     std::string_view poolId;
     int slotCount = 0;
     bool usesLegacyScalarKey = false;
+    RoundRobinMode mode = RoundRobinMode::sequential;
     int slotIndex = 0;
 };
 
@@ -139,9 +169,11 @@ bool routeMatches(const SamplerRenderRoute& route,
         if (sameRoundRobinPool(roundRobinSelections[index].poolId,
                                roundRobinSelections[index].slotCount,
                                roundRobinSelections[index].usesLegacyScalarKey,
+                               roundRobinSelections[index].mode,
                                poolId,
                                slotCount,
-                               usesLegacyScalarKey))
+                               usesLegacyScalarKey,
+                               resolveRoundRobinMode(route)))
         {
             return resolveRoundRobinSlotIndex(route) == roundRobinSelections[index].slotIndex;
         }
@@ -470,6 +502,7 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 const auto slotCount = resolveRoundRobinSlotCount(route);
                 const auto poolId = resolveRoundRobinPoolId(route);
                 const auto usesLegacyScalarKey = usesLegacyRoundRobinKey(route);
+                const auto mode = resolveRoundRobinMode(route);
                 if (roundRobinSelectionCount >= roundRobinSelections.size())
                 {
                     ++result.render.roundRobinFallbackCount;
@@ -482,9 +515,11 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                     if (sameRoundRobinPool(roundRobinSelections[index].poolId,
                                            roundRobinSelections[index].slotCount,
                                            roundRobinSelections[index].usesLegacyScalarKey,
+                                           roundRobinSelections[index].mode,
                                            poolId,
                                            slotCount,
-                                           usesLegacyScalarKey))
+                                           usesLegacyScalarKey,
+                                           mode))
                     {
                         alreadySelected = true;
                         break;
@@ -498,10 +533,12 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 const auto foundPool = peekRoundRobinSlot(poolId,
                                                           slotCount,
                                                           usesLegacyScalarKey,
+                                                          mode,
                                                           slotIndex);
                 roundRobinSelections[roundRobinSelectionCount].poolId = poolId;
                 roundRobinSelections[roundRobinSelectionCount].slotCount = slotCount;
                 roundRobinSelections[roundRobinSelectionCount].usesLegacyScalarKey = usesLegacyScalarKey;
+                roundRobinSelections[roundRobinSelectionCount].mode = mode;
                 roundRobinSelections[roundRobinSelectionCount].slotIndex = slotIndex;
                 if (foundPool)
                 {
@@ -549,7 +586,8 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
             {
                 if (!advanceRoundRobinSlot(roundRobinSelections[index].poolId,
                                            roundRobinSelections[index].slotCount,
-                                           roundRobinSelections[index].usesLegacyScalarKey))
+                                           roundRobinSelections[index].usesLegacyScalarKey,
+                                           roundRobinSelections[index].mode))
                 {
                     ++result.render.roundRobinPoolMissCount;
                     ++result.render.roundRobinFallbackCount;
@@ -825,15 +863,18 @@ void SamplerVoicePool::rebuildRoundRobinPools(const SamplerRenderModel& model) n
         const auto poolId = resolveRoundRobinPoolId(route);
         const auto slotCount = resolveRoundRobinSlotCount(route);
         const auto usesLegacyScalarKey = usesLegacyRoundRobinKey(route);
+        const auto mode = resolveRoundRobinMode(route);
         auto knownPool = false;
         for (std::size_t index = 0; index < roundRobinPoolCount; ++index)
         {
             if (sameRoundRobinPool(roundRobinPools[index].key.poolId,
                                    roundRobinPools[index].key.slotCount,
                                    roundRobinPools[index].key.usesLegacyScalarKey,
+                                   roundRobinPools[index].key.mode,
                                    poolId,
                                    slotCount,
-                                   usesLegacyScalarKey))
+                                   usesLegacyScalarKey,
+                                   mode))
             {
                 knownPool = true;
                 break;
@@ -846,7 +887,21 @@ void SamplerVoicePool::rebuildRoundRobinPools(const SamplerRenderModel& model) n
         roundRobinPools[roundRobinPoolCount].key.poolId = poolId;
         roundRobinPools[roundRobinPoolCount].key.slotCount = slotCount;
         roundRobinPools[roundRobinPoolCount].key.usesLegacyScalarKey = usesLegacyScalarKey;
-        roundRobinPools[roundRobinPoolCount].nextSlotIndex = 1;
+        roundRobinPools[roundRobinPoolCount].key.mode = mode;
+        roundRobinPools[roundRobinPoolCount].randomState =
+            computeFnv1a64(poolId) ^ static_cast<std::uint64_t>(slotCount);
+        if (mode == RoundRobinMode::random)
+        {
+            roundRobinPools[roundRobinPoolCount].randomState =
+                advanceRandomState(roundRobinPools[roundRobinPoolCount].randomState);
+            roundRobinPools[roundRobinPoolCount].nextSlotIndex =
+                static_cast<int>(roundRobinPools[roundRobinPoolCount].randomState
+                                 % static_cast<std::uint64_t>(slotCount)) + 1;
+        }
+        else
+        {
+            roundRobinPools[roundRobinPoolCount].nextSlotIndex = 1;
+        }
         ++roundRobinPoolCount;
     }
 }
@@ -854,6 +909,7 @@ void SamplerVoicePool::rebuildRoundRobinPools(const SamplerRenderModel& model) n
 bool SamplerVoicePool::peekRoundRobinSlot(std::string_view poolId,
                                           int slotCount,
                                           bool usesLegacyScalarKey,
+                                          RoundRobinMode mode,
                                           int& slotIndex) const noexcept
 {
     if (slotCount <= 0)
@@ -867,9 +923,11 @@ bool SamplerVoicePool::peekRoundRobinSlot(std::string_view poolId,
         if (sameRoundRobinPool(roundRobinPools[index].key.poolId,
                                roundRobinPools[index].key.slotCount,
                                roundRobinPools[index].key.usesLegacyScalarKey,
+                               roundRobinPools[index].key.mode,
                                poolId,
                                slotCount,
-                               usesLegacyScalarKey))
+                               usesLegacyScalarKey,
+                               mode))
         {
             slotIndex = roundRobinPools[index].nextSlotIndex;
             return true;
@@ -882,7 +940,8 @@ bool SamplerVoicePool::peekRoundRobinSlot(std::string_view poolId,
 
 bool SamplerVoicePool::advanceRoundRobinSlot(std::string_view poolId,
                                              int slotCount,
-                                             bool usesLegacyScalarKey) noexcept
+                                             bool usesLegacyScalarKey,
+                                             RoundRobinMode mode) noexcept
 {
     if (slotCount <= 0)
         return false;
@@ -892,13 +951,25 @@ bool SamplerVoicePool::advanceRoundRobinSlot(std::string_view poolId,
         if (!sameRoundRobinPool(roundRobinPools[index].key.poolId,
                                 roundRobinPools[index].key.slotCount,
                                 roundRobinPools[index].key.usesLegacyScalarKey,
+                                roundRobinPools[index].key.mode,
                                 poolId,
                                 slotCount,
-                                usesLegacyScalarKey))
+                                usesLegacyScalarKey,
+                                mode))
             continue;
 
-        roundRobinPools[index].nextSlotIndex =
-            advanceRoundRobinSlotIndex(roundRobinPools[index].nextSlotIndex, slotCount);
+        if (mode == RoundRobinMode::random)
+        {
+            roundRobinPools[index].randomState = advanceRandomState(roundRobinPools[index].randomState);
+            roundRobinPools[index].nextSlotIndex =
+                static_cast<int>(roundRobinPools[index].randomState
+                                 % static_cast<std::uint64_t>(slotCount)) + 1;
+        }
+        else
+        {
+            roundRobinPools[index].nextSlotIndex =
+                advanceRoundRobinSlotIndex(roundRobinPools[index].nextSlotIndex, slotCount);
+        }
         return true;
     }
 

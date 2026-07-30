@@ -1,0 +1,1050 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Curated DSP Development Plan — Decent Rhapsody Studio</title>
+  <style>
+    :root {
+      --bg: #0b1015;
+      --panel: #121a22;
+      --panel-2: #17222d;
+      --panel-3: #0e161e;
+      --line: #2a3947;
+      --line-2: #3d5263;
+      --text: #e7edf2;
+      --muted: #a6b3bd;
+      --quiet: #788997;
+      --teal: #6fd3c2;
+      --teal-soft: rgba(111, 211, 194, .10);
+      --gold: #e7b96b;
+      --gold-soft: rgba(231, 185, 107, .10);
+      --green: #75d38c;
+      --red: #ee7b77;
+      --blue: #7eb9ee;
+      --purple: #c59af2;
+      --code: #0a1118;
+      --shadow: 0 18px 48px rgba(0, 0, 0, .24);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 9% -5%, rgba(111, 211, 194, .13), transparent 34rem),
+        radial-gradient(circle at 92% 3%, rgba(231, 185, 107, .10), transparent 31rem),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.56;
+    }
+
+    a { color: var(--teal); text-decoration-color: rgba(111, 211, 194, .45); }
+    a:hover { text-decoration-color: currentColor; }
+    code {
+      padding: .12em .38em;
+      border: 1px solid rgba(61, 82, 99, .56);
+      border-radius: 5px;
+      background: var(--code);
+      color: #cae7e2;
+      font: .87em "Cascadia Code", Consolas, monospace;
+    }
+
+    .shell {
+      width: min(1320px, calc(100% - 34px));
+      margin: 0 auto;
+      padding: 50px 0 84px;
+    }
+
+    header {
+      padding: 22px 0 38px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .eyebrow {
+      color: var(--teal);
+      font-size: .76rem;
+      font-weight: 800;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 1050px;
+      margin: 12px 0 16px;
+      font-size: clamp(2.35rem, 6vw, 5rem);
+      line-height: .99;
+      letter-spacing: -.05em;
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: clamp(1.4rem, 2.5vw, 1.9rem);
+      line-height: 1.16;
+      letter-spacing: -.025em;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 1.02rem;
+      line-height: 1.3;
+    }
+
+    p { margin: 0; }
+    p + p { margin-top: 12px; }
+    ul, ol { margin: 12px 0 0; padding-left: 20px; }
+    li + li { margin-top: 7px; }
+
+    .lede {
+      max-width: 940px;
+      color: var(--muted);
+      font-size: clamp(1rem, 1.5vw, 1.15rem);
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      align-items: center;
+      margin-top: 24px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(18, 26, 34, .72);
+      color: var(--muted);
+      font-size: .79rem;
+      text-decoration: none;
+    }
+
+    .pill.primary {
+      color: var(--green);
+      border-color: rgba(117, 211, 140, .38);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 254px minmax(0, 1fr);
+      gap: 28px;
+      align-items: start;
+      margin-top: 28px;
+    }
+
+    nav {
+      position: sticky;
+      top: 18px;
+      max-height: calc(100vh - 36px);
+      overflow-y: auto;
+      padding: 17px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: rgba(14, 22, 30, .93);
+      box-shadow: var(--shadow);
+    }
+
+    nav strong {
+      display: block;
+      margin: 10px 0 7px;
+      color: var(--quiet);
+      font-size: .68rem;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    nav strong:first-child { margin-top: 0; }
+    nav a {
+      display: block;
+      padding: 4px 0;
+      color: var(--muted);
+      font-size: .79rem;
+      text-decoration: none;
+    }
+    nav a:hover { color: var(--text); }
+
+    article { min-width: 0; }
+    section { scroll-margin-top: 18px; margin-bottom: 26px; }
+
+    .card,
+    .hero-card,
+    .sprint {
+      padding: 23px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: linear-gradient(145deg, rgba(23, 34, 45, .96), rgba(18, 26, 34, .94));
+      box-shadow: var(--shadow);
+    }
+
+    .hero-card {
+      border-color: rgba(111, 211, 194, .42);
+      background: linear-gradient(145deg, rgba(111, 211, 194, .10), rgba(18, 26, 34, .95) 44%);
+    }
+
+    .hero-card .label,
+    .sprint .sprint-label {
+      margin-bottom: 9px;
+      color: var(--teal);
+      font-size: .71rem;
+      font-weight: 820;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+
+    .hero-card .answer {
+      max-width: 940px;
+      font-size: 1.14rem;
+      line-height: 1.5;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .span-3 { grid-column: span 3; }
+    .span-4 { grid-column: span 4; }
+    .span-5 { grid-column: span 5; }
+    .span-6 { grid-column: span 6; }
+    .span-7 { grid-column: span 7; }
+    .span-8 { grid-column: span 8; }
+    .span-9 { grid-column: span 9; }
+    .span-12 { grid-column: 1 / -1; }
+
+    .card p,
+    .card li,
+    .sprint p,
+    .sprint li,
+    td { color: var(--muted); }
+
+    .callout {
+      margin-top: 14px;
+      padding: 14px 16px;
+      border-left: 3px solid var(--gold);
+      background: var(--gold-soft);
+      color: var(--muted);
+    }
+    .callout.good {
+      border-left-color: var(--teal);
+      background: var(--teal-soft);
+    }
+
+    table {
+      width: 100%;
+      margin-top: 14px;
+      border-collapse: collapse;
+      font-size: .84rem;
+    }
+    th, td {
+      padding: 10px 11px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      color: var(--text);
+      background: rgba(10, 17, 24, .50);
+      font-size: .69rem;
+      letter-spacing: .075em;
+      text-transform: uppercase;
+    }
+    tbody tr:last-child td { border-bottom: 0; }
+
+    .roadmap {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .phase {
+      min-height: 126px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel-3);
+    }
+    .phase strong { display: block; font-size: .83rem; }
+    .phase span { display: block; margin-top: 6px; color: var(--muted); font-size: .76rem; }
+    .phase .range { color: var(--gold); font-size: .67rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+
+    .gate-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .gate {
+      padding: 15px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel-3);
+    }
+    .gate b { color: var(--green); }
+    .gate p { margin-top: 6px; color: var(--muted); font-size: .82rem; }
+
+    .sprint {
+      padding-top: 20px;
+      border-top: 3px solid var(--teal);
+    }
+    .sprint.wave-1 { border-top-color: var(--blue); }
+    .sprint.wave-2 { border-top-color: var(--purple); }
+    .sprint.release { border-top-color: var(--green); }
+
+    .sprint-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: start;
+      margin-bottom: 13px;
+    }
+    .sprint h2 { margin-bottom: 6px; }
+    .sprint-goal { color: var(--muted); }
+    .duration {
+      padding: 6px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--quiet);
+      font-size: .73rem;
+      white-space: nowrap;
+    }
+
+    .task-id {
+      color: var(--gold);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: .78rem;
+      white-space: nowrap;
+    }
+
+    .exit {
+      margin-top: 15px;
+      padding: 13px 15px;
+      border: 1px solid rgba(117, 211, 140, .28);
+      border-radius: 9px;
+      background: rgba(117, 211, 140, .07);
+      color: var(--muted);
+    }
+    .exit strong { color: var(--green); }
+
+    .blocked {
+      color: var(--red);
+      font-weight: 720;
+    }
+    .ready {
+      color: var(--green);
+      font-weight: 720;
+    }
+    .defer {
+      color: var(--gold);
+      font-weight: 720;
+    }
+
+    .file-list {
+      margin-top: 12px;
+      padding: 0;
+      list-style: none;
+    }
+    .file-list li {
+      padding: 8px 0;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: .82rem;
+    }
+    .file-list li:last-child { border-bottom: 0; }
+    .file-list code { color: var(--blue); }
+
+    .checklist {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 9px 18px;
+      margin-top: 14px;
+    }
+    .check {
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: rgba(10, 17, 24, .46);
+      color: var(--muted);
+      font-size: .84rem;
+    }
+    .check::before {
+      content: "✓";
+      margin-right: 8px;
+      color: var(--green);
+      font-weight: 900;
+    }
+
+    footer {
+      margin-top: 36px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      color: var(--quiet);
+      font-size: .8rem;
+    }
+
+    @media (max-width: 1080px) {
+      .layout { grid-template-columns: 1fr; }
+      nav { position: static; max-height: none; }
+      nav a { display: inline-block; margin-right: 12px; }
+      .roadmap { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .span-3, .span-4, .span-5, .span-6, .span-7, .span-8, .span-9 { grid-column: 1 / -1; }
+    }
+
+    @media (max-width: 720px) {
+      .shell { width: min(100% - 22px, 1320px); padding-top: 28px; }
+      .card, .hero-card, .sprint { padding: 18px; }
+      .roadmap, .gate-grid, .checklist { grid-template-columns: 1fr; }
+      .sprint-head { grid-template-columns: 1fr; }
+      table { display: block; overflow-x: auto; }
+    }
+
+    @media print {
+      :root { color-scheme: light; }
+      body { background: #fff; color: #111; }
+      .shell { width: 100%; padding: 0; }
+      nav { display: none; }
+      .layout { display: block; }
+      .card, .hero-card, .sprint, .phase, .gate {
+        box-shadow: none;
+        background: #fff;
+        color: #111;
+        break-inside: avoid;
+      }
+      .card p, .card li, .sprint p, .sprint li, td, .lede, .phase span, .gate p { color: #333; }
+      code { color: #111; background: #f2f2f2; }
+    }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <div class="eyebrow">Engineering roadmap · design-to-delivery</div>
+    <h1>Curated DSP implementation plan</h1>
+    <p class="lede">An 18-sprint development sequence that grows the existing FX metadata into a compiled, real-time-safe zone → group → instrument processing system, then delivers gain, saturation, stereo delay, algorithmic reverb, compact EQ/filter, and chorus.</p>
+    <div class="meta">
+      <span class="pill">Decent Rhapsody Studio</span>
+      <span class="pill">30 July 2026</span>
+      <span class="pill primary">Development plan</span>
+      <a class="pill" href="curated-dsp-system-design.html">← Architecture design</a>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav aria-label="Document sections">
+      <strong>Plan</strong>
+      <a href="#summary">Summary</a>
+      <a href="#principles">Constraints</a>
+      <a href="#roadmap">Roadmap</a>
+      <a href="#gates">Release gates</a>
+      <a href="#ownership">File ownership</a>
+      <strong>Sprints</strong>
+      <a href="#s0">S0 · Contract freeze</a>
+      <a href="#s1">S1 · Schema &amp; catalog</a>
+      <a href="#s2">S2 · Authoring transactions</a>
+      <a href="#s3">S3 · Snapshot &amp; digest</a>
+      <a href="#s4">S4 · Graph compiler</a>
+      <a href="#s5">S5 · Generation lifecycle</a>
+      <a href="#s6">S6 · Identity &amp; gain</a>
+      <a href="#s7">S7 · Scoped routing</a>
+      <a href="#s8">S8 · Parameter control</a>
+      <a href="#s9">S9 · Macro publish</a>
+      <a href="#s10">S10 · Saturator</a>
+      <a href="#s11">S11 · Stereo delay</a>
+      <a href="#s12">S12 · Reverb &amp; tails</a>
+      <a href="#s13">S13 · Creator UX</a>
+      <a href="#s14">S14 · Recall &amp; migration</a>
+      <a href="#s15">S15 · Hardening &amp; release</a>
+      <a href="#s16">S16 · Compact EQ/filter</a>
+      <a href="#s17">S17 · Chorus/ensemble</a>
+      <strong>Control</strong>
+      <a href="#tests">Test matrix</a>
+      <a href="#risks">Risks</a>
+      <a href="#done">Definition of done</a>
+    </nav>
+
+    <article>
+      <section id="summary" class="hero-card">
+        <div class="label">Execution recommendation</div>
+        <p class="answer"><strong>Ship the infrastructure before the expensive effects.</strong> The first eight sprints establish schema, validation, graph compilation, activation ownership, dry-path parity, scoped routing, and a smoothed control plane. Only then add saturation, delay, and reverb. This prevents each effect from inventing its own lifecycle, routing, parameter, and recall behavior.</p>
+        <div class="callout good"><strong>Cadence assumption:</strong> each item is a focused mini-sprint, usually about one engineering week for one primary developer plus review. Sprints may be combined when capacity allows, but their exit gates should remain separate. S0–S15 form the Wave 1 release path; S16–S17 are Wave 2 catalog expansion.</div>
+      </section>
+
+      <section id="principles" class="grid">
+        <div class="card span-12">
+          <h2>Non-negotiable engineering constraints</h2>
+          <div class="checklist">
+            <div class="check">No allocation, locks, file access, JSON, string construction, or object destruction in the audio callback.</div>
+            <div class="check">No-DSP projects retain the current direct fast path and dry output.</div>
+            <div class="check">One serial insert chain per zone, group, or instrument owner.</div>
+            <div class="check">Preview and Performance never share mutable DSP state.</div>
+            <div class="check">DSP topology is immutable per activation generation.</div>
+            <div class="check">Parameter values may change without rebuilding topology.</div>
+            <div class="check">Legacy schema-4 FX metadata remains audibly inert until reviewed and enabled.</div>
+            <div class="check">Only fixed published macros become DAW-visible parameters.</div>
+            <div class="check">Unknown effect types/versions are preserved, reported, and bypassed.</div>
+            <div class="check">Every effect has a versioned algorithm, bounded memory, bounded tail, and deterministic reset.</div>
+          </div>
+        </div>
+
+        <div class="card span-6">
+          <h3>Wave 1 scope</h3>
+          <ul>
+            <li>Zone, group, and instrument inserts</li>
+            <li>Gain/trim, saturator, stereo delay, algorithmic reverb</li>
+            <li>Live creator parameters and macro automation</li>
+            <li>Save/reload, host recall, undo/redo, publish, preview</li>
+            <li>Mono/stereo output and common sample-rate/block-size matrix</li>
+          </ul>
+        </div>
+        <div class="card span-6">
+          <h3>Explicitly deferred</h3>
+          <ul>
+            <li>Aux sends, sidechains, feedback routing, or bus-to-bus graphs</li>
+            <li>Third-party VST/AU hosting</li>
+            <li>Convolution reverb and impulse-response asset management</li>
+            <li>Oversampling and host latency compensation</li>
+            <li>Dynamic publication of every effect parameter to the host</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="roadmap" class="card">
+        <h2>Roadmap at a glance</h2>
+        <div class="roadmap">
+          <div class="phase"><span class="range">S0–S3</span><strong>Contract &amp; persistence</strong><span>Freeze the authored model, catalog, migration, snapshot, and graph identity.</span></div>
+          <div class="phase"><span class="range">S4–S7</span><strong>Render foundation</strong><span>Compile the graph, own generations, prove dry parity, and activate all three scopes.</span></div>
+          <div class="phase"><span class="range">S8–S9</span><strong>Control &amp; publish</strong><span>Smoothed values, click-free bypass, macros, automation, and publish conformance.</span></div>
+          <div class="phase"><span class="range">S10–S12</span><strong>Wave 1 DSP</strong><span>Saturation, tempo-aware stereo delay, algorithmic reverb, and bounded tails.</span></div>
+          <div class="phase"><span class="range">S13–S15</span><strong>Product release</strong><span>Creator UX, migration/recall, performance hardening, and staged activation.</span></div>
+          <div class="phase"><span class="range">S16–S17</span><strong>Wave 2 catalog</strong><span>Compact EQ/filter and chorus/ensemble on the proven infrastructure.</span></div>
+        </div>
+        <div class="callout"><strong>Critical path:</strong> S0 → S1 → S3 → S4 → S5 → S6 → S7 → S8 → S9 → S11 → S12 → S13 → S14 → S15. S2 can overlap late S1/S3 work; algorithm characterization for S10–S12 can begin after S0, but integration must wait for the shared graph and control contracts.</div>
+      </section>
+
+      <section id="gates" class="card">
+        <h2>Milestone gates</h2>
+        <div class="gate-grid">
+          <div class="gate"><b>G0 · Contract ready</b><p>After S0: ADR, budgets, red tests, compatibility recordings, and schema decisions are reviewed.</p></div>
+          <div class="gate"><b>G1 · Data ready</b><p>After S3: projects, snapshots, prepared identity, digests, and migrations are deterministic.</p></div>
+          <div class="gate"><b>G2 · Renderer ready</b><p>After S7: no-DSP output is unchanged and zone/group/instrument gain works through one graph.</p></div>
+          <div class="gate"><b>G3 · Automation ready</b><p>After S9: live values, bypass, macros, host automation, preview, and publish share one target system.</p></div>
+          <div class="gate"><b>G4 · Wave 1 sound ready</b><p>After S12: saturation, delay, reverb, reset, tails, transport, and pressure retirement are bounded.</p></div>
+          <div class="gate"><b>G5 · Product ready</b><p>After S15: UX, recall, migration, CPU/memory, offline baselines, and host validation pass.</p></div>
+        </div>
+      </section>
+
+      <section id="ownership" class="grid">
+        <div class="card span-7">
+          <h2>Expected existing-file responsibilities</h2>
+          <ul class="file-list">
+            <li><code>RuntimeModel.h</code> — authored slot parameters, algorithm versions, and bus ownership fields.</li>
+            <li><code>RuntimeLoader.cpp</code> — schema 5 / authoring 4 serialization, validation, and schema-4 migration.</li>
+            <li><code>AuthoringSession.*</code> — undoable slot/chain/parameter transactions and stable changed paths.</li>
+            <li><code>PlaybackSnapshot.*</code> — full immutable DSP capture and authored graph digest input.</li>
+            <li><code>PreparedPlayback.*</code> — prepared graph plan, cost/memory findings, and DSP conformance digest.</li>
+            <li><code>SamplerRenderModel.*</code> — route destination indices and immutable graph plan reference.</li>
+            <li><code>SamplerVoicePool.*</code> — accumulate voices into precompiled graph destinations.</li>
+            <li><code>SamplerPlaybackContext.*</code> — mutable generation state, execution, tails, and retirement.</li>
+            <li><code>PublishedMacroBinding.*</code> — structured DSP parameter targets and bounded callback bindings.</li>
+            <li><code>PluginProcessor.*</code> — sanitized transport view and shell-to-core parameter handoff.</li>
+            <li><code>AuthoringPanel.*</code> — scope-aware chain editor and curated parameter panels.</li>
+            <li><code>HostSessionState.*</code> — structural budgets and complete authored DSP recall.</li>
+          </ul>
+        </div>
+        <div class="card span-5">
+          <h2>Proposed new modules</h2>
+          <p>Names are provisional; ownership is the important part.</p>
+          <ul class="file-list">
+            <li><code>CuratedDspCatalog.*</code> — type/parameter/version/cost descriptors.</li>
+            <li><code>DspGraphPlan.*</code> — normalized nodes, routes, scratch plan, and compiler findings.</li>
+            <li><code>DspRenderGeneration.*</code> — exclusive mutable state and processing lifecycle.</li>
+            <li><code>DspParameterControl.*</code> — bounded updates, target resolution, and smoothing metadata.</li>
+            <li><code>DspGain.*</code>, <code>DspSaturator.*</code>, <code>DspStereoDelay.*</code>, <code>DspAlgorithmicReverb.*</code> — versioned kernels.</li>
+            <li><code>DspCompactEq.*</code>, <code>DspChorus.*</code> — Wave 2 kernels.</li>
+            <li><code>CuratedDspChainEditor.*</code> — reusable zone/group/instrument creator surface.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="s0" class="sprint">
+        <div class="sprint-head">
+          <div>
+            <div class="sprint-label">Sprint 0 · Gate G0</div>
+            <h2>Contract freeze and baseline characterization</h2>
+            <p class="sprint-goal">Remove architectural ambiguity and capture the exact pre-DSP behavior before changing schemas or audio routing.</p>
+          </div>
+          <span class="duration">1 mini-sprint</span>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Concrete artifact</th><th>Verification</th></tr></thead>
+          <tbody>
+            <tr><td class="task-id">DSP-00-01</td><td>Write the authoritative DSP ADR: scope order, one-chain ownership, bypass, reset, tail, latency, transport, macro, and legacy-inert rules.</td><td><code>docs/curated-dsp-contract.md</code></td><td>Architecture review resolves every item in “Decisions to freeze” from the design document.</td></tr>
+            <tr><td class="task-id">DSP-00-02</td><td>Characterize current output for no FX, authored-but-inert FX metadata, non-zero group gain/pan, Preview, Performance, mono, and stereo.</td><td>Reviewed offline WAV/JSON baselines and hashes</td><td>Repeated offline renders are deterministic at the existing <code>1e-6</code> vector tolerance or bit-identical where already guaranteed.</td></tr>
+            <tr><td class="task-id">DSP-00-03</td><td>Add direct-only expected-red contract tests for missing schema, graph plan, scoped destination, generation state, parameter control, and tail retirement seams.</td><td><code>CuratedDspContractRedTests.cpp</code></td><td>Each red test fails for one named missing behavior, not for compilation noise.</td></tr>
+            <tr><td class="task-id">DSP-00-04</td><td>Measure current callback timing and retained memory, then freeze provisional graph CPU, memory, active-generation, parameter-count, and tail budgets.</td><td>Benchmark note plus machine/profile metadata</td><td>Budgets are reproducible and expressed as hard rejection or diagnostic thresholds.</td></tr>
+          </tbody>
+        </table>
+        <div class="exit"><strong>Exit gate:</strong> no implementation work starts until the ADR, compatibility baselines, red tests, and provisional budgets are accepted together.</div>
+      </section>
+
+      <section id="s1" class="sprint">
+        <div class="sprint-head">
+          <div>
+            <div class="sprint-label">Sprint 1 · Contract and persistence</div>
+            <h2>Schema 5, parameter values, and curated catalog</h2>
+            <p class="sprint-goal">Create one durable authored representation for versioned effect instances and scope-owned serial chains.</p>
+          </div>
+          <span class="duration">1–2 mini-sprints</span>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Primary files</th><th>Acceptance</th></tr></thead>
+          <tbody>
+            <tr><td class="task-id">DSP-01-01</td><td>Extend FX slots with <code>effectVersion</code> and ordered stable parameter ID/value records; add optional chain bypass if frozen in S0.</td><td><code>RuntimeModel.h</code></td><td>Model supports unknown preserved parameters without executable ambiguity.</td></tr>
+            <tr><td class="task-id">DSP-01-02</td><td>Define catalog descriptors for type ID, algorithm version, supported scopes, parameter unit/range/default, smoothing, state/tail class, and cost metadata.</td><td><code>CuratedDspCatalog.*</code></td><td>Gain, saturator, stereo delay, and algorithmic reverb descriptors validate independently of UI.</td></tr>
+            <tr><td class="task-id">DSP-01-03</td><td>Implement schema 5 / authoring 4 read, write, structural limits, duplicate checks, source canonicalization, and unknown-version handling.</td><td><code>RuntimeLoader.cpp</code>, <code>HostSessionState.h</code></td><td>Round-trip serialization is deterministic; invalid projects return actionable paths.</td></tr>
+            <tr><td class="task-id">DSP-01-04</td><td>Implement schema-4 migration: canonical zone sources, catalog type mapping, preserved IDs/order, legacy-inert marker/bypass, and group-routing compatibility.</td><td><code>RuntimeLoader.cpp</code>, migration fixtures</td><td>Migrated project validates and produces the exact pre-migration dry render.</td></tr>
+            <tr><td class="task-id">DSP-01-05</td><td>Add positive/negative fixtures for each scope, unknown type/version, missing/duplicate parameter, shared/orphan slot, duplicate source owner, and over-budget state.</td><td><code>content/runtime/phase2/curated-dsp/</code></td><td>Fixtures are small, deterministic, and used by loader and host-state suites.</td></tr>
+          </tbody>
+        </table>
+        <div class="exit"><strong>Exit gate:</strong> project schema, catalog lookup, migration, and persistence tests pass without any audio implementation.</div>
+      </section>
+
+      <section id="s2" class="sprint">
+        <div class="sprint-head">
+          <div>
+            <div class="sprint-label">Sprint 2 · Authoring foundation</div>
+            <h2>Undoable DSP authoring transactions</h2>
+            <p class="sprint-goal">Make all topology and value edits safe, atomic, stable-ID based, and usable by a later UI.</p>
+          </div>
+          <span class="duration">1 mini-sprint</span>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Behavior</th><th>Acceptance</th></tr></thead>
+          <tbody>
+            <tr><td class="task-id">DSP-02-01</td><td>Add create, duplicate, delete, and reorder slot transactions.</td><td>New IDs are stable and unique; deletion removes exactly one owner reference.</td><td>Undo/redo restores IDs, values, order, and selection exactly.</td></tr>
+            <tr><td class="task-id">DSP-02-02</td><td>Add attach, detach, move, and chain-bypass transactions for zone/group/master ownership.</td><td>One bus per source and one bus per slot are preserved atomically.</td><td>Invalid cross-owner moves are rejected without partial document mutation.</td></tr>
+            <tr><td class="task-id">DSP-02-03</td><td>Add parameter edit transactions with validation, drag coalescing, reset-to-default, and catalog-version awareness.</td><td>Live changes may be frequent; document history records one logical gesture.</td><td>Changed paths identify the exact slot/parameter and host-state rebuild triggers once per committed gesture.</td></tr>
+            <tr><td class="task-id">DSP-02-04</td><td>Define deterministic selection recovery after slot/chain deletion, migration, undo, and redo.</td><td>Selection is editor state; audio ownership remains source based.</td><td>Session tests cover empty chains, last-slot deletion, and owner deletion.</td></tr>
+          </tbody>
+        </table>
+        <div class="exit"><strong>Exit gate:</strong> every future UI action is already expressible as a validated <code>AuthoringSession</code> transaction.</div>
+      </section>
+
+      <section id="s3" class="sprint">
+        <div class="sprint-head">
+          <div>
+            <div class="sprint-label">Sprint 3 · Gate G1</div>
+            <h2>Immutable DSP snapshot and conformance identity</h2>
+            <p class="sprint-goal">Freeze complete authored DSP meaning into snapshots and publish/preparation digests.</p>
+          </div>
+          <span class="duration">1 mini-sprint</span>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Primary files</th><th>Acceptance</th></tr></thead>
+          <tbody>
+            <tr><td class="task-id">DSP-03-01</td><td>Replace metadata-only snapshot FX references with complete immutable effect version and parameter values.</td><td><code>PlaybackSnapshot.h/.cpp</code></td><td>Snapshot contains everything required to compile DSP without reading the mutable project.</td></tr>
+            <tr><td class="task-id">DSP-03-02</td><td>Normalize canonical owner sources, chain order, slot ownership, supported scope, catalog version, and cost inputs during snapshot build.</td><td><code>PlaybackSnapshot.cpp</code></td><td>All invalid authored topology yields structured <code>snapshot-dsp-*</code> findings.</td></tr>
+            <tr><td class="task-id">DSP-03-03</td><td>Add deterministic DSP graph serialization and digest; include it in prepared and publish conformance identity.</td><td><code>PreparedPlayback.*</code>, <code>PerformancePublishPreparation.cpp</code></td><td>Value, order, owner, bypass, type, or version changes alter the graph digest; labels do not unless the ADR says otherwise.</td></tr>
+            <tr><td class="task-id">DSP-03-04</td><td>Add snapshot, prepared, and publish tests for canonical ordering, warm/cold agreement, unknown bypassed nodes, and stale-digest rejection.</td><td>Focused DSP snapshot tests</td><td>Repeated builds are byte-equivalent and stale payloads cannot activate.</td></tr>
+          </tbody>
+        </table>
+        <div class="exit"><strong>Exit gate G1:</strong> authored DSP has one deterministic identity from project through snapshot, preparation, and publish validation.</div>
+      </section>
+
+      <section id="s4" class="sprint">
+        <div class="sprint-head">
+          <div>
+            <div class="sprint-label">Sprint 4 · Render foundation</div>
+            <h2>Bounded DSP graph compiler</h2>
+            <p class="sprint-goal">Compile the constrained hierarchy into a flat, validated, allocation-free callback plan.</p>
+          </div>
+          <span class="duration">1–2 mini-sprints</span>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Compiler output</th><th>Acceptance</th></tr></thead>
+          <tbody>
+            <tr><td class="task-id">DSP-04-01</td><td>Define immutable graph nodes, owner kind/ID, ordered effect descriptors, input destination, output destination, scratch slice, and parameter-slot indices.</td><td><code>DspGraphPlan.h</code></td><td>Plan contains no mutable histories or UI/project pointers.</td></tr>
+            <tr><td class="task-id">DSP-04-02</td><td>Compile fixed zone → group → master topology; reject cycles and bus-to-bus inputs; collapse owners with no active chain.</td><td><code>DspGraphPlan.cpp</code></td><td>No-DSP plan has zero processing nodes and selects the direct fast path.</td></tr>
+            <tr><td class="task-id">DSP-04-03</td><td>Compute scratch slices, delay-memory requests, parameter count, effect cost, and bounded graph totals with overflow-safe arithmetic.</td><td>Plan budgets and findings</td><td>Over-budget graphs fail before activation with exact node/slot paths.</td></tr>
+            <tr><td class="task-id">DSP-04-04</td><td>Add graph compiler tests for every scope combination, pass-through collapse, chain order, duplicates, unknown bypassed slots, and maximum legal topology.</td><td><code>CuratedDspGraphPlanTests.cpp</code></td><td>Same snapshot always creates the same plan and digest inputs.</td></tr>
+          </tbody>
+        </table>
+        <div class="exit"><strong>Exit gate:</strong> a valid project produces one flat topological plan with bounded resources; invalid graphs never reach the audio layer.</div>
+      </section>
+
+      <section id="s5" class="sprint">
+        <div class="sprint-head">
+          <div>
+            <div class="sprint-label">Sprint 5 · Lifecycle foundation</div>
+            <h2>DSP render-generation ownership</h2>
+            <p class="sprint-goal">Stage mutable effect state and scratch with the same real-time ownership discipline already used for render models.</p>
+          </div>
+          <span class="duration">1–2 mini-sprints</span>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Primary seam</th><th>Acceptance</th></tr></thead>
+          <tbody>
+            <tr><td class="task-id">DSP-05-01</td><td>Create a render-generation object containing the immutable sampler model/graph plan plus exclusive mutable effect state and preallocated scratch.</td><td><code>DspRenderGeneration.*</code></td><td>Construction, prepare, and destruction occur only off audio.</td></tr>
+            <tr><td class="task-id">DSP-05-02</td><td>Extend activation slots to stage generation ownership and exchange only primitive indices/tokens at block boundaries.</td><td><code>SamplerPlaybackContext.*</code></td><td>Existing voice-model lifetime remains correct under rapid generation replacement.</td></tr>
+            <tr><td class="task-id">DSP-05-03</td><td>Extend retirement readiness to account for voices and a future tail-active flag; retain bounded slot pressure policy.</td><td>Playback context retirement queue</td><td>Generations cannot be destroyed while referenced by voices or DSP state.</td></tr>
+            <tr><td class="task-id">DSP-05-04</td><td>Add diagnostics for active graph ID, node/effect count, scratch bytes, DSP state bytes, retired generations, forced fades, and reclamation latency.</td><td>Primitive diagnostic snapshot</td><td>UI readers never inspect mutable effect instances.</td></tr>
+            <tr><td class="task-id">DSP-05-05</td><td>Run callback guard and concurrent activation soak with identity/no-op state.</td><td>Focused lifecycle soak tests</td><td>No allocation, locks, ownership release, stale pointer, or unbounded retirement appears.</td></tr>
+          </tbody>
+        </table>
+        <div class="exit"><strong>Exit gate:</strong> mutable DSP generation ownership is safe before any audible effect is introduced.</div>
+      </section>
+
+      <section id="s6" class="sprint wave-1">
+        <div class="sprint-head">
+          <div>
+            <div class="sprint-label">Sprint 6 · First audible vertical slice</div>
+            <h2>Identity graph and Gain/Trim at instrument scope</h2>
+            <p class="sprint-goal">Prove graph execution, mono/stereo handling, bypass, and dry-path equivalence with the smallest possible DSP kernel.</p>
+          </div>
+          <span class="duration">1 mini-sprint</span>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Behavior</th><th>Acceptance</th></tr></thead>
+          <tbody>
+            <tr><td class="task-id">DSP-06-01</td><td>Define the version-1 Gain/Trim math, polarity, mute, numeric limits, reset, and denormal policy.</td><td><code>DspGain.*</code></td><td>Golden vectors cover unity, ±gain, polarity, mute, mono, and stereo.</td></tr>
+            <tr><td class="task-id">DSP-06-02</td><td>Execute an instrument-only graph after sampler rendering and before lane output.</td><td>Master scratch/process/write path</td><td>Unity Gain is sample-equivalent to the current dry baseline.</td></tr>
+            <tr><td class="task-id">DSP-06-03</td><td>Implement the zero-node direct fast path and one-node bypass fast path.</td><td>Callback dispatch</td><td>No-DSP output remains bit-identical where the existing harness permits.</td></tr>
+            <tr><td class="task-id">DSP-06-04</td><td>Add offline renders and realtime guard tests for instrument Gain in Preview, Performance, editor-open/closed, standalone, and VST3 shell paths.</td><td>Reviewed Gain baselines</td><td>Both lanes use the same core behavior and separate state.</td></tr>
+          </tbody>
+        </table>
+        <div class="exit"><strong>Exit gate:</strong> one master Gain slot is fully authored, snapshotted, prepared, activated, rendered, diagnosed, saved, and recalled.</div>
+      </section>
+
+      <section id="s7" class="sprint">
+        <div class="sprint-head">
+          <div>
+            <div class="sprint-label">Sprint 7 · Gate G2</div>
+            <h2>Zone and group accumulation routing</h2>
+            <p class="sprint-goal">Complete the zone → group → instrument hierarchy without allocating a block buffer for every zone.</p>
+          </div>
+          <span class="duration">1–2 mini-sprints</span>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Primary seam</th><th>Acceptance</th></tr></thead>
+          <tbody>
+            <tr><td class="task-id">DSP-07-01</td><td>Add a precompiled destination node index to each sampler route and update voice mixing to target graph input slices.</td><td><code>SamplerRenderModel.*</code>, <code>SamplerVoicePool.*</code></td><td>No route lookup, hash, string comparison, or allocation occurs during rendering.</td></tr>
+            <tr><td class="task-id">DSP-07-02</td><td>Execute zone nodes, accumulate into owning group nodes, execute group nodes, then accumulate/process master.</td><td>Graph executor</td><td>Chain order and scope order match the ADR for simultaneous voices and zones.</td></tr>
+            <tr><td class="task-id">DSP-07-03</td><td>Preserve existing route gain/pan math and pass-through optimization; clear only allocated scratch slices each block.</td><td>Graph scratch lifecycle</td><td>Dry reference instruments match S0 baselines, including non-zero group gain/pan.</td></tr>
+            <tr><td class="task-id">DSP-07-04</td><td>Implement Preview scope semantics: selected zone hears zone+group+master; selected group hears member-zone+group+master.</td><td>Preview render-model options</td><td>Focused tests prove ancestor inclusion and unrelated-scope exclusion.</td></tr>
+            <tr><td class="task-id">DSP-07-05</td><td>Add scope-isolation vectors using different gains at zone, group, and master plus overlapping voices.</td><td><code>CuratedDspScopedRoutingTests.cpp</code></td><td>Results prove each effect executes once at the intended aggregation point.</td></tr>
+          </tbody>
+        </table>
+        <div class="exit"><strong>Exit gate G2:</strong> Gain works at all three scopes, no-DSP audio is unchanged, and Preview/Performance routing is correct.</div>
+      </section>
+
+      <section id="s8" class="sprint">
+        <div class="sprint-head">
+          <div>
+            <div class="sprint-label">Sprint 8 · Real-time control</div>
+            <h2>Bounded parameter updates, smoothing, and bypass</h2>
+            <p class="sprint-goal">Let values change live without rebuilding topology or clicking.</p>
+          </div>
+          <span class="duration">1–2 mini-sprints</span>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Behavior</th><th>Acceptance</th></tr></thead>
+          <tbody>
+            <tr><td class="task-id">DSP-08-01</td><td>Compile slot/parameter IDs into fixed generation-local control indices and immutable metadata.</td><td><code>DspParameterControl.*</code></td><td>Callback receives numeric slots only; unknown/stale targets are rejected before audio.</td></tr>
+            <tr><td class="task-id">DSP-08-02</td><td>Add a bounded message-to-audio parameter publication path with latest-value coalescing and generation identity.</td><td>Per-lane control publication</td><td>No dropped structural safety; stale-generation value updates cannot mutate the new graph.</td></tr>
+            <tr><td class="task-id">DSP-08-03</td><td>Implement linear/log smoothing classes declared by the catalog, including sample-rate changes and deterministic reset.</td><td>Effect-owned smoothers</td><td>Block partitioning produces equivalent ramps within approved tolerance.</td></tr>
+            <tr><td class="task-id">DSP-08-04</td><td>Implement click-free slot and chain bypass crossfades plus idle suspension after tail drain.</td><td>Bypass state machine</td><td>Reviewed transition vectors show no discontinuous hard switch.</td></tr>
+            <tr><td class="task-id">DSP-08-05</td><td>Connect authoring parameter gestures to live Preview updates and commit one document transaction on gesture end.</td><td><code>AuthoringSession</code> + shell adapter</td><td>No snapshot rebuild per knob tick; undo returns to the pre-gesture value.</td></tr>
+          </tbody>
+        </table>
+        <div class="exit"><strong>Exit gate:</strong> parameters and bypass are responsive, smoothed, generation-safe, and document-correct.</div>
+      </section>
+
+      <section id="s9" class="sprint">
+        <div class="sprint-head">
+          <div>
+            <div class="sprint-label">Sprint 9 · Gate G3</div>
+            <h2>Published macro targets and host automation</h2>
+            <p class="sprint-goal">Route the existing fixed host macro slots to stable DSP parameter targets.</p>
+          </div>
+          <span class="duration">1 mini-sprint</span>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Primary files</th><th>Acceptance</th></tr></thead>
+          <tbody>
+            <tr><td class="task-id">DSP-09-01</td><td>Replace long-term free-form DSP target interpretation with structured slot ID, parameter ID, source/destination range, and curve metadata.</td><td><code>RuntimeModel.h</code>, macro migration</td><td>Existing tone/motion targets retain compatibility while new DSP targets are unambiguous.</td></tr>
+            <tr><td class="task-id">DSP-09-02</td><td>Resolve structured targets into bounded callback control slots during publish preparation.</td><td><code>PublishedMacroBinding.*</code>, publish preparation</td><td>Reordering a chain does not break a macro; deleting a target produces an actionable publish finding.</td></tr>
+            <tr><td class="task-id">DSP-09-03</td><td>Apply macro mappings through the S8 control path with mapping curves, range clamps, and catalog smoothing.</td><td>Performance callback view</td><td>Host automation causes no graph rebuild, allocation, lock, or stale-target mutation.</td></tr>
+            <tr><td class="task-id">DSP-09-04</td><td>Extend preset/host recall and active publish diagnostics with DSP target identity and graph digest.</td><td><code>RuntimePresetState.*</code>, <code>HostSessionState.*</code></td><td>Automation values survive save/reload and restore after matching authored topology is present.</td></tr>
+            <tr><td class="task-id">DSP-09-05</td><td>Add macro target chooser entries for curated DSP parameters using stable IDs behind creator labels.</td><td><code>AuthoringPanel.cpp</code></td><td>UI never exposes fragile internal pointer/index values.</td></tr>
+          </tbody>
+        </table>
+        <div class="exit"><strong>Exit gate G3:</strong> one macro can automate Gain at any scope with correct preview, publish, DAW automation, preset, and host recall behavior.</div>
+      </section>
+
+      <section id="s10" class="sprint wave-1">
+        <div class="sprint-head">
+          <div>
+            <div class="sprint-label">Sprint 10 · Wave 1 effect</div>
+            <h2>Version-1 saturator / drive</h2>
+            <p class="sprint-goal">Add the first nonlinear effect and prove chain-order, level, smoothing, and determinism policies.</p>
+          </div>
+          <span class="duration">1 mini-sprint</span>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Behavior</th><th>Acceptance</th></tr></thead>
+          <tbody>
+            <tr><td class="task-id">DSP-10-01</td><td>Freeze the v1 transfer function, character modes, drive, tone, wet/dry, output trim, numerical limits, and no-oversampling decision.</td><td>Catalog version 1 + algorithm note</td><td>Changing future math requires a new effect version.</td></tr>
+            <tr><td class="task-id">DSP-10-02</td><td>Implement the allocation-free stereo kernel and state preparation/reset.</td><td><code>DspSaturator.*</code></td><td>NaN/Inf input is contained according to the ADR; denormals are suppressed.</td></tr>
+            <tr><td class="task-id">DSP-10-03</td><td>Add impulse, sine sweep, stepped level, DC, silence, mono/stereo, order, smoothing, and bypass golden vectors.</td><td><code>CuratedDspSaturatorTests.cpp</code></td><td>Vectors pass at all supported sample rates and block partitions.</td></tr>
+            <tr><td class="task-id">DSP-10-04</td><td>Add catalog parameter presentation metadata and minimal creator controls.</td><td>Reusable parameter panel</td><td>Defaults are conservative and gain staging is understandable.</td></tr>
+          </tbody>
+        </table>
+        <div class="exit"><strong>Exit gate:</strong> Gain → Saturator and Saturator → Gain produce deliberately different, deterministic results at every scope.</div>
+      </section>
+
+      <section id="s11" class="sprint wave-1">
+        <div class="sprint-head">
+          <div>
+            <div class="sprint-label">Sprint 11 · Wave 1 effect</div>
+            <h2>Tempo-aware stereo delay</h2>
+            <p class="sprint-goal">Introduce bounded time-domain memory, host tempo, feedback, reset, and tail activity.</p>
+          </div>
+          <span class="duration">1–2 mini-sprints</span>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Primary seam</th><th>Acceptance</th></tr></thead>
+          <tbody>
+            <tr><td class="task-id">DSP-11-01</td><td>Add a sanitized primitive transport view: tempo, time signature, play state, sample position, and validity flags.</td><td><code>PluginProcessor.cpp</code> → core render request</td><td>Missing/invalid host data uses the frozen fallback tempo without strings or host API calls in core.</td></tr>
+            <tr><td class="task-id">DSP-11-02</td><td>Freeze delay v1: free/sync time, divisions, feedback ceiling, ping-pong, tone, width, wet/dry, interpolation, and max delay.</td><td>Catalog + algorithm note</td><td>Memory request is computable before activation and feedback cannot create an infinite tail.</td></tr>
+            <tr><td class="task-id">DSP-11-03</td><td>Implement preallocated stereo delay lines, fractional reads, feedback filtering, tempo conversion, smoothing, and reset.</td><td><code>DspStereoDelay.*</code></td><td>No reallocation on tempo or parameter changes; block partitioning is stable.</td></tr>
+            <tr><td class="task-id">DSP-11-04</td><td>Define discontinuity behavior for stop, seek/loop jump, sample-rate change, all-notes-off, and panic reset.</td><td>Transport/tail state machine</td><td>Normal note release keeps tails; panic clears immediately; transport rules are tested.</td></tr>
+            <tr><td class="task-id">DSP-11-05</td><td>Add echo-position, sync-division, ping-pong, feedback-decay, tone, tail, memory-budget, and automation tests.</td><td><code>CuratedDspStereoDelayTests.cpp</code></td><td>Echo timing is correct in samples at every supported sample rate and tempo case.</td></tr>
+          </tbody>
+        </table>
+        <div class="exit"><strong>Exit gate:</strong> Delay is sample-accurate, tempo-safe, memory-bounded, macro-automatable, and generation-retirement aware.</div>
+      </section>
+
+      <section id="s12" class="sprint wave-1">
+        <div class="sprint-head">
+          <div>
+            <div class="sprint-label">Sprint 12 · Gate G4</div>
+            <h2>Algorithmic reverb and bounded tail retirement</h2>
+            <p class="sprint-goal">Complete Wave 1 sound and safely retire stateful generations after voices and audible tails end.</p>
+          </div>
+          <span class="duration">1–2 mini-sprints</span>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Behavior</th><th>Acceptance</th></tr></thead>
+          <tbody>
+            <tr><td class="task-id">DSP-12-01</td><td>Freeze reverb v1 topology and parameters: pre-delay, size, decay, damping, width, wet/dry, modulation policy, memory, and max tail.</td><td>Versioned algorithm note</td><td>Impulse behavior and parameter meanings are stable enough for long-term recall.</td></tr>
+            <tr><td class="task-id">DSP-12-02</td><td>Implement preallocated stereo algorithmic reverb with deterministic reset and sample-rate preparation.</td><td><code>DspAlgorithmicReverb.*</code></td><td>No convolution assets, background file loads, or callback allocations.</td></tr>
+            <tr><td class="task-id">DSP-12-03</td><td>Add graph-level silence detection, effect-declared tail activity, hard tail ceilings, and oldest-generation pressure fade.</td><td><code>DspRenderGeneration.*</code>, playback context</td><td>Old generation retires only after voices and tails, but never remains unbounded.</td></tr>
+            <tr><td class="task-id">DSP-12-04</td><td>Add impulse decay, stereo width, damping, pre-delay, automation, bypass, reset, tail pressure, and rapid activation tests.</td><td><code>CuratedDspReverbTests.cpp</code></td><td>Tail reclamation counters and ownership bytes return to baseline after every test.</td></tr>
+            <tr><td class="task-id">DSP-12-05</td><td>Review CPU/memory against S0 budgets and adjust catalog cost weights or legal instance ceilings.</td><td>Updated benchmark evidence</td><td>Over-budget graphs are rejected before activation; legal graphs meet callback headroom target.</td></tr>
+          </tbody>
+        </table>
+        <div class="exit"><strong>Exit gate G4:</strong> all Wave 1 effects pass deterministic DSP vectors, automation, reset, tail, pressure, and ownership tests.</div>
+      </section>
+
+      <section id="s13" class="sprint">
+        <div class="sprint-head">
+          <div>
+            <div class="sprint-label">Sprint 13 · Product workflow</div>
+            <h2>Scope-aware creator UX</h2>
+            <p class="sprint-goal">Replace the current project-scoped metadata editor with a clear zone/group/instrument insert workflow.</p>
+          </div>
+          <span class="duration">1–2 mini-sprints</span>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>User outcome</th><th>Acceptance</th></tr></thead>
+          <tbody>
+            <tr><td class="task-id">DSP-13-01</td><td>Add scope selector/breadcrumb bound to current zone, current group, or instrument master.</td><td>Creator always knows what audio is being processed.</td><td>Selection changes never silently move or duplicate a chain.</td></tr>
+            <tr><td class="task-id">DSP-13-02</td><td>Add chain list operations: add from curated catalog, reorder, bypass, duplicate, rename, move to owner, and delete.</td><td>One consistent editor for all scopes.</td><td>Every gesture routes through S2 transactions and supports keyboard/accessibility metadata.</td></tr>
+            <tr><td class="task-id">DSP-13-03</td><td>Add descriptor-driven parameter controls, units, defaults, reset, value text, macro-assignment affordance, and unavailable-version state.</td><td>UI is catalog-driven without effect-specific persistence logic.</td><td>Unknown preserved slots remain visible and bypassed without crashing the panel.</td></tr>
+            <tr><td class="task-id">DSP-13-04</td><td>Add live preview status, chain CPU/cost indication, tail/activity indicator, over-budget findings, and “legacy effect—review to enable” messaging.</td><td>Failure and cost are understandable before publish.</td><td>Diagnostics remain primitive snapshots; UI polling does not touch mutable DSP.</td></tr>
+            <tr><td class="task-id">DSP-13-05</td><td>Add focused UI layout, focus order, keyboard, accessibility, compact-width, and repeated-structure tests.</td><td>Creator surface remains usable at supported window sizes.</td><td>Automated UI contract and screenshot review pass.</td></tr>
+          </tbody>
+        </table>
+        <div class="exit"><strong>Exit gate:</strong> a creator can build, hear, automate, save, undo, and publish chains at all three scopes without editing raw routing metadata.</div>
+      </section>
+
+      <section id="s14" class="sprint">
+        <div class="sprint-head">
+          <div>
+            <div class="sprint-label">Sprint 14 · Compatibility</div>
+            <h2>Host recall, migration, presets, and failure recovery</h2>
+            <p class="sprint-goal">Prove that DSP survives real product lifecycles and that old projects remain unchanged until explicitly enabled.</p>
+          </div>
+          <span class="duration">1 mini-sprint</span>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Scenario</th><th>Acceptance</th></tr></thead>
+          <tbody>
+            <tr><td class="task-id">DSP-14-01</td><td>Expand host-state structural validation for parameters, graph digest, effect versions, and aggregate DSP budgets.</td><td>Untrusted host chunks</td><td>Oversize/deep/invalid DSP state fails before retention or project mutation.</td></tr>
+            <tr><td class="task-id">DSP-14-02</td><td>Stage restored macro/DSP values until matching authored topology and graph identity are active.</td><td>Editor open/closed restore</td><td>Stale values never bind by index to a different slot after reordering.</td></tr>
+            <tr><td class="task-id">DSP-14-03</td><td>Validate schema-4 migration in standalone and VST3: old metadata loads bypassed, warning is visible, and explicit enable becomes a schema-5 authored edit.</td><td>Legacy projects</td><td>Before-enable render matches S0; after-enable state recalls exactly.</td></tr>
+            <tr><td class="task-id">DSP-14-04</td><td>Cover missing/unknown effect implementation, corrupt parameter, changed manifest, moved project, and restore supersession.</td><td>Failure recovery</td><td>Current valid playback remains active or degrades predictably; no partial graph activates.</td></tr>
+            <tr><td class="task-id">DSP-14-05</td><td>Add REAPER scenarios for save/reopen, duplicate instances, editor closed, automated macro, missing content, and changed content.</td><td><code>validation/reaper/</code></td><td>Restored graph/macro/prepared digests agree with captured state.</td></tr>
+          </tbody>
+        </table>
+        <div class="exit"><strong>Exit gate:</strong> project, preset, host, publish, and recovery lifecycles reproduce the intended graph without changing legacy audio.</div>
+      </section>
+
+      <section id="s15" class="sprint release">
+        <div class="sprint-head">
+          <div>
+            <div class="sprint-label">Sprint 15 · Gate G5 · Wave 1 release</div>
+            <h2>Performance hardening and staged rollout</h2>
+            <p class="sprint-goal">Prove bounded behavior at production scale and enable the feature through an evidence-backed rollout.</p>
+          </div>
+          <span class="duration">1–2 mini-sprints</span>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Evidence</th><th>Acceptance</th></tr></thead>
+          <tbody>
+            <tr><td class="task-id">DSP-15-01</td><td>Run the full sample-rate, block-size, mono/stereo, voice-count, graph-size, lane, and shell matrix.</td><td>Automated matrix report</td><td>No correctness, ownership, or deadline failure across supported configurations.</td></tr>
+            <tr><td class="task-id">DSP-15-02</td><td>Measure no-DSP overhead, per-effect CPU, scratch/state bytes, activation time, tail lifetime, and p95/p99 callback time.</td><td>Benchmark report against S0</td><td>No-DSP fast path stays within frozen overhead budget; legal graphs retain required callback headroom.</td></tr>
+            <tr><td class="task-id">DSP-15-03</td><td>Run long activation/automation/transport/preview/publish/restore soak with realtime guard and retirement diagnostics.</td><td>Soak logs and bounded counters</td><td>No leaks, growing backlog, stale generation, non-finite samples, or callback violations.</td></tr>
+            <tr><td class="task-id">DSP-15-04</td><td>Review and approve offline audio baselines for representative zone, group, and master chains.</td><td>Wave 1 reviewed corpus</td><td>Every baseline change is explained by versioned DSP behavior.</td></tr>
+            <tr><td class="task-id">DSP-15-05</td><td>Add feature activation policy: new projects enabled, migrated legacy slots review-gated, unknown versions bypassed, and clear diagnostics.</td><td>Release configuration and notes</td><td>Rollback disables DSP execution without corrupting authored state.</td></tr>
+            <tr><td class="task-id">DSP-15-06</td><td>Run focused suites, <code>drs_all_tests</code>, standalone validation, VST3 host validation, and packaging checks.</td><td>Go/no-go report</td><td>G0–G5 evidence is linked and all release blockers are closed.</td></tr>
+          </tbody>
+        </table>
+        <div class="exit"><strong>Exit gate G5:</strong> Wave 1 is production-ready: Gain, Saturator, Stereo Delay, and Algorithmic Reverb at zone, group, and instrument scope.</div>
+      </section>
+
+      <section id="s16" class="sprint wave-2">
+        <div class="sprint-head">
+          <div>
+            <div class="sprint-label">Sprint 16 · Wave 2</div>
+            <h2>Compact EQ / filter</h2>
+            <p class="sprint-goal">Add a focused tonal tool without turning the curated surface into an unlimited generic EQ designer.</p>
+          </div>
+          <span class="duration">1 mini-sprint</span>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Behavior</th><th>Acceptance</th></tr></thead>
+          <tbody>
+            <tr><td class="task-id">DSP-16-01</td><td>Freeze modes, band count, frequency/Q/gain ranges, coefficient update policy, smoothing, and reset behavior.</td><td>Catalog/algorithm version 1</td><td>Parameter surface remains small and musically purposeful.</td></tr>
+            <tr><td class="task-id">DSP-16-02</td><td>Implement stable stereo filters with coefficient interpolation or crossfade that cannot destabilize under automation.</td><td><code>DspCompactEq.*</code></td><td>Stress sweeps produce finite bounded output at supported sample rates.</td></tr>
+            <tr><td class="task-id">DSP-16-03</td><td>Add frequency-response, impulse, automation, bypass, chain-order, and scope tests.</td><td>Focused EQ/filter suite</td><td>Measured response matches the frozen design within approved tolerances.</td></tr>
+            <tr><td class="task-id">DSP-16-04</td><td>Add catalog-driven controls and macro targets.</td><td>Creator UI</td><td>Save/recall and host automation reuse existing infrastructure unchanged.</td></tr>
+          </tbody>
+        </table>
+        <div class="exit"><strong>Exit gate:</strong> compact EQ/filter adds no new graph, lifecycle, or persistence special case.</div>
+      </section>
+
+      <section id="s17" class="sprint wave-2">
+        <div class="sprint-head">
+          <div>
+            <div class="sprint-label">Sprint 17 · Wave 2</div>
+            <h2>Chorus / ensemble</h2>
+            <p class="sprint-goal">Reuse the proven delay/modulation infrastructure for a bounded stereo modulation effect.</p>
+          </div>
+          <span class="duration">1 mini-sprint</span>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Behavior</th><th>Acceptance</th></tr></thead>
+          <tbody>
+            <tr><td class="task-id">DSP-17-01</td><td>Freeze voice count, rate/depth, phase layout, interpolation, width, wet/dry, deterministic modulation phase, and reset.</td><td>Catalog/algorithm version 1</td><td>Recall is deterministic and modulation does not depend on block boundaries.</td></tr>
+            <tr><td class="task-id">DSP-17-02</td><td>Implement preallocated modulation delay voices using shared low-level delay utilities without sharing effect state.</td><td><code>DspChorus.*</code></td><td>Memory/cost metadata correctly scales with configured voice count.</td></tr>
+            <tr><td class="task-id">DSP-17-03</td><td>Add modulation-period, stereo phase, interpolation, automation, reset, scope, and chain-order vectors.</td><td>Focused Chorus suite</td><td>Results are stable across block sizes and repeated activations.</td></tr>
+            <tr><td class="task-id">DSP-17-04</td><td>Add creator controls, macro targets, documentation, and aggregate regression coverage.</td><td>Wave 2 catalog update</td><td>Wave 1 projects and digests remain compatible.</td></tr>
+          </tbody>
+        </table>
+        <div class="exit"><strong>Exit gate:</strong> Chorus/Ensemble ships as a normal versioned catalog entry, not a bespoke renderer path.</div>
+      </section>
+
+      <section id="tests" class="grid">
+        <div class="card span-12">
+          <h2>Focused test targets and required matrix</h2>
+          <p>Exact executable names can follow repository conventions; each target below should also be added to <code>drs_all_tests</code>.</p>
+          <table>
+            <thead><tr><th>Suggested target</th><th>Primary coverage</th><th>Introduced</th></tr></thead>
+            <tbody>
+              <tr><td><code>drs_curated_dsp_contract_tests</code></td><td>Catalog, schema, invariants, migration, limits</td><td>S0–S1</td></tr>
+              <tr><td><code>drs_curated_dsp_authoring_tests</code></td><td>Transactions, selection, undo/redo, changed paths</td><td>S2</td></tr>
+              <tr><td><code>drs_curated_dsp_snapshot_tests</code></td><td>Immutable capture, canonicalization, digests, publish conformance</td><td>S3</td></tr>
+              <tr><td><code>drs_curated_dsp_graph_tests</code></td><td>Compiler, scratch, pass-through collapse, budgets</td><td>S4</td></tr>
+              <tr><td><code>drs_curated_dsp_generation_tests</code></td><td>Activation, ownership, retirement, concurrent diagnostics</td><td>S5</td></tr>
+              <tr><td><code>drs_curated_dsp_scoped_render_tests</code></td><td>Dry parity and zone/group/master accumulation</td><td>S6–S7</td></tr>
+              <tr><td><code>drs_curated_dsp_parameter_tests</code></td><td>Updates, smoothing, bypass, stale generations</td><td>S8</td></tr>
+              <tr><td><code>drs_curated_dsp_macro_tests</code></td><td>Publish targets, automation, preset and host recall</td><td>S9</td></tr>
+              <tr><td><code>drs_curated_dsp_effect_tests</code></td><td>Per-effect golden vectors and catalog versioning</td><td>S10–S12, S16–S17</td></tr>
+              <tr><td><code>drs_curated_dsp_ui_tests</code></td><td>Scope, chain gestures, parameters, accessibility, findings</td><td>S13</td></tr>
+              <tr><td><code>drs_curated_dsp_host_recall_tests</code></td><td>VST3 state, migration, failure recovery, supersession</td><td>S14</td></tr>
+              <tr><td><code>drs_curated_dsp_hardening_tests</code></td><td>Matrix, pressure, soak, realtime guards, callback timing</td><td>S15</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card span-6">
+          <h3>Audio matrix</h3>
+          <ul>
+            <li>44.1, 48, 88.2, and 96 kHz</li>
+            <li>16, 64, 128, 512, and maximum supported frames per block</li>
+            <li>Mono and stereo host outputs</li>
+            <li>Silence, impulse, DC, sine, sweep, noise, and representative sample playback</li>
+            <li>Single voice, maximum voice pool, overlapping zones, crossfades, and Round Robin</li>
+            <li>Zero, one, and maximum legal nodes/effects</li>
+          </ul>
+        </div>
+        <div class="card span-6">
+          <h3>Lifecycle matrix</h3>
+          <ul>
+            <li>Preview and Performance separately and simultaneously</li>
+            <li>Rapid authoring rebuild, publish replacement, and host restore</li>
+            <li>Editor open/closed, standalone, and VST3</li>
+            <li>Note-off, sustain, all-notes-off, panic, stop, seek, and loop jump</li>
+            <li>Warm/cold preparation and sample-rate/device restart</li>
+            <li>Old voices, audible tails, silent tails, slot pressure, and forced retirement</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="risks" class="card">
+        <h2>Risk register</h2>
+        <table>
+          <thead><tr><th>Risk</th><th>Early signal</th><th>Mitigation / owning sprint</th><th>Release stance</th></tr></thead>
+          <tbody>
+            <tr><td>Dry output changes when the graph is introduced</td><td>S6/S7 baseline mismatch</td><td>Direct zero-node fast path; preserve current route gain/pan; S0 baselines</td><td class="blocked">Block G2</td></tr>
+            <tr><td>Activation destroys old effect state too early</td><td>Tail truncation, stale pointer, ownership counter mismatch</td><td>Generation ownership and retirement before audible DSP; S5/S12</td><td class="blocked">Block G4</td></tr>
+            <tr><td>Delay/reverb make retained generations unbounded</td><td>Retirement backlog grows during soak</td><td>Feedback ceiling, silence detector, hard tail cap, pressure fade; S11/S12</td><td class="blocked">Block release</td></tr>
+            <tr><td>Dynamic controls rebuild too often</td><td>Worker churn or audio gaps during knob drag</td><td>Separate S8 value control plane from topology activation</td><td class="blocked">Block G3</td></tr>
+            <tr><td>Macro binds to wrong reordered slot</td><td>Recall changes a different effect</td><td>Stable slot/parameter IDs and graph identity; S9/S14</td><td class="blocked">Block release</td></tr>
+            <tr><td>Legacy projects become audibly processed</td><td>Schema-4 migrated render differs before user action</td><td>Legacy-inert migration and explicit enable; S1/S14</td><td class="blocked">Block release</td></tr>
+            <tr><td>DSP memory exceeds host-state or runtime budgets</td><td>Overflow, preparation failure, or high residency</td><td>Overflow-safe plan accounting and catalog cost metadata; S0/S4/S12</td><td class="blocked">Reject graph</td></tr>
+            <tr><td>Effect implementation leaks library types across product contracts</td><td>JUCE/HISE objects appear in RuntimeModel or snapshot API</td><td>Product-owned catalog/graph interfaces; library use remains private</td><td class="defer">Refactor before merge</td></tr>
+            <tr><td>UI exposes routing complexity instead of musical scope</td><td>Creators must edit source IDs or bus references</td><td>Scope-aware chain editor and descriptor-driven controls; S13</td><td class="blocked">Block product release</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="done" class="card">
+        <h2>Definition of done for every sprint</h2>
+        <div class="checklist">
+          <div class="check">The sprint’s focused tests are green and registered with CTest.</div>
+          <div class="check">The target is included in <code>drs_all_tests</code> when the slice becomes authoritative.</div>
+          <div class="check">No unrelated user changes in the dirty worktree are overwritten.</div>
+          <div class="check">New schema fields and findings have stable names and documented ownership.</div>
+          <div class="check">Audio-thread changes pass realtime guard and bounded-storage review.</div>
+          <div class="check">Deterministic serialization/digest tests cover every new persistent value.</div>
+          <div class="check">Preview and Performance behavior is tested independently when runtime-facing.</div>
+          <div class="check">Diagnostics are primitive snapshots; UI never reads mutable engine state.</div>
+          <div class="check">Failure leaves the previous valid project/activation available.</div>
+          <div class="check">Sprint evidence and any deferred debt are added to the project documentation.</div>
+        </div>
+        <div class="callout good"><strong>Final completion condition:</strong> the feature is not complete merely when effects make sound. It is complete when authored topology, preview, publish, automation, save/reload, VST3 recall, migration, tails, performance budgets, and failure recovery all agree on the same versioned graph.</div>
+      </section>
+
+      <footer>
+        Companion to <a href="curated-dsp-system-design.html">Curated DSP System Design</a>. Planning artifact only; no implementation source is included.
+      </footer>
+    </article>
+  </div>
+</div>
+</body>
+</html>
