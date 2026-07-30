@@ -20,12 +20,19 @@ struct SfzImportProjectionResult
     std::vector<RuntimeProjectZoneDefinition> zones;
     std::vector<std::string> projectNotes;
     std::vector<std::string> authoringNotes;
+    SfzImportExecutionState execution;
 };
 
 SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& baseProject,
                                                    const SfzImportAnalysisResult& analysis);
+SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& baseProject,
+                                                   const SfzImportAnalysisResult& analysis,
+                                                   const SfzImportExecutionContext& context);
 SfzImportProjectionResult projectSfzImportDocument(const RuntimeProjectModel& baseProject,
                                                    const std::string& sfzPath);
+SfzImportProjectionResult projectSfzImportDocument(const RuntimeProjectModel& baseProject,
+                                                   const std::string& sfzPath,
+                                                   const SfzImportExecutionContext& context);
 RuntimeProjectDocumentActionResult applySfzImportProjection(AuthoringSession& authoringSession,
                                                             SfzImportProjectionResult projection,
                                                             const std::string& label);

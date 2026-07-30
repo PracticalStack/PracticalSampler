@@ -460,7 +460,36 @@ bool projectUsesExplicitRoundRobin(const RuntimeProjectModel& project)
 SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& baseProject,
                                                    const SfzImportAnalysisResult& analysis)
 {
+    return projectSfzImportAnalysis(baseProject,
+                                    analysis,
+                                    defaultSfzImportExecutionContext());
+}
+
+SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& baseProject,
+                                                   const SfzImportAnalysisResult& analysis,
+                                                   const SfzImportExecutionContext& context)
+{
     SfzImportProjectionResult result;
+    context.reportProgress(SfzImportStage::projected, 0.80f);
+    result.execution = analysis.execution;
+
+    const auto initialCancellationReason = context.pollCancellation();
+    if (initialCancellationReason != SfzImportCancellationReason::none)
+    {
+        result.state = "SFZ projection canceled";
+        result.execution.disposition = SfzImportExecutionDisposition::canceled;
+        result.execution.cancellationReason = initialCancellationReason;
+        return result;
+    }
+
+    if (analysis.execution.canceled())
+    {
+        result.state = "SFZ projection canceled";
+        result.execution.disposition = SfzImportExecutionDisposition::canceled;
+        result.execution.cancellationReason = analysis.execution.cancellationReason;
+        return result;
+    }
+
     result.blocking = !analysis.analyzed
         || !analysis.report.available
         || analysis.report.blocking
@@ -523,6 +552,22 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
 
     for (const auto& section : analysis.normalizeResult.document.sections)
     {
+        const auto cancellationReason = context.pollCancellation();
+        if (cancellationReason != SfzImportCancellationReason::none)
+        {
+            result.projected = false;
+            result.playable = false;
+            result.sampleSources.clear();
+            result.zones.clear();
+            result.projectNotes.clear();
+            result.authoringNotes.clear();
+            result.state = "SFZ projection canceled";
+            result.execution.disposition = SfzImportExecutionDisposition::canceled;
+            result.execution.cancellationReason = cancellationReason;
+            context.reportProgress(SfzImportStage::canceled, 0.85f);
+            return result;
+        }
+
         if (section.scope != SfzOpcodeScope::region)
             continue;
 
@@ -665,6 +710,20 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         return result;
     }
 
+    const auto finalCancellationReason = context.pollCancellation();
+    if (finalCancellationReason != SfzImportCancellationReason::none)
+    {
+        result.sampleSources.clear();
+        result.zones.clear();
+        result.projectNotes.clear();
+        result.authoringNotes.clear();
+        result.state = "SFZ projection canceled";
+        result.execution.disposition = SfzImportExecutionDisposition::canceled;
+        result.execution.cancellationReason = finalCancellationReason;
+        context.reportProgress(SfzImportStage::canceled, 0.95f);
+        return result;
+    }
+
     auto provisionalProject = buildProvisionalProject(baseProject, result);
     if (projectUsesExplicitRoundRobin(provisionalProject)
         && (provisionalProject.schemaVersion != 3 || provisionalProject.authoring.schemaVersion != 2))
@@ -703,15 +762,43 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         return result;
     }
 
+    const auto completionCancellationReason = context.pollCancellation();
+    if (completionCancellationReason != SfzImportCancellationReason::none)
+    {
+        result.sampleSources.clear();
+        result.zones.clear();
+        result.projectNotes.clear();
+        result.authoringNotes.clear();
+        result.state = "SFZ projection canceled";
+        result.execution.disposition = SfzImportExecutionDisposition::canceled;
+        result.execution.cancellationReason = completionCancellationReason;
+        context.reportProgress(SfzImportStage::canceled, 0.98f);
+        return result;
+    }
+
     result.projected = true;
+    result.execution.disposition = SfzImportExecutionDisposition::completed;
+    result.execution.failureReason = SfzImportFailureReason::none;
     result.state = result.lossy ? "SFZ projection ready for reviewed apply" : "SFZ projection ready";
+    context.reportProgress(SfzImportStage::reviewReady, 1.0f);
     return result;
 }
 
 SfzImportProjectionResult projectSfzImportDocument(const RuntimeProjectModel& baseProject,
                                                    const std::string& sfzPath)
 {
-    return projectSfzImportAnalysis(baseProject, analyzeSfzImportDocument(sfzPath));
+    return projectSfzImportDocument(baseProject,
+                                     sfzPath,
+                                     defaultSfzImportExecutionContext());
+}
+
+SfzImportProjectionResult projectSfzImportDocument(const RuntimeProjectModel& baseProject,
+                                                   const std::string& sfzPath,
+                                                   const SfzImportExecutionContext& context)
+{
+    return projectSfzImportAnalysis(baseProject,
+                                    analyzeSfzImportDocument(sfzPath, context),
+                                    context);
 }
 
 RuntimeProjectDocumentActionResult applySfzImportProjection(AuthoringSession& authoringSession,

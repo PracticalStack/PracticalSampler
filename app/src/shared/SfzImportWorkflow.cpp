@@ -63,10 +63,20 @@ juce::String buildIssueSummary(const std::vector<std::string>& issues, std::size
 SfzImportReviewPreparationResult prepareSfzImportReview(const drs::engine::RuntimeProjectModel& baseProject,
                                                         const std::string& sfzPath)
 {
+    return prepareSfzImportReview(baseProject,
+                                   sfzPath,
+                                   drs::engine::defaultSfzImportExecutionContext());
+}
+
+SfzImportReviewPreparationResult prepareSfzImportReview(
+    const drs::engine::RuntimeProjectModel& baseProject,
+    const std::string& sfzPath,
+    const drs::engine::SfzImportExecutionContext& context)
+{
     SfzImportReviewPreparationResult result;
-    result.analysis = drs::engine::analyzeSfzImportDocument(sfzPath);
+    result.analysis = drs::engine::analyzeSfzImportDocument(sfzPath, context);
     result.reportModel = makeSfzImportReportModel(result.analysis);
-    result.projection = drs::engine::projectSfzImportAnalysis(baseProject, result.analysis);
+    result.projection = drs::engine::projectSfzImportAnalysis(baseProject, result.analysis, context);
     result.commitAllowed = result.reportModel.commitAllowed && result.projection.projected;
     result.blocking = result.analysis.report.blocking || result.projection.blocking;
     result.state = result.projection.state.empty() ? result.analysis.report.state : result.projection.state;
@@ -82,7 +92,9 @@ SfzImportReviewPreparationResult prepareSfzImportReview(const drs::engine::Runti
         result.issues.push_back("The SFZ document could not be projected into native authoring content.");
     }
 
-    result.prepared = result.analysis.report.available;
+    result.prepared = result.analysis.report.available
+        && !result.analysis.execution.canceled()
+        && !result.projection.execution.canceled();
     return result;
 }
 

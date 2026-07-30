@@ -1031,9 +1031,31 @@ OpcodeClassification classifyOpcode(const SfzResolvedOpcode& opcode)
 
 SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath)
 {
+    return analyzeSfzImportDocument(sfzPath, defaultSfzImportExecutionContext());
+}
+
+SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath,
+                                                const SfzImportExecutionContext& context)
+{
     SfzImportAnalysisResult result;
+    context.resetProgress();
+    context.reportProgress(SfzImportStage::discovering, 0.0f);
     result.analyzed = true;
-    result.parseResult = parseSfzDocument(sfzPath);
+    result.parseResult = parseSfzDocument(sfzPath, context);
+    result.execution = result.parseResult.execution;
+
+    if (result.execution.canceled())
+    {
+        result.analyzed = false;
+        result.report.stage = SfzImportStage::canceled;
+        result.report.state = "Canceled";
+        result.report.available = false;
+        result.report.execution = result.execution;
+        result.report.rootDocumentPath = result.parseResult.document.rootDocumentPath;
+        result.report.sourceFiles = result.parseResult.document.sourceFiles;
+        context.reportProgress(SfzImportStage::canceled, 0.30f);
+        return result;
+    }
 
     result.report.available = true;
     result.report.rootDocumentPath = result.parseResult.document.rootDocumentPath;
@@ -1045,18 +1067,32 @@ SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath)
 
     if (result.parseResult.parsed)
     {
-        result.normalizeResult = normalizeSfzDocument(result.parseResult.document);
+        result.normalizeResult = normalizeSfzDocument(result.parseResult.document, context);
+        result.execution = result.normalizeResult.execution;
         result.report.findings.insert(result.report.findings.end(),
                                       result.normalizeResult.findings.begin(),
                                       result.normalizeResult.findings.end());
 
+        if (result.execution.canceled())
+        {
+            result.analyzed = false;
+            result.report.stage = SfzImportStage::canceled;
+            result.report.state = "Canceled";
+            result.report.available = false;
+            result.report.execution = result.execution;
+            context.reportProgress(SfzImportStage::canceled, 0.50f);
+            return result;
+        }
+
         if (result.normalizeResult.normalized)
         {
+            context.reportProgress(SfzImportStage::validating, 0.55f);
             result.report.rootDocumentPath = result.normalizeResult.document.rootDocumentPath;
             result.report.sourceFiles = result.normalizeResult.document.sourceFiles;
             result.report.summary.sourceFileCount = result.report.sourceFiles.size();
             result.report.summary.sectionCount = result.normalizeResult.document.sections.size();
             result.report.summary.opcodeCount = 0;
+            context.reportProgress(SfzImportStage::classifying, 0.65f);
             const auto crossfadeClassifications =
                 buildVelocityCrossfadeOpcodeClassifications(result.normalizeResult.document);
             const auto roundRobinClassifications =
@@ -1066,11 +1102,39 @@ SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath)
 
             for (const auto& section : result.normalizeResult.document.sections)
             {
+                const auto cancellationReason = context.pollCancellation();
+                if (cancellationReason != SfzImportCancellationReason::none)
+                {
+                    result.analyzed = false;
+                    result.execution.disposition = SfzImportExecutionDisposition::canceled;
+                    result.execution.cancellationReason = cancellationReason;
+                    result.report.stage = SfzImportStage::canceled;
+                    result.report.state = "Canceled";
+                    result.report.available = false;
+                    result.report.execution = result.execution;
+                    context.reportProgress(SfzImportStage::canceled, 0.80f);
+                    return result;
+                }
+
                 const auto sampleReference = findEffectiveSampleReference(section);
                 result.report.summary.opcodeCount += section.localOpcodes.size();
 
                 for (const auto& opcode : section.localOpcodes)
                 {
+                    const auto opcodeCancellationReason = context.pollCancellation();
+                    if (opcodeCancellationReason != SfzImportCancellationReason::none)
+                    {
+                        result.analyzed = false;
+                        result.execution.disposition = SfzImportExecutionDisposition::canceled;
+                        result.execution.cancellationReason = opcodeCancellationReason;
+                        result.report.stage = SfzImportStage::canceled;
+                        result.report.state = "Canceled";
+                        result.report.available = false;
+                        result.report.execution = result.execution;
+                        context.reportProgress(SfzImportStage::canceled, 0.80f);
+                        return result;
+                    }
+
                     auto classification = toLowerAscii(opcode.name) == "sample"
                         ? classifySampleOpcode(section, opcode)
                         : classifyOpcode(opcode);
@@ -1119,13 +1183,47 @@ SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath)
         }
     }
 
+    const auto finalCancellationReason = context.pollCancellation();
+    if (finalCancellationReason != SfzImportCancellationReason::none)
+    {
+        result.analyzed = false;
+        result.execution.disposition = SfzImportExecutionDisposition::canceled;
+        result.execution.cancellationReason = finalCancellationReason;
+        result.report.stage = SfzImportStage::canceled;
+        result.report.state = "Canceled";
+        result.report.available = false;
+        result.report.execution = result.execution;
+        context.reportProgress(SfzImportStage::canceled, 0.95f);
+        return result;
+    }
+
     result.report.reviewDisposition = sfzImportReviewDispositionFor(result.report.findings);
     result.report.blocking = result.report.reviewDisposition == SfzImportReviewDisposition::blocked;
     result.report.stage = result.report.blocking ? SfzImportStage::blocked
                                                  : SfzImportStage::reviewReady;
     result.report.state = result.report.blocking ? "Blocked" : "Review Ready";
+    if (!result.parseResult.parsed)
+    {
+        result.execution.disposition = SfzImportExecutionDisposition::failed;
+        result.execution.failureReason = result.parseResult.execution.failureReason
+            == SfzImportFailureReason::none
+            ? SfzImportFailureReason::malformedInput
+            : result.parseResult.execution.failureReason;
+    }
+    else
+    {
+        // A blocking compatibility finding is a completed analysis with an
+        // unsupported input disposition; it is not an engine exception.
+        result.execution.disposition = SfzImportExecutionDisposition::completed;
+        result.execution.failureReason = result.report.blocking
+            ? SfzImportFailureReason::unsupportedInput
+            : SfzImportFailureReason::none;
+    }
 
     accumulateFindingSeverities(result.report.summary, result.report.findings);
+    result.report.execution = result.execution;
+    context.reportProgress(SfzImportStage::classifying, 0.80f);
+    context.reportProgress(result.report.stage, result.report.blocking ? 0.80f : 1.0f);
     return result;
 }
 } // namespace drs::engine

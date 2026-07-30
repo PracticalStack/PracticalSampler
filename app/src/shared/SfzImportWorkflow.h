@@ -25,6 +25,10 @@ struct SfzImportReviewPreparationResult
 
 SfzImportReviewPreparationResult prepareSfzImportReview(const drs::engine::RuntimeProjectModel& baseProject,
                                                         const std::string& sfzPath);
+SfzImportReviewPreparationResult prepareSfzImportReview(
+    const drs::engine::RuntimeProjectModel& baseProject,
+    const std::string& sfzPath,
+    const drs::engine::SfzImportExecutionContext& context);
 juce::String buildSfzImportIssueSummary(const SfzImportReviewPreparationResult& review,
                                         std::size_t maximumIssueCount = 8);
 juce::String buildSfzImportAppliedSummary(const SfzImportReviewPreparationResult& review);

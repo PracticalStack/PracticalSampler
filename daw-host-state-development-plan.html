@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <title>DAW Host-State Recall — Development Plan</title>
+  <title>DAW Host-State Recall — Detailed Development Plan</title>
   <style>
     :root {
       --paper:#f4f0e7; --surface:#fffdf8; --ink:#20272c; --muted:#626a70;
@@ -124,7 +124,7 @@
     <a class="back" href="code-review.html">← Back to the five-issue code review</a>
 
     <header class="hero">
-      <p class="eyebrow">Critical finding 01 · Implementation roadmap</p>
+      <p class="eyebrow">Critical finding 01 · Detailed development plan</p>
       <h1>Make DAW recall restore the authored project</h1>
       <p class="hero-copy">
         Introduce a versioned, project-aware host-state contract that restores the correct authored
@@ -142,8 +142,8 @@
     <section class="section" aria-labelledby="progress">
       <div class="heading"><h2 id="progress">Implementation progress</h2></div>
       <div class="card">
-        <p><strong>Current phase:</strong> Complete — all six phases passed their gates</p>
-        <p><strong>Current task:</strong> None — implementation and verification complete</p>
+        <p><strong>Repository baseline:</strong> The host-state envelope, asynchronous restore coordinator, processor integration, recovery lifecycle, and validation evidence are present in this checkout.</p>
+        <p><strong>Plan status:</strong> Complete for the recorded implementation pass; keep the task IDs below as the maintenance and release-qualification checklist.</p>
         <p><strong>Task states:</strong></p>
         <p>
           <code>[x] HS-001</code> · <code>[x] HS-002</code> · <code>[x] HS-003</code> ·
@@ -165,6 +165,28 @@
       </div>
     </section>
 
+    <section class="section" aria-labelledby="evidence">
+      <div class="heading"><h2 id="evidence">Repository evidence and remaining verification</h2></div>
+      <div class="grid2">
+        <article class="card">
+          <p class="label">Implemented seams</p>
+          <ul>
+            <li><code>engine_adapter/include/drs/engine/HostSessionState.h</code> and <code>engine_adapter/src/HostSessionState.cpp</code> define the bounded, versioned envelope and canonical project binding digest.</li>
+            <li><code>engine_adapter/include/drs/engine/ProjectRestoreCoordinator.h</code> and <code>engine_adapter/src/ProjectRestoreCoordinator.cpp</code> own generation-tagged asynchronous resolution, relocation, and shutdown.</li>
+            <li><code>app/src/plugin/PluginProcessor.cpp</code> publishes immutable host bytes, queues restore requests, applies validated checkpoints, and gates activation on exact publish identity.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <p class="label">Release follow-through</p>
+          <ul>
+            <li>Run the complete registered test suite and the REAPER matrix on every release build; preserve the evidence in <code>PROGRESS.md</code> and <code>docs/host-state-reaper-validation-evidence.md</code>.</li>
+            <li>Keep <code>docs/host-state-recall-adr.md</code>, <code>docs/daw-host-state-recall.md</code>, and this page synchronized when the schema or recovery policy changes.</li>
+            <li>Any schema change requires new fixtures, migration coverage, and a revised ADR before implementation begins.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
     <section class="section" aria-labelledby="outcome">
       <div class="heading"><h2 id="outcome">Target outcome</h2></div>
       <div class="grid3">
@@ -177,8 +199,8 @@
     <section class="section" aria-labelledby="problem">
       <div class="heading"><h2 id="problem">Problem statement and boundaries</h2></div>
       <div class="callout">
-        <p class="label">Current failure</p>
-        <p><code>Processor::getStateInformation()</code> exports only <code>drs.presetState</code>. On restore, the processor was already constructed with <code>buildInitialAuthoringProject()</code>; no project locator, authored document, draft revision, or published identity is available to replace it.</p>
+        <p class="label">Finding baseline</p>
+        <p>At the time of the code review, <code>Processor::getStateInformation()</code> exported only <code>drs.presetState</code>. A fresh processor therefore started from <code>buildInitialAuthoringProject()</code>; no project locator, authored document, draft revision, or published identity was available to replace it. The implementation and verification tasks below define the corrective work now recorded in this checkout.</p>
       </div>
       <div class="grid2" style="margin-top:14px">
         <article class="card">
@@ -369,7 +391,7 @@
       <div class="grid2">
         <article class="card">
           <p class="label">New files</p>
-          <ul><li><code>engine_adapter/include/drs/engine/HostSessionState.h</code></li><li><code>engine_adapter/src/HostSessionState.cpp</code></li><li><code>app/src/shared/ProjectRestoreCoordinator.h/.cpp</code></li><li><code>tests/src/HostSessionStateContractTests.cpp</code></li><li><code>tests/src/HostProjectRecallIntegrationTests.cpp</code></li><li><code>tests/src/HostProjectRecoveryTests.cpp</code></li></ul>
+          <ul><li><code>engine_adapter/include/drs/engine/HostSessionState.h</code></li><li><code>engine_adapter/src/HostSessionState.cpp</code></li><li><code>engine_adapter/include/drs/engine/ProjectRestoreCoordinator.h</code></li><li><code>engine_adapter/src/ProjectRestoreCoordinator.cpp</code></li><li><code>tests/src/HostSessionStateContractTests.cpp</code></li><li><code>tests/src/ProjectRestoreCoordinatorTests.cpp</code></li><li><code>tests/src/HostProjectRecallTests.cpp</code></li><li><code>tests/src/HostStateRecoveryUiTests.cpp</code></li><li><code>tests/src/HostStateRestoreStressTests.cpp</code></li></ul>
         </article>
         <article class="card">
           <p class="label">Primary modifications</p>

@@ -505,6 +505,13 @@ MainComponent::MainComponent(bool enableAudioOutput)
     workspaceTabs.addTab("Map", juce::Colour::fromRGB(181, 96, 21), &authoringPanel, false);
     addAndMakeVisible(workspaceTabs);
     addAndMakeVisible(restoreBanner);
+    sfzImportProgress.setCancelCallback([this]
+    {
+        if (sfzImportClient.has_value())
+            sfzImportClient->cancel("Canceled by user");
+    });
+    sfzImportProgress.setVisible(false);
+    addAndMakeVisible(sfzImportProgress);
     restoreBanner.update(processor.getProjectRestoreSnapshot());
     setSize(drs::app::authoring::expandedTargetShellWidth,
             drs::app::authoring::expandedTargetShellHeight);
@@ -519,6 +526,11 @@ MainComponent::MainComponent(bool enableAudioOutput)
 MainComponent::~MainComponent()
 {
     stopTimer();
+    if (sfzImportClient.has_value())
+    {
+        sfzImportClient->cancel("Standalone shell closed");
+        sfzImportClient->waitForTerminal(std::chrono::seconds(10));
+    }
     menuBar.setModel(nullptr);
     appProperties.saveIfNeeded();
     shutdownAudioOutput();
@@ -532,6 +544,7 @@ void MainComponent::resized()
         restoreBanner.setBounds(area.removeFromTop(42));
     else
         restoreBanner.setBounds({});
+    sfzImportProgress.setBounds(area.removeFromTop(42).reduced(8, 2));
     workspaceTabs.setBounds(area);
 }
 
@@ -659,6 +672,7 @@ void MainComponent::timerCallback()
     performancePanel.refreshNow();
     authoringPanel.refreshNow();
     updateWindowTitle();
+    pollSfzImportReviewService();
 }
 
 void MainComponent::locateProjectForRestore()
@@ -1069,55 +1083,18 @@ void MainComponent::reviewSfzImportFile(const juce::File& selectedFile)
     {
         if (!ready || safeThis == nullptr || selectedFile == juce::File())
             return;
-
-        const auto baseProject = safeThis->processor.getAuthoringSession().getProject();
-        const auto sfzPath = selectedFile.getFullPathName().toStdString();
-
-        std::thread([safeThis, baseProject, sfzPath]()
-        {
-            auto review = drs::app::prepareSfzImportReview(baseProject, sfzPath);
-            juce::MessageManager::callAsync([safeThis, review = std::move(review)]() mutable
-            {
-                if (safeThis == nullptr)
-                    return;
-
-                if (!review.prepared)
-                {
-                    juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-                                                           "Import SFZ Failed",
-                                                           drs::app::buildSfzImportIssueSummary(review));
-                    return;
-                }
-
-                auto reviewState = std::make_shared<drs::app::SfzImportReviewPreparationResult>(std::move(review));
-                drs::app::showSfzImportReviewDialog(
-                    safeThis.getComponent(),
-                    *reviewState,
-                    [safeThis, reviewState](bool accepted) mutable
-                    {
-                        if (!accepted || safeThis == nullptr)
-                            return;
-
-                        const auto appliedSummary = drs::app::buildSfzImportAppliedSummary(*reviewState);
-                        const auto importResult = drs::engine::applySfzImportProjection(
-                            safeThis->processor.getAuthoringSession(),
-                            std::move(reviewState->projection),
-                            "Import SFZ document");
-                        if (!importResult.applied)
-                        {
-                            juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-                                                                   "Import SFZ Failed",
-                                                                   safeThis->buildProjectIssueSummary(importResult.issues));
-                            return;
-                        }
-
-                        safeThis->refreshProjectViews();
-                        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon,
-                                                               "Import SFZ Complete",
-                                                               appliedSummary);
-                    });
-            });
-        }).detach();
+        const auto& session = safeThis->processor.getAuthoringSession();
+        safeThis->sfzImportProjectId = safeThis->currentProjectFile != juce::File()
+            ? safeThis->currentProjectFile.getFullPathName().toStdString()
+            : session.getProject().displayName;
+        safeThis->sfzImportBaseRevision = session.getDocumentState().revision;
+        safeThis->sfzImportClient.emplace(safeThis->processor.getSfzImportReviewService().openClient());
+        const auto submitted = safeThis->sfzImportClient->submit(
+            drs::app::SfzImportReviewRequest { session.getProject(), selectedFile.getFullPathName().toStdString(),
+                                               safeThis->sfzImportProjectId, safeThis->sfzImportBaseRevision });
+        if (submitted.disposition != drs::app::SfzImportReviewSubmitDisposition::accepted)
+            juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                                   "Import SFZ", "SFZ import could not be started.");
     };
 
     if (currentProjectFile == juce::File())
@@ -1127,6 +1104,77 @@ void MainComponent::reviewSfzImportFile(const juce::File& selectedFile)
     }
 
     beginReview(true);
+}
+
+void MainComponent::pollSfzImportReviewService()
+{
+    if (!sfzImportClient.has_value() || sfzImportReviewDialogOpen)
+        return;
+    const auto snapshot = sfzImportClient->getSnapshot();
+    if (!snapshot)
+        return;
+    sfzImportProgress.update(*snapshot);
+    if (snapshot->stage == drs::app::SfzImportReviewServiceStage::failed
+        || snapshot->stage == drs::app::SfzImportReviewServiceStage::canceled)
+    {
+        if (snapshot->stage == drs::app::SfzImportReviewServiceStage::failed)
+            juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                                   "Import SFZ Failed", juce::String(snapshot->status));
+        sfzImportClient->consume();
+        return;
+    }
+    if (snapshot->stage != drs::app::SfzImportReviewServiceStage::reviewReady || !snapshot->result)
+        return;
+    const auto currentProjectId = currentProjectFile != juce::File()
+        ? currentProjectFile.getFullPathName().toStdString()
+        : processor.getAuthoringSession().getProject().displayName;
+    if (currentProjectId != sfzImportProjectId
+        || processor.getAuthoringSession().getDocumentState().revision != sfzImportBaseRevision)
+    {
+        sfzImportClient->cancel("Project changed while SFZ import was preparing");
+        return;
+    }
+    sfzImportReviewDialogOpen = true;
+    auto reviewState = snapshot->result;
+    drs::app::showSfzImportReviewDialog(
+        this, *reviewState,
+        [safeThis = juce::Component::SafePointer<MainComponent>(this), reviewState](bool accepted) mutable
+        {
+            if (safeThis == nullptr)
+                return;
+            safeThis->sfzImportReviewDialogOpen = false;
+            if (!accepted)
+            {
+                safeThis->sfzImportClient->consume();
+                return;
+            }
+            const auto applyProjectId = safeThis->currentProjectFile != juce::File()
+                ? safeThis->currentProjectFile.getFullPathName().toStdString()
+                : safeThis->processor.getAuthoringSession().getProject().displayName;
+            if (applyProjectId != safeThis->sfzImportProjectId
+                || safeThis->processor.getAuthoringSession().getDocumentState().revision
+                    != safeThis->sfzImportBaseRevision)
+            {
+                safeThis->sfzImportClient->consume();
+                juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                                       "Import SFZ", "The project changed before apply. Please retry.");
+                return;
+            }
+            const auto appliedSummary = drs::app::buildSfzImportAppliedSummary(*reviewState);
+            const auto importResult = drs::engine::applySfzImportProjection(
+                safeThis->processor.getAuthoringSession(), reviewState->projection, "Import SFZ document");
+            safeThis->sfzImportClient->consume();
+            if (!importResult.applied)
+            {
+                juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                                       "Import SFZ Failed",
+                                                       safeThis->buildProjectIssueSummary(importResult.issues));
+                return;
+            }
+            safeThis->refreshProjectViews();
+            juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon,
+                                                   "Import SFZ Complete", appliedSummary);
+        });
 }
 
 void MainComponent::restoreSelectedZoneRootKey()

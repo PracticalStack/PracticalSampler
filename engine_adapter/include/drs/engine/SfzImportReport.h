@@ -59,6 +59,7 @@ struct SfzImportReport
     std::vector<SfzImportFinding> findings;
     std::vector<SfzImportTraceEntry> traceEntries;
     std::vector<SfzImportOpcodeSupportSummary> opcodeSupport;
+    SfzImportExecutionState execution;
 };
 
 struct SfzImportAnalysisResult
@@ -67,7 +68,10 @@ struct SfzImportAnalysisResult
     SfzDocumentParseResult parseResult;
     SfzDocumentNormalizeResult normalizeResult;
     SfzImportReport report;
+    SfzImportExecutionState execution;
 };
 
 SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath);
+SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath,
+                                                const SfzImportExecutionContext& context);
 } // namespace drs::engine

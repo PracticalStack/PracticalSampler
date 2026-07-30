@@ -11,6 +11,7 @@
 #include "drs/engine/SamplerPlaybackContext.h"
 #include "plugin/RealtimeGuard.h"
 #include "shared/AuthoringPreviewModel.h"
+#include "shared/SfzImportReviewService.h"
 
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -157,6 +158,8 @@ public:
     const drs::engine::EngineFacade& getEngineFacade() const { return engineFacade; }
     drs::engine::AuthoringSession& getAuthoringSession() { return authoringSession; }
     const drs::engine::AuthoringSession& getAuthoringSession() const { return authoringSession; }
+    drs::app::SfzImportReviewService& getSfzImportReviewService() { return sfzImportReviewService; }
+    const drs::app::SfzImportReviewService& getSfzImportReviewService() const { return sfzImportReviewService; }
     juce::AudioProcessorValueTreeState& getParameterState() { return parameterState; }
     const juce::AudioProcessorValueTreeState& getParameterState() const { return parameterState; }
     drs::app::AuthoringWaveformPreview getAuthoringWaveformPreview();
@@ -410,6 +413,7 @@ private:
     drs::app::AuthoringImportResponsivenessSnapshot authoringImportResponsivenessSnapshot;
     drs::engine::HostProjectBinding authoringProjectBinding;
     drs::engine::ProjectRestoreCoordinator projectRestoreCoordinator;
+    drs::app::SfzImportReviewService sfzImportReviewService;
     std::shared_ptr<const std::string> serializedHostStatePublication;
     std::shared_ptr<const std::string> latestSubmittedHostState;
     std::string hostStatePublicationKey;

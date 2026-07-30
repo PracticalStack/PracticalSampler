@@ -13,6 +13,8 @@ set(DRS_APP_SHARED_SOURCES
     src/shared/ProjectStorage.cpp
     src/shared/ProjectStorage.h
     src/shared/SfzImportReportModel.h
+    src/shared/SfzImportReviewService.cpp
+    src/shared/SfzImportReviewService.h
     src/shared/SfzImportWorkflow.cpp
     src/shared/SfzImportWorkflow.h
     src/shared/StatusPanel.cpp

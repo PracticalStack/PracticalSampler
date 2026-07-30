@@ -38,6 +38,7 @@ struct SfzDocumentParseResult
     std::string state;
     std::vector<SfzImportFinding> findings;
     SfzParsedDocument document;
+    SfzImportExecutionState execution;
 };
 
 struct SfzResolvedOpcode
@@ -73,10 +74,15 @@ struct SfzDocumentNormalizeResult
     std::string state;
     std::vector<SfzImportFinding> findings;
     SfzNormalizedDocument document;
+    SfzImportExecutionState execution;
 };
 
 SfzDocumentParseResult parseSfzDocument(const std::string& sfzPath);
+SfzDocumentParseResult parseSfzDocument(const std::string& sfzPath,
+                                        const SfzImportExecutionContext& context);
 SfzDocumentNormalizeResult normalizeSfzDocument(const SfzParsedDocument& document);
+SfzDocumentNormalizeResult normalizeSfzDocument(const SfzParsedDocument& document,
+                                                const SfzImportExecutionContext& context);
 const SfzResolvedOpcode* findEffectiveOpcode(const SfzNormalizedSection& section,
                                              const std::string& opcodeName) noexcept;
 } // namespace drs::engine

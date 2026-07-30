@@ -78,6 +78,7 @@ private:
     void confirmSafeToDiscardChanges(const juce::String& nextAction, std::function<void(bool)> completion);
     void refreshProjectViews();
     void updateWindowTitle();
+    void pollSfzImportReviewService();
     drs::engine::RuntimeProjectModel buildUnloadedProjectState() const;
     drs::engine::RuntimeProjectModel buildEmptyProjectTemplate() const;
     juce::String buildWindowTitle() const;
@@ -112,6 +113,7 @@ private:
     drs::app::PerformancePanel performancePanel;
     drs::app::AuthoringPanel authoringPanel;
     drs::app::HostStateRecoveryBanner restoreBanner;
+    drs::app::SfzImportProgressComponent sfzImportProgress;
     juce::AudioDeviceManager audioDeviceManager;
     juce::AudioProcessorPlayer audioProcessorPlayer;
     mutable juce::ApplicationProperties appProperties;
@@ -119,5 +121,9 @@ private:
     juce::File currentProjectFile;
     bool audioOutputEnabled = false;
     juce::String audioDeviceError;
+    std::optional<drs::app::SfzImportReviewService::Client> sfzImportClient;
+    std::string sfzImportProjectId;
+    std::size_t sfzImportBaseRevision = 0;
+    bool sfzImportReviewDialogOpen = false;
 };
 } // namespace drs::standalone

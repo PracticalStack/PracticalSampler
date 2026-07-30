@@ -136,20 +136,36 @@ bool parseIncludeDirective(const std::string& line, std::string& includePath)
 
 using ResolvedOpcodeMap = std::map<std::string, SfzResolvedOpcode>;
 
-ResolvedOpcodeMap buildLocalOpcodeMap(const SfzParsedSection& section)
+ResolvedOpcodeMap buildLocalOpcodeMap(const SfzParsedSection& section,
+                                      const SfzImportExecutionContext& context,
+                                      bool& canceled)
 {
     ResolvedOpcodeMap map;
     for (const auto& opcode : section.opcodes)
     {
+        if (context.isCancellationRequested())
+        {
+            canceled = true;
+            break;
+        }
         map[opcode.name] = { opcode.name, opcode.value, opcode.location, false };
     }
     return map;
 }
 
-void overlayOpcodes(ResolvedOpcodeMap& destination, const ResolvedOpcodeMap& source, bool inherited)
+void overlayOpcodes(ResolvedOpcodeMap& destination,
+                    const ResolvedOpcodeMap& source,
+                    bool inherited,
+                    const SfzImportExecutionContext& context,
+                    bool& canceled)
 {
     for (const auto& [name, opcode] : source)
     {
+        if (context.isCancellationRequested())
+        {
+            canceled = true;
+            break;
+        }
         auto resolved = opcode;
         resolved.inherited = inherited;
         destination[name] = std::move(resolved);
@@ -170,8 +186,14 @@ bool parseFileRecursive(const fs::path& filePath,
                         std::vector<SfzImportFinding>& findings,
                         std::vector<fs::path>& includeStack,
                         std::size_t& currentSectionIndex,
-                        std::size_t& nextDocumentOrder)
+                        std::size_t& nextDocumentOrder,
+                        const SfzImportExecutionContext& context,
+                        SfzImportCancellationReason& cancellationReason)
 {
+    cancellationReason = context.pollCancellation();
+    if (cancellationReason != SfzImportCancellationReason::none)
+        return false;
+
     const auto normalizedPath = filePath.lexically_normal();
     const auto cycleIterator = std::find(includeStack.begin(), includeStack.end(), normalizedPath);
     if (cycleIterator != includeStack.end())
@@ -208,6 +230,10 @@ bool parseFileRecursive(const fs::path& filePath,
 
     while (std::getline(input, rawLine))
     {
+        cancellationReason = context.pollCancellation();
+        if (cancellationReason != SfzImportCancellationReason::none)
+            break;
+
         ++lineNumber;
         if (!rawLine.empty() && rawLine.back() == '\r')
             rawLine.pop_back();
@@ -220,13 +246,21 @@ bool parseFileRecursive(const fs::path& filePath,
         std::string includePath;
         if (parseIncludeDirective(line, includePath))
         {
+            cancellationReason = context.pollCancellation();
+            if (cancellationReason != SfzImportCancellationReason::none)
+                break;
+
             const auto resolvedIncludePath = (normalizedPath.parent_path() / fs::path(includePath)).lexically_normal();
             const auto includeComplete = parseFileRecursive(resolvedIncludePath,
                                                             document,
                                                             findings,
                                                             includeStack,
                                                             currentSectionIndex,
-                                                            nextDocumentOrder);
+                                                            nextDocumentOrder,
+                                                            context,
+                                                            cancellationReason);
+            if (cancellationReason != SfzImportCancellationReason::none)
+                break;
             complete = includeComplete && complete;
             continue;
         }
@@ -414,20 +448,39 @@ bool parseFileRecursive(const fs::path& filePath,
 
 SfzDocumentParseResult parseSfzDocument(const std::string& sfzPath)
 {
+    return parseSfzDocument(sfzPath, defaultSfzImportExecutionContext());
+}
+
+SfzDocumentParseResult parseSfzDocument(const std::string& sfzPath,
+                                        const SfzImportExecutionContext& context)
+{
     SfzDocumentParseResult result;
+    context.reportProgress(SfzImportStage::discovering, 0.0f);
     result.document.rootDocumentPath = toDisplayPath(fs::path(sfzPath));
     result.state = "Discovering";
 
     std::size_t currentSectionIndex = static_cast<std::size_t>(-1);
     std::size_t nextDocumentOrder = 0;
     std::vector<fs::path> includeStack;
+    SfzImportCancellationReason cancellationReason = SfzImportCancellationReason::none;
 
     const auto complete = parseFileRecursive(fs::path(sfzPath),
                                              result.document,
                                              result.findings,
                                              includeStack,
                                              currentSectionIndex,
-                                             nextDocumentOrder);
+                                             nextDocumentOrder,
+                                             context,
+                                             cancellationReason);
+
+    if (cancellationReason != SfzImportCancellationReason::none)
+    {
+        result.execution.disposition = SfzImportExecutionDisposition::canceled;
+        result.execution.cancellationReason = cancellationReason;
+        result.state = "Canceled";
+        context.reportProgress(SfzImportStage::canceled, 0.30f);
+        return result;
+    }
 
     result.parsed = result.findings.end()
         == std::find_if(result.findings.begin(),
@@ -439,18 +492,53 @@ SfzDocumentParseResult parseSfzDocument(const std::string& sfzPath)
     result.complete = complete && result.parsed;
 
     if (!result.parsed)
+    {
         result.state = "Blocked";
+        result.execution.disposition = SfzImportExecutionDisposition::failed;
+        result.execution.failureReason = std::any_of(result.findings.begin(),
+                                                     result.findings.end(),
+                                                     [](const auto& finding)
+                                                     {
+                                                         return finding.code == "source.missing";
+                                                     })
+            ? SfzImportFailureReason::sourceMissing
+            : SfzImportFailureReason::malformedInput;
+    }
     else if (!result.complete)
+    {
         result.state = "Parsed With Findings";
+        result.execution.disposition = SfzImportExecutionDisposition::completed;
+    }
     else
+    {
         result.state = "Parsed";
+        result.execution.disposition = SfzImportExecutionDisposition::completed;
+    }
+
+    context.reportProgress(SfzImportStage::parsing, 0.30f);
 
     return result;
 }
 
 SfzDocumentNormalizeResult normalizeSfzDocument(const SfzParsedDocument& document)
 {
+    return normalizeSfzDocument(document, defaultSfzImportExecutionContext());
+}
+
+SfzDocumentNormalizeResult normalizeSfzDocument(const SfzParsedDocument& document,
+                                                const SfzImportExecutionContext& context)
+{
     SfzDocumentNormalizeResult result;
+    context.reportProgress(SfzImportStage::normalizing, 0.30f);
+    const auto initialCancellationReason = context.pollCancellation();
+    if (initialCancellationReason != SfzImportCancellationReason::none)
+    {
+        result.execution.disposition = SfzImportExecutionDisposition::canceled;
+        result.execution.cancellationReason = initialCancellationReason;
+        result.state = "Canceled";
+        context.reportProgress(SfzImportStage::canceled, 0.50f);
+        return result;
+    }
     result.document.rootDocumentPath = document.rootDocumentPath;
     result.document.sourceFiles = document.sourceFiles;
     result.state = "Normalizing";
@@ -464,43 +552,67 @@ SfzDocumentNormalizeResult normalizeSfzDocument(const SfzParsedDocument& documen
 
     for (const auto& parsedSection : document.sections)
     {
-        const auto localMap = buildLocalOpcodeMap(parsedSection);
+        const auto cancellationReason = context.pollCancellation();
+        if (cancellationReason != SfzImportCancellationReason::none)
+        {
+            result.execution.disposition = SfzImportExecutionDisposition::canceled;
+            result.execution.cancellationReason = cancellationReason;
+            result.state = "Canceled";
+            result.document.sections.clear();
+            context.reportProgress(SfzImportStage::canceled, 0.50f);
+            return result;
+        }
+
+        auto canceled = false;
+        const auto localMap = buildLocalOpcodeMap(parsedSection, context, canceled);
+        if (canceled)
+        {
+            const auto reason = context.pollCancellation();
+            result.execution.disposition = SfzImportExecutionDisposition::canceled;
+            result.execution.cancellationReason = reason == SfzImportCancellationReason::none
+                ? SfzImportCancellationReason::requested
+                : reason;
+            result.state = "Canceled";
+            result.document.sections.clear();
+            context.reportProgress(SfzImportStage::canceled, 0.50f);
+            return result;
+        }
         ResolvedOpcodeMap effective;
 
         switch (parsedSection.scope)
         {
             case SfzOpcodeScope::control:
-                overlayOpcodes(activeControl, localMap, false);
+                overlayOpcodes(activeControl, localMap, false, context, canceled);
                 effective = activeControl;
                 break;
 
             case SfzOpcodeScope::global:
-                overlayOpcodes(activeGlobal, localMap, false);
-                overlayOpcodes(effective, activeControl, true);
-                overlayOpcodes(effective, activeGlobal, false);
+                overlayOpcodes(activeGlobal, localMap, false, context, canceled);
+                overlayOpcodes(effective, activeControl, true, context, canceled);
+                overlayOpcodes(effective, activeGlobal, false, context, canceled);
                 break;
 
             case SfzOpcodeScope::master:
                 activeMaster = localMap;
-                overlayOpcodes(effective, activeControl, true);
-                overlayOpcodes(effective, activeGlobal, true);
-                overlayOpcodes(effective, activeMaster, false);
+                overlayOpcodes(effective, activeControl, true, context, canceled);
+                overlayOpcodes(effective, activeGlobal, true, context, canceled);
+                overlayOpcodes(effective, activeMaster, false, context, canceled);
                 break;
 
             case SfzOpcodeScope::group:
                 activeGroup = localMap;
-                overlayOpcodes(effective, activeControl, true);
-                overlayOpcodes(effective, activeGlobal, true);
-                overlayOpcodes(effective, activeMaster, true);
-                overlayOpcodes(effective, activeGroup, false);
+                overlayOpcodes(effective, activeControl, true, context, canceled);
+                overlayOpcodes(effective, activeGlobal, true, context, canceled);
+                overlayOpcodes(effective, activeMaster, true, context, canceled);
+                overlayOpcodes(effective, activeGroup, false, context, canceled);
                 break;
 
             case SfzOpcodeScope::region:
-                overlayOpcodes(effective, activeControl, true);
-                overlayOpcodes(effective, activeGlobal, true);
-                overlayOpcodes(effective, activeMaster, true);
-                overlayOpcodes(effective, activeGroup, true);
-                overlayOpcodes(effective, localMap, false);
+                overlayOpcodes(effective, activeControl, true, context, canceled);
+                overlayOpcodes(effective, activeGlobal, true, context, canceled);
+                overlayOpcodes(effective, activeMaster, true, context, canceled);
+                overlayOpcodes(effective, activeGroup, true, context, canceled);
+                overlayOpcodes(effective, localMap, false, context, canceled);
                 break;
 
             case SfzOpcodeScope::curve:
@@ -510,6 +622,19 @@ SfzDocumentNormalizeResult normalizeSfzDocument(const SfzParsedDocument& documen
             case SfzOpcodeScope::unknown:
                 effective = localMap;
                 break;
+        }
+
+        if (canceled)
+        {
+            const auto reason = context.pollCancellation();
+            result.execution.disposition = SfzImportExecutionDisposition::canceled;
+            result.execution.cancellationReason = reason == SfzImportCancellationReason::none
+                ? SfzImportCancellationReason::requested
+                : reason;
+            result.state = "Canceled";
+            result.document.sections.clear();
+            context.reportProgress(SfzImportStage::canceled, 0.50f);
+            return result;
         }
 
         SfzNormalizedSection normalizedSection;
@@ -527,7 +652,9 @@ SfzDocumentNormalizeResult normalizeSfzDocument(const SfzParsedDocument& documen
     }
 
     result.normalized = true;
+    result.execution.disposition = SfzImportExecutionDisposition::completed;
     result.state = "Normalized";
+    context.reportProgress(SfzImportStage::normalizing, 0.50f);
     return result;
 }
 

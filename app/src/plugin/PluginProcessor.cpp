@@ -429,6 +429,7 @@ Processor::Processor()
 Processor::~Processor()
 {
     stopTimer();
+    sfzImportReviewService.shutdown();
     projectRestoreCoordinator.shutdown();
 
     for (const auto& macro : engineFacade.getMacroDescriptors())

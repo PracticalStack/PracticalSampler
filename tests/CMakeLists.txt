@@ -846,6 +846,27 @@ add_test(
     COMMAND drs_sprint31_sfz_parser_tests
 )
 
+add_executable(drs_sprint31_sfz_cancellation_tests
+    src/SfzImportCancellationTests.cpp
+)
+
+target_link_libraries(drs_sprint31_sfz_cancellation_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_definitions(drs_sprint31_sfz_cancellation_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_sprint31_sfz_cancellation_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint31.sfz_cancellation
+    COMMAND drs_sprint31_sfz_cancellation_tests
+)
+
 add_executable(drs_sprint31_sfz_normalization_tests
     src/Sprint31SfzNormalizationTests.cpp
 )
@@ -992,6 +1013,35 @@ add_test(
     NAME drs.sprint31.sfz_determinism
     COMMAND drs_sprint31_sfz_determinism_tests
 )
+
+add_executable(drs_sfz_import_lifecycle_tests
+    src/SfzImportLifecycleTests.cpp
+)
+
+target_link_libraries(drs_sfz_import_lifecycle_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+)
+
+target_compile_definitions(drs_sfz_import_lifecycle_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_sfz_import_lifecycle_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sfz_import.lifecycle
+    COMMAND drs_sfz_import_lifecycle_tests
+)
+
+add_executable(drs_sfz_import_shell_lifecycle_tests
+    src/SfzImportShellLifecycleTests.cpp
+)
+target_compile_definitions(drs_sfz_import_shell_lifecycle_tests PRIVATE DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
+target_compile_features(drs_sfz_import_shell_lifecycle_tests PRIVATE cxx_std_17)
+add_test(NAME drs.sfz_import.shell_lifecycle COMMAND drs_sfz_import_shell_lifecycle_tests)
 
 # Phase 3 crossfade Sprint 1 contract and fixture baseline.
 add_executable(drs_phase3_crossfade_contract_tests
@@ -2511,6 +2561,8 @@ add_dependencies(drs_all_tests
     drs_sprint31_sfz_compatibility_tests
     drs_sprint31_sfz_report_model_tests
     drs_sprint31_sfz_projection_tests
+    drs_sfz_import_lifecycle_tests
+    drs_sfz_import_shell_lifecycle_tests
     drs_sprint31_sfz_contract_red_tests
     drs_phase3_crossfade_contract_tests
     drs_phase3_crossfade_fixture_characterization_tests

@@ -8,6 +8,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_extra/juce_gui_extra.h>
 
+#include <optional>
+
 namespace drs::plugin
 {
 class Editor final : public juce::AudioProcessorEditor,
@@ -53,6 +55,7 @@ private:
     void confirmSafeToDiscardChanges(const juce::String& nextAction, std::function<void(bool)> completion);
     void refreshProjectViews();
     void updateProjectStatusLabel();
+    void pollSfzImportReviewService();
     drs::engine::RuntimeProjectModel buildUnloadedProjectState() const;
     drs::engine::RuntimeProjectModel buildEmptyProjectTemplate() const;
     juce::String buildProjectIssueSummary(const std::vector<std::string>& issues) const;
@@ -87,7 +90,12 @@ private:
     drs::app::PerformancePanel performancePanel;
     drs::app::AuthoringPanel authoringPanel;
     drs::app::HostStateRecoveryBanner restoreBanner;
+    drs::app::SfzImportProgressComponent sfzImportProgress;
     mutable juce::ApplicationProperties appProperties;
     std::unique_ptr<juce::FileChooser> activeFileChooser;
+    std::optional<drs::app::SfzImportReviewService::Client> sfzImportClient;
+    std::string sfzImportProjectId;
+    std::size_t sfzImportBaseRevision = 0;
+    bool sfzImportReviewDialogOpen = false;
 };
 } // namespace drs::plugin
