@@ -108,6 +108,7 @@ private:
     void applySelectedGroupNameEdit();
     void applySelectedGroupMixEdit(const juce::String& label);
     void createGroup();
+    void assignSelectedZonesToSelectedGroup();
     void deleteSelectedGroup();
     void moveSelectedGroup(int direction);
     void toggleSelectedGroupVisibility();
@@ -141,6 +142,7 @@ private:
     void timerCallback(int timerId) override;
     authoring::SelectionSummaryViewModel buildSelectionSummaryViewModel() const;
     authoring::ZoneFieldValuesViewModel buildZoneFieldValuesViewModel() const;
+    std::vector<std::string> collectSelectedZoneIdsForGrouping() const;
 
     drs::engine::AuthoringSession& authoringSession;
     WaveformPreviewProvider waveformPreviewProvider;
@@ -205,6 +207,7 @@ private:
     juce::Label groupNameLabel;
     juce::TextEditor groupNameEditor;
     juce::TextButton groupCreateButton;
+    juce::TextButton groupAssignZonesButton;
     juce::TextButton groupPreviewAnchorButton;
     authoring::RepeatedStructureList groupList;
     juce::TextButton groupMoveUpButton;

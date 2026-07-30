@@ -1,4 +1,5 @@
 #include "drs/engine/AuthoringSession.h"
+#include "drs/engine/SampleImport.h"
 #include "drs/engine/RuntimeLoader.h"
 
 #include <algorithm>
@@ -986,21 +987,26 @@ RuntimeProjectDocumentActionResult AuthoringSession::reassignZoneToGroup(const s
                                                                          const std::string& groupId,
                                                                          const std::string& label)
 {
+    return reassignZonesToGroup({ zoneId }, groupId, label);
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::reassignZonesToGroup(const std::vector<std::string>& zoneIds,
+                                                                          const std::string& groupId,
+                                                                          const std::string& label)
+{
     auto project = getProject();
     if (!usesExplicitZoneGroupsSchema(project))
         return makeRejectedResult(getDocumentState(),
                                   "Zone reassignment rejected",
                                   "This project schema does not support explicit authored groups.");
+    if (zoneIds.empty())
+        return makeRejectedResult(getDocumentState(),
+                                  "Zone reassignment rejected",
+                                  "Select at least one zone before assigning it to a group.");
     if (groupId.empty())
         return makeRejectedResult(getDocumentState(),
                                   "Zone reassignment rejected",
                                   "Zones must always belong to a non-empty target group id.");
-
-    const auto zoneIndex = findZoneIndexById(project, zoneId);
-    if (!zoneIndex.has_value())
-        return makeRejectedResult(getDocumentState(),
-                                  "Zone reassignment rejected",
-                                  "Zone '" + zoneId + "' does not exist in the current authoring project.");
 
     const auto targetGroupIndex = findGroupIndexById(project, groupId);
     if (!targetGroupIndex.has_value())
@@ -1008,31 +1014,69 @@ RuntimeProjectDocumentActionResult AuthoringSession::reassignZoneToGroup(const s
                                   "Zone reassignment rejected",
                                   "Target group '" + groupId + "' does not exist in the current authoring project.");
 
-    auto& zone = project.authoring.zones[*zoneIndex];
-    if (zone.groupId == groupId)
+    std::vector<std::size_t> zoneIndices;
+    zoneIndices.reserve(zoneIds.size());
+    for (const auto& zoneId : zoneIds)
+    {
+        const auto zoneIndex = findZoneIndexById(project, zoneId);
+        if (!zoneIndex.has_value())
+            return makeRejectedResult(getDocumentState(),
+                                      "Zone reassignment rejected",
+                                      "Zone '" + zoneId + "' does not exist in the current authoring project.");
+
+        if (std::find(zoneIndices.begin(), zoneIndices.end(), *zoneIndex) == zoneIndices.end())
+            zoneIndices.push_back(*zoneIndex);
+    }
+
+    std::vector<std::string> previousGroupIds;
+    previousGroupIds.reserve(zoneIndices.size());
+    bool anyChanged = false;
+    bool selectedZoneMoved = false;
+    for (const auto zoneIndex : zoneIndices)
+    {
+        auto& zone = project.authoring.zones[zoneIndex];
+        previousGroupIds.push_back(zone.groupId);
+        if (zone.groupId == groupId)
+            continue;
+
+        zone.groupId = groupId;
+        anyChanged = true;
+        selectedZoneMoved = selectedZoneMoved || project.authoring.selectedZoneId == zone.id;
+    }
+
+    if (!anyChanged)
+    {
         return makeRejectedResult(getDocumentState(),
                                   "Zone reassignment rejected",
-                                  "Zone '" + zoneId + "' is already assigned to group '" + groupId + "'.");
+                                  zoneIndices.size() == 1
+                                      ? "Zone '" + zoneIds.front() + "' is already assigned to group '" + groupId + "'."
+                                      : "Every selected zone is already assigned to group '" + groupId + "'.");
+    }
 
-    const auto previousGroupId = zone.groupId;
-    zone.groupId = groupId;
     ensureExplicitZoneGroups(project);
 
     std::vector<std::string> changedPaths {
-        "authoring.zones[" + std::to_string(*zoneIndex) + "]",
+        "authoring.zones",
         "authoring.groups"
     };
-    if (project.authoring.selectedZoneId == zoneId)
+    if (selectedZoneMoved)
     {
         project.authoring.selectedGroupId = groupId;
         changedPaths.push_back("authoring.selectedGroupId");
     }
-    else if (project.authoring.selectedGroupId == previousGroupId
-             && !groupHasMembers(project, previousGroupId))
+    else if (project.authoring.selectedGroupId != groupId)
     {
-        applyFallbackGroupSelection(project, groupId);
-        changedPaths.push_back("authoring.selectedGroupId");
-        changedPaths.push_back("authoring.selectedZoneId");
+        for (const auto& previousGroupId : previousGroupIds)
+        {
+            if (project.authoring.selectedGroupId == previousGroupId
+                && !groupHasMembers(project, previousGroupId))
+            {
+                applyFallbackGroupSelection(project, groupId);
+                changedPaths.push_back("authoring.selectedGroupId");
+                changedPaths.push_back("authoring.selectedZoneId");
+                break;
+            }
+        }
     }
 
     return documentController.commitSnapshot(project, label, changedPaths);
@@ -1414,6 +1458,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
     project.authoring.zones.insert(project.authoring.zones.end(),
                                    std::make_move_iterator(zones.begin()),
                                    std::make_move_iterator(zones.end()));
+    reconcileBatchInferredRoundRobinDescriptors(project.authoring.zones);
     project.notes.insert(project.notes.end(),
                          std::make_move_iterator(projectNotes.begin()),
                          std::make_move_iterator(projectNotes.end()));

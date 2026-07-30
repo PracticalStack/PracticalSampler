@@ -1,6 +1,7 @@
 #include "drs/engine/AuthoringSession.h"
 #include "drs/engine/ProjectDocument.h"
 #include "drs/engine/RuntimeLoader.h"
+#include "drs/engine/SampleImport.h"
 
 #include <filesystem>
 #include <fstream>
@@ -141,6 +142,61 @@ int main()
                 "Imported draft content should select the imported group for schemaVersion 4 projects.");
         require(blankSession.getDocumentState().dirty,
                 "Imported draft content should mark the authoring project dirty.");
+
+        drs::engine::RuntimeProjectGroupDefinition reassignedGroup;
+        reassignedGroup.id = "reassigned-group";
+        reassignedGroup.displayName = "Reassigned Group";
+        reassignedGroup.workspaceVisible = true;
+        const auto createGroupResult = blankSession.createGroup(reassignedGroup, "Create reassignment group");
+        require(createGroupResult.applied,
+                "Phase 2 authoring sessions should allow empty explicit groups to be created.");
+
+        const auto reassignResult = blankSession.reassignZonesToGroup({ "imported-pad-a3" },
+                                                                      "reassigned-group",
+                                                                      "Move zone into reassigned group");
+        require(reassignResult.applied,
+                "Phase 2 authoring sessions should allow zones to move into another explicit group.");
+        require(blankSession.getProject().authoring.zones[0].groupId == "reassigned-group",
+                "Zone reassignment should persist the new group id onto the zone.");
+        require(blankSession.getProject().authoring.selectedGroupId == "reassigned-group",
+                "Reassigning the selected zone should keep group selection aligned with the moved zone.");
+
+        drs::engine::RuntimeProjectSampleSource secondImportedSampleSource;
+        secondImportedSampleSource.id = "imported-sine-a3-rr2";
+        secondImportedSampleSource.path = phase2Project.project.sampleSources[0].path;
+        secondImportedSampleSource.role = "imported-sustain";
+
+        drs::engine::RuntimeProjectZoneDefinition secondImportedZone;
+        secondImportedZone.id = "imported-pad-a3-rr2";
+        secondImportedZone.sampleSourceId = secondImportedSampleSource.id;
+        secondImportedZone.displayName = "Imported Pad A3 RR2";
+        secondImportedZone.groupId = "imported-group";
+        secondImportedZone.articulationId = "sustain";
+        secondImportedZone.rootKey = 60;
+        secondImportedZone.keyLow = 60;
+        secondImportedZone.keyHigh = 60;
+        secondImportedZone.velocityLow = 1;
+        secondImportedZone.velocityHigh = 127;
+        secondImportedZone.roundRobin = drs::engine::RoundRobinDescriptor {
+            "rr-import-test",
+            2,
+            2,
+            drs::engine::RoundRobinMode::sequential
+        };
+        secondImportedZone.roundRobinLength = 2;
+        secondImportedZone.roundRobinPosition = 2;
+
+        const auto secondAppendResult = blankSession.appendImportedContent({ secondImportedSampleSource },
+                                                                           { secondImportedZone },
+                                                                           "Import second draft sample");
+        require(secondAppendResult.applied,
+                "Session import should heal incomplete single-zone round-robin descriptors instead of rejecting them.");
+        require(blankSession.getProject().authoring.zones.size() == 2,
+                "Second imported draft content should append its authoring zone.");
+        require(!blankSession.getProject().authoring.zones[1].roundRobin.has_value()
+                    && blankSession.getProject().authoring.zones[1].roundRobinLength == 0
+                    && blankSession.getProject().authoring.zones[1].roundRobinPosition == 0,
+                "Session import should clear incomplete single-zone round-robin metadata before validation.");
 
         const auto serializedPhase2Project = drs::engine::serializeRuntimeProjectManifest(phase2Project.project,
                                                                                            phase2ProjectPath.generic_string());

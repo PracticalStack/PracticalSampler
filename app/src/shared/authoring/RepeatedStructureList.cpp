@@ -45,6 +45,8 @@ class RepeatedStructureList::RowComponent final : public juce::Component
 public:
     RowComponent()
     {
+        setInterceptsMouseClicks(false, true);
+
         titleLabel.setFont(juce::FontOptions(12.5f, juce::Font::bold));
         titleLabel.setJustificationType(juce::Justification::centredLeft);
         titleLabel.setInterceptsMouseClicks(false, false);

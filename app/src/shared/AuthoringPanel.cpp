@@ -140,6 +140,17 @@ juce::String formatZoneRange(const drs::engine::AuthoringZoneSummary& zone)
     return text;
 }
 
+juce::String buildIssueSummary(const std::vector<std::string>& issues)
+{
+    if (issues.empty())
+        return "The requested action could not be completed.";
+
+    juce::StringArray lines;
+    for (const auto& issue : issues)
+        lines.add(juce::String::fromUTF8(issue.c_str()));
+    return lines.joinIntoString("\n");
+}
+
 juce::String formatMicros(std::uint64_t micros);
 
 juce::String formatAuthoringPreviewStatus(const drs::app::AuthoringPreviewStatusSnapshot& status)
@@ -771,6 +782,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     groupNameLabel.setComponentID("authoringGroupNameLabel");
     groupNameEditor.setComponentID("authoringGroupNameEditor");
     groupCreateButton.setComponentID("authoringGroupCreateButton");
+    groupAssignZonesButton.setComponentID("authoringGroupAssignZonesButton");
     groupPreviewAnchorButton.setComponentID("authoringGroupPreviewAnchorButton");
     groupMoveUpButton.setComponentID("authoringGroupMoveUpButton");
     groupMoveDownButton.setComponentID("authoringGroupMoveDownButton");
@@ -942,12 +954,18 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
             return;
 
         selectedGroupIndex = nextIndex;
-        authoringSession.selectGroup(groups[static_cast<std::size_t>(nextIndex)].id);
+        const auto result = authoringSession.selectGroup(groups[static_cast<std::size_t>(nextIndex)].id);
+        if (!result.applied)
+            return;
+
+        setActiveDrawerTab(authoring::DrawerTab::groups);
         refreshFromSession();
     });
 
     groupCreateButton.setButtonText("New Group");
     groupCreateButton.onClick = [this] { createGroup(); };
+    groupAssignZonesButton.setButtonText("Add Selected Zones");
+    groupAssignZonesButton.onClick = [this] { assignSelectedZonesToSelectedGroup(); };
     groupPreviewAnchorButton.setButtonText("Preview Anchor");
     groupPreviewAnchorButton.onClick = [this] { previewSelectedGroupAnchor(); };
     groupMoveUpButton.setButtonText("Move Up");
@@ -1263,6 +1281,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&groupNameLabel),
              static_cast<juce::Component*>(&groupNameEditor),
              static_cast<juce::Component*>(&groupCreateButton),
+             static_cast<juce::Component*>(&groupAssignZonesButton),
              static_cast<juce::Component*>(&groupPreviewAnchorButton),
              static_cast<juce::Component*>(&groupList),
              static_cast<juce::Component*>(&groupMoveUpButton),
@@ -1602,6 +1621,10 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "Delete group",
                                 "Deletes the selected group when it has no remaining member zones.",
                                 "Press to delete the selected empty group.");
+    configureAccessibleMetadata(groupAssignZonesButton,
+                                "Add selected zones to group",
+                                "Assigns the current selected zone or zone-map multi-selection into the selected group.",
+                                "Press to add the selected zone or selected zones to the current group.");
     configureAccessibleMetadata(groupSummaryLabel,
                                 "Group summary",
                                 "Summarizes the current selected-group state.");
@@ -1633,10 +1656,11 @@ void AuthoringPanel::configureAccessibilityAndFocus()
     groupRoutingSelector.setExplicitFocusOrder(74);
     groupAnchorSelector.setExplicitFocusOrder(75);
     groupDeleteButton.setExplicitFocusOrder(76);
-    groupCreateRoundRobinPoolButton.setExplicitFocusOrder(77);
-    groupAddCompatibleZonesButton.setExplicitFocusOrder(78);
-    groupNormalizeRoundRobinPoolButton.setExplicitFocusOrder(79);
-    groupRemoveRoundRobinAnchorButton.setExplicitFocusOrder(80);
+    groupAssignZonesButton.setExplicitFocusOrder(77);
+    groupCreateRoundRobinPoolButton.setExplicitFocusOrder(78);
+    groupAddCompatibleZonesButton.setExplicitFocusOrder(79);
+    groupNormalizeRoundRobinPoolButton.setExplicitFocusOrder(80);
+    groupRemoveRoundRobinAnchorButton.setExplicitFocusOrder(81);
 
     configureAccessibleMetadata(performanceBankSelector,
                                 "Performance bank selector",
@@ -1918,11 +1942,16 @@ void AuthoringPanel::resized()
         if (expanded)
         {
             auto actionRow = drawerEditorArea.removeFromTop(actionRowHeight);
+            groupAssignZonesButton.setBounds(actionRow);
+            drawerEditorArea.removeFromTop(2);
+
+            actionRow = drawerEditorArea.removeFromTop(actionRowHeight);
             auto leftAction = actionRow.removeFromLeft((actionRow.getWidth() - 8) / 2);
             actionRow.removeFromLeft(8);
             groupCreateRoundRobinPoolButton.setBounds(leftAction);
             groupAddCompatibleZonesButton.setBounds(actionRow);
             drawerEditorArea.removeFromTop(2);
+
             actionRow = drawerEditorArea.removeFromTop(actionRowHeight);
             leftAction = actionRow.removeFromLeft((actionRow.getWidth() - 8) / 2);
             actionRow.removeFromLeft(8);
@@ -1932,6 +1961,10 @@ void AuthoringPanel::resized()
         else
         {
             auto actionRow = drawerEditorArea.removeFromTop(actionRowHeight);
+            groupAssignZonesButton.setBounds(actionRow);
+            drawerEditorArea.removeFromTop(2);
+
+            actionRow = drawerEditorArea.removeFromTop(actionRowHeight);
             const auto buttonWidth = std::max(1, (actionRow.getWidth() - 9) / 4);
             groupCreateRoundRobinPoolButton.setBounds(actionRow.removeFromLeft(buttonWidth));
             actionRow.removeFromLeft(3);
@@ -2097,7 +2130,13 @@ void AuthoringPanel::resized()
     {
         groupSectionLabel.setBounds(groupManagerArea.removeFromTop(22));
         groupManagerArea.removeFromTop(4);
-        auto managerTopRow = groupManagerArea.removeFromTop(28);
+        const auto wrapGroupManagerButtons = groupManagerArea.getWidth() < 360;
+        auto managerTopArea = groupManagerArea.removeFromTop(wrapGroupManagerButtons ? 60 : 28);
+        auto managerTopRow = managerTopArea.removeFromTop(28);
+        managerTopArea.removeFromTop(wrapGroupManagerButtons ? 4 : 0);
+        auto managerSecondaryRow = wrapGroupManagerButtons
+            ? managerTopArea.removeFromTop(28)
+            : juce::Rectangle<int> {};
         const auto showVisibilityHint = groupManagerArea.getHeight() >= 70;
         auto managerActionRow = groupManagerArea.removeFromTop(showVisibilityHint
                                                                    ? std::max(40, groupManagerArea.getHeight() - 18)
@@ -2106,10 +2145,24 @@ void AuthoringPanel::resized()
                                                ? groupManagerArea.removeFromTop(18)
                                                : juce::Rectangle<int> {});
 
-        auto managerButtons = managerTopRow.removeFromRight(std::min(240, managerTopRow.getWidth()));
-        groupPreviewAnchorButton.setBounds(managerButtons.removeFromRight(118));
-        managerButtons.removeFromRight(std::min(8, managerButtons.getWidth()));
-        groupCreateButton.setBounds(managerButtons);
+        if (wrapGroupManagerButtons)
+        {
+            auto primaryButtons = managerTopRow;
+            const auto halfWidth = std::max(1, (primaryButtons.getWidth() - 8) / 2);
+            groupCreateButton.setBounds(primaryButtons.removeFromLeft(halfWidth));
+            primaryButtons.removeFromLeft(std::min(8, primaryButtons.getWidth()));
+            groupPreviewAnchorButton.setBounds(primaryButtons);
+            groupAssignZonesButton.setBounds(managerSecondaryRow);
+        }
+        else
+        {
+            auto managerButtons = managerTopRow.removeFromRight(std::min(364, managerTopRow.getWidth()));
+            groupPreviewAnchorButton.setBounds(managerButtons.removeFromRight(118));
+            managerButtons.removeFromRight(std::min(8, managerButtons.getWidth()));
+            groupAssignZonesButton.setBounds(managerButtons.removeFromRight(138));
+            managerButtons.removeFromRight(std::min(8, managerButtons.getWidth()));
+            groupCreateButton.setBounds(managerButtons);
+        }
 
         auto listArea = managerActionRow.removeFromLeft(std::max(160, managerActionRow.getWidth() - 116));
         groupList.setBounds(listArea);
@@ -2664,6 +2717,7 @@ void AuthoringPanel::refreshDrawerVisibility()
     setVisibleAndAccessible(groupAnchorLabel, drawerContentVisible && groupsTab);
     setVisibleAndAccessible(groupAnchorSelector, drawerContentVisible && groupsTab);
     setVisibleAndAccessible(groupDeleteButton, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupAssignZonesButton, drawerContentVisible && groupsTab);
     setVisibleAndAccessible(groupSummaryLabel, drawerContentVisible && groupsTab);
     setVisibleAndAccessible(groupRoundRobinLabel, drawerContentVisible && groupsTab);
     setVisibleAndAccessible(groupRoundRobinHintLabel, false);
@@ -2766,6 +2820,22 @@ void AuthoringPanel::refreshContextualAccessibility()
     const auto groupMemberCount = hasSelectedGroup
         ? static_cast<int>(countZonesInGroup(project, selectedGroup->id))
         : 0;
+    const auto selectedZoneIdsForGrouping = collectSelectedZoneIdsForGrouping();
+    const auto assignableZoneCount = hasSelectedGroup
+        ? static_cast<int>(std::count_if(selectedZoneIdsForGrouping.begin(),
+                                         selectedZoneIdsForGrouping.end(),
+                                         [&](const std::string& zoneId)
+                                         {
+                                             const auto zoneIterator = std::find_if(project.authoring.zones.begin(),
+                                                                                    project.authoring.zones.end(),
+                                                                                    [&](const auto& zone)
+                                                                                    {
+                                                                                        return zone.id == zoneId;
+                                                                                    });
+                                             return zoneIterator != project.authoring.zones.end()
+                                                 && zoneIterator->groupId != selectedGroup->id;
+                                         }))
+        : 0;
 
     updateAccessibleDescriptionAndHelpText(groupNameEditor,
                                            hasSelectedGroup
@@ -2864,6 +2934,18 @@ void AuthoringPanel::refreshContextualAccessibility()
                                                       ? "Press to delete the selected empty group."
                                                       : "Reassign every member zone before deleting this group.")
                                                : "Select a group before deleting it.");
+    updateAccessibleDescriptionAndHelpText(groupAssignZonesButton,
+                                           hasSelectedGroup
+                                               ? (assignableZoneCount > 0
+                                                      ? "Assigns " + juce::String(assignableZoneCount)
+                                                            + " selected zone(s) into " + groupName + "."
+                                                      : "No selected zones are waiting to be added to " + groupName + ".")
+                                               : "Unavailable because no group is selected.",
+                                           hasSelectedGroup
+                                               ? (assignableZoneCount > 0
+                                                      ? "Press to add the current zone-map selection into " + groupName + "."
+                                                      : "Select one or more zones outside this group before adding them.")
+                                               : "Select a group before assigning zones.");
     updateAccessibleDescriptionAndHelpText(groupSummaryLabel,
                                            hasSelectedGroup
                                                ? groupName + " currently owns " + juce::String(groupMemberCount) + " zones."
@@ -3416,6 +3498,22 @@ void AuthoringPanel::refreshFromSession()
         groupPreviewAnchorButton.setEnabled(!selectedGroup->auditionAnchorZoneId.empty());
         groupMoveUpButton.setEnabled(selectedGroupIndex > 0);
         groupMoveDownButton.setEnabled(selectedGroupIndex + 1 < static_cast<int>(project.authoring.groups.size()));
+        const auto selectedZoneIdsForGrouping = collectSelectedZoneIdsForGrouping();
+        const auto assignableZoneCount = static_cast<int>(std::count_if(selectedZoneIdsForGrouping.begin(),
+                                                                        selectedZoneIdsForGrouping.end(),
+                                                                        [&](const std::string& zoneId)
+                                                                        {
+                                                                            const auto iterator =
+                                                                                std::find_if(project.authoring.zones.begin(),
+                                                                                             project.authoring.zones.end(),
+                                                                                             [&](const auto& zone)
+                                                                                             {
+                                                                                                 return zone.id == zoneId
+                                                                                                     && zone.groupId != selectedGroup->id;
+                                                                                             });
+                                                                            return iterator != project.authoring.zones.end();
+                                                                        }));
+        groupAssignZonesButton.setEnabled(assignableZoneCount > 0);
 
         groupRoutingBusIds.clear();
         groupRoutingSelector.clear(juce::dontSendNotification);
@@ -3535,6 +3633,7 @@ void AuthoringPanel::refreshFromSession()
         groupMoveUpButton.setEnabled(false);
         groupMoveDownButton.setEnabled(false);
         groupDeleteButton.setEnabled(false);
+        groupAssignZonesButton.setEnabled(false);
         groupCreateRoundRobinPoolButton.setEnabled(false);
         groupAddCompatibleZonesButton.setEnabled(false);
         groupNormalizeRoundRobinPoolButton.setEnabled(false);
@@ -3924,11 +4023,43 @@ void AuthoringPanel::createGroup()
     group.displayOrder = static_cast<int>(groups.size());
     group.workspaceVisible = true;
 
-    if (authoringSession.createGroup(group, "Create group").applied)
+    const auto result = authoringSession.createGroup(group, "Create group");
+    if (result.applied)
     {
         setActiveDrawerTab(authoring::DrawerTab::groups);
         refreshFromSession();
     }
+    else
+    {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Create Group Failed",
+                                               buildIssueSummary(result.issues));
+    }
+}
+
+void AuthoringPanel::assignSelectedZonesToSelectedGroup()
+{
+    const auto selectedGroup = authoringSession.getSelectedGroup();
+    if (!selectedGroup.has_value())
+        return;
+
+    const auto selectedZoneIds = collectSelectedZoneIdsForGrouping();
+    if (selectedZoneIds.empty())
+        return;
+
+    const auto result = authoringSession.reassignZonesToGroup(
+        selectedZoneIds,
+        selectedGroup->id,
+        selectedZoneIds.size() > 1 ? "Add selected zones to group" : "Add selected zone to group");
+    if (result.applied)
+    {
+        refreshFromSession();
+        return;
+    }
+
+    juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                           "Assign Zones To Group Failed",
+                                           buildIssueSummary(result.issues));
 }
 
 void AuthoringPanel::deleteSelectedGroup()
@@ -4227,6 +4358,18 @@ bool AuthoringPanel::applyZoneMapSelectionState(const authoring::ZoneMapCanvas::
 std::size_t AuthoringPanel::getZoneMapSelectionCount() const
 {
     return zoneMapSelectedZoneIds.size();
+}
+
+std::vector<std::string> AuthoringPanel::collectSelectedZoneIdsForGrouping() const
+{
+    std::vector<std::string> zoneIds = zoneMapSelectedZoneIds;
+    if (!zoneIds.empty())
+        return zoneIds;
+
+    if (const auto selectedZone = authoringSession.getSelectedZone(); selectedZone.has_value())
+        zoneIds.push_back(selectedZone->id);
+
+    return zoneIds;
 }
 
 void AuthoringPanel::applySelectedMacroEdit(const juce::String& label)

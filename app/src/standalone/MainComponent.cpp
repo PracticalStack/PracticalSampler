@@ -126,6 +126,18 @@ std::optional<drs::engine::RuntimeProjectModel> upgradeLoadedProjectToLatestSche
         upgradedProject = phase3Migration.project;
     }
 
+    if (upgradedProject.schemaVersion == 3 && upgradedProject.authoring.schemaVersion == 2)
+    {
+        const auto zoneGroupMigration = drs::engine::migrateRuntimeProjectToZoneGroupsSchema(upgradedProject);
+        if (!zoneGroupMigration.valid)
+        {
+            issues = zoneGroupMigration.issues;
+            return std::nullopt;
+        }
+
+        upgradedProject = zoneGroupMigration.project;
+    }
+
     return upgradedProject;
 }
 
@@ -809,6 +821,7 @@ void MainComponent::importSampleFiles(std::vector<juce::File> selectedFiles)
                 struct PendingImportState
                 {
                     drs::engine::RuntimeProjectModel currentProject;
+                    std::string selectedGroupId;
                     drs::engine::AuthoringImportQueue importQueue;
                     std::unordered_set<std::string> usedSampleSourceIds;
                     std::unordered_set<std::string> usedZoneIds;
@@ -865,6 +878,11 @@ void MainComponent::importSampleFiles(std::vector<juce::File> selectedFiles)
                     copiedPaths.push_back(item.sourcePath);
 
                 state->currentProject = safeThis->processor.getAuthoringSession().getProject();
+                if (const auto selectedGroup = safeThis->processor.getAuthoringSession().getSelectedGroup();
+                    selectedGroup.has_value())
+                {
+                    state->selectedGroupId = selectedGroup->id;
+                }
                 state->importQueue = drs::engine::createAuthoringImportQueue(copiedPaths, state->currentProject.contentRootPath);
                 while (drs::engine::processNextAuthoringImportQueueItem(state->importQueue).processed)
                 {
@@ -900,6 +918,8 @@ void MainComponent::importSampleFiles(std::vector<juce::File> selectedFiles)
 
                         zone.id = makeUniqueId(zone.id.empty() ? sampleSourceId : zone.id, state->usedZoneIds);
                         zone.sampleSourceId = sampleSourceId;
+                        if (!state->selectedGroupId.empty())
+                            zone.groupId = state->selectedGroupId;
 
                         state->importedSampleSources.push_back(std::move(sampleSource));
                         state->importedZones.push_back(std::move(zone));
@@ -975,6 +995,7 @@ void MainComponent::importSampleFiles(std::vector<juce::File> selectedFiles)
                     }
 
                     const auto importedCount = state->importedSampleSources.size();
+                    drs::engine::reconcileBatchInferredRoundRobinDescriptors(state->importedZones);
                     const auto importResult = safeThis->processor.getAuthoringSession().appendImportedContent(
                         std::move(state->importedSampleSources),
                         std::move(state->importedZones),
@@ -1337,10 +1358,10 @@ drs::engine::RuntimeProjectModel MainComponent::buildUnloadedProjectState() cons
 {
     drs::engine::RuntimeProjectModel project;
     project.schemaName = "drs.project";
-    project.schemaVersion = 3;
+    project.schemaVersion = 4;
     project.displayName = "No Project Loaded";
     project.authoring.schemaName = "drs.authoring";
-    project.authoring.schemaVersion = 2;
+    project.authoring.schemaVersion = 3;
     project.authoring.notes = { "Open a project or create a new one to begin authoring." };
     project.notes = { "This session starts without loading the checked-in reference project." };
     return project;
@@ -1353,16 +1374,16 @@ drs::engine::RuntimeProjectModel MainComponent::buildEmptyProjectTemplate() cons
 
     drs::engine::RuntimeProjectModel project;
     project.schemaName = "drs.project";
-    project.schemaVersion = 3;
+    project.schemaVersion = 4;
     project.projectId = makeProjectId();
     project.displayName = "Untitled Project";
     project.contentRootPath = defaultProjectDirectory.getFullPathName().toStdString();
     project.defaultInstrumentManifestPath = defaultInstrumentFile.getFullPathName().toStdString();
     project.authoring.schemaName = "drs.authoring";
-    project.authoring.schemaVersion = 2;
+    project.authoring.schemaVersion = 3;
     project.authoring.notes = { "Created in the standalone authoring shell." };
     project.notes = {
-        "Created as a new Phase 3 authoring project from the standalone shell.",
+        "Created as a new Zone Groups authoring project from the standalone shell.",
         "Sample sources and zones can be added in later authoring sprints."
     };
     return project;

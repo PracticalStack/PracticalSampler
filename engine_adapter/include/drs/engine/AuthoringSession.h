@@ -85,6 +85,9 @@ public:
     RuntimeProjectDocumentActionResult reassignZoneToGroup(const std::string& zoneId,
                                                            const std::string& groupId,
                                                            const std::string& label);
+    RuntimeProjectDocumentActionResult reassignZonesToGroup(const std::vector<std::string>& zoneIds,
+                                                            const std::string& groupId,
+                                                            const std::string& label);
     RuntimeProjectDocumentActionResult createRoundRobinPoolForSelectedZone(const std::string& label);
     RuntimeProjectDocumentActionResult addCompatibleZonesToSelectedRoundRobinPool(const std::string& label);
     RuntimeProjectDocumentActionResult normalizeSelectedRoundRobinPool(const std::string& label);
