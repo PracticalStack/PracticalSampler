@@ -176,6 +176,9 @@ add_library(drs_engine_adapter STATIC
     src/CuratedDspCatalog.cpp
     src/DraftPlaybackContract.cpp
     src/DspGain.cpp
+    src/DspAlgorithmicReverb.cpp
+    src/DspCompactEq.cpp
+    src/DspChorus.cpp
     src/DspSaturator.cpp
     src/DspStereoDelay.cpp
     src/DspGraphPlan.cpp
@@ -212,6 +215,9 @@ add_library(drs_engine_adapter STATIC
     include/drs/engine/CuratedDspCatalog.h
     include/drs/engine/DraftPlaybackContract.h
     include/drs/engine/DspGain.h
+    include/drs/engine/DspAlgorithmicReverb.h
+    include/drs/engine/DspCompactEq.h
+    include/drs/engine/DspChorus.h
     include/drs/engine/DspSaturator.h
     include/drs/engine/DspStereoDelay.h
     include/drs/engine/DspGraphPlan.h

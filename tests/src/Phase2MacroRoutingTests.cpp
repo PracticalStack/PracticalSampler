@@ -1,10 +1,12 @@
 #include "drs/engine/AuthoringSession.h"
+#include "drs/engine/CuratedDspCatalog.h"
 #include "drs/engine/RuntimeLoader.h"
 #include "plugin/PluginProcessor.h"
 #include "standalone/MainComponent.h"
 
 #include <juce_audio_processors_headless/juce_audio_processors_headless.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -78,20 +80,37 @@ int main()
                 "Macro reorder did not persist the new authoring layout.");
 
         auto editedFxSlot = session.getProject().authoring.fxSlots[1];
-        editedFxSlot.effectType = "reverb";
+        editedFxSlot.effectType = "drs.algorithmicReverb";
+        editedFxSlot.effectVersion = 1;
+        editedFxSlot.unavailable = false;
+        editedFxSlot.legacyInert = false;
+        editedFxSlot.parameters.clear();
+        const auto* reverbDescriptor = drs::engine::findCuratedDspEffect(editedFxSlot.effectType,
+                                                                          editedFxSlot.effectVersion);
+        require(reverbDescriptor != nullptr, "Curated reverb must resolve for routing-edit coverage.");
+        for (const auto& parameter : reverbDescriptor->parameters)
+            editedFxSlot.parameters.push_back({ std::string(parameter.id), parameter.defaultValue });
         editedFxSlot.bypassed = false;
         require(session.updateFxSlot(1, editedFxSlot, "Swap shimmer slot to reverb").applied,
                 "FX slot edit should commit successfully.");
-        require(session.getProject().authoring.fxSlots[1].effectType == "reverb",
+        require(session.getProject().authoring.fxSlots[1].effectType == "drs.algorithmicReverb",
                 "FX slot effect-type edit did not persist in the authoring session.");
         require(!session.getProject().authoring.fxSlots[1].bypassed,
                 "FX slot bypass edit did not persist in the authoring session.");
+        require(session.duplicateFxSlot("color-eq", "color-eq-routing-copy", "Duplicate EQ for routing edit").applied,
+                "Routing coverage requires a distinct owner slot before assigning two insert chains.");
+        require(session.moveFxSlotToBus("color-eq-routing-copy",
+                                        session.getProject().authoring.routingBuses[1].id,
+                                        "Move duplicated EQ into the pad routing chain").applied,
+                "Routing coverage must transfer the copied slot before editing its owner chain.");
 
         auto editedBus = session.getProject().authoring.routingBuses[1];
         editedBus.inputSourceId = "pad-a3-high";
-        editedBus.fxSlotIds = {"color-eq", "shimmer-delay"};
-        require(session.updateRoutingBus(1, editedBus, "Route pad bus through both curated FX slots").applied,
-                "Routing-bus edit should commit successfully.");
+        editedBus.fxSlotIds = {"color-eq-routing-copy", "shimmer-delay"};
+        const auto routingEdit = session.updateRoutingBus(1, editedBus, "Route pad bus through both curated FX slots");
+        require(routingEdit.applied,
+                "Routing-bus edit should commit successfully: "
+                    + (routingEdit.issues.empty() ? std::string("no issue") : routingEdit.issues.front()));
         require(session.getProject().authoring.routingBuses[1].inputSourceId == "pad-a3-high",
                 "Routing input-source edit did not persist in the authoring session.");
         require(session.getProject().authoring.routingBuses[1].fxSlotIds.size() == 2,
@@ -107,8 +126,12 @@ int main()
         require(roundTripLoad.loaded, "Saved Phase 2 Sprint 5 project should load successfully.");
         require(roundTripLoad.project.authoring.macros[1].targets.front().parameterId == "zone-pan",
                 "Saved Sprint 5 project must preserve edited macro assignments.");
-        require(roundTripLoad.project.authoring.fxSlots[1].effectType == "reverb",
-                "Saved Sprint 5 project must preserve edited FX selections.");
+        const auto savedReverb = std::find_if(roundTripLoad.project.authoring.fxSlots.begin(),
+                                              roundTripLoad.project.authoring.fxSlots.end(),
+                                              [](const auto& slot) { return slot.id == "shimmer-delay"; });
+        require(savedReverb != roundTripLoad.project.authoring.fxSlots.end()
+                    && savedReverb->effectType == "drs.algorithmicReverb",
+                "Saved Sprint 5 project must preserve edited FX selections by stable slot ID.");
         require(roundTripLoad.project.authoring.routingBuses[1].inputSourceId == "pad-a3-high",
                 "Saved Sprint 5 project must preserve edited routing inputs.");
         require(roundTripLoad.project.authoring.routingBuses[1].fxSlotIds.size() == 2,

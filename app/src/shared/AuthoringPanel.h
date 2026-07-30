@@ -95,6 +95,7 @@ private:
     void rebuildGroupList();
     void rebuildMacroList();
     void rebuildFxSelector();
+    void rebuildDspScopeSelector();
     void rebuildRoutingBusSelector();
     void rebuildPerformanceBankSelector();
     void rebuildTriggerSlotSelector();
@@ -116,6 +117,16 @@ private:
     void applySelectedMacroEdit(const juce::String& label);
     void moveSelectedMacro(int direction);
     void applySelectedFxSlotEdit(const juce::String& label);
+    void createScopedFxSlot();
+    void duplicateSelectedFxSlot();
+    void deleteSelectedFxSlot();
+    void moveSelectedFxSlot(int direction);
+    void moveSelectedFxSlotToSelectedOwner();
+    void applySelectedFxParameterEdit(const juce::String& label);
+    void resetSelectedFxParameter();
+    std::string selectedDspScopeInputSource() const;
+    std::string selectedDspScopeRoutingBusId() const;
+    std::string ensureSelectedDspScopeRoutingBus();
     void applySelectedRoutingBusEdit(const juce::String& label);
     void applySelectedTriggerSlotEdit(const juce::String& label);
     void importPhraseForSelectedBank();
@@ -166,6 +177,11 @@ private:
     int selectedGroupIndex = 0;
     int selectedMacroIndex = 0;
     int selectedFxSlotIndex = 0;
+    int selectedDspScopeIndex = 2;
+    int selectedFxParameterIndex = 0;
+    std::vector<std::string> scopedFxSlotIds;
+    std::vector<std::string> fxOwnerBusIds;
+    std::vector<std::string> fxParameterIds;
     int selectedRoutingBusIndex = 0;
     int selectedPerformanceBankIndex = 0;
     int selectedTriggerSlotIndex = 0;
@@ -231,11 +247,28 @@ private:
     juce::TextButton macroMoveDownButton;
 
     juce::Label fxSectionLabel;
+    juce::Label fxScopeLabel;
+    juce::ComboBox fxScopeSelector;
+    juce::Label fxScopeBreadcrumbLabel;
     juce::ComboBox fxSelector;
+    juce::TextEditor fxNameEditor;
     juce::Label fxTypeLabel;
     juce::ComboBox fxTypeSelector;
     juce::ToggleButton fxBypassedToggle;
+    juce::TextButton fxAddButton;
+    juce::TextButton fxDuplicateButton;
+    juce::TextButton fxMoveUpButton;
+    juce::TextButton fxMoveDownButton;
+    juce::TextButton fxDeleteButton;
+    juce::ComboBox fxOwnerSelector;
+    juce::TextButton fxMoveOwnerButton;
+    juce::ComboBox fxParameterSelector;
+    juce::Slider fxParameterSlider;
+    juce::TextButton fxParameterResetButton;
+    juce::TextButton fxAssignMacroButton;
+    juce::Label fxParameterValueLabel;
     juce::Label fxSummaryLabel;
+    juce::Label fxDiagnosticsLabel;
 
     juce::Label routingSectionLabel;
     juce::ComboBox routingBusSelector;

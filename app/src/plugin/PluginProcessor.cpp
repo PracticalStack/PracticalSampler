@@ -105,8 +105,12 @@ struct HostTransportObservation
 {
     bool valid = false;
     bool isPlaying = false;
+    bool hasTempo = false;
     bool hasTimeInSamples = false;
+    bool hasTimeSignature = false;
     std::int64_t timeInSamples = 0;
+    std::int32_t timeSignatureNumerator = 4;
+    std::int32_t timeSignatureDenominator = 4;
     double tempoBpm = 120.0;
 };
 
@@ -124,7 +128,17 @@ HostTransportObservation readHostTransportObservation(juce::AudioPlayHead* playH
     observation.isPlaying = position->getIsPlaying();
     if (const auto bpm = position->getBpm(); bpm && std::isfinite(*bpm)
         && *bpm >= 20.0 && *bpm <= 300.0)
+    {
         observation.tempoBpm = *bpm;
+        observation.hasTempo = true;
+    }
+    if (const auto timeSignature = position->getTimeSignature(); timeSignature
+        && timeSignature->numerator > 0 && timeSignature->denominator > 0)
+    {
+        observation.timeSignatureNumerator = timeSignature->numerator;
+        observation.timeSignatureDenominator = timeSignature->denominator;
+        observation.hasTimeSignature = true;
+    }
     if (const auto timeInSamples = position->getTimeInSamples())
     {
         observation.hasTimeInSamples = true;
@@ -658,9 +672,13 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
         auto performanceMacroControls = buildPublishedMacroRenderControls();
         performanceMacroControls.transport.valid = hostTransport.valid;
         performanceMacroControls.transport.isPlaying = hostTransport.isPlaying;
+        performanceMacroControls.transport.hasTempo = hostTransport.hasTempo;
         performanceMacroControls.transport.hasSamplePosition = hostTransport.hasTimeInSamples;
         performanceMacroControls.transport.samplePosition = hostTransport.timeInSamples;
         performanceMacroControls.transport.tempoBpm = hostTransport.tempoBpm;
+        performanceMacroControls.transport.hasTimeSignature = hostTransport.hasTimeSignature;
+        performanceMacroControls.transport.timeSignatureNumerator = hostTransport.timeSignatureNumerator;
+        performanceMacroControls.transport.timeSignatureDenominator = hostTransport.timeSignatureDenominator;
         diagnosticActivePublishedMacroFixedVelocity.store(
             performanceMacroControls.overrideFixedVelocity
                 ? performanceMacroControls.fixedVelocity : 0,

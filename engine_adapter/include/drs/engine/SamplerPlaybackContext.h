@@ -142,6 +142,7 @@ private:
 
     bool applyPendingActivationAtBlockBoundary() noexcept;
     void addRetiredActivation(int slotIndex) noexcept;
+    void renderRetiredDspTails(SamplerAudioBufferView output) noexcept;
     void collectFinishedRetirements() noexcept;
     bool enqueueRetirement(RetirementToken token) noexcept;
     bool dequeueRetirement(RetirementToken& token) noexcept;

@@ -51,14 +51,17 @@ constexpr std::array<const char*, 5> curatedMacroRoles
     "placement"
 };
 
-constexpr std::array<const char*, 6> curatedFxTypes
+constexpr std::array<const char*, 9> curatedFxTypes
 {
+    "drs.gain",
+    "drs.saturator",
+    "drs.stereoDelay",
+    "drs.algorithmicReverb",
     "eq",
     "delay",
     "reverb",
     "chorus",
-    "saturator",
-    "drs.saturator"
+    "saturator"
 };
 
 constexpr std::array<const char*, 3> curatedTriggerEvents
@@ -184,6 +187,22 @@ juce::String buildIssueSummary(const std::vector<std::string>& issues)
 }
 
 juce::String formatMicros(std::uint64_t micros);
+
+juce::String formatCuratedDspUnit(const drs::engine::CuratedDspParameterUnit unit)
+{
+    switch (unit)
+    {
+        case drs::engine::CuratedDspParameterUnit::decibels: return "dB";
+        case drs::engine::CuratedDspParameterUnit::normalized: return "normalized";
+        case drs::engine::CuratedDspParameterUnit::boolean: return "on/off";
+        case drs::engine::CuratedDspParameterUnit::milliseconds: return "ms";
+        case drs::engine::CuratedDspParameterUnit::seconds: return "s";
+        case drs::engine::CuratedDspParameterUnit::hertz: return "Hz";
+        case drs::engine::CuratedDspParameterUnit::ratio: return "ratio";
+        case drs::engine::CuratedDspParameterUnit::semitones: return "st";
+    }
+    return {};
+}
 
 juce::String formatAuthoringPreviewStatus(const drs::app::AuthoringPreviewStatusSnapshot& status)
 {
@@ -759,7 +778,9 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     playbackBannerLabel.setFont(juce::FontOptions(13.0f, juce::Font::bold));
     playbackBannerLabel.setJustificationType(juce::Justification::centredLeft);
     macroSummaryLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
+    fxParameterValueLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
     fxSummaryLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
+    fxDiagnosticsLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
     routingSummaryLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
     groupSummaryLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
     groupVisibilityHintLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
@@ -781,6 +802,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     configureFieldLabel(macroMinLabel, "Min");
     configureFieldLabel(macroMaxLabel, "Max");
     configureFieldLabel(fxTypeLabel, "Type");
+    configureFieldLabel(fxScopeLabel, "Scope");
     configureFieldLabel(groupVisibilityLabel, "Visibility");
     configureFieldLabel(groupGainLabel, "Gain");
     configureFieldLabel(groupPanLabel, "Pan");
@@ -798,10 +820,14 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     configureEditorSlider(macroDefaultSlider, 0.0, 1.0, 0.01);
     configureEditorSlider(macroMinSlider, 0.0, 1.0, 0.01);
     configureEditorSlider(macroMaxSlider, 0.0, 1.0, 0.01);
+    configureEditorSlider(fxParameterSlider, 0.0, 1.0, 0.01);
     configureMetadataLabel(groupVisibilityHintLabel);
     configureMetadataLabel(groupSummaryLabel);
     configureMetadataLabel(groupRoundRobinLabel);
     configureMetadataLabel(groupRoundRobinHintLabel);
+    configureMetadataLabel(fxParameterValueLabel);
+    configureMetadataLabel(fxSummaryLabel);
+    configureMetadataLabel(fxDiagnosticsLabel);
 
     zoneSelector.setComponentID("authoringZoneSelector");
     previewEnabledToggle.setComponentID("authoringPreviewEnabledToggle");
@@ -845,8 +871,25 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     macroMoveUpButton.setComponentID("authoringMacroMoveUpButton");
     macroMoveDownButton.setComponentID("authoringMacroMoveDownButton");
     fxSelector.setComponentID("authoringFxSelector");
+    fxScopeSelector.setComponentID("authoringDspScopeSelector");
+    fxScopeBreadcrumbLabel.setComponentID("authoringDspScopeBreadcrumb");
+    fxNameEditor.setComponentID("authoringFxNameEditor");
     fxTypeSelector.setComponentID("authoringFxTypeSelector");
     fxBypassedToggle.setComponentID("authoringFxBypassedToggle");
+    fxAddButton.setComponentID("authoringFxAddButton");
+    fxDuplicateButton.setComponentID("authoringFxDuplicateButton");
+    fxMoveUpButton.setComponentID("authoringFxMoveUpButton");
+    fxMoveDownButton.setComponentID("authoringFxMoveDownButton");
+    fxDeleteButton.setComponentID("authoringFxDeleteButton");
+    fxOwnerSelector.setComponentID("authoringFxOwnerSelector");
+    fxMoveOwnerButton.setComponentID("authoringFxMoveOwnerButton");
+    fxParameterSelector.setComponentID("authoringFxParameterSelector");
+    fxParameterSlider.setComponentID("authoringFxParameterSlider");
+    fxParameterResetButton.setComponentID("authoringFxParameterResetButton");
+    fxAssignMacroButton.setComponentID("authoringFxAssignMacroButton");
+    fxParameterValueLabel.setComponentID("authoringFxParameterValueLabel");
+    fxSummaryLabel.setComponentID("authoringFxSummaryLabel");
+    fxDiagnosticsLabel.setComponentID("authoringFxDiagnosticsLabel");
     routingBusSelector.setComponentID("authoringRoutingSelector");
     routingInputSelector.setComponentID("authoringRoutingInputSelector");
     routingInsertOneSelector.setComponentID("authoringRoutingInsertOneSelector");
@@ -1142,6 +1185,14 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         refreshFromSession();
     };
 
+    fxScopeSelector.onChange = [this]
+    {
+        if (isRefreshing)
+            return;
+        selectedDspScopeIndex = std::clamp(fxScopeSelector.getSelectedId() - 1, 0, 2);
+        refreshFromSession();
+    };
+
     routingBusSelector.onChange = [this]
     {
         if (isRefreshing)
@@ -1226,6 +1277,34 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
             return;
 
         applySelectedFxSlotEdit("Toggle FX bypass");
+    };
+    fxNameEditor.onReturnKey = [this] { applySelectedFxSlotEdit("Rename FX slot"); };
+    fxAddButton.setButtonText("Add Insert");
+    fxAddButton.onClick = [this] { createScopedFxSlot(); };
+    fxDuplicateButton.setButtonText("Duplicate");
+    fxDuplicateButton.onClick = [this] { duplicateSelectedFxSlot(); };
+    fxMoveUpButton.setButtonText("Move Up");
+    fxMoveUpButton.onClick = [this] { moveSelectedFxSlot(-1); };
+    fxMoveDownButton.setButtonText("Move Down");
+    fxMoveDownButton.onClick = [this] { moveSelectedFxSlot(1); };
+    fxDeleteButton.setButtonText("Delete");
+    fxDeleteButton.onClick = [this] { deleteSelectedFxSlot(); };
+    fxMoveOwnerButton.setButtonText("Move to Scope");
+    fxMoveOwnerButton.onClick = [this] { moveSelectedFxSlotToSelectedOwner(); };
+    fxParameterSelector.onChange = [this]
+    {
+        if (isRefreshing) return;
+        selectedFxParameterIndex = std::max(0, fxParameterSelector.getSelectedId() - 1);
+        refreshFromSession();
+    };
+    fxParameterSlider.onDragEnd = [this] { applySelectedFxParameterEdit("Update FX parameter"); };
+    fxParameterResetButton.setButtonText("Reset");
+    fxParameterResetButton.onClick = [this] { resetSelectedFxParameter(); };
+    fxAssignMacroButton.setButtonText("Assign Macro");
+    fxAssignMacroButton.onClick = [this]
+    {
+        drawerState.activeTab = authoring::DrawerTab::macros;
+        refreshDrawerVisibility();
     };
 
     routingInputSelector.onChange = [this]
@@ -1346,11 +1425,28 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&macroMoveUpButton),
              static_cast<juce::Component*>(&macroMoveDownButton),
              static_cast<juce::Component*>(&fxSectionLabel),
+             static_cast<juce::Component*>(&fxScopeLabel),
+             static_cast<juce::Component*>(&fxScopeSelector),
+             static_cast<juce::Component*>(&fxScopeBreadcrumbLabel),
              static_cast<juce::Component*>(&fxSelector),
+             static_cast<juce::Component*>(&fxNameEditor),
              static_cast<juce::Component*>(&fxTypeLabel),
              static_cast<juce::Component*>(&fxTypeSelector),
              static_cast<juce::Component*>(&fxBypassedToggle),
+             static_cast<juce::Component*>(&fxAddButton),
+             static_cast<juce::Component*>(&fxDuplicateButton),
+             static_cast<juce::Component*>(&fxMoveUpButton),
+             static_cast<juce::Component*>(&fxMoveDownButton),
+             static_cast<juce::Component*>(&fxDeleteButton),
+             static_cast<juce::Component*>(&fxOwnerSelector),
+             static_cast<juce::Component*>(&fxMoveOwnerButton),
+             static_cast<juce::Component*>(&fxParameterSelector),
+             static_cast<juce::Component*>(&fxParameterSlider),
+             static_cast<juce::Component*>(&fxParameterResetButton),
+             static_cast<juce::Component*>(&fxAssignMacroButton),
+             static_cast<juce::Component*>(&fxParameterValueLabel),
              static_cast<juce::Component*>(&fxSummaryLabel),
+             static_cast<juce::Component*>(&fxDiagnosticsLabel),
              static_cast<juce::Component*>(&routingSectionLabel),
              static_cast<juce::Component*>(&routingBusSelector),
              static_cast<juce::Component*>(&routingInputLabel),
@@ -1604,6 +1700,17 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "FX selector",
                                 "Chooses the active FX slot for routing detail.",
                                 "Open the list to choose an FX slot.");
+    configureAccessibleMetadata(fxScopeSelector,
+                                "DSP processing scope",
+                                "Chooses whether the insert chain belongs to the current zone, current group, or instrument master.",
+                                "Open the list to change scope. Changing scope never moves an existing chain.");
+    configureAccessibleMetadata(fxScopeBreadcrumbLabel,
+                                "DSP scope breadcrumb",
+                                "Shows the canonical audio owner and current insert chain for the chosen scope.");
+    configureAccessibleMetadata(fxNameEditor,
+                                "FX name",
+                                "Renames the selected FX slot.",
+                                "Type a new name and press Enter to rename the selected insert.");
     configureAccessibleMetadata(fxTypeSelector,
                                 "FX type",
                                 "Chooses the effect type for the selected FX slot.",
@@ -1612,6 +1719,33 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "FX bypass",
                                 "Toggles bypass for the selected FX slot.",
                                 "Press to toggle FX bypass.");
+    configureAccessibleMetadata(fxAddButton, "Add insert", "Creates a curated Gain insert at the selected scope.",
+                                "Press to create an explicit scoped insert chain when needed.");
+    configureAccessibleMetadata(fxDuplicateButton, "Duplicate insert", "Duplicates the selected insert in its owner chain.",
+                                "Press to duplicate the selected insert.");
+    configureAccessibleMetadata(fxMoveUpButton, "Move insert up", "Moves the selected insert earlier in its chain.",
+                                "Press to move the insert earlier.");
+    configureAccessibleMetadata(fxMoveDownButton, "Move insert down", "Moves the selected insert later in its chain.",
+                                "Press to move the insert later.");
+    configureAccessibleMetadata(fxDeleteButton, "Delete insert", "Deletes the selected insert from its owner chain.",
+                                "Press to delete the selected insert.");
+    configureAccessibleMetadata(fxOwnerSelector, "Insert owner", "Chooses a destination owner chain for the selected insert.",
+                                "Open the list to choose another owner chain.");
+    configureAccessibleMetadata(fxMoveOwnerButton, "Move insert to owner", "Moves the selected insert to the chosen owner chain.",
+                                "Press to move the insert to the selected owner.");
+    configureAccessibleMetadata(fxParameterSelector, "FX parameter", "Chooses a descriptor-defined parameter for the selected effect.",
+                                "Open the list to choose a catalog parameter.");
+    configureAccessibleMetadata(fxParameterSlider, "FX parameter value", "Adjusts the selected descriptor-defined parameter.",
+                                "Drag the slider or enter a numeric value.");
+    configureAccessibleMetadata(fxParameterResetButton, "Reset FX parameter", "Resets the selected parameter to its catalog default.",
+                                "Press to restore the descriptor default.");
+    configureAccessibleMetadata(fxAssignMacroButton, "Assign FX parameter to macro", "Opens the macro assignment workflow for the selected parameter.",
+                                "Press to open Macro assignments.");
+    configureAccessibleMetadata(fxParameterValueLabel, "FX parameter value and default",
+                                "Shows the selected parameter value, unit, and descriptor default.");
+    configureAccessibleMetadata(fxSummaryLabel, "FX state summary", "Shows the selected insert's state, cost, and legacy review guidance.");
+    configureAccessibleMetadata(fxDiagnosticsLabel, "DSP preview diagnostics",
+                                "Shows immutable preview state, chain and graph cost, budget status, and tail capability.");
     configureAccessibleMetadata(routingBusSelector,
                                 "Routing bus selector",
                                 "Chooses the active routing bus.",
@@ -1629,12 +1763,25 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "Chooses the second insert effect for the selected routing bus.",
                                 "Open the list to choose the second insert.");
     fxSelector.setExplicitFocusOrder(80);
-    fxTypeSelector.setExplicitFocusOrder(81);
-    fxBypassedToggle.setExplicitFocusOrder(82);
-    routingBusSelector.setExplicitFocusOrder(83);
-    routingInputSelector.setExplicitFocusOrder(84);
-    routingInsertOneSelector.setExplicitFocusOrder(85);
-    routingInsertTwoSelector.setExplicitFocusOrder(86);
+    fxScopeSelector.setExplicitFocusOrder(81);
+    fxNameEditor.setExplicitFocusOrder(82);
+    fxTypeSelector.setExplicitFocusOrder(83);
+    fxBypassedToggle.setExplicitFocusOrder(84);
+    fxAddButton.setExplicitFocusOrder(85);
+    fxDuplicateButton.setExplicitFocusOrder(86);
+    fxMoveUpButton.setExplicitFocusOrder(87);
+    fxMoveDownButton.setExplicitFocusOrder(88);
+    fxDeleteButton.setExplicitFocusOrder(89);
+    fxOwnerSelector.setExplicitFocusOrder(90);
+    fxMoveOwnerButton.setExplicitFocusOrder(91);
+    fxParameterSelector.setExplicitFocusOrder(92);
+    fxParameterSlider.setExplicitFocusOrder(93);
+    fxParameterResetButton.setExplicitFocusOrder(94);
+    fxAssignMacroButton.setExplicitFocusOrder(95);
+    routingBusSelector.setExplicitFocusOrder(96);
+    routingInputSelector.setExplicitFocusOrder(97);
+    routingInsertOneSelector.setExplicitFocusOrder(98);
+    routingInsertTwoSelector.setExplicitFocusOrder(99);
     configureAccessibleMetadata(groupVisibilityToggle,
                                 "Group workspace visibility",
                                 "Toggles whether the selected group is visible on the workspace map.",
@@ -2047,6 +2194,16 @@ void AuthoringPanel::resized()
         auto left = row.removeFromLeft((row.getWidth() - 12) / 2);
         row.removeFromLeft(12);
         auto right = row;
+        if (expanded)
+        {
+            layoutLabelAndField(left, fxScopeLabel, fxScopeSelector, 44);
+            fxScopeBreadcrumbLabel.setBounds(right);
+            drawerEditorArea.removeFromTop(4);
+            row = drawerEditorArea.removeFromTop(28);
+            left = row.removeFromLeft((row.getWidth() - 12) / 2);
+            row.removeFromLeft(12);
+            right = row;
+        }
         fxSelector.setBounds(left);
         routingBusSelector.setBounds(right);
         drawerEditorArea.removeFromTop(4);
@@ -2075,6 +2232,44 @@ void AuthoringPanel::resized()
             fxSummaryLabel.setBounds(drawerEditorArea.removeFromTop(20));
             drawerEditorArea.removeFromTop(2);
             routingSummaryLabel.setBounds(drawerEditorArea.removeFromTop(20));
+        }
+        if (expanded)
+        {
+            drawerEditorArea.removeFromTop(4);
+            row = drawerEditorArea.removeFromTop(28);
+            left = row.removeFromLeft((row.getWidth() - 12) / 2);
+            row.removeFromLeft(12);
+            right = row;
+            fxNameEditor.setBounds(left);
+            fxOwnerSelector.setBounds(right);
+            drawerEditorArea.removeFromTop(4);
+            row = drawerEditorArea.removeFromTop(28);
+            const auto buttonWidth = std::max(64, (row.getWidth() - 20) / 5);
+            fxAddButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
+            fxDuplicateButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
+            fxMoveUpButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
+            fxMoveDownButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
+            fxDeleteButton.setBounds(row);
+            drawerEditorArea.removeFromTop(4);
+            row = drawerEditorArea.removeFromTop(28);
+            left = row.removeFromLeft((row.getWidth() - 12) / 2);
+            row.removeFromLeft(12);
+            right = row;
+            fxMoveOwnerButton.setBounds(left);
+            fxParameterSelector.setBounds(right);
+            drawerEditorArea.removeFromTop(4);
+            row = drawerEditorArea.removeFromTop(28);
+            left = row.removeFromLeft((row.getWidth() - 12) / 2);
+            row.removeFromLeft(12);
+            right = row;
+            fxParameterSlider.setBounds(left);
+            fxParameterResetButton.setBounds(right.removeFromLeft((right.getWidth() - 5) / 2));
+            right.removeFromLeft(5);
+            fxAssignMacroButton.setBounds(right);
+            drawerEditorArea.removeFromTop(3);
+            fxParameterValueLabel.setBounds(drawerEditorArea.removeFromTop(18));
+            drawerEditorArea.removeFromTop(2);
+            fxDiagnosticsLabel.setBounds(drawerEditorArea.removeFromTop(18));
         }
     }
     else if (drawerState.activeTab == authoring::DrawerTab::performance)
@@ -2515,24 +2710,100 @@ void AuthoringPanel::rebuildMacroList()
     macroList.setViewModel(std::move(viewModel));
 }
 
+std::string AuthoringPanel::selectedDspScopeInputSource() const
+{
+    if (selectedDspScopeIndex == 0)
+    {
+        if (const auto zone = authoringSession.getSelectedZone(); zone.has_value())
+            return "zones/" + zone->id;
+    }
+    else if (selectedDspScopeIndex == 1)
+    {
+        if (const auto group = authoringSession.getSelectedGroup(); group.has_value())
+            return "groups/" + group->id;
+    }
+    return "master";
+}
+
+std::string AuthoringPanel::selectedDspScopeRoutingBusId() const
+{
+    const auto input = selectedDspScopeInputSource();
+    for (const auto& bus : authoringSession.getProject().authoring.routingBuses)
+    {
+        if (bus.inputSourceId == input)
+            return bus.id;
+        // Older authored zone buses used the raw zone id. Preserve them as the selected chain.
+        if (selectedDspScopeIndex == 0 && input.rfind("zones/", 0) == 0
+            && bus.inputSourceId == input.substr(6))
+            return bus.id;
+    }
+    return {};
+}
+
+void AuthoringPanel::rebuildDspScopeSelector()
+{
+    fxScopeSelector.clear(juce::dontSendNotification);
+    fxScopeSelector.addItem("Current Zone", 1);
+    fxScopeSelector.addItem("Current Group", 2);
+    fxScopeSelector.addItem("Instrument Master", 3);
+    selectedDspScopeIndex = std::clamp(selectedDspScopeIndex, 0, 2);
+    fxScopeSelector.setSelectedId(selectedDspScopeIndex + 1, juce::dontSendNotification);
+    const auto input = selectedDspScopeInputSource();
+    const auto bus = selectedDspScopeRoutingBusId();
+    fxScopeBreadcrumbLabel.setText(
+        (selectedDspScopeIndex == 0 ? "Zone" : selectedDspScopeIndex == 1 ? "Group" : "Instrument")
+            + juce::String(" | ") + juce::String::fromUTF8(input.c_str())
+            + (bus.empty() ? " | no insert chain" : " | chain " + juce::String::fromUTF8(bus.c_str())),
+        juce::dontSendNotification);
+
+    fxOwnerBusIds.clear();
+    fxOwnerSelector.clear(juce::dontSendNotification);
+    int selectedOwner = 0;
+    for (std::size_t index = 0; index < authoringSession.getProject().authoring.routingBuses.size(); ++index)
+    {
+        const auto& owner = authoringSession.getProject().authoring.routingBuses[index];
+        fxOwnerBusIds.push_back(owner.id);
+        fxOwnerSelector.addItem(juce::String::fromUTF8(owner.displayName.c_str()), static_cast<int>(index) + 1);
+        if (owner.id == bus) selectedOwner = static_cast<int>(index) + 1;
+    }
+    fxOwnerSelector.setSelectedId(selectedOwner > 0 ? selectedOwner : 1, juce::dontSendNotification);
+}
+
 void AuthoringPanel::rebuildFxSelector()
 {
-    const auto& fxSlots = authoringSession.getProject().authoring.fxSlots;
+    const auto& project = authoringSession.getProject();
     fxSelector.clear(juce::dontSendNotification);
-
-    if (fxSlots.empty())
+    scopedFxSlotIds.clear();
+    const auto ownerBusId = selectedDspScopeRoutingBusId();
+    const auto bus = std::find_if(project.authoring.routingBuses.begin(), project.authoring.routingBuses.end(),
+                                  [&](const auto& candidate) { return candidate.id == ownerBusId; });
+    if (bus == project.authoring.routingBuses.end())
     {
-        selectedFxSlotIndex = 0;
+        selectedFxSlotIndex = -1;
         return;
     }
-
-    selectedFxSlotIndex = std::clamp(selectedFxSlotIndex, 0, static_cast<int>(fxSlots.size()) - 1);
-    for (std::size_t index = 0; index < fxSlots.size(); ++index)
+    for (const auto& slotId : bus->fxSlotIds)
     {
-        fxSelector.addItem(juce::String::fromUTF8(fxSlots[index].displayName.c_str()),
-                           static_cast<int>(index) + 1);
+        const auto slot = std::find_if(project.authoring.fxSlots.begin(), project.authoring.fxSlots.end(),
+                                       [&](const auto& candidate) { return candidate.id == slotId; });
+        if (slot == project.authoring.fxSlots.end()) continue;
+        const auto index = static_cast<int>(std::distance(project.authoring.fxSlots.begin(), slot));
+        scopedFxSlotIds.push_back(slotId);
+        fxSelector.addItem(juce::String::fromUTF8(slot->displayName.c_str()), index + 1);
     }
-
+    if (scopedFxSlotIds.empty())
+    {
+        selectedFxSlotIndex = -1;
+        return;
+    }
+    if (std::find(scopedFxSlotIds.begin(), scopedFxSlotIds.end(),
+                  project.authoring.fxSlots[static_cast<std::size_t>(std::max(0, selectedFxSlotIndex))].id)
+        == scopedFxSlotIds.end())
+    {
+        const auto slot = std::find_if(project.authoring.fxSlots.begin(), project.authoring.fxSlots.end(),
+                                       [&](const auto& candidate) { return candidate.id == scopedFxSlotIds.front(); });
+        selectedFxSlotIndex = static_cast<int>(std::distance(project.authoring.fxSlots.begin(), slot));
+    }
     fxSelector.setSelectedId(selectedFxSlotIndex + 1, juce::dontSendNotification);
 }
 
@@ -2755,11 +3026,28 @@ void AuthoringPanel::refreshDrawerVisibility()
     setVisibleAndAccessible(macroSummaryLabel, drawerContentVisible && macrosTab && expanded);
 
     setVisibleAndAccessible(fxSectionLabel, drawerContentVisible && routingTab);
+    setVisibleAndAccessible(fxScopeLabel, drawerContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxScopeSelector, drawerContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxScopeBreadcrumbLabel, drawerContentVisible && routingTab && expanded);
     setVisibleAndAccessible(fxSelector, drawerContentVisible && routingTab);
+    setVisibleAndAccessible(fxNameEditor, drawerContentVisible && routingTab && expanded);
     setVisibleAndAccessible(fxTypeLabel, drawerContentVisible && routingTab);
     setVisibleAndAccessible(fxTypeSelector, drawerContentVisible && routingTab);
     setVisibleAndAccessible(fxBypassedToggle, drawerContentVisible && routingTab);
+    setVisibleAndAccessible(fxAddButton, drawerContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxDuplicateButton, drawerContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxMoveUpButton, drawerContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxMoveDownButton, drawerContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxDeleteButton, drawerContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxOwnerSelector, drawerContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxMoveOwnerButton, drawerContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxParameterSelector, drawerContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxParameterSlider, drawerContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxParameterResetButton, drawerContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxAssignMacroButton, drawerContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxParameterValueLabel, drawerContentVisible && routingTab && expanded);
     setVisibleAndAccessible(fxSummaryLabel, drawerContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxDiagnosticsLabel, drawerContentVisible && routingTab && expanded);
     setVisibleAndAccessible(routingSectionLabel, drawerContentVisible && routingTab);
     setVisibleAndAccessible(routingBusSelector, drawerContentVisible && routingTab);
     setVisibleAndAccessible(routingInputLabel, drawerContentVisible && routingTab);
@@ -3466,6 +3754,7 @@ void AuthoringPanel::refreshFromSession()
     rebuildZoneSelector();
     rebuildGroupList();
     rebuildMacroList();
+    rebuildDspScopeSelector();
     rebuildFxSelector();
     rebuildRoutingBusSelector();
     rebuildPerformanceBankSelector();
@@ -3706,7 +3995,9 @@ void AuthoringPanel::refreshFromSession()
         macroMoveDownButton.setEnabled(false);
     }
 
-    if (!project.authoring.fxSlots.empty())
+    const auto hasScopedFx = selectedFxSlotIndex >= 0
+        && static_cast<std::size_t>(selectedFxSlotIndex) < project.authoring.fxSlots.size();
+    if (hasScopedFx)
     {
         const auto& fxSlot = project.authoring.fxSlots[static_cast<std::size_t>(selectedFxSlotIndex)];
         fxTypeSelector.clear(juce::dontSendNotification);
@@ -3725,15 +4016,109 @@ void AuthoringPanel::refreshFromSession()
         }
         fxTypeSelector.setSelectedId(selectedFxTypeId > 0 ? selectedFxTypeId : 1, juce::dontSendNotification);
         fxBypassedToggle.setToggleState(fxSlot.bypassed, juce::dontSendNotification);
+        fxNameEditor.setText(juce::String::fromUTF8(fxSlot.displayName.c_str()), juce::dontSendNotification);
+        fxParameterIds.clear();
+        fxParameterSelector.clear(juce::dontSendNotification);
+        const auto* descriptor = drs::engine::findCuratedDspEffect(fxSlot.effectType, fxSlot.effectVersion);
+        const auto unavailable = descriptor == nullptr || fxSlot.unavailable || fxSlot.legacyInert;
+        if (descriptor != nullptr && !descriptor->parameters.empty())
+        {
+            for (std::size_t index = 0; index < descriptor->parameters.size(); ++index)
+            {
+                const auto& parameter = descriptor->parameters[index];
+                fxParameterIds.push_back(std::string(parameter.id));
+                fxParameterSelector.addItem(juce::String(parameter.id.data(), static_cast<int>(parameter.id.size())),
+                                            static_cast<int>(index) + 1);
+            }
+            selectedFxParameterIndex = std::clamp(selectedFxParameterIndex, 0,
+                                                   static_cast<int>(descriptor->parameters.size()) - 1);
+            fxParameterSelector.setSelectedId(selectedFxParameterIndex + 1, juce::dontSendNotification);
+            const auto& parameter = descriptor->parameters[static_cast<std::size_t>(selectedFxParameterIndex)];
+            const auto authored = std::find_if(fxSlot.parameters.begin(), fxSlot.parameters.end(),
+                                               [&](const auto& value) { return value.id == parameter.id; });
+            fxParameterSlider.setRange(parameter.minimum, parameter.maximum,
+                                       std::max(0.0001, (parameter.maximum - parameter.minimum) / 1000.0));
+            const auto value = authored == fxSlot.parameters.end() ? parameter.defaultValue : authored->value;
+            fxParameterSlider.setValue(value, juce::dontSendNotification);
+            fxParameterValueLabel.setText(
+                juce::String(parameter.id.data(), static_cast<int>(parameter.id.size())) + ": "
+                    + juce::String(value, 3) + " " + formatCuratedDspUnit(parameter.unit)
+                    + " | default " + juce::String(parameter.defaultValue, 3),
+                juce::dontSendNotification);
+        }
+        else
+            fxParameterValueLabel.setText("Descriptor parameters unavailable for this preserved effect version.",
+                                          juce::dontSendNotification);
+        fxTypeSelector.setEnabled(!fxSlot.legacyInert);
+        fxBypassedToggle.setEnabled(true);
+        fxNameEditor.setEnabled(true);
+        fxParameterSelector.setEnabled(!unavailable && !fxParameterIds.empty());
+        fxParameterSlider.setEnabled(!unavailable && !fxParameterIds.empty());
+        fxParameterResetButton.setEnabled(!unavailable && !fxParameterIds.empty());
+        fxAssignMacroButton.setEnabled(!unavailable && !fxParameterIds.empty());
+        fxDuplicateButton.setEnabled(true);
+        fxDeleteButton.setEnabled(true);
+        fxMoveUpButton.setEnabled(!scopedFxSlotIds.empty() && scopedFxSlotIds.front() != fxSlot.id);
+        fxMoveDownButton.setEnabled(!scopedFxSlotIds.empty() && scopedFxSlotIds.back() != fxSlot.id);
+        fxMoveOwnerButton.setEnabled(fxOwnerSelector.getNumItems() > 1);
         fxSummaryLabel.setText(
-            juce::String::fromUTF8(fxSlot.id.c_str()) + " | "
-                + (fxSlot.bypassed ? "bypassed" : "active"),
+            unavailable ? "Legacy effect — review to enable | " + juce::String::fromUTF8(fxSlot.id.c_str())
+                : juce::String::fromUTF8(fxSlot.id.c_str()) + " | "
+                    + (fxSlot.bypassed ? "bypassed" : "active") + " | cost "
+                    + juce::String(descriptor != nullptr ? descriptor->cost.costUnits : 0) + " units",
+            juce::dontSendNotification);
+        std::uint32_t totalCost = 0;
+        std::uint32_t scopedCost = 0;
+        for (const auto& candidate : project.authoring.fxSlots)
+        {
+            const auto* candidateDescriptor = drs::engine::findCuratedDspEffect(candidate.effectType,
+                                                                                  candidate.effectVersion);
+            if (candidateDescriptor == nullptr || candidate.bypassed || candidate.unavailable || candidate.legacyInert)
+                continue;
+            totalCost += candidateDescriptor->cost.costUnits;
+            if (std::find(scopedFxSlotIds.begin(), scopedFxSlotIds.end(), candidate.id) != scopedFxSlotIds.end())
+                scopedCost += candidateDescriptor->cost.costUnits;
+        }
+        const auto preview = authoringPreviewStatusProvider ? authoringPreviewStatusProvider()
+                                                            : AuthoringPreviewStatusSnapshot {};
+        const auto tailCapable = descriptor != nullptr
+            && (descriptor->stateClass == drs::engine::CuratedDspStateClass::delay
+                || descriptor->stateClass == drs::engine::CuratedDspStateClass::reverb);
+        fxDiagnosticsLabel.setText(
+            "Preview: " + juce::String::fromUTF8(preview.available ? preview.stateLabel.c_str() : "unavailable")
+                + " | chain " + juce::String(scopedCost) + " units | graph " + juce::String(totalCost)
+                + "/128" + (totalCost > 128 ? " OVER BUDGET" : " within budget")
+                + " | " + (tailCapable ? "tail-capable" : "no tail"),
             juce::dontSendNotification);
     }
     else
     {
-        fxSummaryLabel.setText("No FX slots are authored in this project yet.", juce::dontSendNotification);
+        fxNameEditor.setText({}, juce::dontSendNotification);
+        fxTypeSelector.clear(juce::dontSendNotification);
+        fxParameterSelector.clear(juce::dontSendNotification);
+        fxParameterIds.clear();
+        fxTypeSelector.setEnabled(false);
+        fxBypassedToggle.setEnabled(false);
+        fxNameEditor.setEnabled(false);
+        fxParameterSelector.setEnabled(false);
+        fxParameterSlider.setEnabled(false);
+        fxParameterResetButton.setEnabled(false);
+        fxAssignMacroButton.setEnabled(false);
+        fxParameterValueLabel.setText("Select a catalog effect to inspect its descriptor value and default.",
+                                      juce::dontSendNotification);
+        fxDuplicateButton.setEnabled(false);
+        fxMoveUpButton.setEnabled(false);
+        fxMoveDownButton.setEnabled(false);
+        fxDeleteButton.setEnabled(false);
+        fxMoveOwnerButton.setEnabled(false);
+        fxSummaryLabel.setText(selectedDspScopeRoutingBusId().empty()
+                                   ? "No insert chain at this scope. Add Insert creates one explicitly."
+                                   : "This insert chain is empty. Add Insert creates its first slot.",
+                               juce::dontSendNotification);
+        fxDiagnosticsLabel.setText("Preview: no scoped effect selected | graph diagnostics use immutable authoring data.",
+                                   juce::dontSendNotification);
     }
+    fxAddButton.setEnabled(true);
 
     if (!project.authoring.routingBuses.empty())
     {
@@ -4448,11 +4833,145 @@ void AuthoringPanel::applySelectedFxSlotEdit(const juce::String& label)
     if (effectType.rfind("Custom: ", 0) == 0)
         effectType = effectType.substr(8);
     editedFxSlot.effectType = effectType;
+    editedFxSlot.displayName = fxNameEditor.getText().trim().toStdString();
+    if (const auto* descriptor = drs::engine::findCuratedDspEffect(editedFxSlot.effectType, 1); descriptor != nullptr)
+    {
+        editedFxSlot.effectVersion = 1;
+        editedFxSlot.unavailable = false;
+        editedFxSlot.legacyInert = false;
+        for (const auto& parameter : descriptor->parameters)
+        {
+            if (std::none_of(editedFxSlot.parameters.begin(), editedFxSlot.parameters.end(),
+                             [&](const auto& value) { return value.id == parameter.id; }))
+                editedFxSlot.parameters.push_back({ std::string(parameter.id), parameter.defaultValue });
+        }
+    }
     editedFxSlot.bypassed = fxBypassedToggle.getToggleState();
 
     authoringSession.updateFxSlot(static_cast<std::size_t>(selectedFxSlotIndex),
                                   editedFxSlot,
                                   label.toStdString());
+    refreshFromSession();
+}
+
+std::string AuthoringPanel::ensureSelectedDspScopeRoutingBus()
+{
+    if (const auto existing = selectedDspScopeRoutingBusId(); !existing.empty())
+        return existing;
+    auto input = selectedDspScopeInputSource();
+    auto id = "dsp-chain-" + input;
+    std::replace(id.begin(), id.end(), '/', '-');
+    std::size_t suffix = 2;
+    const auto baseId = id;
+    const auto idInUse = [&](const std::string& candidate)
+    {
+        return std::any_of(authoringSession.getProject().authoring.routingBuses.begin(),
+                           authoringSession.getProject().authoring.routingBuses.end(),
+                           [&](const auto& bus) { return bus.id == candidate; });
+    };
+    while (idInUse(id)) id = baseId + "-" + std::to_string(suffix++);
+    drs::engine::RuntimeProjectRoutingBusDefinition bus;
+    bus.id = id;
+    bus.displayName = selectedDspScopeIndex == 0 ? "Zone Inserts"
+        : selectedDspScopeIndex == 1 ? "Group Inserts" : "Instrument Inserts";
+    bus.inputSourceId = input;
+    return authoringSession.createRoutingBus(bus, "Create scoped insert chain").applied ? id : std::string {};
+}
+
+void AuthoringPanel::createScopedFxSlot()
+{
+    const auto owner = ensureSelectedDspScopeRoutingBus();
+    if (owner.empty()) { refreshFromSession(); return; }
+    auto id = std::string("fx-gain");
+    std::size_t suffix = 2;
+    const auto exists = [&](const std::string& candidate)
+    {
+        return std::any_of(authoringSession.getProject().authoring.fxSlots.begin(),
+                           authoringSession.getProject().authoring.fxSlots.end(),
+                           [&](const auto& slot) { return slot.id == candidate; });
+    };
+    while (exists(id)) id = "fx-gain-" + std::to_string(suffix++);
+    drs::engine::RuntimeProjectFxSlotDefinition slot;
+    slot.id = id;
+    slot.displayName = "Gain";
+    slot.effectType = "drs.gain";
+    slot.effectVersion = 1;
+    if (const auto* descriptor = drs::engine::findCuratedDspEffect(slot.effectType, slot.effectVersion))
+        for (const auto& parameter : descriptor->parameters)
+            slot.parameters.push_back({ std::string(parameter.id), parameter.defaultValue });
+    const auto result = authoringSession.createFxSlot(slot, owner, "Add curated insert");
+    if (result.applied)
+        selectedFxSlotIndex = static_cast<int>(authoringSession.getProject().authoring.fxSlots.size()) - 1;
+    refreshFromSession();
+}
+
+void AuthoringPanel::duplicateSelectedFxSlot()
+{
+    if (selectedFxSlotIndex < 0 || static_cast<std::size_t>(selectedFxSlotIndex) >= authoringSession.getProject().authoring.fxSlots.size())
+        return;
+    const auto& slot = authoringSession.getProject().authoring.fxSlots[static_cast<std::size_t>(selectedFxSlotIndex)];
+    auto duplicateId = slot.id + "-copy";
+    std::size_t suffix = 2;
+    const auto exists = [&](const std::string& candidate)
+    {
+        return std::any_of(authoringSession.getProject().authoring.fxSlots.begin(),
+                           authoringSession.getProject().authoring.fxSlots.end(),
+                           [&](const auto& candidateSlot) { return candidateSlot.id == candidate; });
+    };
+    while (exists(duplicateId)) duplicateId = slot.id + "-copy-" + std::to_string(suffix++);
+    authoringSession.duplicateFxSlot(slot.id, duplicateId, "Duplicate FX slot");
+    refreshFromSession();
+}
+
+void AuthoringPanel::deleteSelectedFxSlot()
+{
+    if (selectedFxSlotIndex >= 0 && static_cast<std::size_t>(selectedFxSlotIndex) < authoringSession.getProject().authoring.fxSlots.size())
+        authoringSession.deleteFxSlot(authoringSession.getProject().authoring.fxSlots[static_cast<std::size_t>(selectedFxSlotIndex)].id,
+                                      "Delete FX slot");
+    refreshFromSession();
+}
+
+void AuthoringPanel::moveSelectedFxSlot(const int direction)
+{
+    if (selectedFxSlotIndex >= 0 && static_cast<std::size_t>(selectedFxSlotIndex) < authoringSession.getProject().authoring.fxSlots.size())
+        authoringSession.moveFxSlot(authoringSession.getProject().authoring.fxSlots[static_cast<std::size_t>(selectedFxSlotIndex)].id,
+                                    direction, direction < 0 ? "Move FX earlier" : "Move FX later");
+    refreshFromSession();
+}
+
+void AuthoringPanel::moveSelectedFxSlotToSelectedOwner()
+{
+    const auto ownerIndex = fxOwnerSelector.getSelectedId() - 1;
+    if (ownerIndex >= 0 && static_cast<std::size_t>(ownerIndex) < fxOwnerBusIds.size()
+        && selectedFxSlotIndex >= 0 && static_cast<std::size_t>(selectedFxSlotIndex) < authoringSession.getProject().authoring.fxSlots.size())
+    {
+        authoringSession.moveFxSlotToBus(authoringSession.getProject().authoring.fxSlots[static_cast<std::size_t>(selectedFxSlotIndex)].id,
+                                         fxOwnerBusIds[static_cast<std::size_t>(ownerIndex)], "Move FX to owner");
+    }
+    refreshFromSession();
+}
+
+void AuthoringPanel::applySelectedFxParameterEdit(const juce::String& label)
+{
+    if (selectedFxSlotIndex >= 0 && static_cast<std::size_t>(selectedFxSlotIndex) < authoringSession.getProject().authoring.fxSlots.size()
+        && selectedFxParameterIndex >= 0 && static_cast<std::size_t>(selectedFxParameterIndex) < fxParameterIds.size())
+    {
+        authoringSession.setFxSlotParameter(authoringSession.getProject().authoring.fxSlots[static_cast<std::size_t>(selectedFxSlotIndex)].id,
+                                            fxParameterIds[static_cast<std::size_t>(selectedFxParameterIndex)],
+                                            fxParameterSlider.getValue(), label.toStdString());
+    }
+    refreshFromSession();
+}
+
+void AuthoringPanel::resetSelectedFxParameter()
+{
+    if (selectedFxSlotIndex >= 0 && static_cast<std::size_t>(selectedFxSlotIndex) < authoringSession.getProject().authoring.fxSlots.size()
+        && selectedFxParameterIndex >= 0 && static_cast<std::size_t>(selectedFxParameterIndex) < fxParameterIds.size())
+    {
+        authoringSession.resetFxSlotParameterToDefault(
+            authoringSession.getProject().authoring.fxSlots[static_cast<std::size_t>(selectedFxSlotIndex)].id,
+            fxParameterIds[static_cast<std::size_t>(selectedFxParameterIndex)], "Reset FX parameter");
+    }
     refreshFromSession();
 }
 

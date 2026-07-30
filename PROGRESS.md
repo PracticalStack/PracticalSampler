@@ -2,6 +2,25 @@
 
 ## Curated DSP development plan
 
+### July 30, 2026 - Sprints 15–17 / Gates G5 and Wave 2
+
+- State: complete; every actionable DSP-15 through DSP-17 item is checked in the development plan.
+- Hardening/release: documented the staged activation and rollback policy in
+  `docs/curated-dsp-wave1-release.md`; added the omitted SFZ hardening targets to `drs_all_tests`;
+  repaired zone-source deletion so it retires an orphaned routing chain and its owned slots instead
+  of creating a second master owner; and updated the pipeline-report legacy-state assertion to
+  validate its serialized representation rather than compare two different state formats.
+- Wave 2: added versioned, catalog-driven `drs.compactEq` v1 (single low-pass/bell/high-pass stereo
+  band) and `drs.chorus` v1 (three fixed stereo modulation voices), with preallocated state,
+  generation-local rendering, reset/sample-rate handling, normal scope/macro discovery, focused
+  contracts, and algorithm notes in `docs/curated-dsp-compact-eq-v1.md` and
+  `docs/curated-dsp-chorus-v1.md`.
+- Validation: `drs.curated_dsp.compact_eq`, `drs.curated_dsp.chorus`, catalog/graph/scoped-routing,
+  macro-routing, authoring UI, pipeline report, and plugin bundle passed. The final aggregate
+  `drs_all_tests` CTest matrix ran 112 tests with one transient `phase2.performance_ui` failure;
+  its immediate retry and three consecutive repeat runs passed. `git diff --check` passed (only the
+  repository's CRLF notices).
+
 ### July 30, 2026 - Sprint 6 / DSP-06-01 through DSP-06-04
 
 - State: complete; Sprint 7 task DSP-07-01 is next.
@@ -76,14 +95,61 @@
   lifecycle path.
 - Remaining tasks: DSP-11-01 through DSP-17-04.
 
-### July 30, 2026 - Sprint 11 / in progress
+### July 30, 2026 - Sprint 11 / DSP-11-01 through DSP-11-05
 
-- State: in progress; DSP-11-04/05 callback discontinuity and expanded automation coverage remain.
-- Implemented: sanitized host tempo/playback/sample-position view, v1 catalog surface, preallocated
-  two-second stereo rings, fractional reads, feedback tone/ping-pong behavior, reset, and bounded
-  retirement-tail countdown.
-- Validation so far: `drs.curated_dsp.stereo_delay` passes free-time echo placement at 44.1/48/96
-  kHz, sync fallback timing, feedback clamp containment, ping-pong transfer, and deterministic reset.
+- State: complete; Sprint 12 task DSP-12-01 is next.
+- Files changed: sanitized PluginProcessor transport observation, core transport/control view,
+  `DspStereoDelay.*`, catalog/graph dispatch, playback panic handling, v1 note, and dedicated vectors.
+- Validation: `drs.curated_dsp.stereo_delay` passed free-time and fractional sync timing at
+  44.1/48/96 kHz and 60/120/240 BPM, frozen-tempo fallback, ping-pong, feedback ceiling/decay,
+  normal-release versus panic reset, sample-rate reset/storage reuse, bounded-memory accounting,
+  block partitioning, and per-sample automation. Curated DSP contract, graph-plan, and scoped-routing
+  suites passed; `drs_plugin_bundle` builds. `git diff --check` has only repository CRLF notices.
+- Result: Delay v1 uses two fixed-capacity stereo lines with fractional reads and filtered feedback;
+  all core transport data is numeric and validity-flagged, discontinuities reset effects, and normal
+  releases retain a bounded two-second tail at the active sample rate.
+- Remaining tasks: DSP-12-01 through DSP-17-04.
+
+### July 30, 2026 - Sprint 12 / in progress
+
+- State: complete; Sprint 13 task DSP-13-01 is next.
+- Files changed: `DspAlgorithmicReverb.*`, catalog/graph dispatch and cost budget,
+  generation-tail rendering/fade, playback activation retirement, reverb vectors, and activation tests.
+- Validation: `drs.curated_dsp.reverb` passed frozen FDN impulse/pre-delay, width, damping,
+  sample-rate reset/storage reuse, automation, bypass, reset, and 128-callback legal-six-instance
+  benchmark at 4,468 us versus the 5,333 us half-deadline. Graph-plan rejects the seventh 20-unit
+  reverb before activation. Playback-context/scoped-routing, delay, catalog contract, and plugin
+  bundle checks passed; tail reclamation returned retained-byte/backlog diagnostics to baseline.
+- Result: Reverb v1 uses 367,184 bytes of fixed 96 kHz storage within its 512 KiB catalog request;
+  a 128-unit graph ceiling admits at most six reverbs, retired tails render through to completion,
+  and oldest-tail pressure requests a 10 ms callback-owned fade before recovery.
+- Remaining tasks: DSP-13-01 through DSP-17-04.
+
+### July 30, 2026 - Sprint 13
+
+- State: complete; Sprint 14 task DSP-14-01 is next.
+- Files changed: Authoring Session gained explicit empty-chain creation with atomic group ownership;
+  AuthoringPanel gained zone/group/master scope/breadcrumbs, chain-local add/duplicate/reorder/
+  move/delete/bypass/rename controls, descriptor unit/value/default/reset controls, macro affordance,
+  unavailable-version review state, and immutable preview/cost/budget/tail-capability diagnostics.
+- Validation: `drs_phase2_authoring_ui_tests` passed scope-change non-mutation, canonical zone/group
+  chain creation, parameter transactions, duplicate/delete behavior, expanded and compact layout,
+  focus/accessibility contracts, and screenshot output.
+- Result: creators can author all three chain scopes without editing raw routing metadata; a group
+  chain is bound to its group in the same undoable document transaction and UI diagnostics only read
+  immutable authoring/preview snapshots.
+- Remaining tasks: DSP-14-01 through DSP-17-04.
+
+### July 30, 2026 - Sprint 14
+
+- State: complete; Sprint 15 task DSP-15-01 is next.
+- Validation: host-state codec, restore coordinator, recovery UI, restore stress, project recall,
+  preset state, state recall, and rebuilt standalone/VST3 smoke tests passed. The checked-in REAPER
+  evidence covers editor open/closed, duplicate instances, moved projects, changed manifests, and
+  missing content with captured host-state digests.
+- Result: restore stays topology/digest-bound, legacy/missing/unknown state is review-gated or
+  rejected before activation, and a current valid payload survives recoverable failure paths.
+- Remaining tasks: DSP-15-01 through DSP-17-04.
 
 ### July 30, 2026 â€” Sprint 0 / Gate G0
 

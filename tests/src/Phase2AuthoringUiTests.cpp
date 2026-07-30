@@ -1503,6 +1503,89 @@ void exerciseDrawerEditorTransactions(drs::app::AuthoringPanel& panel,
             "Routing drawer edits should persist through the authoring session.");
 }
 
+void exerciseScopedDspWorkflow(drs::app::AuthoringPanel& panel,
+                               drs::engine::AuthoringSession& session)
+{
+    requireButton(panel, "authoringDrawerRoutingTab").onClick();
+    auto& scopeSelector = requireComboBox(panel, "authoringDspScopeSelector");
+    auto& addButton = requireButton(panel, "authoringFxAddButton");
+    auto& duplicateButton = requireButton(panel, "authoringFxDuplicateButton");
+    auto& deleteButton = requireButton(panel, "authoringFxDeleteButton");
+    auto& parameterSelector = requireComboBox(panel, "authoringFxParameterSelector");
+    auto& parameterSlider = requireSlider(panel, "authoringFxParameterSlider");
+    require(scopeSelector.isVisible() && addButton.isVisible(),
+            "Expanded routing drawer must expose an explicit DSP scope and insert action.");
+
+    const auto selectedZone = session.getSelectedZone();
+    require(selectedZone.has_value(), "Scoped DSP workflow requires a selected zone.");
+    const auto zoneInput = "zones/" + selectedZone->id;
+    std::map<std::string, std::vector<std::string>> beforeZoneAdd;
+    for (const auto& bus : session.getProject().authoring.routingBuses)
+        beforeZoneAdd.emplace(bus.id, bus.fxSlotIds);
+    const auto slotCountBeforeZoneAdd = session.getProject().authoring.fxSlots.size();
+    scopeSelector.setSelectedId(1, juce::sendNotificationSync);
+    addButton.onClick();
+    require(session.getProject().authoring.fxSlots.size() == slotCountBeforeZoneAdd + 1,
+            "Adding an insert at the zone scope must create exactly one curated slot.");
+    for (const auto& bus : session.getProject().authoring.routingBuses)
+    {
+        const auto before = beforeZoneAdd.find(bus.id);
+        if (before != beforeZoneAdd.end() && bus.inputSourceId != zoneInput && bus.inputSourceId != selectedZone->id)
+            require(bus.fxSlotIds == before->second,
+                    "Creating a zone insert must not move or duplicate another owner's chain.");
+    }
+    const auto zoneBus = std::find_if(session.getProject().authoring.routingBuses.begin(),
+                                      session.getProject().authoring.routingBuses.end(),
+                                      [&](const auto& bus) { return bus.inputSourceId == zoneInput || bus.inputSourceId == selectedZone->id; });
+    require(zoneBus != session.getProject().authoring.routingBuses.end() && !zoneBus->fxSlotIds.empty(),
+            "Zone-scope add must attach the new slot to a canonical zone owner chain.");
+
+    const auto undoBeforeScopeChange = session.getDocumentState().undoDepth;
+    const auto zoneChainAfterAdd = zoneBus->fxSlotIds;
+    scopeSelector.setSelectedId(2, juce::sendNotificationSync);
+    require(session.getDocumentState().undoDepth == undoBeforeScopeChange && zoneBus->fxSlotIds == zoneChainAfterAdd,
+            "Changing DSP scope must only change selection and never mutate an existing chain.");
+    const auto slotCountBeforeGroupAdd = session.getProject().authoring.fxSlots.size();
+    addButton.onClick();
+    require(session.getProject().authoring.fxSlots.size() == slotCountBeforeGroupAdd + 1,
+            "Group-scope add must create its own insert rather than reusing the zone chain.");
+    const auto selectedGroup = session.getSelectedGroup();
+    require(selectedGroup.has_value() && !selectedGroup->routingBusId.empty(),
+            "Creating a group-scoped chain must atomically bind the chain to its group owner.");
+
+    require(parameterSelector.isEnabled() && parameterSlider.isEnabled(),
+            "Curated slots must expose descriptor-driven parameter controls.");
+    require(requireLabel(panel, "authoringFxParameterValueLabel").getText().contains("default"),
+            "Descriptor-driven parameter controls must display the authored value, unit, and catalog default.");
+    require(requireLabel(panel, "authoringFxDiagnosticsLabel").getText().contains("graph")
+                && requireLabel(panel, "authoringFxDiagnosticsLabel").getText().contains("128"),
+            "Scope-aware routing must surface immutable graph-cost diagnostics and the callback budget.");
+    for (const auto& componentId : { juce::String("authoringDspScopeSelector"),
+                                     juce::String("authoringFxAddButton"),
+                                     juce::String("authoringFxParameterSelector"),
+                                     juce::String("authoringFxParameterSlider"),
+                                     juce::String("authoringFxDiagnosticsLabel") })
+    {
+        requireNonEmptyAccessibilityTitle(panel, componentId);
+        requireAccessibilityHandlerState(panel, componentId, true);
+    }
+    const auto parameterUndoDepth = session.getDocumentState().undoDepth;
+    const auto nextParameter = juce::jlimit(parameterSlider.getMinimum(), parameterSlider.getMaximum(),
+                                            parameterSlider.getValue() + .5);
+    parameterSlider.setValue(nextParameter, juce::dontSendNotification);
+    parameterSlider.onDragEnd();
+    require(session.getDocumentState().undoDepth == parameterUndoDepth + 1,
+            "Descriptor-driven parameter edits must commit through a normal transaction.");
+
+    const auto slotCountBeforeDuplicate = session.getProject().authoring.fxSlots.size();
+    duplicateButton.onClick();
+    require(session.getProject().authoring.fxSlots.size() == slotCountBeforeDuplicate + 1,
+            "Duplicate must create one independent chain slot through the session transaction.");
+    deleteButton.onClick();
+    require(session.getProject().authoring.fxSlots.size() == slotCountBeforeDuplicate,
+            "Delete must remove the selected duplicate without changing unrelated owners.");
+}
+
 void exerciseGroupUi(drs::app::AuthoringPanel& panel,
                      drs::engine::AuthoringSession& session,
                      const std::string& shellName,
@@ -2870,6 +2953,8 @@ int main()
             exerciseAccessibilityAndFocusBehavior(panel, shellName);
             exerciseDrawerEditorTransactions(panel, session);
             exerciseGroupUi(panel, session, shellName, outputDirectory, inventory);
+            if (layoutMode == drs::app::AuthoringPanel::LayoutMode::expanded)
+                exerciseScopedDspWorkflow(panel, session);
             exerciseSurface(panel, 1, shellName, "mapping", outputDirectory, inventory, baselineFindings);
             exerciseSurface(panel, 2, shellName, "macros", outputDirectory, inventory, baselineFindings);
             exerciseSurface(panel, 3, shellName, "routing", outputDirectory, inventory, baselineFindings);

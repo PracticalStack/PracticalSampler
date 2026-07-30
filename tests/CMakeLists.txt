@@ -566,6 +566,24 @@ target_compile_features(drs_curated_dsp_stereo_delay_tests PRIVATE cxx_std_17)
 add_test(NAME drs.curated_dsp.stereo_delay COMMAND drs_curated_dsp_stereo_delay_tests)
 set_target_properties(drs_curated_dsp_stereo_delay_tests PROPERTIES FOLDER "Tests")
 
+add_executable(drs_curated_dsp_reverb_tests src/CuratedDspReverbTests.cpp)
+target_link_libraries(drs_curated_dsp_reverb_tests PRIVATE drs_engine_adapter)
+target_compile_features(drs_curated_dsp_reverb_tests PRIVATE cxx_std_17)
+add_test(NAME drs.curated_dsp.reverb COMMAND drs_curated_dsp_reverb_tests)
+set_target_properties(drs_curated_dsp_reverb_tests PROPERTIES FOLDER "Tests")
+
+add_executable(drs_curated_dsp_compact_eq_tests src/CuratedDspCompactEqTests.cpp)
+target_link_libraries(drs_curated_dsp_compact_eq_tests PRIVATE drs_engine_adapter)
+target_compile_features(drs_curated_dsp_compact_eq_tests PRIVATE cxx_std_17)
+add_test(NAME drs.curated_dsp.compact_eq COMMAND drs_curated_dsp_compact_eq_tests)
+set_target_properties(drs_curated_dsp_compact_eq_tests PROPERTIES FOLDER "Tests")
+
+add_executable(drs_curated_dsp_chorus_tests src/CuratedDspChorusTests.cpp)
+target_link_libraries(drs_curated_dsp_chorus_tests PRIVATE drs_engine_adapter)
+target_compile_features(drs_curated_dsp_chorus_tests PRIVATE cxx_std_17)
+add_test(NAME drs.curated_dsp.chorus COMMAND drs_curated_dsp_chorus_tests)
+set_target_properties(drs_curated_dsp_chorus_tests PROPERTIES FOLDER "Tests")
+
 add_executable(drs_curated_dsp_scoped_routing_tests
     src/CuratedDspScopedRoutingTests.cpp
 )
@@ -2659,6 +2677,9 @@ add_dependencies(drs_all_tests
     drs_curated_dsp_contract_tests
     drs_curated_dsp_graph_plan_tests
     drs_curated_dsp_gain_tests
+    drs_curated_dsp_reverb_tests
+    drs_curated_dsp_compact_eq_tests
+    drs_curated_dsp_chorus_tests
     drs_curated_dsp_scoped_routing_tests
     drs_curated_dsp_s0_baseline_report
     drs_project_restore_coordinator_tests
@@ -2693,6 +2714,8 @@ add_dependencies(drs_all_tests
     drs_sprint31_sfz_compatibility_tests
     drs_sprint31_sfz_report_model_tests
     drs_sprint31_sfz_projection_tests
+    drs_sprint31_sfz_review_ui_tests
+    drs_sprint31_sfz_corpus_hardening_tests
     drs_sfz_import_lifecycle_tests
     drs_sfz_import_shell_lifecycle_tests
     drs_sprint31_sfz_contract_red_tests

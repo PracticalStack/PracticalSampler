@@ -132,6 +132,20 @@ int main()
         require(!tooManyNodes.compiled && hasFinding(tooManyNodes, "graph-node-budget"),
                 "One node beyond the legal topology must be rejected before activation.");
 
+        drs::engine::ImmutablePlaybackSnapshot costly;
+        costly.dspGraphDigest = "fnv1a64:costly";
+        drs::engine::PlaybackSnapshotRoutingBusReference costlyMaster { "master", "Master", "master" };
+        for (std::size_t index = 0; index < 7; ++index)
+        {
+            const auto id = "reverb-" + std::to_string(index);
+            costly.fxSlots.push_back(makeSlot(id, "drs.algorithmicReverb", "mix", .2, 20));
+            costlyMaster.fxSlotIds.push_back(id);
+        }
+        costly.routingBuses.push_back(costlyMaster);
+        const auto costlyPlan = drs::engine::compileDspGraphPlan(costly);
+        require(!costlyPlan.compiled && hasFinding(costlyPlan, "graph-cost-budget"),
+                "The seventh 20-unit reverb must be rejected before activation by the callback cost budget.");
+
         std::string generationFailure;
         require(!drs::engine::createDspRenderGeneration({}, plan.plan, 512, &generationFailure)
                     && !generationFailure.empty(),

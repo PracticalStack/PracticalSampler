@@ -58,12 +58,19 @@ bool DspRenderGeneration::publishChainBypass(const std::uint64_t generationIdent
 void DspRenderGeneration::setControlSampleRate(const double sampleRate) noexcept
 {
     if (!std::isfinite(sampleRate) || sampleRate <= 0.0) return;
+    controlSampleRate = sampleRate;
     controlSmoothingFrames = std::max<std::uint32_t>(1, static_cast<std::uint32_t>(std::lround(sampleRate * 0.01)));
     bypassSmoothingFrames = std::max<std::uint32_t>(1, static_cast<std::uint32_t>(std::lround(sampleRate * 0.005)));
     for (auto& state : saturatorStates)
         state.prepare(sampleRate);
     for (auto& state : delayStates)
         if (!state.left.empty()) state.prepare(sampleRate);
+    for (auto& state : reverbStates)
+        if (!state.preDelayLeft.empty()) state.prepare(sampleRate);
+    for (auto& state : compactEqStates)
+        state.prepare(sampleRate);
+    for (auto& state : chorusStates)
+        if (!state.voices.front().left.empty()) state.prepare(sampleRate);
     resetControlSmoothing();
 }
 
@@ -95,15 +102,53 @@ void DspRenderGeneration::resetEffectState() noexcept
         state.reset();
     for (auto& state : delayStates)
         state.reset();
+    for (auto& state : reverbStates)
+        state.reset();
+    for (auto& state : compactEqStates)
+        state.reset();
+    for (auto& state : chorusStates)
+        state.reset();
     clearTail();
+    requestedRetirementTailFadeFrames.store(0, std::memory_order_release);
+    retirementTailFadeFramesRemaining = 0;
+    retirementTailGain = 1.0f;
 }
 
 void DspRenderGeneration::setTransport(const SamplerRenderControlValues::TransportView value) noexcept
 {
-    transport = { value.tempoBpm, value.valid, value.isPlaying };
+    transport = { value.tempoBpm, value.valid, value.hasTempo, value.isPlaying };
 }
 
 bool DspRenderGeneration::beginScopedRender(const SamplerAudioBufferView output) noexcept
+{
+    renderingRetiredTail = false;
+    return beginRender(output);
+}
+
+bool DspRenderGeneration::beginRetiredTailRender(const SamplerAudioBufferView output) noexcept
+{
+    renderingRetiredTail = true;
+    const auto requested = requestedRetirementTailFadeFrames.exchange(0, std::memory_order_acq_rel);
+    if (requested != 0)
+    {
+        retirementTailFadeFramesRemaining = requested;
+        retirementTailGain = 1.0f;
+    }
+    return beginRender(output);
+}
+
+void DspRenderGeneration::requestRetirementTailFade(const std::uint32_t frames) noexcept
+{
+    if (frames == 0) return;
+    auto requested = requestedRetirementTailFadeFrames.load(std::memory_order_relaxed);
+    while ((requested == 0 || frames < requested)
+           && !requestedRetirementTailFadeFrames.compare_exchange_weak(requested, frames,
+               std::memory_order_release, std::memory_order_relaxed))
+    {
+    }
+}
+
+bool DspRenderGeneration::beginRender(const SamplerAudioBufferView output) noexcept
 {
     if (output.channels == nullptr || output.channelCount == 0 || output.frameCount == 0
         || output.frameCount > maximumBlockFrames || graphPlan.directFastPath) return false;
@@ -202,6 +247,15 @@ bool DspRenderGeneration::executeScopedGraph(const SamplerAudioBufferView output
     if (activeFrameCount != output.frameCount || activeChannelCount == 0 || graphPlan.directFastPath)
         return false;
 
+    const auto fadeFrames = renderingRetiredTail ? retirementTailFadeFramesRemaining : 0u;
+    const auto fadeGain = retirementTailGain;
+    const auto gainForFrame = [fadeFrames, fadeGain](const std::uint32_t frame)
+    {
+        if (fadeFrames == 0) return 1.0f;
+        return fadeGain * std::max(0.0f, 1.0f - static_cast<float>(frame + 1)
+            / static_cast<float>(fadeFrames));
+    };
+
     for (std::size_t chainIndex = 0; chainIndex < chainStartIndices.size(); ++chainIndex)
     {
         const auto start = chainStartIndices[chainIndex];
@@ -216,15 +270,25 @@ bool DspRenderGeneration::executeScopedGraph(const SamplerAudioBufferView output
         for (std::uint32_t nodeIndex = start; nodeIndex <= end; ++nodeIndex)
         {
             const auto& node = graphPlan.nodes[nodeIndex];
-            // A fully bypassed stateless node has no tail to render; leave it suspended
-            // until its published wet target changes, while the chain continues to pass audio.
-            if (nodeWetStart[nodeIndex] == 0.0f && nodeWetCurrent[nodeIndex] == 0.0f)
+            // A fully bypassed stateless node has no tail to render. Stateful nodes continue
+            // silently so feedback memory decays deterministically while their wet ramp is zero.
+            const auto statefulNode = node.effectType == "drs.stereoDelay"
+                || node.effectType == "drs.algorithmicReverb" || node.effectType == "drs.compactEq"
+                || node.effectType == "drs.chorus";
+            if (!statefulNode && nodeWetStart[nodeIndex] == 0.0f && nodeWetCurrent[nodeIndex] == 0.0f)
                 continue;
             DspGainParameters gainStart;
             DspGainParameters gainEnd;
             DspSaturatorParameters saturatorStart;
             DspSaturatorParameters saturatorEnd;
-            DspStereoDelayParameters delayParameters;
+            DspStereoDelayParameters delayStart;
+            DspStereoDelayParameters delayEnd;
+            DspAlgorithmicReverbParameters reverbStart;
+            DspAlgorithmicReverbParameters reverbEnd;
+            DspCompactEqParameters compactEqStart;
+            DspCompactEqParameters compactEqEnd;
+            DspChorusParameters chorusStart;
+            DspChorusParameters chorusEnd;
             for (std::size_t parameterOffset = 0; parameterOffset < node.parameterCount; ++parameterOffset)
             {
                 const auto parameterIndex = node.parameterStart + parameterOffset;
@@ -237,15 +301,26 @@ bool DspRenderGeneration::executeScopedGraph(const SamplerAudioBufferView output
                 else if (parameterId == "mute") { gainStart.mute = startValue; gainEnd.mute = endValue; }
                 else if (parameterId == "character") { saturatorStart.character = startValue; saturatorEnd.character = endValue; }
                 else if (parameterId == "driveDb") { saturatorStart.driveDb = startValue; saturatorEnd.driveDb = endValue; }
-                else if (parameterId == "tone") { saturatorStart.tone = startValue; saturatorEnd.tone = endValue; delayParameters.tone = endValue; }
-                else if (parameterId == "mix") { saturatorStart.mix = startValue; saturatorEnd.mix = endValue; delayParameters.mix = endValue; }
+                else if (parameterId == "tone") { saturatorStart.tone = startValue; saturatorEnd.tone = endValue; delayStart.tone = startValue; delayEnd.tone = endValue; }
+                else if (parameterId == "mix") { saturatorStart.mix = startValue; saturatorEnd.mix = endValue; delayStart.mix = startValue; delayEnd.mix = endValue; reverbStart.mix = startValue; reverbEnd.mix = endValue; compactEqStart.mix = startValue; compactEqEnd.mix = endValue; chorusStart.mix = startValue; chorusEnd.mix = endValue; }
                 else if (parameterId == "outputDb") { saturatorStart.outputDb = startValue; saturatorEnd.outputDb = endValue; }
-                else if (parameterId == "timeMs") delayParameters.timeMs = endValue;
-                else if (parameterId == "sync") delayParameters.sync = endValue;
-                else if (parameterId == "divisionBeats") delayParameters.divisionBeats = endValue;
-                else if (parameterId == "feedback") delayParameters.feedback = endValue;
-                else if (parameterId == "pingPong") delayParameters.pingPong = endValue;
-                else if (parameterId == "width") delayParameters.width = endValue;
+                else if (parameterId == "timeMs") { delayStart.timeMs = startValue; delayEnd.timeMs = endValue; }
+                else if (parameterId == "sync") { delayStart.sync = startValue; delayEnd.sync = endValue; }
+                else if (parameterId == "divisionBeats") { delayStart.divisionBeats = startValue; delayEnd.divisionBeats = endValue; }
+                else if (parameterId == "feedback") { delayStart.feedback = startValue; delayEnd.feedback = endValue; }
+                else if (parameterId == "pingPong") { delayStart.pingPong = startValue; delayEnd.pingPong = endValue; }
+                else if (parameterId == "width") { delayStart.width = startValue; delayEnd.width = endValue; reverbStart.width = startValue; reverbEnd.width = endValue; chorusStart.width = startValue; chorusEnd.width = endValue; }
+                else if (parameterId == "preDelayMs") { reverbStart.preDelayMs = startValue; reverbEnd.preDelayMs = endValue; }
+                else if (parameterId == "size") { reverbStart.size = startValue; reverbEnd.size = endValue; }
+                else if (parameterId == "decaySeconds") { reverbStart.decaySeconds = startValue; reverbEnd.decaySeconds = endValue; }
+                else if (parameterId == "damping") { reverbStart.damping = startValue; reverbEnd.damping = endValue; }
+                else if (parameterId == "mode") { compactEqStart.mode = startValue; compactEqEnd.mode = endValue; }
+                else if (parameterId == "frequencyHz") { compactEqStart.frequencyHz = startValue; compactEqEnd.frequencyHz = endValue; }
+                else if (parameterId == "q") { compactEqStart.q = startValue; compactEqEnd.q = endValue; }
+                else if (parameterId == "gainDb") { compactEqStart.gainDb = startValue; compactEqEnd.gainDb = endValue; }
+                else if (parameterId == "rateHz") { chorusStart.rateHz = startValue; chorusEnd.rateHz = endValue; }
+                else if (parameterId == "depthMs") { chorusStart.depthMs = startValue; chorusEnd.depthMs = endValue; }
+                else if (parameterId == "baseDelayMs") { chorusStart.baseDelayMs = startValue; chorusEnd.baseDelayMs = endValue; }
             }
             if (node.effectType == "drs.gain")
                 processDspGainBypassRamp(chainBuffer, gainStart, gainEnd,
@@ -256,10 +331,38 @@ bool DspRenderGeneration::executeScopedGraph(const SamplerAudioBufferView output
                                               nodeWetStart[nodeIndex], nodeWetCurrent[nodeIndex]);
             else if (node.effectType == "drs.stereoDelay")
             {
-                processDspStereoDelay(chainBuffer, delayStates[nodeIndex], delayParameters, transport);
-                if (delayStates[nodeIndex].inputPeak > 1.0e-5f && delayParameters.feedback > 0.0)
+                delayStart.mix *= nodeWetStart[nodeIndex];
+                delayEnd.mix *= nodeWetCurrent[nodeIndex];
+                processDspStereoDelayRamp(chainBuffer, delayStates[nodeIndex], delayStart, delayEnd, transport);
+                if (delayStates[nodeIndex].inputPeak > 1.0e-5f && delayEnd.feedback > 0.0
+                    && (nodeWetStart[nodeIndex] > 0.0f || nodeWetCurrent[nodeIndex] > 0.0f))
                     setTailFramesRemaining(std::min<std::uint64_t>(30u * 96000u,
-                        static_cast<std::uint64_t>(std::ceil(2.0 * 96000.0))));
+                        static_cast<std::uint64_t>(std::ceil(2.0 * controlSampleRate))));
+            }
+            else if (node.effectType == "drs.algorithmicReverb")
+            {
+                reverbStart.mix *= nodeWetStart[nodeIndex];
+                reverbEnd.mix *= nodeWetCurrent[nodeIndex];
+                processDspAlgorithmicReverbRamp(chainBuffer, reverbStates[nodeIndex], reverbStart, reverbEnd);
+                if (reverbStates[nodeIndex].inputPeak > 1.0e-5f && reverbEnd.mix > 0.0
+                    && (nodeWetStart[nodeIndex] > 0.0f || nodeWetCurrent[nodeIndex] > 0.0f))
+                {
+                    const auto tailSeconds = std::min(30.0, std::max(.1, reverbEnd.decaySeconds)
+                        + std::max(0.0, reverbEnd.preDelayMs) / 1000.0);
+                    setTailFramesRemaining(static_cast<std::uint64_t>(std::ceil(tailSeconds * controlSampleRate)));
+                }
+            }
+            else if (node.effectType == "drs.compactEq")
+            {
+                compactEqStart.mix *= nodeWetStart[nodeIndex];
+                compactEqEnd.mix *= nodeWetCurrent[nodeIndex];
+                processDspCompactEqRamp(chainBuffer, compactEqStates[nodeIndex], compactEqStart, compactEqEnd);
+            }
+            else if (node.effectType == "drs.chorus")
+            {
+                chorusStart.mix *= nodeWetStart[nodeIndex];
+                chorusEnd.mix *= nodeWetCurrent[nodeIndex];
+                processDspChorusRamp(chainBuffer, chorusStates[nodeIndex], chorusStart, chorusEnd);
             }
         }
 
@@ -272,7 +375,21 @@ bool DspRenderGeneration::executeScopedGraph(const SamplerAudioBufferView output
                     * maximumBlockFrames;
             const auto* source = channels[channel];
             for (std::uint32_t frame = 0; frame < activeFrameCount; ++frame)
-                destination[frame] += source[frame];
+                destination[frame] += source[frame] * gainForFrame(frame);
+        }
+    }
+    if (fadeFrames != 0)
+    {
+        if (activeFrameCount >= fadeFrames)
+        {
+            retirementTailFadeFramesRemaining = 0;
+            retirementTailGain = 0.0f;
+            clearTail();
+        }
+        else
+        {
+            retirementTailGain = gainForFrame(activeFrameCount - 1);
+            retirementTailFadeFramesRemaining -= activeFrameCount;
         }
     }
     return !chainStartIndices.empty();
@@ -331,11 +448,20 @@ std::shared_ptr<DspRenderGeneration> createDspRenderGeneration(
     generation->nodeBypassFramesRemaining.assign(generation->graphPlan.nodes.size(), 0);
     generation->saturatorStates.resize(generation->graphPlan.nodes.size());
     generation->delayStates.resize(generation->graphPlan.nodes.size());
+    generation->reverbStates.resize(generation->graphPlan.nodes.size());
+    generation->compactEqStates.resize(generation->graphPlan.nodes.size());
+    generation->chorusStates.resize(generation->graphPlan.nodes.size());
     for (auto& state : generation->saturatorStates)
         state.prepare(48000.0);
     for (std::size_t index = 0; index < generation->graphPlan.nodes.size(); ++index)
         if (generation->graphPlan.nodes[index].effectType == "drs.stereoDelay")
             generation->delayStates[index].prepare(48000.0);
+        else if (generation->graphPlan.nodes[index].effectType == "drs.algorithmicReverb")
+            generation->reverbStates[index].prepare(48000.0);
+        else if (generation->graphPlan.nodes[index].effectType == "drs.compactEq")
+            generation->compactEqStates[index].prepare(48000.0);
+        else if (generation->graphPlan.nodes[index].effectType == "drs.chorus")
+            generation->chorusStates[index].prepare(48000.0);
     generation->resetControlSmoothing();
     generation->controlGenerationIdentity = nextControlGenerationIdentity.fetch_add(1, std::memory_order_relaxed);
     if (generation->controlGenerationIdentity == 0)

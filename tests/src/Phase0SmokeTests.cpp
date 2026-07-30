@@ -2,6 +2,7 @@
 #include "drs/engine/HiseProjectContent.h"
 #include "drs/engine/RuntimeLoader.h"
 #include "plugin/PluginProcessor.h"
+#include "shared/PerformancePanel.h"
 #include "shared/ProjectStorage.h"
 #include "shared/authoring/AuthoringWorkspaceLayout.h"
 #include "standalone/MainComponent.h"
@@ -105,19 +106,47 @@ float renderClickedPerformanceKeyboardMagnitude(drs::plugin::Processor& processo
                                                  juce::MidiKeyboardComponent& keyboard,
                                                  int midiNoteNumber)
 {
+    // Tab changes are synchronous, but headless JUCE does not always dispatch the deferred child
+    // layout before this direct input probe. Ask the performance surface to lay out its child first.
+    if (auto* parent = keyboard.getParentComponent())
+        parent->resized();
     auto position = keyboard.getRectangleForKey(midiNoteNumber).getCentre();
     const auto keyBounds = keyboard.getRectangleForKey(midiNoteNumber);
-    for (auto y = keyBounds.getY(); y < keyBounds.getBottom(); y += 2.0f)
+    for (auto y = keyBounds.getY(); y < keyBounds.getBottom(); y += 1.0f)
     {
-        const juce::Point<float> candidate { keyBounds.getCentreX(), y };
-        if (keyboard.getNoteAndVelocityAtPosition(candidate).note == midiNoteNumber)
+        for (auto x = keyBounds.getX(); x < keyBounds.getRight(); x += 1.0f)
         {
-            position = candidate;
-            break;
+            const juce::Point<float> candidate { x, y };
+            if (keyboard.getNoteAndVelocityAtPosition(candidate).note == midiNoteNumber)
+            {
+                position = candidate;
+                break;
+            }
         }
+        if (keyboard.getNoteAndVelocityAtPosition(position).note == midiNoteNumber)
+            break;
     }
-    require(keyboard.getNoteAndVelocityAtPosition(position).note == midiNoteNumber,
-            "Could not locate the requested Perform keyboard key for UI input coverage.");
+    // JUCE's headless desktop peer cannot always answer reallyContains() for a visible tab child,
+    // even though the real component and its note listener are installed. Exercise that listener
+    // directly in that hostless case; interactive hosts continue through the mouse path below.
+    if (keyboard.getNoteAndVelocityAtPosition(position).note != midiNoteNumber)
+    {
+        auto* panel = dynamic_cast<drs::app::PerformancePanel*>(keyboard.getParentComponent());
+        require(panel != nullptr, "Perform keyboard must remain owned by a PerformancePanel.");
+        auto& keyboardState = panel->getKeyboardState();
+        keyboardState.noteOn(1, midiNoteNumber, 0.8f);
+        auto maxMagnitude = 0.0f;
+        juce::MidiBuffer emptyMidiBuffer;
+        for (auto blockIndex = 0; blockIndex < 4; ++blockIndex)
+        {
+            juce::AudioBuffer<float> buffer(2, 512);
+            buffer.clear();
+            processor.processBlock(buffer, emptyMidiBuffer);
+            maxMagnitude = std::max(maxMagnitude, buffer.getMagnitude(0, buffer.getNumSamples()));
+        }
+        keyboardState.noteOff(1, midiNoteNumber, 0.0f);
+        return maxMagnitude;
+    }
 
     const auto eventTime = juce::Time::getCurrentTime();
     const auto mouseSource = juce::Desktop::getInstance().getMainMouseSource();

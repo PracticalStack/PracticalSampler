@@ -667,7 +667,7 @@
           <thead><tr><th>ID</th><th>Development task</th><th>Compiler output</th><th>Acceptance</th></tr></thead>
           <tbody>
             <tr><td class="task-id">DSP-04-01 [x]</td><td>Define immutable graph nodes, owner kind/ID, ordered effect descriptors, input destination, output destination, scratch slice, and parameter-slot indices.</td><td><code>DspGraphPlan.h</code></td><td>Plan contains no mutable histories or UI/project pointers.</td></tr>
-            <tr><td class="task-id">DSP-04-02</td><td>Compile fixed zone → group → master topology; reject cycles and bus-to-bus inputs; collapse owners with no active chain.</td><td><code>DspGraphPlan.cpp</code></td><td>No-DSP plan has zero processing nodes and selects the direct fast path.</td></tr>
+            <tr><td class="task-id">DSP-04-02 [x]</td><td>Compile fixed zone → group → master topology; reject cycles and bus-to-bus inputs; collapse owners with no active chain.</td><td><code>DspGraphPlan.cpp</code></td><td>No-DSP plan has zero processing nodes and selects the direct fast path.</td></tr>
             <tr><td class="task-id">DSP-04-03 [x]</td><td>Compute scratch slices, delay-memory requests, parameter count, effect cost, and bounded graph totals with overflow-safe arithmetic.</td><td>Plan budgets and findings</td><td>Over-budget graphs fail before activation with exact node/slot paths.</td></tr>
             <tr><td class="task-id">DSP-04-04 [x]</td><td>Add graph compiler tests for every scope combination, pass-through collapse, chain order, duplicates, unknown bypassed slots, and maximum legal topology.</td><td><code>CuratedDspGraphPlanTests.cpp</code></td><td>Same snapshot always creates the same plan and digest inputs.</td></tr>
           </tbody>
@@ -710,7 +710,7 @@
         <table>
           <thead><tr><th>ID</th><th>Development task</th><th>Behavior</th><th>Acceptance</th></tr></thead>
           <tbody>
-            <tr><td class="task-id">DSP-06-01</td><td>Define the version-1 Gain/Trim math, polarity, mute, numeric limits, reset, and denormal policy.</td><td><code>DspGain.*</code></td><td>Golden vectors cover unity, ±gain, polarity, mute, mono, and stereo.</td></tr>
+            <tr><td class="task-id">DSP-06-01 [x]</td><td>Define the version-1 Gain/Trim math, polarity, mute, numeric limits, reset, and denormal policy.</td><td><code>DspGain.*</code></td><td>Golden vectors cover unity, ±gain, polarity, mute, mono, and stereo.</td></tr>
             <tr><td class="task-id">DSP-06-02 [x]</td><td>Execute an instrument-only graph after sampler rendering and before lane output.</td><td>Master scratch/process/write path</td><td>Unity Gain is sample-equivalent to the current dry baseline.</td></tr>
             <tr><td class="task-id">DSP-06-03 [x]</td><td>Implement the zero-node direct fast path and one-node bypass fast path.</td><td>Callback dispatch</td><td>No-DSP output remains bit-identical where the existing harness permits.</td></tr>
             <tr><td class="task-id">DSP-06-04 [x]</td><td>Add offline renders and realtime guard tests for instrument Gain in Preview, Performance, editor-open/closed, standalone, and VST3 shell paths.</td><td>Reviewed Gain baselines</td><td>Both lanes use the same core behavior and separate state.</td></tr>
@@ -818,11 +818,11 @@
         <table>
           <thead><tr><th>ID</th><th>Development task</th><th>Primary seam</th><th>Acceptance</th></tr></thead>
           <tbody>
-            <tr><td class="task-id">DSP-11-01</td><td>Add a sanitized primitive transport view: tempo, time signature, play state, sample position, and validity flags.</td><td><code>PluginProcessor.cpp</code> → core render request</td><td>Missing/invalid host data uses the frozen fallback tempo without strings or host API calls in core.</td></tr>
-            <tr><td class="task-id">DSP-11-02</td><td>Freeze delay v1: free/sync time, divisions, feedback ceiling, ping-pong, tone, width, wet/dry, interpolation, and max delay.</td><td>Catalog + algorithm note</td><td>Memory request is computable before activation and feedback cannot create an infinite tail.</td></tr>
-            <tr><td class="task-id">DSP-11-03</td><td>Implement preallocated stereo delay lines, fractional reads, feedback filtering, tempo conversion, smoothing, and reset.</td><td><code>DspStereoDelay.*</code></td><td>No reallocation on tempo or parameter changes; block partitioning is stable.</td></tr>
-            <tr><td class="task-id">DSP-11-04</td><td>Define discontinuity behavior for stop, seek/loop jump, sample-rate change, all-notes-off, and panic reset.</td><td>Transport/tail state machine</td><td>Normal note release keeps tails; panic clears immediately; transport rules are tested.</td></tr>
-            <tr><td class="task-id">DSP-11-05</td><td>Add echo-position, sync-division, ping-pong, feedback-decay, tone, tail, memory-budget, and automation tests.</td><td><code>CuratedDspStereoDelayTests.cpp</code></td><td>Echo timing is correct in samples at every supported sample rate and tempo case.</td></tr>
+            <tr><td class="task-id">DSP-11-01 [x]</td><td>Add a sanitized primitive transport view: tempo, time signature, play state, sample position, and validity flags.</td><td><code>PluginProcessor.cpp</code> → core render request</td><td>Missing/invalid host data uses the frozen fallback tempo without strings or host API calls in core.</td></tr>
+            <tr><td class="task-id">DSP-11-02 [x]</td><td>Freeze delay v1: free/sync time, divisions, feedback ceiling, ping-pong, tone, width, wet/dry, interpolation, and max delay.</td><td>Catalog + algorithm note</td><td>Memory request is computable before activation and feedback cannot create an infinite tail.</td></tr>
+            <tr><td class="task-id">DSP-11-03 [x]</td><td>Implement preallocated stereo delay lines, fractional reads, feedback filtering, tempo conversion, smoothing, and reset.</td><td><code>DspStereoDelay.*</code></td><td>No reallocation on tempo or parameter changes; block partitioning is stable.</td></tr>
+            <tr><td class="task-id">DSP-11-04 [x]</td><td>Define discontinuity behavior for stop, seek/loop jump, sample-rate change, all-notes-off, and panic reset.</td><td>Transport/tail state machine</td><td>Normal note release keeps tails; panic clears immediately; transport rules are tested.</td></tr>
+            <tr><td class="task-id">DSP-11-05 [x]</td><td>Add echo-position, sync-division, ping-pong, feedback-decay, tone, tail, memory-budget, and automation tests.</td><td><code>CuratedDspStereoDelayTests.cpp</code></td><td>Echo timing is correct in samples at every supported sample rate and tempo case.</td></tr>
           </tbody>
         </table>
         <div class="exit"><strong>Exit gate:</strong> Delay is sample-accurate, tempo-safe, memory-bounded, macro-automatable, and generation-retirement aware.</div>
@@ -840,11 +840,11 @@
         <table>
           <thead><tr><th>ID</th><th>Development task</th><th>Behavior</th><th>Acceptance</th></tr></thead>
           <tbody>
-            <tr><td class="task-id">DSP-12-01</td><td>Freeze reverb v1 topology and parameters: pre-delay, size, decay, damping, width, wet/dry, modulation policy, memory, and max tail.</td><td>Versioned algorithm note</td><td>Impulse behavior and parameter meanings are stable enough for long-term recall.</td></tr>
-            <tr><td class="task-id">DSP-12-02</td><td>Implement preallocated stereo algorithmic reverb with deterministic reset and sample-rate preparation.</td><td><code>DspAlgorithmicReverb.*</code></td><td>No convolution assets, background file loads, or callback allocations.</td></tr>
-            <tr><td class="task-id">DSP-12-03</td><td>Add graph-level silence detection, effect-declared tail activity, hard tail ceilings, and oldest-generation pressure fade.</td><td><code>DspRenderGeneration.*</code>, playback context</td><td>Old generation retires only after voices and tails, but never remains unbounded.</td></tr>
-            <tr><td class="task-id">DSP-12-04</td><td>Add impulse decay, stereo width, damping, pre-delay, automation, bypass, reset, tail pressure, and rapid activation tests.</td><td><code>CuratedDspReverbTests.cpp</code></td><td>Tail reclamation counters and ownership bytes return to baseline after every test.</td></tr>
-            <tr><td class="task-id">DSP-12-05</td><td>Review CPU/memory against S0 budgets and adjust catalog cost weights or legal instance ceilings.</td><td>Updated benchmark evidence</td><td>Over-budget graphs are rejected before activation; legal graphs meet callback headroom target.</td></tr>
+            <tr><td class="task-id">DSP-12-01 [x]</td><td>Freeze reverb v1 topology and parameters: pre-delay, size, decay, damping, width, wet/dry, modulation policy, memory, and max tail.</td><td>Versioned algorithm note</td><td>Impulse behavior and parameter meanings are stable enough for long-term recall.</td></tr>
+            <tr><td class="task-id">DSP-12-02 [x]</td><td>Implement preallocated stereo algorithmic reverb with deterministic reset and sample-rate preparation.</td><td><code>DspAlgorithmicReverb.*</code></td><td>No convolution assets, background file loads, or callback allocations.</td></tr>
+            <tr><td class="task-id">DSP-12-03 [x]</td><td>Add graph-level silence detection, effect-declared tail activity, hard tail ceilings, and oldest-generation pressure fade.</td><td><code>DspRenderGeneration.*</code>, playback context</td><td>Old generation retires only after voices and tails, but never remains unbounded.</td></tr>
+            <tr><td class="task-id">DSP-12-04 [x]</td><td>Add impulse decay, stereo width, damping, pre-delay, automation, bypass, reset, tail pressure, and rapid activation tests.</td><td><code>CuratedDspReverbTests.cpp</code></td><td>Tail reclamation counters and ownership bytes return to baseline after every test.</td></tr>
+            <tr><td class="task-id">DSP-12-05 [x]</td><td>Review CPU/memory against S0 budgets and adjust catalog cost weights or legal instance ceilings.</td><td>Updated benchmark evidence</td><td>Over-budget graphs are rejected before activation; legal graphs meet callback headroom target.</td></tr>
           </tbody>
         </table>
         <div class="exit"><strong>Exit gate G4:</strong> all Wave 1 effects pass deterministic DSP vectors, automation, reset, tail, pressure, and ownership tests.</div>
@@ -862,11 +862,12 @@
         <table>
           <thead><tr><th>ID</th><th>Development task</th><th>User outcome</th><th>Acceptance</th></tr></thead>
           <tbody>
-            <tr><td class="task-id">DSP-13-01</td><td>Add scope selector/breadcrumb bound to current zone, current group, or instrument master.</td><td>Creator always knows what audio is being processed.</td><td>Selection changes never silently move or duplicate a chain.</td></tr>
-            <tr><td class="task-id">DSP-13-02</td><td>Add chain list operations: add from curated catalog, reorder, bypass, duplicate, rename, move to owner, and delete.</td><td>One consistent editor for all scopes.</td><td>Every gesture routes through S2 transactions and supports keyboard/accessibility metadata.</td></tr>
-            <tr><td class="task-id">DSP-13-03</td><td>Add descriptor-driven parameter controls, units, defaults, reset, value text, macro-assignment affordance, and unavailable-version state.</td><td>UI is catalog-driven without effect-specific persistence logic.</td><td>Unknown preserved slots remain visible and bypassed without crashing the panel.</td></tr>
-            <tr><td class="task-id">DSP-13-04</td><td>Add live preview status, chain CPU/cost indication, tail/activity indicator, over-budget findings, and “legacy effect—review to enable” messaging.</td><td>Failure and cost are understandable before publish.</td><td>Diagnostics remain primitive snapshots; UI polling does not touch mutable DSP.</td></tr>
-            <tr><td class="task-id">DSP-13-05</td><td>Add focused UI layout, focus order, keyboard, accessibility, compact-width, and repeated-structure tests.</td><td>Creator surface remains usable at supported window sizes.</td><td>Automated UI contract and screenshot review pass.</td></tr>
+            <tr><td class="task-id">DSP-13-01 [x]</td><td>Add scope selector/breadcrumb bound to current zone, current group, or instrument master.</td><td>Creator always knows what audio is being processed.</td><td>Selection changes never silently move or duplicate a chain.</td></tr>
+            <tr><td class="task-id">DSP-13-02 [x]</td><td>Add chain list operations: add from curated catalog, reorder, bypass, duplicate, rename, move to owner, and delete.</td><td>One consistent editor for all scopes.</td><td>Every gesture routes through S2 transactions and supports keyboard/accessibility metadata.</td></tr>
+            <tr><td class="task-id">DSP-13-03 [x]</td><td>Add descriptor-driven parameter controls, units, defaults, reset, value text, macro-assignment affordance, and unavailable-version state.</td><td>UI is catalog-driven without effect-specific persistence logic.</td><td>Unknown preserved slots remain visible and bypassed without crashing the panel.</td></tr>
+            <!-- DSP-13-04 [x]: immutable preview/cost diagnostics and legacy review messaging completed; see PROGRESS.md Sprint 13 evidence. -->
+            <tr><td class="task-id">DSP-13-04 [x]</td><td>Add live preview status, chain CPU/cost indication, tail/activity indicator, over-budget findings, and “legacy effect—review to enable” messaging.</td><td>Failure and cost are understandable before publish.</td><td>Diagnostics remain primitive snapshots; UI polling does not touch mutable DSP.</td></tr>
+            <tr><td class="task-id">DSP-13-05 [x]</td><td>Add focused UI layout, focus order, keyboard, accessibility, compact-width, and repeated-structure tests.</td><td>Creator surface remains usable at supported window sizes.</td><td>Automated UI contract and screenshot review pass.</td></tr>
           </tbody>
         </table>
         <div class="exit"><strong>Exit gate:</strong> a creator can build, hear, automate, save, undo, and publish chains at all three scopes without editing raw routing metadata.</div>
@@ -884,17 +885,18 @@
         <table>
           <thead><tr><th>ID</th><th>Development task</th><th>Scenario</th><th>Acceptance</th></tr></thead>
           <tbody>
-            <tr><td class="task-id">DSP-14-01</td><td>Expand host-state structural validation for parameters, graph digest, effect versions, and aggregate DSP budgets.</td><td>Untrusted host chunks</td><td>Oversize/deep/invalid DSP state fails before retention or project mutation.</td></tr>
-            <tr><td class="task-id">DSP-14-02</td><td>Stage restored macro/DSP values until matching authored topology and graph identity are active.</td><td>Editor open/closed restore</td><td>Stale values never bind by index to a different slot after reordering.</td></tr>
-            <tr><td class="task-id">DSP-14-03</td><td>Validate schema-4 migration in standalone and VST3: old metadata loads bypassed, warning is visible, and explicit enable becomes a schema-5 authored edit.</td><td>Legacy projects</td><td>Before-enable render matches S0; after-enable state recalls exactly.</td></tr>
-            <tr><td class="task-id">DSP-14-04</td><td>Cover missing/unknown effect implementation, corrupt parameter, changed manifest, moved project, and restore supersession.</td><td>Failure recovery</td><td>Current valid playback remains active or degrades predictably; no partial graph activates.</td></tr>
-            <tr><td class="task-id">DSP-14-05</td><td>Add REAPER scenarios for save/reopen, duplicate instances, editor closed, automated macro, missing content, and changed content.</td><td><code>validation/reaper/</code></td><td>Restored graph/macro/prepared digests agree with captured state.</td></tr>
+            <tr><td class="task-id">DSP-14-01 [x]</td><td>Expand host-state structural validation for parameters, graph digest, effect versions, and aggregate DSP budgets.</td><td>Untrusted host chunks</td><td>Oversize/deep/invalid DSP state fails before retention or project mutation.</td></tr>
+            <tr><td class="task-id">DSP-14-02 [x]</td><td>Stage restored macro/DSP values until matching authored topology and graph identity are active.</td><td>Editor open/closed restore</td><td>Stale values never bind by index to a different slot after reordering.</td></tr>
+            <tr><td class="task-id">DSP-14-03 [x]</td><td>Validate schema-4 migration in standalone and VST3: old metadata loads bypassed, warning is visible, and explicit enable becomes a schema-5 authored edit.</td><td>Legacy projects</td><td>Before-enable render matches S0; after-enable state recalls exactly.</td></tr>
+            <tr><td class="task-id">DSP-14-04 [x]</td><td>Cover missing/unknown effect implementation, corrupt parameter, changed manifest, moved project, and restore supersession.</td><td>Failure recovery</td><td>Current valid playback remains active or degrades predictably; no partial graph activates.</td></tr>
+            <tr><td class="task-id">DSP-14-05 [x]</td><td>Add REAPER scenarios for save/reopen, duplicate instances, editor closed, automated macro, missing content, and changed content.</td><td><code>validation/reaper/</code></td><td>Restored graph/macro/prepared digests agree with captured state.</td></tr>
           </tbody>
         </table>
         <div class="exit"><strong>Exit gate:</strong> project, preset, host, publish, and recovery lifecycles reproduce the intended graph without changing legacy audio.</div>
       </section>
 
       <section id="s15" class="sprint release">
+        <!-- DSP-15-01 [x]; DSP-15-02 [x]; DSP-15-03 [x]; DSP-15-04 [x]; DSP-15-05 [x]; DSP-15-06 [x]: see PROGRESS.md Sprints 15-17 evidence. -->
         <div class="sprint-head">
           <div>
             <div class="sprint-label">Sprint 15 · Gate G5 · Wave 1 release</div>
@@ -906,18 +908,19 @@
         <table>
           <thead><tr><th>ID</th><th>Development task</th><th>Evidence</th><th>Acceptance</th></tr></thead>
           <tbody>
-            <tr><td class="task-id">DSP-15-01</td><td>Run the full sample-rate, block-size, mono/stereo, voice-count, graph-size, lane, and shell matrix.</td><td>Automated matrix report</td><td>No correctness, ownership, or deadline failure across supported configurations.</td></tr>
-            <tr><td class="task-id">DSP-15-02</td><td>Measure no-DSP overhead, per-effect CPU, scratch/state bytes, activation time, tail lifetime, and p95/p99 callback time.</td><td>Benchmark report against S0</td><td>No-DSP fast path stays within frozen overhead budget; legal graphs retain required callback headroom.</td></tr>
-            <tr><td class="task-id">DSP-15-03</td><td>Run long activation/automation/transport/preview/publish/restore soak with realtime guard and retirement diagnostics.</td><td>Soak logs and bounded counters</td><td>No leaks, growing backlog, stale generation, non-finite samples, or callback violations.</td></tr>
-            <tr><td class="task-id">DSP-15-04</td><td>Review and approve offline audio baselines for representative zone, group, and master chains.</td><td>Wave 1 reviewed corpus</td><td>Every baseline change is explained by versioned DSP behavior.</td></tr>
-            <tr><td class="task-id">DSP-15-05</td><td>Add feature activation policy: new projects enabled, migrated legacy slots review-gated, unknown versions bypassed, and clear diagnostics.</td><td>Release configuration and notes</td><td>Rollback disables DSP execution without corrupting authored state.</td></tr>
-            <tr><td class="task-id">DSP-15-06</td><td>Run focused suites, <code>drs_all_tests</code>, standalone validation, VST3 host validation, and packaging checks.</td><td>Go/no-go report</td><td>G0–G5 evidence is linked and all release blockers are closed.</td></tr>
+            <tr><td class="task-id">DSP-15-01 [x]</td><td>Run the full sample-rate, block-size, mono/stereo, voice-count, graph-size, lane, and shell matrix.</td><td>Automated matrix report</td><td>No correctness, ownership, or deadline failure across supported configurations.</td></tr>
+            <tr><td class="task-id">DSP-15-02 [x]</td><td>Measure no-DSP overhead, per-effect CPU, scratch/state bytes, activation time, tail lifetime, and p95/p99 callback time.</td><td>Benchmark report against S0</td><td>No-DSP fast path stays within frozen overhead budget; legal graphs retain required callback headroom.</td></tr>
+            <tr><td class="task-id">DSP-15-03 [x]</td><td>Run long activation/automation/transport/preview/publish/restore soak with realtime guard and retirement diagnostics.</td><td>Soak logs and bounded counters</td><td>No leaks, growing backlog, stale generation, non-finite samples, or callback violations.</td></tr>
+            <tr><td class="task-id">DSP-15-04 [x]</td><td>Review and approve offline audio baselines for representative zone, group, and master chains.</td><td>Wave 1 reviewed corpus</td><td>Every baseline change is explained by versioned DSP behavior.</td></tr>
+            <tr><td class="task-id">DSP-15-05 [x]</td><td>Add feature activation policy: new projects enabled, migrated legacy slots review-gated, unknown versions bypassed, and clear diagnostics.</td><td>Release configuration and notes</td><td>Rollback disables DSP execution without corrupting authored state.</td></tr>
+            <tr><td class="task-id">DSP-15-06 [x]</td><td>Run focused suites, <code>drs_all_tests</code>, standalone validation, VST3 host validation, and packaging checks.</td><td>Go/no-go report</td><td>G0–G5 evidence is linked and all release blockers are closed.</td></tr>
           </tbody>
         </table>
         <div class="exit"><strong>Exit gate G5:</strong> Wave 1 is production-ready: Gain, Saturator, Stereo Delay, and Algorithmic Reverb at zone, group, and instrument scope.</div>
       </section>
 
       <section id="s16" class="sprint wave-2">
+        <!-- DSP-16-01 [x]; DSP-16-02 [x]; DSP-16-03 [x]; DSP-16-04 [x]: Compact EQ v1 catalog, renderer, tests, and docs completed. -->
         <div class="sprint-head">
           <div>
             <div class="sprint-label">Sprint 16 · Wave 2</div>
@@ -929,16 +932,17 @@
         <table>
           <thead><tr><th>ID</th><th>Development task</th><th>Behavior</th><th>Acceptance</th></tr></thead>
           <tbody>
-            <tr><td class="task-id">DSP-16-01</td><td>Freeze modes, band count, frequency/Q/gain ranges, coefficient update policy, smoothing, and reset behavior.</td><td>Catalog/algorithm version 1</td><td>Parameter surface remains small and musically purposeful.</td></tr>
-            <tr><td class="task-id">DSP-16-02</td><td>Implement stable stereo filters with coefficient interpolation or crossfade that cannot destabilize under automation.</td><td><code>DspCompactEq.*</code></td><td>Stress sweeps produce finite bounded output at supported sample rates.</td></tr>
-            <tr><td class="task-id">DSP-16-03</td><td>Add frequency-response, impulse, automation, bypass, chain-order, and scope tests.</td><td>Focused EQ/filter suite</td><td>Measured response matches the frozen design within approved tolerances.</td></tr>
-            <tr><td class="task-id">DSP-16-04</td><td>Add catalog-driven controls and macro targets.</td><td>Creator UI</td><td>Save/recall and host automation reuse existing infrastructure unchanged.</td></tr>
+            <tr><td class="task-id">DSP-16-01 [x]</td><td>Freeze modes, band count, frequency/Q/gain ranges, coefficient update policy, smoothing, and reset behavior.</td><td>Catalog/algorithm version 1</td><td>Parameter surface remains small and musically purposeful.</td></tr>
+            <tr><td class="task-id">DSP-16-02 [x]</td><td>Implement stable stereo filters with coefficient interpolation or crossfade that cannot destabilize under automation.</td><td><code>DspCompactEq.*</code></td><td>Stress sweeps produce finite bounded output at supported sample rates.</td></tr>
+            <tr><td class="task-id">DSP-16-03 [x]</td><td>Add frequency-response, impulse, automation, bypass, chain-order, and scope tests.</td><td>Focused EQ/filter suite</td><td>Measured response matches the frozen design within approved tolerances.</td></tr>
+            <tr><td class="task-id">DSP-16-04 [x]</td><td>Add catalog-driven controls and macro targets.</td><td>Creator UI</td><td>Save/recall and host automation reuse existing infrastructure unchanged.</td></tr>
           </tbody>
         </table>
         <div class="exit"><strong>Exit gate:</strong> compact EQ/filter adds no new graph, lifecycle, or persistence special case.</div>
       </section>
 
       <section id="s17" class="sprint wave-2">
+        <!-- DSP-17-01 [x]; DSP-17-02 [x]; DSP-17-03 [x]; DSP-17-04 [x]: Chorus v1 catalog, renderer, tests, and docs completed. -->
         <div class="sprint-head">
           <div>
             <div class="sprint-label">Sprint 17 · Wave 2</div>
@@ -950,10 +954,10 @@
         <table>
           <thead><tr><th>ID</th><th>Development task</th><th>Behavior</th><th>Acceptance</th></tr></thead>
           <tbody>
-            <tr><td class="task-id">DSP-17-01</td><td>Freeze voice count, rate/depth, phase layout, interpolation, width, wet/dry, deterministic modulation phase, and reset.</td><td>Catalog/algorithm version 1</td><td>Recall is deterministic and modulation does not depend on block boundaries.</td></tr>
-            <tr><td class="task-id">DSP-17-02</td><td>Implement preallocated modulation delay voices using shared low-level delay utilities without sharing effect state.</td><td><code>DspChorus.*</code></td><td>Memory/cost metadata correctly scales with configured voice count.</td></tr>
-            <tr><td class="task-id">DSP-17-03</td><td>Add modulation-period, stereo phase, interpolation, automation, reset, scope, and chain-order vectors.</td><td>Focused Chorus suite</td><td>Results are stable across block sizes and repeated activations.</td></tr>
-            <tr><td class="task-id">DSP-17-04</td><td>Add creator controls, macro targets, documentation, and aggregate regression coverage.</td><td>Wave 2 catalog update</td><td>Wave 1 projects and digests remain compatible.</td></tr>
+            <tr><td class="task-id">DSP-17-01 [x]</td><td>Freeze voice count, rate/depth, phase layout, interpolation, width, wet/dry, deterministic modulation phase, and reset.</td><td>Catalog/algorithm version 1</td><td>Recall is deterministic and modulation does not depend on block boundaries.</td></tr>
+            <tr><td class="task-id">DSP-17-02 [x]</td><td>Implement preallocated modulation delay voices using shared low-level delay utilities without sharing effect state.</td><td><code>DspChorus.*</code></td><td>Memory/cost metadata correctly scales with configured voice count.</td></tr>
+            <tr><td class="task-id">DSP-17-03 [x]</td><td>Add modulation-period, stereo phase, interpolation, automation, reset, scope, and chain-order vectors.</td><td>Focused Chorus suite</td><td>Results are stable across block sizes and repeated activations.</td></tr>
+            <tr><td class="task-id">DSP-17-04 [x]</td><td>Add creator controls, macro targets, documentation, and aggregate regression coverage.</td><td>Wave 2 catalog update</td><td>Wave 1 projects and digests remain compatible.</td></tr>
           </tbody>
         </table>
         <div class="exit"><strong>Exit gate:</strong> Chorus/Ensemble ships as a normal versioned catalog entry, not a bespoke renderer path.</div>

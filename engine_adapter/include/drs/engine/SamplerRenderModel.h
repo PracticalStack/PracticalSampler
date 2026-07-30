@@ -73,9 +73,13 @@ struct SamplerRenderControlValues
     {
         double tempoBpm = 120.0;
         std::int64_t samplePosition = 0;
+        std::int32_t timeSignatureNumerator = 4;
+        std::int32_t timeSignatureDenominator = 4;
         bool valid = false;
         bool isPlaying = false;
+        bool hasTempo = false;
         bool hasSamplePosition = false;
+        bool hasTimeSignature = false;
     } transport;
     bool overrideMidiNoteOffset = false;
     int midiNoteOffset = 0;

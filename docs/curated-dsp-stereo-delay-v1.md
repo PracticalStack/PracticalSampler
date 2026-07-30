@@ -6,5 +6,5 @@ is absent or invalid. Divisions span 1/16 to four beats, feedback clamps to 0.95
 clears rings immediately. A normal release retains a bounded two-second retirement tail after the
 last non-silent delay input. Tempo or parameter updates never reallocate memory.
 
-Ping-pong crosses feedback channels; tone filters feedback; width is reserved in the stable v1
-surface and currently preserves the stereo ring layout. Changing any algorithm behavior requires v2.
+Ping-pong crosses feedback channels; tone filters feedback; width scales the wet mid/side image.
+Changing any algorithm behavior requires v2.

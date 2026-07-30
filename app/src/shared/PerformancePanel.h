@@ -35,6 +35,7 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
     void refreshNow();
+    juce::MidiKeyboardState& getKeyboardState() noexcept { return keyboardState; }
 
 private:
     struct MacroControl

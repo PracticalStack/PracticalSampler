@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <string_view>
+#include <unordered_set>
 #include <utility>
 
 namespace drs::engine
@@ -1615,12 +1617,17 @@ RuntimeProjectDocumentActionResult AuthoringSession::deleteZones(const std::vect
                        }),
         project.authoring.zones.end());
 
+    std::unordered_set<std::string> deletedRoutingSlotIds;
     for (const auto& deletedZone : deletedZones)
     {
-        for (auto& routingBus : project.authoring.routingBuses)
+        for (auto busIterator = project.authoring.routingBuses.begin();
+             busIterator != project.authoring.routingBuses.end();)
         {
-            if (routingBus.inputSourceId != deletedZone.id)
+            if (busIterator->inputSourceId != deletedZone.id)
+            {
+                ++busIterator;
                 continue;
+            }
 
             const auto replacementZone = std::find_if(project.authoring.zones.begin(),
                                                       project.authoring.zones.end(),
@@ -1628,10 +1635,31 @@ RuntimeProjectDocumentActionResult AuthoringSession::deleteZones(const std::vect
                                                       {
                                                           return zone.groupId == deletedZone.groupId;
                                                       });
-            routingBus.inputSourceId = replacementZone != project.authoring.zones.end()
-                ? replacementZone->id
-                : std::string { "master" };
+            if (replacementZone != project.authoring.zones.end())
+            {
+                busIterator->inputSourceId = replacementZone->id;
+                ++busIterator;
+                continue;
+            }
+
+            // A source-owned chain cannot fall back to master: master may already have
+            // its own chain, and every source and slot has exactly one owner. Retire the
+            // orphaned chain together with its inserts when its final source zone goes away.
+            deletedRoutingSlotIds.insert(busIterator->fxSlotIds.begin(), busIterator->fxSlotIds.end());
+            busIterator = project.authoring.routingBuses.erase(busIterator);
         }
+    }
+
+    if (!deletedRoutingSlotIds.empty())
+    {
+        project.authoring.fxSlots.erase(
+            std::remove_if(project.authoring.fxSlots.begin(),
+                           project.authoring.fxSlots.end(),
+                           [&](const RuntimeProjectFxSlotDefinition& slot)
+                           {
+                               return deletedRoutingSlotIds.count(slot.id) != 0;
+                           }),
+            project.authoring.fxSlots.end());
     }
 
     std::vector<std::string> affectedRoundRobinPoolIds;
@@ -1984,6 +2012,38 @@ RuntimeProjectDocumentActionResult AuthoringSession::moveFxSlotToBus(const std::
                                                          + std::to_string(*destinationIndex) + "].fxSlotIds" });
     if (result.applied && dspSelection.fxSlotId == fxSlotId) dspSelection.routingBusId = destinationBusId;
     return result;
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::createRoutingBus(
+    const RuntimeProjectRoutingBusDefinition& routingBus,
+    const std::string& label)
+{
+    if (routingBus.id.empty() || routingBus.inputSourceId.empty())
+        return makeRejectedResult(getDocumentState(), "Routing chain creation rejected",
+                                  "Routing chain id and canonical input source must not be empty.");
+    if (findRoutingBusIndexById(getProject(), routingBus.id).has_value())
+        return makeRejectedResult(getDocumentState(), "Routing chain creation rejected",
+                                  "Routing chain id already exists: " + routingBus.id);
+
+    auto project = getProject();
+    std::vector<std::string> changedPaths { "authoring.routingBuses" };
+    constexpr std::string_view groupPrefix { "groups/" };
+    if (routingBus.inputSourceId.rfind(groupPrefix.data(), 0) == 0)
+    {
+        const auto groupId = routingBus.inputSourceId.substr(groupPrefix.size());
+        const auto groupIndex = findGroupIndexById(project, groupId);
+        if (!groupIndex.has_value())
+            return makeRejectedResult(getDocumentState(), "Routing chain creation rejected",
+                                      "Group-scoped chain requires an existing group: " + groupId);
+        if (!project.authoring.groups[*groupIndex].routingBusId.empty())
+            return makeRejectedResult(getDocumentState(), "Routing chain creation rejected",
+                                      "Group '" + groupId + "' already owns routing bus '"
+                                          + project.authoring.groups[*groupIndex].routingBusId + "'.");
+        project.authoring.groups[*groupIndex].routingBusId = routingBus.id;
+        changedPaths.push_back("authoring.groups[" + std::to_string(*groupIndex) + "].routingBusId");
+    }
+    project.authoring.routingBuses.push_back(routingBus);
+    return documentController.commitSnapshot(project, label, std::move(changedPaths));
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::deleteRoutingBus(const std::string& busId,

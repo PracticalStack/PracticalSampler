@@ -158,6 +158,8 @@ public:
     RuntimeProjectDocumentActionResult moveFxSlotToBus(const std::string& fxSlotId,
                                                         const std::string& destinationBusId,
                                                         const std::string& label);
+    RuntimeProjectDocumentActionResult createRoutingBus(const RuntimeProjectRoutingBusDefinition& routingBus,
+                                                         const std::string& label);
     RuntimeProjectDocumentActionResult deleteRoutingBus(const std::string& busId,
                                                          const std::string& label);
     RuntimeProjectDocumentActionResult setRoutingBusChainBypassed(const std::string& busId,

@@ -23,6 +23,7 @@ struct DspStereoDelayTransport
 {
     double tempoBpm = 120.0;
     bool valid = false;
+    bool hasTempo = false;
     bool isPlaying = false;
 };
 

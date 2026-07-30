@@ -24,6 +24,61 @@ float readLinear(const std::vector<float>& line, const double position) noexcept
     return clean(line[static_cast<std::size_t>(base)]
                  + (line[static_cast<std::size_t>(next)] - line[static_cast<std::size_t>(base)]) * fraction);
 }
+
+DspStereoDelayParameters interpolate(const DspStereoDelayParameters& start,
+                                     const DspStereoDelayParameters& end,
+                                     const float fraction) noexcept
+{
+    const auto lerp = [fraction](const double left, const double right)
+    { return left + (right - left) * fraction; };
+    return { lerp(start.timeMs, end.timeMs), lerp(start.sync, end.sync),
+             lerp(start.divisionBeats, end.divisionBeats), lerp(start.feedback, end.feedback),
+             lerp(start.pingPong, end.pingPong), lerp(start.tone, end.tone),
+             lerp(start.width, end.width), lerp(start.mix, end.mix) };
+}
+
+void process(SamplerAudioBufferView output, DspStereoDelayState& state,
+             const DspStereoDelayParameters& start, const DspStereoDelayParameters& end,
+             const DspStereoDelayTransport& transport) noexcept
+{
+    if (output.channels == nullptr || output.channelCount == 0 || output.frameCount == 0
+        || state.left.empty() || state.right.empty()) return;
+    const auto tempo = transport.valid && transport.hasTempo && std::isfinite(transport.tempoBpm)
+        ? std::clamp(transport.tempoBpm, 20.0, 300.0) : 120.0;
+    state.inputPeak = 0.0f;
+    for (std::uint32_t frame = 0; frame < output.frameCount; ++frame)
+    {
+        // Match the control ramps used elsewhere: adjacent blocks join without repeating an endpoint.
+        const auto p = interpolate(start, end,
+                                   static_cast<float>(frame + 1) / static_cast<float>(output.frameCount));
+        const auto delayFrames = std::clamp((p.sync >= 0.5 ? 60.0 / tempo * std::clamp(p.divisionBeats, .0625, 4.0)
+                                                             : std::clamp(p.timeMs, 1.0, 2000.0) / 1000.0)
+                                             * state.sampleRate, 1.0,
+                                             static_cast<double>(state.left.size() - 2));
+        const auto feedback = static_cast<float>(std::clamp(p.feedback, 0.0, .95));
+        const auto mix = static_cast<float>(std::clamp(p.mix, 0.0, 1.0));
+        const auto tone = static_cast<float>(std::clamp(p.tone, 0.0, 1.0));
+        const auto width = static_cast<float>(std::clamp(p.width, 0.0, 1.0));
+        const auto alpha = tone >= 1.0f ? 1.0f : .02f + .96f * tone;
+        const auto readAt = static_cast<double>(state.writeIndex) - delayFrames;
+        const auto delayedL = readLinear(state.left, readAt), delayedR = readLinear(state.right, readAt);
+        const auto inL = clean(output.channels[0][frame]);
+        const auto inR = output.channelCount > 1 ? clean(output.channels[1][frame]) : inL;
+        state.inputPeak = std::max(state.inputPeak, std::max(std::abs(inL), std::abs(inR)));
+        state.lastPeak = std::max(state.lastPeak * 0.999f,
+                                  std::max(std::abs(inL), std::max(std::abs(delayedL), std::abs(delayedR))));
+        state.feedbackLowpassLeft = clean(state.feedbackLowpassLeft + alpha * (delayedL - state.feedbackLowpassLeft));
+        state.feedbackLowpassRight = clean(state.feedbackLowpassRight + alpha * (delayedR - state.feedbackLowpassRight));
+        const auto pingPong = p.pingPong >= .5;
+        state.left[state.writeIndex] = clean(inL + feedback * (pingPong ? state.feedbackLowpassRight : state.feedbackLowpassLeft));
+        state.right[state.writeIndex] = clean(inR + feedback * (pingPong ? state.feedbackLowpassLeft : state.feedbackLowpassRight));
+        const auto mid = (delayedL + delayedR) * 0.5f;
+        const auto side = (delayedL - delayedR) * 0.5f * width;
+        output.channels[0][frame] = clean(inL * (1.0f - mix) + (mid + side) * mix);
+        if (output.channelCount > 1) output.channels[1][frame] = clean(inR * (1.0f - mix) + (mid - side) * mix);
+        state.writeIndex = (state.writeIndex + 1) % static_cast<std::uint32_t>(state.left.size());
+    }
+}
 }
 
 bool DspStereoDelayState::prepare(const double newSampleRate)
@@ -50,46 +105,13 @@ void processDspStereoDelay(const SamplerAudioBufferView output, DspStereoDelaySt
                            const DspStereoDelayParameters& p,
                            const DspStereoDelayTransport& transport) noexcept
 {
-    if (output.channels == nullptr || output.channelCount == 0 || output.frameCount == 0
-        || state.left.empty() || state.right.empty()) return;
-    const auto tempo = transport.valid && std::isfinite(transport.tempoBpm)
-        ? std::clamp(transport.tempoBpm, 20.0, 300.0) : 120.0;
-    const auto delayFrames = std::clamp((p.sync >= 0.5 ? 60.0 / tempo * std::clamp(p.divisionBeats, .0625, 4.0)
-                                                       : std::clamp(p.timeMs, 1.0, 2000.0) / 1000.0)
-                                         * state.sampleRate, 1.0,
-                                         static_cast<double>(state.left.size() - 2));
-    const auto feedback = static_cast<float>(std::clamp(p.feedback, 0.0, .95));
-    const auto mix = static_cast<float>(std::clamp(p.mix, 0.0, 1.0));
-    const auto tone = static_cast<float>(std::clamp(p.tone, 0.0, 1.0));
-    const auto width = static_cast<float>(std::clamp(p.width, 0.0, 1.0));
-    const auto alpha = tone >= 1.0f ? 1.0f : .02f + .96f * tone;
-    state.inputPeak = 0.0f;
-    for (std::uint32_t frame = 0; frame < output.frameCount; ++frame)
-    {
-        const auto readAt = static_cast<double>(state.writeIndex) - delayFrames;
-        const auto delayedL = readLinear(state.left, readAt), delayedR = readLinear(state.right, readAt);
-        const auto inL = clean(output.channels[0][frame]);
-        const auto inR = output.channelCount > 1 ? clean(output.channels[1][frame]) : inL;
-        state.inputPeak = std::max(state.inputPeak, std::max(std::abs(inL), std::abs(inR)));
-        state.lastPeak = std::max(state.lastPeak * 0.999f,
-                                  std::max(std::abs(inL), std::max(std::abs(delayedL), std::abs(delayedR))));
-        state.feedbackLowpassLeft = clean(state.feedbackLowpassLeft + alpha * (delayedL - state.feedbackLowpassLeft));
-        state.feedbackLowpassRight = clean(state.feedbackLowpassRight + alpha * (delayedR - state.feedbackLowpassRight));
-        const auto pingPong = p.pingPong >= .5;
-        state.left[state.writeIndex] = clean(inL + feedback * (pingPong ? state.feedbackLowpassRight : state.feedbackLowpassLeft));
-        state.right[state.writeIndex] = clean(inR + feedback * (pingPong ? state.feedbackLowpassLeft : state.feedbackLowpassRight));
-        const auto mid = (delayedL + delayedR) * 0.5f;
-        const auto side = (delayedL - delayedR) * 0.5f * width;
-        output.channels[0][frame] = clean(inL * (1.0f - mix) + (mid + side) * mix);
-        if (output.channelCount > 1) output.channels[1][frame] = clean(inR * (1.0f - mix) + (mid - side) * mix);
-        state.writeIndex = (state.writeIndex + 1) % static_cast<std::uint32_t>(state.left.size());
-    }
+    process(output, state, p, p, transport);
 }
 
 void processDspStereoDelayRamp(const SamplerAudioBufferView output, DspStereoDelayState& state,
-                               const DspStereoDelayParameters&, const DspStereoDelayParameters& end,
+                               const DspStereoDelayParameters& start, const DspStereoDelayParameters& end,
                                const DspStereoDelayTransport& transport) noexcept
 {
-    processDspStereoDelay(output, state, end, transport);
+    process(output, state, start, end, transport);
 }
 } // namespace drs::engine

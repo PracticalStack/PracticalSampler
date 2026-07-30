@@ -61,7 +61,24 @@ bool SamplerPlaybackContext::stageActivation(SamplerRenderModelPtr model,
 
     const auto slotIndex = acquireFreeSlot();
     if (slotIndex < 0)
+    {
+        // Reclamation stays message-owned; under slot pressure, request a brief audio-owned fade
+        // from the oldest retired tail so the next callback can reclaim it deterministically.
+        for (std::size_t index = 0; index < retiredActivationCount; ++index)
+        {
+            const auto& token = retiredActivations[index];
+            if (token.slotIndex < 0) continue;
+            auto& retired = activationSlots[static_cast<std::size_t>(token.slotIndex)];
+            if (retired.serial == token.serial && retired.dspGeneration != nullptr
+                && retired.dspGeneration->tailActive())
+            {
+                retired.dspGeneration->requestRetirementTailFade(
+                    static_cast<std::uint32_t>(std::max(1.0, sampleRate * .010)));
+                break;
+            }
+        }
         return false;
+    }
 
     auto& slot = activationSlots[static_cast<std::size_t>(slotIndex)];
     slot.model = std::move(model);
@@ -206,10 +223,13 @@ SamplerPlaybackContextRenderResult SamplerPlaybackContext::renderBlock(
 
     result.activationApplied = applyPendingActivationAtBlockBoundary();
     eventScratch.clear();
+    auto hasPanicReset = false;
     for (std::size_t index = 0; index < events.size; ++index)
     {
         if (!eventScratch.push(events[index]))
             ++counters.droppedEventCount;
+        else if (events[index].type == SamplerRenderEventType::reset)
+            hasPanicReset = true;
     }
 
     if (activeRenderModel == nullptr)
@@ -236,6 +256,11 @@ SamplerPlaybackContextRenderResult SamplerPlaybackContext::renderBlock(
             activeDspGeneration->executeScopedGraph(output);
             activeDspGeneration->advanceTail(output.frameCount);
         }
+        renderRetiredDspTails(output);
+        // Voice reset is sample-positioned inside the voice pool; clear effect memory before the
+        // next callback so an emergency reset never carries a delay tail into later audio.
+        if (hasPanicReset && activeDspGeneration != nullptr)
+            activeDspGeneration->resetEffectState();
         ++counters.renderedBlockCount;
         accumulate(result.voicePool);
     }
@@ -405,6 +430,25 @@ void SamplerPlaybackContext::addRetiredActivation(int slotIndex) noexcept
     diagnosticRetiredBacklog.fetch_add(1, std::memory_order_relaxed);
     diagnosticRetiredPayloadBytes.fetch_add(payload != nullptr ? payload->retainedPreparedBytes : 0,
                                             std::memory_order_relaxed);
+}
+
+void SamplerPlaybackContext::renderRetiredDspTails(const SamplerAudioBufferView output) noexcept
+{
+    for (std::size_t index = 0; index < retiredActivationCount; ++index)
+    {
+        const auto token = retiredActivations[index];
+        if (token.slotIndex < 0 || static_cast<std::size_t>(token.slotIndex) >= activationSlots.size())
+            continue;
+        auto& slot = activationSlots[static_cast<std::size_t>(token.slotIndex)];
+        if (slot.serial != token.serial || slot.dspGeneration == nullptr || !slot.dspGeneration->tailActive()
+            || voicePool.voiceCountUsingModel(slot.model.get()) != 0)
+            continue;
+        if (slot.dspGeneration->beginRetiredTailRender(output))
+        {
+            slot.dspGeneration->executeScopedGraph(output);
+            slot.dspGeneration->advanceTail(output.frameCount);
+        }
+    }
 }
 
 void SamplerPlaybackContext::collectFinishedRetirements() noexcept

@@ -1,6 +1,9 @@
 #pragma once
 
 #include "drs/engine/DspGraphPlan.h"
+#include "drs/engine/DspAlgorithmicReverb.h"
+#include "drs/engine/DspCompactEq.h"
+#include "drs/engine/DspChorus.h"
 #include "drs/engine/DspParameterControl.h"
 #include "drs/engine/DspSaturator.h"
 #include "drs/engine/DspStereoDelay.h"
@@ -55,12 +58,14 @@ public:
     // Called around voice mixing. All routing buffers and route views were allocated
     // during construction, so the callback exchanges only numeric route targets.
     bool beginScopedRender(SamplerAudioBufferView output) noexcept;
+    bool beginRetiredTailRender(SamplerAudioBufferView output) noexcept;
     const SamplerAudioBufferView* getRouteOutputViews() const noexcept
     {
         return routeOutputViews.empty() ? nullptr : routeOutputViews.data();
     }
     std::size_t getRouteOutputViewCount() const noexcept { return routeOutputViews.size(); }
     bool executeScopedGraph(SamplerAudioBufferView output) noexcept;
+    void requestRetirementTailFade(std::uint32_t frames) noexcept;
     // Indexed by immutable sampler route. This is built off-audio and lets the
     // voice path select its future graph input without IDs, hashes, or strings.
     std::uint32_t getRouteDestinationNodeIndex(std::size_t routeIndex) const noexcept
@@ -117,8 +122,12 @@ private:
     std::vector<std::uint32_t> nodeBypassFramesRemaining;
     std::vector<DspSaturatorState> saturatorStates;
     std::vector<DspStereoDelayState> delayStates;
+    std::vector<DspAlgorithmicReverbState> reverbStates;
+    std::vector<DspCompactEqState> compactEqStates;
+    std::vector<DspChorusState> chorusStates;
     DspStereoDelayTransport transport;
     std::uint64_t controlGenerationIdentity = 0;
+    double controlSampleRate = 48000.0;
     std::uint32_t controlSmoothingFrames = 480;
     std::uint32_t bypassSmoothingFrames = 240;
     std::uint32_t maximumBlockFrames = 0;
@@ -126,6 +135,11 @@ private:
     std::uint32_t activeChannelCount = 0;
     DspRenderGenerationDiagnostics diagnostics;
     std::atomic<std::uint64_t> tailFramesRemaining { 0 };
+    std::atomic<std::uint32_t> requestedRetirementTailFadeFrames { 0 };
+    std::uint32_t retirementTailFadeFramesRemaining = 0;
+    float retirementTailGain = 1.0f;
+    bool renderingRetiredTail = false;
+    bool beginRender(SamplerAudioBufferView output) noexcept;
 };
 
 std::shared_ptr<DspRenderGeneration> createDspRenderGeneration(

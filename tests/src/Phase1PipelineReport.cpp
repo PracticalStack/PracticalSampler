@@ -1,4 +1,5 @@
 #include "drs/engine/EngineFacade.h"
+#include "drs/engine/HostSessionState.h"
 #include "drs/engine/RuntimeCompiler.h"
 #include "drs/engine/RuntimeLoadProfile.h"
 #include "drs/engine/RuntimeLoader.h"
@@ -114,6 +115,26 @@ bool sessionMatchesLeadPerformance(const drs::engine::RuntimeSessionStateSnapsho
 
     return toneIterator != sessionState.macroValues.end()
         && motionIterator != sessionState.macroValues.end()
+        && nearlyEqual(toneIterator->value, 0.62)
+        && nearlyEqual(motionIterator->value, 0.78);
+}
+
+bool legacyPresetMatchesLeadPerformance(const std::string& serializedState)
+{
+    const auto parsed = drs::engine::parseHostSessionState(serializedState);
+    if (!parsed.isLegacyPreset() || !parsed.legacyPreset.has_value())
+        return false;
+
+    const auto& preset = *parsed.legacyPreset;
+    if (preset.loadProfileId != "performance" || preset.selectedArticulationId != "lead")
+        return false;
+
+    const auto toneIterator = std::find_if(preset.macroValues.begin(), preset.macroValues.end(),
+                                           [](const auto& macro) { return macro.id == "tone"; });
+    const auto motionIterator = std::find_if(preset.macroValues.begin(), preset.macroValues.end(),
+                                             [](const auto& macro) { return macro.id == "motion"; });
+    return toneIterator != preset.macroValues.end()
+        && motionIterator != preset.macroValues.end()
         && nearlyEqual(toneIterator->value, 0.62)
         && nearlyEqual(motionIterator->value, 0.78);
 }
@@ -1058,8 +1079,7 @@ int main(int argc, char* argv[])
         standaloneFixtureRestored = standaloneRestore.restored;
 
         const auto standaloneExportedState = standaloneSource.exportStateJson();
-        standaloneExportMatchesFixture =
-            standaloneExportedState == standaloneSource.getEngineFacade().exportPresetStateJson();
+        standaloneExportMatchesFixture = legacyPresetMatchesLeadPerformance(standaloneExportedState);
 
         drs::standalone::MainComponent standaloneReloaded;
         const auto standaloneReload = standaloneReloaded.restoreStateJson(standaloneExportedState);
@@ -1075,8 +1095,7 @@ int main(int argc, char* argv[])
         juce::MemoryBlock pluginState;
         sourceProcessor.getStateInformation(pluginState);
         const auto pluginStateJson = std::string(static_cast<const char*>(pluginState.getData()), pluginState.getSize());
-        pluginExportMatchesFixture =
-            pluginStateJson == sourceProcessor.getEngineFacade().exportPresetStateJson();
+        pluginExportMatchesFixture = legacyPresetMatchesLeadPerformance(pluginStateJson);
 
         drs::plugin::Processor restoredProcessor;
         restoredProcessor.setStateInformation(pluginState.getData(), static_cast<int>(pluginState.getSize()));

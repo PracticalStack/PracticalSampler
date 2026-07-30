@@ -453,12 +453,49 @@ void runDspGenerationActivationMatrix()
             "A replacement model should stage while the prior generation retains a tail.");
     require(context.renderBlock(output.view(), noEvents()).activationApplied,
             "The replacement should activate at a later block boundary.");
-    require(context.serviceRetirements() == 0,
-            "A retired generation with an active DSP tail must not be released.");
-    generation->clearTail();
-    context.renderBlock(output.view(), noEvents());
     require(context.serviceRetirements() >= 1,
-            "A tail-drained generation with no voices must become reclaimable off audio.");
+            "A retired tail must render and drain on audio before its generation becomes reclaimable off audio.");
+    const auto tailReclaimedSnapshot = context.getSnapshot();
+    require(tailReclaimedSnapshot.retiredActivationBacklog == 0
+                && tailReclaimedSnapshot.retiredActivationPayloadBytes == 0,
+            "Tail reclamation must return retained activation ownership accounting to baseline.");
+
+    drs::engine::SamplerPlaybackContext pressure(drs::engine::PlaybackActivationLane::preview);
+    require(pressure.prepare(48000.0), "Tail-pressure context should prepare.");
+    std::vector<ModelLifetime> pressureLifetimes;
+    std::vector<std::shared_ptr<drs::engine::DspRenderGeneration>> pressureGenerations;
+    for (std::size_t index = 0; index < drs::engine::SamplerPlaybackContext::activationSlotCapacity; ++index)
+    {
+        auto lifetime = buildModel(drs::engine::PlaybackActivationLane::preview, 200 + index, 1.0f);
+        auto pressurePlan = plan;
+        const auto pressureZoneId = lifetime.model->getRoutes().front().zoneId;
+        pressurePlan.nodes.front().ownerId = pressureZoneId;
+        pressurePlan.nodes.front().inputSourceId = "zones/" + pressureZoneId;
+        auto pressureGeneration = drs::engine::createDspRenderGeneration(lifetime.model, pressurePlan, 512, &failure);
+        require(pressureGeneration != nullptr && pressure.stageActivation(lifetime.model, pressureGeneration),
+                "Each pre-pressure activation must stage its matching DSP generation.");
+        if (!pressureGenerations.empty()) pressureGenerations.back()->setTailFramesRemaining(48000);
+        StereoOutput pressureOutput(512);
+        require(pressure.renderBlock(pressureOutput.view(), noEvents()).accepted,
+                "Each pre-pressure activation must cross the audio boundary.");
+        pressureLifetimes.push_back(std::move(lifetime));
+        pressureGenerations.push_back(std::move(pressureGeneration));
+    }
+    auto pressuredLifetime = buildModel(drs::engine::PlaybackActivationLane::preview, 300, 1.0f);
+    auto pressuredPlan = plan;
+    const auto pressuredZoneId = pressuredLifetime.model->getRoutes().front().zoneId;
+    pressuredPlan.nodes.front().ownerId = pressuredZoneId;
+    pressuredPlan.nodes.front().inputSourceId = "zones/" + pressuredZoneId;
+    auto pressuredGeneration = drs::engine::createDspRenderGeneration(
+        pressuredLifetime.model, pressuredPlan, 512, &failure);
+    require(pressuredGeneration != nullptr
+                && !pressure.stageActivation(pressuredLifetime.model, pressuredGeneration),
+            "An exhausted activation pool must request a bounded fade before accepting another generation.");
+    StereoOutput pressureFadeOutput(512);
+    require(pressure.renderBlock(pressureFadeOutput.view(), noEvents()).accepted
+                && pressure.serviceRetirements() >= 1
+                && pressure.stageActivation(pressuredLifetime.model, pressuredGeneration),
+            "The oldest retired tail must fade and reclaim a slot for the deferred activation.");
 }
 
 void runConcurrentRenderMatrix()

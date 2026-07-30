@@ -65,7 +65,7 @@ int main()
         std::vector<std::string> findings;
         require(drs::engine::validatesCuratedDspCatalog(findings),
                 "The initial curated catalog must validate independently of UI.");
-        for (const auto type : { "drs.gain", "drs.saturator", "drs.stereoDelay", "drs.algorithmicReverb" })
+        for (const auto type : { "drs.gain", "drs.saturator", "drs.stereoDelay", "drs.algorithmicReverb", "drs.compactEq", "drs.chorus" })
         {
             const auto* descriptor = drs::engine::findCuratedDspEffect(type, 1);
             require(descriptor != nullptr && !descriptor->supportedScopes.empty()

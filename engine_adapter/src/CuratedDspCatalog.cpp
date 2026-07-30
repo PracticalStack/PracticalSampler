@@ -1,4 +1,8 @@
 #include "drs/engine/CuratedDspCatalog.h"
+#include "drs/engine/DspAlgorithmicReverb.h"
+#include "drs/engine/DspCompactEq.h"
+#include "drs/engine/DspChorus.h"
+#include "drs/engine/DspStereoDelay.h"
 
 #include <algorithm>
 #include <cmath>
@@ -6,6 +10,14 @@
 
 namespace drs::engine
 {
+namespace
+{
+constexpr std::size_t stereoDelayMemoryBytes = 2u * DspStereoDelayState::maximumDelayFrames * sizeof(float);
+constexpr std::size_t algorithmicReverbMemoryBytes = DspAlgorithmicReverbState::maximumStateBytes;
+constexpr std::size_t compactEqStateBytes = DspCompactEqState::maximumStateBytes;
+constexpr std::size_t chorusStateBytes = DspChorusState::maximumStateBytes;
+}
+
 const std::vector<CuratedDspEffectDescriptor>& getCuratedDspCatalog()
 {
     static const std::vector<CuratedDspEffectDescriptor> catalog {
@@ -30,13 +42,29 @@ const std::vector<CuratedDspEffectDescriptor>& getCuratedDspCatalog()
             { "tone", CuratedDspParameterUnit::normalized, 0.0, 1.0, 0.7, CuratedDspSmoothing::linear },
             { "width", CuratedDspParameterUnit::normalized, 0.0, 1.0, 1.0, CuratedDspSmoothing::linear },
             { "mix", CuratedDspParameterUnit::normalized, 0.0, 1.0, 0.25, CuratedDspSmoothing::linear } },
-          CuratedDspStateClass::delay, { 1536000u, 0, 30u * 96000u, 12 } },
+          CuratedDspStateClass::delay, { stereoDelayMemoryBytes, 0, 30u * 96000u, 12 } },
         { "drs.algorithmicReverb", 1, { CuratedDspScope::zone, CuratedDspScope::group, CuratedDspScope::instrument },
           { { "preDelayMs", CuratedDspParameterUnit::milliseconds, 0.0, 250.0, 20.0, CuratedDspSmoothing::linear },
             { "size", CuratedDspParameterUnit::normalized, 0.0, 1.0, 0.5, CuratedDspSmoothing::linear },
             { "decaySeconds", CuratedDspParameterUnit::seconds, 0.1, 20.0, 2.5, CuratedDspSmoothing::logarithmic },
+            { "damping", CuratedDspParameterUnit::normalized, 0.0, 1.0, 0.5, CuratedDspSmoothing::linear },
+            { "width", CuratedDspParameterUnit::normalized, 0.0, 1.0, 1.0, CuratedDspSmoothing::linear },
             { "mix", CuratedDspParameterUnit::normalized, 0.0, 1.0, 0.2, CuratedDspSmoothing::linear } },
-          CuratedDspStateClass::reverb, { 524288u, 0, 30u * 96000u, 20 } }
+          CuratedDspStateClass::reverb, { algorithmicReverbMemoryBytes, 0, 30u * 96000u, 20 } }
+        , { "drs.compactEq", 1, { CuratedDspScope::zone, CuratedDspScope::group, CuratedDspScope::instrument },
+          { { "mode", CuratedDspParameterUnit::normalized, 0.0, 2.0, 1.0, CuratedDspSmoothing::none },
+            { "frequencyHz", CuratedDspParameterUnit::hertz, 40.0, 18000.0, 1000.0, CuratedDspSmoothing::logarithmic },
+            { "q", CuratedDspParameterUnit::ratio, .25, 12.0, .707, CuratedDspSmoothing::logarithmic },
+            { "gainDb", CuratedDspParameterUnit::decibels, -18.0, 18.0, 0.0, CuratedDspSmoothing::linear },
+            { "mix", CuratedDspParameterUnit::normalized, 0.0, 1.0, 1.0, CuratedDspSmoothing::linear } },
+          CuratedDspStateClass::bounded, { compactEqStateBytes, 0, 0, 5 } }
+        , { "drs.chorus", 1, { CuratedDspScope::zone, CuratedDspScope::group, CuratedDspScope::instrument },
+          { { "rateHz", CuratedDspParameterUnit::hertz, .05, 5.0, .8, CuratedDspSmoothing::logarithmic },
+            { "depthMs", CuratedDspParameterUnit::milliseconds, .1, 12.0, 5.0, CuratedDspSmoothing::linear },
+            { "baseDelayMs", CuratedDspParameterUnit::milliseconds, 5.0, 30.0, 15.0, CuratedDspSmoothing::linear },
+            { "width", CuratedDspParameterUnit::normalized, 0.0, 1.0, 1.0, CuratedDspSmoothing::linear },
+            { "mix", CuratedDspParameterUnit::normalized, 0.0, 1.0, .35, CuratedDspSmoothing::linear } },
+          CuratedDspStateClass::delay, { chorusStateBytes, 0, 0, 9 } }
     };
     return catalog;
 }

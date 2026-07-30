@@ -13,6 +13,7 @@ constexpr std::size_t maximumNodes = 128;
 constexpr std::size_t maximumParameters = 1024;
 constexpr std::size_t maximumScratchBytes = 8u * 1024u * 1024u;
 constexpr std::size_t maximumStateBytes = 16u * 1024u * 1024u;
+constexpr std::uint32_t maximumCostUnits = 128;
 
 void addFinding(DspGraphPlanBuildResult& result, std::string code, std::string path, std::string message)
 {
@@ -113,6 +114,12 @@ DspGraphPlanBuildResult compileDspGraphPlan(const ImmutablePlaybackSnapshot& sna
             if (node.costUnits > std::numeric_limits<std::uint32_t>::max() - result.plan.costUnits)
             {
                 addFinding(result, "graph-cost-overflow", "fxSlots." + slotId, "Graph effect cost overflowed its bounded total.");
+                continue;
+            }
+            if (node.costUnits > maximumCostUnits - result.plan.costUnits)
+            {
+                addFinding(result, "graph-cost-budget", "fxSlots." + slotId,
+                           "Graph DSP cost exceeds the 128-unit callback budget.");
                 continue;
             }
             auto nextDelayMemoryBytes = result.plan.delayMemoryBytes;
