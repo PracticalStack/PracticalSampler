@@ -1,4 +1,6 @@
 #include "drs/engine/EngineFacade.h"
+#include "drs/engine/DspGraphPlan.h"
+#include "drs/engine/DspParameterControl.h"
 #include "drs/engine/HiseFrontendBridge.h"
 #include "drs/engine/HiseProjectContent.h"
 #include "drs/engine/PerformancePublishPreparation.h"
@@ -1532,6 +1534,7 @@ PerformancePublishActivationPayloadPtr EngineFacade::authorizePerformanceActivat
     PublishedMacroBindingBuildRequest macroBindingRequest;
     macroBindingRequest.revision = payload->revision;
     macroBindingRequest.macroSchemaDigest = payload->macroSchemaDigest;
+    macroBindingRequest.dspGraphDigest = payload->snapshot->dspGraphDigest;
     macroBindingRequest.authoredMacros = payload->snapshot->macroDefaults;
     macroBindingRequest.previousActiveTable = getActivePublishedMacroBindings();
     macroBindingRequest.hostSlots.reserve(referenceManifest.instrument.macros.size());
@@ -1544,6 +1547,42 @@ PerformancePublishActivationPayloadPtr EngineFacade::authorizePerformanceActivat
     }
     for (const auto& value : currentSessionState.macroValues)
         macroBindingRequest.currentValues.push_back({ value.id, value.value });
+
+    DspParameterControlLayout dspControlLayout;
+    const auto requiresDspMacroControls = std::any_of(
+        macroBindingRequest.authoredMacros.begin(), macroBindingRequest.authoredMacros.end(),
+        [](const auto& macro)
+        {
+            return std::any_of(macro.targets.begin(), macro.targets.end(), [](const auto& target)
+            {
+                return !target.dspSlotId.empty() || !target.dspParameterId.empty();
+            });
+        });
+    if (requiresDspMacroControls)
+    {
+        const auto graphPlan = compileDspGraphPlan(*payload->snapshot);
+        if (!graphPlan.compiled)
+        {
+            performancePublishController.fail(
+                controller.currentRequest.identity,
+                makePerformancePublishFailure(
+                    "performance-macro-dsp-graph-rejected", "performance.macroBindings",
+                    "The structured DSP macro target could not compile the published graph."));
+            return {};
+        }
+        const auto controlLayout = compileDspParameterControlLayout(graphPlan.plan);
+        if (!controlLayout.compiled)
+        {
+            performancePublishController.fail(
+                controller.currentRequest.identity,
+                makePerformancePublishFailure(
+                    "performance-macro-dsp-control-layout-rejected", "performance.macroBindings",
+                    "The structured DSP macro target could not compile the published control layout."));
+            return {};
+        }
+        dspControlLayout = controlLayout.layout;
+        macroBindingRequest.dspControlLayout = &dspControlLayout;
+    }
 
     const auto macroBindingResult = buildPublishedMacroBindingTable(macroBindingRequest);
     if (!macroBindingResult.built || macroBindingResult.table == nullptr)

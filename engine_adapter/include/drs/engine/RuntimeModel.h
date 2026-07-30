@@ -80,6 +80,15 @@ struct RuntimeProjectMacroTargetDefinition
     std::string parameterId;
     std::string parameterPath;
     std::string role;
+    // Empty fields preserve the legacy free-form target. A DSP target always carries both
+    // stable authored identities plus an explicit mapping range and curve.
+    std::string dspSlotId;
+    std::string dspParameterId;
+    double sourceMinimum = 0.0;
+    double sourceMaximum = 1.0;
+    double destinationMinimum = 0.0;
+    double destinationMaximum = 1.0;
+    std::string curve = "linear";
 };
 
 struct RuntimeProjectMacroDefinition
@@ -110,6 +119,18 @@ struct RuntimeProjectFxSlotDefinition
     std::string displayName;
     std::string effectType;
     bool bypassed = false;
+    // Version zero means legacy metadata has not yet been mapped to a catalog algorithm.
+    std::uint32_t effectVersion = 0;
+    struct ParameterValue
+    {
+        std::string id;
+        double value = 0.0;
+    };
+    // Ordered records deliberately preserve unknown parameters for a later catalog/runtime.
+    std::vector<ParameterValue> parameters;
+    // Loader-owned compatibility state; never serialized over the authored bypass value.
+    bool unavailable = false;
+    bool legacyInert = false;
 };
 
 struct RuntimeProjectRoutingBusDefinition
@@ -118,6 +139,7 @@ struct RuntimeProjectRoutingBusDefinition
     std::string displayName;
     std::string inputSourceId;
     std::vector<std::string> fxSlotIds;
+    bool chainBypassed = false;
 };
 
 struct RuntimeProjectTriggerSlotDefinition
@@ -358,6 +380,7 @@ struct RuntimeProjectLoadResult
     std::string manifestPath;
     std::string state;
     std::vector<std::string> issues;
+    std::vector<std::string> warnings;
     RuntimeProjectModel project;
 };
 

@@ -148,6 +148,8 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
 {
     ordered_json root;
     root["snapshotContentDigest"] = prepared.snapshotContentDigest;
+    root["snapshotDspGraphDigest"] = prepared.snapshotDspGraphDigest;
+    root["dspGraphDigest"] = prepared.dspGraphDigest;
     root["compilerVersion"] = prepared.compilerVersion;
     root["draftRevision"] = prepared.draftRevision;
     root["selectedGroupId"] = prepared.selectedGroupId;
@@ -775,6 +777,8 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
 
     result.prepared.snapshotBuildId = snapshotResult.buildId;
     result.prepared.snapshotContentDigest = snapshotResult.snapshot.contentDigest;
+    result.prepared.snapshotDspGraphDigest = snapshotResult.snapshot.dspGraphDigest;
+    result.prepared.dspGraphDigest = snapshotResult.snapshot.dspGraphDigest;
     result.prepared.compilerVersion = compilerVersion;
     result.prepared.draftRevision = snapshotResult.snapshot.draftRevision;
     result.prepared.selectedGroupId = snapshotResult.snapshot.selectedGroupId;

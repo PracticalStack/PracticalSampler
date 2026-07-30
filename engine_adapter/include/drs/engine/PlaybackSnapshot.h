@@ -1,6 +1,7 @@
 #pragma once
 
 #include "drs/engine/RuntimeModel.h"
+#include "drs/engine/CuratedDspCatalog.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -39,6 +40,13 @@ struct PlaybackSnapshotMacroTarget
     std::string parameterId;
     std::string parameterPath;
     std::string role;
+    std::string dspSlotId;
+    std::string dspParameterId;
+    double sourceMinimum = 0.0;
+    double sourceMaximum = 1.0;
+    double destinationMinimum = 0.0;
+    double destinationMaximum = 1.0;
+    std::string curve = "linear";
 };
 
 struct PlaybackSnapshotMacroDefault
@@ -53,10 +61,24 @@ struct PlaybackSnapshotMacroDefault
 
 struct PlaybackSnapshotFxSlotReference
 {
+    struct ParameterValue
+    {
+        std::string id;
+        double value = 0.0;
+    };
+
     std::string id;
     std::string displayName;
     std::string effectType;
     bool bypassed = false;
+    std::uint32_t effectVersion = 0;
+    std::vector<ParameterValue> parameters;
+    bool unavailable = false;
+    bool legacyInert = false;
+    bool catalogResolved = false;
+    std::vector<CuratedDspScope> supportedScopes;
+    CuratedDspStateClass stateClass = CuratedDspStateClass::stateless;
+    CuratedDspCostMetadata cost;
 };
 
 struct PlaybackSnapshotRoutingBusReference
@@ -65,6 +87,7 @@ struct PlaybackSnapshotRoutingBusReference
     std::string displayName;
     std::string inputSourceId;
     std::vector<std::string> fxSlotIds;
+    bool chainBypassed = false;
 };
 
 struct PlaybackSnapshotArticulationRoute
@@ -134,6 +157,7 @@ struct ImmutablePlaybackSnapshot
     std::string selectedGroupId;
     std::string selectedPerformanceBankId;
     std::string contentDigest;
+    std::string dspGraphDigest;
     std::vector<PlaybackSnapshotSampleIdentity> sampleIdentities;
     std::vector<PlaybackSnapshotMacroDefault> macroDefaults;
     std::vector<PlaybackSnapshotFxSlotReference> fxSlots;
@@ -198,4 +222,5 @@ std::string toString(PlaybackSnapshotLifecycleState state);
 std::string toString(PlaybackSnapshotFindingSeverity severity);
 std::string serializeImmutablePlaybackSnapshot(const ImmutablePlaybackSnapshot& snapshot);
 std::string computePlaybackSnapshotContentDigest(const ImmutablePlaybackSnapshot& snapshot);
+std::string computePlaybackSnapshotDspGraphDigest(const ImmutablePlaybackSnapshot& snapshot);
 } // namespace drs::engine

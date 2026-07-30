@@ -155,6 +155,7 @@ Fixture makeFixture()
         { "drums", { "sustain" }, { "kick-zone" } },
         { "main", { "sustain" }, { "strings-zone" }, "Main", 0, "groups/main", true, 0.0, 0.0, "main" }
     };
+    snapshot.snapshot.dspGraphDigest = computePlaybackSnapshotDspGraphDigest(snapshot.snapshot);
     snapshot.snapshot.contentDigest = computePlaybackSnapshotContentDigest(snapshot.snapshot);
 
     auto& result = value.prepared;
@@ -168,6 +169,8 @@ Fixture makeFixture()
     result.lifecycleState = PlaybackSnapshotLifecycleState::ready;
     result.prepared.snapshotBuildId = snapshot.buildId;
     result.prepared.snapshotContentDigest = snapshot.snapshot.contentDigest;
+    result.prepared.snapshotDspGraphDigest = snapshot.snapshot.dspGraphDigest;
+    result.prepared.dspGraphDigest = snapshot.snapshot.dspGraphDigest;
     result.prepared.compilerVersion = "sprint6.3-test";
     result.prepared.draftRevision = 9;
     result.prepared.samples = {
@@ -248,6 +251,15 @@ int main()
                     && repeat.publishResult.routeDigest == valid.publishResult.routeDigest
                     && repeat.publishResult.sourceProvenanceDigest == valid.publishResult.sourceProvenanceDigest,
                 "Repeated complete-project preparation must be deterministic.");
+
+        auto staleDspGraph = fixture.prepared;
+        staleDspGraph.prepared.dspGraphDigest = "fnv1a64:stale";
+        staleDspGraph.prepared.preparedContentDigest = computePreparedPlaybackContentDigest(staleDspGraph.prepared);
+        const auto staleDspGraphResult = validatePerformancePublishPreparation(
+            fixture.identity, fixture.snapshot, staleDspGraph);
+        require(!staleDspGraphResult.activationEligible
+                    && containsCode(staleDspGraphResult, "publish-dsp-graph-digest-mismatch"),
+                "A stale DSP graph digest must never activate a prepared payload.");
 
         auto reorderedSnapshot = fixture.snapshot.snapshot;
         auto reorderedPrepared = fixture.prepared.prepared;

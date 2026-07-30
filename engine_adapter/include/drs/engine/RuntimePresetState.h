@@ -15,6 +15,13 @@ struct RuntimePresetMacroValue
     double value = 0.0;
 };
 
+struct RuntimePresetDspMacroTarget
+{
+    std::string macroId;
+    std::string dspSlotId;
+    std::string dspParameterId;
+};
+
 struct RuntimePresetState
 {
     std::string schemaName;
@@ -26,6 +33,8 @@ struct RuntimePresetState
     std::string loadProfileId;
     std::string selectedArticulationId;
     std::vector<RuntimePresetMacroValue> macroValues;
+    std::string dspGraphDigest;
+    std::vector<RuntimePresetDspMacroTarget> dspMacroTargets;
     std::vector<std::string> notes;
 };
 
@@ -47,6 +56,8 @@ struct RuntimeSessionStateSnapshot
     std::string loadProfileId;
     std::string selectedArticulationId;
     std::vector<RuntimePresetMacroValue> macroValues;
+    std::string dspGraphDigest;
+    std::vector<RuntimePresetDspMacroTarget> dspMacroTargets;
     std::vector<std::string> notes;
     RuntimeStateTransientMetrics transientMetrics;
 };

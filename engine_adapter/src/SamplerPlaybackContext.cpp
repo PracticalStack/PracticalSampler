@@ -18,6 +18,8 @@ bool SamplerPlaybackContext::prepare(double outputSampleRate) noexcept
     const auto resetCount = voicePool.activeVoiceCount() + voicePool.releasingVoiceCount();
     counters.resetVoiceCount += resetCount;
     sampleRate = outputSampleRate;
+    if (activeDspGeneration != nullptr)
+        activeDspGeneration->setControlSampleRate(sampleRate);
     isPrepared = true;
     if (activeRenderModel != nullptr)
         voicePool.prepare(*activeRenderModel,
@@ -33,8 +35,18 @@ bool SamplerPlaybackContext::prepare(double outputSampleRate) noexcept
 
 bool SamplerPlaybackContext::stageActivation(SamplerRenderModelPtr model)
 {
+    return stageActivation(std::move(model), {});
+}
+
+bool SamplerPlaybackContext::stageActivation(SamplerRenderModelPtr model,
+                                             std::shared_ptr<DspRenderGeneration> dspGeneration)
+{
     if (model == nullptr || model->getLane() != contextLane)
         return false;
+    if (dspGeneration != nullptr && dspGeneration->getSamplerModel() != model)
+        return false;
+    if (dspGeneration != nullptr)
+        dspGeneration->setControlSampleRate(sampleRate > 0.0 ? sampleRate : 48000.0);
 
     serviceRetirements();
     const auto superseded = pendingActivationSlot.exchange(-1, std::memory_order_acq_rel);
@@ -53,6 +65,7 @@ bool SamplerPlaybackContext::stageActivation(SamplerRenderModelPtr model)
 
     auto& slot = activationSlots[static_cast<std::size_t>(slotIndex)];
     slot.model = std::move(model);
+    slot.dspGeneration = std::move(dspGeneration);
     slot.serial = nextActivationSerial++;
     if (nextActivationSerial == 0)
         nextActivationSerial = 1;
@@ -63,6 +76,70 @@ bool SamplerPlaybackContext::stageActivation(SamplerRenderModelPtr model)
                                         std::memory_order_relaxed);
     pendingActivationSlot.store(slotIndex, std::memory_order_release);
     return true;
+}
+
+bool SamplerPlaybackContext::publishDspControl(const std::uint64_t generationIdentity,
+                                               const std::uint32_t controlIndex,
+                                               const double value) noexcept
+{
+    if (generationIdentity == 0) return false;
+    for (const auto& slot : activationSlots)
+    {
+        if (slot.dspGeneration != nullptr
+            && slot.dspGeneration->getControlGenerationIdentity() == generationIdentity)
+            return slot.dspGeneration->publishControlValue(generationIdentity, controlIndex, value);
+    }
+    return false;
+}
+
+bool SamplerPlaybackContext::publishDspControlByIdentity(const std::string& slotId,
+                                                         const std::string& parameterId,
+                                                         const double value) noexcept
+{
+    DspRenderGeneration* latest = nullptr;
+    std::uint64_t latestSerial = 0;
+    for (auto& slot : activationSlots)
+    {
+        if (slot.dspGeneration != nullptr && slot.serial > latestSerial)
+        {
+            latest = slot.dspGeneration.get();
+            latestSerial = slot.serial;
+        }
+    }
+    if (latest == nullptr) return false;
+    const auto control = latest->findControlIndex(slotId, parameterId);
+    return control.has_value()
+        && latest->publishControlValue(latest->getControlGenerationIdentity(), *control, value);
+}
+
+bool SamplerPlaybackContext::publishActiveDspControl(const std::uint32_t controlIndex,
+                                                     const double value) noexcept
+{
+    return activeDspGeneration != nullptr
+        && activeDspGeneration->publishControlValue(
+            activeDspGeneration->getControlGenerationIdentity(), controlIndex, value);
+}
+
+bool SamplerPlaybackContext::publishDspNodeBypass(const std::uint64_t generationIdentity,
+                                                  const std::uint32_t nodeIndex,
+                                                  const bool bypassed) noexcept
+{
+    for (const auto& slot : activationSlots)
+        if (slot.dspGeneration != nullptr
+            && slot.dspGeneration->getControlGenerationIdentity() == generationIdentity)
+            return slot.dspGeneration->publishNodeBypass(generationIdentity, nodeIndex, bypassed);
+    return false;
+}
+
+bool SamplerPlaybackContext::publishDspChainBypass(const std::uint64_t generationIdentity,
+                                                   const std::uint32_t chainIndex,
+                                                   const bool bypassed) noexcept
+{
+    for (const auto& slot : activationSlots)
+        if (slot.dspGeneration != nullptr
+            && slot.dspGeneration->getControlGenerationIdentity() == generationIdentity)
+            return slot.dspGeneration->publishChainBypass(generationIdentity, chainIndex, bypassed);
+    return false;
 }
 
 bool SamplerPlaybackContext::cancelPendingActivation()
@@ -142,10 +219,23 @@ SamplerPlaybackContextRenderResult SamplerPlaybackContext::renderBlock(
         return result;
     }
 
-    result.voicePool = voicePool.renderBlock(output, eventScratch.view(), controls);
+    const auto scopedGraph = activeDspGeneration != nullptr
+        && activeDspGeneration->beginScopedRender(output);
+    if (scopedGraph)
+        activeDspGeneration->setTransport(controls.transport);
+    result.voicePool = voicePool.renderBlock(output,
+                                              eventScratch.view(),
+                                              controls,
+                                              scopedGraph ? activeDspGeneration->getRouteOutputViews() : nullptr,
+                                              scopedGraph ? activeDspGeneration->getRouteOutputViewCount() : 0);
     result.accepted = result.voicePool.accepted;
     if (result.accepted)
     {
+        if (scopedGraph)
+        {
+            activeDspGeneration->executeScopedGraph(output);
+            activeDspGeneration->advanceTail(output.frameCount);
+        }
         ++counters.renderedBlockCount;
         accumulate(result.voicePool);
     }
@@ -159,6 +249,8 @@ void SamplerPlaybackContext::resetAtBlockBoundary() noexcept
     const auto resetCount = voicePool.activeVoiceCount() + voicePool.releasingVoiceCount();
     counters.resetVoiceCount += resetCount;
     voicePool.resetVoices();
+    if (activeDspGeneration != nullptr)
+        activeDspGeneration->resetEffectState();
     eventScratch.clear();
     collectFinishedRetirements();
     publishRealtimeDiagnostics();
@@ -178,6 +270,7 @@ void SamplerPlaybackContext::closeAtBlockBoundary() noexcept
 
     activeActivationSlot = -1;
     activeRenderModel = nullptr;
+    activeDspGeneration = nullptr;
     activeRevision = 0;
     activePreparedBuildId = 0;
     voicePool.clearRenderModel();
@@ -201,6 +294,11 @@ SamplerPlaybackContextSnapshot SamplerPlaybackContext::getSnapshot() const noexc
         snapshot.activeActivationGeneration
             = diagnosticActiveActivationGeneration.load(std::memory_order_relaxed);
         snapshot.activeActivationPayloadBytes = diagnosticActivePayloadBytes.load(std::memory_order_relaxed);
+        snapshot.activeDspNodeCount = diagnosticActiveDspNodeCount.load(std::memory_order_relaxed);
+        snapshot.activeDspEffectCount = diagnosticActiveDspEffectCount.load(std::memory_order_relaxed);
+        snapshot.activeDspScratchBytes = diagnosticActiveDspScratchBytes.load(std::memory_order_relaxed);
+        snapshot.activeDspStateBytes = diagnosticActiveDspStateBytes.load(std::memory_order_relaxed);
+        snapshot.activeDspDelayMemoryBytes = diagnosticActiveDspDelayMemoryBytes.load(std::memory_order_relaxed);
         snapshot.activeVoiceCount = diagnosticActiveVoiceCount.load(std::memory_order_relaxed);
         snapshot.releasingVoiceCount = diagnosticReleasingVoiceCount.load(std::memory_order_relaxed);
         snapshot.finishedVoiceCount = diagnosticFinishedVoiceCount.load(std::memory_order_relaxed);
@@ -290,6 +388,7 @@ bool SamplerPlaybackContext::applyPendingActivationAtBlockBoundary() noexcept
         addRetiredActivation(activeActivationSlot);
     activeActivationSlot = pending;
     activeRenderModel = model;
+    activeDspGeneration = slot.dspGeneration.get();
     activeRevision = model->getRevision();
     activePreparedBuildId = model->getPreparedBuildId();
     ++counters.appliedActivationCount;
@@ -315,7 +414,8 @@ void SamplerPlaybackContext::collectFinishedRetirements() noexcept
     {
         const auto token = retiredActivations[index];
         const auto& slot = activationSlots[static_cast<std::size_t>(token.slotIndex)];
-        if (voicePool.voiceCountUsingModel(slot.model.get()) != 0 || !enqueueRetirement(token))
+        const auto dspTailActive = slot.dspGeneration != nullptr && slot.dspGeneration->tailActive();
+        if (voicePool.voiceCountUsingModel(slot.model.get()) != 0 || dspTailActive || !enqueueRetirement(token))
         {
             ++index;
             continue;
@@ -370,6 +470,7 @@ void SamplerPlaybackContext::releaseSlotOnMessageThread(RetirementToken token)
     if (slot.serial != token.serial || slot.model == nullptr)
         return;
     slot.model.reset();
+    slot.dspGeneration.reset();
     slot.serial = 0;
     if (freeActivationSlotCount < freeActivationSlots.size())
         freeActivationSlots[freeActivationSlotCount++] = token.slotIndex;
@@ -408,6 +509,13 @@ void SamplerPlaybackContext::publishRealtimeDiagnostics() noexcept
         : nullptr;
     diagnosticActivePayloadBytes.store(payload != nullptr ? payload->retainedPreparedBytes : 0,
                                        std::memory_order_relaxed);
+    const auto* dsp = activeDspGeneration != nullptr ? &activeDspGeneration->getDiagnostics() : nullptr;
+    diagnosticActiveDspNodeCount.store(dsp != nullptr ? dsp->nodeCount : 0, std::memory_order_relaxed);
+    diagnosticActiveDspEffectCount.store(dsp != nullptr ? dsp->effectCount : 0, std::memory_order_relaxed);
+    diagnosticActiveDspScratchBytes.store(dsp != nullptr ? dsp->scratchBytes : 0, std::memory_order_relaxed);
+    diagnosticActiveDspStateBytes.store(dsp != nullptr ? dsp->stateBytes : 0, std::memory_order_relaxed);
+    diagnosticActiveDspDelayMemoryBytes.store(dsp != nullptr ? dsp->delayMemoryBytes : 0,
+                                               std::memory_order_relaxed);
     diagnosticActiveVoiceCount.store(static_cast<std::uint32_t>(voicePool.activeVoiceCount()),
                                      std::memory_order_release);
     diagnosticReleasingVoiceCount.store(static_cast<std::uint32_t>(voicePool.releasingVoiceCount()),

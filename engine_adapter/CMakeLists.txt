@@ -173,7 +173,14 @@ add_library(drs_engine_adapter STATIC
     src/AuthoringPreviewController.cpp
     src/AuthoringPreviewRecovery.cpp
     src/AuthoringSession.cpp
+    src/CuratedDspCatalog.cpp
     src/DraftPlaybackContract.cpp
+    src/DspGain.cpp
+    src/DspSaturator.cpp
+    src/DspStereoDelay.cpp
+    src/DspGraphPlan.cpp
+    src/DspParameterControl.cpp
+    src/DspRenderGeneration.cpp
     src/EngineFacade.cpp
     src/HiseProjectContent.cpp
     src/HostSessionState.cpp
@@ -202,7 +209,14 @@ add_library(drs_engine_adapter STATIC
     include/drs/engine/AuthoringPreviewController.h
     include/drs/engine/AuthoringPreviewRecovery.h
     include/drs/engine/AuthoringSession.h
+    include/drs/engine/CuratedDspCatalog.h
     include/drs/engine/DraftPlaybackContract.h
+    include/drs/engine/DspGain.h
+    include/drs/engine/DspSaturator.h
+    include/drs/engine/DspStereoDelay.h
+    include/drs/engine/DspGraphPlan.h
+    include/drs/engine/DspParameterControl.h
+    include/drs/engine/DspRenderGeneration.h
     include/drs/engine/HostSessionState.h
     include/drs/engine/PlaybackSnapshot.h
     include/drs/engine/PerformancePublishContract.h

@@ -177,6 +177,18 @@ AuthoringPreviewPreparationResult prepareAuthoringPreviewRenderModel(
         scopedSnapshot.sampleIdentities.end());
     retainSelectedZones(scopedSnapshot.articulationRoutes, retainedZoneIds);
     retainSelectedZones(scopedSnapshot.groupRoutes, retainedZoneIds);
+    scopedSnapshot.routingBuses.erase(
+        std::remove_if(scopedSnapshot.routingBuses.begin(), scopedSnapshot.routingBuses.end(),
+                       [&](const PlaybackSnapshotRoutingBusReference& bus)
+                       {
+                           if (bus.inputSourceId.rfind("zones/", 0) == 0)
+                               return !containsZoneId(retainedZoneIds, bus.inputSourceId.substr(6));
+                           if (bus.inputSourceId.rfind("groups/", 0) == 0)
+                               return bus.inputSourceId.substr(7) != scopedSnapshot.selectedGroupId;
+                           return false;
+                       }),
+        scopedSnapshot.routingBuses.end());
+    scopedSnapshot.dspGraphDigest = computePlaybackSnapshotDspGraphDigest(scopedSnapshot);
     scopedSnapshot.contentDigest = computePlaybackSnapshotContentDigest(scopedSnapshot);
 
     auto scopedPrepared = sourcePrepared;

@@ -478,6 +478,132 @@ add_test(
 )
 
 # Sprint 4.7 deterministic shell-free offline render conformance matrix.
+add_executable(drs_curated_dsp_contract_red_tests
+    src/CuratedDspContractRedTests.cpp
+)
+
+target_link_libraries(drs_curated_dsp_contract_red_tests
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_curated_dsp_contract_red_tests PRIVATE cxx_std_17)
+
+# S0 expected-red checks are intentionally not CTest tests and not drs_all_tests
+# dependencies. Each case is invoked directly by its named missing seam.
+set_target_properties(drs_curated_dsp_contract_red_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+juce_add_console_app(drs_curated_dsp_contract_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Curated DSP Contract Tests"
+)
+
+target_sources(drs_curated_dsp_contract_tests
+    PRIVATE
+        src/CuratedDspContractTests.cpp
+)
+
+target_link_libraries(drs_curated_dsp_contract_tests
+    PRIVATE
+        drs_engine_adapter
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_curated_dsp_contract_tests PRIVATE cxx_std_17)
+
+target_compile_definitions(drs_curated_dsp_contract_tests
+    PRIVATE
+        DRS_CURATED_DSP_FIXTURE_ROOT="${CMAKE_SOURCE_DIR}/content/runtime/phase2/curated-dsp"
+)
+
+target_include_directories(drs_curated_dsp_contract_tests
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
+)
+
+add_test(
+    NAME drs.curated_dsp.contract
+    COMMAND drs_curated_dsp_contract_tests
+)
+
+set_target_properties(drs_curated_dsp_contract_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+add_executable(drs_curated_dsp_graph_plan_tests
+    src/CuratedDspGraphPlanTests.cpp
+)
+target_link_libraries(drs_curated_dsp_graph_plan_tests PRIVATE drs_engine_adapter)
+target_compile_features(drs_curated_dsp_graph_plan_tests PRIVATE cxx_std_17)
+add_test(NAME drs.curated_dsp.graph_plan COMMAND drs_curated_dsp_graph_plan_tests)
+set_target_properties(drs_curated_dsp_graph_plan_tests PROPERTIES FOLDER "Tests")
+
+add_executable(drs_curated_dsp_gain_tests
+    src/CuratedDspGainTests.cpp
+)
+target_link_libraries(drs_curated_dsp_gain_tests PRIVATE drs_engine_adapter)
+target_compile_features(drs_curated_dsp_gain_tests PRIVATE cxx_std_17)
+add_test(NAME drs.curated_dsp.gain COMMAND drs_curated_dsp_gain_tests)
+set_target_properties(drs_curated_dsp_gain_tests PROPERTIES FOLDER "Tests")
+
+add_executable(drs_curated_dsp_saturator_tests
+    src/CuratedDspSaturatorTests.cpp
+)
+target_link_libraries(drs_curated_dsp_saturator_tests PRIVATE drs_engine_adapter)
+target_compile_features(drs_curated_dsp_saturator_tests PRIVATE cxx_std_17)
+add_test(NAME drs.curated_dsp.saturator COMMAND drs_curated_dsp_saturator_tests)
+set_target_properties(drs_curated_dsp_saturator_tests PROPERTIES FOLDER "Tests")
+
+add_executable(drs_curated_dsp_stereo_delay_tests src/CuratedDspStereoDelayTests.cpp)
+target_link_libraries(drs_curated_dsp_stereo_delay_tests PRIVATE drs_engine_adapter)
+target_compile_features(drs_curated_dsp_stereo_delay_tests PRIVATE cxx_std_17)
+add_test(NAME drs.curated_dsp.stereo_delay COMMAND drs_curated_dsp_stereo_delay_tests)
+set_target_properties(drs_curated_dsp_stereo_delay_tests PROPERTIES FOLDER "Tests")
+
+add_executable(drs_curated_dsp_scoped_routing_tests
+    src/CuratedDspScopedRoutingTests.cpp
+)
+target_link_libraries(drs_curated_dsp_scoped_routing_tests PRIVATE drs_engine_adapter drs_sampler_core)
+target_compile_features(drs_curated_dsp_scoped_routing_tests PRIVATE cxx_std_17)
+add_test(NAME drs.curated_dsp.scoped_routing COMMAND drs_curated_dsp_scoped_routing_tests)
+set_target_properties(drs_curated_dsp_scoped_routing_tests PROPERTIES FOLDER "Tests")
+
+juce_add_console_app(drs_curated_dsp_s0_baseline_report
+    PRODUCT_NAME "Decent Rhapsody Studio Curated DSP S0 Baseline Report"
+)
+
+target_sources(drs_curated_dsp_s0_baseline_report
+    PRIVATE
+        src/CuratedDspS0BaselineReport.cpp
+)
+
+target_link_libraries(drs_curated_dsp_s0_baseline_report
+    PRIVATE
+        drs_plugin_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_curated_dsp_s0_baseline_report PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.curated_dsp.s0_baseline
+    COMMAND drs_curated_dsp_s0_baseline_report "${CMAKE_CURRENT_BINARY_DIR}/curated-dsp-s0-baseline.json"
+)
+
+set_target_properties(drs_curated_dsp_s0_baseline_report PROPERTIES
+    FOLDER "Tests"
+)
+
 add_executable(drs_sprint4_offline_renderer_tests
     src/Sprint4OfflineRendererTests.cpp
     support/Sprint4OfflineRenderHarness.cpp
@@ -1625,6 +1751,7 @@ add_executable(drs_host_session_state_contract_tests
 target_compile_definitions(drs_host_session_state_contract_tests
     PRIVATE
         DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+        DRS_CURATED_DSP_FIXTURE_ROOT="${CMAKE_SOURCE_DIR}/content/runtime/phase2/curated-dsp"
 )
 
 target_compile_features(drs_host_session_state_contract_tests PRIVATE cxx_std_17)
@@ -2529,6 +2656,11 @@ add_dependencies(drs_all_tests
     drs_host_project_recall_tests
     drs_host_state_recovery_ui_tests
     drs_host_state_restore_stress_tests
+    drs_curated_dsp_contract_tests
+    drs_curated_dsp_graph_plan_tests
+    drs_curated_dsp_gain_tests
+    drs_curated_dsp_scoped_routing_tests
+    drs_curated_dsp_s0_baseline_report
     drs_project_restore_coordinator_tests
     drs_sprint4_entry_authored_input_tests
     drs_sprint4_entry_activation_payload_tests

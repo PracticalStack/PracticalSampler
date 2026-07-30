@@ -1,6 +1,7 @@
 #include "shared/AuthoringPanel.h"
 
 #include "shared/authoring/AuthoringWorkspaceLayout.h"
+#include "drs/engine/CuratedDspCatalog.h"
 
 #include <algorithm>
 #include <array>
@@ -50,13 +51,14 @@ constexpr std::array<const char*, 5> curatedMacroRoles
     "placement"
 };
 
-constexpr std::array<const char*, 5> curatedFxTypes
+constexpr std::array<const char*, 6> curatedFxTypes
 {
     "eq",
     "delay",
     "reverb",
     "chorus",
-    "saturator"
+    "saturator",
+    "drs.saturator"
 };
 
 constexpr std::array<const char*, 3> curatedTriggerEvents
@@ -72,6 +74,36 @@ constexpr std::array<const char*, 3> curatedChordModes
     "follow-root",
     "preserve-intervals"
 };
+
+constexpr int curatedDspMacroAssignmentBase = 1000;
+
+struct CuratedDspMacroAssignment
+{
+    const drs::engine::RuntimeProjectFxSlotDefinition* slot = nullptr;
+    const drs::engine::CuratedDspParameterDescriptor* parameter = nullptr;
+};
+
+std::vector<CuratedDspMacroAssignment> buildCuratedDspMacroAssignments(
+    const drs::engine::RuntimeProjectModel& project)
+{
+    std::vector<CuratedDspMacroAssignment> assignments;
+    for (const auto& slot : project.authoring.fxSlots)
+    {
+        const auto* effect = drs::engine::findCuratedDspEffect(slot.effectType, slot.effectVersion);
+        if (effect == nullptr || slot.unavailable || slot.legacyInert)
+            continue;
+        for (const auto& parameter : effect->parameters)
+            assignments.push_back({ &slot, &parameter });
+    }
+    return assignments;
+}
+
+juce::String formatCuratedDspMacroAssignment(const CuratedDspMacroAssignment& assignment)
+{
+    return "DSP: " + juce::String::fromUTF8(assignment.slot->displayName.c_str())
+        + " / " + juce::String(assignment.parameter->id.data(),
+                                static_cast<int>(assignment.parameter->id.size()));
+}
 
 void configureEditorSlider(juce::Slider& slider,
                            double minValue,
@@ -3594,8 +3626,21 @@ void AuthoringPanel::refreshFromSession()
         {
             macroAssignmentSelector.addItem(curatedMacroAssignments[index].label, static_cast<int>(index) + 1);
         }
+        const auto dspAssignments = buildCuratedDspMacroAssignments(project);
+        for (std::size_t index = 0; index < dspAssignments.size(); ++index)
+        {
+            const auto& assignment = dspAssignments[index];
+            const auto itemId = curatedDspMacroAssignmentBase + static_cast<int>(index);
+            macroAssignmentSelector.addItem(formatCuratedDspMacroAssignment(assignment), itemId);
+            if (!macro.targets.empty()
+                && macro.targets.front().dspSlotId == assignment.slot->id
+                && macro.targets.front().dspParameterId == assignment.parameter->id)
+            {
+                selectedAssignmentId = itemId;
+            }
+        }
 
-        if (!macro.targets.empty())
+        if (!macro.targets.empty() && selectedAssignmentId == 0)
         {
             const auto assignmentIndex = findAssignmentIndex(macro.targets.front().parameterId);
             if (assignmentIndex >= 0)
@@ -4342,8 +4387,32 @@ void AuthoringPanel::applySelectedMacroEdit(const juce::String& label)
         const auto& assignment = curatedMacroAssignments[static_cast<std::size_t>(assignmentId - 1)];
         editedMacro.targets.front().parameterId = assignment.parameterId;
         editedMacro.targets.front().parameterPath = assignment.parameterPath;
+        editedMacro.targets.front().dspSlotId.clear();
+        editedMacro.targets.front().dspParameterId.clear();
         if (editedMacro.targets.front().role.empty())
             editedMacro.targets.front().role = assignment.defaultRole;
+    }
+    else if (assignmentId >= curatedDspMacroAssignmentBase)
+    {
+        const auto dspAssignments = buildCuratedDspMacroAssignments(authoringSession.getProject());
+        const auto assignmentIndex = static_cast<std::size_t>(assignmentId - curatedDspMacroAssignmentBase);
+        if (assignmentIndex < dspAssignments.size())
+        {
+            const auto& assignment = dspAssignments[assignmentIndex];
+            auto& target = editedMacro.targets.front();
+            target.parameterId = "dsp." + assignment.slot->id + "." + std::string(assignment.parameter->id);
+            target.parameterPath = "curatedDsp." + assignment.slot->id + "."
+                + std::string(assignment.parameter->id);
+            target.dspSlotId = assignment.slot->id;
+            target.dspParameterId = std::string(assignment.parameter->id);
+            target.sourceMinimum = editedMacro.minValue;
+            target.sourceMaximum = editedMacro.maxValue;
+            target.destinationMinimum = assignment.parameter->minimum;
+            target.destinationMaximum = assignment.parameter->maximum;
+            target.curve = "linear";
+            if (target.role.empty())
+                target.role = "mix";
+        }
     }
 
     auto selectedRoleText = macroRoleSelector.getText().toStdString();

@@ -25,6 +25,7 @@ inline constexpr std::size_t hostSessionStateMaxZones = 65536u;
 inline constexpr std::size_t hostSessionStateMaxGroups = 2048u;
 inline constexpr std::size_t hostSessionStateMaxMacros = 128u;
 inline constexpr std::size_t hostSessionStateMaxFxSlots = 128u;
+inline constexpr std::size_t hostSessionStateMaxDspParameters = 1024u;
 inline constexpr std::size_t hostSessionStateMaxRoutingBuses = 128u;
 inline constexpr std::size_t hostSessionStateMaxPerformanceBanks = 256u;
 inline constexpr std::size_t hostSessionStateMaxNotesOrIssues = 4096u;
@@ -105,6 +106,7 @@ struct HostPublishedCheckpoint
     std::string authoredContentDigest;
     std::string macroSchemaDigest;
     std::string preparedContentDigest;
+    std::string dspGraphDigest;
 };
 
 enum class HostProjectBindingMatch

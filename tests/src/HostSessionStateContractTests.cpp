@@ -157,6 +157,36 @@ int main()
         require(dirtySerialized.serialized && dirtySerialized.text == dirtyText,
                 "Dirty-project golden fixture must round-trip byte-for-byte.");
 
+        const auto curatedDspFixtureText = readTextFile(
+            fs::path(DRS_CURATED_DSP_FIXTURE_ROOT) / "valid-all-scopes.json");
+        const auto curatedDspFixture = drs::engine::parseRuntimeProjectManifest(
+            curatedDspFixtureText, "curated-dsp-valid-all-scopes.drsproj", false);
+        require(curatedDspFixture.loaded,
+                "The curated DSP all-scopes fixture must load before host-state embedding.");
+
+        auto curatedDspHostState = *dirty.hostState;
+        curatedDspHostState.projectBinding.projectId = curatedDspFixture.project.projectId;
+        curatedDspHostState.projectBinding.manifestPath = "curated-dsp-valid-all-scopes.drsproj";
+        curatedDspHostState.projectBinding.manifestFileName = "curated-dsp-valid-all-scopes.drsproj";
+        curatedDspHostState.projectBinding.manifestDigest = drs::engine::computeHostProjectManifestDigest(
+            curatedDspFixture.project, curatedDspHostState.projectBinding.manifestPath);
+        curatedDspHostState.authoringState.projectSnapshot = curatedDspFixture.project;
+        const auto curatedDspHostSerialized = drs::engine::serializeHostSessionState(curatedDspHostState);
+        require(curatedDspHostSerialized.serialized,
+                "The all-scopes curated DSP fixture must survive host-state serialization.");
+        const auto curatedDspHostRestored = drs::engine::parseHostSessionState(
+            curatedDspHostSerialized.text);
+        require(curatedDspHostRestored.isValidHostState()
+                    && curatedDspHostRestored.hostState->authoringState.projectSnapshot->authoring.fxSlots[1].unavailable,
+                "Host-state restore must preserve an unavailable unknown DSP effect without rejecting the project.");
+
+        auto overBudgetDspHostState = curatedDspHostState;
+        overBudgetDspHostState.authoringState.projectSnapshot->authoring.fxSlots.front().parameters.assign(
+            drs::engine::hostSessionStateMaxDspParameters + 1u, { "over-budget", 0.0 });
+        const auto overBudgetDspHostSerialized = drs::engine::serializeHostSessionState(overBudgetDspHostState);
+        require(!overBudgetDspHostSerialized.serialized,
+                "Host-state serialization must reject DSP parameter state above its 1,024-item limit.");
+
         const auto legacy = drs::engine::parseHostSessionState(legacyText);
         require(legacy.isLegacyPreset(), "Raw preset-state v1 fixture must be classified as legacy.");
         require(!legacy.hostState.has_value(),

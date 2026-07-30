@@ -1,5 +1,297 @@
 # DAW Host-State Recall Progress
 
+## Curated DSP development plan
+
+### July 30, 2026 - Sprint 6 / DSP-06-01 through DSP-06-04
+
+- State: complete; Sprint 7 task DSP-07-01 is next.
+- Files changed: `engine_adapter/include/drs/engine/DspGain.h`, `engine_adapter/src/DspGain.cpp`,
+  `DspRenderGeneration.*`, `SamplerPlaybackContext.cpp`, build registration, and focused Gain/playback tests.
+- Integration: normal Preview and Performance activation now compile an executable curated graph and
+  preallocate its matching render generation before staging. Legacy/unknown-only graphs retain the
+  original direct dry path, preserving schema-migration behavior.
+- Validation: `drs.curated_dsp.gain` passed golden mono/stereo vectors for unity, +/- dB gain,
+  polarity, mute, clamp limits, and denormal flushing; `drs.sprint4.playback_context` passed
+  master-Gain activation, post-sampler execution, Preview/Performance parity, separate mutable
+  generations, and tail retirement. The existing realtime guard and standalone/editor-closed shell
+  parity executables also passed. `git diff --check` passed (line-ending notices only).
+- Result: master Gain is a stateless, bounded, allocation-free callback kernel. A zero-node or
+  bypass-compiled graph leaves the sampler's dry output on the existing direct path.
+- Remaining tasks: DSP-07-01 through DSP-17-04.
+
+### July 30, 2026 - Sprint 7 / DSP-07-01 through DSP-07-05
+
+- State: complete; Sprint 8 task DSP-08-01 is next.
+- Files changed: `DspRenderGeneration.*`, `SamplerVoicePool.*`, `SamplerPlaybackContext.*`,
+  Preview preparation, normal plugin activation staging, and `CuratedDspScopedRoutingTests.cpp`.
+- Validation: `drs.curated_dsp.scoped_routing` passed overlapping voices through distinct zone,
+  group, and master Gain values, and Preview/Performance retained separate generations. The
+  preview-preparation/audition, graph-plan, Gain, playback-context, realtime-guard, and
+  standalone/editor-closed shell-parity suites passed.
+- Result: callback routing uses generation-precompiled numeric route targets and preallocated
+  scoped buffers; zone chains feed group chains, which feed master, while direct graphs preserve
+  the legacy dry route.
+- Remaining tasks: DSP-09-01 through DSP-17-04.
+
+### July 30, 2026 - Sprint 8 / DSP-08-01 through DSP-08-05
+
+- State: complete; Sprint 9 task DSP-09-01 is next.
+- Files changed: `DspParameterControl.*`, `DspRenderGeneration.*`, `DspGain.*`,
+  `SamplerPlaybackContext.*`, Authoring Session gesture publication, and the plugin bridge.
+- Validation: numeric control layouts, stale-generation rejection, latest-value publication,
+  10 ms smoothing, block-partition equivalence, slot bypass crossfade, and
+  single-transaction gesture behavior are covered by the curated DSP contract, Gain, graph-plan,
+  scoped-routing, playback-context, realtime-guard, and shell-parity tests.
+- Result: live Preview controls update generation-local atomic targets without graph rebuild;
+  sample-rate changes reset smoother state, authoring commits only on gesture end, and all
+  slot/chain bypass transitions are click-free.
+- Remaining tasks: DSP-09-01 through DSP-17-04.
+
+### July 30, 2026 - Sprint 9 / DSP-09-01 through DSP-09-05
+
+- State: complete; Sprint 10 task DSP-10-01 is next.
+- Files changed: structured macro target model/snapshot persistence, publish binding resolution,
+  performance callback control publication, preset/host recall metadata, and the Authoring macro
+  target chooser.
+- Validation: the published-macro suite passed stable structured target resolution, chain-control
+  reordering, missing-target publish rejection, and existing host automation cutover; host-session
+  codec and curated DSP contract tests passed; the plugin bundle builds. `git diff --check` passed
+  with only the repository's CRLF notices.
+- Result: a macro resolves slot/parameter identity off the callback, maps its bounded value to the
+  catalog parameter range on the audio thread, and publishes through the generation-local S8
+  atomic control plane without a graph rebuild. Recall records the stable target identities and
+  active graph digest; chooser labels never show runtime indices.
+- Remaining tasks: DSP-10-01 through DSP-17-04.
+
+### July 30, 2026 - Sprint 10 / DSP-10-01 through DSP-10-04
+
+- State: complete; Sprint 11 task DSP-11-01 is next.
+- Files changed: `DspSaturator.*`, catalog v1 metadata, shared graph dispatch, creator catalog
+  selection, S10 algorithm note, and dedicated saturator vectors.
+- Validation: `drs.curated_dsp.saturator` passed hard-clip, invalid input, mono/stereo,
+  block-partition ramp, sample-rate, bypass-compatible, and chain-order vectors. Graph-plan and
+  scoped-routing suites also passed; the plugin bundle builds.
+- Result: Saturator v1 is a fixed zero-latency 1x algorithm with per-channel resettable tone state,
+  bounded parameters, denormal/NaN containment, catalog smoothing, and no effect-specific graph
+  lifecycle path.
+- Remaining tasks: DSP-11-01 through DSP-17-04.
+
+### July 30, 2026 - Sprint 11 / in progress
+
+- State: in progress; DSP-11-04/05 callback discontinuity and expanded automation coverage remain.
+- Implemented: sanitized host tempo/playback/sample-position view, v1 catalog surface, preallocated
+  two-second stereo rings, fractional reads, feedback tone/ping-pong behavior, reset, and bounded
+  retirement-tail countdown.
+- Validation so far: `drs.curated_dsp.stereo_delay` passes free-time echo placement at 44.1/48/96
+  kHz, sync fallback timing, feedback clamp containment, ping-pong transfer, and deterministic reset.
+
+### July 30, 2026 â€” Sprint 0 / Gate G0
+
+- State: complete; Sprint 1 task DSP-01-01 is next.
+- Files changed: `docs/curated-dsp-contract.md`, `docs/curated-dsp-s0-baselines.md`,
+  `tests/src/CuratedDspContractRedTests.cpp`, `tests/src/CuratedDspS0BaselineReport.cpp`,
+  `tests/CMakeLists.txt`, and `curated-dsp-development-plan.html`.
+- Validation: audited all frozen design decisions; built six direct expected-red seams (each exits
+  1 with its named missing behavior); ran the 21-scenario offline matrix twice at `1e-6` tolerance;
+  registered and passed `drs.curated_dsp.s0_baseline` plus `drs.sprint4.offline_renderer` (2/2);
+  captured 256 no-DSP blocks at 48 kHz / stereo / 512 frames: 10,667us deadline, 543us maximum
+  callback, 705,600 active prepared bytes, zero retired bytes, and zero real-time guard failures;
+  passed `git diff --check`.
+- Result: G0 closed. No DSP execution behavior was introduced.
+- Remaining tasks: DSP-01-01 through DSP-17-04.
+- Known risk: current authored FX remains metadata-only; schema 5 must preserve its dry behavior.
+
+### July 30, 2026 â€” Sprint 1 / DSP-01-01
+
+- State: complete; DSP-01-02 is in progress.
+- Files changed: `RuntimeModel.h`, `CuratedDspContractTests.cpp`, and `tests/CMakeLists.txt`.
+- Validation: the registered `drs.curated_dsp.contract` test proves exact retention of a
+  non-catalog version, ordered unknown parameter records (including a duplicate ID), their numeric
+  values, and explicit chain bypass; legacy zone-group contract and schema-persistence executables
+  also passed after the model extension; `git diff --check` passed.
+- Result: FX slots now retain durable algorithm versions and ordered parameter values without a
+  runtime interpreter. Existing aggregate initializers retain their original bypass semantics.
+- Remaining tasks: DSP-01-02 through DSP-17-04.
+
+### July 30, 2026 â€” Sprint 1 / DSP-01-02
+
+- State: complete; DSP-01-03 is in progress.
+- Files changed: `CuratedDspCatalog.h/.cpp`, engine-adapter build ownership, and the curated
+  DSP contract test.
+- Validation: `drs.curated_dsp.contract` passed after confirming version-1 descriptors for Gain,
+  Saturator, Stereo Delay, and Algorithmic Reverb; each descriptor has all declared metadata and
+  unknown types have no executable catalog interpretation. `git diff --check` passed.
+- Result: the catalog is product-owned and independent of UI/runtime DSP kernels.
+- Remaining tasks: DSP-01-03 through DSP-17-04.
+
+### July 30, 2026 â€” Sprint 1 / DSP-01-03
+
+- State: complete; DSP-01-04 is in progress.
+- Files changed: schema model, loader, snapshot validation, host-state limits, and curated DSP
+  contract tests.
+- Validation: registered curated contract test passed after deterministic schema-5 serialize/parse
+  round trip, duplicate-parameter and zero-version rejection, canonical zone-source acceptance,
+  and unknown-effect warning/runtime-bypass handling; the legacy schema-persistence target built
+  successfully.
+- Result: schema 5 / authoring 4 has deterministic durable DSP fields while schema 4 emission is
+  unchanged. Unknown slots remain preserved and non-executable.
+- Remaining tasks: DSP-01-04 through DSP-17-04.
+
+### July 30, 2026 â€” Sprint 1 / DSP-01-04
+
+- State: complete; DSP-01-05 is in progress.
+- Validation: `drs.curated_dsp.contract` passed migration of the checked-in schema-4 reference
+  project. It verifies stable slot IDs/order, legacy type mapping, schema 5/authoring 4 versions,
+  legacy-inert bypass, canonical zone routes, and equality of all zone dry-render inputs plus
+  group topology before and after migration.
+- Result: schema-4 FX metadata remains audibly inert after migration while the authored data is
+  ready for explicit later enablement.
+- Remaining tasks: DSP-01-05 through DSP-17-04.
+
+### July 30, 2026 â€” Sprint 1 / DSP-01-05
+
+- State: complete; Sprint 2 task DSP-02-01 is next.
+- Files changed: curated DSP fixture corpus, loader/host-state contract suites, loader structural
+  ownership and parameter-count validation, and test build definitions.
+- Validation: `drs.curated_dsp.contract` executes `valid-all-scopes.json` plus the data-driven
+  negative case catalog for unknown version, missing/duplicate parameter, shared/orphan slot,
+  duplicate source owner, and 1,025 parameters. `drs.host_state.contract` embeds the all-scopes
+  project, preserves its unavailable unknown effect across round-trip, and rejects 1,025 parameters.
+  Both registered tests passed, and `git diff --check` passed.
+- Result: complete. Schema, fixtures, migration, persistence, and bounded host-state coverage are
+  in place without enabling audio DSP.
+- Remaining tasks: DSP-02-01 through DSP-17-04.
+
+### July 30, 2026 — Sprint 2 / DSP-02-01
+
+- State: complete; DSP-02-02 is in progress.
+- Files changed: `AuthoringSession.h/.cpp` and the curated DSP contract suite.
+- Validation: create attaches a new stable-ID slot to one named owner; duplicate inserts a unique
+  caller-supplied ID alongside its original owner; in-chain reorder changes execution order; delete
+  removes the slot and exactly that owner reference. The curated contract proves undo/redo restores
+  and re-removes the exact chain position. `drs.curated_dsp.contract` and
+  `drs.phase2.authoring_foundation` passed.
+- Result: complete. Slot topology edits are now transaction-only and document-history safe.
+- Remaining tasks: DSP-02-02 through DSP-17-04.
+
+### July 30, 2026 — Sprint 2 / DSP-02-02
+
+- State: complete; DSP-02-03 is in progress.
+- Files changed: `AuthoringSession.h/.cpp` and the curated DSP contract suite.
+- Validation: transactionally moved a slot from zone to group ownership, proved a same-owner move
+  rejected without mutation, and toggled an authored chain bypass. A direct attempt to create a
+  second bus for the same source is rejected by document validation and retains byte-identical
+  authored serialization. `drs.curated_dsp.contract` passed.
+- Result: complete. Attach/detach is represented as one atomic owner transfer, so no observable
+  document state can orphan or double-own a slot.
+- Remaining tasks: DSP-02-03 through DSP-17-04.
+
+### July 30, 2026 — Sprint 2 / DSP-02-03
+
+- State: complete; DSP-02-04 is in progress.
+- Files changed: `ProjectDocument.h/.cpp`, `AuthoringSession.h/.cpp`, and curated DSP contracts.
+- Validation: known effects validate finite values and the catalog's versioned ranges; reset persists
+  the exact descriptor default. Gesture begin/update/commit coalesces multiple valid drag updates
+  into one undo entry. The committed result reports
+  `authoring.fxSlots[3].parameters.driveDb` and exactly one host-state rebuild signal; intermediate
+  updates do not signal a document change. Curated DSP and existing authoring-foundation suites passed.
+- Result: complete. DSP values have a stable authoring transaction surface without amplifying drag
+  frequency into history or rebuild work.
+- Remaining tasks: DSP-02-04 through DSP-17-04.
+
+### July 30, 2026 — Sprint 2 / DSP-02-04
+
+- State: complete; Sprint 3 snapshot work is next.
+- Files changed: `AuthoringSession.h/.cpp` and curated DSP contracts.
+- Validation: editor-only selection derives its selected slot's owner from routing topology and is
+  recovered on migration, project replacement, checkpoint restore, undo, and redo. Tests cover
+  selected-slot deletion, group-chain owner deletion (which atomically removes owned slots), a
+  newly empty chain, and an all-empty project. Curated DSP and existing authoring-foundation tests
+  passed.
+- Result: complete. Every planned DSP authoring operation is a validated transaction; selection is
+  never part of audio/render ownership.
+- Remaining tasks: DSP-03-01 through DSP-17-04.
+
+### July 30, 2026 — Sprint 3 / DSP-03-01
+
+- State: complete; DSP-03-02 is in progress.
+- Files changed: `PlaybackSnapshot.h/.cpp` and curated DSP contracts.
+- Validation: the immutable snapshot now copies every executable/preserved FX field: type, version,
+  ordered stable parameter values, slot bypass, unavailable/legacy-inert state, and chain bypass.
+  The focused contract verified the compact all-scopes fixture's unknown preserved node reaches the
+  snapshot with its original parameter value. `drs.curated_dsp.contract` passed.
+- Result: complete. Future graph compilation has no reason to consult a mutable project for authored
+  DSP meaning.
+- Remaining tasks: DSP-03-02 through DSP-17-04.
+
+### July 30, 2026 — Sprint 3 / DSP-03-02
+
+- State: complete; DSP-03-03 is in progress.
+- Files changed: `PlaybackSnapshot.h/.cpp` and curated DSP contracts.
+- Validation: snapshot build canonicalizes zone sources, resolves catalog scopes and cost metadata,
+  and checks one source/chain and one owner/slot. Structured `snapshot-dsp-*` findings cover
+  unresolved owner sources, duplicate owner sources, unsupported scope, unresolved catalog versions,
+  duplicate/invalid parameters, and owner-count errors. Legacy schema-4 projects remain dry/inert.
+  `drs.curated_dsp.contract` passed.
+- Result: complete. Schema-5 DSP snapshot topology has one canonical, bounded representation.
+- Remaining tasks: DSP-03-03 through DSP-17-04.
+
+### July 30, 2026 — Sprint 3 / DSP-03-03
+
+- State: complete; DSP-03-04 is in progress.
+- Files changed: `PlaybackSnapshot.*`, `PreparedPlayback.*`,
+  `PerformancePublishPreparation.cpp`, and curated DSP contracts.
+- Validation: deterministic DSP graph serialization excludes display labels and includes stable slot
+  IDs, owner/chain order, types, versions, values, bypass, unavailable, and legacy-inert state.
+  Mutation checks prove value, owner/order, and bypass alter the digest while labels do not. Prepared
+  payloads carry the snapshot graph digest, and publish validation rejects mismatches. The focused
+  DSP contract and existing Sprint 6 publish contract/seam tests passed.
+- Result: complete. DSP conformance identity is explicit from immutable snapshot through publish.
+- Remaining tasks: DSP-03-04 through DSP-17-04.
+
+### July 30, 2026 — Sprint 3 / DSP-03-04 / Gate G1
+
+- State: complete; Sprint 4 graph-plan work is next.
+- Files changed: focused curated DSP and existing performance-preparation contracts.
+- Validation: repeated builds at the same draft revision produce byte-equivalent snapshots and equal
+  graph/content digests; unavailable unknown nodes survive as explicitly bypassed snapshot nodes;
+  a stale prepared graph digest is rejected with `publish-dsp-graph-digest-mismatch`. Existing
+  prepared-playback warm/cold cache coverage continues to pass with the new graph identity fields.
+  Passed `drs.curated_dsp.contract`, `drs.sprint6.performance_preparation`, and
+  `drs.phase1.prepared_playback`; `git diff --check` passed.
+- Result: G1 complete. Authored DSP carries one deterministic identity through snapshot, preparation,
+  and publish validation.
+- Remaining tasks: DSP-04-01 through DSP-17-04.
+
+### July 30, 2026 — Sprint 4 / DSP-04-01 through DSP-04-04
+
+- State: complete; Sprint 5 render-generation ownership is next.
+- Files changed: `DspGraphPlan.h/.cpp`, catalog metadata, snapshot metadata, engine build ownership,
+  and registered curated DSP graph-plan tests.
+- Validation: the compiler produces pointer-free flat zone/group/master nodes with resolved output
+  destinations, ordered parameter slots, scratch/state/delay-memory requests, and deterministic
+  plan digests. It collapses no-active-DSP input to a direct fast path and rejects noncanonical
+  bus inputs, duplicate slot ownership, and node/parameter/scratch/state/cost budget failures.
+  The 128-node boundary compiles; 129 nodes reject. Passed `drs.curated_dsp.graph_plan` and
+  `drs.curated_dsp.contract`.
+- Result: complete. Valid authored DSP has one bounded immutable topology plan; invalid graphs do
+  not reach the audio layer.
+- Remaining tasks: DSP-05-01 through DSP-17-04.
+
+### July 30, 2026 — Sprint 5 / DSP-05-01 through DSP-05-05
+
+- State: complete; Sprint 6 processor kernels are next.
+- Files changed: `DspRenderGeneration.*`, `SamplerPlaybackContext.*`, sampler playback-context
+  tests, engine build ownership, and graph-plan contracts.
+- Validation: a render generation owns immutable sampler/plan state and preallocated mutable
+  state/scratch off audio; activation slots retain it and exchange only a primitive pending-slot
+  token at block boundaries. Retirement waits for both voices and atomic tail state before the
+  message-thread reclaimer releases ownership. Diagnostics expose only primitive DSP resource
+  totals. Passed playback-context, graph-plan, 60-second concurrency-soak, and 54-second realtime
+  safety tests.
+- Result: complete. Generation ownership is safe before audible DSP kernel introduction.
+- Remaining tasks: DSP-06-01 through DSP-17-04.
+
 Source of truth: `daw-host-state-development-plan.html`  
 Started: July 29, 2026
 

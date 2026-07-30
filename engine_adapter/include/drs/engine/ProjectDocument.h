@@ -48,8 +48,10 @@ struct RuntimeProjectDocumentCheckpointValidationResult
 struct RuntimeProjectDocumentActionResult
 {
     bool applied = false;
+    bool requiresHostStateRebuild = false;
     std::string state;
     std::vector<std::string> issues;
+    std::vector<std::string> changedPaths;
     RuntimeProjectDocumentState documentState;
 };
 

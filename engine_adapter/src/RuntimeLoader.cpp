@@ -1,4 +1,5 @@
 #include "drs/engine/RuntimeLoader.h"
+#include "drs/engine/CuratedDspCatalog.h"
 
 #include "drs/engine/WorkspacePaths.generated.h"
 
@@ -56,6 +57,13 @@ std::string extractGroupIdFromRoutingSourceId(std::string_view sourceId)
         return {};
 
     return std::string(sourceId.substr(std::string_view("groups/").size()));
+}
+
+std::string extractZoneIdFromRoutingSourceId(std::string_view sourceId)
+{
+    constexpr std::string_view prefix { "zones/" };
+    return sourceId.rfind(prefix, 0) == 0 && sourceId.size() > prefix.size()
+        ? std::string(sourceId.substr(prefix.size())) : std::string {};
 }
 
 std::string readTextFile(const fs::path& filePath)
@@ -513,6 +521,16 @@ ordered_json serializeMacroTargets(const std::vector<RuntimeProjectMacroTargetDe
         targetObject["parameterId"] = target.parameterId;
         targetObject["parameterPath"] = target.parameterPath;
         targetObject["role"] = target.role;
+        if (!target.dspSlotId.empty() || !target.dspParameterId.empty())
+        {
+            targetObject["dspSlotId"] = target.dspSlotId;
+            targetObject["dspParameterId"] = target.dspParameterId;
+            targetObject["sourceMinimum"] = target.sourceMinimum;
+            targetObject["sourceMaximum"] = target.sourceMaximum;
+            targetObject["destinationMinimum"] = target.destinationMinimum;
+            targetObject["destinationMaximum"] = target.destinationMaximum;
+            targetObject["curve"] = target.curve;
+        }
         array.push_back(std::move(targetObject));
     }
 
@@ -848,7 +866,7 @@ ordered_json serializeProjectGroups(const std::vector<RuntimeProjectGroupDefinit
     return array;
 }
 
-ordered_json serializeFxSlots(const std::vector<RuntimeProjectFxSlotDefinition>& fxSlots)
+ordered_json serializeFxSlots(const std::vector<RuntimeProjectFxSlotDefinition>& fxSlots, const bool dspSchema)
 {
     ordered_json array = ordered_json::array();
 
@@ -859,13 +877,22 @@ ordered_json serializeFxSlots(const std::vector<RuntimeProjectFxSlotDefinition>&
         fxObject["displayName"] = fxSlot.displayName;
         fxObject["effectType"] = fxSlot.effectType;
         fxObject["bypassed"] = fxSlot.bypassed;
+        if (dspSchema)
+        {
+            fxObject["effectVersion"] = fxSlot.effectVersion;
+            fxObject["legacyInert"] = fxSlot.legacyInert;
+            ordered_json parameters = ordered_json::array();
+            for (const auto& parameter : fxSlot.parameters)
+                parameters.push_back({ { "id", parameter.id }, { "value", parameter.value } });
+            fxObject["parameters"] = std::move(parameters);
+        }
         array.push_back(std::move(fxObject));
     }
 
     return array;
 }
 
-ordered_json serializeRoutingBuses(const std::vector<RuntimeProjectRoutingBusDefinition>& routingBuses)
+ordered_json serializeRoutingBuses(const std::vector<RuntimeProjectRoutingBusDefinition>& routingBuses, const bool dspSchema)
 {
     ordered_json array = ordered_json::array();
 
@@ -876,6 +903,8 @@ ordered_json serializeRoutingBuses(const std::vector<RuntimeProjectRoutingBusDef
         busObject["displayName"] = bus.displayName;
         busObject["inputSourceId"] = bus.inputSourceId;
         busObject["fxSlotIds"] = serializeStringArray(bus.fxSlotIds);
+        if (dspSchema)
+            busObject["chainBypassed"] = bus.chainBypassed;
         array.push_back(std::move(busObject));
     }
 
@@ -1107,7 +1136,7 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
 
     project.notes = readRequiredStringArray(root, result, "notes", "Project");
 
-    if (project.schemaVersion >= 2 && project.schemaVersion <= 4)
+    if (project.schemaVersion >= 2 && project.schemaVersion <= 5)
     {
         const auto authoringIterator = root.find("authoring");
         if (authoringIterator == root.end() || !authoringIterator->is_object())
@@ -1325,6 +1354,13 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
                                 target.parameterPath = *parameterPath;
                             if (const auto role = readRequired<RuntimeProjectLoadResult, std::string>(targetObject, result, "role", targetContext.c_str()))
                                 target.role = *role;
+                            if (const auto value = readOptional<RuntimeProjectLoadResult, std::string>(targetObject, result, "dspSlotId", targetContext.c_str())) target.dspSlotId = *value;
+                            if (const auto value = readOptional<RuntimeProjectLoadResult, std::string>(targetObject, result, "dspParameterId", targetContext.c_str())) target.dspParameterId = *value;
+                            if (const auto value = readOptional<RuntimeProjectLoadResult, double>(targetObject, result, "sourceMinimum", targetContext.c_str())) target.sourceMinimum = *value;
+                            if (const auto value = readOptional<RuntimeProjectLoadResult, double>(targetObject, result, "sourceMaximum", targetContext.c_str())) target.sourceMaximum = *value;
+                            if (const auto value = readOptional<RuntimeProjectLoadResult, double>(targetObject, result, "destinationMinimum", targetContext.c_str())) target.destinationMinimum = *value;
+                            if (const auto value = readOptional<RuntimeProjectLoadResult, double>(targetObject, result, "destinationMaximum", targetContext.c_str())) target.destinationMaximum = *value;
+                            if (const auto value = readOptional<RuntimeProjectLoadResult, std::string>(targetObject, result, "curve", targetContext.c_str())) target.curve = *value;
 
                             macro.targets.push_back(std::move(target));
                         }
@@ -1357,6 +1393,31 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
                         fxSlot.effectType = *effectType;
                     if (const auto bypassed = readRequired<RuntimeProjectLoadResult, bool>(fxObject, result, "bypassed", context.c_str()))
                         fxSlot.bypassed = *bypassed;
+                    if (project.schemaVersion >= 5)
+                    {
+                        if (const auto version = readRequired<RuntimeProjectLoadResult, std::uint32_t>(fxObject, result, "effectVersion", context.c_str()))
+                            fxSlot.effectVersion = *version;
+                        if (const auto legacyInert = readRequired<RuntimeProjectLoadResult, bool>(fxObject, result, "legacyInert", context.c_str())) fxSlot.legacyInert = *legacyInert;
+                        const auto parameters = fxObject.find("parameters");
+                        if (parameters == fxObject.end() || !isObjectArray(*parameters))
+                            addIssue(result, context + " field 'parameters' must be an array of objects.");
+                        else for (std::size_t parameterIndex = 0; parameterIndex < parameters->size(); ++parameterIndex)
+                        {
+                            const auto& parameter = parameters->at(parameterIndex);
+                            RuntimeProjectFxSlotDefinition::ParameterValue value;
+                            const auto parameterContext = context + ".parameters[" + std::to_string(parameterIndex) + "]";
+                            if (const auto id = readRequired<RuntimeProjectLoadResult, std::string>(parameter, result, "id", parameterContext.c_str())) value.id = *id;
+                            if (const auto numeric = readRequired<RuntimeProjectLoadResult, double>(parameter, result, "value", parameterContext.c_str())) value.value = *numeric;
+                            fxSlot.parameters.push_back(std::move(value));
+                        }
+                        if (findCuratedDspEffect(fxSlot.effectType, fxSlot.effectVersion) == nullptr)
+                        {
+                            fxSlot.unavailable = true;
+                            result.warnings.push_back(context + " effect '" + fxSlot.effectType
+                                + "' version " + std::to_string(fxSlot.effectVersion)
+                                + " is unavailable and will be bypassed at runtime.");
+                        }
+                    }
 
                     authoring.fxSlots.push_back(std::move(fxSlot));
                 }
@@ -1382,8 +1443,16 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
                     if (const auto displayName = readRequired<RuntimeProjectLoadResult, std::string>(busObject, result, "displayName", context.c_str()))
                         bus.displayName = *displayName;
                     if (const auto inputSourceId = readRequired<RuntimeProjectLoadResult, std::string>(busObject, result, "inputSourceId", context.c_str()))
+                    {
                         bus.inputSourceId = *inputSourceId;
+                        if (project.schemaVersion >= 5 && bus.inputSourceId != "master"
+                            && bus.inputSourceId.rfind("zones/", 0) != 0
+                            && bus.inputSourceId.rfind("groups/", 0) != 0)
+                            bus.inputSourceId = "zones/" + bus.inputSourceId;
+                    }
                     bus.fxSlotIds = readRequiredStringArray(busObject, result, "fxSlotIds", context.c_str());
+                    if (project.schemaVersion >= 5)
+                        if (const auto bypassed = readRequired<RuntimeProjectLoadResult, bool>(busObject, result, "chainBypassed", context.c_str())) bus.chainBypassed = *bypassed;
 
                     authoring.routingBuses.push_back(std::move(bus));
                 }
@@ -1571,9 +1640,9 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         addIssue(result, "Project schemaName must be 'drs.project'.");
 
     if (project.schemaVersion != 1 && project.schemaVersion != 2 && project.schemaVersion != 3
-        && project.schemaVersion != 4)
+        && project.schemaVersion != 4 && project.schemaVersion != 5)
     {
-        addIssue(result, "Project schemaVersion must be 1, 2, 3, or 4.");
+        addIssue(result, "Project schemaVersion must be 1, 2, 3, 4, or 5.");
     }
 
     if (project.projectId.empty())
@@ -1608,7 +1677,7 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         }
     }
 
-    if (project.schemaVersion >= 2 && project.schemaVersion <= 4)
+    if (project.schemaVersion >= 2 && project.schemaVersion <= 5)
     {
         const auto& authoring = project.authoring;
         const auto explicitRoundRobinRequired = project.schemaVersion >= 3;
@@ -1625,6 +1694,8 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
         if (project.schemaVersion == 4 && authoring.schemaVersion != 3)
             addIssue(result, "Project authoring schemaVersion must be 3 for schemaVersion 4 projects.");
+        if (project.schemaVersion == 5 && authoring.schemaVersion != 4)
+            addIssue(result, "Project authoring schemaVersion must be 4 for schemaVersion 5 projects.");
 
         if (hasDuplicateIds(authoring.zones))
             addIssue(result, "Project authoring zone ids must be unique.");
@@ -1739,6 +1810,7 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
                      "Project authoring selectedGroupId references unknown group '" + authoring.selectedGroupId + "'.");
 
         std::unordered_set<std::string> fxSlotIds;
+        std::size_t totalDspParameterCount = 0;
         for (const auto& fxSlot : authoring.fxSlots)
         {
             if (fxSlot.id.empty())
@@ -1751,7 +1823,24 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
             if (fxSlot.effectType.empty())
                 addIssue(result, "Project FX slot '" + fxSlot.id + "' must have an effectType.");
+
+            if (project.schemaVersion >= 5 && fxSlot.effectVersion == 0)
+                addIssue(result, "Project FX slot '" + fxSlot.id + "' must have a non-zero effectVersion.");
+
+            std::unordered_set<std::string> parameterIds;
+            for (const auto& parameter : fxSlot.parameters)
+            {
+                ++totalDspParameterCount;
+                if (parameter.id.empty())
+                    addIssue(result, "Project FX slot '" + fxSlot.id + "' contains a parameter without id.");
+                else if (!parameterIds.insert(parameter.id).second)
+                    addIssue(result, "Project FX slot '" + fxSlot.id + "' contains duplicate parameter id '" + parameter.id + "'.");
+                if (!std::isfinite(parameter.value))
+                    addIssue(result, "Project FX slot '" + fxSlot.id + "' parameter '" + parameter.id + "' must be finite.");
+            }
         }
+        if (totalDspParameterCount > 1024)
+            addIssue(result, "Project authored DSP parameter count exceeds the 1024-item limit.");
 
         for (const auto& macro : authoring.macros)
         {
@@ -1774,6 +1863,15 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
                 if (target.role.empty())
                     addIssue(result, "Project macro '" + macro.id + "' contains a target without role.");
+                const auto hasDspIdentity = !target.dspSlotId.empty() || !target.dspParameterId.empty();
+                if (hasDspIdentity && (target.dspSlotId.empty() || target.dspParameterId.empty()
+                    || !std::isfinite(target.sourceMinimum) || !std::isfinite(target.sourceMaximum)
+                    || !std::isfinite(target.destinationMinimum) || !std::isfinite(target.destinationMaximum)
+                    || target.sourceMinimum >= target.sourceMaximum || target.destinationMinimum > target.destinationMaximum
+                    || (target.curve != "linear" && target.curve != "logarithmic")
+                    || (target.curve == "logarithmic"
+                        && (target.destinationMinimum <= 0.0 || target.destinationMaximum <= 0.0))))
+                    addIssue(result, "Project macro '" + macro.id + "' contains an invalid structured DSP target.");
             }
         }
 
@@ -1854,6 +1952,8 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
         std::unordered_set<std::string> routingBusIds;
         std::unordered_set<std::string> groupOwnedRoutingBusIds;
+        std::unordered_map<std::string, std::size_t> fxSlotOwnerCounts;
+        std::unordered_set<std::string> routingSourceOwners;
         for (const auto& bus : authoring.routingBuses)
         {
             if (bus.id.empty())
@@ -1866,7 +1966,10 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
             if (bus.inputSourceId.empty())
                 addIssue(result, "Project routing bus '" + bus.id + "' must have an inputSourceId.");
-            else if (bus.inputSourceId != "master" && !zoneIds.count(bus.inputSourceId))
+            else if (!routingSourceOwners.insert(bus.inputSourceId).second)
+                addIssue(result, "Project routing source '" + bus.inputSourceId + "' must have exactly one chain owner.");
+            else if (bus.inputSourceId != "master" && !zoneIds.count(bus.inputSourceId)
+                     && !zoneIds.count(extractZoneIdFromRoutingSourceId(bus.inputSourceId)))
             {
                 const auto groupId = extractGroupIdFromRoutingSourceId(bus.inputSourceId);
                 if (groupId.empty() || !explicitGroupsRequired || !groupIds.count(groupId))
@@ -1881,8 +1984,14 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
             {
                 if (!fxSlotIds.count(fxSlotId))
                     addIssue(result, "Project routing bus '" + bus.id + "' references unknown FX slot '" + fxSlotId + "'.");
+                else
+                    ++fxSlotOwnerCounts[fxSlotId];
             }
         }
+
+        for (const auto& fxSlot : authoring.fxSlots)
+            if (fxSlotOwnerCounts[fxSlot.id] != 1)
+                addIssue(result, "Project FX slot '" + fxSlot.id + "' must have exactly one chain owner.");
 
         if (explicitGroupsRequired)
         {
@@ -2110,6 +2219,47 @@ RuntimeProjectMigrationResult migrateRuntimeProjectToZoneGroupsSchema(const Runt
     result.state = validation.valid
         ? "Project migrated to the Zone Groups schema"
         : validation.state;
+    return result;
+}
+
+RuntimeProjectMigrationResult migrateRuntimeProjectToCuratedDspSchema(const RuntimeProjectModel& project)
+{
+    RuntimeProjectMigrationResult result;
+    auto migrated = project;
+    if (migrated.schemaVersion < 4)
+    {
+        const auto groups = migrateRuntimeProjectToZoneGroupsSchema(migrated);
+        if (!groups.valid) return groups;
+        migrated = groups.project;
+    }
+    if (migrated.schemaVersion != 4 || migrated.authoring.schemaVersion != 3)
+    {
+        addIssue(result, "Only schema-4 / authoring-3 projects can migrate to curated DSP schema 5.");
+        return result;
+    }
+    for (auto& slot : migrated.authoring.fxSlots)
+    {
+        if (slot.effectType == "delay") slot.effectType = "drs.stereoDelay";
+        else if (slot.effectType == "reverb") slot.effectType = "drs.algorithmicReverb";
+        else if (slot.effectType == "saturator") slot.effectType = "drs.saturator";
+        else if (slot.effectType == "gain") slot.effectType = "drs.gain";
+        else if (slot.effectType == "eq") slot.effectType = "drs.compactEq";
+        else if (slot.effectType == "chorus") slot.effectType = "drs.chorus";
+        slot.effectVersion = 1;
+        slot.legacyInert = true;
+        slot.bypassed = true;
+    }
+    for (auto& bus : migrated.authoring.routingBuses)
+        if (bus.inputSourceId != "master" && bus.inputSourceId.rfind("groups/", 0) != 0 && bus.inputSourceId.rfind("zones/", 0) != 0)
+            bus.inputSourceId = "zones/" + bus.inputSourceId;
+    migrated.schemaVersion = 5;
+    migrated.authoring.schemaVersion = 4;
+    const auto validation = validateRuntimeProjectModel(migrated);
+    result.project = std::move(migrated);
+    result.issues = validation.issues;
+    result.valid = validation.valid;
+    result.migrated = validation.valid;
+    result.state = validation.valid ? "Project migrated to curated DSP schema" : validation.state;
     return result;
 }
 
@@ -2542,8 +2692,8 @@ std::string serializeRuntimeProjectManifest(const RuntimeProjectModel& project, 
         if (project.schemaVersion >= 4)
             authoring["groups"] = serializeProjectGroups(project.authoring.groups);
         authoring["macros"] = serializeProjectMacros(project.authoring.macros);
-        authoring["fxSlots"] = serializeFxSlots(project.authoring.fxSlots);
-        authoring["routingBuses"] = serializeRoutingBuses(project.authoring.routingBuses);
+        authoring["fxSlots"] = serializeFxSlots(project.authoring.fxSlots, project.schemaVersion >= 5);
+        authoring["routingBuses"] = serializeRoutingBuses(project.authoring.routingBuses, project.schemaVersion >= 5);
         authoring["performanceBanks"] = serializePerformanceBanks(project.authoring.performanceBanks);
         authoring["notes"] = serializeStringArray(project.authoring.notes);
         root["authoring"] = std::move(authoring);

@@ -94,6 +94,13 @@ std::string extractGroupIdFromRoutingSourceId(std::string_view sourceId)
     return std::string(sourceId.substr(std::string_view("groups/").size()));
 }
 
+std::string extractZoneIdFromRoutingSourceId(std::string_view sourceId)
+{
+    constexpr std::string_view prefix { "zones/" };
+    return sourceId.rfind(prefix, 0) == 0 && sourceId.size() > prefix.size()
+        ? std::string(sourceId.substr(prefix.size())) : std::string {};
+}
+
 ordered_json serializeGroupRoute(const PlaybackSnapshotGroupRoute& route, bool includeWorkspaceVisible)
 {
     ordered_json routeObject;
@@ -318,6 +325,8 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
 
     if (includeDigest)
         root["contentDigest"] = snapshot.contentDigest;
+    if (includeDigest)
+        root["dspGraphDigest"] = snapshot.dspGraphDigest;
 
     ordered_json sampleIdentities = ordered_json::array();
     for (const auto& sample : snapshot.sampleIdentities)
@@ -347,6 +356,13 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
             targetObject["parameterId"] = target.parameterId;
             targetObject["parameterPath"] = target.parameterPath;
             targetObject["role"] = target.role;
+            targetObject["dspSlotId"] = target.dspSlotId;
+            targetObject["dspParameterId"] = target.dspParameterId;
+            targetObject["sourceMinimum"] = target.sourceMinimum;
+            targetObject["sourceMaximum"] = target.sourceMaximum;
+            targetObject["destinationMinimum"] = target.destinationMinimum;
+            targetObject["destinationMaximum"] = target.destinationMaximum;
+            targetObject["curve"] = target.curve;
             targets.push_back(std::move(targetObject));
         }
 
@@ -363,6 +379,18 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
         fxObject["displayName"] = fxSlot.displayName;
         fxObject["effectType"] = fxSlot.effectType;
         fxObject["bypassed"] = fxSlot.bypassed;
+        fxObject["effectVersion"] = fxSlot.effectVersion;
+        fxObject["unavailable"] = fxSlot.unavailable;
+        fxObject["legacyInert"] = fxSlot.legacyInert;
+        fxObject["catalogResolved"] = fxSlot.catalogResolved;
+        fxObject["costStateBytes"] = fxSlot.cost.stateBytes;
+        fxObject["costScratchBytes"] = fxSlot.cost.scratchBytes;
+        fxObject["costMaximumTailFrames"] = fxSlot.cost.maximumTailFrames;
+        fxObject["costUnits"] = fxSlot.cost.costUnits;
+        ordered_json parameters = ordered_json::array();
+        for (const auto& parameter : fxSlot.parameters)
+            parameters.push_back({ { "id", parameter.id }, { "value", parameter.value } });
+        fxObject["parameters"] = std::move(parameters);
         fxSlots.push_back(std::move(fxObject));
     }
     root["fxSlots"] = std::move(fxSlots);
@@ -375,6 +403,7 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
         busObject["displayName"] = routingBus.displayName;
         busObject["inputSourceId"] = routingBus.inputSourceId;
         busObject["fxSlotIds"] = serializeStringArray(routingBus.fxSlotIds);
+        busObject["chainBypassed"] = routingBus.chainBypassed;
         routingBuses.push_back(std::move(busObject));
     }
     root["routingBuses"] = std::move(routingBuses);
@@ -427,6 +456,35 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
     }
     root["zones"] = std::move(zones);
     root["notes"] = serializeStringArray(snapshot.notes);
+    return root;
+}
+
+ordered_json serializeDspGraph(const ImmutablePlaybackSnapshot& snapshot)
+{
+    ordered_json root;
+    ordered_json slots = ordered_json::array();
+    for (const auto& slot : snapshot.fxSlots)
+    {
+        ordered_json value;
+        value["id"] = slot.id;
+        value["effectType"] = slot.effectType;
+        value["effectVersion"] = slot.effectVersion;
+        value["bypassed"] = slot.bypassed;
+        value["unavailable"] = slot.unavailable;
+        value["legacyInert"] = slot.legacyInert;
+        ordered_json parameters = ordered_json::array();
+        for (const auto& parameter : slot.parameters)
+            parameters.push_back({ { "id", parameter.id }, { "value", parameter.value } });
+        value["parameters"] = std::move(parameters);
+        slots.push_back(std::move(value));
+    }
+    root["slots"] = std::move(slots);
+    ordered_json chains = ordered_json::array();
+    for (const auto& bus : snapshot.routingBuses)
+        chains.push_back({ { "id", bus.id }, { "inputSourceId", bus.inputSourceId },
+                           { "fxSlotIds", serializeStringArray(bus.fxSlotIds) },
+                           { "chainBypassed", bus.chainBypassed } });
+    root["chains"] = std::move(chains);
     return root;
 }
 } // namespace
@@ -543,7 +601,10 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
         snapshotMacro.targets.reserve(macro.targets.size());
 
         for (const auto& target : macro.targets)
-            snapshotMacro.targets.push_back({ target.parameterId, target.parameterPath, target.role });
+            snapshotMacro.targets.push_back({ target.parameterId, target.parameterPath, target.role,
+                                              target.dspSlotId, target.dspParameterId,
+                                              target.sourceMinimum, target.sourceMaximum,
+                                              target.destinationMinimum, target.destinationMaximum, target.curve });
 
         result.snapshot.macroDefaults.push_back(std::move(snapshotMacro));
     }
@@ -562,7 +623,25 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
             addFinding(result, PlaybackSnapshotFindingSeverity::error, "duplicate-fx-slot-id", path + ".id",
                        "FX slot id '" + fxSlot.id + "' is duplicated.");
 
-        result.snapshot.fxSlots.push_back({ fxSlot.id, fxSlot.displayName, fxSlot.effectType, fxSlot.bypassed });
+        PlaybackSnapshotFxSlotReference snapshotSlot;
+        snapshotSlot.id = fxSlot.id;
+        snapshotSlot.displayName = fxSlot.displayName;
+        snapshotSlot.effectType = fxSlot.effectType;
+        snapshotSlot.bypassed = fxSlot.bypassed;
+        snapshotSlot.effectVersion = fxSlot.effectVersion;
+        snapshotSlot.unavailable = fxSlot.unavailable;
+        snapshotSlot.legacyInert = fxSlot.legacyInert;
+        if (const auto* catalogEffect = findCuratedDspEffect(fxSlot.effectType, fxSlot.effectVersion))
+        {
+            snapshotSlot.catalogResolved = true;
+            snapshotSlot.supportedScopes = catalogEffect->supportedScopes;
+            snapshotSlot.stateClass = catalogEffect->stateClass;
+            snapshotSlot.cost = catalogEffect->cost;
+        }
+        snapshotSlot.parameters.reserve(fxSlot.parameters.size());
+        for (const auto& parameter : fxSlot.parameters)
+            snapshotSlot.parameters.push_back({ parameter.id, parameter.value });
+        result.snapshot.fxSlots.push_back(std::move(snapshotSlot));
     }
 
     const auto usesExplicitGroupDefinitions = project.schemaVersion >= 4
@@ -613,7 +692,8 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
                        path + ".inputSourceId",
                        "Routing buses must declare an input source.");
         }
-        else if (routingBus.inputSourceId != "master" && !authoredZoneIds.count(routingBus.inputSourceId))
+        else if (routingBus.inputSourceId != "master" && !authoredZoneIds.count(routingBus.inputSourceId)
+                 && !authoredZoneIds.count(extractZoneIdFromRoutingSourceId(routingBus.inputSourceId)))
         {
             const auto groupId = extractGroupIdFromRoutingSourceId(routingBus.inputSourceId);
             if (!groupId.empty() && usesExplicitGroupDefinitions && authoredGroupIds.count(groupId))
@@ -650,8 +730,93 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
             routingBus.id,
             routingBus.displayName,
             routingBus.inputSourceId,
-            routingBus.fxSlotIds
+            routingBus.fxSlotIds,
+            routingBus.chainBypassed
         });
+    }
+
+    if (project.schemaVersion >= 5)
+    {
+        std::unordered_set<std::string> canonicalDspSources;
+        std::unordered_map<std::string, std::size_t> dspSlotOwnerCounts;
+        for (std::size_t index = 0; index < result.snapshot.routingBuses.size(); ++index)
+        {
+        auto& bus = result.snapshot.routingBuses[index];
+        const auto path = "authoring.routingBuses[" + std::to_string(index) + "]";
+        CuratedDspScope scope = CuratedDspScope::instrument;
+        if (bus.inputSourceId != "master")
+        {
+            auto zoneId = extractZoneIdFromRoutingSourceId(bus.inputSourceId);
+            if (zoneId.empty() && authoredZoneIds.count(bus.inputSourceId))
+                zoneId = bus.inputSourceId;
+            const auto groupId = extractGroupIdFromRoutingSourceId(bus.inputSourceId);
+            if (!zoneId.empty() && authoredZoneIds.count(zoneId))
+            {
+                bus.inputSourceId = "zones/" + zoneId;
+                scope = CuratedDspScope::zone;
+            }
+            else if (!groupId.empty() && authoredGroupIds.count(groupId))
+            {
+                bus.inputSourceId = "groups/" + groupId;
+                scope = CuratedDspScope::group;
+            }
+            else
+            {
+                addFinding(result, PlaybackSnapshotFindingSeverity::error, "snapshot-dsp-invalid-owner-source",
+                           path + ".inputSourceId", "DSP chain owner source cannot be canonically resolved.");
+            }
+        }
+        if (!canonicalDspSources.insert(bus.inputSourceId).second)
+        {
+            addFinding(result, PlaybackSnapshotFindingSeverity::error, "snapshot-dsp-duplicate-owner-source",
+                       path + ".inputSourceId", "Every canonical DSP owner source must have exactly one chain.");
+        }
+
+        for (const auto& slotId : bus.fxSlotIds)
+        {
+            const auto slotIndex = fxSlotIndices.find(slotId);
+            if (slotIndex == fxSlotIndices.end())
+                continue;
+            ++dspSlotOwnerCounts[slotId];
+            const auto& slot = result.snapshot.fxSlots[slotIndex->second];
+            const auto slotPath = "authoring.fxSlots[" + std::to_string(slotIndex->second) + "]";
+            if (!slot.catalogResolved)
+            {
+                if (!slot.unavailable && !slot.legacyInert)
+                    addFinding(result, PlaybackSnapshotFindingSeverity::error, "snapshot-dsp-unknown-catalog-version",
+                               slotPath, "An unresolved DSP effect must be explicitly unavailable or legacy-inert.");
+                continue;
+            }
+            if (std::find(slot.supportedScopes.begin(), slot.supportedScopes.end(), scope)
+                == slot.supportedScopes.end())
+            {
+                addFinding(result, PlaybackSnapshotFindingSeverity::error, "snapshot-dsp-unsupported-scope",
+                           slotPath, "The resolved DSP catalog effect is unsupported at this chain owner scope.");
+            }
+            std::unordered_set<std::string> parameterIds;
+            const auto* catalogEffect = findCuratedDspEffect(slot.effectType, slot.effectVersion);
+            for (const auto& parameter : slot.parameters)
+            {
+                if (!parameterIds.insert(parameter.id).second)
+                    addFinding(result, PlaybackSnapshotFindingSeverity::error, "snapshot-dsp-duplicate-parameter",
+                               slotPath + ".parameters", "DSP parameter IDs must be unique in a snapshot slot.");
+                const auto descriptor = std::find_if(catalogEffect->parameters.begin(), catalogEffect->parameters.end(),
+                                                     [&](const CuratedDspParameterDescriptor& candidate)
+                                                     { return candidate.id == parameter.id; });
+                if (descriptor == catalogEffect->parameters.end() || !std::isfinite(parameter.value)
+                    || parameter.value < descriptor->minimum || parameter.value > descriptor->maximum)
+                {
+                    addFinding(result, PlaybackSnapshotFindingSeverity::error, "snapshot-dsp-invalid-parameter",
+                               slotPath + ".parameters." + parameter.id,
+                               "Catalog DSP parameters must be known, finite, and within their versioned range.");
+                }
+            }
+        }
+        }
+        for (const auto& slot : result.snapshot.fxSlots)
+            if (dspSlotOwnerCounts[slot.id] != 1)
+                addFinding(result, PlaybackSnapshotFindingSeverity::error, "snapshot-dsp-slot-owner-count",
+                           "authoring.fxSlots", "Every DSP slot must have exactly one canonical chain owner.");
     }
 
     std::unordered_map<std::string, std::size_t> articulationRouteIndices;
@@ -1061,6 +1226,7 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
 
     if (result.activationEligible)
     {
+        result.snapshot.dspGraphDigest = computePlaybackSnapshotDspGraphDigest(result.snapshot);
         result.snapshot.contentDigest = "fnv1a64:" + computeFnv1a64Hex(serializeSnapshot(result.snapshot, false).dump());
     }
 
@@ -1142,5 +1308,10 @@ std::string serializeImmutablePlaybackSnapshot(const ImmutablePlaybackSnapshot& 
 std::string computePlaybackSnapshotContentDigest(const ImmutablePlaybackSnapshot& snapshot)
 {
     return "fnv1a64:" + computeFnv1a64Hex(serializeSnapshot(snapshot, false).dump());
+}
+
+std::string computePlaybackSnapshotDspGraphDigest(const ImmutablePlaybackSnapshot& snapshot)
+{
+    return "fnv1a64:" + computeFnv1a64Hex(serializeDspGraph(snapshot).dump());
 }
 } // namespace drs::engine

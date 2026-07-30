@@ -348,6 +348,119 @@ void runIndependentContextMatrix()
             "Voice pools, note ownership, and counters must be context-local.");
 }
 
+void runDspGenerationActivationMatrix()
+{
+    drs::engine::SamplerPlaybackContext context(drs::engine::PlaybackActivationLane::preview);
+    require(context.prepare(48000.0), "DSP-generation context should prepare.");
+    auto lifetime = buildModel(drs::engine::PlaybackActivationLane::preview, 99, 1.0f);
+    drs::engine::ImmutableDspGraphPlan plan;
+    plan.planDigest = "fnv1a64:context-dsp-generation";
+    plan.directFastPath = false;
+    const auto zoneId = lifetime.model->getRoutes().front().zoneId;
+    plan.parameters = {
+        { "gainDb", 6.0 }, { "polarity", 0.0 }, { "mute", 0.0 },
+        { "gainDb", -6.0 }, { "polarity", 0.0 }, { "mute", 0.0 },
+        { "gainDb", 6.0 }, { "polarity", 0.0 }, { "mute", 0.0 }
+    };
+    plan.nodes = {
+        { drs::engine::DspGraphOwnerKind::zone, zoneId, "zones/" + zoneId, "groups/context-group",
+          "zone-gain", "drs.gain", 1, 0, 3 },
+        { drs::engine::DspGraphOwnerKind::group, "context-group", "groups/context-group", "master",
+          "group-gain", "drs.gain", 1, 3, 3 },
+        { drs::engine::DspGraphOwnerKind::master, "master", "master", "output",
+          "instrument-gain", "drs.gain", 1, 6, 3 }
+    };
+    plan.scratchBytes = 8;
+    plan.stateBytes = 16;
+    plan.delayMemoryBytes = 4;
+    std::string failure;
+    auto generation = drs::engine::createDspRenderGeneration(lifetime.model, plan, 512, &failure);
+    require(generation != nullptr && failure.empty(),
+            "DSP generation must preallocate graph state and scratch off audio.");
+    require(generation->getRouteDestinationNodeIndex(0) == 0,
+            "Each immutable sampler route must receive its numeric master graph destination off audio.");
+    require(context.stageActivation(lifetime.model, generation),
+            "Activation slots must retain a DSP generation that matches their immutable sampler model.");
+    StereoOutput output(4);
+    const std::array gainNotes { noteOn(0, 60), noteOn(0, 60) };
+    require(context.renderBlock(output.view(), eventView(gainNotes)).activationApplied
+                && context.getActiveDspGeneration() == generation.get(),
+            "The audio block boundary must exchange only the prepared slot's generation pointer.");
+    requireNear(output.left.front(), 0.9976312f,
+                "Overlapping voices must traverse zone, group, and master Gain once at each aggregation point.");
+    require(!context.publishDspControl(generation->getControlGenerationIdentity() + 1, 6, 0.0)
+                && context.publishDspControl(generation->getControlGenerationIdentity(), 6, 0.0),
+            "A stale generation must not publish a control value, while the active numeric control may.");
+    context.resetAtBlockBoundary();
+    StereoOutput updatedOutput(4);
+    require(context.renderBlock(updatedOutput.view(), eventView(gainNotes)).accepted,
+            "A live Gain control update must render without rebuilding the active graph.");
+    require(updatedOutput.left[1] < 0.9976312f && updatedOutput.left[1] > 0.5f,
+            "A linear Gain control update must begin a click-free ramp on the next callback block.");
+    for (std::size_t block = 1; block < 120; ++block)
+    {
+        StereoOutput smoothingOutput(4);
+        require(context.renderBlock(smoothingOutput.view(), noEvents()).accepted,
+                "A smoothing ramp must remain renderable across callback partitions.");
+        if (block == 119)
+            requireNear(smoothingOutput.left.back(), 0.5f,
+                        "A numeric master Gain control update must reach its target after 10 ms.");
+    }
+    require(!context.publishDspNodeBypass(generation->getControlGenerationIdentity() + 1, 1, true)
+                && context.publishDspNodeBypass(generation->getControlGenerationIdentity(), 1, true),
+            "A stale generation must not bypass a node, while the active node may crossfade to bypass.");
+    StereoOutput bypassTransition(4);
+    require(context.renderBlock(bypassTransition.view(), noEvents()).accepted
+                && bypassTransition.left[1] > 0.5f && bypassTransition.left[1] < 0.9976312f,
+            "A node bypass must start as a click-free wet/dry transition rather than a hard switch.");
+    for (std::size_t block = 1; block < 60; ++block)
+    {
+        StereoOutput bypassOutput(4);
+        require(context.renderBlock(bypassOutput.view(), noEvents()).accepted,
+                "A bypass transition must remain renderable across callback partitions.");
+        if (block == 59)
+            requireNear(bypassOutput.left.back(), 0.9976312f,
+                        "A bypassed group Gain must become transparent after its 5 ms crossfade.");
+    }
+    const auto snapshot = context.getSnapshot();
+    require(snapshot.activeDspScratchBytes == 12296 && snapshot.activeDspStateBytes == 16
+                && snapshot.activeDspDelayMemoryBytes == 4,
+            "Realtime diagnostics must expose primitive DSP generation resource totals.");
+
+    drs::engine::SamplerPlaybackContext performance(drs::engine::PlaybackActivationLane::performance);
+    auto performanceLifetime = buildModel(drs::engine::PlaybackActivationLane::performance, 101, 1.0f);
+    auto performancePlan = plan;
+    const auto performanceZoneId = performanceLifetime.model->getRoutes().front().zoneId;
+    performancePlan.nodes.front().ownerId = performanceZoneId;
+    performancePlan.nodes.front().inputSourceId = "zones/" + performanceZoneId;
+    auto performanceGeneration = drs::engine::createDspRenderGeneration(
+        performanceLifetime.model, performancePlan, 512, &failure);
+    require(performance.prepare(48000.0) && performanceGeneration != nullptr
+                && performance.stageActivation(performanceLifetime.model, performanceGeneration),
+            "Performance must own a distinct prepared Gain generation.");
+    StereoOutput performanceOutput(4);
+    require(performance.renderBlock(performanceOutput.view(), eventView(gainNotes)).accepted,
+            "Performance must render the same instrument Gain core.");
+    requireNear(performanceOutput.left.front(), 0.9976312f,
+                "Preview and Performance must produce the same Gain result with separate state.");
+    require(performance.getActiveDspGeneration() != generation.get(),
+            "Preview and Performance must never share mutable Gain-generation state.");
+
+    context.resetAtBlockBoundary();
+    generation->setTailFramesRemaining(1);
+    auto replacement = buildModel(drs::engine::PlaybackActivationLane::preview, 100, 1.0f);
+    require(context.stageActivation(replacement.model),
+            "A replacement model should stage while the prior generation retains a tail.");
+    require(context.renderBlock(output.view(), noEvents()).activationApplied,
+            "The replacement should activate at a later block boundary.");
+    require(context.serviceRetirements() == 0,
+            "A retired generation with an active DSP tail must not be released.");
+    generation->clearTail();
+    context.renderBlock(output.view(), noEvents());
+    require(context.serviceRetirements() >= 1,
+            "A tail-drained generation with no voices must become reclaimable off audio.");
+}
+
 void runConcurrentRenderMatrix()
 {
     drs::engine::SamplerPlaybackContext preview(drs::engine::PlaybackActivationLane::preview);
@@ -516,6 +629,7 @@ int main()
     try
     {
         runIndependentContextMatrix();
+        runDspGenerationActivationMatrix();
         runConcurrentRenderMatrix();
         runBlockBoundaryAndLifetimeMatrix();
         runRestartCloseAndDrainMatrix();

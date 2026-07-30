@@ -37,6 +37,15 @@ PublishedMacroRenderTarget classifyRenderTarget(const PlaybackSnapshotMacroDefau
     return PublishedMacroRenderTarget::none;
 }
 
+const PlaybackSnapshotMacroTarget* findDspTarget(const PlaybackSnapshotMacroDefault& macro)
+{
+    const auto target = std::find_if(macro.targets.begin(), macro.targets.end(), [](const auto& candidate)
+    {
+        return !candidate.dspSlotId.empty() || !candidate.dspParameterId.empty();
+    });
+    return target == macro.targets.end() ? nullptr : &*target;
+}
+
 const PublishedMacroBinding* findPreviousBinding(
     const ImmutablePublishedMacroBindingTablePtr& table,
     const std::string& stableAuthoredId)
@@ -118,6 +127,7 @@ PublishedMacroBindingBuildResult buildPublishedMacroBindingTable(
     auto table = std::make_shared<ImmutablePublishedMacroBindingTable>();
     table->revision = request.revision;
     table->macroSchemaDigest = request.macroSchemaDigest;
+    table->dspGraphDigest = request.dspGraphDigest;
     table->callbackView.revision = request.revision;
     table->callbackView.hostSlotCount = request.hostSlots.size();
     table->bindings.reserve(request.hostSlots.size());
@@ -139,6 +149,40 @@ PublishedMacroBindingBuildResult buildPublishedMacroBindingTable(
             binding.maxValue = macro.maxValue;
             binding.defaultValue = macro.defaultValue;
             binding.renderTarget = classifyRenderTarget(macro);
+            if (const auto* dspTarget = findDspTarget(macro))
+            {
+                if (request.dspControlLayout == nullptr)
+                {
+                    addFinding(result, PublishedMacroBindingFindingSeverity::error,
+                               "published-macro-dsp-layout-missing", "authoredMacros." + macro.id,
+                               "A structured DSP macro target requires a compiled DSP control layout.");
+                    continue;
+                }
+                const auto control = std::find_if(request.dspControlLayout->controls.begin(),
+                                                  request.dspControlLayout->controls.end(),
+                                                  [&](const auto& descriptor)
+                                                  {
+                                                      return descriptor.slotId == dspTarget->dspSlotId
+                                                          && descriptor.parameterId == dspTarget->dspParameterId;
+                                                  });
+                if (control == request.dspControlLayout->controls.end())
+                {
+                    addFinding(result, PublishedMacroBindingFindingSeverity::error,
+                               "published-macro-dsp-target-missing", "authoredMacros." + macro.id,
+                               "The structured DSP macro target is absent from the published graph.");
+                    continue;
+                }
+                binding.renderTarget = PublishedMacroRenderTarget::dspControl;
+                binding.dspControlIndex = control->controlIndex;
+                binding.dspSlotId = dspTarget->dspSlotId;
+                binding.dspParameterId = dspTarget->dspParameterId;
+                binding.sourceMinimum = dspTarget->sourceMinimum;
+                binding.sourceMaximum = dspTarget->sourceMaximum;
+                binding.destinationMinimum = dspTarget->destinationMinimum;
+                binding.destinationMaximum = dspTarget->destinationMaximum;
+                binding.curve = dspTarget->curve == "logarithmic"
+                    ? PublishedMacroCurve::logarithmic : PublishedMacroCurve::linear;
+            }
 
             const auto* previous = findPreviousBinding(request.previousActiveTable, macro.id);
             auto migratedValue = macro.defaultValue;
@@ -163,6 +207,12 @@ PublishedMacroBindingBuildResult buildPublishedMacroBindingTable(
             callbackSlot.minValue = binding.minValue;
             callbackSlot.maxValue = binding.maxValue;
             callbackSlot.publishedValue = binding.publishedValue;
+            callbackSlot.dspControlIndex = binding.dspControlIndex;
+            callbackSlot.sourceMinimum = binding.sourceMinimum;
+            callbackSlot.sourceMaximum = binding.sourceMaximum;
+            callbackSlot.destinationMinimum = binding.destinationMinimum;
+            callbackSlot.destinationMaximum = binding.destinationMaximum;
+            callbackSlot.curve = binding.curve;
         }
         table->bindings.push_back(std::move(binding));
     }
@@ -186,6 +236,10 @@ PublishedMacroBindingBuildResult buildPublishedMacroBindingTable(
                 table->retiredStableAuthoredIds.push_back(previous.stableAuthoredId);
         }
     }
+
+    if (std::any_of(result.findings.begin(), result.findings.end(), [](const auto& finding)
+        { return finding.severity == PublishedMacroBindingFindingSeverity::error; }))
+        return result;
 
     result.built = true;
     result.table = std::move(table);

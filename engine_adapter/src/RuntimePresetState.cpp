@@ -120,6 +120,17 @@ ordered_json serializeMacroValues(const std::vector<RuntimePresetMacroValue>& ma
     return array;
 }
 
+ordered_json serializeDspMacroTargets(const std::vector<RuntimePresetDspMacroTarget>& targets)
+{
+    ordered_json array = ordered_json::array();
+    for (const auto& target : targets)
+    {
+        array.push_back({ { "macroId", target.macroId }, { "dspSlotId", target.dspSlotId },
+                          { "dspParameterId", target.dspParameterId } });
+    }
+    return array;
+}
+
 std::optional<std::string> describeForbiddenPresetField(const std::string& fieldName)
 {
     static const std::unordered_map<std::string, std::string> forbiddenFields {
@@ -223,6 +234,48 @@ std::vector<RuntimePresetMacroValue> readMacroValues(const json& object,
     return macroValues;
 }
 
+std::vector<RuntimePresetDspMacroTarget> readDspMacroTargets(const json& object,
+                                                             RuntimePresetStateLoadResult& result)
+{
+    std::vector<RuntimePresetDspMacroTarget> targets;
+    const auto iterator = object.find("dspMacroTargets");
+    if (iterator == object.end())
+        return targets;
+    if (!iterator->is_array())
+    {
+        addIssue(result, "Preset state field 'dspMacroTargets' must be an array.");
+        return targets;
+    }
+
+    std::unordered_set<std::string> seenMacroIds;
+    targets.reserve(iterator->size());
+    for (std::size_t index = 0; index < iterator->size(); ++index)
+    {
+        const auto& entry = (*iterator)[index];
+        const auto context = "Preset state dspMacroTargets[" + std::to_string(index) + "]";
+        if (!entry.is_object())
+        {
+            addIssue(result, context + " must be an object.");
+            continue;
+        }
+        static const std::unordered_set<std::string> allowed { "macroId", "dspSlotId", "dspParameterId" };
+        validateAllowedFields(entry, result, allowed, context.c_str());
+        const auto macroId = readRequired<std::string>(entry, result, "macroId", context.c_str());
+        const auto slotId = readRequired<std::string>(entry, result, "dspSlotId", context.c_str());
+        const auto parameterId = readRequired<std::string>(entry, result, "dspParameterId", context.c_str());
+        if (!macroId.has_value() || !slotId.has_value() || !parameterId.has_value())
+            continue;
+        if (macroId->empty() || slotId->empty() || parameterId->empty()
+            || !seenMacroIds.insert(*macroId).second)
+        {
+            addIssue(result, context + " must contain unique non-empty stable DSP target identities.");
+            continue;
+        }
+        targets.push_back({ *macroId, *slotId, *parameterId });
+    }
+    return targets;
+}
+
 std::string findDefaultArticulationId(const RuntimeInstrumentModel& instrument)
 {
     const auto iterator = std::find_if(instrument.articulations.begin(),
@@ -268,6 +321,8 @@ RuntimePresetState captureRuntimePresetState(const RuntimeSessionStateSnapshot& 
     preset.loadProfileId = snapshot.loadProfileId;
     preset.selectedArticulationId = snapshot.selectedArticulationId;
     preset.macroValues = snapshot.macroValues;
+    preset.dspGraphDigest = snapshot.dspGraphDigest;
+    preset.dspMacroTargets = snapshot.dspMacroTargets;
     preset.notes = snapshot.notes;
     return preset;
 }
@@ -305,6 +360,8 @@ RuntimePresetStateLoadResult parseRuntimePresetState(const std::string& text)
         "loadProfileId",
         "selectedArticulationId",
         "macroValues",
+        "dspGraphDigest",
+        "dspMacroTargets",
         "notes"
     };
     validateAllowedFields(root, result, allowedFields, "Preset state");
@@ -334,6 +391,14 @@ RuntimePresetStateLoadResult parseRuntimePresetState(const std::string& text)
         result.preset.selectedArticulationId = *selectedArticulationId;
 
     result.preset.macroValues = readMacroValues(root, result);
+    if (const auto digest = root.find("dspGraphDigest"); digest != root.end())
+    {
+        if (!digest->is_string())
+            addIssue(result, "Preset state field 'dspGraphDigest' must be a string.");
+        else
+            result.preset.dspGraphDigest = digest->get<std::string>();
+    }
+    result.preset.dspMacroTargets = readDspMacroTargets(root, result);
     result.preset.notes = readOptionalStringArray(root, result, "notes", "Preset state");
 
     if (result.preset.schemaName != phase1PresetSchemaName)
@@ -470,6 +535,10 @@ std::string serializeRuntimePresetState(const RuntimePresetState& preset)
     root["loadProfileId"] = preset.loadProfileId;
     root["selectedArticulationId"] = preset.selectedArticulationId;
     root["macroValues"] = serializeMacroValues(preset.macroValues);
+    if (!preset.dspGraphDigest.empty())
+        root["dspGraphDigest"] = preset.dspGraphDigest;
+    if (!preset.dspMacroTargets.empty())
+        root["dspMacroTargets"] = serializeDspMacroTargets(preset.dspMacroTargets);
     root["notes"] = serializeStringArray(preset.notes);
     return root.dump(2) + "\n";
 }

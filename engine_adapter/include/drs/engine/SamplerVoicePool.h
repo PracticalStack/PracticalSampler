@@ -75,7 +75,9 @@ public:
     void clearRenderModel() noexcept;
     SamplerVoicePoolRenderResult renderBlock(SamplerAudioBufferView output,
                                              SamplerRenderEventView events,
-                                             SamplerRenderControlValues controls = {}) noexcept;
+                                             SamplerRenderControlValues controls = {},
+                                             const SamplerAudioBufferView* routeTargets = nullptr,
+                                             std::size_t routeTargetCount = 0) noexcept;
     void resetVoices() noexcept;
 
     std::size_t activeVoiceCount() const noexcept;
@@ -116,7 +118,9 @@ private:
     void renderRange(SamplerAudioBufferView output,
                      std::uint32_t startFrame,
                      std::uint32_t frameCount,
-                     SamplerVoicePoolRenderResult& result) noexcept;
+                     SamplerVoicePoolRenderResult& result,
+                     const SamplerAudioBufferView* routeTargets,
+                     std::size_t routeTargetCount) noexcept;
     void applyEvent(const SamplerRenderEvent& event,
                     SamplerVoicePoolRenderResult& result,
                     const SamplerRenderControlValues& controls) noexcept;

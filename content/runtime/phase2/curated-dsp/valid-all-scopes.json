@@ -1,0 +1,29 @@
+{
+  "schemaName": "drs.project",
+  "schemaVersion": 5,
+  "projectId": "curated-dsp-valid-all-scopes",
+  "displayName": "Curated DSP Valid All Scopes",
+  "contentRoot": "content",
+  "defaultInstrumentManifest": "instrument.drinst",
+  "sampleSources": [{ "id": "sample", "path": "sample.wav", "role": "fixture" }],
+  "authoring": {
+    "schemaName": "drs.authoring",
+    "schemaVersion": 4,
+    "selectedZoneId": "",
+    "selectedGroupId": "",
+    "selectedPerformanceBankId": "",
+    "zones": [{ "id": "example", "sampleSourceId": "sample", "displayName": "Example", "groupId": "example", "articulationId": "default", "rootKey": 60, "keyLow": 0, "keyHigh": 127, "velocityLow": 1, "velocityHigh": 127, "gainDb": 0.0, "pan": 0.0, "sampleStartFrame": 0, "loopEnabled": false, "loopStartFrame": 0, "loopEndFrame": 0, "releaseSeconds": 0.0, "roundRobin": { "poolId": "example", "slotCount": 1, "slotIndex": 1, "mode": "sequential" }, "triggerMode": "gated" }],
+    "groups": [{ "id": "example", "displayName": "Example", "displayOrder": 0, "workspaceVisible": true, "gainDb": 0.0, "pan": 0.0, "routingBusId": "group", "auditionAnchorZoneId": "example" }], "macros": [],
+    "fxSlots": [
+      { "id": "zone-gain", "displayName": "Zone Gain", "effectType": "drs.gain", "bypassed": false, "effectVersion": 1, "legacyInert": false, "parameters": [{ "id": "gainDb", "value": 0.0 }] },
+      { "id": "group-unknown", "displayName": "Future Group Effect", "effectType": "vendor.future", "bypassed": false, "effectVersion": 1, "legacyInert": false, "parameters": [{ "id": "future", "value": 0.5 }] },
+      { "id": "master-delay", "displayName": "Master Delay", "effectType": "drs.stereoDelay", "bypassed": true, "effectVersion": 1, "legacyInert": false, "parameters": [{ "id": "timeMs", "value": 375.0 }] }
+    ],
+    "routingBuses": [
+      { "id": "zone", "displayName": "Zone", "inputSourceId": "zones/example", "fxSlotIds": ["zone-gain"], "chainBypassed": false },
+      { "id": "group", "displayName": "Group", "inputSourceId": "groups/example", "fxSlotIds": ["group-unknown"], "chainBypassed": false },
+      { "id": "master", "displayName": "Master", "inputSourceId": "master", "fxSlotIds": ["master-delay"], "chainBypassed": false }
+    ],
+    "performanceBanks": [], "notes": []
+  }, "notes": []
+}

@@ -69,6 +69,14 @@ struct SamplerRenderRequest
 
 struct SamplerRenderControlValues
 {
+    struct TransportView
+    {
+        double tempoBpm = 120.0;
+        std::int64_t samplePosition = 0;
+        bool valid = false;
+        bool isPlaying = false;
+        bool hasSamplePosition = false;
+    } transport;
     bool overrideMidiNoteOffset = false;
     int midiNoteOffset = 0;
     bool overrideFixedVelocity = false;

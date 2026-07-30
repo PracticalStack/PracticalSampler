@@ -281,6 +281,9 @@ std::optional<std::size_t> collectionLimitForPath(const std::string& path) noexc
         return hostSessionStateMaxMacros;
     if (path == "/authoringState/projectSnapshot/authoring/fxSlots")
         return hostSessionStateMaxFxSlots;
+    if (path.find("/authoringState/projectSnapshot/authoring/fxSlots[") == 0
+        && endsWith(path, "/parameters"))
+        return hostSessionStateMaxDspParameters;
     if (path == "/authoringState/projectSnapshot/authoring/routingBuses")
         return hostSessionStateMaxRoutingBuses;
     if (path == "/authoringState/projectSnapshot/authoring/performanceBanks")
@@ -520,7 +523,8 @@ void parsePublishedState(const json& object, HostSessionStateParseResult& result
         "projectGeneration",
         "authoredContentDigest",
         "macroSchemaDigest",
-        "preparedContentDigest"
+        "preparedContentDigest",
+        "dspGraphDigest"
     };
     validateAllowedFields(object, result, allowed, "/publishedState");
 
@@ -535,6 +539,14 @@ void parsePublishedState(const json& object, HostSessionStateParseResult& result
         published.macroSchemaDigest = *value;
     if (const auto value = readRequiredString(object, result, "preparedContentDigest", "/publishedState"))
         published.preparedContentDigest = *value;
+    if (const auto iterator = object.find("dspGraphDigest"); iterator != object.end())
+    {
+        if (!iterator->is_string())
+            addFinding(result, HostSessionStateFindingCode::fieldTypeInvalid, "/publishedState/dspGraphDigest",
+                       "Published DSP graph digest must be a string.");
+        else
+            published.dspGraphDigest = iterator->get<std::string>();
+    }
 
     if (published.projectGeneration == 0
         || published.revision > result.hostState->authoringState.revision
@@ -841,6 +853,8 @@ HostSessionStateSerializeResult serializeHostSessionState(
             published["authoredContentDigest"] = hostState.publishedState->authoredContentDigest;
             published["macroSchemaDigest"] = hostState.publishedState->macroSchemaDigest;
             published["preparedContentDigest"] = hostState.publishedState->preparedContentDigest;
+            if (!hostState.publishedState->dspGraphDigest.empty())
+                published["dspGraphDigest"] = hostState.publishedState->dspGraphDigest;
         }
         root["publishedState"] = std::move(published);
 

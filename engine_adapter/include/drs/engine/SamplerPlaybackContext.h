@@ -1,6 +1,7 @@
 #pragma once
 
 #include "drs/engine/SamplerVoicePool.h"
+#include "drs/engine/DspRenderGeneration.h"
 
 #include <array>
 #include <atomic>
@@ -47,6 +48,11 @@ struct SamplerPlaybackContextSnapshot
     std::uint64_t activeActivationPayloadBytes = 0;
     std::uint64_t pendingActivationPayloadBytes = 0;
     std::uint64_t retiredActivationPayloadBytes = 0;
+    std::size_t activeDspNodeCount = 0;
+    std::size_t activeDspEffectCount = 0;
+    std::size_t activeDspScratchBytes = 0;
+    std::size_t activeDspStateBytes = 0;
+    std::size_t activeDspDelayMemoryBytes = 0;
     std::uint32_t activeVoiceCount = 0;
     std::uint32_t releasingVoiceCount = 0;
     std::uint32_t finishedVoiceCount = 0;
@@ -85,6 +91,24 @@ public:
 
     // Message-owned activation/reclamation API. Model ownership never moves on the audio thread.
     bool stageActivation(SamplerRenderModelPtr model);
+    bool stageActivation(SamplerRenderModelPtr model, std::shared_ptr<DspRenderGeneration> dspGeneration);
+    // Message-owned latest-value publication. A generation identity mismatch is rejected before
+    // audio, preventing a stale UI gesture from mutating a replacement graph.
+    bool publishDspControl(std::uint64_t generationIdentity,
+                           std::uint32_t controlIndex,
+                           double value) noexcept;
+    bool publishDspControlByIdentity(const std::string& slotId,
+                                     const std::string& parameterId,
+                                     double value) noexcept;
+    // Callback-safe fixed-index publication for the active audio-owned generation.
+    // Published macro bindings have already resolved stable identities off the audio thread.
+    bool publishActiveDspControl(std::uint32_t controlIndex, double value) noexcept;
+    bool publishDspNodeBypass(std::uint64_t generationIdentity,
+                               std::uint32_t nodeIndex,
+                               bool bypassed) noexcept;
+    bool publishDspChainBypass(std::uint64_t generationIdentity,
+                                std::uint32_t chainIndex,
+                                bool bypassed) noexcept;
     bool cancelPendingActivation();
     bool activatePendingForPreparation() noexcept;
     std::size_t serviceRetirements();
@@ -99,11 +123,13 @@ public:
     SamplerPlaybackContextSnapshot getSnapshot() const noexcept;
     const SamplerVoicePool& getVoicePool() const noexcept { return voicePool; }
     const SamplerRenderModel* getActiveRenderModel() const noexcept { return activeRenderModel; }
+    const DspRenderGeneration* getActiveDspGeneration() const noexcept { return activeDspGeneration; }
 
 private:
     struct ActivationSlot
     {
         SamplerRenderModelPtr model;
+        std::shared_ptr<DspRenderGeneration> dspGeneration;
         std::uint64_t serial = 0;
     };
 
@@ -130,6 +156,7 @@ private:
     double sampleRate = 0.0;
     bool isPrepared = false;
     const SamplerRenderModel* activeRenderModel = nullptr;
+    DspRenderGeneration* activeDspGeneration = nullptr;
     int activeActivationSlot = -1;
     std::size_t activeRevision = 0;
     std::uint64_t activePreparedBuildId = 0;
@@ -147,6 +174,11 @@ private:
     std::atomic<std::uint64_t> diagnosticActivePreparedBuildId { 0 };
     std::atomic<std::uint64_t> diagnosticActiveActivationGeneration { 0 };
     std::atomic<std::uint64_t> diagnosticActivePayloadBytes { 0 };
+    std::atomic<std::size_t> diagnosticActiveDspNodeCount { 0 };
+    std::atomic<std::size_t> diagnosticActiveDspEffectCount { 0 };
+    std::atomic<std::size_t> diagnosticActiveDspScratchBytes { 0 };
+    std::atomic<std::size_t> diagnosticActiveDspStateBytes { 0 };
+    std::atomic<std::size_t> diagnosticActiveDspDelayMemoryBytes { 0 };
     std::atomic<std::size_t> diagnosticRetiredBacklog { 0 };
     std::atomic<std::uint64_t> diagnosticRetiredPayloadBytes { 0 };
     std::atomic<std::uint32_t> diagnosticActiveVoiceCount { 0 };

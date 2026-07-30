@@ -1,0 +1,14 @@
+{
+  "schemaName": "drs.curatedDspFixtureCases",
+  "schemaVersion": 1,
+  "baseFixture": "valid-all-scopes.json",
+  "cases": [
+    { "id": "unknown-effect-version", "mutation": "unknownEffectVersion", "slotId": "zone-gain", "effectVersion": 99, "expectLoaded": true },
+    { "id": "missing-effect-version", "mutation": "missingEffectVersion", "slotId": "zone-gain", "expectLoaded": false },
+    { "id": "duplicate-parameter", "mutation": "duplicateParameter", "slotId": "zone-gain", "expectLoaded": false },
+    { "id": "shared-slot", "mutation": "sharedSlot", "slotId": "zone-gain", "busId": "group", "expectLoaded": false },
+    { "id": "orphan-slot", "mutation": "orphanSlot", "slotId": "zone-gain", "busId": "zone", "expectLoaded": false },
+    { "id": "duplicate-source-owner", "mutation": "duplicateSourceOwner", "busId": "master", "inputSourceId": "zones/example", "expectLoaded": false },
+    { "id": "over-budget-parameters", "mutation": "overBudgetParameters", "slotId": "zone-gain", "parameterCount": 1025, "expectLoaded": false }
+  ]
+}

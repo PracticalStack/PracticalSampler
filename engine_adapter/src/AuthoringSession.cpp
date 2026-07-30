@@ -1,8 +1,10 @@
 #include "drs/engine/AuthoringSession.h"
+#include "drs/engine/CuratedDspCatalog.h"
 #include "drs/engine/SampleImport.h"
 #include "drs/engine/RuntimeLoader.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <utility>
 
@@ -87,6 +89,67 @@ std::optional<std::size_t> findZoneIndexById(const RuntimeProjectModel& project,
         return std::nullopt;
 
     return static_cast<std::size_t>(std::distance(project.authoring.zones.begin(), iterator));
+}
+
+std::optional<std::size_t> findFxSlotIndexById(const RuntimeProjectModel& project,
+                                               const std::string& fxSlotId)
+{
+    const auto iterator = std::find_if(project.authoring.fxSlots.begin(),
+                                       project.authoring.fxSlots.end(),
+                                       [&](const RuntimeProjectFxSlotDefinition& slot)
+                                       {
+                                           return slot.id == fxSlotId;
+                                       });
+    if (iterator == project.authoring.fxSlots.end())
+        return std::nullopt;
+
+    return static_cast<std::size_t>(std::distance(project.authoring.fxSlots.begin(), iterator));
+}
+
+std::optional<std::size_t> findRoutingBusIndexById(const RuntimeProjectModel& project,
+                                                   const std::string& busId)
+{
+    const auto iterator = std::find_if(project.authoring.routingBuses.begin(),
+                                       project.authoring.routingBuses.end(),
+                                       [&](const RuntimeProjectRoutingBusDefinition& bus)
+                                       {
+                                           return bus.id == busId;
+                                       });
+    if (iterator == project.authoring.routingBuses.end())
+        return std::nullopt;
+
+    return static_cast<std::size_t>(std::distance(project.authoring.routingBuses.begin(), iterator));
+}
+
+std::optional<std::size_t> findUniqueFxSlotOwnerBusIndex(const RuntimeProjectModel& project,
+                                                         const std::string& fxSlotId)
+{
+    std::optional<std::size_t> ownerIndex;
+    for (std::size_t index = 0; index < project.authoring.routingBuses.size(); ++index)
+    {
+        const auto& slotIds = project.authoring.routingBuses[index].fxSlotIds;
+        const auto occurrences = static_cast<std::size_t>(std::count(slotIds.begin(), slotIds.end(), fxSlotId));
+        if (occurrences == 0)
+            continue;
+        if (occurrences != 1 || ownerIndex.has_value())
+            return std::nullopt;
+        ownerIndex = index;
+    }
+    return ownerIndex;
+}
+
+const CuratedDspParameterDescriptor* findCatalogParameter(const RuntimeProjectFxSlotDefinition& slot,
+                                                          const std::string& parameterId)
+{
+    const auto* effect = findCuratedDspEffect(slot.effectType, slot.effectVersion);
+    if (effect == nullptr)
+        return nullptr;
+    const auto iterator = std::find_if(effect->parameters.begin(), effect->parameters.end(),
+                                       [&](const CuratedDspParameterDescriptor& parameter)
+                                       {
+                                           return parameter.id == parameterId;
+                                       });
+    return iterator == effect->parameters.end() ? nullptr : &*iterator;
 }
 
 bool groupHasMembers(const RuntimeProjectModel& project, const std::string& groupId)
@@ -761,6 +824,7 @@ void addCompatibleZonesToAnchorRoundRobinPool(RuntimeProjectModel& project, std:
 AuthoringSession::AuthoringSession(RuntimeProjectModel project)
     : documentController(prepareAuthoringProject(std::move(project)))
 {
+    recoverDspSelection();
 }
 
 const RuntimeProjectModel& AuthoringSession::getProject() const
@@ -782,12 +846,15 @@ RuntimeProjectDocumentActionResult AuthoringSession::restoreCheckpoint(
     RuntimeProjectDocumentCheckpoint checkpoint,
     RuntimeProjectDocumentCheckpointConstraints constraints)
 {
-    return documentController.restoreCheckpoint(std::move(checkpoint), std::move(constraints));
+    auto result = documentController.restoreCheckpoint(std::move(checkpoint), std::move(constraints));
+    if (result.applied) recoverDspSelection();
+    return result;
 }
 
 void AuthoringSession::replaceProject(RuntimeProjectModel project)
 {
     documentController = RuntimeProjectDocumentController(prepareAuthoringProject(std::move(project)));
+    recoverDspSelection();
 }
 
 std::vector<AuthoringZoneSummary> AuthoringSession::getZoneSummaries() const
@@ -827,6 +894,11 @@ AuthoringGroupRoundRobinStatus AuthoringSession::getSelectedGroupRoundRobinStatu
     }
 
     return assessGroupRoundRobin(getProject(), selectedGroup->id);
+}
+
+AuthoringDspSelection AuthoringSession::getDspSelection() const
+{
+    return dspSelection;
 }
 
 std::optional<RuntimeProjectPerformanceBankDefinition> AuthoringSession::getSelectedPerformanceBank() const
@@ -927,6 +999,21 @@ RuntimeProjectDocumentActionResult AuthoringSession::selectPerformanceBank(const
     return documentController.commitSnapshot(project,
                                              "Select performance bank",
                                              {"authoring.selectedPerformanceBankId"});
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::selectDspSlot(const std::string& fxSlotId)
+{
+    const auto slotIndex = findFxSlotIndexById(getProject(), fxSlotId);
+    const auto ownerIndex = findUniqueFxSlotOwnerBusIndex(getProject(), fxSlotId);
+    if (!slotIndex.has_value() || !ownerIndex.has_value())
+        return makeRejectedResult(getDocumentState(), "DSP selection rejected", "FX slot must exist with exactly one owner.");
+    dspSelection.fxSlotId = fxSlotId;
+    dspSelection.routingBusId = getProject().authoring.routingBuses[*ownerIndex].id;
+    auto result = RuntimeProjectDocumentActionResult {};
+    result.applied = true;
+    result.state = "DSP slot selected";
+    result.documentState = getDocumentState();
+    return result;
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::updateSelectedZone(const RuntimeProjectZoneDefinition& zone,
@@ -1784,6 +1871,281 @@ RuntimeProjectDocumentActionResult AuthoringSession::moveMacro(std::size_t macro
                                              });
 }
 
+RuntimeProjectDocumentActionResult AuthoringSession::createFxSlot(
+    const RuntimeProjectFxSlotDefinition& fxSlot,
+    const std::string& ownerBusId,
+    const std::string& label)
+{
+    if (fxSlot.id.empty())
+        return makeRejectedResult(getDocumentState(), "FX slot creation rejected", "FX slot id must not be empty.");
+    if (findFxSlotIndexById(getProject(), fxSlot.id).has_value())
+        return makeRejectedResult(getDocumentState(), "FX slot creation rejected", "FX slot id already exists: " + fxSlot.id);
+    const auto ownerIndex = findRoutingBusIndexById(getProject(), ownerBusId);
+    if (!ownerIndex.has_value())
+        return makeRejectedResult(getDocumentState(), "FX slot creation rejected", "FX slot owner bus does not exist: " + ownerBusId);
+
+    auto project = getProject();
+    project.authoring.fxSlots.push_back(fxSlot);
+    project.authoring.routingBuses[*ownerIndex].fxSlotIds.push_back(fxSlot.id);
+    auto result = documentController.commitSnapshot(project, label,
+                                                     { "authoring.fxSlots", "authoring.routingBuses["
+                                                         + std::to_string(*ownerIndex) + "].fxSlotIds" });
+    if (result.applied) dspSelection = { fxSlot.id, ownerBusId };
+    return result;
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::duplicateFxSlot(const std::string& fxSlotId,
+                                                                      const std::string& duplicateId,
+                                                                      const std::string& label)
+{
+    const auto slotIndex = findFxSlotIndexById(getProject(), fxSlotId);
+    if (!slotIndex.has_value())
+        return makeRejectedResult(getDocumentState(), "FX slot duplication rejected", "FX slot does not exist: " + fxSlotId);
+    if (duplicateId.empty() || findFxSlotIndexById(getProject(), duplicateId).has_value())
+        return makeRejectedResult(getDocumentState(), "FX slot duplication rejected", "Duplicate FX slot id must be non-empty and unique.");
+    const auto ownerIndex = findUniqueFxSlotOwnerBusIndex(getProject(), fxSlotId);
+    if (!ownerIndex.has_value())
+        return makeRejectedResult(getDocumentState(), "FX slot duplication rejected", "FX slot must have exactly one owner before duplication.");
+
+    auto project = getProject();
+    auto duplicate = project.authoring.fxSlots[*slotIndex];
+    duplicate.id = duplicateId;
+    project.authoring.fxSlots.insert(project.authoring.fxSlots.begin() + static_cast<std::ptrdiff_t>(*slotIndex + 1),
+                                     std::move(duplicate));
+    auto& ownerSlots = project.authoring.routingBuses[*ownerIndex].fxSlotIds;
+    const auto ownerPosition = std::find(ownerSlots.begin(), ownerSlots.end(), fxSlotId);
+    ownerSlots.insert(ownerPosition + 1, duplicateId);
+    auto result = documentController.commitSnapshot(project, label,
+                                                     { "authoring.fxSlots", "authoring.routingBuses["
+                                                         + std::to_string(*ownerIndex) + "].fxSlotIds" });
+    if (result.applied) dspSelection = { duplicateId, project.authoring.routingBuses[*ownerIndex].id };
+    return result;
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::deleteFxSlot(const std::string& fxSlotId,
+                                                                   const std::string& label)
+{
+    const auto slotIndex = findFxSlotIndexById(getProject(), fxSlotId);
+    const auto ownerIndex = findUniqueFxSlotOwnerBusIndex(getProject(), fxSlotId);
+    if (!slotIndex.has_value() || !ownerIndex.has_value())
+        return makeRejectedResult(getDocumentState(), "FX slot deletion rejected", "FX slot must exist with exactly one owner.");
+
+    auto project = getProject();
+    project.authoring.fxSlots.erase(project.authoring.fxSlots.begin() + static_cast<std::ptrdiff_t>(*slotIndex));
+    auto& ownerSlots = project.authoring.routingBuses[*ownerIndex].fxSlotIds;
+    ownerSlots.erase(std::find(ownerSlots.begin(), ownerSlots.end(), fxSlotId));
+    auto result = documentController.commitSnapshot(project, label,
+                                                     { "authoring.fxSlots", "authoring.routingBuses["
+                                                         + std::to_string(*ownerIndex) + "].fxSlotIds" });
+    if (result.applied) recoverDspSelection();
+    return result;
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::moveFxSlot(const std::string& fxSlotId,
+                                                                 int direction,
+                                                                 const std::string& label)
+{
+    const auto ownerIndex = findUniqueFxSlotOwnerBusIndex(getProject(), fxSlotId);
+    if (!ownerIndex.has_value() || (direction != -1 && direction != 1))
+        return makeRejectedResult(getDocumentState(), "FX slot reorder rejected", "FX slot and direction must be valid.");
+    const auto& ownerSlots = getProject().authoring.routingBuses[*ownerIndex].fxSlotIds;
+    const auto position = static_cast<int>(std::distance(ownerSlots.begin(),
+                                                          std::find(ownerSlots.begin(), ownerSlots.end(), fxSlotId)));
+    const auto target = position + direction;
+    if (target < 0 || target >= static_cast<int>(ownerSlots.size()))
+        return makeRejectedResult(getDocumentState(), "FX slot reorder rejected", "FX slot cannot move beyond the list bounds.");
+
+    auto project = getProject();
+    auto& mutableOwnerSlots = project.authoring.routingBuses[*ownerIndex].fxSlotIds;
+    std::swap(mutableOwnerSlots[static_cast<std::size_t>(position)],
+              mutableOwnerSlots[static_cast<std::size_t>(target)]);
+    return documentController.commitSnapshot(project, label,
+                                             { "authoring.routingBuses[" + std::to_string(*ownerIndex)
+                                                 + "].fxSlotIds" });
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::moveFxSlotToBus(const std::string& fxSlotId,
+                                                                      const std::string& destinationBusId,
+                                                                      const std::string& label)
+{
+    const auto sourceIndex = findUniqueFxSlotOwnerBusIndex(getProject(), fxSlotId);
+    const auto destinationIndex = findRoutingBusIndexById(getProject(), destinationBusId);
+    if (!sourceIndex.has_value() || !destinationIndex.has_value() || *sourceIndex == *destinationIndex)
+        return makeRejectedResult(getDocumentState(), "FX slot move rejected",
+                                  "FX slot must have one distinct existing source and destination owner.");
+
+    auto project = getProject();
+    auto& sourceSlots = project.authoring.routingBuses[*sourceIndex].fxSlotIds;
+    sourceSlots.erase(std::find(sourceSlots.begin(), sourceSlots.end(), fxSlotId));
+    project.authoring.routingBuses[*destinationIndex].fxSlotIds.push_back(fxSlotId);
+    auto result = documentController.commitSnapshot(project, label,
+                                                     { "authoring.routingBuses[" + std::to_string(*sourceIndex)
+                                                         + "].fxSlotIds", "authoring.routingBuses["
+                                                         + std::to_string(*destinationIndex) + "].fxSlotIds" });
+    if (result.applied && dspSelection.fxSlotId == fxSlotId) dspSelection.routingBusId = destinationBusId;
+    return result;
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::deleteRoutingBus(const std::string& busId,
+                                                                       const std::string& label)
+{
+    const auto busIndex = findRoutingBusIndexById(getProject(), busId);
+    if (!busIndex.has_value())
+        return makeRejectedResult(getDocumentState(), "Routing chain deletion rejected", "Routing bus does not exist: " + busId);
+
+    auto project = getProject();
+    const auto removedSlotIds = project.authoring.routingBuses[*busIndex].fxSlotIds;
+    project.authoring.fxSlots.erase(std::remove_if(project.authoring.fxSlots.begin(),
+                                                   project.authoring.fxSlots.end(),
+                                                   [&](const RuntimeProjectFxSlotDefinition& slot)
+                                                   {
+                                                       return std::find(removedSlotIds.begin(), removedSlotIds.end(), slot.id)
+                                                           != removedSlotIds.end();
+                                                   }),
+                                    project.authoring.fxSlots.end());
+    project.authoring.routingBuses.erase(project.authoring.routingBuses.begin()
+                                         + static_cast<std::ptrdiff_t>(*busIndex));
+    for (auto& group : project.authoring.groups)
+        if (group.routingBusId == busId)
+            group.routingBusId.clear();
+
+    auto result = documentController.commitSnapshot(project, label,
+                                                     { "authoring.routingBuses", "authoring.fxSlots", "authoring.groups" });
+    if (result.applied) recoverDspSelection();
+    return result;
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::setRoutingBusChainBypassed(
+    const std::string& busId,
+    bool bypassed,
+    const std::string& label)
+{
+    const auto busIndex = findRoutingBusIndexById(getProject(), busId);
+    if (!busIndex.has_value())
+        return makeRejectedResult(getDocumentState(), "Routing bypass rejected", "Routing bus does not exist: " + busId);
+
+    auto project = getProject();
+    project.authoring.routingBuses[*busIndex].chainBypassed = bypassed;
+    return documentController.commitSnapshot(project, label,
+                                             { "authoring.routingBuses[" + std::to_string(*busIndex)
+                                                 + "].chainBypassed" });
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::setFxSlotParameter(const std::string& fxSlotId,
+                                                                         const std::string& parameterId,
+                                                                         double value,
+                                                                         const std::string& label)
+{
+    const auto slotIndex = findFxSlotIndexById(getProject(), fxSlotId);
+    if (!slotIndex.has_value() || parameterId.empty() || !std::isfinite(value))
+        return makeRejectedResult(getDocumentState(), "DSP parameter edit rejected",
+                                  "FX slot, parameter id, and finite value are required.");
+    const auto& slot = getProject().authoring.fxSlots[*slotIndex];
+    const auto* descriptor = findCatalogParameter(slot, parameterId);
+    if (findCuratedDspEffect(slot.effectType, slot.effectVersion) != nullptr
+        && (descriptor == nullptr || value < descriptor->minimum || value > descriptor->maximum))
+    {
+        return makeRejectedResult(getDocumentState(), "DSP parameter edit rejected",
+                                  "Known catalog parameter is unknown or outside its allowed range.");
+    }
+
+    auto project = getProject();
+    auto& parameters = project.authoring.fxSlots[*slotIndex].parameters;
+    const auto parameter = std::find_if(parameters.begin(), parameters.end(),
+                                        [&](const RuntimeProjectFxSlotDefinition::ParameterValue& entry)
+                                        { return entry.id == parameterId; });
+    if (parameter == parameters.end())
+        parameters.push_back({ parameterId, value });
+    else
+        parameter->value = value;
+    return documentController.commitSnapshot(project, label,
+                                             { "authoring.fxSlots[" + std::to_string(*slotIndex)
+                                                 + "].parameters." + parameterId });
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::resetFxSlotParameterToDefault(
+    const std::string& fxSlotId,
+    const std::string& parameterId,
+    const std::string& label)
+{
+    const auto slotIndex = findFxSlotIndexById(getProject(), fxSlotId);
+    if (!slotIndex.has_value())
+        return makeRejectedResult(getDocumentState(), "DSP parameter reset rejected", "FX slot does not exist: " + fxSlotId);
+    const auto* descriptor = findCatalogParameter(getProject().authoring.fxSlots[*slotIndex], parameterId);
+    if (descriptor == nullptr)
+        return makeRejectedResult(getDocumentState(), "DSP parameter reset rejected",
+                                  "Only known catalog parameters have an authored default.");
+    return setFxSlotParameter(fxSlotId, parameterId, descriptor->defaultValue, label);
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::beginFxSlotParameterGesture(
+    const std::string& fxSlotId,
+    const std::string& parameterId)
+{
+    const auto slotIndex = findFxSlotIndexById(getProject(), fxSlotId);
+    if (pendingDspParameterGesture.has_value() || !slotIndex.has_value() || parameterId.empty())
+        return makeRejectedResult(getDocumentState(), "DSP parameter gesture rejected",
+                                  "A gesture requires one existing slot, parameter id, and no active gesture.");
+    const auto& parameters = getProject().authoring.fxSlots[*slotIndex].parameters;
+    const auto parameter = std::find_if(parameters.begin(), parameters.end(),
+                                        [&](const RuntimeProjectFxSlotDefinition::ParameterValue& entry)
+                                        { return entry.id == parameterId; });
+    const auto* descriptor = findCatalogParameter(getProject().authoring.fxSlots[*slotIndex], parameterId);
+    if (parameter == parameters.end() && descriptor == nullptr)
+        return makeRejectedResult(getDocumentState(), "DSP parameter gesture rejected",
+                                  "A gesture may only edit an existing or catalog-defined parameter.");
+    pendingDspParameterGesture = { fxSlotId, parameterId,
+                                   parameter == parameters.end() ? descriptor->defaultValue : parameter->value };
+    auto result = RuntimeProjectDocumentActionResult {};
+    result.applied = true;
+    result.state = "DSP parameter gesture started";
+    result.documentState = getDocumentState();
+    return result;
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::updateFxSlotParameterGesture(double value)
+{
+    if (!pendingDspParameterGesture.has_value())
+        return makeRejectedResult(getDocumentState(), "DSP parameter gesture rejected", "No parameter gesture is active.");
+    const auto slotIndex = findFxSlotIndexById(getProject(), pendingDspParameterGesture->fxSlotId);
+    const auto* descriptor = slotIndex.has_value()
+        ? findCatalogParameter(getProject().authoring.fxSlots[*slotIndex], pendingDspParameterGesture->parameterId)
+        : nullptr;
+    if (!std::isfinite(value) || (descriptor != nullptr && (value < descriptor->minimum || value > descriptor->maximum)))
+        return makeRejectedResult(getDocumentState(), "DSP parameter gesture rejected", "Gesture value is not valid for its parameter.");
+    pendingDspParameterGesture->value = value;
+    if (dspParameterGesturePreviewListener)
+        dspParameterGesturePreviewListener(pendingDspParameterGesture->fxSlotId,
+                                           pendingDspParameterGesture->parameterId,
+                                           value);
+    auto result = RuntimeProjectDocumentActionResult {};
+    result.applied = true;
+    result.state = "DSP parameter gesture preview updated";
+    result.documentState = getDocumentState();
+    return result;
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::commitFxSlotParameterGesture(const std::string& label)
+{
+    if (!pendingDspParameterGesture.has_value())
+        return makeRejectedResult(getDocumentState(), "DSP parameter gesture rejected", "No parameter gesture is active.");
+    const auto gesture = *pendingDspParameterGesture;
+    pendingDspParameterGesture.reset();
+    return setFxSlotParameter(gesture.fxSlotId, gesture.parameterId, gesture.value, label);
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::cancelFxSlotParameterGesture()
+{
+    if (!pendingDspParameterGesture.has_value())
+        return makeRejectedResult(getDocumentState(), "DSP parameter gesture rejected", "No parameter gesture is active.");
+    pendingDspParameterGesture.reset();
+    auto result = RuntimeProjectDocumentActionResult {};
+    result.applied = true;
+    result.state = "DSP parameter gesture cancelled";
+    result.documentState = getDocumentState();
+    return result;
+}
+
 RuntimeProjectDocumentActionResult AuthoringSession::updateFxSlot(std::size_t fxSlotIndex,
                                                                   const RuntimeProjectFxSlotDefinition& fxSlot,
                                                                   const std::string& label)
@@ -1839,12 +2201,49 @@ RuntimeProjectDocumentActionResult AuthoringSession::updatePerformanceBank(
 
 RuntimeProjectDocumentActionResult AuthoringSession::undo()
 {
-    return documentController.undo();
+    auto result = documentController.undo();
+    if (result.applied) recoverDspSelection();
+    return result;
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::redo()
 {
-    return documentController.redo();
+    auto result = documentController.redo();
+    if (result.applied) recoverDspSelection();
+    return result;
+}
+
+void AuthoringSession::recoverDspSelection()
+{
+    if (!dspSelection.fxSlotId.empty())
+    {
+        if (const auto owner = findUniqueFxSlotOwnerBusIndex(getProject(), dspSelection.fxSlotId); owner.has_value())
+        {
+            dspSelection.routingBusId = getProject().authoring.routingBuses[*owner].id;
+            return;
+        }
+        dspSelection.fxSlotId.clear();
+    }
+
+    const auto bus = findRoutingBusIndexById(getProject(), dspSelection.routingBusId);
+    if (!bus.has_value())
+        dspSelection.routingBusId = getProject().authoring.routingBuses.empty()
+            ? std::string {} : getProject().authoring.routingBuses.front().id;
+    const auto selectedBus = findRoutingBusIndexById(getProject(), dspSelection.routingBusId);
+    if (selectedBus.has_value() && !getProject().authoring.routingBuses[*selectedBus].fxSlotIds.empty())
+    {
+        dspSelection.fxSlotId = getProject().authoring.routingBuses[*selectedBus].fxSlotIds.front();
+        return;
+    }
+    for (const auto& candidateBus : getProject().authoring.routingBuses)
+    {
+        if (!candidateBus.fxSlotIds.empty())
+        {
+            dspSelection.routingBusId = candidateBus.id;
+            dspSelection.fxSlotId = candidateBus.fxSlotIds.front();
+            return;
+        }
+    }
 }
 
 void AuthoringSession::markSaved()

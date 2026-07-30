@@ -2,6 +2,9 @@
 #include "plugin/PluginEditor.h"
 
 #include "drs/engine/AuthoringPreviewPreparation.h"
+#include "drs/engine/CuratedDspCatalog.h"
+#include "drs/engine/DspGraphPlan.h"
+#include "drs/engine/DspRenderGeneration.h"
 #include "drs/engine/RuntimeLoader.h"
 
 #include <algorithm>
@@ -44,6 +47,15 @@ void updateAtomicMaximum(std::atomic<std::uint64_t>& destination, std::uint64_t 
     }
 }
 
+bool requestsExecutableCuratedDsp(const drs::engine::ImmutablePlaybackSnapshot& snapshot)
+{
+    return std::any_of(snapshot.fxSlots.begin(), snapshot.fxSlots.end(), [](const auto& slot)
+    {
+        return !slot.bypassed && !slot.unavailable && !slot.legacyInert
+            && drs::engine::findCuratedDspEffect(slot.effectType, slot.effectVersion) != nullptr;
+    });
+}
+
 std::optional<double> findMacroValue(const drs::engine::RuntimeSessionStateSnapshot& sessionState,
                                      std::string_view macroId)
 {
@@ -58,6 +70,24 @@ std::optional<double> findMacroValue(const drs::engine::RuntimeSessionStateSnaps
         return std::nullopt;
 
     return iterator->value;
+}
+
+double mapPublishedDspMacroValue(const drs::engine::PublishedMacroCallbackSlot& slot,
+                                 const double value) noexcept
+{
+    const auto sourceSpan = slot.sourceMaximum - slot.sourceMinimum;
+    if (!(sourceSpan > 0.0))
+        return slot.destinationMinimum;
+
+    const auto normalized = std::clamp((value - slot.sourceMinimum) / sourceSpan, 0.0, 1.0);
+    if (slot.curve == drs::engine::PublishedMacroCurve::logarithmic
+        && slot.destinationMinimum > 0.0 && slot.destinationMaximum > 0.0)
+    {
+        return slot.destinationMinimum * std::pow(
+            slot.destinationMaximum / slot.destinationMinimum, normalized);
+    }
+    return slot.destinationMinimum
+        + (slot.destinationMaximum - slot.destinationMinimum) * normalized;
 }
 
 int clampMidiValue(int value)
@@ -77,6 +107,7 @@ struct HostTransportObservation
     bool isPlaying = false;
     bool hasTimeInSamples = false;
     std::int64_t timeInSamples = 0;
+    double tempoBpm = 120.0;
 };
 
 HostTransportObservation readHostTransportObservation(juce::AudioPlayHead* playHead)
@@ -91,6 +122,9 @@ HostTransportObservation readHostTransportObservation(juce::AudioPlayHead* playH
 
     observation.valid = true;
     observation.isPlaying = position->getIsPlaying();
+    if (const auto bpm = position->getBpm(); bpm && std::isfinite(*bpm)
+        && *bpm >= 20.0 && *bpm <= 300.0)
+        observation.tempoBpm = *bpm;
     if (const auto timeInSamples = position->getTimeInSamples())
     {
         observation.hasTimeInSamples = true;
@@ -415,6 +449,11 @@ Processor::Processor()
 {
     primeRealtimeSafetyState(512);
     initializeAuthoringImportMetrics();
+    authoringSession.setDspParameterGesturePreviewListener(
+        [this](const std::string& slotId, const std::string& parameterId, const double value)
+        {
+            authoringPreviewPlaybackContext.publishDspControlByIdentity(slotId, parameterId, value);
+        });
 
     for (const auto& macro : engineFacade.getMacroDescriptors())
         parameterState.addParameterListener(buildMacroParameterId(macro.id), this);
@@ -616,7 +655,12 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
             installPublishedMacroCallbackView(
                 pendingPerformanceActivation->macroBindings->callbackView);
         }
-        const auto performanceMacroControls = buildPublishedMacroRenderControls();
+        auto performanceMacroControls = buildPublishedMacroRenderControls();
+        performanceMacroControls.transport.valid = hostTransport.valid;
+        performanceMacroControls.transport.isPlaying = hostTransport.isPlaying;
+        performanceMacroControls.transport.hasSamplePosition = hostTransport.hasTimeInSamples;
+        performanceMacroControls.transport.samplePosition = hostTransport.timeInSamples;
+        performanceMacroControls.transport.tempoBpm = hostTransport.tempoBpm;
         diagnosticActivePublishedMacroFixedVelocity.store(
             performanceMacroControls.overrideFixedVelocity
                 ? performanceMacroControls.fixedVelocity : 0,
@@ -1352,8 +1396,21 @@ void Processor::refreshSerializedHostStatePublication(const bool force)
         return;
 
     const auto& project = authoringSession.getProject();
-    const auto presetState = drs::engine::captureRuntimePresetState(
+    auto presetState = drs::engine::captureRuntimePresetState(
         engineFacade.getCurrentSessionState());
+    if (const auto bindings = engineFacade.getActivePublishedMacroBindings(); bindings != nullptr)
+    {
+        presetState.dspGraphDigest = bindings->dspGraphDigest;
+        for (const auto& binding : bindings->bindings)
+        {
+            if (binding.assigned
+                && binding.renderTarget == drs::engine::PublishedMacroRenderTarget::dspControl)
+            {
+                presetState.dspMacroTargets.push_back(
+                    { binding.stableAuthoredId, binding.dspSlotId, binding.dspParameterId });
+            }
+        }
+    }
     if (project.projectId.empty())
     {
         auto immutable = std::make_shared<const std::string>(
@@ -1405,6 +1462,8 @@ void Processor::refreshSerializedHostStatePublication(const bool force)
         published.macroSchemaDigest
             = publish.activeRequestIdentity.macroSchemaDigest;
         published.preparedContentDigest = publish.activePreparedDigest;
+        if (const auto bindings = engineFacade.getActivePublishedMacroBindings(); bindings != nullptr)
+            published.dspGraphDigest = bindings->dspGraphDigest;
         state.publishedState = std::move(published);
     }
 
@@ -1499,6 +1558,11 @@ bool Processor::applyValidatedProjectRestore(
         return false;
 
     authoringSession = std::move(restoredSession);
+    authoringSession.setDspParameterGesturePreviewListener(
+        [this](const std::string& slotId, const std::string& parameterId, const double value)
+        {
+            authoringPreviewPlaybackContext.publishDspControlByIdentity(slotId, parameterId, value);
+        });
     authoringProjectBinding = std::move(restoredBinding);
     authoringWaveformPreviewCache.clear();
     authoringPreviewController.reset();
@@ -1991,7 +2055,7 @@ void Processor::installPublishedMacroCallbackView(
     }
 }
 
-drs::engine::SamplerRenderControlValues Processor::buildPublishedMacroRenderControls() const noexcept
+drs::engine::SamplerRenderControlValues Processor::buildPublishedMacroRenderControls() noexcept
 {
     drs::engine::SamplerRenderControlValues controls;
     const auto slotCount = std::min(activePublishedMacroCallbackView.hostSlotCount,
@@ -2019,6 +2083,11 @@ drs::engine::SamplerRenderControlValues Processor::buildPublishedMacroRenderCont
         {
             controls.overrideMidiNoteOffset = true;
             controls.midiNoteOffset = static_cast<int>(std::lround((value - 0.5) * 24.0));
+        }
+        else if (slot.renderTarget == drs::engine::PublishedMacroRenderTarget::dspControl)
+        {
+            performancePlaybackContext.publishActiveDspControl(
+                slot.dspControlIndex, mapPublishedDspMacroValue(slot, value));
         }
     }
     return controls;
@@ -2165,7 +2234,27 @@ bool Processor::stageAuthoringPreviewActivation(const drs::engine::AuthoringPrev
                                                     preparation.scopedPayload->snapshotContentDigest,
                                                     preparation.scopedPayload->preparedContentDigest))
         return false;
-    if (!authoringPreviewPlaybackContext.stageActivation(preparation.model))
+    std::shared_ptr<drs::engine::DspRenderGeneration> dspGeneration;
+    if (requestsExecutableCuratedDsp(*preparation.scopedPayload->snapshot))
+    {
+        const auto graphPlan = drs::engine::compileDspGraphPlan(*preparation.scopedPayload->snapshot);
+        if (!graphPlan.compiled)
+            return failPreviewActivation(drs::engine::classifyAuthoringPreviewFailure(
+                "preview-dsp-graph-rejected", "preview.dspGraph",
+                graphPlan.findings.empty() ? "Preview DSP graph compilation failed."
+                                          : graphPlan.findings.front().message));
+        std::string dspFailure;
+        dspGeneration = drs::engine::createDspRenderGeneration(
+            preparation.model,
+            graphPlan.plan,
+            static_cast<std::uint32_t>(std::max<std::size_t>(
+                1, diagnosticsPreparedBlockSize.load(std::memory_order_acquire))),
+            &dspFailure);
+        if (dspGeneration == nullptr)
+            return failPreviewActivation(drs::engine::classifyAuthoringPreviewFailure(
+                "preview-dsp-generation-rejected", "preview.dspGeneration", dspFailure));
+    }
+    if (!authoringPreviewPlaybackContext.stageActivation(preparation.model, dspGeneration))
         return failPreviewActivation(drs::engine::classifyAuthoringPreviewFailure(
             "preview-activation-slot-exhausted", "preview.activationSlots",
             "Authoring Preview activation slots are exhausted."));
@@ -2275,7 +2364,56 @@ bool Processor::synchronizePerformanceActivation(bool installImmediately)
         }
         return false;
     }
-    if (!performancePlaybackContext.stageActivation(modelResult.model))
+    std::shared_ptr<drs::engine::DspRenderGeneration> dspGeneration;
+    if (requestsExecutableCuratedDsp(*payload->snapshot))
+    {
+        const auto graphPlan = drs::engine::compileDspGraphPlan(*payload->snapshot);
+        if (!graphPlan.compiled)
+        {
+            if (authorized != nullptr)
+                engineFacade.rejectPerformanceActivationStaging(
+                    authorized,
+                    { drs::engine::PerformancePublishFindingSeverity::error,
+                      "performance-dsp-graph-rejected",
+                      "performance.dspGraph",
+                      graphPlan.findings.empty() ? "Performance DSP graph compilation failed."
+                                                : graphPlan.findings.front().message });
+            return false;
+        }
+        std::string dspFailure;
+        dspGeneration = drs::engine::createDspRenderGeneration(
+            modelResult.model,
+            graphPlan.plan,
+            static_cast<std::uint32_t>(std::max<std::size_t>(
+                1, diagnosticsPreparedBlockSize.load(std::memory_order_acquire))),
+            &dspFailure);
+        if (dspGeneration == nullptr)
+        {
+            if (authorized != nullptr)
+                engineFacade.rejectPerformanceActivationStaging(
+                    authorized,
+                    { drs::engine::PerformancePublishFindingSeverity::error,
+                      "performance-dsp-generation-rejected",
+                      "performance.dspGeneration",
+                      dspFailure });
+            return false;
+        }
+        if (authorized != nullptr && authorized->macroBindings != nullptr)
+        {
+            for (const auto& slot : authorized->macroBindings->callbackView.slots)
+            {
+                if (slot.assigned
+                    && slot.renderTarget == drs::engine::PublishedMacroRenderTarget::dspControl)
+                {
+                    dspGeneration->publishControlValue(
+                        dspGeneration->getControlGenerationIdentity(), slot.dspControlIndex,
+                        mapPublishedDspMacroValue(slot, std::clamp(
+                            slot.publishedValue, slot.minValue, slot.maxValue)));
+                }
+            }
+        }
+    }
+    if (!performancePlaybackContext.stageActivation(modelResult.model, dspGeneration))
     {
         if (authorized != nullptr)
             engineFacade.rejectPerformanceActivationStaging(

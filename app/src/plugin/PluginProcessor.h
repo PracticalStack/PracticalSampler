@@ -253,7 +253,7 @@ private:
     void initializePublishedMacroRealtimeState();
     void installPublishedMacroCallbackView(
         const drs::engine::PublishedMacroCallbackView& view) noexcept;
-    drs::engine::SamplerRenderControlValues buildPublishedMacroRenderControls() const noexcept;
+    drs::engine::SamplerRenderControlValues buildPublishedMacroRenderControls() noexcept;
     void drainRealtimeNoteEvents(RealtimeNoteEventQueue& queue,
                                  drs::engine::SamplerEventBlock& destination,
                                  std::uint32_t frameCount) noexcept;

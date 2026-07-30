@@ -126,6 +126,13 @@ PerformancePublishPreparationResult validatePerformancePublishPreparation(
     if (prepared.snapshotContentDigest != snapshot.contentDigest)
         addError(result, "publish-prepared-snapshot-digest-mismatch", "prepared.snapshotContentDigest",
                  "Prepared content was produced from a different authored snapshot.");
+    const auto dspGraphDigest = computePlaybackSnapshotDspGraphDigest(snapshot);
+    if (snapshot.dspGraphDigest.empty() || snapshot.dspGraphDigest != dspGraphDigest
+        || prepared.snapshotDspGraphDigest != dspGraphDigest || prepared.dspGraphDigest != dspGraphDigest)
+    {
+        addError(result, "publish-dsp-graph-digest-mismatch", "prepared.dspGraphDigest",
+                 "Prepared content was not produced from the exact immutable DSP graph identity.");
+    }
     if (prepared.preparedContentDigest.empty()
         || prepared.preparedContentDigest != computePreparedPlaybackContentDigest(prepared))
         addError(result, "publish-prepared-digest-mismatch", "prepared.preparedContentDigest",

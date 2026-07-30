@@ -143,6 +143,7 @@ struct ImmutablePreparedPlayback
 {
     std::uint64_t snapshotBuildId = 0;
     std::string snapshotContentDigest;
+    std::string snapshotDspGraphDigest;
     std::string compilerVersion;
     std::size_t draftRevision = 0;
     std::string selectedGroupId;
@@ -151,6 +152,7 @@ struct ImmutablePreparedPlayback
     std::string payloadEncoding;
     std::uint64_t pageSizeBytes = 0;
     std::string preparedContentDigest;
+    std::string dspGraphDigest;
     // Publish-conformance digests are computed by the preparation worker from
     // immutable data. They deliberately exclude cache ownership tokens so a
     // warm and cold preparation of the same authored project agree.

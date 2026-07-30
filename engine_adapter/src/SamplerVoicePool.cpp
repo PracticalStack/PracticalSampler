@@ -305,7 +305,9 @@ void SamplerVoicePool::clearRenderModel() noexcept
 
 SamplerVoicePoolRenderResult SamplerVoicePool::renderBlock(SamplerAudioBufferView output,
                                                            SamplerRenderEventView events,
-                                                           SamplerRenderControlValues controls) noexcept
+                                                           SamplerRenderControlValues controls,
+                                                           const SamplerAudioBufferView* routeTargets,
+                                                           const std::size_t routeTargetCount) noexcept
 {
     SamplerVoicePoolRenderResult result;
     if (renderModel == nullptr || !output.isValid() || !events.isValid() || events.size > SamplerEventBlock::capacity)
@@ -327,12 +329,12 @@ SamplerVoicePoolRenderResult SamplerVoicePool::renderBlock(SamplerAudioBufferVie
     for (std::size_t index = 0; index < events.size; ++index)
     {
         const auto eventOffset = events[index].sampleOffset;
-        renderRange(output, renderedThrough, eventOffset - renderedThrough, result);
+        renderRange(output, renderedThrough, eventOffset - renderedThrough, result, routeTargets, routeTargetCount);
         renderedThrough = eventOffset;
         applyEvent(events[index], result, controls);
         ++result.render.consumedEventCount;
     }
-    renderRange(output, renderedThrough, output.frameCount - renderedThrough, result);
+    renderRange(output, renderedThrough, output.frameCount - renderedThrough, result, routeTargets, routeTargetCount);
     result.render.renderedFrameCount = output.frameCount;
     updateCounts(result);
     return result;
@@ -438,7 +440,9 @@ SamplerVoiceSlotSnapshot SamplerVoicePool::getSlotSnapshot(std::size_t index) co
 void SamplerVoicePool::renderRange(SamplerAudioBufferView output,
                                    std::uint32_t startFrame,
                                    std::uint32_t frameCount,
-                                   SamplerVoicePoolRenderResult& result) noexcept
+                                   SamplerVoicePoolRenderResult& result,
+                                   const SamplerAudioBufferView* routeTargets,
+                                   const std::size_t routeTargetCount) noexcept
 {
     if (frameCount == 0)
         return;
@@ -451,7 +455,10 @@ void SamplerVoicePool::renderRange(SamplerAudioBufferView output,
             continue;
         }
 
-        const auto voiceResult = slot.voice.render(output, startFrame, frameCount);
+        const auto routeIndex = slot.voice.getRouteIndex();
+        const auto target = routeTargets != nullptr && routeIndex < routeTargetCount
+            ? routeTargets[routeIndex] : output;
+        const auto voiceResult = slot.voice.render(target, startFrame, frameCount);
         if (voiceResult.voiceFinished)
         {
             slot.state = SamplerVoiceSlotState::finished;

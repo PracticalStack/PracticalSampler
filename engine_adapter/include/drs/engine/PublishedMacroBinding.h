@@ -1,6 +1,7 @@
 #pragma once
 
 #include "drs/engine/PlaybackSnapshot.h"
+#include "drs/engine/DspParameterControl.h"
 
 #include <array>
 #include <cstddef>
@@ -17,8 +18,11 @@ enum class PublishedMacroRenderTarget : std::uint8_t
 {
     none = 0,
     toneVelocity,
-    motionPitch
+    motionPitch,
+    dspControl
 };
+
+enum class PublishedMacroCurve : std::uint8_t { linear = 0, logarithmic };
 
 struct PublishedMacroHostSlotDefinition
 {
@@ -40,6 +44,12 @@ struct PublishedMacroCallbackSlot
     double minValue = 0.0;
     double maxValue = 1.0;
     double publishedValue = 0.0;
+    std::uint32_t dspControlIndex = 0;
+    double sourceMinimum = 0.0;
+    double sourceMaximum = 1.0;
+    double destinationMinimum = 0.0;
+    double destinationMaximum = 1.0;
+    PublishedMacroCurve curve = PublishedMacroCurve::linear;
 };
 
 struct PublishedMacroCallbackView
@@ -61,12 +71,21 @@ struct PublishedMacroBinding
     double publishedValue = 0.0;
     bool assigned = false;
     PublishedMacroRenderTarget renderTarget = PublishedMacroRenderTarget::none;
+    std::uint32_t dspControlIndex = 0;
+    std::string dspSlotId;
+    std::string dspParameterId;
+    double sourceMinimum = 0.0;
+    double sourceMaximum = 1.0;
+    double destinationMinimum = 0.0;
+    double destinationMaximum = 1.0;
+    PublishedMacroCurve curve = PublishedMacroCurve::linear;
 };
 
 struct ImmutablePublishedMacroBindingTable final
 {
     std::size_t revision = 0;
     std::string macroSchemaDigest;
+    std::string dspGraphDigest;
     std::vector<PublishedMacroBinding> bindings;
     std::vector<std::string> retiredStableAuthoredIds;
     std::vector<std::string> unassignedStableAuthoredIds;
@@ -98,6 +117,8 @@ struct PublishedMacroBindingBuildRequest
     std::vector<PlaybackSnapshotMacroDefault> authoredMacros;
     std::vector<PublishedMacroCurrentValue> currentValues;
     ImmutablePublishedMacroBindingTablePtr previousActiveTable;
+    const DspParameterControlLayout* dspControlLayout = nullptr;
+    std::string dspGraphDigest;
 };
 
 struct PublishedMacroBindingBuildResult

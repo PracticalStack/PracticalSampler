@@ -184,7 +184,10 @@ RuntimeProjectDocumentActionResult RuntimeProjectDocumentController::commitSnaps
     documentState.lastChangeLabel = label;
     syncDocumentState();
 
-    return makeAppliedResult("Project transaction committed");
+    auto result = makeAppliedResult("Project transaction committed");
+    result.requiresHostStateRebuild = true;
+    result.changedPaths = changedPaths;
+    return result;
 }
 
 RuntimeProjectDocumentActionResult RuntimeProjectDocumentController::undo()
@@ -206,7 +209,10 @@ RuntimeProjectDocumentActionResult RuntimeProjectDocumentController::undo()
     documentState.lastChangeLabel = snapshot.entry.label;
     syncDocumentState();
 
-    return makeAppliedResult("Project undo restored");
+    auto result = makeAppliedResult("Project undo restored");
+    result.requiresHostStateRebuild = true;
+    result.changedPaths = snapshot.entry.changedPaths;
+    return result;
 }
 
 RuntimeProjectDocumentActionResult RuntimeProjectDocumentController::redo()
@@ -228,7 +234,10 @@ RuntimeProjectDocumentActionResult RuntimeProjectDocumentController::redo()
     documentState.lastChangeLabel = snapshot.entry.label;
     syncDocumentState();
 
-    return makeAppliedResult("Project redo restored");
+    auto result = makeAppliedResult("Project redo restored");
+    result.requiresHostStateRebuild = true;
+    result.changedPaths = snapshot.entry.changedPaths;
+    return result;
 }
 
 void RuntimeProjectDocumentController::markSaved()

@@ -2,6 +2,7 @@
 
 #include "drs/engine/ProjectDocument.h"
 
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -60,9 +61,16 @@ struct AuthoringGroupRoundRobinStatus
     std::string state;
 };
 
+struct AuthoringDspSelection
+{
+    std::string fxSlotId;
+    std::string routingBusId;
+};
+
 class AuthoringSession
 {
 public:
+    using DspParameterGesturePreviewListener = std::function<void(const std::string&, const std::string&, double)>;
     explicit AuthoringSession(RuntimeProjectModel project);
 
     const RuntimeProjectModel& getProject() const;
@@ -77,6 +85,7 @@ public:
     std::optional<RuntimeProjectZoneDefinition> getSelectedZone() const;
     std::optional<RuntimeProjectGroupDefinition> getSelectedGroup() const;
     AuthoringGroupRoundRobinStatus getSelectedGroupRoundRobinStatus() const;
+    AuthoringDspSelection getDspSelection() const;
     std::optional<RuntimeProjectPerformanceBankDefinition> getSelectedPerformanceBank() const;
     AuthoringZonePreviewRequest buildSelectedZonePreviewRequest() const;
     AuthoringGroupPreviewRequest buildSelectedGroupPreviewRequest() const;
@@ -84,6 +93,7 @@ public:
     RuntimeProjectDocumentActionResult selectZone(const std::string& zoneId);
     RuntimeProjectDocumentActionResult selectGroup(const std::string& groupId);
     RuntimeProjectDocumentActionResult selectPerformanceBank(const std::string& performanceBankId);
+    RuntimeProjectDocumentActionResult selectDspSlot(const std::string& fxSlotId);
     RuntimeProjectDocumentActionResult updateSelectedZone(const RuntimeProjectZoneDefinition& zone,
                                                           const std::string& label);
     RuntimeProjectDocumentActionResult createGroup(const RuntimeProjectGroupDefinition& group,
@@ -134,6 +144,41 @@ public:
     RuntimeProjectDocumentActionResult moveMacro(std::size_t macroIndex,
                                                  int direction,
                                                  const std::string& label);
+    RuntimeProjectDocumentActionResult createFxSlot(const RuntimeProjectFxSlotDefinition& fxSlot,
+                                                    const std::string& ownerBusId,
+                                                    const std::string& label);
+    RuntimeProjectDocumentActionResult duplicateFxSlot(const std::string& fxSlotId,
+                                                       const std::string& duplicateId,
+                                                       const std::string& label);
+    RuntimeProjectDocumentActionResult deleteFxSlot(const std::string& fxSlotId,
+                                                    const std::string& label);
+    RuntimeProjectDocumentActionResult moveFxSlot(const std::string& fxSlotId,
+                                                  int direction,
+                                                  const std::string& label);
+    RuntimeProjectDocumentActionResult moveFxSlotToBus(const std::string& fxSlotId,
+                                                        const std::string& destinationBusId,
+                                                        const std::string& label);
+    RuntimeProjectDocumentActionResult deleteRoutingBus(const std::string& busId,
+                                                         const std::string& label);
+    RuntimeProjectDocumentActionResult setRoutingBusChainBypassed(const std::string& busId,
+                                                                   bool bypassed,
+                                                                   const std::string& label);
+    RuntimeProjectDocumentActionResult setFxSlotParameter(const std::string& fxSlotId,
+                                                           const std::string& parameterId,
+                                                           double value,
+                                                           const std::string& label);
+    RuntimeProjectDocumentActionResult resetFxSlotParameterToDefault(const std::string& fxSlotId,
+                                                                      const std::string& parameterId,
+                                                                      const std::string& label);
+    RuntimeProjectDocumentActionResult beginFxSlotParameterGesture(const std::string& fxSlotId,
+                                                                    const std::string& parameterId);
+    RuntimeProjectDocumentActionResult updateFxSlotParameterGesture(double value);
+    void setDspParameterGesturePreviewListener(DspParameterGesturePreviewListener listener)
+    {
+        dspParameterGesturePreviewListener = std::move(listener);
+    }
+    RuntimeProjectDocumentActionResult commitFxSlotParameterGesture(const std::string& label);
+    RuntimeProjectDocumentActionResult cancelFxSlotParameterGesture();
     RuntimeProjectDocumentActionResult updateFxSlot(std::size_t fxSlotIndex,
                                                     const RuntimeProjectFxSlotDefinition& fxSlot,
                                                     const std::string& label);
@@ -148,6 +193,18 @@ public:
     void markSaved();
 
 private:
+    struct PendingDspParameterGesture
+    {
+        std::string fxSlotId;
+        std::string parameterId;
+        double value = 0.0;
+    };
+
     RuntimeProjectDocumentController documentController;
+    std::optional<PendingDspParameterGesture> pendingDspParameterGesture;
+    DspParameterGesturePreviewListener dspParameterGesturePreviewListener;
+    AuthoringDspSelection dspSelection;
+
+    void recoverDspSelection();
 };
 } // namespace drs::engine

@@ -32,6 +32,15 @@ const drs::engine::PublishedMacroBinding& bindingFor(
     return *found;
 }
 
+bool hasFinding(const drs::engine::PublishedMacroBindingBuildResult& result,
+                const std::string& code)
+{
+    return std::any_of(result.findings.begin(), result.findings.end(), [&](const auto& finding)
+    {
+        return finding.code == code;
+    });
+}
+
 drs::engine::PublishedMacroBindingBuildRequest baselineRequest()
 {
     using namespace drs::engine;
@@ -131,6 +140,42 @@ int main()
                     && bindingFor(*baseline.table, "tone").publishedValue == 0.8
                     && bindingFor(*baseline.table, "motion").publishedValue == 0.7,
                 "Initial publication must capture current fixed-slot values by stable id.");
+
+        auto dspTargetRequest = baselineRequest();
+        dspTargetRequest.authoredMacros.front().targets = {
+            { "dsp.zone-gain.gainDb", "curatedDsp.zone-gain.gainDb", "mix",
+              "zone-gain", "gainDb", 0.0, 1.0, -24.0, 6.0, "linear" }
+        };
+        DspParameterControlLayout dspLayout;
+        dspLayout.graphPlanDigest = "graph-before-reorder";
+        dspLayout.controls = {
+            { 4, 3, 9, "other-slot", "gainDb", -96.0, 24.0, 0.0,
+              CuratedDspSmoothing::linear },
+            { 11, 7, 21, "zone-gain", "gainDb", -96.0, 24.0, 0.0,
+              CuratedDspSmoothing::linear }
+        };
+        dspTargetRequest.dspControlLayout = &dspLayout;
+        const auto dspTarget = buildPublishedMacroBindingTable(dspTargetRequest);
+        require(dspTarget.built && dspTarget.table != nullptr
+                    && bindingFor(*dspTarget.table, "tone").renderTarget
+                        == PublishedMacroRenderTarget::dspControl
+                    && bindingFor(*dspTarget.table, "tone").dspControlIndex == 11
+                    && bindingFor(*dspTarget.table, "tone").destinationMinimum == -24.0
+                    && bindingFor(*dspTarget.table, "tone").destinationMaximum == 6.0,
+                "Structured DSP macro targets must resolve stable slot and parameter ids into callback indices.");
+
+        std::reverse(dspLayout.controls.begin(), dspLayout.controls.end());
+        dspLayout.graphPlanDigest = "graph-after-reorder";
+        const auto reorderedDspTarget = buildPublishedMacroBindingTable(dspTargetRequest);
+        require(reorderedDspTarget.built
+                    && bindingFor(*reorderedDspTarget.table, "tone").dspControlIndex == 11,
+                "Reordering graph controls must not break a macro resolved by stable DSP identity.");
+
+        dspLayout.controls.erase(dspLayout.controls.begin());
+        const auto deletedDspTarget = buildPublishedMacroBindingTable(dspTargetRequest);
+        require(!deletedDspTarget.built
+                    && hasFinding(deletedDspTarget, "published-macro-dsp-target-missing"),
+                "Deleting a structured DSP target must reject publication with an actionable finding.");
 
         auto migratedRequest = baselineRequest();
         migratedRequest.revision = 11;
