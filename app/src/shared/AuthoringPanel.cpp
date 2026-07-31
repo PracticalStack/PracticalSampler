@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <tuple>
 #include <utility>
@@ -82,14 +83,141 @@ constexpr int unassignedMacroAssignmentId = 1;
 constexpr int curatedMacroAssignmentBase = 2;
 constexpr int curatedDspMacroAssignmentBase = 1000;
 
+juce::String findZoneDisplayName(const drs::engine::RuntimeProjectModel& project,
+                                 const std::string& zoneId);
+juce::String findGroupDisplayName(const drs::engine::RuntimeProjectModel& project,
+                                  const std::string& groupId);
+juce::String findRoutingBusDisplayName(const drs::engine::RuntimeProjectModel& project,
+                                       const std::string& routingBusId);
+juce::String formatRoutingInputSourceLabel(const drs::engine::RuntimeProjectModel& project,
+                                           const std::string& inputSourceId);
+
 struct CuratedDspMacroAssignment
 {
     const drs::engine::RuntimeProjectFxSlotDefinition* slot = nullptr;
     const drs::engine::CuratedDspParameterDescriptor* parameter = nullptr;
 };
 
+const drs::engine::RuntimeProjectRoutingBusDefinition* findRoutingBusById(
+    const drs::engine::RuntimeProjectModel& project,
+    const std::string& routingBusId)
+{
+    const auto iterator = std::find_if(project.authoring.routingBuses.begin(),
+                                       project.authoring.routingBuses.end(),
+                                       [&](const auto& routingBus)
+                                       {
+                                           return routingBus.id == routingBusId;
+                                       });
+    return iterator == project.authoring.routingBuses.end() ? nullptr : &*iterator;
+}
+
+const drs::engine::RuntimeProjectRoutingBusDefinition* findOwnerBusForFxSlot(
+    const drs::engine::RuntimeProjectModel& project,
+    const std::string& fxSlotId)
+{
+    const auto iterator = std::find_if(project.authoring.routingBuses.begin(),
+                                       project.authoring.routingBuses.end(),
+                                       [&](const auto& routingBus)
+                                       {
+                                           return std::find(routingBus.fxSlotIds.begin(),
+                                                            routingBus.fxSlotIds.end(),
+                                                            fxSlotId) != routingBus.fxSlotIds.end();
+                                       });
+    return iterator == project.authoring.routingBuses.end() ? nullptr : &*iterator;
+}
+
+const drs::engine::RuntimeProjectFxSlotDefinition::ParameterValue* findAuthoredFxParameterValue(
+    const drs::engine::RuntimeProjectFxSlotDefinition& slot,
+    std::string_view parameterId)
+{
+    const auto iterator = std::find_if(slot.parameters.begin(),
+                                       slot.parameters.end(),
+                                       [&](const auto& parameter)
+                                       {
+                                           return parameter.id == parameterId;
+                                       });
+    return iterator == slot.parameters.end() ? nullptr : &*iterator;
+}
+
+std::optional<std::size_t> findMacroIndexForDspTarget(
+    const drs::engine::RuntimeProjectModel& project,
+    std::string_view dspSlotId,
+    std::string_view dspParameterId)
+{
+    for (std::size_t index = 0; index < project.authoring.macros.size(); ++index)
+    {
+        const auto& macro = project.authoring.macros[index];
+        if (macro.targets.empty())
+            continue;
+
+        const auto& target = macro.targets.front();
+        if (target.dspSlotId == dspSlotId && target.dspParameterId == dspParameterId)
+            return index;
+    }
+
+    return std::nullopt;
+}
+
+juce::String formatDspParameterName(std::string_view parameterId)
+{
+    std::string text;
+    text.reserve(parameterId.size() * 2);
+
+    auto previous = '\0';
+    for (const auto character : parameterId)
+    {
+        if (character == '-' || character == '_' || character == '.' || character == '/')
+        {
+            if (!text.empty() && text.back() != ' ')
+                text.push_back(' ');
+            previous = ' ';
+            continue;
+        }
+
+        const auto current = static_cast<unsigned char>(character);
+        const auto prior = static_cast<unsigned char>(previous);
+        const auto needsSeparator = !text.empty() && previous != ' '
+            && ((std::islower(prior) != 0 && std::isupper(current) != 0)
+                || (std::isalpha(prior) != 0 && std::isdigit(current) != 0)
+                || (std::isdigit(prior) != 0 && std::isalpha(current) != 0));
+        if (needsSeparator)
+            text.push_back(' ');
+
+        text.push_back(character);
+        previous = character;
+    }
+
+    auto formatted = juce::String::fromUTF8(text.c_str()).trim();
+    formatted = formatted.replace(" Db", " dB");
+    if (formatted.isNotEmpty())
+        formatted = formatted.substring(0, 1).toUpperCase() + formatted.substring(1);
+    return formatted;
+}
+
+int scoreCuratedDspMacroAssignment(const drs::engine::RuntimeProjectModel& project,
+                                   const CuratedDspMacroAssignment& assignment,
+                                   const std::string& preferredBusId,
+                                   const std::string& preferredInputSourceId)
+{
+    auto score = 0;
+    if (const auto* ownerBus = findOwnerBusForFxSlot(project, assignment.slot->id))
+    {
+        if (!preferredBusId.empty() && ownerBus->id == preferredBusId)
+            score += 1000;
+        else if (!preferredInputSourceId.empty() && ownerBus->inputSourceId == preferredInputSourceId)
+            score += 500;
+    }
+
+    if (assignment.slot->effectType == "drs.gain" && assignment.parameter->id == "gainDb")
+        score += 50;
+
+    return score;
+}
+
 std::vector<CuratedDspMacroAssignment> buildCuratedDspMacroAssignments(
-    const drs::engine::RuntimeProjectModel& project)
+    const drs::engine::RuntimeProjectModel& project,
+    const std::string& preferredBusId = {},
+    const std::string& preferredInputSourceId = {})
 {
     std::vector<CuratedDspMacroAssignment> assignments;
     for (const auto& slot : project.authoring.fxSlots)
@@ -100,14 +228,70 @@ std::vector<CuratedDspMacroAssignment> buildCuratedDspMacroAssignments(
         for (const auto& parameter : effect->parameters)
             assignments.push_back({ &slot, &parameter });
     }
+
+    std::stable_sort(assignments.begin(),
+                     assignments.end(),
+                     [&](const auto& left, const auto& right)
+                     {
+                         const auto leftScore = scoreCuratedDspMacroAssignment(project,
+                                                                              left,
+                                                                              preferredBusId,
+                                                                              preferredInputSourceId);
+                         const auto rightScore = scoreCuratedDspMacroAssignment(project,
+                                                                                right,
+                                                                                preferredBusId,
+                                                                                preferredInputSourceId);
+                         if (leftScore != rightScore)
+                             return leftScore > rightScore;
+
+                         return std::tie(left.slot->displayName, left.parameter->id, left.slot->id)
+                             < std::tie(right.slot->displayName, right.parameter->id, right.slot->id);
+                     });
+
     return assignments;
 }
 
-juce::String formatCuratedDspMacroAssignment(const CuratedDspMacroAssignment& assignment)
+juce::String formatCuratedDspMacroAssignment(const drs::engine::RuntimeProjectModel& project,
+                                             const CuratedDspMacroAssignment& assignment,
+                                             const std::string& preferredBusId)
 {
-    return "DSP: " + juce::String::fromUTF8(assignment.slot->displayName.c_str())
-        + " / " + juce::String(assignment.parameter->id.data(),
-                                static_cast<int>(assignment.parameter->id.size()));
+    auto scopeLabel = juce::String("FX");
+    if (const auto* ownerBus = findOwnerBusForFxSlot(project, assignment.slot->id))
+    {
+        scopeLabel = ownerBus->id == preferredBusId
+            ? "Current Scope"
+            : formatRoutingInputSourceLabel(project, ownerBus->inputSourceId);
+    }
+
+    return scopeLabel + " | "
+        + juce::String::fromUTF8(assignment.slot->displayName.c_str())
+        + " / " + formatDspParameterName(assignment.parameter->id);
+}
+
+juce::String buildMacroControllerSummaryForBus(const drs::engine::RuntimeProjectModel& project,
+                                               const std::string& routingBusId)
+{
+    if (routingBusId.empty())
+        return "macros none";
+
+    juce::String summary = "macros ";
+    auto appendedAny = false;
+    for (const auto& macro : project.authoring.macros)
+    {
+        if (macro.targets.empty() || macro.targets.front().dspSlotId.empty())
+            continue;
+
+        const auto* ownerBus = findOwnerBusForFxSlot(project, macro.targets.front().dspSlotId);
+        if (ownerBus == nullptr || ownerBus->id != routingBusId)
+            continue;
+
+        if (appendedAny)
+            summary << ", ";
+        summary << juce::String::fromUTF8(macro.name.c_str());
+        appendedAny = true;
+    }
+
+    return appendedAny ? summary : "macros none";
 }
 
 void configureEditorSlider(juce::Slider& slider,
@@ -1356,6 +1540,18 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         if (isRefreshing)
             return;
         selectedDspScopeIndex = std::clamp(fxScopeSelector.getSelectedId() - 1, 0, 2);
+        if (const auto scopedBusId = selectedDspScopeRoutingBusId(); !scopedBusId.empty())
+        {
+            const auto& routingBuses = authoringSession.getProject().authoring.routingBuses;
+            const auto iterator = std::find_if(routingBuses.begin(),
+                                               routingBuses.end(),
+                                               [&](const auto& routingBus)
+                                               {
+                                                   return routingBus.id == scopedBusId;
+                                               });
+            if (iterator != routingBuses.end())
+                selectedRoutingBusIndex = static_cast<int>(std::distance(routingBuses.begin(), iterator));
+        }
         refreshFromSession();
     };
 
@@ -1469,8 +1665,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     fxAssignMacroButton.setButtonText("Assign Macro");
     fxAssignMacroButton.onClick = [this]
     {
-        drawerState.activeTab = authoring::DrawerTab::macros;
-        refreshDrawerVisibility();
+        assignSelectedFxParameterToMacro();
     };
 
     routingInputSelector.onChange = [this]
@@ -3699,6 +3894,17 @@ void AuthoringPanel::refreshContextualAccessibility()
         ? juce::String(project.authoring.fxSlots[static_cast<std::size_t>(selectedFxSlotIndex)].bypassed ? "bypassed"
                                                                                                             : "active")
         : juce::String{};
+    const auto hasSelectedFxParameter = hasSelectedFxSlot
+        && selectedFxParameterIndex >= 0
+        && static_cast<std::size_t>(selectedFxParameterIndex) < fxParameterIds.size();
+    const auto fxParameterName = hasSelectedFxParameter
+        ? formatDspParameterName(fxParameterIds[static_cast<std::size_t>(selectedFxParameterIndex)])
+        : juce::String("the selected parameter");
+    const auto existingMacroIndex = hasSelectedFxParameter
+        ? findMacroIndexForDspTarget(project,
+                                     project.authoring.fxSlots[static_cast<std::size_t>(selectedFxSlotIndex)].id,
+                                     fxParameterIds[static_cast<std::size_t>(selectedFxParameterIndex)])
+        : std::optional<std::size_t> {};
 
     updateAccessibleDescriptionAndHelpText(fxSelector,
                                            hasSelectedFxSlot
@@ -3721,6 +3927,19 @@ void AuthoringPanel::refreshContextualAccessibility()
                                            hasSelectedFxSlot
                                                ? "Press to toggle whether " + fxName + " is bypassed."
                                                : "Author an FX slot before toggling bypass.");
+    updateAccessibleDescriptionAndHelpText(fxAssignMacroButton,
+                                           hasSelectedFxParameter
+                                               ? (existingMacroIndex.has_value()
+                                                      ? "Opens the authored control bound to " + fxParameterName
+                                                            + " on " + fxName + "."
+                                                      : "Creates a new performance control from " + fxParameterName
+                                                            + " on " + fxName + ".")
+                                               : "Unavailable because no FX parameter is selected.",
+                                           hasSelectedFxParameter
+                                               ? (existingMacroIndex.has_value()
+                                                      ? "Press to jump to the macro that already controls this parameter."
+                                                      : "Press to create a visible control from the selected routing parameter.")
+                                               : "Select a curated FX parameter before creating a control.");
 
     const auto hasSelectedRoutingBus = !project.authoring.routingBuses.empty()
         && selectedRoutingBusIndex >= 0
@@ -4234,7 +4453,8 @@ void AuthoringPanel::refreshFromSession()
                 + " | " + juce::String(memberCount) + " zones"
                 + " | routing " + (selectedGroup->routingBusId.empty()
                                        ? juce::String("direct")
-                                       : findRoutingBusDisplayName(project, selectedGroup->routingBusId)),
+                                       : findRoutingBusDisplayName(project, selectedGroup->routingBusId))
+                + " | " + buildMacroControllerSummaryForBus(project, selectedGroup->routingBusId),
             juce::dontSendNotification);
         groupVisibilityHintLabel.setText(
             hiddenGroupCount > 0
@@ -4308,12 +4528,18 @@ void AuthoringPanel::refreshFromSession()
             const auto itemId = curatedMacroAssignmentBase + static_cast<int>(index);
             macroAssignmentSelector.addItem(curatedMacroAssignments[index].label, itemId);
         }
-        const auto dspAssignments = buildCuratedDspMacroAssignments(project);
+        const auto preferredRoutingBusId = selectedDspScopeRoutingBusId();
+        const auto dspAssignments = buildCuratedDspMacroAssignments(project,
+                                                                    preferredRoutingBusId,
+                                                                    selectedDspScopeInputSource());
         for (std::size_t index = 0; index < dspAssignments.size(); ++index)
         {
             const auto& assignment = dspAssignments[index];
             const auto itemId = curatedDspMacroAssignmentBase + static_cast<int>(index);
-            macroAssignmentSelector.addItem(formatCuratedDspMacroAssignment(assignment), itemId);
+            macroAssignmentSelector.addItem(formatCuratedDspMacroAssignment(project,
+                                                                            assignment,
+                                                                            preferredRoutingBusId),
+                                           itemId);
             if (!macro.targets.empty()
                 && macro.targets.front().dspSlotId == assignment.slot->id
                 && macro.targets.front().dspParameterId == assignment.parameter->id)
@@ -4467,6 +4693,13 @@ void AuthoringPanel::refreshFromSession()
         fxParameterSlider.setEnabled(!unavailable && !fxParameterIds.empty());
         fxParameterResetButton.setEnabled(!unavailable && !fxParameterIds.empty());
         fxAssignMacroButton.setEnabled(!unavailable && !fxParameterIds.empty());
+        const auto hasMacroControl = selectedFxParameterIndex >= 0
+            && static_cast<std::size_t>(selectedFxParameterIndex) < fxParameterIds.size()
+            && findMacroIndexForDspTarget(project,
+                                          fxSlot.id,
+                                          fxParameterIds[static_cast<std::size_t>(selectedFxParameterIndex)]).has_value();
+        fxAssignMacroButton.setButtonText(hasMacroControl ? "Edit Control" : "Create Control");
+        fxAssignMacroButton.setTitle(fxAssignMacroButton.getButtonText());
         fxDuplicateButton.setEnabled(true);
         fxDeleteButton.setEnabled(true);
         fxMoveUpButton.setEnabled(!scopedFxSlotIds.empty() && scopedFxSlotIds.front() != fxSlot.id);
@@ -4515,6 +4748,8 @@ void AuthoringPanel::refreshFromSession()
         fxParameterSlider.setEnabled(false);
         fxParameterResetButton.setEnabled(false);
         fxAssignMacroButton.setEnabled(false);
+        fxAssignMacroButton.setButtonText("Create Control");
+        fxAssignMacroButton.setTitle(fxAssignMacroButton.getButtonText());
         fxParameterValueLabel.setText("Select a catalog effect to inspect its descriptor value and default.",
                                       juce::dontSendNotification);
         fxDuplicateButton.setEnabled(false);
@@ -4580,7 +4815,8 @@ void AuthoringPanel::refreshFromSession()
         routingSummaryLabel.setText(
             "Bus " + juce::String::fromUTF8(routingBus.id.c_str())
                 + " | source " + formatRoutingInputSourceLabel(project, routingBus.inputSourceId)
-                + " | chain " + joinIdList(routingBus.fxSlotIds),
+                + " | chain " + joinIdList(routingBus.fxSlotIds)
+                + " | " + buildMacroControllerSummaryForBus(project, routingBus.id),
             juce::dontSendNotification);
     }
     else
@@ -5198,7 +5434,9 @@ void AuthoringPanel::applySelectedMacroEdit(const juce::String& label)
     }
     else if (assignmentId >= curatedDspMacroAssignmentBase)
     {
-        const auto dspAssignments = buildCuratedDspMacroAssignments(authoringSession.getProject());
+        const auto dspAssignments = buildCuratedDspMacroAssignments(authoringSession.getProject(),
+                                                                    selectedDspScopeRoutingBusId(),
+                                                                    selectedDspScopeInputSource());
         const auto assignmentIndex = static_cast<std::size_t>(assignmentId - curatedDspMacroAssignmentBase);
         if (assignmentIndex < dspAssignments.size())
         {
@@ -5405,7 +5643,20 @@ void AuthoringPanel::createScopedFxSlot()
             slot.parameters.push_back({ std::string(parameter.id), parameter.defaultValue });
     const auto result = authoringSession.createFxSlot(slot, owner, "Add curated insert");
     if (result.applied)
+    {
         selectedFxSlotIndex = static_cast<int>(authoringSession.getProject().authoring.fxSlots.size()) - 1;
+        if (const auto* ownerBus = findRoutingBusById(authoringSession.getProject(), owner))
+        {
+            const auto& routingBuses = authoringSession.getProject().authoring.routingBuses;
+            selectedRoutingBusIndex = static_cast<int>(std::distance(routingBuses.begin(),
+                                                                     std::find_if(routingBuses.begin(),
+                                                                                  routingBuses.end(),
+                                                                                  [&](const auto& routingBus)
+                                                                                  {
+                                                                                      return routingBus.id == ownerBus->id;
+                                                                                  })));
+        }
+    }
     refreshFromSession();
 }
 
@@ -5464,6 +5715,114 @@ void AuthoringPanel::applySelectedFxParameterEdit(const juce::String& label)
                                             fxParameterIds[static_cast<std::size_t>(selectedFxParameterIndex)],
                                             fxParameterSlider.getValue(), label.toStdString());
     }
+    refreshFromSession();
+}
+
+void AuthoringPanel::assignSelectedFxParameterToMacro()
+{
+    const auto& project = authoringSession.getProject();
+    if (selectedFxSlotIndex < 0
+        || static_cast<std::size_t>(selectedFxSlotIndex) >= project.authoring.fxSlots.size()
+        || selectedFxParameterIndex < 0
+        || static_cast<std::size_t>(selectedFxParameterIndex) >= fxParameterIds.size())
+    {
+        return;
+    }
+
+    const auto& fxSlot = project.authoring.fxSlots[static_cast<std::size_t>(selectedFxSlotIndex)];
+    const auto parameterId = fxParameterIds[static_cast<std::size_t>(selectedFxParameterIndex)];
+    if (const auto existingMacroIndex = findMacroIndexForDspTarget(project, fxSlot.id, parameterId);
+        existingMacroIndex.has_value())
+    {
+        authoringSession.selectMacro(project.authoring.macros[*existingMacroIndex].id);
+        setActiveDrawerTab(authoring::DrawerTab::macros);
+        refreshFromSession();
+        return;
+    }
+
+    const auto* descriptor = drs::engine::findCuratedDspEffect(fxSlot.effectType, fxSlot.effectVersion);
+    if (descriptor == nullptr)
+    {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Create Control Failed",
+                                               "The selected insert does not have a curated DSP descriptor.");
+        return;
+    }
+
+    const auto parameterIterator = std::find_if(descriptor->parameters.begin(),
+                                                descriptor->parameters.end(),
+                                                [&](const auto& parameter)
+                                                {
+                                                    return parameter.id == parameterId;
+                                                });
+    if (parameterIterator == descriptor->parameters.end())
+    {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Create Control Failed",
+                                               "The selected parameter could not be resolved from the DSP catalog.");
+        return;
+    }
+
+    juce::String scopeName = "Instrument";
+    if (selectedDspScopeIndex == 0)
+    {
+        if (const auto selectedZone = authoringSession.getSelectedZone(); selectedZone.has_value())
+            scopeName = juce::String::fromUTF8(selectedZone->displayName.c_str());
+    }
+    else if (selectedDspScopeIndex == 1)
+    {
+        if (const auto selectedGroup = authoringSession.getSelectedGroup(); selectedGroup.has_value())
+            scopeName = juce::String::fromUTF8(selectedGroup->displayName.c_str());
+    }
+
+    auto suggestedName = scopeName.trim();
+    if (!(fxSlot.effectType == "drs.gain" && parameterIterator->id == "gainDb"))
+    {
+        const auto parameterName = formatDspParameterName(parameterIterator->id);
+        suggestedName = (suggestedName + " " + parameterName).trim();
+    }
+    if (suggestedName.isEmpty())
+        suggestedName = "Control";
+
+    const auto* authoredParameter = findAuthoredFxParameterValue(fxSlot, parameterId);
+    const auto parameterValue = authoredParameter == nullptr ? parameterIterator->defaultValue : authoredParameter->value;
+    const auto normalizedDefault = parameterIterator->maximum > parameterIterator->minimum
+        ? juce::jlimit(0.0,
+                       1.0,
+                       (parameterValue - parameterIterator->minimum)
+                           / (parameterIterator->maximum - parameterIterator->minimum))
+        : 0.0;
+
+    drs::engine::RuntimeProjectMacroDefinition macro;
+    macro.name = suggestedName.toStdString();
+    macro.exposedInPerformance = true;
+    macro.minValue = 0.0;
+    macro.maxValue = 1.0;
+    macro.defaultValue = normalizedDefault;
+
+    drs::engine::RuntimeProjectMacroTargetDefinition target;
+    target.parameterId = "dsp." + fxSlot.id + "." + parameterId;
+    target.parameterPath = "curatedDsp." + fxSlot.id + "." + parameterId;
+    target.role = "mix";
+    target.dspSlotId = fxSlot.id;
+    target.dspParameterId = parameterId;
+    target.sourceMinimum = macro.minValue;
+    target.sourceMaximum = macro.maxValue;
+    target.destinationMinimum = parameterIterator->minimum;
+    target.destinationMaximum = parameterIterator->maximum;
+    target.curve = "linear";
+    macro.targets.push_back(std::move(target));
+
+    const auto result = authoringSession.createMacro(macro, "Create control from FX parameter");
+    if (!result.applied)
+    {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Create Control Failed",
+                                               buildIssueSummary(result.issues));
+        return;
+    }
+
+    setActiveDrawerTab(authoring::DrawerTab::macros);
     refreshFromSession();
 }
 

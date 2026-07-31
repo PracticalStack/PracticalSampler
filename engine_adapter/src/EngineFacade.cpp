@@ -26,6 +26,8 @@
 #include <sstream>
 #include <stdexcept>
 #include <thread>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace drs::engine
 {
@@ -204,6 +206,139 @@ std::string buildMotionCurrentEffect(const RuntimeSessionStateSnapshot& sessionS
 std::string buildAppliedMacroSummary(const RuntimeSessionStateSnapshot& sessionState)
 {
     return "Tone: " + buildToneCurrentEffect(sessionState) + " | Motion: " + buildMotionCurrentEffect(sessionState);
+}
+
+std::string runtimeMacroIdFromHostParameterId(const std::string& hostParameterId)
+{
+    constexpr std::string_view prefix { "macro." };
+    return hostParameterId.rfind(prefix.data(), 0) == 0
+        ? hostParameterId.substr(prefix.size())
+        : hostParameterId;
+}
+
+std::vector<PublishedMacroHostSlotDefinition> buildPublishedHostSlots(
+    const std::vector<PlaybackSnapshotMacroDefault>& authoredMacros,
+    const std::vector<RuntimeMacroDefinition>& hostMacros,
+    const ImmutablePublishedMacroBindingTablePtr& previousActiveTable)
+{
+    std::vector<PublishedMacroHostSlotDefinition> hostSlots;
+    hostSlots.reserve(hostMacros.size());
+
+    std::unordered_set<std::string> authoredIds;
+    authoredIds.reserve(authoredMacros.size());
+    for (const auto& macro : authoredMacros)
+        authoredIds.insert(macro.id);
+
+    std::vector<std::string> assignedStableIds(hostMacros.size());
+    std::unordered_set<std::string> assignedIds;
+    assignedIds.reserve(authoredMacros.size());
+
+    auto retainPrevious = [&](bool exposedOnly)
+    {
+        if (previousActiveTable == nullptr)
+            return;
+
+        for (const auto& binding : previousActiveTable->bindings)
+        {
+            if (!binding.assigned || binding.hostSlotIndex >= hostMacros.size())
+                continue;
+            if (!authoredIds.count(binding.stableAuthoredId)
+                || !assignedStableIds[binding.hostSlotIndex].empty())
+            {
+                continue;
+            }
+
+            const auto authored = std::find_if(authoredMacros.begin(),
+                                               authoredMacros.end(),
+                                               [&](const auto& macro)
+                                               {
+                                                   return macro.id == binding.stableAuthoredId;
+                                               });
+            if (authored == authoredMacros.end())
+                continue;
+            if (exposedOnly && !authored->exposedInPerformance)
+                continue;
+            if (!exposedOnly && authored->exposedInPerformance)
+                continue;
+            if (!assignedIds.insert(binding.stableAuthoredId).second)
+                continue;
+
+            assignedStableIds[binding.hostSlotIndex] = binding.stableAuthoredId;
+        }
+    };
+
+    retainPrevious(true);
+
+    auto assignAuthoredMacros = [&](bool exposedOnly)
+    {
+        for (const auto& macro : authoredMacros)
+        {
+            if (macro.exposedInPerformance != exposedOnly || assignedIds.count(macro.id))
+                continue;
+
+            const auto openSlot = std::find(assignedStableIds.begin(),
+                                            assignedStableIds.end(),
+                                            std::string {});
+            if (openSlot == assignedStableIds.end())
+                return;
+
+            *openSlot = macro.id;
+            assignedIds.insert(macro.id);
+        }
+    };
+
+    assignAuthoredMacros(true);
+    retainPrevious(false);
+    assignAuthoredMacros(false);
+
+    for (std::size_t index = 0; index < assignedStableIds.size(); ++index)
+    {
+        if (assignedStableIds[index].empty())
+            continue;
+        hostSlots.push_back(
+            { index, "macro." + hostMacros[index].id, assignedStableIds[index] });
+    }
+
+    return hostSlots;
+}
+
+std::vector<PublishedMacroCurrentValue> buildPublishedCurrentValues(
+    const RuntimeSessionStateSnapshot& sessionState,
+    const std::vector<PlaybackSnapshotMacroDefault>& authoredMacros,
+    const ImmutablePublishedMacroBindingTablePtr& previousActiveTable)
+{
+    std::vector<PublishedMacroCurrentValue> currentValues;
+    std::unordered_set<std::string> insertedIds;
+
+    if (previousActiveTable != nullptr)
+    {
+        currentValues.reserve(previousActiveTable->bindings.size());
+        for (const auto& binding : previousActiveTable->bindings)
+        {
+            if (!binding.assigned || !insertedIds.insert(binding.stableAuthoredId).second)
+                continue;
+
+            const auto slotValue = findMacroValue(sessionState,
+                                                  runtimeMacroIdFromHostParameterId(binding.hostParameterId));
+            if (!slotValue.has_value() || !std::isfinite(*slotValue))
+                continue;
+
+            currentValues.push_back({ binding.stableAuthoredId, *slotValue });
+        }
+
+        return currentValues;
+    }
+
+    currentValues.reserve(authoredMacros.size());
+    for (const auto& macro : authoredMacros)
+    {
+        const auto value = findMacroValue(sessionState, macro.id);
+        if (!value.has_value() || !std::isfinite(*value))
+            continue;
+        currentValues.push_back({ macro.id, *value });
+    }
+
+    return currentValues;
 }
 
 std::string resolveDraftSurfaceSource(const DraftPlaybackStatus& status)
@@ -1137,6 +1272,58 @@ std::vector<EngineMacroDescriptor> EngineFacade::getMacroDescriptors() const
     if (!referenceInstrumentActive || !referenceManifest.loaded)
         return descriptors;
 
+    if (const auto activeBindings = getActivePublishedMacroBindings(); activeBindings != nullptr)
+    {
+        descriptors.reserve(activeBindings->bindings.size());
+        for (const auto& binding : activeBindings->bindings)
+        {
+            if (!binding.assigned)
+                continue;
+
+            const auto runtimeId = runtimeMacroIdFromHostParameterId(binding.hostParameterId);
+            const auto currentValue = findMacroValue(currentSessionState, runtimeId)
+                .value_or(binding.publishedValue);
+
+            auto ownershipKey = binding.hostParameterId;
+            auto soundIntent = std::string("Published performance control.");
+            auto currentEffect = std::string {};
+            if (binding.renderTarget == PublishedMacroRenderTarget::toneVelocity)
+            {
+                ownershipKey = "preview.triggerVelocity";
+                soundIntent = "Published control shapes the fixed playback velocity.";
+                currentEffect = buildToneCurrentEffect(currentSessionState);
+            }
+            else if (binding.renderTarget == PublishedMacroRenderTarget::motionPitch)
+            {
+                ownershipKey = "preview.noteTravel";
+                soundIntent = "Published control offsets the played pitch.";
+                currentEffect = buildMotionCurrentEffect(currentSessionState);
+            }
+            else if (binding.renderTarget == PublishedMacroRenderTarget::dspControl)
+            {
+                ownershipKey = "published.dsp." + binding.dspSlotId + "." + binding.dspParameterId;
+                soundIntent = binding.exposedInPerformance
+                    ? "Published exposed control routed into the active DSP graph."
+                    : "Published helper control routed into the active DSP graph.";
+                currentEffect = binding.dspSlotId + " / " + binding.dspParameterId;
+            }
+
+            descriptors.push_back({
+                runtimeId,
+                binding.publishedName,
+                binding.minValue,
+                binding.maxValue,
+                binding.defaultValue,
+                std::clamp(currentValue, binding.minValue, binding.maxValue),
+                std::move(ownershipKey),
+                std::move(soundIntent),
+                std::move(currentEffect)
+            });
+        }
+
+        return descriptors;
+    }
+
     descriptors.reserve(referenceManifest.instrument.macros.size());
 
     for (const auto& macro : referenceManifest.instrument.macros)
@@ -1535,16 +1722,14 @@ PerformancePublishActivationPayloadPtr EngineFacade::authorizePerformanceActivat
     macroBindingRequest.dspGraphDigest = payload->snapshot->dspGraphDigest;
     macroBindingRequest.authoredMacros = payload->snapshot->macroDefaults;
     macroBindingRequest.previousActiveTable = getActivePublishedMacroBindings();
-    macroBindingRequest.hostSlots.reserve(referenceManifest.instrument.macros.size());
-    macroBindingRequest.currentValues.reserve(currentSessionState.macroValues.size());
-    for (std::size_t index = 0; index < referenceManifest.instrument.macros.size(); ++index)
-    {
-        const auto& macro = referenceManifest.instrument.macros[index];
-        macroBindingRequest.hostSlots.push_back(
-            { index, "macro." + macro.id, macro.id });
-    }
-    for (const auto& value : currentSessionState.macroValues)
-        macroBindingRequest.currentValues.push_back({ value.id, value.value });
+    macroBindingRequest.hostSlots = buildPublishedHostSlots(
+        macroBindingRequest.authoredMacros,
+        referenceManifest.instrument.macros,
+        macroBindingRequest.previousActiveTable);
+    macroBindingRequest.currentValues = buildPublishedCurrentValues(
+        currentSessionState,
+        macroBindingRequest.authoredMacros,
+        macroBindingRequest.previousActiveTable);
 
     DspParameterControlLayout dspControlLayout;
     const auto requiresDspMacroControls = std::any_of(

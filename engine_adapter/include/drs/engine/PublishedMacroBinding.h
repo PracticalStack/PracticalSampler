@@ -70,6 +70,7 @@ struct PublishedMacroBinding
     double defaultValue = 0.0;
     double publishedValue = 0.0;
     bool assigned = false;
+    bool exposedInPerformance = false;
     PublishedMacroRenderTarget renderTarget = PublishedMacroRenderTarget::none;
     std::uint32_t dspControlIndex = 0;
     std::string dspSlotId;
@@ -89,6 +90,10 @@ struct ImmutablePublishedMacroBindingTable final
     std::vector<PublishedMacroBinding> bindings;
     std::vector<std::string> retiredStableAuthoredIds;
     std::vector<std::string> unassignedStableAuthoredIds;
+    std::size_t assignedExposedCount = 0;
+    std::size_t assignedHiddenCount = 0;
+    std::size_t unassignedExposedCount = 0;
+    std::size_t unassignedHiddenCount = 0;
     PublishedMacroCallbackView callbackView;
 };
 

@@ -1721,6 +1721,10 @@ void exerciseScopedDspWorkflow(drs::app::AuthoringPanel& panel,
     auto& deleteButton = requireButton(panel, "authoringFxDeleteButton");
     auto& parameterSelector = requireComboBox(panel, "authoringFxParameterSelector");
     auto& parameterSlider = requireSlider(panel, "authoringFxParameterSlider");
+    auto& assignControlButton = requireButton(panel, "authoringFxAssignMacroButton");
+    auto& macrosTabButton = requireButton(panel, "authoringDrawerMacrosTab");
+    auto& routingTabButton = requireButton(panel, "authoringDrawerRoutingTab");
+    auto& macroAssignmentSelector = requireComboBox(panel, "authoringMacroAssignmentSelector");
     require(scopeSelector.isVisible() && addButton.isVisible(),
             "Expanded routing drawer must expose an explicit DSP scope and insert action.");
 
@@ -1772,6 +1776,7 @@ void exerciseScopedDspWorkflow(drs::app::AuthoringPanel& panel,
                                      juce::String("authoringFxAddButton"),
                                      juce::String("authoringFxParameterSelector"),
                                      juce::String("authoringFxParameterSlider"),
+                                     juce::String("authoringFxAssignMacroButton"),
                                      juce::String("authoringFxDiagnosticsLabel") })
     {
         requireNonEmptyAccessibilityTitle(panel, componentId);
@@ -1784,7 +1789,54 @@ void exerciseScopedDspWorkflow(drs::app::AuthoringPanel& panel,
     parameterSlider.onDragEnd();
     require(session.getDocumentState().undoDepth == parameterUndoDepth + 1,
             "Descriptor-driven parameter edits must commit through a normal transaction.");
+    require(assignControlButton.getButtonText() == "Create Control",
+            "An unassigned scoped DSP parameter should advertise a direct Create Control action.");
 
+    const auto groupBus = std::find_if(session.getProject().authoring.routingBuses.begin(),
+                                       session.getProject().authoring.routingBuses.end(),
+                                       [&](const auto& bus)
+                                       {
+                                           return bus.id == selectedGroup->routingBusId;
+                                       });
+    require(groupBus != session.getProject().authoring.routingBuses.end() && !groupBus->fxSlotIds.empty(),
+            "Group-scope control authoring requires the selected group routing bus to own the created insert.");
+    const auto controlledSlotId = groupBus->fxSlotIds.back();
+    const auto macroCountBeforeCreate = session.getProject().authoring.macros.size();
+    assignControlButton.onClick();
+    require(macrosTabButton.getToggleState(),
+            "Create Control should hand off directly into the macros drawer.");
+    require(session.getProject().authoring.macros.size() == macroCountBeforeCreate + 1,
+            "Create Control must author exactly one new macro for an unbound scoped DSP parameter.");
+    const auto createdMacro = session.getSelectedMacro();
+    require(createdMacro.has_value(),
+            "Create Control should leave the new macro selected for immediate editing.");
+    require(createdMacro->name == selectedGroup->displayName,
+            "Group-scoped gain controls should inherit the selected group name by default.");
+    require(createdMacro->exposedInPerformance,
+            "Create Control should expose the authored macro in the performance surface by default.");
+    require(!createdMacro->targets.empty()
+                && createdMacro->targets.front().dspSlotId == controlledSlotId
+                && createdMacro->targets.front().dspParameterId == parameterSelector.getText().toStdString(),
+            "Create Control must bind the authored macro back to the selected scoped DSP parameter.");
+    require(macroAssignmentSelector.getText().contains("Current Scope"),
+            "The macro assignment selector should surface the current scoped DSP target prominently after handoff.");
+    require(requireLabel(panel, "authoringGroupSummaryLabel").getText().contains(createdMacro->name)
+                && requireLabel(panel, "authoringRoutingSummaryLabel").getText().contains(createdMacro->name),
+            "Group and routing summaries should surface which authored control owns the active group bus.");
+
+    routingTabButton.onClick();
+    require(assignControlButton.getButtonText() == "Edit Control",
+            "A scoped DSP parameter that already has a macro should advertise Edit Control.");
+    const auto macroCountBeforeEdit = session.getProject().authoring.macros.size();
+    assignControlButton.onClick();
+    require(macrosTabButton.getToggleState(),
+            "Edit Control should return the creator to the selected macro drawer.");
+    require(session.getProject().authoring.macros.size() == macroCountBeforeEdit,
+            "Edit Control must not create duplicate macros for the same scoped DSP target.");
+    require(session.getSelectedMacro().has_value() && session.getSelectedMacro()->id == createdMacro->id,
+            "Edit Control should focus the existing authored macro for the current scoped DSP target.");
+
+    routingTabButton.onClick();
     const auto slotCountBeforeDuplicate = session.getProject().authoring.fxSlots.size();
     duplicateButton.onClick();
     require(session.getProject().authoring.fxSlots.size() == slotCountBeforeDuplicate + 1,

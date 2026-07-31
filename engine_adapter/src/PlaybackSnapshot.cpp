@@ -348,6 +348,7 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
         macroObject["defaultValue"] = macro.defaultValue;
         macroObject["minValue"] = macro.minValue;
         macroObject["maxValue"] = macro.maxValue;
+        macroObject["exposedInPerformance"] = macro.exposedInPerformance;
 
         ordered_json targets = ordered_json::array();
         for (const auto& target : macro.targets)
@@ -598,6 +599,7 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
         snapshotMacro.defaultValue = macro.defaultValue;
         snapshotMacro.minValue = macro.minValue;
         snapshotMacro.maxValue = macro.maxValue;
+        snapshotMacro.exposedInPerformance = macro.exposedInPerformance;
         snapshotMacro.targets.reserve(macro.targets.size());
 
         for (const auto& target : macro.targets)

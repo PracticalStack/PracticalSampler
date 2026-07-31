@@ -141,11 +141,11 @@ int main()
 
         requireLabelContains(panel,
                              "performancePatchStatusLabel",
-                             "Draft r0 | Preview r0 (Ready) | Published r0 (Ready)",
+                             "Draft r0 | Preview r0 (Ready) | Published r0 (Active)",
                              "Performance panel should expose the seeded default draft-playback state.");
         requireLabelContains(panel,
                              "statusSessionLabel",
-                             "draft=0 | preview=0 (Ready) | published=0 (Ready)",
+                             "draft=0 | preview=0 (Ready) | published=0 (Active)",
                              "Diagnostics panel should expose the seeded default draft-playback state.");
         requireLabelContains(panel,
                              "performancePatchStatusLabel",
@@ -270,8 +270,12 @@ int main()
 
         requireLabelContains(panel,
                              "performancePatchStatusLabel",
-                             "Draft r1 | Preview r1 (Ready) | Published r1 (Ready)",
+                             "Draft r1 | Preview r1 (Ready)",
                              "Performance panel should surface the recovered migrated preview/publish state.");
+        requireLabelContains(panel,
+                             "performancePatchStatusLabel",
+                             "Published r1 (Ready)",
+                             "Performance panel should surface the recovered migrated publish state.");
         requireLabelContains(panel,
                              "statusSessionLabel",
                              "draft=1 | preview=1 (Ready) | published=1 (Ready)",
@@ -310,8 +314,12 @@ int main()
 
         requireLabelContains(panel,
                              "performancePatchStatusLabel",
-                             "Draft r2 | Preview r1 (Stale) | Published r1 (Ready)",
+                             "Draft r2 | Preview r1 (Stale)",
                              "Performance panel should surface the stale-preview edited-draft state.");
+        requireLabelContains(panel,
+                             "performancePatchStatusLabel",
+                             "Published r1 (Ready)",
+                             "Performance panel should keep the last published revision visible while the draft is stale.");
         requireLabelContains(panel,
                              "statusSessionLabel",
                              "draft=2 | preview=1 (Stale) | published=1 (Ready)",
@@ -337,8 +345,12 @@ int main()
 
         requireLabelContains(panel,
                              "performancePatchStatusLabel",
-                             "Draft r2 | Preview r2 (Ready) | Published r2 (Ready)",
+                             "Draft r2 | Preview r2 (Ready)",
                              "Performance panel should surface the republished edited-draft state.");
+        requireLabelContains(panel,
+                             "performancePatchStatusLabel",
+                             "Published r2 (Ready)",
+                             "Performance panel should surface the republished publish revision.");
         requireLabelContains(panel,
                              "statusSessionLabel",
                              "draft=2 | preview=2 (Ready) | published=2 (Ready)",

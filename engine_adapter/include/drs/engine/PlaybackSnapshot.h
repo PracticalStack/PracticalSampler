@@ -56,6 +56,7 @@ struct PlaybackSnapshotMacroDefault
     double defaultValue = 0.0;
     double minValue = 0.0;
     double maxValue = 1.0;
+    bool exposedInPerformance = false;
     std::vector<PlaybackSnapshotMacroTarget> targets;
 };
 

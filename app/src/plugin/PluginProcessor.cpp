@@ -72,6 +72,36 @@ std::optional<double> findMacroValue(const drs::engine::RuntimeSessionStateSnaps
     return iterator->value;
 }
 
+std::string runtimeMacroIdFromHostParameterId(std::string_view hostParameterId)
+{
+    constexpr std::string_view prefix { "macro." };
+    return hostParameterId.rfind(prefix, 0) == 0
+        ? std::string(hostParameterId.substr(prefix.size()))
+        : std::string(hostParameterId);
+}
+
+std::optional<juce::String> findPublishedHostParameterId(
+    const drs::engine::ImmutablePublishedMacroBindingTablePtr& bindings,
+    std::string_view macroId)
+{
+    if (bindings == nullptr)
+        return std::nullopt;
+
+    const auto iterator = std::find_if(bindings->bindings.begin(),
+                                       bindings->bindings.end(),
+                                       [&](const auto& binding)
+                                       {
+                                           return binding.assigned
+                                               && (binding.stableAuthoredId == macroId
+                                                   || runtimeMacroIdFromHostParameterId(binding.hostParameterId)
+                                                       == macroId);
+                                       });
+    if (iterator == bindings->bindings.end())
+        return std::nullopt;
+
+    return juce::String::fromUTF8(iterator->hostParameterId.c_str());
+}
+
 double mapPublishedDspMacroValue(const drs::engine::PublishedMacroCallbackSlot& slot,
                                  const double value) noexcept
 {
@@ -847,8 +877,7 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
             && performanceBeforeRender.hasPendingActivation
             && pendingPerformanceActivation->macroBindings != nullptr)
         {
-            installPublishedMacroCallbackView(
-                pendingPerformanceActivation->macroBindings->callbackView);
+            installPublishedMacroBindings(*pendingPerformanceActivation->macroBindings);
         }
         auto performanceMacroControls = buildPublishedMacroRenderControls();
         performanceMacroControls.transport.valid = hostTransport.valid;
@@ -1014,13 +1043,27 @@ bool Processor::retryProjectRestore()
 
 void Processor::setMacroValueFromShell(const std::string& macroId, double value)
 {
+    auto parameterId = buildMacroParameterId(macroId);
+    if (parameterState.getParameter(parameterId) == nullptr)
+    {
+        if (const auto publishedParameterId = findPublishedHostParameterId(
+                engineFacade.getActivePublishedMacroBindings(), macroId);
+            publishedParameterId.has_value())
+        {
+            parameterId = *publishedParameterId;
+        }
+    }
+
     if (auto* parameter = dynamic_cast<juce::RangedAudioParameter*>(
-            parameterState.getParameter(buildMacroParameterId(macroId))))
+            parameterState.getParameter(parameterId)))
     {
         parameter->beginChangeGesture();
         parameter->setValueNotifyingHost(parameter->convertTo0to1(static_cast<float>(value)));
         parameter->endChangeGesture();
+        return;
     }
+
+    engineFacade.setMacroValue(macroId, value);
 }
 
 void Processor::queueAuthoringPreviewNoteOn(int midiNoteNumber, float velocity)
@@ -2438,9 +2481,10 @@ void Processor::initializePublishedMacroRealtimeState()
     }
 }
 
-void Processor::installPublishedMacroCallbackView(
-    const drs::engine::PublishedMacroCallbackView& view) noexcept
+void Processor::installPublishedMacroBindings(
+    const drs::engine::ImmutablePublishedMacroBindingTable& bindings) noexcept
 {
+    const auto& view = bindings.callbackView;
     activePublishedMacroCallbackView = view;
     diagnosticActivePublishedMacroRevision.store(view.revision, std::memory_order_relaxed);
     for (std::size_t index = 0; index < maxPublishedMacroSlots; ++index)
@@ -2492,7 +2536,18 @@ void Processor::syncEngineFromParameters()
 {
     for (const auto& macro : engineFacade.getMacroDescriptors())
     {
-        if (auto* rawValue = parameterState.getRawParameterValue(buildMacroParameterId(macro.id)))
+        auto parameterId = buildMacroParameterId(macro.id);
+        if (parameterState.getParameter(parameterId) == nullptr)
+        {
+            if (const auto publishedParameterId = findPublishedHostParameterId(
+                    engineFacade.getActivePublishedMacroBindings(), macro.id);
+                publishedParameterId.has_value())
+            {
+                parameterId = *publishedParameterId;
+            }
+        }
+
+        if (auto* rawValue = parameterState.getRawParameterValue(parameterId))
             engineFacade.setMacroValue(macro.id, static_cast<double>(rawValue->load()));
     }
 }
@@ -2505,8 +2560,19 @@ void Processor::syncParametersFromEngine()
     for (std::size_t index = 0; index < macros.size(); ++index)
     {
         const auto& macro = macros[index];
+        auto parameterId = buildMacroParameterId(macro.id);
+        if (parameterState.getParameter(parameterId) == nullptr)
+        {
+            if (const auto publishedParameterId = findPublishedHostParameterId(
+                    engineFacade.getActivePublishedMacroBindings(), macro.id);
+                publishedParameterId.has_value())
+            {
+                parameterId = *publishedParameterId;
+            }
+        }
+
         if (auto* parameter = dynamic_cast<juce::RangedAudioParameter*>(
-                parameterState.getParameter(buildMacroParameterId(macro.id))))
+                parameterState.getParameter(parameterId)))
         {
             parameter->setValueNotifyingHost(parameter->convertTo0to1(static_cast<float>(macro.currentValue)));
         }

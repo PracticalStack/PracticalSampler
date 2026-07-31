@@ -135,6 +135,7 @@ private:
     void moveSelectedFxSlotToSelectedOwner();
     void applySelectedFxParameterEdit(const juce::String& label);
     void resetSelectedFxParameter();
+    void assignSelectedFxParameterToMacro();
     std::string selectedDspScopeInputSource() const;
     std::string selectedDspScopeRoutingBusId() const;
     std::string ensureSelectedDspScopeRoutingBus();

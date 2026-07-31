@@ -49,8 +49,8 @@ drs::engine::PublishedMacroBindingBuildRequest baselineRequest()
     request.macroSchemaDigest = "schema-10";
     request.hostSlots = { { 0, "macro.tone", "tone" }, { 1, "macro.motion", "motion" } };
     request.authoredMacros = {
-        { "tone", "Tone", 0.35, 0.0, 1.0, {} },
-        { "motion", "Motion", 0.15, 0.0, 1.0, {} }
+        { "tone", "Tone", 0.35, 0.0, 1.0, true, {} },
+        { "motion", "Motion", 0.15, 0.0, 1.0, true, {} }
     };
     request.currentValues = { { "tone", 0.8 }, { "motion", 0.7 } };
     return request;
@@ -209,6 +209,27 @@ int main()
                     && bindingFor(*readded.table, "motion").publishedValue == 0.15,
                 "A newly re-added binding must start from its authored default, not a retired slot value.");
 
+        auto hiddenHelper = baselineRequest();
+        hiddenHelper.hostSlots = { { 0, "macro.tone", "tone" } };
+        hiddenHelper.authoredMacros = {
+            { "tone", "Tone", 0.35, 0.0, 1.0, true, {} },
+            { "helper", "Helper", 0.1, 0.0, 1.0, false, {} }
+        };
+        const auto hiddenHelperResult = buildPublishedMacroBindingTable(hiddenHelper);
+        require(hiddenHelperResult.built
+                    && hiddenHelperResult.table != nullptr
+                    && hiddenHelperResult.table->assignedExposedCount == 1
+                    && hiddenHelperResult.table->unassignedHiddenCount == 1
+                    && hasFinding(hiddenHelperResult, "published-macro-unassigned"),
+                "Hidden helper macros may remain unassigned, but the published table must report them explicitly.");
+
+        auto exposedOverflow = hiddenHelper;
+        exposedOverflow.authoredMacros[1].exposedInPerformance = true;
+        const auto exposedOverflowResult = buildPublishedMacroBindingTable(exposedOverflow);
+        require(!exposedOverflowResult.built
+                    && hasFinding(exposedOverflowResult, "published-macro-exposed-slot-missing"),
+                "Exposed macros without a compatible host slot must reject publication.");
+
         auto duplicate = baselineRequest();
         duplicate.authoredMacros.push_back(duplicate.authoredMacros.front());
         require(!buildPublishedMacroBindingTable(duplicate).built,
@@ -219,15 +240,20 @@ int main()
                 "Invalid authored macro ranges must reject publication.");
 
         auto maximum = baselineRequest();
+        maximum.hostSlots.clear();
         maximum.authoredMacros.clear();
         for (std::size_t index = 0; index < maximumPublishedMacroHostSlots; ++index)
         {
+            maximum.hostSlots.push_back(
+                { index,
+                  "macro.slot-" + std::to_string(index),
+                  "macro-" + std::to_string(index) });
             maximum.authoredMacros.push_back(
-                { "macro-" + std::to_string(index), "Macro", 0.5, 0.0, 1.0, {} });
+                { "macro-" + std::to_string(index), "Macro", 0.5, 0.0, 1.0, true, {} });
         }
         require(buildPublishedMacroBindingTable(maximum).built,
                 "The declared maximum authored macro count must remain bounded and accepted.");
-        maximum.authoredMacros.push_back({ "overflow", "Overflow", 0.5, 0.0, 1.0, {} });
+        maximum.authoredMacros.push_back({ "overflow", "Overflow", 0.5, 0.0, 1.0, true, {} });
         require(!buildPublishedMacroBindingTable(maximum).built,
                 "Authored macros beyond the fixed maximum must reject publication.");
 
@@ -319,6 +345,33 @@ int main()
         require(processor.getEngineFacade().getActivePublishedMacroBindings() == changedActive
                     && processor.getRealtimeSafetySnapshot().activePublishedMacroMidiNoteOffset == 0,
                 "Automation for a retired slot must not mutate the active immutable published table.");
+
+        auto arbitraryProject = loadedProject.project;
+        arbitraryProject.projectId += "-arbitrary-exposed-slot";
+        arbitraryProject.authoring.macros = {
+            { "room-gain", "Room Gain", 0.45, 0.0, 1.0, {}, true }
+        };
+        drs::plugin::Processor arbitraryProcessor;
+        arbitraryProcessor.prepareToPlay(48000.0, 256);
+        arbitraryProcessor.replaceAuthoringProject(arbitraryProject);
+        const auto arbitraryRevision
+            = arbitraryProcessor.getAuthoringSession().getDocumentState().revision;
+        require(arbitraryProcessor.getEngineFacade().publishCurrentDraft()
+                    && waitForActivePublish(arbitraryProcessor, arbitraryRevision),
+                "An exposed authored macro with a non-reference id must still publish into the fixed host slot topology.");
+        const auto arbitraryActive = arbitraryProcessor.getEngineFacade().getActivePublishedMacroBindings();
+        require(arbitraryActive != nullptr
+                    && arbitraryActive->assignedExposedCount == 1
+                    && bindingFor(*arbitraryActive, "room-gain").hostParameterId == "macro.tone",
+                "Published bindings must retain the authored stable id while mapping it into a fixed host parameter slot.");
+        arbitraryProcessor.setMacroValueFromShell("room-gain", 0.22);
+        crossAudioBoundary(arbitraryProcessor);
+        const auto arbitraryDescriptors = arbitraryProcessor.getEngineFacade().getMacroDescriptors();
+        require(!arbitraryDescriptors.empty()
+                    && arbitraryDescriptors.front().id == "tone"
+                    && arbitraryDescriptors.front().name == "Room Gain"
+                    && std::abs(arbitraryDescriptors.front().currentValue - 0.22) < 0.001,
+                "Shell automation routed by authored id must update the published slot-backed runtime descriptor.");
 
         std::cout << "Mini Sprint 6.7 published macro and automation binding matrix passed."
                   << std::endl;

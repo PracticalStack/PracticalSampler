@@ -148,6 +148,7 @@ PublishedMacroBindingBuildResult buildPublishedMacroBindingTable(
             binding.minValue = macro.minValue;
             binding.maxValue = macro.maxValue;
             binding.defaultValue = macro.defaultValue;
+            binding.exposedInPerformance = macro.exposedInPerformance;
             binding.renderTarget = classifyRenderTarget(macro);
             if (const auto* dspTarget = findDspTarget(macro))
             {
@@ -200,6 +201,10 @@ PublishedMacroBindingBuildResult buildPublishedMacroBindingTable(
             }
             binding.publishedValue = std::clamp(migratedValue, macro.minValue, macro.maxValue);
             assignedIds.insert(macro.id);
+            if (macro.exposedInPerformance)
+                ++table->assignedExposedCount;
+            else
+                ++table->assignedHiddenCount;
 
             auto& callbackSlot = table->callbackView.slots[slot.slotIndex];
             callbackSlot.assigned = true;
@@ -222,9 +227,20 @@ PublishedMacroBindingBuildResult buildPublishedMacroBindingTable(
         if (!assignedIds.count(macro.id))
         {
             table->unassignedStableAuthoredIds.push_back(macro.id);
-            addFinding(result, PublishedMacroBindingFindingSeverity::warning,
-                       "published-macro-unassigned", "authoredMacros." + macro.id,
-                       "The authored macro has no compatible fixed host slot and remains unassigned.");
+            if (macro.exposedInPerformance)
+            {
+                ++table->unassignedExposedCount;
+                addFinding(result, PublishedMacroBindingFindingSeverity::error,
+                           "published-macro-exposed-slot-missing", "authoredMacros." + macro.id,
+                           "The exposed authored macro has no compatible published host slot.");
+            }
+            else
+            {
+                ++table->unassignedHiddenCount;
+                addFinding(result, PublishedMacroBindingFindingSeverity::warning,
+                           "published-macro-unassigned", "authoredMacros." + macro.id,
+                           "The authored macro has no compatible fixed host slot and remains unassigned.");
+            }
         }
     }
 

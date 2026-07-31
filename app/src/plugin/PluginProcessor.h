@@ -264,8 +264,8 @@ private:
     void resetAuthoringPreviewPreparationAuthorization() noexcept;
     void resetAuthoringWaveformPreviewAuthorization() noexcept;
     void initializePublishedMacroRealtimeState();
-    void installPublishedMacroCallbackView(
-        const drs::engine::PublishedMacroCallbackView& view) noexcept;
+    void installPublishedMacroBindings(
+        const drs::engine::ImmutablePublishedMacroBindingTable& bindings) noexcept;
     drs::engine::SamplerRenderControlValues buildPublishedMacroRenderControls() noexcept;
     void drainRealtimeNoteEvents(RealtimeNoteEventQueue& queue,
                                  drs::engine::SamplerEventBlock& destination,
