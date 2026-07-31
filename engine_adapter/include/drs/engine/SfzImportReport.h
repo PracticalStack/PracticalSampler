@@ -44,6 +44,7 @@ struct SfzImportReportSummary
     std::size_t informationFindingCount = 0;
     std::size_t warningFindingCount = 0;
     std::size_t errorFindingCount = 0;
+    std::size_t suppressedFindingCount = 0;
 };
 
 struct SfzImportReport

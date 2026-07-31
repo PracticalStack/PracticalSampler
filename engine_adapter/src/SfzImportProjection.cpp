@@ -317,7 +317,9 @@ bool isVelocityCrossfadeOpcode(const std::string& opcodeName)
 fs::path resolveSamplePath(const SfzNormalizedSection& section,
                            const SfzResolvedOpcode& sampleOpcode)
 {
-    fs::path resolvedBase = fs::path(sampleOpcode.location.sourcePath).parent_path();
+    fs::path resolvedBase = sampleOpcode.resolutionBasePath.empty()
+        ? fs::path(sampleOpcode.location.sourcePath).parent_path()
+        : fs::path(sampleOpcode.resolutionBasePath);
     if (const auto* prefix = findEffectiveOpcode(section, "prefix_sfz_path");
         prefix != nullptr && !prefix->value.empty())
     {
@@ -420,6 +422,13 @@ std::vector<std::string> buildAuthoringNotes(const SfzImportReport& report)
         if (entry.second > 1)
             note << " (" << entry.second << " occurrences)";
         notes.push_back(note.str());
+    }
+
+    if (report.summary.suppressedFindingCount > 0)
+    {
+        notes.push_back("SFZ import omitted "
+                        + std::to_string(report.summary.suppressedFindingCount)
+                        + " additional findings after reaching the diagnostic safety limit.");
     }
 
     return notes;

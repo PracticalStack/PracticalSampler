@@ -1098,6 +1098,15 @@ bool Editor::saveProjectToFile(const juce::File& file)
 bool Editor::loadProjectFromFile(const juce::File& file)
 {
     const auto targetFile = drs::app::ensureProjectFileExtension(file);
+    const auto recovery = drs::app::recoverProjectFilesTransaction(targetFile);
+    if (recovery.recoveryNeeded && !recovery.recovered)
+    {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Project Recovery Failed",
+                                               recovery.errorMessage);
+        return false;
+    }
+
     const auto loadResult = drs::engine::loadRuntimeProjectManifest(targetFile.getFullPathName().toStdString());
     if (!loadResult.loaded)
     {

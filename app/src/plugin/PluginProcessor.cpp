@@ -6,6 +6,7 @@
 #include "drs/engine/DspGraphPlan.h"
 #include "drs/engine/DspRenderGeneration.h"
 #include "drs/engine/RuntimeLoader.h"
+#include "shared/ProjectStorage.h"
 
 #include <algorithm>
 #include <cctype>
@@ -1576,9 +1577,15 @@ std::optional<drs::engine::HostProjectBinding> Processor::buildValidatedAuthorin
     const drs::engine::RuntimeProjectModel& project) const
 {
     if (resolvedProjectFile == juce::File()
-        || !resolvedProjectFile.hasFileExtension(".drsproj")
-        || !resolvedProjectFile.existsAsFile())
+        || !resolvedProjectFile.hasFileExtension(".drsproj"))
         return std::nullopt;
+
+    const auto recovery = drs::app::recoverProjectFilesTransaction(resolvedProjectFile);
+    if ((recovery.recoveryNeeded && !recovery.recovered)
+        || !resolvedProjectFile.existsAsFile())
+    {
+        return std::nullopt;
+    }
 
     const auto manifestPath = resolvedProjectFile.getFullPathName().toStdString();
     const auto loaded = drs::engine::loadRuntimeProjectManifest(manifestPath);

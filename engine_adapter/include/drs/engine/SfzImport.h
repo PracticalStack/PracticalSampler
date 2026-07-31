@@ -13,6 +13,7 @@ struct SfzParsedOpcode
     std::string name;
     std::string value;
     SfzImportSourceLocation location;
+    std::string resolutionBasePath;
 };
 
 struct SfzParsedSection
@@ -37,6 +38,7 @@ struct SfzDocumentParseResult
     bool complete = false;
     std::string state;
     std::vector<SfzImportFinding> findings;
+    std::size_t suppressedFindingCount = 0;
     SfzParsedDocument document;
     SfzImportExecutionState execution;
 };
@@ -47,6 +49,7 @@ struct SfzResolvedOpcode
     std::string value;
     SfzImportSourceLocation location;
     bool inherited = false;
+    std::string resolutionBasePath;
 };
 
 struct SfzNormalizedSection

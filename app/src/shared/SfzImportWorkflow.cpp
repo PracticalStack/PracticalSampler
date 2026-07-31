@@ -1,6 +1,7 @@
 #include "shared/SfzImportWorkflow.h"
 
 #include <algorithm>
+#include <map>
 #include <sstream>
 
 namespace drs::app
@@ -30,6 +31,36 @@ std::string summarizeFinding(const drs::engine::SfzImportFinding& finding)
     if (!finding.location.sourcePath.empty())
         stream << " [" << finding.location.sourcePath << ":" << finding.location.lineNumber << "]";
     return stream.str();
+}
+
+struct GroupedFinding
+{
+    const drs::engine::SfzImportFinding* first = nullptr;
+    std::size_t occurrenceCount = 0;
+};
+
+std::vector<GroupedFinding> groupFindings(
+    const std::vector<drs::engine::SfzImportFinding>& findings)
+{
+    std::vector<GroupedFinding> groups;
+    std::map<std::string, std::size_t> groupIndexes;
+
+    for (const auto& finding : findings)
+    {
+        const auto key = std::to_string(static_cast<int>(finding.severity)) + "\n"
+            + std::to_string(static_cast<int>(finding.disposition)) + "\n"
+            + finding.code + "\n" + finding.summary;
+        if (const auto iterator = groupIndexes.find(key); iterator != groupIndexes.end())
+        {
+            ++groups[iterator->second].occurrenceCount;
+            continue;
+        }
+
+        groupIndexes.emplace(key, groups.size());
+        groups.push_back({ &finding, 1 });
+    }
+
+    return groups;
 }
 
 void configureWrappedLabel(juce::Label& label,
@@ -263,13 +294,13 @@ juce::String SfzImportReviewComponent::buildProjectionText() const
 
 juce::String SfzImportReviewComponent::buildFindingsText() const
 {
+    constexpr auto maximumRenderedFindingGroups = std::size_t { 100 };
     juce::String text;
 
     if (!review.issues.empty())
     {
         text += "Projection issues:\n";
-        for (const auto& issue : review.issues)
-            text += "- " + toDisplayString(issue) + "\n";
+        text += buildIssueSummary(review.issues, 20) + "\n";
         text += "\n";
     }
 
@@ -280,8 +311,29 @@ juce::String SfzImportReviewComponent::buildFindingsText() const
     }
 
     text += "Findings:\n";
-    for (const auto& finding : review.analysis.report.findings)
-        text += "- " + toDisplayString(summarizeFinding(finding)) + "\n";
+    const auto groups = groupFindings(review.analysis.report.findings);
+    const auto renderedGroupCount = std::min(groups.size(), maximumRenderedFindingGroups);
+    for (std::size_t index = 0; index < renderedGroupCount; ++index)
+    {
+        const auto& group = groups[index];
+        text += "- " + toDisplayString(summarizeFinding(*group.first));
+        if (group.occurrenceCount > 1)
+            text += " (" + juce::String(static_cast<int>(group.occurrenceCount)) + " occurrences)";
+        text += "\n";
+    }
+
+    if (groups.size() > renderedGroupCount)
+    {
+        text += "- ... " + juce::String(static_cast<int>(groups.size() - renderedGroupCount))
+            + " additional finding groups omitted from this view.\n";
+    }
+
+    if (review.analysis.report.summary.suppressedFindingCount > 0)
+    {
+        text += "- ... "
+            + juce::String(static_cast<int>(review.analysis.report.summary.suppressedFindingCount))
+            + " additional findings omitted by import safety limits.\n";
+    }
     return text;
 }
 

@@ -1158,6 +1158,28 @@ add_test(
     COMMAND drs_sprint31_sfz_determinism_tests
 )
 
+add_executable(drs_sprint0_import_storage_hardening_tests
+    src/Sprint0ImportAndStorageHardeningTests.cpp
+)
+
+target_link_libraries(drs_sprint0_import_storage_hardening_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+)
+
+target_compile_definitions(drs_sprint0_import_storage_hardening_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_sprint0_import_storage_hardening_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint0.import_storage_hardening
+    COMMAND drs_sprint0_import_storage_hardening_tests
+)
+
 add_executable(drs_sfz_import_lifecycle_tests
     src/SfzImportLifecycleTests.cpp
 )

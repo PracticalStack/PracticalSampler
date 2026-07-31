@@ -71,6 +71,7 @@ inline SfzImportReportModel makeSfzImportReportModel(
     model.reportedOnlyCount = analysis.report.summary.reportedOnlyOpcodeCount;
     model.blockingCount = analysis.report.summary.blockingOpcodeCount;
     model.report = analysis.report;
+    const auto& report = analysis.report;
 
     if (!model.available)
     {
@@ -87,7 +88,7 @@ inline SfzImportReportModel makeSfzImportReportModel(
     else if (model.confirmationRequired)
     {
         model.headline = "Review SFZ import";
-        if (reportHasVelocityCrossfadeWithDisposition(model.report, drs::engine::SfzImportSupportDisposition::approximated))
+        if (reportHasVelocityCrossfadeWithDisposition(report, drs::engine::SfzImportSupportDisposition::approximated))
         {
             model.guidance =
                 "Some velocity crossfades still fall outside the supported linear-adjacent contract, or other review-only features remain. Confirm the findings before final import.";
@@ -95,10 +96,10 @@ inline SfzImportReportModel makeSfzImportReportModel(
         else
         {
             const auto preservesCrossfades = reportHasVelocityCrossfadeWithDisposition(
-                model.report,
+                report,
                 drs::engine::SfzImportSupportDisposition::converted);
             const auto preservesRoundRobin = reportHasRoundRobinWithDisposition(
-                model.report,
+                report,
                 drs::engine::SfzImportSupportDisposition::converted);
 
             if (preservesCrossfades && preservesRoundRobin)
@@ -127,11 +128,11 @@ inline SfzImportReportModel makeSfzImportReportModel(
     {
         model.headline = "SFZ import ready";
         model.guidance = reportHasVelocityCrossfadeWithDisposition(
-                             model.report,
+                             report,
                              drs::engine::SfzImportSupportDisposition::converted)
             ? "No blocking or lossy findings were detected. Supported linear velocity crossfades will be preserved."
             : reportHasRoundRobinWithDisposition(
-                  model.report,
+                  report,
                   drs::engine::SfzImportSupportDisposition::converted)
             ? "No blocking or lossy findings were detected. Supported sequential round robins will be preserved."
             : "No blocking or lossy findings were detected.";

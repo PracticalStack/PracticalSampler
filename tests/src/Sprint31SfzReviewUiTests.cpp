@@ -194,6 +194,16 @@ int main()
         blockedReview.issues = { "Blocking example issue" };
         blockedReview.reportModel.headline = "Blocked SFZ import";
         blockedReview.reportModel.guidance = "Unsupported content must remain review-only.";
+        blockedReview.analysis.report.findings.clear();
+        drs::engine::SfzImportFinding repeatedFinding;
+        repeatedFinding.severity = drs::engine::SfzImportFindingSeverity::warning;
+        repeatedFinding.disposition = drs::engine::SfzImportSupportDisposition::reportedOnly;
+        repeatedFinding.code = "sfz.opcode.unmapped";
+        repeatedFinding.summary = "Repeated compatibility finding";
+        repeatedFinding.detail = "Only the first occurrence should be rendered.";
+        for (int index = 0; index < 150; ++index)
+            blockedReview.analysis.report.findings.push_back(repeatedFinding);
+        blockedReview.analysis.report.summary.suppressedFindingCount = 27;
 
         std::optional<bool> cancelledDecision;
         {
@@ -211,6 +221,10 @@ int main()
                     "Blocked SFZ review should disable the apply button.");
             require(requireEditor(component, "sfzImportReviewFindingsEditor").getText().contains("Projection issues:"),
                     "Blocked SFZ review should surface projection issues in the findings panel.");
+            const auto findingsText = requireEditor(component, "sfzImportReviewFindingsEditor").getText();
+            require(findingsText.contains("150 occurrences")
+                        && findingsText.contains("27 additional findings omitted by import safety limits"),
+                    "Review UI should group duplicate findings and disclose safety-limit omissions.");
 
             auto& cancelButton = requireButton(component, "sfzImportReviewCancelButton");
             require(static_cast<bool>(cancelButton.onClick),

@@ -114,6 +114,75 @@ void populateCrossfadeRuntimeDescriptors(std::vector<drs::engine::RuntimeZoneDef
         }
     }
 }
+
+struct ProjectTransactionFiles
+{
+    juce::File project;
+    juce::File instrument;
+    juce::File journal;
+    juce::File projectBackup;
+    juce::File instrumentBackup;
+};
+
+ProjectTransactionFiles makeProjectTransactionFiles(const juce::File& projectFile)
+{
+    const auto instrumentFile = projectFile.withFileExtension(".drinst");
+    return {
+        projectFile,
+        instrumentFile,
+        projectFile.getSiblingFile(projectFile.getFileName() + ".save-journal"),
+        projectFile.getSiblingFile(projectFile.getFileName() + ".save-backup"),
+        instrumentFile.getSiblingFile(instrumentFile.getFileName() + ".save-backup")
+    };
+}
+
+bool removeFileIfPresent(const juce::File& file)
+{
+    return !file.exists() || file.deleteFile();
+}
+
+bool restoreTransactionTarget(const juce::File& target,
+                              const juce::File& backup,
+                              const bool targetPreviouslyExisted,
+                              juce::String& errorMessage)
+{
+    if (!removeFileIfPresent(target))
+    {
+        errorMessage = "Could not remove the interrupted transaction target:\n"
+            + target.getFullPathName();
+        return false;
+    }
+
+    if (!targetPreviouslyExisted)
+        return true;
+
+    if (!backup.existsAsFile() || !backup.copyFileTo(target))
+    {
+        errorMessage = "Could not restore the transaction backup:\n"
+            + backup.getFullPathName();
+        return false;
+    }
+
+    return true;
+}
+
+bool writeTransactionJournal(const ProjectTransactionFiles& files,
+                             const bool projectExisted,
+                             const bool instrumentExisted)
+{
+    const juce::String journalText = "drs-project-save-transaction=1\nproject-existed="
+        + juce::String(projectExisted ? 1 : 0)
+        + "\ninstrument-existed=" + juce::String(instrumentExisted ? 1 : 0) + "\n";
+    juce::TemporaryFile temporaryJournal(files.journal);
+    return temporaryJournal.getFile().replaceWithText(journalText, false, false, "\n")
+        && temporaryJournal.overwriteTargetFileWithTemporary();
+}
+
+bool checkpointAllowed(const ProjectFilesSaveOptions& options,
+                       const ProjectFilesSaveCheckpoint checkpoint)
+{
+    return !options.allowCommitAtCheckpoint || options.allowCommitAtCheckpoint(checkpoint);
+}
 } // namespace
 
 juce::File ensureProjectFileExtension(juce::File file)
@@ -281,8 +350,58 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
     return instrument;
 }
 
+ProjectFilesRecoveryResult recoverProjectFilesTransaction(const juce::File& projectFile)
+{
+    ProjectFilesRecoveryResult result;
+    const auto files = makeProjectTransactionFiles(projectFile);
+    if (!files.journal.existsAsFile())
+        return result;
+
+    result.recoveryNeeded = true;
+    const auto journalText = files.journal.loadFileAsString();
+    if (!journalText.contains("drs-project-save-transaction=1"))
+    {
+        result.errorMessage = "The project save recovery journal is not recognized:\n"
+            + files.journal.getFullPathName();
+        return result;
+    }
+
+    const auto projectExisted = journalText.contains("project-existed=1");
+    const auto instrumentExisted = journalText.contains("instrument-existed=1");
+    if (!restoreTransactionTarget(files.project,
+                                  files.projectBackup,
+                                  projectExisted,
+                                  result.errorMessage)
+        || !restoreTransactionTarget(files.instrument,
+                                     files.instrumentBackup,
+                                     instrumentExisted,
+                                     result.errorMessage))
+    {
+        return result;
+    }
+
+    if (!removeFileIfPresent(files.journal))
+    {
+        result.errorMessage = "The recovered project save journal could not be removed:\n"
+            + files.journal.getFullPathName();
+        return result;
+    }
+
+    removeFileIfPresent(files.projectBackup);
+    removeFileIfPresent(files.instrumentBackup);
+    result.recovered = true;
+    return result;
+}
+
 ProjectFilesSaveResult saveProjectFiles(const drs::engine::RuntimeProjectModel& project,
                                         const juce::File& projectFile)
+{
+    return saveProjectFiles(project, projectFile, {});
+}
+
+ProjectFilesSaveResult saveProjectFiles(const drs::engine::RuntimeProjectModel& project,
+                                        const juce::File& projectFile,
+                                        const ProjectFilesSaveOptions& options)
 {
     ProjectFilesSaveResult result;
     if (!ensureProjectFolderLayout(projectFile))
@@ -292,7 +411,16 @@ ProjectFilesSaveResult saveProjectFiles(const drs::engine::RuntimeProjectModel& 
         return result;
     }
 
-    const auto instrumentFile = projectFile.withFileExtension(".drinst");
+    const auto files = makeProjectTransactionFiles(projectFile);
+    const auto recovery = recoverProjectFilesTransaction(projectFile);
+    if (recovery.recoveryNeeded && !recovery.recovered)
+    {
+        result.errorMessage = recovery.errorMessage;
+        return result;
+    }
+    result.recoveredPreviousGeneration = recovery.recovered;
+
+    const auto instrumentFile = files.instrument;
     const auto instrument = buildInstrumentManifestForProject(project, projectFile);
     const auto serializedProject = drs::engine::serializeRuntimeProjectManifest(
         project, projectFile.getFullPathName().toStdString());
@@ -315,17 +443,69 @@ ProjectFilesSaveResult saveProjectFiles(const drs::engine::RuntimeProjectModel& 
         return result;
     }
 
+    removeFileIfPresent(files.projectBackup);
+    removeFileIfPresent(files.instrumentBackup);
+    const auto projectExisted = files.project.existsAsFile();
+    const auto instrumentExisted = files.instrument.existsAsFile();
+    if ((projectExisted && !files.project.copyFileTo(files.projectBackup))
+        || (instrumentExisted && !files.instrument.copyFileTo(files.instrumentBackup)))
+    {
+        removeFileIfPresent(files.projectBackup);
+        removeFileIfPresent(files.instrumentBackup);
+        result.errorMessage = "The previous project generation could not be backed up before saving.";
+        return result;
+    }
+
+    if (!writeTransactionJournal(files, projectExisted, instrumentExisted))
+    {
+        removeFileIfPresent(files.projectBackup);
+        removeFileIfPresent(files.instrumentBackup);
+        result.errorMessage = "The recoverable project save journal could not be written to:\n"
+            + files.journal.getFullPathName();
+        return result;
+    }
+
+    const auto rollback = [&result, &files](const juce::String& commitError)
+    {
+        const auto rollbackResult = recoverProjectFilesTransaction(files.project);
+        result.recoveredPreviousGeneration = rollbackResult.recovered;
+        result.errorMessage = commitError;
+        if (!rollbackResult.recovered)
+            result.errorMessage += "\n\nAutomatic recovery failed:\n" + rollbackResult.errorMessage;
+    };
+
+    if (!checkpointAllowed(options, ProjectFilesSaveCheckpoint::beforeInstrumentCommit))
+    {
+        rollback("The project save was interrupted before the instrument commit.");
+        return result;
+    }
+
     if (!temporaryInstrument.overwriteTargetFileWithTemporary())
     {
-        result.errorMessage = "The instrument could not be saved to:\n" + instrumentFile.getFullPathName();
+        rollback("The instrument could not be saved to:\n" + instrumentFile.getFullPathName());
+        return result;
+    }
+
+    if (!checkpointAllowed(options, ProjectFilesSaveCheckpoint::beforeProjectCommit))
+    {
+        rollback("The project save was interrupted after the instrument commit.");
         return result;
     }
 
     if (!temporaryProject.overwriteTargetFileWithTemporary())
     {
-        result.errorMessage = "The project could not be saved to:\n" + projectFile.getFullPathName();
+        rollback("The project could not be saved to:\n" + projectFile.getFullPathName());
         return result;
     }
+
+    if (!removeFileIfPresent(files.journal))
+    {
+        rollback("The project pair was written, but the save transaction could not be finalized.");
+        return result;
+    }
+
+    removeFileIfPresent(files.projectBackup);
+    removeFileIfPresent(files.instrumentBackup);
 
     result.saved = true;
     return result;

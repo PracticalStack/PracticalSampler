@@ -282,7 +282,9 @@ std::string findEffectiveSampleReference(const SfzNormalizedSection& section)
     if (sample == nullptr)
         return {};
 
-    fs::path resolvedBase = fs::path(sample->location.sourcePath).parent_path();
+    fs::path resolvedBase = sample->resolutionBasePath.empty()
+        ? fs::path(sample->location.sourcePath).parent_path()
+        : fs::path(sample->resolutionBasePath);
     if (const auto* prefix = findEffectiveOpcode(section, "prefix_sfz_path");
         prefix != nullptr && !prefix->value.empty())
     {
@@ -298,7 +300,9 @@ std::string findEffectiveSampleReference(const SfzNormalizedSection& section)
 std::string resolveSamplePathForSection(const SfzNormalizedSection& section,
                                         const SfzResolvedOpcode& opcode)
 {
-    fs::path resolvedBase = fs::path(opcode.location.sourcePath).parent_path();
+    fs::path resolvedBase = opcode.resolutionBasePath.empty()
+        ? fs::path(opcode.location.sourcePath).parent_path()
+        : fs::path(opcode.resolutionBasePath);
     if (const auto* prefix = findEffectiveOpcode(section, "prefix_sfz_path");
         prefix != nullptr && !prefix->value.empty())
     {
@@ -807,7 +811,7 @@ void incrementDispositionCount(SfzImportReportSummary& summary,
 }
 
 void accumulateFindingSeverities(SfzImportReportSummary& summary,
-                                 const std::vector<SfzImportFinding>& findings) noexcept
+                                  const std::vector<SfzImportFinding>& findings) noexcept
 {
     for (const auto& finding : findings)
     {
@@ -826,10 +830,29 @@ void accumulateFindingSeverities(SfzImportReportSummary& summary,
     }
 }
 
+void appendFindingsBounded(std::vector<SfzImportFinding>& destination,
+                           const std::vector<SfzImportFinding>& source,
+                           const std::size_t maximumFindingCount,
+                           std::size_t& suppressedFindingCount)
+{
+    for (const auto& finding : source)
+    {
+        if (destination.size() >= maximumFindingCount)
+        {
+            ++suppressedFindingCount;
+            continue;
+        }
+
+        destination.push_back(finding);
+    }
+}
+
 void addClassificationFinding(std::vector<SfzImportFinding>& findings,
-                              const OpcodeClassification& classification,
-                              const SfzResolvedOpcode& opcode,
-                              const std::string& sampleReference)
+                               const OpcodeClassification& classification,
+                               const SfzResolvedOpcode& opcode,
+                               const std::string& sampleReference,
+                               const std::size_t maximumFindingCount,
+                               std::size_t& suppressedFindingCount)
 {
     if (classification.disposition == SfzImportSupportDisposition::converted)
         return;
@@ -845,6 +868,12 @@ void addClassificationFinding(std::vector<SfzImportFinding>& findings,
     if (!sampleReference.empty())
         finding.detail += " Context sample: '" + sampleReference + "'.";
     finding.location = opcode.location;
+    if (findings.size() >= maximumFindingCount)
+    {
+        ++suppressedFindingCount;
+        return;
+    }
+
     findings.push_back(std::move(finding));
 }
 
@@ -1064,14 +1093,16 @@ SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath,
     result.report.summary.sectionCount = result.parseResult.document.sections.size();
     result.report.summary.opcodeCount = countParsedOpcodes(result.parseResult.document);
     result.report.findings = result.parseResult.findings;
+    result.report.summary.suppressedFindingCount = result.parseResult.suppressedFindingCount;
 
     if (result.parseResult.parsed)
     {
         result.normalizeResult = normalizeSfzDocument(result.parseResult.document, context);
         result.execution = result.normalizeResult.execution;
-        result.report.findings.insert(result.report.findings.end(),
-                                      result.normalizeResult.findings.begin(),
-                                      result.normalizeResult.findings.end());
+        appendFindingsBounded(result.report.findings,
+                              result.normalizeResult.findings,
+                              context.budgets.maximumFindingCount,
+                              result.report.summary.suppressedFindingCount);
 
         if (result.execution.canceled())
         {
@@ -1160,7 +1191,9 @@ SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath,
                     addClassificationFinding(result.report.findings,
                                              classification,
                                              opcode,
-                                             sampleReference);
+                                             sampleReference,
+                                             context.budgets.maximumFindingCount,
+                                             result.report.summary.suppressedFindingCount);
                     updateSupportSummary(supportSummaries, opcode, classification);
 
                     result.report.traceEntries.push_back(
@@ -1198,6 +1231,15 @@ SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath,
     }
 
     result.report.reviewDisposition = sfzImportReviewDispositionFor(result.report.findings);
+    if (!result.parseResult.parsed || result.report.summary.blockingOpcodeCount > 0)
+    {
+        result.report.reviewDisposition = SfzImportReviewDisposition::blocked;
+    }
+    else if (result.report.summary.approximatedOpcodeCount > 0
+             || result.report.summary.reportedOnlyOpcodeCount > 0)
+    {
+        result.report.reviewDisposition = SfzImportReviewDisposition::confirmationRequired;
+    }
     result.report.blocking = result.report.reviewDisposition == SfzImportReviewDisposition::blocked;
     result.report.stage = result.report.blocking ? SfzImportStage::blocked
                                                  : SfzImportStage::reviewReady;

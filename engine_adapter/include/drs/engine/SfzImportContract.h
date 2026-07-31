@@ -61,7 +61,21 @@ enum class SfzImportFailureReason : std::uint8_t
     sourceMissing,
     malformedInput,
     unsupportedInput,
-    internalError
+    internalError,
+    budgetExceeded
+};
+
+struct SfzImportBudgetLimits
+{
+    // These defaults admit the checked-in real-world corpus while bounding
+    // hostile recursive or diagnostic-heavy documents well below process-
+    // threatening sizes.
+    std::size_t maximumTotalSourceBytes = 16u * 1024u * 1024u;
+    std::size_t maximumIncludeCount = 256;
+    std::size_t maximumIncludeDepth = 32;
+    std::size_t maximumSectionCount = 100000;
+    std::size_t maximumRegionCount = 65536;
+    std::size_t maximumFindingCount = 512;
 };
 
 struct SfzImportExecutionState
@@ -108,6 +122,7 @@ struct SfzImportExecutionContext
     SfzImportProgressSink progressSink;
     SfzImportCancellationReasonProbe cancellationReasonProbe;
     SfzImportProgressEventSink progressEventSink;
+    SfzImportBudgetLimits budgets;
 
     // Polling is intentionally noexcept. A throwing callback is unsafe on a
     // parser worker, so it becomes a typed cancellation instead.
