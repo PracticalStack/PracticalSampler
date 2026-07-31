@@ -123,6 +123,9 @@ private:
     void toggleSelectedGroupVisibility();
     void previewSelectedGroupAnchor();
     void applySelectedMacroEdit(const juce::String& label);
+    void createMacro();
+    void duplicateSelectedMacro();
+    void deleteSelectedMacro();
     void moveSelectedMacro(int direction);
     void applySelectedFxSlotEdit(const juce::String& label);
     void createScopedFxSlot();
@@ -246,6 +249,13 @@ private:
     juce::Label groupVisibilityHintLabel;
 
     authoring::RepeatedStructureList macroList;
+    juce::TextButton macroCreateButton;
+    juce::TextButton macroDuplicateButton;
+    juce::TextButton macroDeleteButton;
+    juce::Label macroNameLabel;
+    juce::TextEditor macroNameEditor;
+    juce::Label macroExposeLabel;
+    juce::ToggleButton macroExposeToggle;
     juce::Label macroAssignmentLabel;
     juce::ComboBox macroAssignmentSelector;
     juce::Label macroRoleLabel;

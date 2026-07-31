@@ -168,6 +168,13 @@ juce::ComboBox& requireComboBox(juce::Component& root, const juce::String& compo
     return *combo;
 }
 
+juce::TextEditor& requireTextEditor(juce::Component& root, const juce::String& componentId)
+{
+    auto* editor = dynamic_cast<juce::TextEditor*>(findDescendantById(root, componentId));
+    require(editor != nullptr, "Missing text editor ID: " + componentId.toStdString());
+    return *editor;
+}
+
 juce::Viewport& requireViewport(juce::Component& root, const juce::String& componentId)
 {
     auto* viewport = dynamic_cast<juce::Viewport*>(findDescendantById(root, componentId));
@@ -1103,7 +1110,7 @@ void writeReachabilityChecklist(std::ostream& inventory)
     inventory << "- Mapping inspector: authoringRootKeySlider, authoringKeyLowSlider, authoringKeyHighSlider, authoringVelocityLowSlider, authoringVelocityHighSlider, authoringGainSlider, authoringPanSlider, authoringLoopEnabledToggle, authoringTriggerModeSelector, authoringRestoreRootKeyButton\n";
     inventory << "- Drawer context: authoringDrawerTitleLabel, authoringDrawerScopeLabel, authoringDrawerBreadcrumbLabel\n";
     inventory << "- Waveform drawer content: authoringWaveformPreview, authoringWaveformStatusLabel, authoringWaveformInfoLabel, authoringWaveformLoopLabel, authoringWaveformImportLabel, authoringWaveformValidationLabel, authoringWaveformValidationButton\n";
-    inventory << "- Macros drawer content: authoringMacroList, authoringMacroListBox, authoringMacroAssignmentSelector, authoringMacroRoleSelector, authoringMacroDefaultSlider, authoringMacroMinSlider, authoringMacroMaxSlider, authoringMacroMoveUpButton, authoringMacroMoveDownButton\n";
+    inventory << "- Macros drawer content: authoringMacroList, authoringMacroListBox, authoringMacroCreateButton, authoringMacroDuplicateButton, authoringMacroDeleteButton, authoringMacroNameEditor, authoringMacroExposeToggle, authoringMacroAssignmentSelector, authoringMacroRoleSelector, authoringMacroDefaultSlider, authoringMacroMinSlider, authoringMacroMaxSlider, authoringMacroMoveUpButton, authoringMacroMoveDownButton\n";
     inventory << "- Routing drawer content: authoringFxSelector, authoringFxTypeSelector, authoringFxBypassedToggle, authoringRoutingSelector, authoringRoutingInputSelector, authoringRoutingInsertOneSelector, authoringRoutingInsertTwoSelector\n";
     inventory << "- Performance drawer content: authoringPerformanceBankSelector, authoringTriggerSlotSelector, authoringTriggerEventSelector, authoringTargetArticulationSelector, authoringPhraseAssetSelector, authoringChordModeSelector, authoringPhraseImportPath, authoringPhraseImportButton\n";
     inventory << "- Retired temporary IDs absent: authoringModeSelector, authoringDrawerPlaceholder, authoringMacroSelector\n";
@@ -2038,6 +2045,11 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
     auto& toggleButton = requireButton(panel, "authoringDrawerToggleButton");
     auto& waveformTabButton = requireButton(panel, "authoringDrawerWaveformTab");
     auto& macrosTabButton = requireButton(panel, "authoringDrawerMacrosTab");
+    auto& macroCreateButton = requireButton(panel, "authoringMacroCreateButton");
+    auto& macroDuplicateButton = requireButton(panel, "authoringMacroDuplicateButton");
+    auto& macroDeleteButton = requireButton(panel, "authoringMacroDeleteButton");
+    auto& macroNameEditor = requireTextEditor(panel, "authoringMacroNameEditor");
+    auto& macroExposeToggle = requireButton(panel, "authoringMacroExposeToggle");
     auto& routingTabButton = requireButton(panel, "authoringDrawerRoutingTab");
     auto& performanceTabButton = requireButton(panel, "authoringDrawerPerformanceTab");
     auto& macroAssignmentSelector = requireComboBox(panel, "authoringMacroAssignmentSelector");
@@ -2224,13 +2236,27 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
     macrosTabButton.onClick();
     require(macroAssignmentSelector.isVisible(),
             "Macro drawer controls should be visible when the macros tab is active.");
+    require(macroCreateButton.isVisible() && macroNameEditor.isVisible() && macroExposeToggle.isVisible(),
+            "Macro drawer should expose creation, naming, and Perform-exposure controls when active.");
     requireAccessibilityHandlerState(panel, "authoringMacroAssignmentSelector", true);
+    requireAccessibilityHandlerState(panel, "authoringMacroCreateButton", true);
+    requireAccessibilityHandlerState(panel, "authoringMacroNameEditor", true);
+    requireAccessibilityHandlerState(panel, "authoringMacroExposeToggle", true);
     requireAccessibilityTitleEquals(panel, "authoringDrawerTitleLabel", "Macro Assignment");
     requireAccessibilityTitleEquals(panel,
                                     "authoringDrawerScopeLabel",
                                     requireLabel(panel, "authoringDrawerScopeLabel").getText());
     requireAccessibilityDescriptionContains(panel, "authoringDrawerScopeLabel", "Project-scoped");
     requireAccessibilityDescriptionContains(panel, "authoringDrawerBreadcrumbLabel", "Project > Macros");
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringMacroCreateButton",
+                                            "Creates a new authored macro");
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringMacroNameEditor",
+                                            "Renames");
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringMacroExposeToggle",
+                                            "appears in Perform");
     requireAccessibilityDescriptionContains(panel,
                                             "authoringMacroAssignmentSelector",
                                             "Chooses the parameter assigned to");
@@ -2253,6 +2279,8 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
                 "The last macro should still be movable upward.");
         require(!macroMoveDownButton.isEnabled(),
                 "The last macro should not be movable downward.");
+        require(macroDuplicateButton.isEnabled() && macroDeleteButton.isEnabled(),
+                "Selected macros should expose enabled duplicate and delete actions.");
         requireAccessibilityDescriptionContains(panel,
                                                 "authoringMacroMoveUpButton",
                                                 "earlier in the list");
@@ -2266,6 +2294,9 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
     require(!macroAssignmentSelector.isVisible(),
             "Macro drawer controls should be hidden after switching to routing.");
     requireAccessibilityHandlerState(panel, "authoringMacroAssignmentSelector", false);
+    requireAccessibilityHandlerState(panel, "authoringMacroCreateButton", false);
+    requireAccessibilityHandlerState(panel, "authoringMacroNameEditor", false);
+    requireAccessibilityHandlerState(panel, "authoringMacroExposeToggle", false);
     requireAccessibilityTitleEquals(panel, "authoringDrawerTitleLabel", "Routing Detail");
     requireAccessibilityDescriptionContains(panel, "authoringDrawerScopeLabel", "Project-scoped");
     requireAccessibilityDescriptionContains(panel, "authoringDrawerBreadcrumbLabel", "Project > Routing >");

@@ -78,6 +78,8 @@ constexpr std::array<const char*, 3> curatedChordModes
     "preserve-intervals"
 };
 
+constexpr int unassignedMacroAssignmentId = 1;
+constexpr int curatedMacroAssignmentBase = 2;
 constexpr int curatedDspMacroAssignmentBase = 1000;
 
 struct CuratedDspMacroAssignment
@@ -461,12 +463,12 @@ bool isComponentFocusedWithin(const juce::Component* focusedComponent, const juc
 
 juce::String buildMacroListStatusText(const drs::engine::RuntimeProjectMacroDefinition& macro)
 {
+    juce::String status = macro.exposedInPerformance ? "Perform | " : "Hidden | ";
+
     if (macro.targets.empty())
-        return "Unassigned";
+        return status + "Unassigned";
 
     const auto& target = macro.targets.front();
-    juce::String status;
-
     if (!target.role.empty())
         status << juce::String::fromUTF8(target.role.c_str()) << " | ";
 
@@ -911,6 +913,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     configureSectionLabel(routingSectionLabel, "Selected Bus");
 
     configureFieldLabel(groupNameLabel, "Group Name");
+    configureFieldLabel(macroNameLabel, "Macro Name");
+    configureFieldLabel(macroExposeLabel, "Perform");
     configureFieldLabel(macroAssignmentLabel, "Parameter");
     configureFieldLabel(macroRoleLabel, "Role");
     configureFieldLabel(macroDefaultLabel, "Default");
@@ -988,6 +992,13 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     macroDefaultSlider.setComponentID("authoringMacroDefaultSlider");
     macroMinSlider.setComponentID("authoringMacroMinSlider");
     macroMaxSlider.setComponentID("authoringMacroMaxSlider");
+    macroCreateButton.setComponentID("authoringMacroCreateButton");
+    macroDuplicateButton.setComponentID("authoringMacroDuplicateButton");
+    macroDeleteButton.setComponentID("authoringMacroDeleteButton");
+    macroNameLabel.setComponentID("authoringMacroNameLabel");
+    macroNameEditor.setComponentID("authoringMacroNameEditor");
+    macroExposeLabel.setComponentID("authoringMacroExposeLabel");
+    macroExposeToggle.setComponentID("authoringMacroExposeToggle");
     macroMoveUpButton.setComponentID("authoringMacroMoveUpButton");
     macroMoveDownButton.setComponentID("authoringMacroMoveDownButton");
     fxSectionLabel.setComponentID("authoringFxSectionLabel");
@@ -1303,9 +1314,33 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         if (isRefreshing)
             return;
 
+        const auto& macros = authoringSession.getProject().authoring.macros;
+        if (nextIndex < 0 || static_cast<std::size_t>(nextIndex) >= macros.size())
+            return;
+
         selectedMacroIndex = std::max(0, nextIndex);
+        authoringSession.selectMacro(macros[static_cast<std::size_t>(nextIndex)].id);
         refreshFromSession();
     });
+
+    macroCreateButton.setButtonText("Create");
+    macroCreateButton.onClick = [this] { createMacro(); };
+    macroDuplicateButton.setButtonText("Duplicate");
+    macroDuplicateButton.onClick = [this] { duplicateSelectedMacro(); };
+    macroDeleteButton.setButtonText("Delete");
+    macroDeleteButton.onClick = [this] { deleteSelectedMacro(); };
+    macroNameEditor.setMultiLine(false);
+    macroNameEditor.setReturnKeyStartsNewLine(false);
+    macroNameEditor.onReturnKey = [this] { applySelectedMacroEdit("Rename macro"); };
+    macroNameEditor.onFocusLost = [this] { applySelectedMacroEdit("Rename macro"); };
+    macroExposeToggle.setButtonText("Expose In Perform");
+    macroExposeToggle.onClick = [this]
+    {
+        if (isRefreshing)
+            return;
+
+        applySelectedMacroEdit("Toggle macro exposure");
+    };
 
     fxSelector.onChange = [this]
     {
@@ -1544,6 +1579,13 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&waveformPreview),
              static_cast<juce::Component*>(&drawerGroupsTabButton),
              static_cast<juce::Component*>(&macroList),
+             static_cast<juce::Component*>(&macroCreateButton),
+             static_cast<juce::Component*>(&macroDuplicateButton),
+             static_cast<juce::Component*>(&macroDeleteButton),
+             static_cast<juce::Component*>(&macroNameLabel),
+             static_cast<juce::Component*>(&macroNameEditor),
+             static_cast<juce::Component*>(&macroExposeLabel),
+             static_cast<juce::Component*>(&macroExposeToggle),
              static_cast<juce::Component*>(&macroAssignmentLabel),
              static_cast<juce::Component*>(&macroAssignmentSelector),
              static_cast<juce::Component*>(&macroRoleLabel),
@@ -1852,6 +1894,26 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "Macro list",
                                 "Lists project macros in compact rows.");
     macroList.getListBox().setExplicitFocusOrder(70);
+    configureAccessibleMetadata(macroCreateButton,
+                                "Create macro",
+                                "Creates a new authored macro with sensible defaults.",
+                                "Press to create a new macro in the project.");
+    configureAccessibleMetadata(macroDuplicateButton,
+                                "Duplicate macro",
+                                "Duplicates the selected macro.",
+                                "Press to duplicate the selected macro.");
+    configureAccessibleMetadata(macroDeleteButton,
+                                "Delete macro",
+                                "Deletes the selected macro.",
+                                "Press to delete the selected macro.");
+    configureAccessibleMetadata(macroNameEditor,
+                                "Macro name",
+                                "Renames the selected macro.",
+                                "Type a new macro name and press Enter.");
+    configureAccessibleMetadata(macroExposeToggle,
+                                "Expose macro in Perform",
+                                "Chooses whether the selected macro appears in the player-facing Perform surface.",
+                                "Press to expose or hide the selected macro in Perform.");
     configureAccessibleMetadata(macroAssignmentSelector,
                                 "Macro parameter",
                                 "Chooses the parameter assigned to the selected macro.",
@@ -1880,13 +1942,18 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "Move macro down",
                                 "Moves the selected macro later in the list.",
                                 "Press to move the selected macro down.");
-    macroAssignmentSelector.setExplicitFocusOrder(71);
-    macroRoleSelector.setExplicitFocusOrder(72);
-    macroDefaultSlider.setExplicitFocusOrder(73);
-    macroMinSlider.setExplicitFocusOrder(74);
-    macroMaxSlider.setExplicitFocusOrder(75);
-    macroMoveUpButton.setExplicitFocusOrder(76);
-    macroMoveDownButton.setExplicitFocusOrder(77);
+    macroCreateButton.setExplicitFocusOrder(71);
+    macroDuplicateButton.setExplicitFocusOrder(72);
+    macroDeleteButton.setExplicitFocusOrder(73);
+    macroNameEditor.setExplicitFocusOrder(74);
+    macroExposeToggle.setExplicitFocusOrder(75);
+    macroAssignmentSelector.setExplicitFocusOrder(76);
+    macroRoleSelector.setExplicitFocusOrder(77);
+    macroDefaultSlider.setExplicitFocusOrder(78);
+    macroMinSlider.setExplicitFocusOrder(79);
+    macroMaxSlider.setExplicitFocusOrder(80);
+    macroMoveUpButton.setExplicitFocusOrder(81);
+    macroMoveDownButton.setExplicitFocusOrder(82);
 
     configureAccessibleMetadata(fxSelector,
                                 "FX selector",
@@ -2201,13 +2268,17 @@ void AuthoringPanel::resized()
     const auto expanded = isExpandedLayout(layoutMode);
     const auto groupDrawerInShortLayout = shortHeightLayout
         && drawerState.activeTab == authoring::DrawerTab::groups;
+    const auto macroDrawerInShortLayout = shortHeightLayout
+        && drawerState.activeTab == authoring::DrawerTab::macros;
     const auto routingDrawerInShortLayout = shortHeightLayout
         && drawerState.activeTab == authoring::DrawerTab::routing;
     const auto inspectorDrawerInShortLayout = groupDrawerInShortLayout || routingDrawerInShortLayout;
     const auto drawerOpenHeight = inspectorDrawerInShortLayout
         ? authoring::shortInspectorDrawerOpenHeight
-        : (expanded ? authoring::expandedDrawerOpenHeight
-                    : authoring::compactDrawerOpenHeight);
+        : (macroDrawerInShortLayout
+               ? std::max(authoring::compactDrawerOpenHeight, 252)
+               : (expanded ? authoring::expandedDrawerOpenHeight
+                           : authoring::compactDrawerOpenHeight));
     const auto drawerHeight = authoring::drawerTabStripHeight + (drawerState.open ? drawerOpenHeight : 0);
     auto drawerArea = area.removeFromBottom(std::min(drawerHeight, area.getHeight()));
     drawerRegion.setBounds(drawerArea);
@@ -2330,44 +2401,65 @@ void AuthoringPanel::resized()
     }
     else if (drawerState.activeTab == authoring::DrawerTab::macros)
     {
-        constexpr auto macroListHeight = 48;
-        auto selectorRow = drawerEditorArea.removeFromTop(macroListHeight);
-        const auto buttonColumnWidth = selectorRow.getWidth() < 420 ? 96 : 110;
-        const auto listWidth = std::max(180, selectorRow.getWidth() - buttonColumnWidth - 8);
-        macroList.setBounds(selectorRow.removeFromLeft(listWidth));
-        selectorRow.removeFromLeft(8);
-        auto buttonColumn = selectorRow.removeFromLeft(buttonColumnWidth);
-        macroMoveUpButton.setBounds(buttonColumn.removeFromTop(20));
-        buttonColumn.removeFromTop(8);
-        macroMoveDownButton.setBounds(buttonColumn.removeFromTop(20));
+        const auto compactMacroDrawerLayout = true;
+        const auto macroListHeight = expanded ? 36 : 24;
+        const auto macroFieldRowHeight = 18;
+        const auto macroSummaryRowHeight = 16;
+        auto actionRow = drawerEditorArea.removeFromTop(18);
+        constexpr auto macroActionGap = 4;
+        const auto buttonWidth = std::max(52, (actionRow.getWidth() - (macroActionGap * 4)) / 5);
+        macroCreateButton.setBounds(actionRow.removeFromLeft(buttonWidth));
+        actionRow.removeFromLeft(std::min(macroActionGap, actionRow.getWidth()));
+        macroDuplicateButton.setBounds(actionRow.removeFromLeft(buttonWidth));
+        actionRow.removeFromLeft(std::min(macroActionGap, actionRow.getWidth()));
+        macroDeleteButton.setBounds(actionRow.removeFromLeft(buttonWidth));
+        actionRow.removeFromLeft(std::min(macroActionGap, actionRow.getWidth()));
+        macroMoveUpButton.setBounds(actionRow.removeFromLeft(buttonWidth));
+        actionRow.removeFromLeft(std::min(macroActionGap, actionRow.getWidth()));
+        macroMoveDownButton.setBounds(actionRow);
+        drawerEditorArea.removeFromTop(1);
+        macroList.setBounds(drawerEditorArea.removeFromTop(macroListHeight));
 
-        drawerEditorArea.removeFromTop(2);
-        auto row = drawerEditorArea.removeFromTop(28);
+        drawerEditorArea.removeFromTop(compactMacroDrawerLayout ? 1 : 2);
+        auto row = drawerEditorArea.removeFromTop(macroFieldRowHeight);
+        layoutDualLabelAndFieldRow(row,
+                                   macroNameLabel,
+                                   macroNameEditor,
+                                   compactMacroDrawerLayout ? 64 : 76,
+                                   macroExposeLabel,
+                                   macroExposeToggle,
+                                   compactMacroDrawerLayout ? 44 : 54);
+        drawerEditorArea.removeFromTop(compactMacroDrawerLayout ? 1 : 2);
+
+        row = drawerEditorArea.removeFromTop(macroFieldRowHeight);
         layoutDualLabelAndFieldRow(row,
                                    macroAssignmentLabel,
                                    macroAssignmentSelector,
-                                   76,
+                                   compactMacroDrawerLayout ? 60 : 76,
                                    macroRoleLabel,
                                    macroRoleSelector,
-                                   56);
-        drawerEditorArea.removeFromTop(2);
+                                   compactMacroDrawerLayout ? 40 : 56);
+        drawerEditorArea.removeFromTop(compactMacroDrawerLayout ? 1 : 2);
 
-        row = drawerEditorArea.removeFromTop(28);
+        row = drawerEditorArea.removeFromTop(macroFieldRowHeight);
         layoutDualLabelAndFieldRow(row,
                                    macroDefaultLabel,
                                    macroDefaultSlider,
-                                   56,
+                                   compactMacroDrawerLayout ? 46 : 56,
                                    macroMinLabel,
                                    macroMinSlider,
-                                   40);
-        drawerEditorArea.removeFromTop(2);
+                                   compactMacroDrawerLayout ? 30 : 40);
+        drawerEditorArea.removeFromTop(compactMacroDrawerLayout ? 1 : 2);
 
-        row = drawerEditorArea.removeFromTop(28);
-        layoutLabelAndField(row, macroMaxLabel, macroMaxSlider, 44);
+        row = drawerEditorArea.removeFromTop(macroFieldRowHeight);
+        layoutLabelAndField(row,
+                            macroMaxLabel,
+                            macroMaxSlider,
+                            compactMacroDrawerLayout ? 34 : 44);
         if (expanded)
         {
             drawerEditorArea.removeFromTop(2);
-            macroSummaryLabel.setBounds(drawerEditorArea.removeFromTop(20));
+            macroSummaryLabel.setBounds(drawerEditorArea.removeFromTop(macroSummaryRowHeight));
         }
     }
     else if (drawerState.activeTab == authoring::DrawerTab::routing)
@@ -2871,7 +2963,7 @@ void AuthoringPanel::rebuildMacroList()
 {
     const auto& macros = authoringSession.getProject().authoring.macros;
     authoring::RepeatedStructureListViewModel viewModel;
-    viewModel.emptyStateText = "No macros are authored in this project yet.";
+    viewModel.emptyStateText = "No macros are authored in this project yet. Use Create to add one.";
 
     if (macros.empty())
     {
@@ -2880,7 +2972,17 @@ void AuthoringPanel::rebuildMacroList()
         return;
     }
 
-    selectedMacroIndex = std::clamp(selectedMacroIndex, 0, static_cast<int>(macros.size()) - 1);
+    if (const auto sessionSelectedMacroIndex = authoringSession.getSelectedMacroIndex();
+        sessionSelectedMacroIndex.has_value())
+    {
+        selectedMacroIndex = std::clamp(static_cast<int>(*sessionSelectedMacroIndex),
+                                        0,
+                                        static_cast<int>(macros.size()) - 1);
+    }
+    else
+    {
+        selectedMacroIndex = std::clamp(selectedMacroIndex, 0, static_cast<int>(macros.size()) - 1);
+    }
     viewModel.selectedIndex = selectedMacroIndex;
     viewModel.rows.reserve(macros.size());
 
@@ -3143,6 +3245,11 @@ void AuthoringPanel::refreshDrawerVisibility()
         || isComponentFocusedWithin(focusedComponent, groupRoundRobinToggle)
         || isComponentFocusedWithin(focusedComponent, groupRoundRobinModeSelector);
     const auto focusWithinMacros = isComponentFocusedWithin(focusedComponent, macroList)
+        || isComponentFocusedWithin(focusedComponent, macroCreateButton)
+        || isComponentFocusedWithin(focusedComponent, macroDuplicateButton)
+        || isComponentFocusedWithin(focusedComponent, macroDeleteButton)
+        || isComponentFocusedWithin(focusedComponent, macroNameEditor)
+        || isComponentFocusedWithin(focusedComponent, macroExposeToggle)
         || isComponentFocusedWithin(focusedComponent, macroAssignmentSelector)
         || isComponentFocusedWithin(focusedComponent, macroRoleSelector)
         || isComponentFocusedWithin(focusedComponent, macroDefaultSlider)
@@ -3203,6 +3310,13 @@ void AuthoringPanel::refreshDrawerVisibility()
     setVisibleAndAccessible(groupRoundRobinModeSelector, drawerContentVisible && groupsTab);
 
     setVisibleAndAccessible(macroList, drawerContentVisible && macrosTab);
+    setVisibleAndAccessible(macroCreateButton, drawerContentVisible && macrosTab);
+    setVisibleAndAccessible(macroDuplicateButton, drawerContentVisible && macrosTab);
+    setVisibleAndAccessible(macroDeleteButton, drawerContentVisible && macrosTab);
+    setVisibleAndAccessible(macroNameLabel, drawerContentVisible && macrosTab);
+    setVisibleAndAccessible(macroNameEditor, drawerContentVisible && macrosTab);
+    setVisibleAndAccessible(macroExposeLabel, drawerContentVisible && macrosTab);
+    setVisibleAndAccessible(macroExposeToggle, drawerContentVisible && macrosTab);
     setVisibleAndAccessible(macroAssignmentLabel, drawerContentVisible && macrosTab);
     setVisibleAndAccessible(macroAssignmentSelector, drawerContentVisible && macrosTab);
     setVisibleAndAccessible(macroRoleLabel, drawerContentVisible && macrosTab);
@@ -3483,6 +3597,37 @@ void AuthoringPanel::refreshContextualAccessibility()
         ? juce::String::fromUTF8(project.authoring.macros[static_cast<std::size_t>(selectedMacroIndex)].name.c_str())
         : juce::String("the selected macro");
 
+    updateAccessibleDescriptionAndHelpText(macroCreateButton,
+                                           "Creates a new authored macro with sensible defaults.",
+                                           "Press to create a new macro in the project.");
+    updateAccessibleDescriptionAndHelpText(macroDuplicateButton,
+                                           hasSelectedMacro
+                                               ? "Duplicates " + macroName + "."
+                                               : "Unavailable because no macro is selected.",
+                                           hasSelectedMacro
+                                               ? "Press to duplicate " + macroName + "."
+                                               : "Select a macro before duplicating it.");
+    updateAccessibleDescriptionAndHelpText(macroDeleteButton,
+                                           hasSelectedMacro
+                                               ? "Deletes " + macroName + "."
+                                               : "Unavailable because no macro is selected.",
+                                           hasSelectedMacro
+                                               ? "Press to delete " + macroName + "."
+                                               : "Select a macro before deleting it.");
+    updateAccessibleDescriptionAndHelpText(macroNameEditor,
+                                           hasSelectedMacro
+                                               ? "Renames " + macroName + "."
+                                               : "Unavailable because no macro is selected.",
+                                           hasSelectedMacro
+                                               ? "Type a new name for " + macroName + " and press Enter."
+                                               : "Create or select a macro before renaming it.");
+    updateAccessibleDescriptionAndHelpText(macroExposeToggle,
+                                           hasSelectedMacro
+                                               ? "Chooses whether " + macroName + " appears in Perform."
+                                               : "Unavailable because no macro is selected.",
+                                           hasSelectedMacro
+                                               ? "Press to expose or hide " + macroName + " in the Perform surface."
+                                               : "Create or select a macro before changing its Perform visibility.");
     updateAccessibleDescriptionAndHelpText(macroAssignmentSelector,
                                            hasSelectedMacro
                                                ? "Chooses the parameter assigned to " + macroName + "."
@@ -4149,12 +4294,19 @@ void AuthoringPanel::refreshFromSession()
 
     if (!project.authoring.macros.empty())
     {
+        if (const auto selectedMacro = authoringSession.getSelectedMacroIndex(); selectedMacro.has_value())
+            selectedMacroIndex = static_cast<int>(*selectedMacro);
+
         const auto& macro = project.authoring.macros[static_cast<std::size_t>(selectedMacroIndex)];
+        macroNameEditor.setText(juce::String::fromUTF8(macro.name.c_str()), juce::dontSendNotification);
+        macroExposeToggle.setToggleState(macro.exposedInPerformance, juce::dontSendNotification);
         macroAssignmentSelector.clear(juce::dontSendNotification);
-        int selectedAssignmentId = 0;
+        macroAssignmentSelector.addItem("(unassigned)", unassignedMacroAssignmentId);
+        int selectedAssignmentId = unassignedMacroAssignmentId;
         for (std::size_t index = 0; index < curatedMacroAssignments.size(); ++index)
         {
-            macroAssignmentSelector.addItem(curatedMacroAssignments[index].label, static_cast<int>(index) + 1);
+            const auto itemId = curatedMacroAssignmentBase + static_cast<int>(index);
+            macroAssignmentSelector.addItem(curatedMacroAssignments[index].label, itemId);
         }
         const auto dspAssignments = buildCuratedDspMacroAssignments(project);
         for (std::size_t index = 0; index < dspAssignments.size(); ++index)
@@ -4175,11 +4327,11 @@ void AuthoringPanel::refreshFromSession()
             const auto assignmentIndex = findAssignmentIndex(macro.targets.front().parameterId);
             if (assignmentIndex >= 0)
             {
-                selectedAssignmentId = assignmentIndex + 1;
+                selectedAssignmentId = curatedMacroAssignmentBase + assignmentIndex;
             }
             else
             {
-                const auto customItemId = static_cast<int>(curatedMacroAssignments.size()) + 1;
+                const auto customItemId = curatedDspMacroAssignmentBase - 1;
                 macroAssignmentSelector.addItem("Custom: "
                                                    + juce::String::fromUTF8(macro.targets.front().parameterId.c_str()),
                                                customItemId);
@@ -4211,13 +4363,21 @@ void AuthoringPanel::refreshFromSession()
         macroMinSlider.setValue(macro.minValue, juce::dontSendNotification);
         macroMaxSlider.setValue(macro.maxValue, juce::dontSendNotification);
         macroSummaryLabel.setText(
-            "Target "
-                + juce::String::fromUTF8(macro.targets.empty() ? "" : macro.targets.front().parameterPath.c_str())
+            juce::String(macro.exposedInPerformance ? "Perform | " : "Hidden | ")
+                + (macro.targets.empty()
+                       ? juce::String("No parameter assigned")
+                       : "Target "
+                             + juce::String::fromUTF8(macro.targets.front().parameterPath.c_str()))
                 + " | range " + juce::String(macro.minValue, 2)
                 + " to " + juce::String(macro.maxValue, 2),
             juce::dontSendNotification);
+        macroCreateButton.setEnabled(true);
+        macroDuplicateButton.setEnabled(true);
+        macroDeleteButton.setEnabled(true);
+        macroNameEditor.setEnabled(true);
+        macroExposeToggle.setEnabled(true);
         macroAssignmentSelector.setEnabled(true);
-        macroRoleSelector.setEnabled(true);
+        macroRoleSelector.setEnabled(!macro.targets.empty());
         macroDefaultSlider.setEnabled(true);
         macroMinSlider.setEnabled(true);
         macroMaxSlider.setEnabled(true);
@@ -4226,7 +4386,17 @@ void AuthoringPanel::refreshFromSession()
     }
     else
     {
-        macroSummaryLabel.setText("No macros are authored in this project yet.", juce::dontSendNotification);
+        macroNameEditor.setText({}, juce::dontSendNotification);
+        macroExposeToggle.setToggleState(false, juce::dontSendNotification);
+        macroAssignmentSelector.clear(juce::dontSendNotification);
+        macroRoleSelector.clear(juce::dontSendNotification);
+        macroSummaryLabel.setText("No macros are authored in this project yet. Use Create to add one.",
+                                  juce::dontSendNotification);
+        macroCreateButton.setEnabled(true);
+        macroDuplicateButton.setEnabled(false);
+        macroDeleteButton.setEnabled(false);
+        macroNameEditor.setEnabled(false);
+        macroExposeToggle.setEnabled(false);
         macroAssignmentSelector.setEnabled(false);
         macroRoleSelector.setEnabled(false);
         macroDefaultSlider.setEnabled(false);
@@ -4995,6 +5165,8 @@ void AuthoringPanel::applySelectedMacroEdit(const juce::String& label)
         return;
 
     auto editedMacro = macros[static_cast<std::size_t>(selectedMacroIndex)];
+    editedMacro.name = macroNameEditor.getText().trim().toStdString();
+    editedMacro.exposedInPerformance = macroExposeToggle.getToggleState();
     auto minValue = macroMinSlider.getValue();
     auto maxValue = macroMaxSlider.getValue();
     if (minValue > maxValue)
@@ -5004,17 +5176,23 @@ void AuthoringPanel::applySelectedMacroEdit(const juce::String& label)
     editedMacro.maxValue = maxValue;
     editedMacro.defaultValue = std::clamp(macroDefaultSlider.getValue(), editedMacro.minValue, editedMacro.maxValue);
 
-    if (editedMacro.targets.empty())
-        editedMacro.targets.push_back({});
-
     const auto assignmentId = macroAssignmentSelector.getSelectedId();
-    if (assignmentId > 0 && assignmentId <= static_cast<int>(curatedMacroAssignments.size()))
+    if (assignmentId == unassignedMacroAssignmentId)
     {
-        const auto& assignment = curatedMacroAssignments[static_cast<std::size_t>(assignmentId - 1)];
+        editedMacro.targets.clear();
+    }
+    else if (assignmentId >= curatedMacroAssignmentBase
+             && assignmentId < curatedMacroAssignmentBase + static_cast<int>(curatedMacroAssignments.size()))
+    {
+        if (editedMacro.targets.empty())
+            editedMacro.targets.push_back({});
+        const auto& assignment = curatedMacroAssignments[static_cast<std::size_t>(assignmentId - curatedMacroAssignmentBase)];
         editedMacro.targets.front().parameterId = assignment.parameterId;
         editedMacro.targets.front().parameterPath = assignment.parameterPath;
         editedMacro.targets.front().dspSlotId.clear();
         editedMacro.targets.front().dspParameterId.clear();
+        editedMacro.targets.front().sourceMinimum = editedMacro.minValue;
+        editedMacro.targets.front().sourceMaximum = editedMacro.maxValue;
         if (editedMacro.targets.front().role.empty())
             editedMacro.targets.front().role = assignment.defaultRole;
     }
@@ -5024,6 +5202,8 @@ void AuthoringPanel::applySelectedMacroEdit(const juce::String& label)
         const auto assignmentIndex = static_cast<std::size_t>(assignmentId - curatedDspMacroAssignmentBase);
         if (assignmentIndex < dspAssignments.size())
         {
+            if (editedMacro.targets.empty())
+                editedMacro.targets.push_back({});
             const auto& assignment = dspAssignments[assignmentIndex];
             auto& target = editedMacro.targets.front();
             target.parameterId = "dsp." + assignment.slot->id + "." + std::string(assignment.parameter->id);
@@ -5041,24 +5221,96 @@ void AuthoringPanel::applySelectedMacroEdit(const juce::String& label)
         }
     }
 
-    auto selectedRoleText = macroRoleSelector.getText().toStdString();
-    if (selectedRoleText.rfind("Custom: ", 0) == 0)
-        selectedRoleText = selectedRoleText.substr(8);
-    editedMacro.targets.front().role = selectedRoleText;
+    if (!editedMacro.targets.empty())
+    {
+        auto selectedRoleText = macroRoleSelector.getText().toStdString();
+        if (selectedRoleText.rfind("Custom: ", 0) == 0)
+            selectedRoleText = selectedRoleText.substr(8);
+        editedMacro.targets.front().role = selectedRoleText;
+    }
 
-    authoringSession.updateMacro(static_cast<std::size_t>(selectedMacroIndex),
-                                 editedMacro,
-                                 label.toStdString());
+    const auto result = authoringSession.updateMacro(static_cast<std::size_t>(selectedMacroIndex),
+                                                     editedMacro,
+                                                     label.toStdString());
+    if (!result.applied)
+    {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Update Macro Failed",
+                                               buildIssueSummary(result.issues));
+    }
     refreshFromSession();
+}
+
+void AuthoringPanel::createMacro()
+{
+    drs::engine::RuntimeProjectMacroDefinition macro;
+    macro.defaultValue = 0.5;
+    macro.minValue = 0.0;
+    macro.maxValue = 1.0;
+
+    const auto result = authoringSession.createMacro(macro, "Create macro");
+    if (result.applied)
+    {
+        setActiveDrawerTab(authoring::DrawerTab::macros);
+        refreshFromSession();
+        return;
+    }
+
+    juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                           "Create Macro Failed",
+                                           buildIssueSummary(result.issues));
+}
+
+void AuthoringPanel::duplicateSelectedMacro()
+{
+    const auto selectedMacro = authoringSession.getSelectedMacro();
+    if (!selectedMacro.has_value())
+        return;
+
+    const auto result = authoringSession.duplicateMacro(selectedMacro->id, "Duplicate macro");
+    if (result.applied)
+    {
+        refreshFromSession();
+        return;
+    }
+
+    juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                           "Duplicate Macro Failed",
+                                           buildIssueSummary(result.issues));
+}
+
+void AuthoringPanel::deleteSelectedMacro()
+{
+    const auto selectedMacro = authoringSession.getSelectedMacro();
+    if (!selectedMacro.has_value())
+        return;
+
+    const auto result = authoringSession.deleteMacro(selectedMacro->id, "Delete macro");
+    if (result.applied)
+    {
+        refreshFromSession();
+        return;
+    }
+
+    juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                           "Delete Macro Failed",
+                                           buildIssueSummary(result.issues));
 }
 
 void AuthoringPanel::moveSelectedMacro(int direction)
 {
+    if (selectedMacroIndex < 0)
+        return;
+
     const auto result = authoringSession.moveMacro(static_cast<std::size_t>(selectedMacroIndex),
                                                    direction,
                                                    direction < 0 ? "Move macro earlier" : "Move macro later");
     if (result.applied)
         selectedMacroIndex = std::max(0, selectedMacroIndex + direction);
+    else
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Move Macro Failed",
+                                               buildIssueSummary(result.issues));
 
     refreshFromSession();
 }
