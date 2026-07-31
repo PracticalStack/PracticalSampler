@@ -208,12 +208,53 @@ std::string buildAppliedMacroSummary(const RuntimeSessionStateSnapshot& sessionS
     return "Tone: " + buildToneCurrentEffect(sessionState) + " | Motion: " + buildMotionCurrentEffect(sessionState);
 }
 
+std::string resolveAuthoredArticulationSelection(const RuntimeProjectModel& project,
+                                                 const std::string& currentSelection)
+{
+    std::vector<std::string> authoredArticulations;
+    authoredArticulations.reserve(project.authoring.zones.size());
+    std::unordered_set<std::string> seenArticulations;
+
+    for (const auto& zone : project.authoring.zones)
+    {
+        if (zone.articulationId.empty())
+            continue;
+        if (seenArticulations.insert(zone.articulationId).second)
+            authoredArticulations.push_back(zone.articulationId);
+    }
+
+    if (authoredArticulations.empty())
+        return currentSelection;
+
+    if (!currentSelection.empty()
+        && seenArticulations.count(currentSelection) > 0)
+    {
+        return currentSelection;
+    }
+
+    if (seenArticulations.count("default") > 0)
+        return "default";
+
+    return authoredArticulations.front();
+}
+
 std::string runtimeMacroIdFromHostParameterId(const std::string& hostParameterId)
 {
     constexpr std::string_view prefix { "macro." };
     return hostParameterId.rfind(prefix.data(), 0) == 0
         ? hostParameterId.substr(prefix.size())
         : hostParameterId;
+}
+
+std::string buildPublishedHostSlotPlaceholderId(const std::size_t slotIndex)
+{
+    return "__published-host-slot__." + std::to_string(slotIndex);
+}
+
+bool isPublishedHostSlotPlaceholderId(const std::string& stableAuthoredId)
+{
+    constexpr std::string_view prefix { "__published-host-slot__." };
+    return stableAuthoredId.rfind(prefix.data(), 0) == 0;
 }
 
 EngineMacroDescriptor makePublishedMacroDescriptor(const PublishedMacroBinding& binding,
@@ -269,51 +310,29 @@ std::vector<PublishedMacroHostSlotDefinition> buildPublishedHostSlots(
 {
     std::vector<PublishedMacroHostSlotDefinition> hostSlots;
     hostSlots.reserve(hostMacros.size());
-
-    std::unordered_set<std::string> authoredIds;
-    authoredIds.reserve(authoredMacros.size());
-    for (const auto& macro : authoredMacros)
-        authoredIds.insert(macro.id);
-
     std::vector<std::string> assignedStableIds(hostMacros.size());
+    std::vector<bool> retainedStableIds(hostMacros.size(), false);
+    for (std::size_t index = 0; index < assignedStableIds.size(); ++index)
+        assignedStableIds[index] = buildPublishedHostSlotPlaceholderId(index);
+
     std::unordered_set<std::string> assignedIds;
     assignedIds.reserve(authoredMacros.size());
 
-    auto retainPrevious = [&](bool exposedOnly)
+    if (previousActiveTable != nullptr)
     {
-        if (previousActiveTable == nullptr)
-            return;
-
         for (const auto& binding : previousActiveTable->bindings)
         {
-            if (!binding.assigned || binding.hostSlotIndex >= hostMacros.size())
-                continue;
-            if (!authoredIds.count(binding.stableAuthoredId)
-                || !assignedStableIds[binding.hostSlotIndex].empty())
+            if (binding.hostSlotIndex >= hostMacros.size()
+                || binding.stableAuthoredId.empty())
             {
                 continue;
             }
 
-            const auto authored = std::find_if(authoredMacros.begin(),
-                                               authoredMacros.end(),
-                                               [&](const auto& macro)
-                                               {
-                                                   return macro.id == binding.stableAuthoredId;
-                                               });
-            if (authored == authoredMacros.end())
-                continue;
-            if (exposedOnly && !authored->exposedInPerformance)
-                continue;
-            if (!exposedOnly && authored->exposedInPerformance)
-                continue;
-            if (!assignedIds.insert(binding.stableAuthoredId).second)
-                continue;
-
             assignedStableIds[binding.hostSlotIndex] = binding.stableAuthoredId;
+            retainedStableIds[binding.hostSlotIndex]
+                = !isPublishedHostSlotPlaceholderId(binding.stableAuthoredId);
         }
-    };
-
-    retainPrevious(true);
+    }
 
     auto assignAuthoredMacros = [&](bool exposedOnly)
     {
@@ -322,28 +341,41 @@ std::vector<PublishedMacroHostSlotDefinition> buildPublishedHostSlots(
             if (macro.exposedInPerformance != exposedOnly || assignedIds.count(macro.id))
                 continue;
 
-            const auto openSlot = std::find(assignedStableIds.begin(),
-                                            assignedStableIds.end(),
-                                            std::string {});
+            const auto retainedSlot = std::find(assignedStableIds.begin(),
+                                                assignedStableIds.end(),
+                                                macro.id);
+            if (retainedSlot != assignedStableIds.end())
+            {
+                assignedIds.insert(macro.id);
+                continue;
+            }
+
+            auto openSlot = assignedStableIds.end();
+            for (std::size_t index = 0; index < assignedStableIds.size(); ++index)
+            {
+                if (!retainedStableIds[index]
+                    && isPublishedHostSlotPlaceholderId(assignedStableIds[index]))
+                {
+                    openSlot = assignedStableIds.begin() + static_cast<std::ptrdiff_t>(index);
+                    break;
+                }
+            }
             if (openSlot == assignedStableIds.end())
                 return;
 
             *openSlot = macro.id;
             assignedIds.insert(macro.id);
+            retainedStableIds[static_cast<std::size_t>(openSlot - assignedStableIds.begin())]
+                = true;
         }
     };
 
     assignAuthoredMacros(true);
-    retainPrevious(false);
     assignAuthoredMacros(false);
 
     for (std::size_t index = 0; index < assignedStableIds.size(); ++index)
-    {
-        if (assignedStableIds[index].empty())
-            continue;
         hostSlots.push_back(
             { index, "macro." + hostMacros[index].id, assignedStableIds[index] });
-    }
 
     return hostSlots;
 }
@@ -1880,6 +1912,9 @@ bool EngineFacade::replaceDraftPlaybackAuthoringProject(RuntimeProjectModel proj
     authoringProject.loaded = true;
     authoringProject.state = "Draft playback authoring project replaced";
     authoringProject.project = std::move(project);
+    currentSessionState.selectedArticulationId = resolveAuthoredArticulationSelection(
+        authoringProject.project,
+        currentSessionState.selectedArticulationId);
     currentSessionState.transientMetrics.integrationState = "Draft playback authoring project replaced";
     currentSessionState.transientMetrics.lastFailure.clear();
     previewPlaybackSnapshot = {};

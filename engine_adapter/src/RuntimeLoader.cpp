@@ -1333,8 +1333,12 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
                         macro.minValue = *minValue;
                     if (const auto maxValue = readRequired<RuntimeProjectLoadResult, double>(macroObject, result, "maxValue", context.c_str()))
                         macro.maxValue = *maxValue;
-                    if (const auto exposedInPerformance = readOptional<RuntimeProjectLoadResult, bool>(macroObject, result, "exposedInPerformance", context.c_str()))
+                    const auto exposedInPerformance = readOptional<RuntimeProjectLoadResult, bool>(
+                        macroObject, result, "exposedInPerformance", context.c_str());
+                    if (exposedInPerformance.has_value())
                         macro.exposedInPerformance = *exposedInPerformance;
+                    else
+                        macro.exposedInPerformance = true;
 
                     const auto targetsIterator = macroObject.find("targets");
                     if (targetsIterator == macroObject.end() || !isObjectArray(*targetsIterator))

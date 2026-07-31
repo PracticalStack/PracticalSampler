@@ -11,6 +11,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <regex>
 #include <stdexcept>
 #include <string>
 
@@ -29,6 +30,13 @@ void writeTextFile(const fs::path& path, const std::string& text)
     fs::create_directories(path.parent_path());
     std::ofstream output(path, std::ios::binary);
     output << text;
+}
+
+std::string removeMacroExposureFields(std::string text)
+{
+    static const std::regex exposureField(
+        R"(\s*"exposedInPerformance": (true|false),\r?\n)");
+    return std::regex_replace(text, exposureField, "\n");
 }
 
 juce::Component* findDescendantById(juce::Component& root, const juce::String& componentId)
@@ -204,6 +212,38 @@ int main()
                 "Saved Sprint 5 project must preserve edited routing inputs.");
         require(roundTripLoad.project.authoring.routingBuses[1].fxSlotIds.size() == 2,
                 "Saved Sprint 5 project must preserve edited routing chains.");
+
+        auto legacyProject = session.getProject();
+        legacyProject.authoring.macros = {
+            { "legacy-close", "Legacy Close", 0.5, 0.0, 1.0, {} },
+            { "legacy-room", "Legacy Room", 0.3, 0.0, 1.0, {} }
+        };
+        const auto legacyProjectPath = tempDirectory / "phase2-macro-routing-legacy-macros.drsproj";
+        writeTextFile(legacyProjectPath,
+                      removeMacroExposureFields(
+                          drs::engine::serializeRuntimeProjectManifest(
+                              legacyProject,
+                              legacyProjectPath.generic_string())));
+        const auto legacyLoad = drs::engine::loadRuntimeProjectManifest(legacyProjectPath.generic_string());
+        require(legacyLoad.loaded,
+                "Legacy macro project without exposure flags should still load successfully.");
+        require(legacyLoad.project.authoring.macros.size() == 2
+                    && legacyLoad.project.authoring.macros[0].id == "legacy-close"
+                    && legacyLoad.project.authoring.macros[1].id == "legacy-room"
+                    && legacyLoad.project.authoring.macros[0].exposedInPerformance
+                    && legacyLoad.project.authoring.macros[1].exposedInPerformance,
+                "Legacy macros without explicit exposure flags should preserve authored order and remain visible in Perform.");
+
+        auto zeroMacroProject = session.getProject();
+        zeroMacroProject.authoring.macros.clear();
+        const auto zeroMacroProjectPath = tempDirectory / "phase2-macro-routing-zero-macros.drsproj";
+        writeTextFile(zeroMacroProjectPath,
+                      drs::engine::serializeRuntimeProjectManifest(
+                          zeroMacroProject,
+                          zeroMacroProjectPath.generic_string()));
+        const auto zeroMacroLoad = drs::engine::loadRuntimeProjectManifest(zeroMacroProjectPath.generic_string());
+        require(zeroMacroLoad.loaded && zeroMacroLoad.project.authoring.macros.empty(),
+                "Older or migrated projects with zero macros should remain valid and load without synthetic authored controls.");
 
         auto invalidProject = roundTripLoad.project;
         invalidProject.authoring.macros.back().defaultValue = 5.0;

@@ -111,6 +111,7 @@ Sprint 4 state-recall work has now started in the same seam:
 - `docs/phase1-failure-handling.md`
 - `docs/phase1-macro-map.md`
 - `docs/phase1-macro-bridge.md`
+- `docs/phase2-group-mixer-workflow.md`
 - `docs/phase1-performance-surface.md`
 - `docs/phase1-reference-corpus.md`
 - `docs/phase1-preset-state.md`

@@ -81,6 +81,37 @@ bool waitForActivePublish(drs::plugin::Processor& processor,
     return false;
 }
 
+bool waitForBootstrapLastKnownGood(drs::plugin::Processor& processor)
+{
+    juce::AudioBuffer<float> buffer(2, 256);
+    juce::MidiBuffer midi;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (std::chrono::steady_clock::now() < deadline)
+    {
+        processor.serviceMessageThreadWork();
+        const auto snapshot = processor.getRealtimeSafetySnapshot();
+        if (snapshot.activePublishedRevision == 0
+            && snapshot.activeActivationPayloadBytes > 0)
+        {
+            return true;
+        }
+
+        buffer.clear();
+        processor.processBlock(buffer, midi);
+    }
+
+    const auto snapshot = processor.getRealtimeSafetySnapshot();
+    const auto controller = processor.getPerformancePublishControllerSnapshot();
+    std::cerr << "Bootstrap timeout: activeBytes=" << snapshot.activeActivationPayloadBytes
+              << ", activeRevision=" << snapshot.activePublishedRevision
+              << ", pendingRevision=" << snapshot.pendingPublishedRevision
+              << ", performanceActivations=" << snapshot.performanceActivationCount
+              << ", controllerPreparation=" << static_cast<int>(controller.preparationState)
+              << ", controllerActivation=" << static_cast<int>(controller.activationState)
+              << ", failure=" << controller.failureFinding.code << std::endl;
+    return false;
+}
+
 std::array<float, 512> renderOfflineBlock(
     drs::engine::SamplerPlaybackContext& context,
     const drs::engine::SamplerEventBlock& events)
@@ -112,7 +143,8 @@ int main()
         drs::plugin::Processor processor;
         processor.prepareToPlay(48000.0, 256);
         processor.replaceAuthoringProject(project.project);
-        processor.serviceMessageThreadWork();
+        require(waitForBootstrapLastKnownGood(processor),
+                "Recovery coverage requires the bootstrap last-known-good payload to activate before Publish recovery runs.");
         const auto bootstrap = processor.getRealtimeSafetySnapshot();
         require(bootstrap.activePublishedRevision == 0
                     && bootstrap.activeActivationPayloadBytes > 0,

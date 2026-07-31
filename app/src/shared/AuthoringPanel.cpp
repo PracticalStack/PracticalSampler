@@ -4591,11 +4591,12 @@ void AuthoringPanel::refreshFromSession()
         macroSummaryLabel.setText(
             juce::String(macro.exposedInPerformance ? "Perform | " : "Hidden | ")
                 + (macro.targets.empty()
-                       ? juce::String("No parameter assigned")
+                       ? juce::String("No parameter assigned | Workflow: select a group bus gain parameter, expose it in Perform, then Publish.")
                        : "Target "
                              + juce::String::fromUTF8(macro.targets.front().parameterPath.c_str()))
                 + " | range " + juce::String(macro.minValue, 2)
-                + " to " + juce::String(macro.maxValue, 2),
+                + " to " + juce::String(macro.maxValue, 2)
+                + " | Release scope: group gain lanes only (mic, layer, pedal/noise).",
             juce::dontSendNotification);
         macroCreateButton.setEnabled(true);
         macroDuplicateButton.setEnabled(true);
@@ -4616,7 +4617,7 @@ void AuthoringPanel::refreshFromSession()
         macroExposeToggle.setToggleState(false, juce::dontSendNotification);
         macroAssignmentSelector.clear(juce::dontSendNotification);
         macroRoleSelector.clear(juce::dontSendNotification);
-        macroSummaryLabel.setText("No macros are authored in this project yet. Use Create to add one.",
+        macroSummaryLabel.setText("No macros are authored in this project yet. Use Create, then target a group bus gain lane such as close mic, room, layer blend, or pedal noise. Group pan stays out of the first release.",
                                   juce::dontSendNotification);
         macroCreateButton.setEnabled(true);
         macroDuplicateButton.setEnabled(false);

@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <chrono>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -106,7 +107,44 @@ bool waitForActivePublish(drs::plugin::Processor& processor, std::size_t revisio
             return true;
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
     }
+    const auto controller = processor.getPerformancePublishControllerSnapshot();
+    const auto realtime = processor.getRealtimeSafetySnapshot();
+    std::cerr << "Active timeout: preparation=" << static_cast<int>(controller.preparationState)
+              << ", activation=" << static_cast<int>(controller.activationState)
+              << ", activeRequest=" << controller.hasActiveRequest
+              << ", activeRevision=" << controller.activeRequestIdentity.draftRevision
+              << ", currentRevision=" << controller.currentRequest.identity.draftRevision
+              << ", authorized=" << controller.activationAuthorizedCount
+              << ", authorizationRejected=" << controller.activationAuthorizationRejectedCount
+              << ", stagingRejected=" << controller.activationStagingRejectedCount
+              << ", ackRejected=" << controller.activationAcknowledgementRejectedCount
+              << ", failure=" << controller.failureFinding.code
+              << ", realtimeActiveRevision=" << realtime.activePublishedRevision
+              << ", realtimePendingRevision=" << realtime.pendingPublishedRevision
+              << std::endl;
     return false;
+}
+
+std::string describePublishActivationState(drs::plugin::Processor& processor)
+{
+    const auto controller = processor.getPerformancePublishControllerSnapshot();
+    const auto realtime = processor.getRealtimeSafetySnapshot();
+    std::ostringstream stream;
+    stream << "prep=" << static_cast<int>(controller.preparationState)
+           << ", activation=" << static_cast<int>(controller.activationState)
+           << ", hasRequest=" << controller.hasRequest
+           << ", hasActiveRequest=" << controller.hasActiveRequest
+           << ", currentRevision=" << controller.currentRequest.identity.draftRevision
+           << ", activeRevision=" << controller.activeRequestIdentity.draftRevision
+           << ", failureCode=" << controller.failureFinding.code
+           << ", failureMessage=" << controller.failureFinding.message
+           << ", authorized=" << controller.activationAuthorizedCount
+           << ", authorizationRejected=" << controller.activationAuthorizationRejectedCount
+           << ", stagingRejected=" << controller.activationStagingRejectedCount
+           << ", activePublishedRevision=" << realtime.activePublishedRevision
+           << ", pendingPublishedRevision=" << realtime.pendingPublishedRevision
+           << ", activePublishedMacroRevision=" << realtime.activePublishedMacroRevision;
+    return stream.str();
 }
 
 float renderPerformanceKeyboardNote(drs::plugin::Processor& processor,
@@ -272,16 +310,36 @@ int main()
         narrowZone.velocityHigh = 127;
         narrowZone.articulationId = "default";
         narrowProject.authoring.selectedZoneId = narrowZone.id;
+        narrowProject.authoring.selectedGroupId = narrowZone.groupId;
+        narrowProject.authoring.selectedPerformanceBankId.clear();
+        narrowProject.authoring.performanceBanks.clear();
+        narrowProject.authoring.fxSlots.clear();
+        narrowProject.authoring.routingBuses.clear();
+        auto narrowGroup = std::find_if(narrowProject.authoring.groups.begin(),
+                                        narrowProject.authoring.groups.end(),
+                                        [&](const auto& group)
+                                        {
+                                            return group.id == narrowZone.groupId;
+                                        });
+        require(narrowGroup != narrowProject.authoring.groups.end(),
+                "Perform keyboard regression requires the narrowed zone's authored group.");
+        narrowGroup->auditionAnchorZoneId = narrowZone.id;
+        narrowGroup->routingBusId.clear();
+        narrowProject.authoring.groups = { *narrowGroup };
 
         drs::plugin::Processor narrowProcessor;
         narrowProcessor.prepareToPlay(48000.0, 256);
-        narrowProcessor.replaceAuthoringProject(narrowProject);
+        require(narrowProcessor.replaceAuthoringProject(narrowProject),
+                "Perform keyboard regression fixture must stay valid after pruning to one authored zone.");
         const auto narrowRevision
             = narrowProcessor.getAuthoringSession().getDocumentState().revision;
-        require(narrowProcessor.submitPerformancePublishCommand(
-                    {}, PerformancePublishCommandSource::externalApi)
-                    && waitForActivePublish(narrowProcessor, narrowRevision),
-                "A single-key imported project must publish when its authored articulation differs from the bootstrap selection.");
+        const auto submitted = narrowProcessor.submitPerformancePublishCommand(
+            {}, PerformancePublishCommandSource::externalApi);
+        const auto activated = submitted
+            && waitForActivePublish(narrowProcessor, narrowRevision);
+        require(submitted && activated,
+                "A single-key imported project must publish when its authored articulation differs from the bootstrap selection. State: "
+                    + describePublishActivationState(narrowProcessor));
         require(renderPerformanceKeyboardNote(narrowProcessor, narrowZone.rootKey, 0.8f)
                     > 0.0001f,
                 "The Perform keyboard root key must remain audible when published macro modulation changes pitch or velocity.");
