@@ -360,6 +360,10 @@ void StatusPanel::rebuildMacroControls()
         control->id = macro.id;
         control->minValue = macro.minValue;
         control->maxValue = macro.maxValue;
+        const auto macroId = juce::String::fromUTF8(macro.id.c_str());
+        control->nameLabel.setComponentID("statusMacroNameLabel." + macroId);
+        control->slider.setComponentID("statusMacroSlider." + macroId);
+        control->valueLabel.setComponentID("statusMacroValueLabel." + macroId);
         control->nameLabel.setText(juce::String::fromUTF8(macro.name.c_str()), juce::dontSendNotification);
         control->nameLabel.setJustificationType(juce::Justification::centredLeft);
         control->slider.setSliderStyle(juce::Slider::LinearHorizontal);

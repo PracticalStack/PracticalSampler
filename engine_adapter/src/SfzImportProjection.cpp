@@ -443,6 +443,90 @@ RuntimeProjectModel buildProvisionalProject(const RuntimeProjectModel& baseProje
                                    projection.authoringNotes.end());
     if (!projection.zones.empty())
         project.authoring.selectedZoneId = projection.zones.front().id;
+
+    if (project.schemaVersion >= 4 && project.authoring.schemaVersion >= 3)
+    {
+        auto nextDisplayOrder = static_cast<int>(project.authoring.groups.size());
+        for (const auto& group : project.authoring.groups)
+            nextDisplayOrder = std::max(nextDisplayOrder, group.displayOrder + 1);
+
+        for (const auto& zone : project.authoring.zones)
+        {
+            if (zone.groupId.empty())
+                continue;
+
+            const auto existingGroup = std::find_if(project.authoring.groups.begin(),
+                                                    project.authoring.groups.end(),
+                                                    [&](const RuntimeProjectGroupDefinition& group)
+                                                    {
+                                                        return group.id == zone.groupId;
+                                                    });
+            if (existingGroup != project.authoring.groups.end())
+                continue;
+
+            RuntimeProjectGroupDefinition group;
+            group.id = zone.groupId;
+            group.displayName = zone.groupId;
+            group.displayOrder = nextDisplayOrder++;
+            group.workspaceVisible = true;
+            group.gainDb = 0.0;
+            group.pan = 0.0;
+            group.auditionAnchorZoneId = zone.id;
+            project.authoring.groups.push_back(std::move(group));
+        }
+
+        std::stable_sort(project.authoring.groups.begin(),
+                         project.authoring.groups.end(),
+                         [](const RuntimeProjectGroupDefinition& left,
+                            const RuntimeProjectGroupDefinition& right)
+                         {
+                             if (left.displayOrder != right.displayOrder)
+                                 return left.displayOrder < right.displayOrder;
+                             return left.id < right.id;
+                         });
+
+        for (std::size_t index = 0; index < project.authoring.groups.size(); ++index)
+        {
+            auto& group = project.authoring.groups[index];
+            group.displayOrder = static_cast<int>(index);
+            if (group.displayName.empty())
+                group.displayName = group.id;
+
+            const auto anchorZone = std::find_if(project.authoring.zones.begin(),
+                                                 project.authoring.zones.end(),
+                                                 [&](const RuntimeProjectZoneDefinition& zone)
+                                                 {
+                                                     return zone.id == group.auditionAnchorZoneId
+                                                         && zone.groupId == group.id;
+                                                 });
+            if (anchorZone != project.authoring.zones.end())
+                continue;
+
+            const auto firstMember = std::find_if(project.authoring.zones.begin(),
+                                                  project.authoring.zones.end(),
+                                                  [&](const RuntimeProjectZoneDefinition& zone)
+                                                  {
+                                                      return zone.groupId == group.id;
+                                                  });
+            group.auditionAnchorZoneId = firstMember != project.authoring.zones.end()
+                ? firstMember->id
+                : std::string {};
+        }
+
+        const auto selectedZone = std::find_if(project.authoring.zones.begin(),
+                                               project.authoring.zones.end(),
+                                               [&](const RuntimeProjectZoneDefinition& zone)
+                                               {
+                                                   return zone.id == project.authoring.selectedZoneId;
+                                               });
+        if (selectedZone != project.authoring.zones.end())
+            project.authoring.selectedGroupId = selectedZone->groupId;
+        else if (!project.authoring.groups.empty())
+            project.authoring.selectedGroupId = project.authoring.groups.front().id;
+        else
+            project.authoring.selectedGroupId.clear();
+    }
+
     return project;
 }
 
@@ -726,7 +810,7 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
 
     auto provisionalProject = buildProvisionalProject(baseProject, result);
     if (projectUsesExplicitRoundRobin(provisionalProject)
-        && (provisionalProject.schemaVersion != 3 || provisionalProject.authoring.schemaVersion != 2))
+        && provisionalProject.schemaVersion < 3)
     {
         const auto migration = migrateRuntimeProjectToPhase3RoundRobinSchema(provisionalProject);
         if (!migration.valid)

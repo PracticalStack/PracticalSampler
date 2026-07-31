@@ -8,6 +8,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <set>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 
@@ -19,6 +21,32 @@ void require(bool condition, const std::string& message)
 {
     if (!condition)
         throw std::runtime_error(message);
+}
+
+std::string joinIssues(const std::vector<std::string>& issues)
+{
+    if (issues.empty())
+        return {};
+
+    std::ostringstream stream;
+    for (std::size_t index = 0; index < issues.size(); ++index)
+    {
+        if (index > 0)
+            stream << " | ";
+        stream << issues[index];
+    }
+    return stream.str();
+}
+
+std::size_t countDistinctGroupIds(const std::vector<drs::engine::RuntimeProjectZoneDefinition>& zones)
+{
+    std::set<std::string> groupIds;
+    for (const auto& zone : zones)
+    {
+        if (!zone.groupId.empty())
+            groupIds.insert(zone.groupId);
+    }
+    return groupIds.size();
 }
 
 fs::path resolveFirstFixturePath()
@@ -65,6 +93,20 @@ drs::engine::RuntimeProjectModel makeBlankPhase2Project(const fs::path& fixtureP
     project.defaultInstrumentManifestPath = (fixturePath.parent_path() / "projection-test.drstrm").generic_string();
     project.authoring.schemaName = "drs.authoring";
     project.authoring.schemaVersion = 1;
+    return project;
+}
+
+drs::engine::RuntimeProjectModel makeBlankPhase5Project(const fs::path& fixturePath)
+{
+    drs::engine::RuntimeProjectModel project;
+    project.schemaName = "drs.project";
+    project.schemaVersion = 5;
+    project.projectId = "sprint31.sfz-projection-schema5";
+    project.displayName = "Sprint 3.1.4 Projection Schema 5";
+    project.contentRootPath = fixturePath.parent_path().generic_string();
+    project.defaultInstrumentManifestPath = (fixturePath.parent_path() / "projection-test-schema5.drstrm").generic_string();
+    project.authoring.schemaName = "drs.authoring";
+    project.authoring.schemaVersion = 4;
     return project;
 }
 
@@ -130,8 +172,10 @@ int main()
     {
         const auto fixturePath = resolveFirstFixturePath();
         const auto blankProject = makeBlankPhase2Project(fixturePath);
+        const auto blankPhase5Project = makeBlankPhase5Project(fixturePath);
         const auto analysis = analyzeSfzImportDocument(fixturePath.generic_string());
         const auto projection = projectSfzImportAnalysis(blankProject, analysis);
+        const auto phase5Projection = projectSfzImportAnalysis(blankPhase5Project, analysis);
 
         require(projection.projected, "Sprint 3.1.4 should project the first SFZ fixture into native content.");
         require(projection.playable, "Sprint 3.1.4 should keep the first SFZ fixture playable after projection.");
@@ -145,6 +189,14 @@ int main()
                 "Sprint 3.1.4 should persist at least one project-level SFZ provenance note.");
         require(!projection.authoringNotes.empty(),
                 "Sprint 3.1.4 should persist creator-facing SFZ compatibility notes.");
+        require(phase5Projection.projected && phase5Projection.playable,
+                "Sprint 3.1.4 should also project the first SFZ fixture into a fresh schema 5 project. Issues: "
+                    + joinIssues(phase5Projection.issues));
+        require(phase5Projection.zones.size() == projection.zones.size()
+                    && phase5Projection.sampleSources.size() == projection.sampleSources.size(),
+                "Schema 5 SFZ projection should produce the same zone and sample counts as the legacy authoring baseline.");
+        require(phase5Projection.issues.empty(),
+                "Schema 5 SFZ projection should not report legacy round-robin migration failures.");
 
         const auto& firstZone = projection.zones.at(0);
         const auto& secondZone = projection.zones.at(1);
@@ -186,6 +238,25 @@ int main()
                                61,
                                84,
                                "The second projected SFZ layer crossfade metadata");
+
+        AuthoringSession phase5Session(blankPhase5Project);
+        const auto phase5ApplyResult = applySfzImportProjection(
+            phase5Session,
+            phase5Projection,
+            "Import Sprint 3.1.4 SFZ fixture into schema 5 project");
+        require(phase5ApplyResult.applied,
+                "Sprint 3.1.4 should apply projected SFZ content into a fresh schema 5 project.");
+        require(phase5Session.getProject().schemaVersion == 5
+                    && phase5Session.getProject().authoring.schemaVersion == 4,
+                "Applying SFZ content into a schema 5 project should preserve the current project schema versions.");
+        require(phase5Session.getProject().authoring.zones.size() == phase5Projection.zones.size(),
+                "Applying SFZ content into a schema 5 project should append every projected zone.");
+        require(phase5Session.getProject().authoring.groups.size()
+                    == countDistinctGroupIds(phase5Session.getProject().authoring.zones),
+                "Applying SFZ content into a schema 5 project should synthesize one explicit group per distinct imported groupId.");
+        require(phase5Session.getProject().authoring.selectedGroupId
+                    == phase5Session.getProject().authoring.zones.front().groupId,
+                "Applying SFZ content into a schema 5 project should align selectedGroupId with the imported selection.");
 
         AuthoringSession session(blankProject);
         const auto applyResult = applySfzImportProjection(session, projection, "Import Sprint 3.1.4 SFZ fixture");

@@ -88,6 +88,15 @@ juce::Button& requireButton(juce::Component& root, const juce::String& component
     return *button;
 }
 
+void requireComponentPresent(juce::Component& root,
+                             const juce::String& componentId,
+                             const bool expectedPresent,
+                             const std::string& message)
+{
+    const auto present = findDescendantById(root, componentId) != nullptr;
+    require(present == expectedPresent, message);
+}
+
 void requireLabelContains(juce::Component& root,
                           const juce::String& componentId,
                           const std::string& expectedFragment,
@@ -366,6 +375,118 @@ int main()
                                  + " - "
                                  + juce::MidiMessage::getMidiNoteName(57, true, true, 3).toStdString(),
                              "Performance panel should preserve the authored playable range after republishing an edited draft.");
+
+        const auto phase2ProjectLoad = drs::engine::loadPhase2ReferenceProjectManifest();
+        require(phase2ProjectLoad.loaded,
+                "Phase 2 reference project must load before Sprint 5 mixer coverage runs.");
+
+        auto mixedExposureProject = phase2ProjectLoad.project;
+        mixedExposureProject.projectId += "-performance-mixer-ui";
+        mixedExposureProject.authoring.macros = {
+            { "layer-blend", "Layer Blend", 0.42, 0.0, 1.0, {}, true },
+            { "pedal-helper", "Pedal Helper", 0.18, 0.0, 1.0, {}, false }
+        };
+        require(engineFacade.replaceDraftPlaybackAuthoringProject(mixedExposureProject),
+                "Engine facade should accept the mixed-exposure project for performance mixer coverage.");
+        require(engineFacade.reopenDraftPlaybackProject(0),
+                "Engine facade should reopen the mixed-exposure project for performance mixer coverage.");
+        require(engineFacade.refreshPreviewToCurrentDraft(),
+                "Mixed-exposure project should prepare preview before publish.");
+        require(waitForWorkerToSettle(engineFacade, std::chrono::milliseconds(1500)),
+                "Mixed-exposure preview should settle through the prepared-playback worker.");
+        require(engineFacade.serviceBackgroundWork(),
+                "Background work servicing should apply the mixed-exposure preview.");
+        require(engineFacade.publishCurrentDraft(),
+                "Mixed-exposure project should publish successfully.");
+        require(waitForWorkerToSettle(engineFacade, std::chrono::milliseconds(1500)),
+                "Mixed-exposure publish should settle through the prepared-playback worker.");
+        require(engineFacade.serviceBackgroundWork(),
+                "Background work servicing should apply the mixed-exposure publish.");
+        const auto mixedActivation = engineFacade.authorizePerformanceActivation();
+        require(mixedActivation != nullptr,
+                "Mixed-exposure publish should authorize an active performance binding.");
+        require(engineFacade.acknowledgePerformanceActivation(mixedActivation),
+                "Mixed-exposure publish should acknowledge the active performance binding.");
+        refreshPanel(panel);
+
+        requireLabelContains(panel,
+                             "performanceMacroStripLabel",
+                             "Performance Mixer | 1 Exposed",
+                             "Performance panel should switch into mixer mode when published exposed controls are active.");
+        requireLabelContains(panel,
+                             "performanceMacroNameLabel.tone",
+                             "Layer Blend",
+                             "Performance mixer should expose the published authored control label on the active slot.");
+        requireComponentPresent(panel,
+                                "performanceMacroNameLabel.motion",
+                                false,
+                                "Performance mixer should hide assigned helper controls from the default player surface.");
+        requireLabelContains(panel,
+                             "statusMacroNameLabel.motion",
+                             "Pedal Helper",
+                             "Diagnostics should continue to expose hidden helper controls through the full published macro table.");
+        require(!requireLabel(panel, "performanceMixerEmptyStateLabel").isVisible(),
+                "Performance mixer empty state should stay hidden while at least one exposed control is available.");
+
+        auto hiddenOnlyProject = phase2ProjectLoad.project;
+        hiddenOnlyProject.projectId += "-performance-mixer-hidden-only";
+        hiddenOnlyProject.authoring.macros = {
+            { "pedal-noise", "Pedal Noise", 0.25, 0.0, 1.0, {}, false },
+            { "release-helper", "Release Helper", 0.12, 0.0, 1.0, {}, false }
+        };
+        require(engineFacade.replaceDraftPlaybackAuthoringProject(hiddenOnlyProject),
+                "Engine facade should accept the hidden-only helper project for performance mixer coverage.");
+        require(engineFacade.reopenDraftPlaybackProject(0),
+                "Engine facade should reopen the hidden-only helper project for performance mixer coverage.");
+        require(engineFacade.refreshPreviewToCurrentDraft(),
+                "Hidden-only helper project should prepare preview before publish.");
+        require(waitForWorkerToSettle(engineFacade, std::chrono::milliseconds(1500)),
+                "Hidden-only helper preview should settle through the prepared-playback worker.");
+        require(engineFacade.serviceBackgroundWork(),
+                "Background work servicing should apply the hidden-only helper preview.");
+        require(engineFacade.publishCurrentDraft(),
+                "Hidden-only helper project should publish successfully.");
+        require(waitForWorkerToSettle(engineFacade, std::chrono::milliseconds(1500)),
+                "Hidden-only helper publish should settle through the prepared-playback worker.");
+        require(engineFacade.serviceBackgroundWork(),
+                "Background work servicing should apply the hidden-only helper publish.");
+        const auto hiddenOnlyActivation = engineFacade.authorizePerformanceActivation();
+        require(hiddenOnlyActivation != nullptr,
+                "Hidden-only helper publish should authorize an active performance binding.");
+        require(engineFacade.acknowledgePerformanceActivation(hiddenOnlyActivation),
+                "Hidden-only helper publish should acknowledge the active performance binding.");
+        refreshPanel(panel);
+
+        requireLabelContains(panel,
+                             "performanceMacroStripLabel",
+                             "Published Controls | None Exposed",
+                             "Performance panel should call out when a published instrument exposes no player-facing controls.");
+        requireLabelContains(panel,
+                             "performanceMixerEmptyStateLabel",
+                             "This instrument publishes no exposed performance controls.",
+                             "Performance mixer should render an explicit empty state when only hidden helpers are published.");
+        require(requireLabel(panel, "performanceMixerEmptyStateLabel").isVisible(),
+                "Performance mixer empty state should become visible when all published controls are hidden.");
+        requireComponentPresent(panel,
+                                "performanceMacroNameLabel.tone",
+                                false,
+                                "Performance mixer should remove the prior exposed control when the new publication exposes none.");
+        requireComponentPresent(panel,
+                                "performanceMacroNameLabel.motion",
+                                false,
+                                "Performance mixer should keep hidden helper slots off the player surface.");
+        requireLabelContains(panel,
+                             "statusMacroNameLabel.tone",
+                             "Pedal Noise",
+                             "Diagnostics should continue to expose the first hidden helper binding.");
+        requireLabelContains(panel,
+                             "statusMacroNameLabel.motion",
+                             "Release Helper",
+                             "Diagnostics should continue to expose the second hidden helper binding.");
+        requireLabelContains(panel,
+                             "performanceKeyboardHintLabel",
+                             "publishes no exposed performance controls",
+                             "Performance keyboard guidance should explain why the active publication has no visible mixer controls.");
 
         std::cout << "Phase 2 performance UI tests passed." << std::endl;
         return 0;

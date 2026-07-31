@@ -51,6 +51,8 @@ struct EngineMacroDescriptor
     std::string ownershipKey;
     std::string soundIntent;
     std::string currentEffect;
+    bool publishedControl = false;
+    bool exposedInPerformance = true;
 };
 
 struct EngineArticulationDescriptor

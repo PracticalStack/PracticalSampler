@@ -216,6 +216,52 @@ std::string runtimeMacroIdFromHostParameterId(const std::string& hostParameterId
         : hostParameterId;
 }
 
+EngineMacroDescriptor makePublishedMacroDescriptor(const PublishedMacroBinding& binding,
+                                                   const RuntimeSessionStateSnapshot& sessionState)
+{
+    const auto runtimeId = runtimeMacroIdFromHostParameterId(binding.hostParameterId);
+    const auto currentValue = findMacroValue(sessionState, runtimeId)
+        .value_or(binding.publishedValue);
+
+    auto ownershipKey = binding.hostParameterId;
+    auto soundIntent = std::string("Published performance control.");
+    auto currentEffect = std::string {};
+    if (binding.renderTarget == PublishedMacroRenderTarget::toneVelocity)
+    {
+        ownershipKey = "preview.triggerVelocity";
+        soundIntent = "Published control shapes the fixed playback velocity.";
+        currentEffect = buildToneCurrentEffect(sessionState);
+    }
+    else if (binding.renderTarget == PublishedMacroRenderTarget::motionPitch)
+    {
+        ownershipKey = "preview.noteTravel";
+        soundIntent = "Published control offsets the played pitch.";
+        currentEffect = buildMotionCurrentEffect(sessionState);
+    }
+    else if (binding.renderTarget == PublishedMacroRenderTarget::dspControl)
+    {
+        ownershipKey = "published.dsp." + binding.dspSlotId + "." + binding.dspParameterId;
+        soundIntent = binding.exposedInPerformance
+            ? "Published exposed control routed into the active DSP graph."
+            : "Published helper control routed into the active DSP graph.";
+        currentEffect = binding.dspSlotId + " / " + binding.dspParameterId;
+    }
+
+    return {
+        runtimeId,
+        binding.publishedName,
+        binding.minValue,
+        binding.maxValue,
+        binding.defaultValue,
+        std::clamp(currentValue, binding.minValue, binding.maxValue),
+        std::move(ownershipKey),
+        std::move(soundIntent),
+        std::move(currentEffect),
+        true,
+        binding.exposedInPerformance
+    };
+}
+
 std::vector<PublishedMacroHostSlotDefinition> buildPublishedHostSlots(
     const std::vector<PlaybackSnapshotMacroDefault>& authoredMacros,
     const std::vector<RuntimeMacroDefinition>& hostMacros,
@@ -1279,46 +1325,7 @@ std::vector<EngineMacroDescriptor> EngineFacade::getMacroDescriptors() const
         {
             if (!binding.assigned)
                 continue;
-
-            const auto runtimeId = runtimeMacroIdFromHostParameterId(binding.hostParameterId);
-            const auto currentValue = findMacroValue(currentSessionState, runtimeId)
-                .value_or(binding.publishedValue);
-
-            auto ownershipKey = binding.hostParameterId;
-            auto soundIntent = std::string("Published performance control.");
-            auto currentEffect = std::string {};
-            if (binding.renderTarget == PublishedMacroRenderTarget::toneVelocity)
-            {
-                ownershipKey = "preview.triggerVelocity";
-                soundIntent = "Published control shapes the fixed playback velocity.";
-                currentEffect = buildToneCurrentEffect(currentSessionState);
-            }
-            else if (binding.renderTarget == PublishedMacroRenderTarget::motionPitch)
-            {
-                ownershipKey = "preview.noteTravel";
-                soundIntent = "Published control offsets the played pitch.";
-                currentEffect = buildMotionCurrentEffect(currentSessionState);
-            }
-            else if (binding.renderTarget == PublishedMacroRenderTarget::dspControl)
-            {
-                ownershipKey = "published.dsp." + binding.dspSlotId + "." + binding.dspParameterId;
-                soundIntent = binding.exposedInPerformance
-                    ? "Published exposed control routed into the active DSP graph."
-                    : "Published helper control routed into the active DSP graph.";
-                currentEffect = binding.dspSlotId + " / " + binding.dspParameterId;
-            }
-
-            descriptors.push_back({
-                runtimeId,
-                binding.publishedName,
-                binding.minValue,
-                binding.maxValue,
-                binding.defaultValue,
-                std::clamp(currentValue, binding.minValue, binding.maxValue),
-                std::move(ownershipKey),
-                std::move(soundIntent),
-                std::move(currentEffect)
-            });
+            descriptors.push_back(makePublishedMacroDescriptor(binding, currentSessionState));
         }
 
         return descriptors;
@@ -1349,7 +1356,9 @@ std::vector<EngineMacroDescriptor> EngineFacade::getMacroDescriptors() const
             macro.id == "tone"
                 ? "Biases the reference preview from softer attacks into accent territory."
                 : "Offsets the previewed note pitch to add movement across the reference range.",
-            macro.id == "tone" ? buildToneCurrentEffect(currentSessionState) : buildMotionCurrentEffect(currentSessionState)
+            macro.id == "tone" ? buildToneCurrentEffect(currentSessionState) : buildMotionCurrentEffect(currentSessionState),
+            false,
+            true
         });
     }
 

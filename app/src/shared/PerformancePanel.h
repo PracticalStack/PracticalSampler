@@ -44,12 +44,14 @@ private:
         juce::Label nameLabel;
         juce::Slider slider;
         juce::Label valueLabel;
+        bool mixerControl = false;
     };
 
     void timerCallback() override;
     void handleNoteOn(juce::MidiKeyboardState* source, int midiChannel, int midiNoteNumber, float velocity) override;
     void handleNoteOff(juce::MidiKeyboardState* source, int midiChannel, int midiNoteNumber, float velocity) override;
-    void rebuildMacroControls();
+    void rebuildMacroControls(const std::vector<drs::engine::EngineMacroDescriptor>& macros,
+                              bool mixerControl);
     void rebuildArticulationButtons();
     void refreshSurface();
     void syncKeyboardPlayableRange();
@@ -66,6 +68,9 @@ private:
     juce::String publishedPerformanceFindingCode;
     drs::engine::EnginePerformanceSnapshot performanceSnapshot;
     std::uint64_t lastObservedStateRevision = 0;
+    bool showingPublishedMixer = false;
+    std::size_t hiddenPublishedMacroCount = 0;
+    std::vector<std::string> visibleMacroIds;
     std::vector<std::unique_ptr<MacroControl>> macroControls;
     std::vector<std::unique_ptr<juce::TextButton>> articulationButtons;
     juce::MidiKeyboardState keyboardState;
@@ -77,6 +82,7 @@ private:
     juce::Label patchStatusLabel;
     juce::Label previewStatusLabel;
     juce::Label macroStripLabel;
+    juce::Label mixerEmptyStateLabel;
     juce::Label articulationLabel;
     juce::Label keyboardHintLabel;
     juce::Label loadIndicatorLabel;

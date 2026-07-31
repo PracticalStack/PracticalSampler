@@ -73,6 +73,95 @@ int computeMotionSemitoneOffset(const drs::engine::RuntimeSessionStateSnapshot& 
     const auto motionValue = findMacroValue(sessionState, "motion").value_or(0.15);
     return static_cast<int>(std::lround((motionValue - 0.5) * 24.0));
 }
+
+struct PerformanceMacroSurfaceModel
+{
+    std::vector<drs::engine::EngineMacroDescriptor> displayedMacros;
+    bool showingPublishedMixer = false;
+    std::size_t hiddenPublishedMacroCount = 0;
+};
+
+PerformanceMacroSurfaceModel buildPerformanceMacroSurfaceModel(
+    const std::vector<drs::engine::EngineMacroDescriptor>& macros)
+{
+    PerformanceMacroSurfaceModel model;
+    model.showingPublishedMixer = std::any_of(macros.begin(), macros.end(), [](const auto& macro)
+    {
+        return macro.publishedControl;
+    });
+
+    if (!model.showingPublishedMixer)
+    {
+        model.displayedMacros = macros;
+        return model;
+    }
+
+    model.displayedMacros.reserve(macros.size());
+    for (const auto& macro : macros)
+    {
+        if (macro.exposedInPerformance)
+            model.displayedMacros.push_back(macro);
+        else
+            ++model.hiddenPublishedMacroCount;
+    }
+
+    return model;
+}
+
+bool sameMacroLayout(const std::vector<std::string>& currentIds,
+                     const std::vector<drs::engine::EngineMacroDescriptor>& nextMacros,
+                     const bool currentMixerMode,
+                     const bool nextMixerMode)
+{
+    if (currentMixerMode != nextMixerMode || currentIds.size() != nextMacros.size())
+        return false;
+
+    for (std::size_t index = 0; index < nextMacros.size(); ++index)
+    {
+        if (currentIds[index] != nextMacros[index].id)
+            return false;
+    }
+
+    return true;
+}
+
+juce::String buildMacroStripTitle(const PerformanceMacroSurfaceModel& model)
+{
+    if (!model.showingPublishedMixer)
+        return model.displayedMacros.empty() ? "Performance Macros" : "Performance Macros | Preview Controls";
+
+    if (model.displayedMacros.empty())
+        return "Published Controls | None Exposed";
+
+    return "Performance Mixer | " + juce::String(static_cast<int>(model.displayedMacros.size()))
+        + " Exposed";
+}
+
+juce::String buildMacroStripDescription(const PerformanceMacroSurfaceModel& model)
+{
+    if (!model.showingPublishedMixer)
+        return "Reference preview macros stay visible until a published performance binding becomes active.";
+
+    if (model.displayedMacros.empty())
+        return "Published helper controls remain active, but this instrument does not expose any end-user performance controls.";
+
+    return "Published exposed controls stay in authored order while hidden helper controls remain available in Diagnostics.";
+}
+
+juce::String buildMixerEmptyStateText(const std::size_t hiddenPublishedMacroCount)
+{
+    auto text = juce::String("This instrument publishes no exposed performance controls.");
+    if (hiddenPublishedMacroCount > 0)
+    {
+        text << " " << juce::String(static_cast<int>(hiddenPublishedMacroCount))
+             << " hidden helper control";
+        if (hiddenPublishedMacroCount != 1)
+            text << "s";
+        text << " remain available in Diagnostics.";
+    }
+
+    return text;
+}
 } // namespace
 
 PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
@@ -92,7 +181,7 @@ PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
       diagnosticsPanel(facade, onMacroValueChanged, std::move(publishCommand),
                        publishPresentationProvider)
 {
-    titleLabel.setText("Phase 1 Performance Surface", juce::dontSendNotification);
+    titleLabel.setText("Performance Mixer", juce::dontSendNotification);
     titleLabel.setFont(juce::FontOptions(26.0f, juce::Font::bold));
     titleLabel.setColour(juce::Label::textColourId, juce::Colours::white);
 
@@ -104,6 +193,9 @@ PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
     previewStatusLabel.setComponentID("performancePreviewStatusLabel");
     macroStripLabel.setFont(juce::FontOptions(16.0f, juce::Font::bold));
     macroStripLabel.setComponentID("performanceMacroStripLabel");
+    mixerEmptyStateLabel.setFont(juce::FontOptions(15.0f));
+    mixerEmptyStateLabel.setComponentID("performanceMixerEmptyStateLabel");
+    mixerEmptyStateLabel.setJustificationType(juce::Justification::centredLeft);
     articulationLabel.setFont(juce::FontOptions(16.0f, juce::Font::bold));
     articulationLabel.setComponentID("performanceArticulationLabel");
     keyboardHintLabel.setFont(juce::FontOptions(15.0f));
@@ -115,6 +207,7 @@ PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
     patchStatusLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(52, 64, 84));
     previewStatusLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(52, 64, 84));
     macroStripLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(14, 20, 27));
+    mixerEmptyStateLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(52, 64, 84));
     articulationLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(14, 20, 27));
     keyboardHintLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(52, 64, 84));
     loadIndicatorLabel.setJustificationType(juce::Justification::centred);
@@ -165,6 +258,7 @@ PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
     addAndMakeVisible(patchStatusLabel);
     addAndMakeVisible(previewStatusLabel);
     addAndMakeVisible(macroStripLabel);
+    addAndMakeVisible(mixerEmptyStateLabel);
     addAndMakeVisible(articulationLabel);
     addAndMakeVisible(keyboardHintLabel);
     addAndMakeVisible(loadIndicatorLabel);
@@ -175,7 +269,7 @@ PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
     addChildComponent(diagnosticsPanel);
 
     rebuildArticulationButtons();
-    rebuildMacroControls();
+    rebuildMacroControls(engineFacade.getMacroDescriptors(), false);
     refreshSurface();
     startTimerHz(2);
 }
@@ -243,14 +337,61 @@ void PerformancePanel::resized()
     macroStripLabel.setBounds(area.removeFromTop(24));
     area.removeFromTop(8);
 
-    for (auto& control : macroControls)
+    if (showingPublishedMixer)
     {
-        auto macroRow = area.removeFromTop(28);
-        control->nameLabel.setBounds(macroRow.removeFromLeft(110));
-        control->slider.setBounds(macroRow.removeFromLeft(220));
-        macroRow.removeFromLeft(10);
-        control->valueLabel.setBounds(macroRow.removeFromLeft(190));
-        area.removeFromTop(6);
+        if (macroControls.empty())
+        {
+            mixerEmptyStateLabel.setBounds(area.removeFromTop(56));
+            area.removeFromTop(8);
+        }
+        else
+        {
+            constexpr int maximumMixerColumns = 8;
+            constexpr int mixerRowHeight = 188;
+            constexpr int mixerGap = 12;
+            const auto controlCount = static_cast<int>(macroControls.size());
+            const auto columnCount = std::max(1, std::min(maximumMixerColumns, controlCount));
+            const auto rowCount = (controlCount + columnCount - 1) / columnCount;
+            const auto mixerHeight = rowCount * mixerRowHeight + (rowCount - 1) * mixerGap;
+            auto mixerArea = area.removeFromTop(mixerHeight);
+
+            const auto cellWidth = (mixerArea.getWidth() - mixerGap * (columnCount - 1)) / columnCount;
+            const auto cellHeight = (mixerArea.getHeight() - mixerGap * (rowCount - 1)) / rowCount;
+
+            for (int index = 0; index < controlCount; ++index)
+            {
+                const auto row = index / columnCount;
+                const auto column = index % columnCount;
+                auto cell = juce::Rectangle<int>(
+                    mixerArea.getX() + column * (cellWidth + mixerGap),
+                    mixerArea.getY() + row * (cellHeight + mixerGap),
+                    cellWidth,
+                    cellHeight);
+                cell.reduce(6, 4);
+
+                auto& control = macroControls[static_cast<std::size_t>(index)];
+                control->nameLabel.setBounds(cell.removeFromTop(24));
+                cell.removeFromTop(6);
+                auto footer = cell.removeFromBottom(38);
+                control->valueLabel.setBounds(footer);
+                control->slider.setBounds(cell.reduced(18, 0));
+            }
+
+            area.removeFromTop(10);
+        }
+    }
+    else
+    {
+        mixerEmptyStateLabel.setBounds({});
+        for (auto& control : macroControls)
+        {
+            auto macroRow = area.removeFromTop(28);
+            control->nameLabel.setBounds(macroRow.removeFromLeft(110));
+            control->slider.setBounds(macroRow.removeFromLeft(220));
+            macroRow.removeFromLeft(10);
+            control->valueLabel.setBounds(macroRow.removeFromLeft(190));
+            area.removeFromTop(6);
+        }
     }
 
     area.removeFromTop(12);
@@ -294,19 +435,36 @@ void PerformancePanel::handleNoteOff(juce::MidiKeyboardState*, int, int midiNote
         onPerformanceNoteOff(midiNoteNumber);
 }
 
-void PerformancePanel::rebuildMacroControls()
+void PerformancePanel::rebuildMacroControls(
+    const std::vector<drs::engine::EngineMacroDescriptor>& macros,
+    const bool mixerControl)
 {
+    visibleMacroIds.clear();
     macroControls.clear();
+    showingPublishedMixer = mixerControl;
 
-    for (const auto& macro : engineFacade.getMacroDescriptors())
+    for (const auto& macro : macros)
     {
         auto control = std::make_unique<MacroControl>();
         control->id = macro.id;
+        control->mixerControl = mixerControl;
+        visibleMacroIds.push_back(macro.id);
+        const auto macroId = juce::String::fromUTF8(macro.id.c_str());
+        control->nameLabel.setComponentID("performanceMacroNameLabel." + macroId);
+        control->slider.setComponentID("performanceMacroSlider." + macroId);
+        control->valueLabel.setComponentID("performanceMacroValueLabel." + macroId);
         control->nameLabel.setText(juce::String::fromUTF8(macro.name.c_str()), juce::dontSendNotification);
-        control->nameLabel.setJustificationType(juce::Justification::centredLeft);
-        control->slider.setSliderStyle(juce::Slider::LinearHorizontal);
+        control->nameLabel.setJustificationType(mixerControl
+                                                    ? juce::Justification::centred
+                                                    : juce::Justification::centredLeft);
+        control->slider.setSliderStyle(mixerControl
+                                           ? juce::Slider::LinearVertical
+                                           : juce::Slider::LinearHorizontal);
         control->slider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
         control->slider.setRange(macro.minValue, macro.maxValue, 0.001);
+        control->slider.setColour(juce::Slider::trackColourId,
+                                  performancePanelAccent.withAlpha(mixerControl ? 0.55f : 0.35f));
+        control->slider.setColour(juce::Slider::thumbColourId, performancePanelAccent);
         control->slider.onValueChange = [this, rawControl = control.get()]
         {
             if (rawControl->slider.isMouseButtonDown())
@@ -317,7 +475,9 @@ void PerformancePanel::rebuildMacroControls()
                     engineFacade.setMacroValue(rawControl->id, rawControl->slider.getValue());
             }
         };
-        control->valueLabel.setJustificationType(juce::Justification::centredRight);
+        control->valueLabel.setJustificationType(mixerControl
+                                                     ? juce::Justification::centred
+                                                     : juce::Justification::centredRight);
 
         addAndMakeVisible(control->nameLabel);
         addAndMakeVisible(control->slider);
@@ -349,7 +509,8 @@ void PerformancePanel::refreshSurface()
     performanceSnapshot = engineFacade.getPerformanceSnapshot();
     lastObservedStateRevision = engineFacade.getStateRevision();
     const auto articulations = engineFacade.getArticulationDescriptors();
-    const auto macros = engineFacade.getMacroDescriptors();
+    const auto allMacros = engineFacade.getMacroDescriptors();
+    const auto macroSurface = buildPerformanceMacroSurfaceModel(allMacros);
     const auto publishPresentation = publishPresentationProvider
         ? publishPresentationProvider()
         : engineFacade.getPerformancePublishPresentationSnapshot();
@@ -360,9 +521,13 @@ void PerformancePanel::refreshSurface()
         resized();
     }
 
-    if (macros.size() != macroControls.size())
+    hiddenPublishedMacroCount = macroSurface.hiddenPublishedMacroCount;
+    if (!sameMacroLayout(visibleMacroIds,
+                         macroSurface.displayedMacros,
+                         showingPublishedMixer,
+                         macroSurface.showingPublishedMixer))
     {
-        rebuildMacroControls();
+        rebuildMacroControls(macroSurface.displayedMacros, macroSurface.showingPublishedMixer);
         resized();
     }
 
@@ -462,7 +627,16 @@ void PerformancePanel::refreshSurface()
     previewStatusLabel.setColour(juce::Label::textColourId,
                                  hasPreviewError ? performancePanelDanger : juce::Colour::fromRGB(52, 64, 84));
 
-    macroStripLabel.setText("Macro Strip", juce::dontSendNotification);
+    const auto macroStripDescription = buildMacroStripDescription(macroSurface);
+    macroStripLabel.setText(buildMacroStripTitle(macroSurface), juce::dontSendNotification);
+    macroStripLabel.setTooltip(macroStripDescription);
+    macroStripLabel.setDescription(macroStripDescription);
+    mixerEmptyStateLabel.setVisible(macroSurface.showingPublishedMixer
+                                    && macroSurface.displayedMacros.empty());
+    const auto mixerEmptyText = buildMixerEmptyStateText(macroSurface.hiddenPublishedMacroCount);
+    mixerEmptyStateLabel.setText(mixerEmptyText, juce::dontSendNotification);
+    mixerEmptyStateLabel.setTooltip(mixerEmptyText);
+    mixerEmptyStateLabel.setDescription(mixerEmptyText);
     articulationLabel.setText("Articulations", juce::dontSendNotification);
     syncKeyboardPlayableRange();
 
@@ -477,17 +651,27 @@ void PerformancePanel::refreshSurface()
                           articulation.selected ? juce::Colours::white : juce::Colour::fromRGB(14, 20, 27));
     }
 
-    for (std::size_t index = 0; index < std::min(macros.size(), macroControls.size()); ++index)
+    for (std::size_t index = 0;
+         index < std::min(macroSurface.displayedMacros.size(), macroControls.size());
+         ++index)
     {
         auto& control = macroControls[index];
-        const auto& macro = macros[index];
+        const auto& macro = macroSurface.displayedMacros[index];
+        const auto currentEffect = juce::String::fromUTF8(macro.currentEffect.c_str());
+        const auto currentValueText = juce::String(macro.currentValue, 3);
         control->nameLabel.setText(juce::String::fromUTF8(macro.name.c_str()), juce::dontSendNotification);
         control->slider.setRange(macro.minValue, macro.maxValue, 0.001);
         control->slider.setValue(macro.currentValue, juce::dontSendNotification);
-        control->valueLabel.setText(juce::String(macro.currentValue, 3)
-                                        + " | "
-                                        + juce::String::fromUTF8(macro.currentEffect.c_str()),
-                                    juce::dontSendNotification);
+        control->valueLabel.setText(
+            currentEffect.isNotEmpty() ? currentValueText + " | " + currentEffect : currentValueText,
+            juce::dontSendNotification);
+        auto controlDescription = juce::String::fromUTF8(macro.soundIntent.c_str());
+        if (currentEffect.isNotEmpty())
+            controlDescription << " Current effect: " << currentEffect << ".";
+        control->slider.setTooltip(controlDescription);
+        control->slider.setDescription(controlDescription);
+        control->nameLabel.setTooltip(controlDescription);
+        control->valueLabel.setTooltip(controlDescription);
     }
 
     if (diagnosticsPanel.isVisible())
@@ -537,7 +721,16 @@ void PerformancePanel::syncKeyboardPlayableRange()
     }
     else
     {
-        keyboardHint = "Play the keyboard to audition the active Performance path, routing, and macro state. ";
+        if (showingPublishedMixer && macroControls.empty())
+        {
+            keyboardHint = "Published performance is active. This instrument publishes no exposed performance controls. ";
+            if (hiddenPublishedMacroCount > 0)
+                keyboardHint << "Hidden helper controls remain available in Diagnostics. ";
+        }
+        else
+        {
+            keyboardHint = "Play the keyboard to audition the active Performance path, routing, and macro state. ";
+        }
     }
     keyboardHint << "Range "
             + juce::MidiMessage::getMidiNoteName(lowestPlayableNote, true, true, 3)
