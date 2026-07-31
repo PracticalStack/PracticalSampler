@@ -1,5 +1,265 @@
 # DAW Host-State Recall Progress
 
+### July 31, 2026 - WAV Sprint 7 / WAV-706
+
+- State: complete; all WAV plan items are implemented, verified, and completion-audited.
+- Files changed:
+  - `app/src/shared/WavImportWorkflow.h/.cpp`;
+  - `tests/src/WavImportLifecycleIoAuditTests.cpp`;
+  - `tests/src/WavImportWorkflowTests.cpp`;
+  - `tests/src/WavImportShellCharacterizationTests.cpp`;
+  - `tests/src/WavImportBaselineReport.cpp`;
+  - `docs/architecture-overview.md`;
+  - `docs/host-validation.md`;
+  - `docs/wav-import-baseline-report.md`;
+  - `docs/wav-import-release-evidence.md`;
+  - `tests/README.md`.
+- Result: the final product-owned WAV workflow is now completion-driven only. `WavImportWorkflow`
+  no longer constructs or drains `AuthoringImportQueue` state, no longer owns the old synchronous
+  copy/queue helper path, and now prepares apply/finalize/rollback commits strictly from immutable
+  terminal `WavImportCompletionPayload` results. The shell characterization gate also now audits the
+  shared workflow source itself, so any future reintroduction of `prepareWavImportBatch(...)`,
+  `createAuthoringImportQueue(...)`, `processNextAuthoringImportQueueItem(...)`, or
+  `copySampleFileForImport(...)` into `app/src` fails the WAV shell regression suite. The
+  architecture and diagnostics notes now explicitly describe the shipped async-only request,
+  completion, and release-evidence path, while the old synchronous baseline is preserved only as a
+  historical artifact. The lifecycle I/O audit also now waits for the async waveform preview using
+  the same polling pattern as the dedicated preview suites instead of forcing extra audio-block
+  processing during the authorization wait.
+- Validation:
+  - rebuilt the touched WAV targets in `build/vs2022-debug` under the Visual Studio 2022 developer
+    environment, including `drs_wav_import_workflow_tests`,
+    `drs_wav_import_shell_characterization_tests`,
+    `drs_wav_import_processor_responsiveness_tests`,
+    `drs_wav_import_lifecycle_io_audit_tests`,
+    `drs_wav_import_ci_budget_tests`,
+    `drs_wav_import_host_validation_tests`, and `drs_wav_import_baseline_report`;
+  - passed the focused Debug CTest release slice
+    `drs.wav_import.workflow|drs.wav_import.shell_characterization|drs.wav_import.processor_responsiveness|drs.wav_import.lifecycle_io_audit|drs.wav_import.ci_budgets|drs.wav_import.host_validation`;
+  - reran `validation/reaper/run-wav-import-matrix.ps1`, capturing fresh signed REAPER evidence on
+    July 31, 2026 at `07:33:07Z`, `07:33:11Z`, and `07:33:15Z` for missing-local,
+    removable-media-like, and UNC-like sample locations; all three runs reported
+    `instantiation_elapsed_ms=0`, `parameter_count=2086`, `enabled=true`, `offline=false`,
+    Tone `0.3499999940`, Motion `0.1500000060`, and `track_chunk_captured=true`;
+  - rebuilt `drs_wav_import_lifecycle_io_audit_tests` in the Visual Studio 2022 developer
+    environment after aligning its waveform-preview wait helper with the async preview suites, then
+    passed the executable directly and the focused Debug CTest rerun
+    `drs.wav_import.processor_responsiveness|drs.wav_import.lifecycle_io_audit|drs.host_state.project_recall|drs.wav_import.baseline_report`;
+  - passed the full 22-test Debug WAV audit slice
+    `drs\\.wav_import\\.|drs\\.phase2\\.authoring_import|drs\\.phase2\\.waveform_preview|drs\\.phase2\\.authoring_ui|drs\\.host_state\\.project_recall|drs\\.phase1\\.sample_import`,
+    including `drs.wav_import.lifecycle_stress` at `712.89 sec`, with `100% tests passed, 0 tests failed`;
+  - completed a fresh top-level Debug build with
+    `cmake --build build/vs2022-debug --config Debug` in the Visual Studio 2022 developer
+    environment;
+  - completed the final task audit against `wav-import-startup-decode-development-plan.html`,
+    confirming `plan_id_count=37`, `missing=none`, and `not_complete=none`;
+  - confirmed no dedicated lint or type-check targets were defined in the searched repo CMake/docs
+    surface, and no `TODO`, `FIXME`, `temporary workaround`, `mock result`, or disabled-test markers
+    remained in the WAV deliverables counted as release evidence;
+  - ran the final product-code audit
+    `rg -n "createAuthoringImportQueue|processNextAuthoringImportQueueItem|prepareWavImportBatch\\(|copySampleFileForImport\\(" app/src -g "*.cpp" -g "*.h"`,
+    which returned no matches;
+  - recorded the final release note at `docs/wav-import-release-evidence.md`.
+
+### July 31, 2026 - WAV Sprint 7 / WAV-705
+
+- State: complete; WAV-706 is next.
+- Files changed:
+  - `tests/src/WavImportHostValidationTests.cpp`;
+  - `tests/CMakeLists.txt`;
+  - `tests/README.md`;
+  - `validation/reaper/make-wav-import-scenarios.ps1`;
+  - `validation/reaper/validate-wav-import-startup.lua`;
+  - `validation/reaper/run-wav-import-matrix.ps1`;
+  - `docs/host-validation.md`;
+  - `docs/wav-import-host-validation-evidence.md`.
+- Result: WAV-705 now has both a checked standalone gate and signed host evidence. The new
+  `drs.wav_import.host_validation` target proves missing-local, removable-drive-like, and UNC-like
+  project sample-source paths do not trigger startup copy/hash/read/decode work in the standalone
+  shell, leave the responsiveness surface in `not-run`, and stay within reviewed Debug construction
+  and project-replace budgets. The new REAPER-specific WAV harness rewrites the Phase 2 reference
+  project to those same three path classes, launches an isolated REAPER 7.39/x64 config, records
+  first-ready instantiation timing once the VST3 instance is online with a readable parameter
+  surface, and captures the restored track chunk for each scenario. All three REAPER runs restored
+  one enabled online Decent Rhapsody VST3i instance with the full 2,086-parameter surface and the
+  safe startup Tone/Motion values, proving missing media no longer delays host instantiation.
+- Validation:
+  - built `drs_wav_import_host_validation_tests` in `build/vs2022-debug` under the Visual Studio
+    2022 developer environment;
+  - passed `drs.wav_import.host_validation`, publishing
+    `missing-local: construction=891ms, replace=420ms`,
+    `removable-drive: construction=805ms, replace=411ms`, and
+    `network-unc: construction=836ms, replace=425ms` with zero startup sample-import I/O in every
+    case;
+  - ran `validation/reaper/make-wav-import-scenarios.ps1`, generating
+    `wav-import-missing-local`, `wav-import-removable-media`, and
+    `wav-import-network-media` scenario manifests plus injected `.rpp` projects;
+  - ran `validation/reaper/run-wav-import-matrix.ps1`, capturing signed REAPER evidence with
+    `instantiation_elapsed_ms=3` for missing-local and `0` for removable-media and network-media,
+    while all three runs reported `parameter_count=2086`, `enabled=true`, `offline=false`,
+    Tone `0.3499999940`, Motion `0.1500000060`, and `track_chunk_captured=true`;
+  - passed the focused CTest regression slice
+    `drs.wav_import.processor_responsiveness|drs.wav_import.lifecycle_io_audit|drs.wav_import.ci_budgets|drs.wav_import.host_validation`;
+  - recorded the signed host-validation matrix and SHA-256 evidence catalog in
+    `docs/wav-import-host-validation-evidence.md`.
+
+### July 31, 2026 - WAV Sprint 7 / WAV-704
+
+- State: complete; WAV-705 is next.
+- Files changed:
+  - `tests/src/WavImportCiBudgetTests.cpp`;
+  - `tests/CMakeLists.txt`;
+  - `tests/README.md`.
+- Result: CI now has an explicit WAV budget target that hard-gates the structural regressions this
+  rollout was meant to eliminate while still reporting timing diagnostics with build-aware tolerance.
+  The new `drs.wav_import.ci_budgets` coverage proves processor construction/serialization still
+  performs zero import-related sample I/O, a paused 256-item WAV import submit still returns with
+  zero inline copy/hash/read/decode work, a paused waveform-preview request still returns with zero
+  inline reader/decode work, the staged large-batch snapshot stays inside a reviewed 192 KiB
+  resident-memory proxy budget, and the waveform peak builder stays inside a reviewed 40 KiB
+  fixed-size working-set estimate. The same target also publishes the measured import and waveform
+  cancellation latencies to the CI log with Debug/Release-specific threshold context instead of
+  making the suite flaky on machine-dependent timing variance.
+- Validation:
+  - built `drs_wav_import_ci_budget_tests` in `build/vs2022-debug` under the Visual Studio 2022
+    developer environment;
+  - passed `drs.wav_import.ci_budgets`, publishing
+    `constructorIoOps=0`, `importSubmitIoOps=0`, `previewSubmitIoOps=0`,
+    `residentBatchBytes=155612`, `waveformPeakWorkingBytes=37376`,
+    `wavImportCancel=2247us`, and `waveformPreviewCancel=603us`;
+  - passed the focused CTest regression slice
+    `drs.wav_import.lifecycle_io_audit|drs.wav_import.ci_budgets`, preserving the earlier
+    no-startup/no-lifecycle-I/O gate alongside the new CI budget coverage.
+
+### July 31, 2026 - WAV Sprint 7 / WAV-703
+
+- State: complete; WAV-704 is next.
+- Files changed:
+  - `tests/src/WavImportLifecycleStressTests.cpp`;
+  - `tests/CMakeLists.txt`.
+- Result: the new lifecycle stress harness now drives 100 repeated cycles of editor open/close,
+  rapid waveform selection, import/cancel, project close/reopen, host-state restore, and
+  processor unload against the WAV startup/import path. Across the full run it proved there was no
+  deadlock, orphan worker, use-after-free, leaked staging artifact, or post-unload waveform-preview
+  callback while repeated cancellation, project replacement, and restore churn were in flight.
+- Validation:
+  - built `drs_wav_import_lifecycle_stress_tests` in `build/vs2022-debug` under the Visual Studio
+    2022 developer environment;
+  - passed a verbose 3-cycle diagnostic run, confirming each phase completed in order across editor
+    open/close, rapid selection, import/cancel, close/reopen, restore, and unload-probe loops;
+  - passed a quiet 10-cycle run, confirming the harness stayed stable beyond the smoke slice before
+    the full gate;
+  - passed the full default `drs.wav_import.lifecycle_stress` gate at 100 cycles, publishing
+    `WAV lifecycle stress tests passed: cycles=100, unloadPreviewCallbacks=300` after roughly
+    11 minutes 55 seconds with no leaked `Samples` artifacts at teardown.
+
+### July 31, 2026 - WAV Sprint 7 / WAV-702
+
+- State: complete; WAV-703 is next.
+- Files changed:
+  - `app/src/shared/WavImportWorkflow.h/.cpp`;
+  - `tests/src/WavImportWorkflowTests.cpp`.
+- Result: the late WAV import workflow boundaries now roll back cleanly without leaving stale
+  in-memory mutation behind. Partial file-finalize failure restores any earlier moved staged files
+  and also restores the commit sample-source paths to their staged locations, while an explicit
+  project-commit rollback now restores both the files and the commit’s staged-path view after a
+  failed append/apply step. Combined with the existing lifecycle, staging, analysis, and shell
+  characterization coverage, the boundary matrix now exercises cancellation or stale-result handling
+  at copy, inspect/hash, publish, prompt, file-finalize, and project-commit seams.
+- Validation:
+  - built `drs_wav_import_workflow_tests` in `build/vs2022-debug` under the Visual Studio 2022
+    developer environment;
+  - passed `drs.wav_import.workflow`, proving completion-derived prompt resolution still works,
+    successful finalization updates commit sample-source paths to final files, rollback after
+    finalization restores both files and staged paths, and a partial second-file finalize failure
+    restores earlier moved files plus the commit’s staged-path view;
+  - re-passed `drs.wav_import.lifecycle`, preserving copy-boundary cancellation, supersede,
+    fingerprint/inspection failure cleanup, and owned-worker teardown behavior;
+  - re-passed `drs.wav_import.staging` and `drs.wav_import.analysis`, preserving bounded staged-file
+    publishing, immutable completion payloads, staged-artifact cleanup for failed items, and
+    real-duration/finding reporting for the publish boundary;
+  - re-passed `drs.wav_import.lifecycle_io_audit` and `drs.wav_import.shell_characterization`,
+    preserving the no-startup-I/O guarantees and the shell-side identity/staleness guards around
+    completion apply, prompt, finalize, rollback, and consume.
+
+### July 31, 2026 - WAV Sprint 7 / WAV-701
+
+- State: complete; WAV-702 is next.
+- Files changed:
+  - `app/src/plugin/PluginProcessor.h/.cpp`;
+  - `tests/src/WavImportServiceLifecycleTests.cpp`;
+  - `tests/src/Phase2WaveformPreviewTests.cpp`.
+- Result: deterministic paused-worker coverage now proves both submission entrypoints return before any
+  inline sample work begins. A paused WAV import worker can hold the batch at the staging checkpoint
+  without delaying `Client::submit(...)`, and a paused waveform-preview worker can hold the shell in
+  the loading state without delaying `authorizeAuthoringWaveformPreviewLoad()`. At those paused
+  checkpoints the low-level counters remain at zero, so no copy, fingerprint/hash, reader-open, or
+  decode work is being executed inline on the submitting callback path.
+- Validation:
+  - built `drs_wav_import_lifecycle_tests` and `drs_phase2_waveform_preview_tests` in
+    `build/vs2022-debug` under the Visual Studio 2022 developer environment;
+  - passed `drs.wav_import.lifecycle`, proving a staging-paused worker leaves staged-byte progress
+    at zero, writes no staged files, records no sample-import I/O, and still accepts/reaches a
+    terminal disposition after release;
+  - passed `drs.phase2.waveform_preview`, proving a build-paused preview worker leaves the shell in
+    `Loading`, records no sample-import I/O before release, then still reaches a ready waveform
+    preview after release;
+  - re-passed `drs.wav_import.lifecycle_io_audit` and `drs.wav_import.waveform_preview_service`,
+    preserving the explicit no-startup-I/O guarantees and the latest-request/cancellation behavior
+    around the new paused-worker assertions.
+
+### July 31, 2026 - WAV Sprint 6 / WAV-602, WAV-603, WAV-604, and WAV-605
+
+- State: complete; WAV-701 is next.
+- Files changed:
+  - `app/src/shared/WaveformPreviewService.h/.cpp`;
+  - `app/src/plugin/PluginProcessor.h/.cpp`;
+  - `app/src/shared/authoring/WaveformDetailView.cpp`;
+  - `engine_adapter/src/SampleImport.cpp`;
+  - `tests/src/WaveformPreviewServiceTests.cpp`;
+  - `tests/src/Phase2WaveformPreviewTests.cpp`;
+  - `tests/CMakeLists.txt`.
+- Result: authoring waveform preview requests now run through a processor-owned asynchronous
+  service that supersedes obsolete work, never blocks the message thread, and publishes loading,
+  ready, unavailable, canceled, superseded, and stale outcomes through the existing preview
+  contract while preserving selected-zone loop markers. The preview cache now keys entries by
+  source identity, path, file size, modification time, fingerprint, display resolution, and
+  channel policy, and project/source replacement clears both cached peaks and in-flight results so
+  changed files cannot reuse stale data. Incremental peak construction also now matches the
+  reference full-buffer reducer across mono, stereo, surround, silence, short files, partial final
+  buckets, and looped samples.
+- Validation:
+  - built and passed `drs.wav_import.waveform_preview_service`, proving the latest request wins,
+    superseded work is canceled safely, and terminal waits track the final published request rather
+    than an older snapshot;
+  - passed `drs.phase2.waveform_preview`, proving async preview loading, ready-state publication,
+    cache reuse, stale invalidation after file rewrite, and incremental-peak equivalence across the
+    planned waveform matrix;
+  - re-passed `drs.wav_import.waveform_peak_builder` and `drs.phase1.sample_import`, preserving the
+    chunked engine-side peak builder behavior while removing any duration-sized preview allocation
+    from the authoring path;
+  - re-passed `drs.phase2.authoring_ui`, `drs.wav_import.lifecycle_io_audit`, and
+    `drs.wav_import.source_validation_service`, confirming the authoring panel stays stable during
+    rapid selection and the explicit no-startup-I/O/source-validation guarantees still hold;
+  - re-passed the focused July 31, 2026 regression slice:
+    `drs.wav_import.lifecycle_io_audit`, `drs.wav_import.source_validation_service`,
+    `drs.wav_import.waveform_peak_builder`, `drs.wav_import.waveform_preview_service`,
+    `drs.phase2.waveform_preview`, `drs.phase2.authoring_ui`, and `drs.phase1.sample_import`.
+
+### July 31, 2026 - WAV Sprint 6 / WAV-601
+
+- State: complete; WAV-602 is next.
+- Files changed: `SampleImport.h/.cpp`, waveform preview construction in `PluginProcessor`, new waveform peak builder coverage, and Phase 2 waveform preview assertions.
+- Result: waveform previews now build bounded min/max peaks through a chunked engine-side utility with configurable point resolution, channel reduction policy, progress callbacks, and cancellation, so the authoring preview path no longer needs a full-sample decode just to draw the waveform.
+- Validation: `drs.wav_import.waveform_peak_builder`, `drs.phase2.waveform_preview`, and `drs.phase1.sample_import` passed, alongside the existing `drs.wav_import.lifecycle_io_audit`, `drs.wav_import.source_validation_service`, and `drs.phase2.authoring_ui` regression slice.
+
+### July 31, 2026 - WAV Sprint 5 / WAV-505
+
+- State: complete; WAV-601 is next.
+- Files changed: explicit project source validation service, processor snapshots/controls, authoring waveform drawer validation affordances, plugin and standalone panel wiring, and focused WAV validation/lifecycle/UI tests.
+- Result: background project source validation is now opt-in from the authoring waveform drawer, can be canceled while active, and remains decoupled from constructor, project replace, project close, migration, and host-state restore success.
+- Validation: `drs.wav_import.source_validation_service`, `drs.wav_import.lifecycle_io_audit`, and `drs.phase2.authoring_ui` passed after proving explicit validation performs sample I/O only on request and the new drawer controls expose request/cancel behavior without gating shell startup or restore.
+
 ## Curated DSP development plan
 
 ### July 30, 2026 - Sprints 15–17 / Gates G5 and Wave 2
@@ -928,3 +1188,733 @@ Started: July 29, 2026
   passed.
 - Task audit: HS-001 through HS-604 are complete; no unchecked authoritative task remains.
 - Result: implementation complete.
+
+### July 31, 2026 - WAV Sprint 1 / WAV-101
+
+- State: complete; WAV-102 is next.
+- Files changed:
+  - `tests/src/Phase2AuthoringImportTests.cpp`;
+  - `tests/src/WavImportShellCharacterizationTests.cpp`;
+  - `tests/CMakeLists.txt`.
+- Validation:
+  - built `drs_phase2_authoring_import_tests` and `drs_wav_import_shell_characterization_tests`
+    in `build/vs2022-debug` under the Visual Studio 2022 developer environment;
+  - passed `drs.phase2.authoring_import` after expanding the mixed batch to freeze missing source,
+    unsupported format, portable-name policy warning, manual root-key confirmation, cancellation,
+    accepted inference, and queue-metric summary counts;
+  - passed `drs.wav_import.shell_characterization`, which freezes the current plugin and
+    standalone synchronous shell paths for skipped-missing, copy-failure reporting, queue
+    construction, and inline queue draining.
+- Result: complete. The current synchronous WAV batch outcome matrix is now frozen with concrete
+  evidence before thread/lifecycle changes begin.
+- Remaining tasks: WAV-102 through WAV-706.
+- Known risks: copy failure is still characterized at the shell source-contract level because the
+  synchronous copy step remains duplicated in `PluginEditor.cpp` and `MainComponent.cpp`.
+
+### July 31, 2026 - WAV Sprint 1 / WAV-102
+
+- State: complete; WAV-103 is next.
+- Files changed:
+  - `engine_adapter/include/drs/engine/SampleImport.h`;
+  - `engine_adapter/src/SampleImport.cpp`;
+  - `app/src/plugin/PluginEditor.cpp`;
+  - `app/src/standalone/MainComponent.cpp`;
+  - `tests/src/Phase1SampleImportTests.cpp`;
+  - `tests/src/Phase2WaveformPreviewTests.cpp`.
+- Validation:
+  - built `drs_phase1_sample_import_tests`, `drs_phase2_authoring_import_tests`,
+    `drs_phase2_waveform_preview_tests`, and `drs_wav_import_shell_characterization_tests`
+    in `build/vs2022-debug` under the Visual Studio 2022 developer environment;
+  - passed `drs.phase1.sample_import` after adding shared sample-import hooks, counter snapshots,
+    deterministic null-reader and failing-copy overrides, and direct copy/peak-counter probes;
+  - passed `drs.phase2.waveform_preview` after proving the current project-replace/startup metrics
+    path still opens readers, fingerprints project samples, performs full-frame reads, and copies
+    zero files;
+  - re-passed `drs.phase2.authoring_import` and `drs.wav_import.shell_characterization` to confirm
+    the behavior-preserving shell copy wrapper and import instrumentation did not change the frozen
+    synchronous batch outcomes.
+- Result: complete. Import analysis now has injectable file and reader seams plus concrete open,
+  bytes-read, full-frame-read, copy, and peak-chunk counters that tests can use to prove when
+  synchronous sample work occurred.
+- Remaining tasks: WAV-103 through WAV-706.
+- Known risks: peak-chunk counters are ready for the future async waveform path, but no production
+  peak builder exists yet, so runtime peak-chunk observations remain test-driven only.
+
+### July 31, 2026 - WAV Sprint 1 / WAV-103
+
+- State: complete; WAV-104 is next.
+- Files changed:
+  - `tests/support/WavImportTestSupport.h`;
+  - `tests/support/WavImportTestSupport.cpp`;
+  - `tests/src/WavImportFixtureSupportTests.cpp`;
+  - `tests/CMakeLists.txt`.
+- Validation:
+  - built `drs_wav_import_fixture_support_tests` in `build/vs2022-debug` under the Visual Studio
+    2022 developer environment;
+  - passed `drs.wav_import.fixture_support` after generating a deterministic mixed WAV-import corpus
+    at runtime, pausing a counted copy stage, pausing a synthetic full-frame reader stage, forcing
+    a deterministic copy failure, and simulating a million-frame sample without checking in any
+    large binary fixture.
+- Result: complete. Shared test support now exists for large/slow reader fixtures, mixed batch
+  corpus generation, and deterministic pause/failure injection at copy and read boundaries.
+- Remaining tasks: WAV-104 through WAV-706.
+- Known risks: the pause gates currently prove copy and full-frame read boundaries; later async
+  service tests will still need to thread cancellation identities and stale-generation expectations
+  through those helpers.
+
+### July 31, 2026 - WAV Sprint 1 / WAV-104
+
+- State: complete; WAV-201 is next.
+- Files changed:
+  - `tests/src/WavImportBaselineReport.cpp`;
+  - `tests/README.md`;
+  - `docs/wav-import-baseline-report.md`;
+  - `validation/wav-import/sync-shell-baseline.json`.
+- Validation:
+  - built `drs_wav_import_baseline_report` in `build/vs2022-debug` under the Visual Studio 2022
+    developer environment;
+  - passed `drs.wav_import.baseline_report` after making the scratch directory self-cleaning and
+    widening the report to capture the full synchronous shell callback instead of just the copy
+    phase;
+  - checked in the generated July 31, 2026 snapshot with constructor `424612` us, project replace
+    `622208` us, restore `1027575` us, and synchronous import submit/full batch `11720` us;
+  - recorded that the current submit callback still performs `6` copies, `4` fingerprint opens,
+    `5` reader opens, `4` full-frame reads, `12072` bytes of import-analysis reads, and an
+    estimated peak working set of `19200` bytes for the mixed batch.
+- Result: complete. Sprint 1 now has a checked-in synchronous WAV baseline artifact that later
+  async work can compare against for I/O shape, callback cost, and transient memory estimates.
+- Remaining tasks: WAV-201 through WAV-706.
+- Known risks: the checked-in snapshot is observational and timing-only; later guard work will need
+  an explicit drift policy before CI should enforce these values.
+
+### July 31, 2026 - WAV Sprint 2 / WAV-201
+
+- State: complete; WAV-202 is next.
+- Files changed:
+  - `engine_adapter/include/drs/engine/SampleImport.h`;
+  - `engine_adapter/src/SampleImport.cpp`;
+  - `tests/src/Phase1SampleImportTests.cpp`.
+- Validation:
+  - built `drs_phase1_sample_import_tests` in `build/vs2022-debug` under the Visual Studio 2022
+    developer environment;
+  - passed `drs.phase1.sample_import` after adding `inspectSampleFile(...)` as a metadata-only
+    reader path that preserves format, rate, channels, frame count, embedded root note, loop
+    metadata, filename-heuristic compatibility, and Phase 1 policy results;
+  - proved the new inspection path records reader and fingerprint opens plus source bytes read, but
+    performs `0` full-frame reads and retains no decoded PCM.
+- Result: complete. The engine now exposes a metadata-only inspection seam that returns the facts
+  needed for inference and policy checks without allocating frame-count-sized channel storage.
+- Remaining tasks: WAV-202 through WAV-706.
+- Known risks: queue processing and lifecycle metrics were still holding decoded import results
+  until the following queue-model migration landed.
+
+### July 31, 2026 - WAV Sprint 2 / WAV-202
+
+- State: complete; WAV-203 is next.
+- Files changed:
+  - `engine_adapter/include/drs/engine/SampleImport.h`;
+  - `engine_adapter/src/SampleImport.cpp`;
+  - `app/src/plugin/PluginEditor.cpp`;
+  - `app/src/standalone/MainComponent.cpp`;
+  - `tests/src/Phase2AuthoringImportTests.cpp`;
+  - `tests/src/WavImportBaselineReport.cpp`.
+- Validation:
+  - built `drs_phase2_authoring_import_tests` and `drs_wav_import_baseline_report` in
+    `build/vs2022-debug` under the Visual Studio 2022 developer environment;
+  - changed `AuthoringImportQueueItem` to retain `SampleInspectionResult` plus an optional
+    precomputed fingerprint instead of `SampleImportResult` with normalized channel buffers;
+  - confirmed the queue-owned memory shape no longer depends on source duration, and the generated
+    WAV baseline report now shows `largestDecodedSampleBytes`, `estimatedRetainedQueueBytes`, and
+    `estimatedPeakWorkingBytes` all at `0` for the queue path.
+- Result: complete. Queue items no longer own decoded PCM, which removes duration-sized storage
+  from the authoring analysis path.
+- Remaining tasks: WAV-203 through WAV-706.
+- Known risks: queue processing still needed to preserve all warning, failure, and fingerprint
+  semantics after switching to inspection-only analysis.
+
+### July 31, 2026 - WAV Sprint 2 / WAV-203
+
+- State: complete; WAV-204 is next.
+- Files changed:
+  - `engine_adapter/include/drs/engine/SampleImport.h`;
+  - `engine_adapter/src/SampleImport.cpp`;
+  - `app/src/plugin/PluginEditor.cpp`;
+  - `app/src/standalone/MainComponent.cpp`;
+  - `tests/src/Phase2AuthoringImportTests.cpp`;
+  - `tests/src/Phase2WaveformPreviewTests.cpp`;
+  - `tests/src/WavImportBaselineReport.cpp`.
+- Validation:
+  - built `drs_phase2_authoring_import_tests`, `drs_phase2_waveform_preview_tests`,
+    `drs_phase1_sample_import_tests`, and `drs_wav_import_baseline_report` in
+    `build/vs2022-debug` under the Visual Studio 2022 developer environment;
+  - passed `drs.phase2.authoring_import` after moving `processNextAuthoringImportQueueItem()` to
+    `inspectSampleFile(...)`, preserving mixed-batch warning/failure semantics, reusing a supplied
+    fingerprint, and proving the reused-fingerprint path performs `0` fingerprint-stream opens and
+    `0` full-frame reads;
+  - passed `drs.phase2.waveform_preview` after updating the startup-metrics expectations to reflect
+    the new queue behavior: project replacement still opens readers and fingerprints project
+    samples, but now performs `0` full-frame reads while rebuilding the metrics snapshot;
+  - re-ran `drs.wav_import.baseline_report`, which now reports project replace, restore,
+    import-submit, and full-batch `fullFrameReadCount = 0`, with queue-memory estimates at `0`.
+- Result: complete. Authoring queue analysis now runs entirely from inspection data while preserving
+  the existing inference, finding, and failure outcomes.
+- Remaining tasks: WAV-204 through WAV-706.
+- Known risks: fingerprinting was still synchronous and non-cancelable until the next task added a
+  cooperative chunk-level stop/progress contract.
+
+### July 31, 2026 - WAV Sprint 2 / WAV-204
+
+- State: complete; WAV-205 is next.
+- Files changed:
+  - `engine_adapter/include/drs/engine/SampleImport.h`;
+  - `engine_adapter/src/SampleImport.cpp`;
+  - `tests/src/WavImportFixtureSupportTests.cpp`.
+- Validation:
+  - built `drs_wav_import_fixture_support_tests`, `drs_phase1_sample_import_tests`, and
+    `drs_phase2_authoring_import_tests` in `build/vs2022-debug` under the Visual Studio 2022
+    developer environment;
+  - passed `drs.wav_import.fixture_support` after adding chunk-size and callback options to
+    `fingerprintSampleSourceFile(...)`, proving a synthetic fingerprint stays stable across
+    different chunk sizes and reports byte-based progress to the final `16384`-byte total;
+  - proved cooperative cancellation is observed within one configured `4096`-byte chunk, with the
+    canceled fingerprint result surfacing a stable canceled disposition and `bytesReadCount == 4096`;
+  - re-passed `drs.phase1.sample_import`, `drs.phase2.authoring_import`,
+    `drs.phase2.waveform_preview`, and `drs.wav_import.baseline_report` to confirm the chunked
+    fingerprint contract did not regress metadata inspection, queue processing, or the updated
+    lifecycle counters.
+- Result: complete. Fingerprinting is now explicitly chunked, progress-aware, and cooperatively
+  cancelable, which gives the later worker/service path a bounded stop latency contract.
+- Remaining tasks: WAV-205 through WAV-706.
+- Known risks: caller classification and migration are still outstanding, so metadata-only analysis
+  and full PCM decode currently coexist until the remaining audit moves the right consumers to the
+  new seam.
+
+### July 31, 2026 - WAV Sprint 2 / WAV-205
+
+- State: complete; WAV-301 is next.
+- Files changed:
+  - `app/src/plugin/PluginEditor.cpp`;
+  - `app/src/standalone/MainComponent.cpp`;
+  - `tests/src/Phase2AuthoringImportTests.cpp`;
+  - `tests/src/Phase1CompilePathTests.cpp`;
+  - `tests/src/Phase1PipelineReport.cpp`.
+- Validation:
+  - built `drs_phase2_authoring_import_tests`, `drs_phase1_compile_path_tests`, and
+    `drs_phase1_pipeline_report` in `build/vs2022-debug` under the Visual Studio 2022 developer
+    environment;
+  - passed `drs.phase2.authoring_import` after migrating the root-key conflict test helper from
+    full import to metadata-only inspection;
+  - passed `drs.phase1.compile_path` after migrating the reference compile-plan fixture from
+    full import to metadata-only inspection while preserving source metadata serialization;
+  - passed `drs.phase1.pipeline_report` after migrating the importer report and reference-plan
+    setup to metadata-only inspection, preserving the existing JSON entry shape while avoiding
+    unnecessary PCM decode;
+  - audited the remaining production callers and left only the true PCM consumers on
+    `importSampleFile(...)`: prepared playback, waveform preview, decode-focused fixtures, and
+    playback-preparation tests. The plugin and standalone "Restore Root Key" workflows now use
+    `inspectSampleFile(...)`.
+- Result: complete. Every audited metadata-only caller discovered in Sprint 2 now uses the
+  inspection seam, while PCM-requiring playback and waveform paths remain explicitly on the full
+  decoder.
+- Remaining tasks: WAV-301 through WAV-706.
+- Known risks: the next sprint is substantially larger because it introduces the owned background
+  WAV import service and lifecycle management rather than another narrow seam migration.
+
+### July 31, 2026 - WAV Sprint 3 / WAV-301
+
+- State: complete; WAV-302 is next.
+- Files changed:
+  - `app/CMakeLists.txt`;
+  - `app/src/shared/WavImportService.h`;
+  - `tests/CMakeLists.txt`;
+  - `tests/src/WavImportServiceContractTests.cpp`.
+- Validation:
+  - built `drs_wav_import_service_contract_tests` in `build/vs2022-debug` under the Visual Studio
+    2022 developer environment;
+  - passed `drs.wav_import.service_contract`, proving the new shared contract preserves
+    owner/generation/project/revision identity, exposes immutable completion payloads via
+    `std::shared_ptr<const ...>`, and stores metadata-only `SampleInspectionResult` state instead
+    of decoded `SampleImportResult` channels.
+- Result: complete. The WAV import service contract is now defined in a shared header with no UI
+  object references and no decoded-channel ownership, which gives Sprint 3 a stable lifecycle and
+  snapshot seam to build on.
+- Remaining tasks: WAV-302 through WAV-706.
+- Known risks: the next task still has to turn this contract into a real owned worker service with
+  deterministic cancel, wait, consume, and shutdown behavior.
+
+### July 31, 2026 - WAV Sprint 3 / WAV-302
+
+- State: complete; WAV-303 is next.
+- Files changed:
+  - `app/CMakeLists.txt`;
+  - `app/src/plugin/PluginProcessor.cpp`;
+  - `app/src/plugin/PluginProcessor.h`;
+  - `app/src/shared/WavImportService.cpp`;
+  - `app/src/shared/WavImportService.h`;
+  - `tests/CMakeLists.txt`;
+  - `tests/src/WavImportServiceLifecycleTests.cpp`.
+- Validation:
+  - built `drs_wav_import_service_contract_tests`, `drs_wav_import_lifecycle_tests`, and
+    `DecentRhapsodyStudioPlugin` in `build/vs2022-debug` under the Visual Studio 2022 developer
+    environment;
+  - passed `drs.wav_import.service_contract` after moving the shared contract from a header-only
+    type bag to the full service declaration without regressing the immutable snapshot invariants;
+  - passed `drs.wav_import.lifecycle`, proving the processor-owned WAV service now runs with one
+    joinable worker, one active batch, bounded pending work, RAII client teardown, explicit
+    cancel/wait/consume operations, terminal publication on owner closure, and idempotent shutdown.
+- Result: complete. The WAV import lifecycle now has a real processor-owned service seam and a
+  deterministic ownership contract that later staging/copy work can safely build on.
+- Remaining tasks: WAV-303 through WAV-706.
+- Known risks: the worker currently publishes lifecycle states with synthetic per-item completion
+  data; the next task must replace that scaffolding with real request-scoped staging and chunked
+  copy behavior before any UI path starts relying on it.
+
+### July 31, 2026 - WAV Sprint 3 / WAV-303
+
+- State: complete; WAV-304 is next.
+- Files changed:
+  - `app/src/shared/WavImportService.cpp`;
+  - `app/src/shared/WavImportService.h`;
+  - `tests/CMakeLists.txt`;
+  - `tests/src/WavImportServiceLifecycleTests.cpp`;
+  - `tests/src/WavImportServiceStagingTests.cpp`.
+- Validation:
+  - built `drs_wav_import_service_contract_tests`, `drs_wav_import_lifecycle_tests`,
+    `drs_wav_import_staging_tests`, and `DecentRhapsodyStudioPlugin` in `build/vs2022-debug`
+    under the Visual Studio 2022 developer environment;
+  - passed `drs.wav_import.service_contract`, confirming the shared contract still exposes the same
+    immutable request/snapshot/completion shape after moving the worker to real staging files;
+  - passed `drs.wav_import.lifecycle`, confirming the owned worker still honors cancel, consume,
+    RAII teardown, and terminal publication after replacing the synthetic completion path with real
+    staged-copy work;
+  - passed `drs.wav_import.staging`, proving the worker now stages sources under a request-private
+    `Samples/.staging/...` directory, copies in visible chunks, preserves source extensions, and
+    reserves unique final `Samples` targets without creating or overwriting committed project files.
+- Result: complete. WAV import requests now perform real chunked staging work behind the owned
+  service, and partial copies no longer appear as committed project samples.
+- Remaining tasks: WAV-304 through WAV-706.
+- Known risks: the completion payload still lacks real fingerprint, inspection, policy, and
+  filename-inference data, so the next task must replace the remaining synthetic analysis state
+  while keeping cancellation bounded by the staged-copy and metadata-read chunk seams.
+
+### July 31, 2026 - WAV Sprint 3 / WAV-304
+
+- State: complete; WAV-305 is next.
+- Files changed:
+  - `app/CMakeLists.txt`;
+  - `app/src/shared/WavImportService.cpp`;
+  - `app/src/shared/WavImportService.h`;
+  - `tests/CMakeLists.txt`;
+  - `tests/src/WavImportServiceAnalysisTests.cpp`;
+  - `tests/src/WavImportServiceLifecycleTests.cpp`;
+  - `tests/src/WavImportServiceStagingTests.cpp`.
+- Validation:
+  - built `drs_wav_import_service_contract_tests`, `drs_wav_import_lifecycle_tests`,
+    `drs_wav_import_staging_tests`, `drs_wav_import_analysis_tests`,
+    `drs_wav_import_fixture_support_tests`, and `DecentRhapsodyStudioPlugin` in
+    `build/vs2022-debug` under the Visual Studio 2022 developer environment;
+  - passed `drs.wav_import.analysis`, proving successful staged items now retain real fingerprint
+    hashes, metadata inspection results, filename-token inference, warning findings, and draft-zone
+    suggestions, while unsupported staged sources fail per item and surface a partially completed
+    immutable payload instead of aborting the whole batch;
+  - passed `drs.wav_import.lifecycle` and `drs.wav_import.staging` after switching those tests to
+    valid audio fixtures, confirming the owned worker still honors cancel/consume/RAII teardown and
+    request-private staging while running the real analysis path;
+  - re-passed `drs.wav_import.service_contract` to confirm the shared request/snapshot/completion
+    contract remained stable;
+  - re-passed `drs.wav_import.fixture_support`, preserving the engine-level proof that fingerprint
+    cancellation is observed within one configured hash chunk, which is the bounded-stop seam now
+    exercised by the WAV service worker.
+- Result: complete. The WAV import worker now performs real staged-file fingerprint, inspection,
+  policy evaluation, and filename inference, and its immutable completion payloads preserve the
+  same authoring-analysis facts the synchronous queue path produced.
+- Remaining tasks: WAV-305 through WAV-706.
+- Known risks: durations and richer aggregate publication are still incomplete, so the next task
+  must turn the current live bytes/items/warnings/failures state into a fuller immutable metrics
+  snapshot without introducing blocking readers or weakening the owned-worker boundary.
+
+### July 31, 2026 - WAV Sprint 3 / WAV-305
+
+- State: complete; WAV-306 is next.
+- Files changed:
+  - `app/src/shared/WavImportService.cpp`;
+  - `app/src/shared/WavImportService.h`;
+  - `tests/src/WavImportServiceAnalysisTests.cpp`.
+- Validation:
+  - built `drs_wav_import_service_contract_tests`, `drs_wav_import_lifecycle_tests`,
+    `drs_wav_import_staging_tests`, `drs_wav_import_analysis_tests`,
+    `drs_wav_import_fixture_support_tests`, and `DecentRhapsodyStudioPlugin` in
+    `build/vs2022-debug` under the Visual Studio 2022 developer environment;
+  - passed `drs.wav_import.service_contract`, `drs.wav_import.lifecycle`,
+    `drs.wav_import.staging`, `drs.wav_import.analysis`, and `drs.wav_import.fixture_support`,
+    proving immutable snapshots, completion payloads, and service metrics now publish real
+    per-item and aggregate copy/fingerprint/inspection durations alongside the existing bytes,
+    warnings, failures, cancellations, and terminal-generation counters;
+  - revalidated the `publish(...)` terminal metrics path after fixing a moved-snapshot lifetime
+    bug uncovered during verification, with the focused WAV suite staying green end to end.
+- Result: complete. The WAV import service now exposes full immutable duration metrics for in-flight
+  and terminal batches without blocking readers or weakening the owned worker boundary.
+- Remaining tasks: WAV-306 through WAV-706.
+- Known risks: cleanup still leaves staged artifacts behind after completion and has not yet proven
+  the cancel, supersede, failure, stale-completion, and shutdown cleanup guarantees required by the
+  next task.
+
+### July 31, 2026 - WAV Sprint 3 / WAV-306
+
+- State: complete; WAV-401 is next.
+- Files changed:
+  - `app/src/shared/WavImportService.cpp`;
+  - `tests/src/WavImportServiceAnalysisTests.cpp`;
+  - `tests/src/WavImportServiceLifecycleTests.cpp`.
+- Validation:
+  - built `drs_wav_import_service_contract_tests`, `drs_wav_import_lifecycle_tests`,
+    `drs_wav_import_staging_tests`, `drs_wav_import_analysis_tests`,
+    `drs_wav_import_fixture_support_tests`, and `DecentRhapsodyStudioPlugin` in
+    `build/vs2022-debug` under the Visual Studio 2022 developer environment;
+  - passed `drs.wav_import.lifecycle`, proving canceled, superseded, injected copy-failure,
+    injected inspection-failure, stale-consumed, owner-teardown, and shutdown paths all reach a
+    terminal state with no request staging directory or committed project files left behind;
+  - passed `drs.wav_import.analysis`, proving mixed batches now clean failed staged artifacts while
+    preserving successful staged files until a later consume or commit step;
+  - re-passed `drs.wav_import.service_contract`, `drs.wav_import.staging`, and
+    `drs.wav_import.fixture_support`, preserving the shared contract, visible staging progress, and
+    bounded fingerprint cancellation seam after the cleanup changes.
+- Result: complete. The WAV import service now drains staged artifacts on canceled, superseded,
+  failed, stale-consumed, and shutdown paths, while partial completions retain only the successful
+  staged files needed for a later commit.
+- Remaining tasks: WAV-401 through WAV-706.
+- Known risks: Sprint 4 still has not moved either shell off the synchronous chooser/copy workflow,
+  so the next task must isolate the remaining UI-specific chooser/presentation code from the shared
+  service request and completion lifecycle.
+
+### July 31, 2026 - WAV Sprint 4 / WAV-401
+
+- State: complete; WAV-402 is next.
+- Files changed:
+  - `app/CMakeLists.txt`;
+  - `app/src/plugin/PluginEditor.cpp`;
+  - `app/src/shared/WavImportWorkflow.cpp`;
+  - `app/src/shared/WavImportWorkflow.h`;
+  - `app/src/standalone/MainComponent.cpp`;
+  - `tests/CMakeLists.txt`;
+  - `tests/src/WavImportShellCharacterizationTests.cpp`;
+  - `tests/src/WavImportWorkflowTests.cpp`.
+- Validation:
+  - built `drs_wav_import_workflow_tests`, `drs_wav_import_shell_characterization_tests`,
+    `drs_wav_import_service_contract_tests`, `drs_wav_import_lifecycle_tests`,
+    `drs_wav_import_staging_tests`, `drs_wav_import_analysis_tests`,
+    `drs_wav_import_fixture_support_tests`, and `DecentRhapsodyStudioPlugin` in
+    `build/vs2022-debug` under the Visual Studio 2022 developer environment;
+  - passed `drs.wav_import.workflow`, proving shared request construction now owns the synchronous
+    sample copy/queue drain, shared completion projection preserves manual-root and warning paths,
+    shared commit preparation produces grouped sample-source/zone payloads, and shared summary
+    building preserves the shell-facing counts;
+  - passed `drs.wav_import.shell_characterization`, proving both shells now call the shared WAV
+    workflow helper instead of owning queue creation, queue draining, or direct sample-copy logic;
+  - re-passed `drs.wav_import.service_contract`, `drs.wav_import.lifecycle`,
+    `drs.wav_import.staging`, `drs.wav_import.analysis`, and `drs.wav_import.fixture_support`,
+    preserving the Sprint 3 service and cleanup behavior while extracting the duplicated shell
+    workflow.
+- Result: complete. Shared WAV request construction, completion projection, summary building, and
+  commit preparation now live under `app/src/shared`, and the plugin and standalone shells are
+  reduced to chooser/save flow, manual-root prompts, alerts, and project refresh.
+- Remaining tasks: WAV-402 through WAV-706.
+- Known risks: both shells still run the shared WAV workflow synchronously on the message thread,
+  so the next task must swap those direct calls over to the owned background service and immutable
+  snapshot polling path.
+
+### July 31, 2026 - WAV Sprint 4 / WAV-402
+
+- State: complete; WAV-403 is next.
+- Files changed:
+  - `app/src/plugin/PluginEditor.cpp`;
+  - `app/src/plugin/PluginEditor.h`;
+  - `app/src/shared/WavImportWorkflow.cpp`;
+  - `app/src/shared/WavImportWorkflow.h`;
+  - `app/src/standalone/MainComponent.cpp`;
+  - `app/src/standalone/MainComponent.h`;
+  - `tests/src/WavImportShellCharacterizationTests.cpp`;
+  - `tests/src/WavImportWorkflowTests.cpp`.
+- Validation:
+  - built `drs_wav_import_workflow_tests`, `drs_wav_import_shell_characterization_tests`,
+    `drs_wav_import_service_contract_tests`, `drs_wav_import_lifecycle_tests`,
+    `drs_wav_import_staging_tests`, `drs_wav_import_analysis_tests`,
+    `drs_wav_import_fixture_support_tests`, and `DecentRhapsodyStudioPlugin` in
+    `build/vs2022-debug` under the Visual Studio 2022 developer environment;
+  - passed `drs.wav_import.workflow`, proving completion-derived shared batches now drive manual
+    root prompts, skip/resume decisions, and staged-file finalization without re-entering the old
+    synchronous copy/queue path;
+  - passed `drs.wav_import.shell_characterization`, proving both shells now open the owned WAV
+    service client, submit immutable requests, poll immutable snapshots, and commit through the
+    shared completion workflow instead of creating directories, copying files, or draining import
+    queues inside chooser callbacks;
+  - re-passed `drs.wav_import.service_contract`, `drs.wav_import.lifecycle`,
+    `drs.wav_import.staging`, `drs.wav_import.analysis`, and `drs.wav_import.fixture_support`,
+    preserving the Sprint 3 owned-worker, staging, cleanup, and immutable-completion guarantees
+    after the shell cutover.
+- Result: complete. Both shells now submit WAV imports to the background service and consume
+  immutable snapshots on the timer thread, while the shared workflow owns completion projection,
+  manual-root resolution, staged-file finalization, and rollback-safe commit preparation.
+- Remaining tasks: WAV-403 through WAV-706.
+- Known risks: the shells still do not surface modeless in-flight batch progress or distinct
+  terminal states, so the next task must make long-running imports visibly interactive and
+  cancellable.
+
+### July 31, 2026 - WAV Sprint 4 / WAV-403
+
+- State: complete; WAV-404 is next.
+- Files changed:
+  - `app/src/plugin/PluginEditor.cpp`;
+  - `app/src/plugin/PluginEditor.h`;
+  - `app/src/shared/WavImportService.cpp`;
+  - `app/src/shared/WavImportService.h`;
+  - `app/src/standalone/MainComponent.cpp`;
+  - `app/src/standalone/MainComponent.h`;
+  - `tests/CMakeLists.txt`;
+  - `tests/src/WavImportProgressTests.cpp`;
+  - `tests/src/WavImportShellCharacterizationTests.cpp`.
+- Validation:
+  - built `drs_wav_import_workflow_tests`, `drs_wav_import_progress_tests`,
+    `drs_wav_import_shell_characterization_tests`, `drs_wav_import_service_contract_tests`,
+    `drs_wav_import_lifecycle_tests`, `drs_wav_import_staging_tests`,
+    `drs_wav_import_analysis_tests`, `drs_wav_import_fixture_support_tests`, and
+    `DecentRhapsodyStudioPlugin` in `build/vs2022-debug` under the Visual Studio 2022 developer
+    environment;
+  - passed `drs.wav_import.progress`, proving the shared WAV progress component now exposes
+    modeless current-item/stage text, byte and item counts, a cancel action, and distinct partial,
+    canceled, failed, and consumed UI states from immutable snapshots;
+  - passed `drs.wav_import.shell_characterization`, proving both shells now host the shared WAV
+    progress component, wire its cancel action back to the owned client, and update it from the
+    polled immutable snapshot path;
+  - re-passed `drs.wav_import.workflow`, `drs.wav_import.service_contract`,
+    `drs.wav_import.lifecycle`, `drs.wav_import.staging`, `drs.wav_import.analysis`, and
+    `drs.wav_import.fixture_support`, preserving the async shell cutover, owned-worker staging, and
+    completion/workflow behavior while adding the in-flight UI surface.
+- Result: complete. WAV imports now remain modelessly interactive in both shells, surface current
+  item/stage plus byte/item counts during long batches, expose user-visible cancellation, and end
+  with distinct complete, partial, canceled, or failed outcomes.
+- Remaining tasks: WAV-404 through WAV-706.
+- Known risks: manual-root prompting now runs after analysis on the message thread, but the next
+  task still needs explicit verification that skip/cancel decisions can resume the remaining
+  decision sequence without ever re-entering background inspection.
+
+### July 31, 2026 - WAV Sprint 4 / WAV-404
+
+- State: complete; WAV-405 is next.
+- Files changed:
+  - `tests/src/WavImportWorkflowTests.cpp`.
+- Validation:
+  - rebuilt `drs_wav_import_workflow_tests` in `build/vs2022-debug` under the Visual Studio 2022
+    developer environment;
+  - passed `drs.wav_import.workflow`, proving completion-derived manual-root prompts now allow a
+    per-item skip/cancel decision, resume the remaining decision sequence on the message thread,
+    and still commit the remaining accepted items without rerunning background inspection;
+  - re-passed `drs.wav_import.progress`, `drs.wav_import.shell_characterization`,
+    `drs.wav_import.service_contract`, `drs.wav_import.lifecycle`, `drs.wav_import.staging`,
+    `drs.wav_import.analysis`, and `drs.wav_import.fixture_support`, preserving the async shell,
+    progress, staging, and completion behavior while extending the manual-decision proof.
+- Result: complete. Manual root-key resolution now stays entirely in the shared completion
+  workflow after analysis, supports skip/accept decisions per item, and resumes the remaining
+  sequence without any background thread touching components.
+- Remaining tasks: WAV-405 through WAV-706.
+- Known risks: the shells still need stricter stale-result rejection around selected group,
+  destination root, and request generation so project mutations cannot receive an obsolete batch.
+
+### July 31, 2026 - WAV Sprint 4 / WAV-405
+
+- State: complete; WAV-406 is next.
+- Files changed:
+  - `app/src/plugin/PluginEditor.cpp`;
+  - `app/src/plugin/PluginEditor.h`;
+  - `app/src/standalone/MainComponent.cpp`;
+  - `app/src/standalone/MainComponent.h`;
+  - `tests/src/WavImportShellCharacterizationTests.cpp`.
+- Validation:
+  - built `drs_wav_import_workflow_tests`, `drs_wav_import_progress_tests`,
+    `drs_wav_import_shell_characterization_tests`, `drs_wav_import_service_contract_tests`,
+    `drs_wav_import_lifecycle_tests`, `drs_wav_import_staging_tests`,
+    `drs_wav_import_analysis_tests`, `drs_wav_import_fixture_support_tests`, and
+    `DecentRhapsodyStudioPlugin` in `build/vs2022-debug` under the Visual Studio 2022 developer
+    environment;
+  - passed `drs.wav_import.shell_characterization`, proving both shells now persist and revalidate
+    the submitted WAV import owner, generation, project ID, content root, base revision, and
+    selected group against the immutable snapshot identity before any prompt or apply step can
+    continue;
+  - re-passed `drs.wav_import.workflow`, `drs.wav_import.progress`,
+    `drs.wav_import.service_contract`, `drs.wav_import.lifecycle`,
+    `drs.wav_import.staging`, `drs.wav_import.analysis`, and
+    `drs.wav_import.fixture_support`, preserving the async shell flow, staged-file handling, and
+    manual-root sequence while hardening stale-result rejection.
+- Result: complete. Opening, closing, saving, restoring, or regrouping a project can no longer
+  silently apply an obsolete WAV batch; both shells now reject mismatched owner/generation,
+  project, revision, content-root, or selected-group state before prompt or commit.
+- Remaining tasks: WAV-406 through WAV-706.
+- Known risks: staged-file finalization and project mutation are already coordinated, but the next
+  task still needs an explicit verification trail proving both shells keep the rollback path wired
+  as one logical operation.
+
+### July 31, 2026 - WAV Sprint 4 / WAV-406
+
+- State: complete; WAV-501 is next.
+- Files changed:
+  - `tests/src/WavImportShellCharacterizationTests.cpp`;
+  - `tests/src/WavImportWorkflowTests.cpp`.
+- Validation:
+  - built `drs_wav_import_workflow_tests`, `drs_wav_import_progress_tests`,
+    `drs_wav_import_shell_characterization_tests`, `drs_wav_import_service_contract_tests`,
+    `drs_wav_import_lifecycle_tests`, `drs_wav_import_staging_tests`,
+    `drs_wav_import_analysis_tests`, `drs_wav_import_fixture_support_tests`, and
+    `DecentRhapsodyStudioPlugin` in `build/vs2022-debug` under the Visual Studio 2022 developer
+    environment;
+  - passed `drs.wav_import.workflow`, proving completion-derived commits still finalize staged files
+    into reserved `Samples` targets and roll those filesystem moves back when requested;
+  - passed `drs.wav_import.shell_characterization`, proving both shells still finalize through
+    `finalizePreparedWavImportCommit(...)` and invoke `rollbackPreparedWavImportCommit(...)` on the
+    shared commit object instead of letting the project reference missing files on apply failure;
+  - re-passed `drs.wav_import.progress`, `drs.wav_import.service_contract`,
+    `drs.wav_import.lifecycle`, `drs.wav_import.staging`, `drs.wav_import.analysis`, and
+    `drs.wav_import.fixture_support`, preserving the owned-worker staging and cleanup guarantees
+    while closing the Sprint 4 finalize/apply boundary.
+- Result: complete. Staged WAV files and authoring mutations now remain one logical operation:
+  final files are reserved and moved only at commit time, apply failures trigger rollback, and the
+  project never intentionally commits sample references without their finalized files.
+- Remaining tasks: WAV-501 through WAV-706.
+- Known risks: Sprint 5 now shifts to startup metrics and lifecycle audit work, where the next task
+  must remove any remaining synthetic queue-drain initialization from processor startup paths.
+
+### July 31, 2026 - WAV Sprint 5 / WAV-501
+
+- State: complete; WAV-502 is next.
+- Files changed:
+  - `app/src/plugin/PluginProcessor.cpp`;
+  - `tests/src/Phase2WaveformPreviewTests.cpp`;
+  - `tests/src/HostProjectRecallTests.cpp`.
+- Validation:
+  - built `drs_phase2_waveform_preview_tests`, `drs_host_project_recall_tests`, and
+    `DecentRhapsodyStudioPlugin` in `build/vs2022-debug` under the Visual Studio 2022 developer
+    environment;
+  - passed `drs.phase2.waveform_preview`, proving `initializeAuthoringImportMetrics()` now
+    publishes an honest no-I/O baseline with configured source count, `idle` or `not-run` state,
+    zero processed/accepted/warning/failure counts, and zeroed duration fields instead of draining a
+    synthetic import queue at project replace;
+  - passed `drs.host_state.project_recall`, proving dirty checkpoint restore now republishes the
+    same no-I/O `not-run` baseline coherently after host-state application.
+- Result: complete. Processor startup and restore paths no longer create or drain an authoring
+  import queue just to seed the responsiveness panel; they now publish a cheap baseline that
+  reflects configured sample-source count without claiming completed work.
+- Remaining tasks: WAV-502 through WAV-706.
+- Known risks: the panel baseline is now honest, but the next task still needs to source
+  responsiveness metrics from real WAV service activity so active, completed, canceled, and failed
+  batches are visible instead of synthetic project processing.
+
+### July 31, 2026 - WAV Sprint 5 / WAV-502
+
+- State: complete; WAV-503 is next.
+- Files changed:
+  - `app/src/plugin/PluginProcessor.cpp`;
+  - `app/src/shared/AuthoringPanel.cpp`;
+  - `app/src/shared/WavImportService.cpp`;
+  - `tests/CMakeLists.txt`;
+  - `tests/src/HostProjectRecallTests.cpp`;
+  - `tests/src/Phase2AuthoringUiTests.cpp`;
+  - `tests/src/WavImportProcessorResponsivenessTests.cpp`.
+- Validation:
+  - built `drs_phase2_authoring_ui_tests`, `drs_phase2_waveform_preview_tests`,
+    `drs_host_project_recall_tests`, `drs_wav_import_processor_responsiveness_tests`, and
+    `DecentRhapsodyStudioPlugin` in `build/vs2022-debug` under the Visual Studio 2022 developer
+    environment;
+  - passed `drs.wav_import.processor_responsiveness`, proving the processor now adapts
+    `AuthoringImportResponsivenessSnapshot` from live WAV service state: fresh projects stay
+    `idle`, in-flight batches surface `active`, completions preserve completed counts through
+    consume, failed requests surface `failed`, and canceled requests surface `canceled`;
+  - passed `drs.phase2.authoring_ui`, proving the authoring waveform drawer now exposes the
+    responsiveness state text directly in the panel instead of hiding it behind count-only text;
+  - re-passed `drs.phase2.waveform_preview`, `drs.host_state.project_recall`,
+    `drs.wav_import.workflow`, `drs.wav_import.progress`, `drs.wav_import.shell_characterization`,
+    `drs.wav_import.service_contract`, `drs.wav_import.lifecycle`, `drs.wav_import.staging`,
+    `drs.wav_import.analysis`, and `drs.wav_import.fixture_support` in one focused CTest slice,
+    preserving the no-I/O baseline, shell integration, shared progress UI, and owned worker
+    lifecycle while moving responsiveness reporting onto real service metrics;
+  - fixed `WavImportService::waitForTerminal(...)` so older client generations no longer hang on
+    teardown after a newer batch replaces the published snapshot, and tightened the host recall
+    test helper to wait for a fresh restore generation after manual locate retries.
+- Result: complete. Authoring responsiveness metrics now describe real WAV import jobs and the
+  panel visibly distinguishes not-run, active, completed, canceled, and failed states while
+  preserving the existing async workflow and host recall coverage.
+- Remaining tasks: WAV-503 through WAV-706.
+- Known risks: the next task still needs a broader lifecycle audit proving constructor, close,
+  migration, restore, editor creation, and host-scan paths perform zero indirect sample I/O.
+
+### July 31, 2026 - WAV Sprint 5 / WAV-503
+
+- State: complete; WAV-504 is next.
+- Files changed:
+  - `app/src/plugin/PluginProcessor.cpp`;
+  - `app/src/plugin/PluginProcessor.h`;
+  - `app/src/plugin/PluginEditor.cpp`;
+  - `app/src/shared/AuthoringPanel.cpp`;
+  - `app/src/shared/AuthoringPanel.h`;
+  - `app/src/standalone/MainComponent.cpp`;
+  - `engine_adapter/include/drs/engine/EngineFacade.h`;
+  - `engine_adapter/src/EngineFacade.cpp`;
+  - `tests/CMakeLists.txt`;
+  - `tests/src/WavImportLifecycleIoAuditTests.cpp`;
+  - `tests/src/Phase2WaveformPreviewTests.cpp`.
+- Validation:
+  - built `drs_wav_import_lifecycle_io_audit_tests`, `drs_wav_import_processor_responsiveness_tests`,
+    `drs_phase2_waveform_preview_tests`, `drs_phase2_authoring_ui_tests`,
+    `drs_host_project_recall_tests`, and `DecentRhapsodyStudioPlugin` in `build/vs2022-debug`
+    under the Visual Studio 2022 developer environment;
+  - passed `drs.wav_import.lifecycle_io_audit`, proving constructor, `prepareToPlay()`,
+    host-scanning serialization, editor creation, project migration, project close, project
+    replace, standalone shell refresh, and host-state restore now perform `0` import fingerprints,
+    reader opens, bytes read, full-frame reads, copies, and peak-chunk reads until the user
+    explicitly requests preview work;
+  - re-passed `drs.wav_import.processor_responsiveness`, `drs.host_state.project_recall`,
+    `drs.phase2.waveform_preview`, and `drs.phase2.authoring_ui`, confirming the new preview
+    authorization gates preserve explicit waveform loading, explicit keyboard audition, host recall,
+    and the visible authoring panel status while removing passive lifecycle decode;
+  - re-passed `drs.wav_import.workflow`, `drs.wav_import.progress`,
+    `drs.wav_import.shell_characterization`, `drs.wav_import.service_contract`,
+    `drs.wav_import.lifecycle`, `drs.wav_import.staging`, `drs.wav_import.analysis`, and
+    `drs.wav_import.fixture_support` in the same focused CTest slice, preserving the owned-worker
+    import workflow while the lifecycle hardening moved preview preparation behind explicit
+    requests.
+- Result: complete. Processor and shell lifecycle paths are now genuinely no-I/O for sample import
+  work: the engine no longer boots with the checked-in Phase 2 authoring project, host-state preset
+  restore no longer bootstraps preview/publish preparation, waveform preview decode is on-demand,
+  and authoring preview preparation stays dormant until an explicit audition or preview request.
+- Remaining tasks: WAV-504 through WAV-706.
+- Known risks: startup-metrics expectations were updated during WAV-501 and WAV-502 work, but the
+  next task still needs that test-semantic closeout logged explicitly as its own Sprint 5 step.
+
+### July 31, 2026 - WAV Sprint 5 / WAV-504
+
+- State: complete; WAV-505 is next.
+- Files changed:
+  - `tests/src/Phase2WaveformPreviewTests.cpp`;
+  - `tests/src/HostProjectRecallTests.cpp`;
+  - `tests/src/Phase2AuthoringUiTests.cpp`.
+- Validation:
+  - passed `drs.phase2.waveform_preview`, proving the startup/import-metrics assertions now expect
+    the honest `not-run` baseline, zero processed/accepted/warning/failure counts, and explicit
+    preview authorization before waveform decode;
+  - passed `drs.host_state.project_recall`, proving dirty authored-project restore now expects the
+    same no-I/O `not-run` metrics snapshot after checkpoint application instead of synthetic
+    project-sample processing;
+  - passed `drs.phase2.authoring_ui`, proving the waveform drawer fixture asserts the visible
+    responsiveness state text directly instead of assuming startup has already processed project
+    samples;
+  - re-passed the focused lifecycle slice on July 31, 2026:
+    `drs.wav_import.lifecycle_io_audit`, `drs.wav_import.processor_responsiveness`,
+    `drs.wav_import.workflow`, `drs.wav_import.progress`, `drs.wav_import.shell_characterization`,
+    `drs.wav_import.service_contract`, `drs.wav_import.lifecycle`, `drs.wav_import.staging`,
+    `drs.wav_import.analysis`, `drs.wav_import.fixture_support`, `drs.phase2.waveform_preview`,
+    `drs.phase2.authoring_ui`, and `drs.host_state.project_recall`.
+- Result: complete. The affected waveform, host-recall, and UI suites now encode the honest
+  startup semantics introduced by Sprint 5: restore correctness is preserved, but no test expects
+  constructor or project-replace paths to decode project samples or claim completed import work.
+- Remaining tasks: WAV-505 through WAV-706.
+- Known risks: there is still no dedicated explicit or idle-service source-validation workflow for
+  authored project samples beyond the preview/audition triggers; that is the next Sprint 5 design
+  and implementation slice.

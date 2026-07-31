@@ -101,4 +101,20 @@ struct AuthoringImportResponsivenessSnapshot
     std::uint64_t maxProcessDurationMicros = 0;
     std::string lastProcessedItemId;
 };
+
+struct AuthoringSourceValidationSnapshot
+{
+    bool available = false;
+    std::string state;
+    std::size_t totalItemCount = 0;
+    std::size_t processedCount = 0;
+    std::size_t warningItemCount = 0;
+    std::size_t failedItemCount = 0;
+    std::size_t canceledItemCount = 0;
+    std::uint64_t totalBytesProcessed = 0;
+    std::uint64_t totalBytesExpected = 0;
+    std::uint64_t totalDurationMicros = 0;
+    std::string currentSourceId;
+    std::string currentSourcePath;
+};
 } // namespace drs::app

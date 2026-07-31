@@ -26,8 +26,23 @@ void WaveformDetailView::paint(juce::Graphics& g)
     g.setColour(juce::Colour::fromRGBA(24, 29, 33, 42));
     g.drawHorizontalLine(static_cast<int>(inner.getCentreY()), inner.getX(), inner.getRight());
 
+    const auto drawLoopMarkers = [&]
+    {
+        if (!preview.loopEnabled || preview.frameCount == 0)
+            return;
+
+        const auto startX = inner.getX() + inner.getWidth()
+            * (static_cast<float>(preview.loopStartFrame) / static_cast<float>(preview.frameCount));
+        const auto endX = inner.getX() + inner.getWidth()
+            * (static_cast<float>(preview.loopEndFrame) / static_cast<float>(preview.frameCount));
+        g.setColour(waveformAccent);
+        g.drawVerticalLine(static_cast<int>(startX), inner.getY(), inner.getBottom());
+        g.drawVerticalLine(static_cast<int>(endX), inner.getY(), inner.getBottom());
+    };
+
     if (!preview.available || preview.points.empty())
     {
+        drawLoopMarkers();
         g.setColour(waveformMuted);
         g.drawFittedText(preview.state.empty() ? "Waveform unavailable" : juce::String::fromUTF8(preview.state.c_str()),
                          getLocalBounds().reduced(12),
@@ -49,16 +64,15 @@ void WaveformDetailView::paint(juce::Graphics& g)
 
     g.setColour(waveformSelected);
     g.strokePath(waveformPath, juce::PathStrokeType(1.3f));
+    drawLoopMarkers();
 
-    if (preview.loopEnabled && preview.frameCount > 0)
+    if (!preview.state.empty() && preview.state != "Ready")
     {
-        const auto startX = inner.getX() + inner.getWidth()
-            * (static_cast<float>(preview.loopStartFrame) / static_cast<float>(preview.frameCount));
-        const auto endX = inner.getX() + inner.getWidth()
-            * (static_cast<float>(preview.loopEndFrame) / static_cast<float>(preview.frameCount));
-        g.setColour(waveformAccent);
-        g.drawVerticalLine(static_cast<int>(startX), inner.getY(), inner.getBottom());
-        g.drawVerticalLine(static_cast<int>(endX), inner.getY(), inner.getBottom());
+        g.setColour(waveformMuted);
+        g.drawFittedText(juce::String::fromUTF8(preview.state.c_str()),
+                         getLocalBounds().reduced(12).removeFromTop(20),
+                         juce::Justification::centredLeft,
+                         1);
     }
 }
 } // namespace drs::app::authoring

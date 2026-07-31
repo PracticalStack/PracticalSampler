@@ -116,8 +116,10 @@ int main()
         const auto cleanSiblingThreePath = scratchDirectory / "Pad_Sustain_C4_vel064_rr3.wav";
         const auto ambiguousPath = scratchDirectory / "MysteryTexture.wav";
         const auto conflictPath = scratchDirectory / "Lead_A4.wav";
-        const auto canceledPath = scratchDirectory / "Shimmer_Bad Name!.wav";
+        const auto policyWarningPath = scratchDirectory / "Shimmer_Bad Name!.wav";
+        const auto canceledPath = scratchDirectory / "Canceled_C3.wav";
         const auto unsupportedPath = scratchDirectory / "Unsupported.txt";
+        const auto missingPath = scratchDirectory / "Missing_C4.wav";
         const auto sparseOnePath = scratchDirectory / "Brush_Sustain_D4_vel096_rr1.wav";
         const auto sparseThreePath = scratchDirectory / "Brush_Sustain_D4_vel096_rr3.wav";
 
@@ -135,7 +137,8 @@ int main()
         writeAudioFile(cleanSiblingThreePath, wavFormat, buffer, matchingMetadata);
         writeAudioFile(ambiguousPath, wavFormat, buffer, {});
         writeAudioFile(conflictPath, wavFormat, buffer, conflictingMetadata);
-        writeAudioFile(canceledPath, wavFormat, buffer, {});
+        writeAudioFile(policyWarningPath, wavFormat, buffer, {});
+        writeAudioFile(canceledPath, wavFormat, buffer, matchingMetadata);
         writeAudioFile(sparseOnePath, wavFormat, buffer, matchingMetadata);
         writeAudioFile(sparseThreePath, wavFormat, buffer, matchingMetadata);
 
@@ -242,10 +245,10 @@ int main()
         require(ambiguousRootInference.source == "manual",
                 "Ambiguous root-key inference source changed unexpectedly.");
 
-        const auto conflictImport = drs::engine::importSampleFile(conflictPath.generic_string());
-        require(conflictImport.imported, "Conflict fixture should still decode for root-key inference.");
+        const auto conflictImport = drs::engine::inspectSampleFile(conflictPath.generic_string());
+        require(conflictImport.accepted, "Conflict fixture should still inspect for root-key inference.");
         const auto conflictRootInference = drs::engine::inferSampleRootKey(conflictPath.generic_string(),
-                                                                           &conflictImport.sample.metadata);
+                                                                           &conflictImport.metadata);
         require(conflictRootInference.resolved, "Conflicting root-key sources should still resolve a primary candidate.");
         require(conflictRootInference.rootKey == 69,
                 "Filename root-key inference should remain primary when metadata conflicts.");
@@ -258,11 +261,15 @@ int main()
                 ambiguousPath.generic_string(),
                 conflictPath.generic_string(),
                 canceledPath.generic_string(),
-                unsupportedPath.generic_string()
+                policyWarningPath.generic_string(),
+                unsupportedPath.generic_string(),
+                missingPath.generic_string()
             },
             scratchDirectory.generic_string());
 
-        require(queue.items.size() == 5, "Authoring import queue item count changed unexpectedly.");
+        queue.items.front().knownFingerprintHex = "known-clean-fingerprint";
+
+        require(queue.items.size() == 7, "Authoring import queue item count changed unexpectedly.");
         const auto canceledItemId = queue.items[3].id;
         require(drs::engine::cancelAuthoringImportQueueItem(queue, canceledItemId),
                 "Pending queue item should be cancelable before processing.");
@@ -283,7 +290,7 @@ int main()
                 cleanItemId = step.itemId;
         }
 
-        require(processedCount == 4, "Exactly four queue items should process after one pending item is canceled.");
+        require(processedCount == 6, "Exactly six queue items should process after one pending item is canceled.");
 
         const auto& cleanItem = findItem(queue, cleanItemId);
         require(cleanItem.state == drs::engine::AuthoringImportItemState::inferred,
@@ -322,19 +329,67 @@ int main()
         require(conflictItem.suggestedZone.zone.rootKey == 69,
                 "Filename note should stay active when metadata conflicts with it.");
 
+        const auto& policyWarningItem = queue.items[4];
+        require(policyWarningItem.state == drs::engine::AuthoringImportItemState::warning,
+                "Portable-name policy warnings should surface a warning state.");
+        require(hasFindingCode(policyWarningItem, "import.policy_warning"),
+                "Portable-name policy warnings should surface a structured policy finding.");
+        require(policyWarningItem.suggestedZone.suggested,
+                "Policy warnings should still preserve the inferred draft zone.");
+
         const auto& canceledItem = findItem(queue, canceledItemId);
         require(canceledItem.state == drs::engine::AuthoringImportItemState::canceled,
                 "Canceled queue item state changed unexpectedly.");
-        require(canceledItem.importResult.state.empty(),
+        require(canceledItem.inspectionResult.state.empty(),
                 "Canceled queue item should not have been imported.");
 
-        const auto& failedItem = queue.items[4];
-        require(failedItem.state == drs::engine::AuthoringImportItemState::failed,
+        const auto& unsupportedItem = queue.items[5];
+        require(unsupportedItem.state == drs::engine::AuthoringImportItemState::failed,
                 "Unsupported text input should fail the import queue item.");
-        require(!failedItem.importResult.issues.empty(),
+        require(!unsupportedItem.inspectionResult.issues.empty(),
                 "Failed import queue item should preserve actionable import issues.");
-        require(!drs::engine::acceptAuthoringImportQueueItem(queue, failedItem.id),
+        require(!drs::engine::acceptAuthoringImportQueueItem(queue, unsupportedItem.id),
                 "Failed queue item must not become accepted.");
+
+        const auto& missingItem = queue.items[6];
+        require(missingItem.state == drs::engine::AuthoringImportItemState::failed,
+                "Missing batch inputs should fail the import queue item.");
+        require(missingItem.inspectionResult.state == "Sample missing",
+                "Missing batch inputs should preserve the missing-file disposition.");
+        require(!missingItem.inspectionResult.issues.empty(),
+                "Missing batch inputs should preserve an actionable missing-file issue.");
+
+        require(cleanItem.inspectionResult.metadata.sourceChecksumHex == "known-clean-fingerprint",
+                "Queue processing should reuse a supplied fingerprint instead of recomputing it.");
+
+        auto fingerprintQueue = drs::engine::createAuthoringImportQueue({cleanPath.generic_string()},
+                                                                        scratchDirectory.generic_string());
+        fingerprintQueue.items.front().knownFingerprintHex = "precomputed-fingerprint";
+        drs::engine::resetSampleImportIoCounters();
+        const auto fingerprintStep = drs::engine::processNextAuthoringImportQueueItem(fingerprintQueue);
+        require(fingerprintStep.processed, "Single-item fingerprint reuse queue should process normally.");
+        require(fingerprintQueue.items.front().inspectionResult.metadata.sourceChecksumHex == "precomputed-fingerprint",
+                "Single-item queue should retain the supplied fingerprint in inspection metadata.");
+        const auto fingerprintReuseCounters = drs::engine::getSampleImportIoCounters();
+        require(fingerprintReuseCounters.fingerprintOpenCount == 0,
+                "Queue processing should not reopen the fingerprint stream when a fingerprint is supplied.");
+        require(fingerprintReuseCounters.fullFrameReadCount == 0,
+                "Queue processing should not perform full-frame reads after moving to metadata-only inspection.");
+
+        require(queue.metrics.totalItemCount == 7,
+                "Queue metrics total-item count changed unexpectedly.");
+        require(queue.metrics.pendingCount == 0,
+                "Queue metrics should report no pending items after the batch drains.");
+        require(queue.metrics.processedCount == 6,
+                "Queue metrics processed-count changed unexpectedly for a mixed batch.");
+        require(queue.metrics.warningItemCount == 3,
+                "Queue metrics warning-count changed unexpectedly for a mixed batch.");
+        require(queue.metrics.failedItemCount == 2,
+                "Queue metrics failed-count changed unexpectedly for a mixed batch.");
+        require(queue.metrics.canceledItemCount == 1,
+                "Queue metrics canceled-count changed unexpectedly for a mixed batch.");
+        require(queue.metrics.acceptedItemCount == 1,
+                "Queue metrics accepted-count changed unexpectedly after confirming one inferred item.");
 
         std::cout << "Phase 2 authoring import tests passed." << std::endl;
         return 0;

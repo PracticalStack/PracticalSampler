@@ -59,7 +59,8 @@ void waitForPublishedPerformance(drs::plugin::Processor& processor,
 }
 
 std::shared_ptr<const drs::engine::ProjectRestoreSnapshot> waitForRestore(
-    drs::plugin::Processor& processor)
+    drs::plugin::Processor& processor,
+    const std::uint64_t minimumGeneration = 0)
 {
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
     while (std::chrono::steady_clock::now() < deadline)
@@ -69,6 +70,7 @@ std::shared_ptr<const drs::engine::ProjectRestoreSnapshot> waitForRestore(
         processor.serviceMessageThreadWork();
         const auto snapshot = processor.getProjectRestoreSnapshot();
         if (snapshot != nullptr
+            && snapshot->generation >= minimumGeneration
             && (snapshot->state == drs::engine::ProjectRestoreState::active
                 || snapshot->state == drs::engine::ProjectRestoreState::ready
                 || snapshot->state == drs::engine::ProjectRestoreState::failed
@@ -217,8 +219,15 @@ int main()
                     && dirtyRestored.getAuthoringSession().getProject().authoring.selectedZoneId
                         == "pad-a3-high",
                 "Checkpoint application must restore revision metadata and selection atomically.");
-        require(dirtyRestored.getAuthoringImportResponsivenessSnapshot().available,
-                "Checkpoint application must rebuild authoring import metrics coherently.");
+        const auto dirtyRestoreMetrics = dirtyRestored.getAuthoringImportResponsivenessSnapshot();
+        require(dirtyRestoreMetrics.available
+                    && dirtyRestoreMetrics.state == "not-run"
+                    && dirtyRestoreMetrics.totalItemCount
+                        == dirtyRestored.getAuthoringSession().getProject().sampleSources.size()
+                    && dirtyRestoreMetrics.processedCount == 0
+                    && dirtyRestoreMetrics.pendingCount == 0
+                    && dirtyRestoreMetrics.lastProcessedItemId.empty(),
+                "Checkpoint application must publish no-I/O authoring import metrics coherently.");
 
         auto missingState = *parsed.hostState;
         missingState.projectBinding.manifestPath
@@ -245,7 +254,7 @@ int main()
         require(missingRestore.retryProjectRestoreWithFile(
                     juce::File(drs::engine::getPhase1ReferenceProjectManifestPath())),
                 "Locate must submit a user-selected project candidate.");
-        const auto wrongLocate = waitForRestore(missingRestore);
+        const auto wrongLocate = waitForRestore(missingRestore, missingResult->generation + 1);
         require(wrongLocate->state == drs::engine::ProjectRestoreState::needsLocation
                     && wrongLocate->finding
                         == drs::engine::ProjectRestoreFinding::identityMismatch
@@ -255,7 +264,7 @@ int main()
 
         require(missingRestore.retryProjectRestoreWithFile(juce::File(projectPath)),
                 "Locate must accept another explicit candidate after a wrong-ID rejection.");
-        const auto repairedLocate = waitForRestore(missingRestore);
+        const auto repairedLocate = waitForRestore(missingRestore, wrongLocate->generation + 1);
         require(repairedLocate->state == drs::engine::ProjectRestoreState::active
                     && missingRestore.getAuthoringSession().getProject().projectId
                         == projectLoad.project.projectId,

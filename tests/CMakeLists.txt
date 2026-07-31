@@ -1187,6 +1187,396 @@ target_compile_definitions(drs_sfz_import_shell_lifecycle_tests PRIVATE DRS_SOUR
 target_compile_features(drs_sfz_import_shell_lifecycle_tests PRIVATE cxx_std_17)
 add_test(NAME drs.sfz_import.shell_lifecycle COMMAND drs_sfz_import_shell_lifecycle_tests)
 
+add_executable(drs_wav_import_service_contract_tests
+    src/WavImportServiceContractTests.cpp
+)
+
+target_link_libraries(drs_wav_import_service_contract_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+)
+
+target_compile_features(drs_wav_import_service_contract_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.wav_import.service_contract
+    COMMAND drs_wav_import_service_contract_tests
+)
+
+add_executable(drs_wav_import_lifecycle_tests
+    src/WavImportServiceLifecycleTests.cpp
+)
+
+target_link_libraries(drs_wav_import_lifecycle_tests
+    PRIVATE
+        drs_app_shared
+)
+
+target_compile_features(drs_wav_import_lifecycle_tests PRIVATE cxx_std_17)
+target_sources(drs_wav_import_lifecycle_tests
+    PRIVATE
+        support/WavImportTestSupport.cpp
+        support/WavImportTestSupport.h
+)
+
+add_test(
+    NAME drs.wav_import.lifecycle
+    COMMAND drs_wav_import_lifecycle_tests
+)
+
+add_executable(drs_wav_import_staging_tests
+    src/WavImportServiceStagingTests.cpp
+)
+
+target_link_libraries(drs_wav_import_staging_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+)
+
+target_compile_features(drs_wav_import_staging_tests PRIVATE cxx_std_17)
+target_sources(drs_wav_import_staging_tests
+    PRIVATE
+        support/WavImportTestSupport.cpp
+        support/WavImportTestSupport.h
+)
+
+add_test(
+    NAME drs.wav_import.staging
+    COMMAND drs_wav_import_staging_tests
+)
+
+add_executable(drs_wav_import_analysis_tests
+    src/WavImportServiceAnalysisTests.cpp
+)
+
+target_link_libraries(drs_wav_import_analysis_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+)
+
+target_compile_features(drs_wav_import_analysis_tests PRIVATE cxx_std_17)
+target_sources(drs_wav_import_analysis_tests
+    PRIVATE
+        support/WavImportTestSupport.cpp
+        support/WavImportTestSupport.h
+)
+
+add_test(
+    NAME drs.wav_import.analysis
+    COMMAND drs_wav_import_analysis_tests
+)
+
+add_executable(drs_wav_import_workflow_tests
+    src/WavImportWorkflowTests.cpp
+)
+
+target_link_libraries(drs_wav_import_workflow_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+)
+
+target_compile_features(drs_wav_import_workflow_tests PRIVATE cxx_std_17)
+target_sources(drs_wav_import_workflow_tests
+    PRIVATE
+        support/WavImportTestSupport.cpp
+        support/WavImportTestSupport.h
+)
+
+add_test(
+    NAME drs.wav_import.workflow
+    COMMAND drs_wav_import_workflow_tests
+)
+
+juce_add_console_app(drs_wav_import_progress_tests
+    PRODUCT_NAME "Decent Rhapsody Studio WAV Import Progress Tests"
+)
+
+target_sources(drs_wav_import_progress_tests
+    PRIVATE
+        src/WavImportProgressTests.cpp
+)
+
+target_link_libraries(drs_wav_import_progress_tests
+    PRIVATE
+        drs_app_shared
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_wav_import_progress_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.wav_import.progress
+    COMMAND drs_wav_import_progress_tests
+)
+
+juce_add_console_app(drs_wav_import_processor_responsiveness_tests
+    PRODUCT_NAME "Decent Rhapsody Studio WAV Import Processor Responsiveness Tests"
+)
+
+target_sources(drs_wav_import_processor_responsiveness_tests
+    PRIVATE
+        src/WavImportProcessorResponsivenessTests.cpp
+        support/WavImportTestSupport.cpp
+)
+
+target_link_libraries(drs_wav_import_processor_responsiveness_tests
+    PRIVATE
+        drs_plugin_shell
+        drs_sample_import
+        juce::juce_audio_processors_headless
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_wav_import_processor_responsiveness_tests PRIVATE cxx_std_17)
+
+target_include_directories(drs_wav_import_processor_responsiveness_tests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/support
+        ${CMAKE_SOURCE_DIR}/third_party/juce/modules
+)
+
+add_test(
+    NAME drs.wav_import.processor_responsiveness
+    COMMAND drs_wav_import_processor_responsiveness_tests
+)
+
+juce_add_console_app(drs_wav_import_lifecycle_io_audit_tests
+    PRODUCT_NAME "Decent Rhapsody Studio WAV Import Lifecycle IO Audit Tests"
+)
+
+target_sources(drs_wav_import_lifecycle_io_audit_tests
+    PRIVATE
+        src/WavImportLifecycleIoAuditTests.cpp
+)
+
+target_link_libraries(drs_wav_import_lifecycle_io_audit_tests
+    PRIVATE
+        drs_plugin_shell
+        drs_standalone_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_wav_import_lifecycle_io_audit_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.wav_import.lifecycle_io_audit
+    COMMAND drs_wav_import_lifecycle_io_audit_tests
+)
+
+juce_add_console_app(drs_wav_import_lifecycle_stress_tests
+    PRODUCT_NAME "Decent Rhapsody Studio WAV Import Lifecycle Stress Tests"
+)
+
+target_sources(drs_wav_import_lifecycle_stress_tests
+    PRIVATE
+        src/WavImportLifecycleStressTests.cpp
+        support/WavImportTestSupport.cpp
+)
+
+target_link_libraries(drs_wav_import_lifecycle_stress_tests
+    PRIVATE
+        drs_plugin_shell
+        drs_sample_import
+        juce::juce_audio_processors_headless
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_wav_import_lifecycle_stress_tests PRIVATE cxx_std_17)
+
+target_include_directories(drs_wav_import_lifecycle_stress_tests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/support
+        ${CMAKE_SOURCE_DIR}/third_party/juce/modules
+)
+
+add_test(
+    NAME drs.wav_import.lifecycle_stress
+    COMMAND drs_wav_import_lifecycle_stress_tests
+)
+
+juce_add_console_app(drs_wav_import_ci_budget_tests
+    PRODUCT_NAME "Decent Rhapsody Studio WAV Import CI Budget Tests"
+)
+
+target_sources(drs_wav_import_ci_budget_tests
+    PRIVATE
+        src/WavImportCiBudgetTests.cpp
+        support/WavImportTestSupport.cpp
+)
+
+target_link_libraries(drs_wav_import_ci_budget_tests
+    PRIVATE
+        drs_plugin_shell
+        drs_sample_import
+        juce::juce_audio_processors_headless
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_wav_import_ci_budget_tests PRIVATE cxx_std_17)
+
+target_include_directories(drs_wav_import_ci_budget_tests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/support
+        ${CMAKE_SOURCE_DIR}/third_party/juce/modules
+)
+
+add_test(
+    NAME drs.wav_import.ci_budgets
+    COMMAND drs_wav_import_ci_budget_tests
+)
+
+juce_add_console_app(drs_wav_import_host_validation_tests
+    PRODUCT_NAME "Decent Rhapsody Studio WAV Import Host Validation Tests"
+)
+
+target_sources(drs_wav_import_host_validation_tests
+    PRIVATE
+        src/WavImportHostValidationTests.cpp
+)
+
+target_link_libraries(drs_wav_import_host_validation_tests
+    PRIVATE
+        drs_plugin_shell
+        drs_standalone_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_wav_import_host_validation_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.wav_import.host_validation
+    COMMAND drs_wav_import_host_validation_tests
+)
+
+juce_add_console_app(drs_project_source_validation_service_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Project Source Validation Service Tests"
+)
+
+target_sources(drs_project_source_validation_service_tests
+    PRIVATE
+        src/ProjectSourceValidationServiceTests.cpp
+        support/WavImportTestSupport.cpp
+)
+
+target_link_libraries(drs_project_source_validation_service_tests
+    PRIVATE
+        drs_app_shared
+        drs_sample_import
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_project_source_validation_service_tests PRIVATE cxx_std_17)
+
+target_include_directories(drs_project_source_validation_service_tests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/support
+        ${CMAKE_SOURCE_DIR}/third_party/juce/modules
+)
+
+add_test(
+    NAME drs.wav_import.source_validation_service
+    COMMAND drs_project_source_validation_service_tests
+)
+
+juce_add_console_app(drs_waveform_peak_builder_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Waveform Peak Builder Tests"
+)
+
+target_sources(drs_waveform_peak_builder_tests
+    PRIVATE
+        src/WaveformPeakBuilderTests.cpp
+        support/WavImportTestSupport.cpp
+)
+
+target_link_libraries(drs_waveform_peak_builder_tests
+    PRIVATE
+        drs_engine_adapter
+        drs_sample_import
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_waveform_peak_builder_tests PRIVATE cxx_std_17)
+
+target_include_directories(drs_waveform_peak_builder_tests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/support
+        ${CMAKE_SOURCE_DIR}/third_party/juce/modules
+)
+
+add_test(
+    NAME drs.wav_import.waveform_peak_builder
+    COMMAND drs_waveform_peak_builder_tests
+)
+
+juce_add_console_app(drs_waveform_preview_service_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Waveform Preview Service Tests"
+)
+
+target_sources(drs_waveform_preview_service_tests
+    PRIVATE
+        src/WaveformPreviewServiceTests.cpp
+        support/WavImportTestSupport.cpp
+)
+
+target_link_libraries(drs_waveform_preview_service_tests
+    PRIVATE
+        drs_app_shared
+        drs_sample_import
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_waveform_preview_service_tests PRIVATE cxx_std_17)
+
+target_include_directories(drs_waveform_preview_service_tests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/support
+        ${CMAKE_SOURCE_DIR}/third_party/juce/modules
+)
+
+add_test(
+    NAME drs.wav_import.waveform_preview_service
+    COMMAND drs_waveform_preview_service_tests
+)
+
 # Phase 3 crossfade Sprint 1 contract and fixture baseline.
 add_executable(drs_phase3_crossfade_contract_tests
     src/Phase3CrossfadeContractTests.cpp
@@ -1935,6 +2325,19 @@ add_test(
     COMMAND drs_phase2_authoring_import_tests
 )
 
+add_executable(drs_wav_import_shell_characterization_tests
+    src/WavImportShellCharacterizationTests.cpp
+)
+target_compile_definitions(drs_wav_import_shell_characterization_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+target_compile_features(drs_wav_import_shell_characterization_tests PRIVATE cxx_std_17)
+add_test(
+    NAME drs.wav_import.shell_characterization
+    COMMAND drs_wav_import_shell_characterization_tests
+)
+
 juce_add_console_app(drs_phase2_mapping_workspace_tests
     PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Mapping Workspace Tests"
 )
@@ -2316,6 +2719,74 @@ target_include_directories(drs_phase1_sample_import_tests
 add_test(
     NAME drs.phase1.sample_import
     COMMAND drs_phase1_sample_import_tests
+)
+
+juce_add_console_app(drs_wav_import_fixture_support_tests
+    PRODUCT_NAME "Decent Rhapsody Studio WAV Import Fixture Support Tests"
+)
+
+target_sources(drs_wav_import_fixture_support_tests
+    PRIVATE
+        src/WavImportFixtureSupportTests.cpp
+        support/WavImportTestSupport.cpp
+)
+
+target_link_libraries(drs_wav_import_fixture_support_tests
+    PRIVATE
+        drs_engine_adapter
+        drs_sample_import
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_wav_import_fixture_support_tests PRIVATE cxx_std_17)
+
+target_include_directories(drs_wav_import_fixture_support_tests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/support
+        ${CMAKE_SOURCE_DIR}/third_party/juce/modules
+)
+
+add_test(
+    NAME drs.wav_import.fixture_support
+    COMMAND drs_wav_import_fixture_support_tests
+)
+
+juce_add_console_app(drs_wav_import_baseline_report
+    PRODUCT_NAME "Decent Rhapsody Studio WAV Import Baseline Report"
+)
+
+target_sources(drs_wav_import_baseline_report
+    PRIVATE
+        src/WavImportBaselineReport.cpp
+        support/WavImportTestSupport.cpp
+)
+
+target_link_libraries(drs_wav_import_baseline_report
+    PRIVATE
+        drs_plugin_shell
+        drs_sample_import
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_wav_import_baseline_report PRIVATE cxx_std_17)
+
+target_include_directories(drs_wav_import_baseline_report
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/support
+        ${CMAKE_SOURCE_DIR}/third_party/juce/modules
+)
+
+add_test(
+    NAME drs.wav_import.baseline_report
+    COMMAND drs_wav_import_baseline_report "${CMAKE_CURRENT_BINARY_DIR}/wav-import-baseline-report.json"
 )
 
 juce_add_console_app(drs_phase1_compile_path_tests
@@ -2718,6 +3189,10 @@ add_dependencies(drs_all_tests
     drs_sprint31_sfz_corpus_hardening_tests
     drs_sfz_import_lifecycle_tests
     drs_sfz_import_shell_lifecycle_tests
+    drs_wav_import_service_contract_tests
+    drs_wav_import_lifecycle_tests
+    drs_wav_import_staging_tests
+    drs_wav_import_analysis_tests
     drs_sprint31_sfz_contract_red_tests
     drs_phase3_crossfade_contract_tests
     drs_phase3_crossfade_fixture_characterization_tests
@@ -2755,6 +3230,13 @@ add_dependencies(drs_all_tests
     drs_phase1_state_recall_tests
     drs_phase2_authoring_foundation_tests
     drs_phase2_authoring_import_tests
+    drs_wav_import_workflow_tests
+    drs_wav_import_progress_tests
+    drs_wav_import_processor_responsiveness_tests
+    drs_wav_import_lifecycle_io_audit_tests
+    drs_wav_import_ci_budget_tests
+    drs_wav_import_host_validation_tests
+    drs_wav_import_shell_characterization_tests
     drs_phase2_mapping_workspace_tests
     drs_sprint8_zone_group_hardening_tests
     drs_phase2_waveform_preview_tests
@@ -2769,6 +3251,8 @@ add_dependencies(drs_all_tests
     drs_phase1_macro_bridge_tests
     drs_phase1_runtime_baseline_report
     drs_phase1_sample_import_tests
+    drs_wav_import_fixture_support_tests
+    drs_wav_import_baseline_report
     drs_phase1_compile_path_tests
     drs_phase1_pipeline_report
     drs_phase1_benchmark_scene
@@ -2826,6 +3310,34 @@ set_target_properties(drs_phase2_authoring_import_tests PROPERTIES
     FOLDER "Tests"
 )
 
+set_target_properties(drs_wav_import_workflow_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_wav_import_progress_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_wav_import_processor_responsiveness_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_wav_import_lifecycle_io_audit_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_wav_import_ci_budget_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_wav_import_host_validation_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_wav_import_shell_characterization_tests PROPERTIES
+    FOLDER "Tests"
+)
+
 set_target_properties(drs_phase2_mapping_workspace_tests PROPERTIES
     FOLDER "Tests"
 )
@@ -2875,6 +3387,30 @@ set_target_properties(drs_phase1_runtime_baseline_report PROPERTIES
 )
 
 set_target_properties(drs_phase1_sample_import_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_wav_import_fixture_support_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_wav_import_baseline_report PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_wav_import_service_contract_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_wav_import_lifecycle_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_wav_import_staging_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+set_target_properties(drs_wav_import_analysis_tests PROPERTIES
     FOLDER "Tests"
 )
 

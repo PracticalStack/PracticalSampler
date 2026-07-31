@@ -64,11 +64,11 @@ drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path& output
     const auto sinePath = (contentRoot / "Samples" / "DRS_Sine_A3.wav").lexically_normal();
     const auto trianglePath = (contentRoot / "Samples" / "DRS_TriangleLead_A4.wav").lexically_normal();
 
-    const auto sineImport = drs::engine::importSampleFile(sinePath.generic_string());
-    require(sineImport.imported, "Reference sine sample must import successfully before compile tests run.");
+    const auto sineImport = drs::engine::inspectSampleFile(sinePath.generic_string());
+    require(sineImport.accepted, "Reference sine sample must inspect successfully before compile tests run.");
 
-    const auto triangleImport = drs::engine::importSampleFile(trianglePath.generic_string());
-    require(triangleImport.imported, "Reference triangle sample must import successfully before compile tests run.");
+    const auto triangleImport = drs::engine::inspectSampleFile(trianglePath.generic_string());
+    require(triangleImport.accepted, "Reference triangle sample must inspect successfully before compile tests run.");
 
     drs::engine::RuntimeCompilePlan plan;
     plan.outputProjectPath = projectPath.generic_string();
@@ -95,14 +95,14 @@ drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path& output
     sineSource.id = "sine-a3";
     sineSource.sourcePath = sinePath.generic_string();
     sineSource.role = "core-sustain";
-    sineSource.metadata = sineImport.sample.metadata;
+    sineSource.metadata = sineImport.metadata;
     plan.sampleSources.push_back(std::move(sineSource));
 
     drs::engine::RuntimeCompileSourceDefinition triangleSource;
     triangleSource.id = "triangle-a4";
     triangleSource.sourcePath = trianglePath.generic_string();
     triangleSource.role = "core-lead";
-    triangleSource.metadata = triangleImport.sample.metadata;
+    triangleSource.metadata = triangleImport.metadata;
     plan.sampleSources.push_back(std::move(triangleSource));
 
     drs::engine::RuntimeMacroDefinition tone;

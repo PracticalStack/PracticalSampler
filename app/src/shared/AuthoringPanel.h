@@ -32,8 +32,10 @@ public:
     };
 
     using WaveformPreviewProvider = std::function<AuthoringWaveformPreview()>;
+    using WaveformPreviewRequestCallback = std::function<void()>;
     using AuthoringPreviewStatusProvider = std::function<AuthoringPreviewStatusSnapshot()>;
     using ImportResponsivenessProvider = std::function<AuthoringImportResponsivenessSnapshot()>;
+    using SourceValidationStatusProvider = std::function<AuthoringSourceValidationSnapshot()>;
     using RestoreRootKeyCallback = std::function<void()>;
     using DraftPlaybackStatusProvider = std::function<drs::engine::DraftPlaybackStatus()>;
     using DraftPlaybackActionCallback = std::function<void()>;
@@ -50,7 +52,11 @@ public:
                             DraftPlaybackActionCallback onPrepareDraftPlaybackRequested = {},
                             DraftPlaybackActionCallback onPublishDraftPlaybackRequested = {},
                             PreviewCommandCallback previewCommandCallback = {},
-                            SampleFilesDroppedCallback sampleFilesDroppedCallback = {});
+                            SampleFilesDroppedCallback sampleFilesDroppedCallback = {},
+                            WaveformPreviewRequestCallback waveformPreviewRequestCallback = {},
+                            SourceValidationStatusProvider sourceValidationStatusProvider = {},
+                            DraftPlaybackActionCallback onRequestSourceValidation = {},
+                            DraftPlaybackActionCallback onCancelSourceValidation = {});
     ~AuthoringPanel() override;
 
     void paint(juce::Graphics& g) override;
@@ -103,6 +109,8 @@ private:
     void refreshDrawerContextLabels();
     void refreshContextualAccessibility();
     void refreshWaveformDrawerContent();
+    void updateSourceValidationAction();
+    void requestWaveformPreviewLoad(bool refreshImmediately = false);
     void refreshDraftPlaybackBanner();
     void refreshFromSession();
     void applySelectedZoneEdit(const authoring::ZoneFieldValuesViewModel& values, const juce::String& label);
@@ -157,13 +165,17 @@ private:
 
     drs::engine::AuthoringSession& authoringSession;
     WaveformPreviewProvider waveformPreviewProvider;
+    WaveformPreviewRequestCallback waveformPreviewRequestCallback;
     AuthoringPreviewStatusProvider authoringPreviewStatusProvider;
     ImportResponsivenessProvider importResponsivenessProvider;
+    SourceValidationStatusProvider sourceValidationStatusProvider;
     LayoutMode layoutMode = LayoutMode::compact;
     RestoreRootKeyCallback onRestoreRootKeyRequested;
     DraftPlaybackStatusProvider draftPlaybackStatusProvider;
     DraftPlaybackActionCallback onPrepareDraftPlaybackRequested;
     DraftPlaybackActionCallback onPublishDraftPlaybackRequested;
+    DraftPlaybackActionCallback onRequestSourceValidation;
+    DraftPlaybackActionCallback onCancelSourceValidation;
     PreviewCommandCallback previewCommandCallback;
     SampleFilesDroppedCallback sampleFilesDroppedCallback;
     struct TimedPreviewNote
@@ -203,6 +215,8 @@ private:
     juce::Label waveformInfoLabel;
     juce::Label loopInfoLabel;
     juce::Label importMetricsLabel;
+    juce::Label sourceValidationLabel;
+    juce::TextButton sourceValidationButton;
     juce::Component drawerRegion;
     juce::Component drawerTabStrip;
     juce::Component drawerContentHost;

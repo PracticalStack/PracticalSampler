@@ -4,9 +4,16 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <iosfwd>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+namespace juce
+{
+class AudioFormatReader;
+}
 
 namespace drs::engine
 {
@@ -35,6 +42,18 @@ struct ImportedSampleData
     std::vector<std::vector<float>> normalizedChannels;
 };
 
+struct SampleInspectionResult
+{
+    bool fileFound = false;
+    bool inspected = false;
+    bool accepted = false;
+    std::string sourcePath;
+    std::string state;
+    std::vector<std::string> warnings;
+    std::vector<std::string> issues;
+    ImportedSampleMetadata metadata;
+};
+
 struct SampleImportPolicyReport
 {
     bool accepted = false;
@@ -54,14 +73,117 @@ struct SampleImportResult
     ImportedSampleData sample;
 };
 
+struct WaveformPeakPoint
+{
+    float minValue = 0.0f;
+    float maxValue = 0.0f;
+};
+
+enum class WaveformPeakChannelReduction
+{
+    firstChannel,
+    averageChannels,
+    channelExtrema
+};
+
+struct WaveformPeakBuildProgress
+{
+    std::uint64_t framesProcessed = 0;
+    std::uint64_t totalFrames = 0;
+    std::size_t pointsCompleted = 0;
+    std::size_t totalPointCount = 0;
+};
+
+struct WaveformPeakBuildCallbacks
+{
+    virtual ~WaveformPeakBuildCallbacks() = default;
+
+    virtual bool isCancellationRequested() const;
+    virtual void onProgress(const WaveformPeakBuildProgress& progress) const;
+};
+
+struct WaveformPeakBuildOptions
+{
+    std::size_t displayPointCount = 192;
+    std::uint64_t chunkFrameCount = 4096;
+    WaveformPeakChannelReduction channelReduction = WaveformPeakChannelReduction::channelExtrema;
+    const WaveformPeakBuildCallbacks* callbacks = nullptr;
+};
+
+struct WaveformPeakBuildResult
+{
+    bool fileFound = false;
+    bool built = false;
+    bool canceled = false;
+    std::string sourcePath;
+    std::string state;
+    std::vector<std::string> issues;
+    ImportedSampleMetadata metadata;
+    std::vector<WaveformPeakPoint> points;
+};
+
 struct SampleSourceFingerprintResult
 {
     bool fileFound = false;
     bool fingerprinted = false;
+    bool canceled = false;
     std::string sourcePath;
     std::string fingerprintHex;
     std::string state;
     std::vector<std::string> issues;
+};
+
+struct SampleFingerprintProgress
+{
+    std::uint64_t bytesProcessed = 0;
+    std::uint64_t totalBytes = 0;
+};
+
+struct SampleFingerprintCallbacks
+{
+    virtual ~SampleFingerprintCallbacks() = default;
+
+    virtual bool isCancellationRequested() const;
+    virtual void onProgress(const SampleFingerprintProgress& progress) const;
+};
+
+struct SampleFingerprintOptions
+{
+    std::uint64_t chunkSizeBytes = 4096;
+    const SampleFingerprintCallbacks* callbacks = nullptr;
+};
+
+struct SampleImportIoCounters
+{
+    std::uint64_t fingerprintOpenCount = 0;
+    std::uint64_t readerOpenCount = 0;
+    std::uint64_t bytesReadCount = 0;
+    std::uint64_t fullFrameReadCount = 0;
+    std::uint64_t copyCount = 0;
+    std::uint64_t peakChunkReadCount = 0;
+};
+
+struct SampleImportHooks
+{
+    virtual ~SampleImportHooks() = default;
+
+    virtual bool fileExists(const std::string& samplePath) const;
+    virtual bool copyFile(const std::string& sourcePath, const std::string& destinationPath) const;
+    virtual std::unique_ptr<std::istream> openFingerprintStream(const std::string& samplePath) const;
+    virtual std::unique_ptr<juce::AudioFormatReader> createAudioReader(const std::string& samplePath) const;
+};
+
+class ScopedSampleImportHooksOverride
+{
+public:
+    explicit ScopedSampleImportHooksOverride(const SampleImportHooks& hooks) noexcept;
+    ~ScopedSampleImportHooksOverride();
+
+    ScopedSampleImportHooksOverride(const ScopedSampleImportHooksOverride&) = delete;
+    ScopedSampleImportHooksOverride& operator=(const ScopedSampleImportHooksOverride&) = delete;
+
+private:
+    const SampleImportHooks* previousHooks = nullptr;
 };
 
 enum class SampleFilenameTokenKind
@@ -124,8 +246,9 @@ struct AuthoringImportQueueItem
 {
     std::string id;
     std::string sourcePath;
+    std::string knownFingerprintHex;
     AuthoringImportItemState state = AuthoringImportItemState::pending;
-    SampleImportResult importResult;
+    SampleInspectionResult inspectionResult;
     std::vector<SampleFilenameToken> filenameTokens;
     std::vector<AuthoringImportFinding> findings;
     AuthoringImportZoneSuggestion suggestedZone;
@@ -181,9 +304,19 @@ struct SampleRootKeyInferenceResult
 
 SampleImportPolicyReport evaluatePhase1SamplePolicy(const ImportedSampleMetadata& metadata,
                                                     const std::string& contentRootPath = {});
-SampleSourceFingerprintResult fingerprintSampleSourceFile(const std::string& samplePath);
+SampleImportIoCounters getSampleImportIoCounters();
+void resetSampleImportIoCounters();
+SampleSourceFingerprintResult fingerprintSampleSourceFile(const std::string& samplePath,
+                                                          const SampleFingerprintOptions& options = {});
+bool copySampleFileForImport(const std::string& sourcePath, const std::string& destinationPath);
+SampleInspectionResult inspectSampleFile(const std::string& samplePath,
+                                         const std::string& knownFingerprintHex = {});
 SampleImportResult importSampleFile(const std::string& samplePath,
                                     const std::string& knownFingerprintHex = {});
+WaveformPeakBuildResult buildWaveformPeaks(const std::string& samplePath,
+                                           const std::string& knownFingerprintHex = {},
+                                           const WaveformPeakBuildOptions& options = {});
+void recordWaveformPeakChunkRead(std::uint64_t chunkFrameCount, std::uint32_t channelCount);
 SampleRootKeyInferenceResult inferSampleRootKey(const std::string& samplePath,
                                                 const ImportedSampleMetadata* metadata = nullptr);
 ParsedSampleFilenameHeuristics parseSampleFilenameHeuristics(const std::string& samplePath,

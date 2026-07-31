@@ -4,10 +4,12 @@
 #include "shared/HostStateRecoveryBanner.h"
 #include "plugin/PluginProcessor.h"
 #include "shared/PerformancePanel.h"
+#include "shared/WavImportWorkflow.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_extra/juce_gui_extra.h>
 
+#include <memory>
 #include <optional>
 
 namespace drs::plugin
@@ -55,6 +57,7 @@ private:
     void confirmSafeToDiscardChanges(const juce::String& nextAction, std::function<void(bool)> completion);
     void refreshProjectViews();
     void updateProjectStatusLabel();
+    void pollWavImportService();
     void pollSfzImportReviewService();
     drs::engine::RuntimeProjectModel buildUnloadedProjectState() const;
     drs::engine::RuntimeProjectModel buildEmptyProjectTemplate() const;
@@ -90,9 +93,19 @@ private:
     drs::app::PerformancePanel performancePanel;
     drs::app::AuthoringPanel authoringPanel;
     drs::app::HostStateRecoveryBanner restoreBanner;
+    drs::app::WavImportProgressComponent wavImportProgress;
     drs::app::SfzImportProgressComponent sfzImportProgress;
     mutable juce::ApplicationProperties appProperties;
     std::unique_ptr<juce::FileChooser> activeFileChooser;
+    std::optional<drs::app::WavImportService::Client> wavImportClient;
+    std::shared_ptr<drs::app::PreparedWavImportBatch> wavImportPreparedBatch;
+    std::string wavImportProjectId;
+    std::size_t wavImportBaseRevision = 0;
+    std::string wavImportContentRootPath;
+    std::string wavImportSelectedGroupId;
+    std::uint64_t wavImportOwnerId = 0;
+    std::uint64_t wavImportGeneration = 0;
+    bool wavImportManualRootDialogOpen = false;
     std::optional<drs::app::SfzImportReviewService::Client> sfzImportClient;
     std::string sfzImportProjectId;
     std::size_t sfzImportBaseRevision = 0;

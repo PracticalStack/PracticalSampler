@@ -426,7 +426,8 @@ private:
     void clearPendingPreparedCompletions();
     void discardSupersededPreviewPendingPreparedCompletions(std::uint64_t newestBuildId);
     void syncPreviewSnapshotFromDraftPlayback();
-    void initializeDraftPlaybackContract(bool activatePerformanceRevision);
+    void initializeDraftPlaybackContract(bool activatePerformanceRevision,
+                                         bool bootstrapPreparedPlayback = true);
     void refreshDiagnosticsSnapshot();
 
     RuntimeManifestLoadResult referenceManifest;

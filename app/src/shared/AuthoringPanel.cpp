@@ -245,6 +245,70 @@ juce::String formatMicros(std::uint64_t micros)
     return juce::String(static_cast<int>(micros)) + " us";
 }
 
+juce::String formatImportResponsivenessState(const std::string& state)
+{
+    if (state.empty())
+        return "unknown";
+
+    juce::String formatted = juce::String::fromUTF8(state.c_str()).replaceCharacter('-', ' ');
+    if (formatted.isEmpty())
+        return "unknown";
+
+    const auto words = juce::StringArray::fromTokens(formatted, " ", {});
+    juce::String result;
+    for (int index = 0; index < words.size(); ++index)
+    {
+        auto word = words[index].trim();
+        if (word.isEmpty())
+            continue;
+
+        word = word.substring(0, 1).toUpperCase() + word.substring(1).toLowerCase();
+        if (!result.isEmpty())
+            result << ' ';
+        result << word;
+    }
+
+    return result.isEmpty() ? "unknown" : result;
+}
+
+bool isSourceValidationActive(const drs::app::AuthoringSourceValidationSnapshot& snapshot) noexcept
+{
+    return snapshot.available && snapshot.state == "active";
+}
+
+juce::String formatSourceValidationStatus(const drs::app::AuthoringSourceValidationSnapshot& snapshot)
+{
+    if (!snapshot.available)
+        return "Source validation unavailable";
+
+    juce::String text = "Validation " + formatImportResponsivenessState(snapshot.state);
+
+    if (snapshot.totalItemCount == 0)
+        return text + " | no linked project sources";
+
+    text += " " + juce::String(static_cast<int>(snapshot.processedCount))
+        + "/" + juce::String(static_cast<int>(snapshot.totalItemCount));
+    text += " | warn " + juce::String(static_cast<int>(snapshot.warningItemCount));
+    text += " | fail " + juce::String(static_cast<int>(snapshot.failedItemCount));
+    text += " | canceled " + juce::String(static_cast<int>(snapshot.canceledItemCount));
+
+    if (snapshot.totalBytesExpected > 0)
+    {
+        text += " | "
+            + juce::File::descriptionOfSizeInBytes(static_cast<juce::int64>(snapshot.totalBytesProcessed))
+            + "/"
+            + juce::File::descriptionOfSizeInBytes(static_cast<juce::int64>(snapshot.totalBytesExpected));
+    }
+
+    if (snapshot.totalDurationMicros > 0)
+        text += " | " + formatMicros(snapshot.totalDurationMicros);
+
+    if (!snapshot.currentSourcePath.empty())
+        text += " | current " + juce::File(juce::String::fromUTF8(snapshot.currentSourcePath.c_str())).getFileName();
+
+    return text;
+}
+
 juce::String joinIdList(const std::vector<std::string>& values)
 {
     if (values.empty())
@@ -622,6 +686,14 @@ DraftPlaybackGuidance buildDraftPlaybackGuidance(const drs::engine::AuthoringSes
 
 } // namespace
 
+void AuthoringPanel::requestWaveformPreviewLoad(const bool refreshImmediately)
+{
+    if (waveformPreviewRequestCallback)
+        waveformPreviewRequestCallback();
+    if (refreshImmediately)
+        refreshWaveformDrawerContent();
+}
+
 AuthoringPanel::AuthoringControlLookAndFeel::AuthoringControlLookAndFeel()
 {
     setColour(juce::TextButton::buttonColourId, authoringButtonFill);
@@ -774,16 +846,24 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
                                DraftPlaybackActionCallback prepareDraftPlaybackRequested,
                                DraftPlaybackActionCallback publishDraftPlaybackRequested,
                                PreviewCommandCallback nextPreviewCommandCallback,
-                               SampleFilesDroppedCallback nextSampleFilesDroppedCallback)
+                               SampleFilesDroppedCallback nextSampleFilesDroppedCallback,
+                               WaveformPreviewRequestCallback nextWaveformPreviewRequestCallback,
+                               SourceValidationStatusProvider nextSourceValidationStatusProvider,
+                               DraftPlaybackActionCallback nextRequestSourceValidation,
+                               DraftPlaybackActionCallback nextCancelSourceValidation)
     : authoringSession(session),
       waveformPreviewProvider(std::move(previewProvider)),
+      waveformPreviewRequestCallback(std::move(nextWaveformPreviewRequestCallback)),
       authoringPreviewStatusProvider(std::move(nextAuthoringPreviewStatusProvider)),
       importResponsivenessProvider(std::move(responsivenessProvider)),
+      sourceValidationStatusProvider(std::move(nextSourceValidationStatusProvider)),
       layoutMode(nextLayoutMode),
       onRestoreRootKeyRequested(std::move(restoreRootKeyRequested)),
       draftPlaybackStatusProvider(std::move(nextDraftPlaybackStatusProvider)),
       onPrepareDraftPlaybackRequested(std::move(prepareDraftPlaybackRequested)),
       onPublishDraftPlaybackRequested(std::move(publishDraftPlaybackRequested)),
+      onRequestSourceValidation(std::move(nextRequestSourceValidation)),
+      onCancelSourceValidation(std::move(nextCancelSourceValidation)),
       previewCommandCallback(std::move(nextPreviewCommandCallback)),
       sampleFilesDroppedCallback(std::move(nextSampleFilesDroppedCallback)),
       groupList("authoringGroupList",
@@ -808,6 +888,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     configureMetadataLabel(waveformInfoLabel);
     configureMetadataLabel(loopInfoLabel);
     configureMetadataLabel(importMetricsLabel);
+    configureMetadataLabel(sourceValidationLabel);
     playbackBannerLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(24, 29, 33));
     playbackBannerLabel.setFont(juce::FontOptions(13.0f, juce::Font::bold));
     playbackBannerLabel.setJustificationType(juce::Justification::centredLeft);
@@ -898,6 +979,9 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     waveformInfoLabel.setComponentID("authoringWaveformInfoLabel");
     loopInfoLabel.setComponentID("authoringWaveformLoopLabel");
     importMetricsLabel.setComponentID("authoringWaveformImportLabel");
+    sourceValidationLabel.setComponentID("authoringWaveformValidationLabel");
+    sourceValidationButton.setComponentID("authoringWaveformValidationButton");
+    sourceValidationButton.setButtonText("Validate Sources");
     waveformPreview.setComponentID("authoringWaveformPreview");
     macroAssignmentSelector.setComponentID("authoringMacroAssignmentSelector");
     macroRoleSelector.setComponentID("authoringMacroRoleSelector");
@@ -1013,7 +1097,10 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
             return;
 
         if (applyZoneMapSelectionState(selectionState))
+        {
+            requestWaveformPreviewLoad(drawerState.activeTab == authoring::DrawerTab::waveform);
             refreshFromSession();
+        }
     });
     zoneMap.setOnZoneAuditionRequested([this](const std::string& zoneId,
                                                int midiNote,
@@ -1176,6 +1263,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
             return;
 
         authoringSession.selectZone(zones[static_cast<std::size_t>(zoneIndex)].id);
+        requestWaveformPreviewLoad(drawerState.activeTab == authoring::DrawerTab::waveform);
         refreshFromSession();
     };
 
@@ -1202,6 +1290,11 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
             command.source = drs::engine::AuthoringPreviewAuditionSource::summaryPreview;
             previewCommandCallback(command);
         }
+        refreshWaveformDrawerContent();
+    };
+    sourceValidationButton.onClick = [this]
+    {
+        updateSourceValidationAction();
         refreshWaveformDrawerContent();
     };
 
@@ -1424,6 +1517,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&waveformInfoLabel),
              static_cast<juce::Component*>(&loopInfoLabel),
              static_cast<juce::Component*>(&importMetricsLabel),
+             static_cast<juce::Component*>(&sourceValidationLabel),
+             static_cast<juce::Component*>(&sourceValidationButton),
              static_cast<juce::Component*>(&drawerToggleButton),
              static_cast<juce::Component*>(&drawerWaveformTabButton),
              static_cast<juce::Component*>(&drawerMacrosTabButton),
@@ -1575,8 +1670,11 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     }
 
     refreshFromSession();
-    if (waveformPreviewProvider || authoringPreviewStatusProvider || importResponsivenessProvider || draftPlaybackStatusProvider)
+    if (waveformPreviewProvider || authoringPreviewStatusProvider || importResponsivenessProvider
+        || sourceValidationStatusProvider || draftPlaybackStatusProvider)
+    {
         startTimer(statusTimerId, 250);
+    }
 }
 
 AuthoringPanel::~AuthoringPanel()
@@ -1741,6 +1839,14 @@ void AuthoringPanel::configureAccessibilityAndFocus()
     configureAccessibleMetadata(importMetricsLabel,
                                 "Import responsiveness",
                                 "Shows import responsiveness metrics for the current project.");
+    configureAccessibleMetadata(sourceValidationLabel,
+                                "Source validation",
+                                "Shows project source validation status for the current project.");
+    configureAccessibleMetadata(sourceValidationButton,
+                                "Validate project sources",
+                                "Starts or cancels project source validation in the background.",
+                                "Press to validate the current project sources or cancel an active validation.");
+    sourceValidationButton.setExplicitFocusOrder(66);
 
     configureAccessibleMetadata(macroList,
                                 "Macro list",
@@ -2150,10 +2256,11 @@ void AuthoringPanel::resized()
 
     if (drawerState.activeTab == authoring::DrawerTab::waveform)
     {
-        const auto waveformMetadataHeight = 18 + 2 + 18 + 2 + 18 + 2 + 24;
-        const auto waveformPreviewHeight = juce::jlimit(72,
-                                                        authoring::waveformPreviewHeight,
-                                                        drawerEditorArea.getHeight() - waveformMetadataHeight);
+        const auto waveformMetadataHeight = 4 + 18 + 2 + 18 + 2 + 18 + 2 + 24 + 2 + 24 + 2 + 18;
+        const auto waveformPreviewHeight = juce::jmax(
+            0,
+            juce::jmin(authoring::waveformPreviewHeight,
+                       drawerEditorArea.getHeight() - waveformMetadataHeight));
         waveformPreview.setBounds(drawerEditorArea.removeFromTop(waveformPreviewHeight));
         drawerEditorArea.removeFromTop(4);
         waveformStatusLabel.setBounds(drawerEditorArea.removeFromTop(18));
@@ -2163,6 +2270,10 @@ void AuthoringPanel::resized()
         loopInfoLabel.setBounds(drawerEditorArea.removeFromTop(18));
         drawerEditorArea.removeFromTop(2);
         importMetricsLabel.setBounds(drawerEditorArea.removeFromTop(24));
+        drawerEditorArea.removeFromTop(2);
+        sourceValidationButton.setBounds(drawerEditorArea.removeFromTop(24));
+        drawerEditorArea.removeFromTop(2);
+        sourceValidationLabel.setBounds(drawerEditorArea.removeFromTop(18));
     }
 
     if (drawerState.activeTab == authoring::DrawerTab::groups)
@@ -2978,6 +3089,8 @@ void AuthoringPanel::setActiveDrawerTab(authoring::DrawerTab nextTab)
     drawerState.open = true;
     refreshDrawerVisibility();
     resized();
+    if (drawerState.activeTab == authoring::DrawerTab::waveform)
+        requestWaveformPreviewLoad(true);
 }
 
 void AuthoringPanel::timerCallback(int timerId)
@@ -3017,7 +3130,9 @@ void AuthoringPanel::refreshDrawerVisibility()
         || isComponentFocusedWithin(focusedComponent, waveformStatusLabel)
         || isComponentFocusedWithin(focusedComponent, waveformInfoLabel)
         || isComponentFocusedWithin(focusedComponent, loopInfoLabel)
-        || isComponentFocusedWithin(focusedComponent, importMetricsLabel);
+        || isComponentFocusedWithin(focusedComponent, importMetricsLabel)
+        || isComponentFocusedWithin(focusedComponent, sourceValidationLabel)
+        || isComponentFocusedWithin(focusedComponent, sourceValidationButton);
     const auto focusWithinGroups = isComponentFocusedWithin(focusedComponent, groupNameEditor)
         || isComponentFocusedWithin(focusedComponent, groupVisibilityToggle)
         || isComponentFocusedWithin(focusedComponent, groupGainSlider)
@@ -3064,6 +3179,8 @@ void AuthoringPanel::refreshDrawerVisibility()
     setVisibleAndAccessible(waveformInfoLabel, drawerContentVisible && waveformTab);
     setVisibleAndAccessible(loopInfoLabel, drawerContentVisible && waveformTab);
     setVisibleAndAccessible(importMetricsLabel, drawerContentVisible && waveformTab);
+    setVisibleAndAccessible(sourceValidationLabel, drawerContentVisible && waveformTab);
+    setVisibleAndAccessible(sourceValidationButton, drawerContentVisible && waveformTab);
 
     setVisibleAndAccessible(groupNameLabel, drawerContentVisible && groupsTab);
     setVisibleAndAccessible(groupNameEditor, drawerContentVisible && groupsTab);
@@ -3797,10 +3914,13 @@ void AuthoringPanel::refreshWaveformDrawerContent()
         const auto metrics = importResponsivenessProvider();
         importMetricsLabel.setText(
             metrics.available
-                ? "Import " + juce::String(static_cast<int>(metrics.processedCount))
+                ? "Import " + formatImportResponsivenessState(metrics.state)
+                    + " " + juce::String(static_cast<int>(metrics.processedCount))
                     + "/" + juce::String(static_cast<int>(metrics.totalItemCount))
+                    + " | pending " + juce::String(static_cast<int>(metrics.pendingCount))
                     + " | warn " + juce::String(static_cast<int>(metrics.warningItemCount))
                     + " | fail " + juce::String(static_cast<int>(metrics.failedItemCount))
+                    + " | canceled " + juce::String(static_cast<int>(metrics.canceledItemCount))
                     + " | last " + formatMicros(metrics.lastProcessDurationMicros)
                     + " avg " + formatMicros(metrics.averageProcessDurationMicros)
                     + " max " + formatMicros(metrics.maxProcessDurationMicros)
@@ -3812,6 +3932,30 @@ void AuthoringPanel::refreshWaveformDrawerContent()
         importMetricsLabel.setText("Import responsiveness unavailable", juce::dontSendNotification);
     }
 
+    AuthoringSourceValidationSnapshot validation;
+    if (sourceValidationStatusProvider)
+        validation = sourceValidationStatusProvider();
+
+    sourceValidationLabel.setText(formatSourceValidationStatus(validation), juce::dontSendNotification);
+    const auto validationActive = isSourceValidationActive(validation);
+    const auto canRequestValidation = validation.available
+        && validation.totalItemCount > 0
+        && !validationActive
+        && static_cast<bool>(onRequestSourceValidation);
+    const auto canCancelValidation = validationActive
+        && static_cast<bool>(onCancelSourceValidation);
+    sourceValidationButton.setButtonText(validationActive ? "Cancel Validation" : "Validate Sources");
+    sourceValidationButton.setEnabled(canRequestValidation || canCancelValidation);
+    sourceValidationButton.setTitle(sourceValidationButton.getButtonText());
+    sourceValidationButton.setDescription(validationActive
+        ? "Cancels the active background project source validation request."
+        : "Starts background validation for the current project's linked sample sources.");
+    sourceValidationButton.setHelpText(validationActive
+        ? "Press to cancel background source validation without interrupting project editing."
+        : (validation.totalItemCount > 0
+               ? "Press to validate linked sample sources without blocking project load or restore."
+               : "Validation becomes available after the project links one or more sample sources."));
+
     waveformStatusLabel.setTitle(waveformStatusLabel.getText());
     auto waveformStatusDescription = "Waveform preview status: " + waveformStatusLabel.getText().toStdString();
     if (!previewStatus.blockingGuidance.empty())
@@ -3820,6 +3964,28 @@ void AuthoringPanel::refreshWaveformDrawerContent()
     updateDynamicAccessibleText(waveformInfoLabel, waveformInfoLabel.getText(), "Waveform metadata: ");
     updateDynamicAccessibleText(loopInfoLabel, loopInfoLabel.getText(), "Loop metadata: ");
     updateDynamicAccessibleText(importMetricsLabel, importMetricsLabel.getText(), "Import responsiveness: ");
+    updateDynamicAccessibleText(sourceValidationLabel, sourceValidationLabel.getText(), "Source validation: ");
+}
+
+void AuthoringPanel::updateSourceValidationAction()
+{
+    if (!sourceValidationStatusProvider)
+        return;
+
+    const auto validation = sourceValidationStatusProvider();
+    if (isSourceValidationActive(validation))
+    {
+        if (onCancelSourceValidation)
+            onCancelSourceValidation();
+        return;
+    }
+
+    if (validation.available
+        && validation.totalItemCount > 0
+        && onRequestSourceValidation)
+    {
+        onRequestSourceValidation();
+    }
 }
 
 void AuthoringPanel::refreshFromSession()

@@ -11,7 +11,10 @@
 #include "drs/engine/SamplerPlaybackContext.h"
 #include "plugin/RealtimeGuard.h"
 #include "shared/AuthoringPreviewModel.h"
+#include "shared/ProjectSourceValidationService.h"
 #include "shared/SfzImportReviewService.h"
+#include "shared/WaveformPreviewService.h"
+#include "shared/WavImportService.h"
 
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -129,6 +132,7 @@ class Processor final : public juce::AudioProcessor,
 {
 public:
     Processor();
+    explicit Processor(drs::app::WaveformPreviewServiceOptions waveformPreviewServiceOptions);
     ~Processor() override;
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
@@ -160,6 +164,12 @@ public:
     const drs::engine::AuthoringSession& getAuthoringSession() const { return authoringSession; }
     drs::app::SfzImportReviewService& getSfzImportReviewService() { return sfzImportReviewService; }
     const drs::app::SfzImportReviewService& getSfzImportReviewService() const { return sfzImportReviewService; }
+    drs::app::WavImportService& getWavImportService() { return wavImportService; }
+    const drs::app::WavImportService& getWavImportService() const { return wavImportService; }
+    bool requestAuthoringSourceValidation();
+    bool cancelAuthoringSourceValidation();
+    drs::app::AuthoringSourceValidationSnapshot getAuthoringSourceValidationSnapshot() const;
+    void authorizeAuthoringWaveformPreviewLoad();
     juce::AudioProcessorValueTreeState& getParameterState() { return parameterState; }
     const juce::AudioProcessorValueTreeState& getParameterState() const { return parameterState; }
     drs::app::AuthoringWaveformPreview getAuthoringWaveformPreview();
@@ -251,6 +261,8 @@ private:
     static juce::String buildMacroParameterId(const std::string& macroId);
     static juce::AudioProcessorValueTreeState::ParameterLayout buildParameterLayout(
         const drs::engine::EngineFacade& engineFacade);
+    void resetAuthoringPreviewPreparationAuthorization() noexcept;
+    void resetAuthoringWaveformPreviewAuthorization() noexcept;
     void initializePublishedMacroRealtimeState();
     void installPublishedMacroCallbackView(
         const drs::engine::PublishedMacroCallbackView& view) noexcept;
@@ -265,11 +277,45 @@ private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     void syncEngineFromParameters();
     void syncParametersFromEngine();
-    drs::app::AuthoringWaveformPreview buildAuthoringWaveformPreview(const drs::engine::ImportedSampleData& sample,
-                                                                     bool loopEnabled,
-                                                                     std::uint64_t loopStartFrame,
-                                                                     std::uint64_t loopEndFrame) const;
+    struct WaveformPreviewCacheEntry
+    {
+        std::string sampleSourceId;
+        std::string sourcePath;
+        std::uint64_t sourceFileSizeBytes = 0;
+        std::int64_t sourceModificationTicks = 0;
+        std::string fingerprintHex;
+        std::size_t displayPointCount = 0;
+        drs::engine::WaveformPeakChannelReduction channelReduction
+            = drs::engine::WaveformPeakChannelReduction::channelExtrema;
+        std::string requestStamp;
+        drs::app::AuthoringWaveformPreview preview;
+    };
+
+    static constexpr std::size_t authoringWaveformPreviewPointCount = 192;
+    static constexpr std::uint64_t authoringWaveformPreviewChunkFrameCount = 4096;
+    static constexpr auto authoringWaveformPreviewChannelReduction
+        = drs::engine::WaveformPeakChannelReduction::channelExtrema;
+
+    drs::app::AuthoringWaveformPreview buildAuthoringWaveformPreview(
+        const drs::engine::WaveformPeakBuildResult& waveform,
+        bool loopEnabled,
+        std::uint64_t loopStartFrame,
+        std::uint64_t loopEndFrame) const;
+    void consumeAuthoringWaveformPreviewSnapshot();
+    bool describeAuthoringWaveformPreviewSource(const drs::engine::RuntimeProjectSampleSource& sampleSource,
+                                                std::uint64_t& fileSizeBytes,
+                                                std::int64_t& modificationTicks) const;
+    std::string buildAuthoringWaveformPreviewRequestStamp(
+        const drs::engine::RuntimeProjectSampleSource& sampleSource,
+        std::uint64_t fileSizeBytes,
+        std::int64_t modificationTicks) const;
+    const WaveformPreviewCacheEntry* findAuthoringWaveformPreviewCacheEntryForStamp(
+        const std::string& requestStamp) const;
+    const WaveformPreviewCacheEntry* findLatestAuthoringWaveformPreviewCacheEntryForSource(
+        const std::string& sampleSourceId) const;
+    void clearAuthoringWaveformPreviewCache();
     void initializeAuthoringImportMetrics();
+    void initializeAuthoringSourceValidationSnapshot();
     std::optional<drs::engine::HostProjectBinding> buildValidatedAuthoringProjectBinding(
         const juce::File& resolvedProjectFile,
         const drs::engine::RuntimeProjectModel& project) const;
@@ -391,7 +437,12 @@ private:
     drs::engine::AuthoringPreviewController authoringPreviewController;
     std::shared_ptr<const drs::app::AuthoringPreviewStatusSnapshot> authoringPreviewStatusPublication;
     drs::engine::EngineFacade engineFacade;
-    std::unordered_map<std::string, drs::app::AuthoringWaveformPreview> authoringWaveformPreviewCache;
+    std::unordered_map<std::string, WaveformPreviewCacheEntry> authoringWaveformPreviewCache;
+    std::unordered_map<std::string, std::string> authoringWaveformPreviewLatestStampBySourceId;
+    std::unordered_map<std::string, std::string> authoringWaveformPreviewCurrentStampBySourceId;
+    std::uint64_t authoringWaveformPreviewConsumedGeneration = 0;
+    bool authoringWaveformPreviewLoadAuthorized = false;
+    bool authoringPreviewPreparationAuthorized = false;
     drs::engine::SamplerPlaybackContext performancePlaybackContext {
         drs::engine::PlaybackActivationLane::performance
     };
@@ -412,9 +463,13 @@ private:
     std::atomic<int> diagnosticActivePublishedMacroFixedVelocity { 0 };
     std::atomic<int> diagnosticActivePublishedMacroMidiNoteOffset { 0 };
     drs::app::AuthoringImportResponsivenessSnapshot authoringImportResponsivenessSnapshot;
+    drs::app::AuthoringSourceValidationSnapshot authoringSourceValidationSnapshot;
     drs::engine::HostProjectBinding authoringProjectBinding;
     drs::engine::ProjectRestoreCoordinator projectRestoreCoordinator;
     drs::app::SfzImportReviewService sfzImportReviewService;
+    drs::app::WavImportService wavImportService;
+    drs::app::ProjectSourceValidationService projectSourceValidationService;
+    drs::app::WaveformPreviewService waveformPreviewService;
     std::shared_ptr<const std::string> serializedHostStatePublication;
     std::shared_ptr<const std::string> latestSubmittedHostState;
     std::string hostStatePublicationKey;

@@ -541,7 +541,7 @@ drs::app::AuthoringImportResponsivenessSnapshot makeImportMetricsFixture()
 {
     drs::app::AuthoringImportResponsivenessSnapshot metrics;
     metrics.available = true;
-    metrics.state = "ready";
+    metrics.state = "completed";
     metrics.totalItemCount = 24;
     metrics.processedCount = 24;
     metrics.warningItemCount = 1;
@@ -551,6 +551,22 @@ drs::app::AuthoringImportResponsivenessSnapshot makeImportMetricsFixture()
     metrics.maxProcessDurationMicros = 870;
     metrics.lastProcessedItemId = "lead-a4-sustain";
     return metrics;
+}
+
+drs::app::AuthoringSourceValidationSnapshot makeSourceValidationFixture()
+{
+    drs::app::AuthoringSourceValidationSnapshot validation;
+    validation.available = true;
+    validation.state = "completed";
+    validation.totalItemCount = 24;
+    validation.processedCount = 24;
+    validation.warningItemCount = 1;
+    validation.failedItemCount = 0;
+    validation.canceledItemCount = 0;
+    validation.totalBytesProcessed = 98304;
+    validation.totalBytesExpected = 98304;
+    validation.totalDurationMicros = 1120;
+    return validation;
 }
 
 drs::engine::DraftPlaybackStatus makeDraftPlaybackStatusFixture()
@@ -1086,7 +1102,7 @@ void writeReachabilityChecklist(std::ostream& inventory)
     inventory << "- Drawer tabs: authoringDrawerWaveformTab, authoringDrawerMacrosTab, authoringDrawerRoutingTab, authoringDrawerPerformanceTab\n";
     inventory << "- Mapping inspector: authoringRootKeySlider, authoringKeyLowSlider, authoringKeyHighSlider, authoringVelocityLowSlider, authoringVelocityHighSlider, authoringGainSlider, authoringPanSlider, authoringLoopEnabledToggle, authoringTriggerModeSelector, authoringRestoreRootKeyButton\n";
     inventory << "- Drawer context: authoringDrawerTitleLabel, authoringDrawerScopeLabel, authoringDrawerBreadcrumbLabel\n";
-    inventory << "- Waveform drawer content: authoringWaveformPreview, authoringWaveformStatusLabel, authoringWaveformInfoLabel, authoringWaveformLoopLabel, authoringWaveformImportLabel\n";
+    inventory << "- Waveform drawer content: authoringWaveformPreview, authoringWaveformStatusLabel, authoringWaveformInfoLabel, authoringWaveformLoopLabel, authoringWaveformImportLabel, authoringWaveformValidationLabel, authoringWaveformValidationButton\n";
     inventory << "- Macros drawer content: authoringMacroList, authoringMacroListBox, authoringMacroAssignmentSelector, authoringMacroRoleSelector, authoringMacroDefaultSlider, authoringMacroMinSlider, authoringMacroMaxSlider, authoringMacroMoveUpButton, authoringMacroMoveDownButton\n";
     inventory << "- Routing drawer content: authoringFxSelector, authoringFxTypeSelector, authoringFxBypassedToggle, authoringRoutingSelector, authoringRoutingInputSelector, authoringRoutingInsertOneSelector, authoringRoutingInsertTwoSelector\n";
     inventory << "- Performance drawer content: authoringPerformanceBankSelector, authoringTriggerSlotSelector, authoringTriggerEventSelector, authoringTargetArticulationSelector, authoringPhraseAssetSelector, authoringChordModeSelector, authoringPhraseImportPath, authoringPhraseImportButton\n";
@@ -1400,7 +1416,10 @@ void exerciseSurface(drs::app::AuthoringPanel& panel,
 
 void exerciseDrawerBehavior(drs::app::AuthoringPanel& panel,
                             const std::string& shellName,
-                            std::vector<std::string>& baselineFindings)
+                            std::vector<std::string>& baselineFindings,
+                            drs::app::AuthoringSourceValidationSnapshot& validationSnapshot,
+                            int& validationRequestCount,
+                            int& validationCancelCount)
 {
     const auto panelBounds = panel.getLocalBounds();
     auto& toggleButton = requireButton(panel, "authoringDrawerToggleButton");
@@ -1431,6 +1450,8 @@ void exerciseDrawerBehavior(drs::app::AuthoringPanel& panel,
     requireComponentVisibleWithin(panel, "authoringWaveformInfoLabel", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformLoopLabel", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformImportLabel", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformValidationLabel", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformValidationButton", panelBounds);
 
     const auto initialZoneId = zoneSelector->getSelectedId();
     const auto alternateZoneId = initialZoneId == 2 ? 1 : 2;
@@ -1439,10 +1460,34 @@ void exerciseDrawerBehavior(drs::app::AuthoringPanel& panel,
     const auto initialWaveformScope = requireLabel(panel, "authoringDrawerScopeLabel").getText().toStdString();
     const auto initialWaveformBreadcrumb = requireLabel(panel, "authoringDrawerBreadcrumbLabel").getText().toStdString();
     const auto initialWaveformInfo = requireLabel(panel, "authoringWaveformInfoLabel").getText().toStdString();
+    require(requireLabel(panel, "authoringWaveformImportLabel").getText().containsIgnoreCase("completed"),
+            "Waveform drawer import metrics should expose the current responsiveness state.");
+    require(requireLabel(panel, "authoringWaveformValidationLabel").getText().containsIgnoreCase("completed"),
+            "Waveform drawer source validation status should expose the current validation state.");
+    require(requireButton(panel, "authoringWaveformValidationButton").getButtonText() == "Validate Sources",
+            "Waveform drawer should start with an explicit validation request action.");
     require(initialWaveformScope.find("Zone-scoped") != std::string::npos,
             "Waveform drawer should expose explicit zone scope vocabulary.");
     require(initialWaveformBreadcrumb.find("Project > Zones >") != std::string::npos,
             "Waveform drawer should expose a breadcrumb for the selected zone.");
+
+    requireButton(panel, "authoringWaveformValidationButton").onClick();
+    require(validationRequestCount == 1,
+            "Waveform drawer validation button should issue an explicit validation request.");
+    require(requireLabel(panel, "authoringWaveformValidationLabel").getText().containsIgnoreCase("active"),
+            "Waveform drawer validation label should update when validation becomes active.");
+    require(requireButton(panel, "authoringWaveformValidationButton").getButtonText() == "Cancel Validation",
+            "Waveform drawer validation button should switch to a cancel action while active.");
+
+    requireButton(panel, "authoringWaveformValidationButton").onClick();
+    require(validationCancelCount == 1,
+            "Waveform drawer validation button should cancel an active validation request.");
+    require(validationSnapshot.state == "canceled",
+            "Validation cancel test fixture should transition into the canceled state.");
+    require(requireLabel(panel, "authoringWaveformValidationLabel").getText().containsIgnoreCase("canceled"),
+            "Waveform drawer validation label should update when validation is canceled.");
+    require(requireButton(panel, "authoringWaveformValidationButton").getButtonText() == "Validate Sources",
+            "Waveform drawer validation button should return to an explicit request action after cancellation.");
 
     zoneSelector->setSelectedId(alternateZoneId, juce::sendNotificationSync);
     require(waveformTabButton.getToggleState(),
@@ -2489,6 +2534,12 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
     requireAccessibilityDescriptionContains(panel,
                                             "authoringWaveformInfoLabel",
                                             requireLabel(panel, "authoringWaveformInfoLabel").getText());
+    requireAccessibilityDescriptionContains(panel,
+                                            "authoringWaveformValidationLabel",
+                                            requireLabel(panel, "authoringWaveformValidationLabel").getText());
+    requireAccessibilityTitleEquals(panel,
+                                    "authoringWaveformValidationButton",
+                                    requireButton(panel, "authoringWaveformValidationButton").getButtonText());
     requireAccessibilityHandlerState(panel, "authoringPerformanceBankSelector", false);
     requireAccessibilityHandlerState(panel, "authoringTriggerSlotSelector", false);
     requireAccessibilityHandlerState(panel, "authoringTriggerEventSelector", false);
@@ -3165,8 +3216,11 @@ int main()
             int previewStartCount = 0;
             int previewEndCount = 0;
             int restoreRootKeyCount = 0;
+            int validationRequestCount = 0;
+            int validationCancelCount = 0;
             int lastPreviewMidiNote = -1;
             float lastPreviewVelocity = -1.0f;
+            auto validationSnapshot = makeSourceValidationFixture();
             drs::app::AuthoringPanel* panelPtr = nullptr;
             drs::app::AuthoringPanel panel(session,
                                            []()
@@ -3218,6 +3272,28 @@ int main()
                                                {
                                                    ++previewEndCount;
                                                }
+                                           },
+                                           {},
+                                           {},
+                                           [&validationSnapshot]()
+                                           {
+                                               return validationSnapshot;
+                                           },
+                                           [&validationSnapshot, &validationRequestCount]()
+                                           {
+                                               ++validationRequestCount;
+                                               validationSnapshot.state = "active";
+                                               validationSnapshot.processedCount = 8;
+                                               validationSnapshot.currentSourceId = "pad-a3-high";
+                                               validationSnapshot.currentSourcePath = "fixtures/phase2/pad-a3-high.wav";
+                                           },
+                                           [&validationSnapshot, &validationCancelCount]()
+                                           {
+                                               ++validationCancelCount;
+                                               validationSnapshot.state = "canceled";
+                                               validationSnapshot.canceledItemCount = 1;
+                                               validationSnapshot.currentSourceId.clear();
+                                               validationSnapshot.currentSourcePath.clear();
                                            });
             panelPtr = &panel;
             panel.setTopLeftPosition(0, 0);
@@ -3250,7 +3326,12 @@ int main()
                                   lastPreviewMidiNote,
                                   lastPreviewVelocity);
             exerciseKeyboardOnlyWorkflowSmoke(panel, session, shellName);
-            exerciseDrawerBehavior(panel, shellName, baselineFindings);
+            exerciseDrawerBehavior(panel,
+                                   shellName,
+                                   baselineFindings,
+                                   validationSnapshot,
+                                   validationRequestCount,
+                                   validationCancelCount);
             exerciseAccessibilityAndFocusBehavior(panel, shellName);
             exerciseDrawerEditorTransactions(panel, session);
             exerciseGroupUi(panel, session, shellName, outputDirectory, inventory);

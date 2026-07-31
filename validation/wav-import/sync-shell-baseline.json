@@ -1,0 +1,73 @@
+{
+  "report": "drs.wavImportBaseline",
+  "schemaVersion": 1,
+  "baselineId": "drs.wavImport.syncShellBaseline",
+  "capturedOn": "2026-07-31",
+  "timingUnits": "microseconds",
+  "constructor": {
+    "durationMicros": 424612,
+    "fingerprintOpenCount": 2,
+    "readerOpenCount": 2,
+    "bytesReadCount": 441648,
+    "fullFrameReadCount": 2,
+    "copyCount": 0,
+    "peakChunkReadCount": 0
+  },
+  "projectReplace": {
+    "durationMicros": 622208,
+    "totalItemCount": 2,
+    "processedCount": 2,
+    "fingerprintOpenCount": 4,
+    "readerOpenCount": 2,
+    "bytesReadCount": 883296,
+    "fullFrameReadCount": 2,
+    "copyCount": 0,
+    "peakChunkReadCount": 0
+  },
+  "restore": {
+    "durationMicros": 1027575,
+    "message": "Authored project and preset restored; no published Performance checkpoint was saved",
+    "fingerprintOpenCount": 6,
+    "readerOpenCount": 2,
+    "bytesReadCount": 1324944,
+    "fullFrameReadCount": 2,
+    "copyCount": 0,
+    "peakChunkReadCount": 0
+  },
+  "importSubmit": {
+    "durationMicros": 11720,
+    "completedInline": true,
+    "skippedCount": 1,
+    "totalItemCount": 6,
+    "processedCount": 5,
+    "warningItemCount": 3,
+    "failedItemCount": 1,
+    "canceledItemCount": 1,
+    "acceptedItemCount": 1,
+    "fingerprintOpenCount": 4,
+    "readerOpenCount": 5,
+    "bytesReadCount": 12072,
+    "fullFrameReadCount": 4,
+    "copyCount": 6,
+    "peakChunkReadCount": 0
+  },
+  "fullBatch": {
+    "durationMicros": 11720,
+    "completedInline": true,
+    "fingerprintOpenCount": 4,
+    "readerOpenCount": 5,
+    "bytesReadCount": 12072,
+    "fullFrameReadCount": 4,
+    "copyCount": 6,
+    "peakChunkReadCount": 0
+  },
+  "memoryShape": {
+    "largestDecodedSampleBytes": 3840,
+    "estimatedRetainedQueueBytes": 15360,
+    "estimatedPeakWorkingBytes": 19200
+  },
+  "notes": [
+    "The current plugin and standalone WAV shells complete copy and queue processing inline before the submit callback returns.",
+    "Import submit and full-batch timings are therefore identical in this baseline until the asynchronous service lands."
+  ]
+}

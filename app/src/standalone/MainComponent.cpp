@@ -4,14 +4,13 @@
 #include "drs/engine/RuntimeLoader.h"
 #include "shared/ProjectStorage.h"
 #include "shared/SfzImportWorkflow.h"
+#include "shared/WavImportWorkflow.h"
 #include "shared/authoring/AuthoringWorkspaceLayout.h"
 
 #include <algorithm>
-#include <cctype>
 #include <filesystem>
 #include <memory>
 #include <thread>
-#include <unordered_set>
 
 namespace drs::standalone
 {
@@ -58,42 +57,6 @@ bool ensureDirectoryExists(const juce::File& directory)
 std::string makeProjectId()
 {
     return "project-" + juce::Uuid().toString().toLowerCase().toStdString();
-}
-
-std::string slugifyText(const std::string& text)
-{
-    std::string slug;
-    bool previousWasDash = false;
-
-    for (const auto character : text)
-    {
-        if (std::isalnum(static_cast<unsigned char>(character)) != 0)
-        {
-            slug.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(character))));
-            previousWasDash = false;
-        }
-        else if (!previousWasDash)
-        {
-            slug.push_back('-');
-            previousWasDash = true;
-        }
-    }
-
-    while (!slug.empty() && slug.back() == '-')
-        slug.pop_back();
-
-    return slug.empty() ? "imported-sample" : slug;
-}
-
-std::string makeUniqueId(const std::string& preferredId, std::unordered_set<std::string>& usedIds)
-{
-    auto candidate = slugifyText(preferredId);
-    auto suffix = 2;
-
-    while (!usedIds.insert(candidate).second)
-        candidate = slugifyText(preferredId) + "-" + std::to_string(suffix++);
-
-    return candidate;
 }
 
 std::optional<drs::engine::RuntimeProjectModel> upgradeLoadedProjectToLatestSchema(
@@ -497,6 +460,22 @@ MainComponent::MainComponent(bool enableAudioOutput)
                      [this](std::vector<juce::File> files)
                      {
                          importSampleFiles(std::move(files));
+                     },
+                     [this]()
+                     {
+                         processor.authorizeAuthoringWaveformPreviewLoad();
+                     },
+                     [this]()
+                     {
+                         return processor.getAuthoringSourceValidationSnapshot();
+                     },
+                     [this]()
+                     {
+                         processor.requestAuthoringSourceValidation();
+                     },
+                     [this]()
+                     {
+                         processor.cancelAuthoringSourceValidation();
                      }),
       restoreBanner([this] { locateProjectForRestore(); },
                     [this] { processor.retryProjectRestore(); })
@@ -517,6 +496,13 @@ MainComponent::MainComponent(bool enableAudioOutput)
     workspaceTabs.addTab("Map", juce::Colour::fromRGB(181, 96, 21), &authoringPanel, false);
     addAndMakeVisible(workspaceTabs);
     addAndMakeVisible(restoreBanner);
+    wavImportProgress.setCancelCallback([this]
+    {
+        if (wavImportClient.has_value())
+            wavImportClient->cancel("Canceled by user");
+    });
+    wavImportProgress.setVisible(false);
+    addAndMakeVisible(wavImportProgress);
     sfzImportProgress.setCancelCallback([this]
     {
         if (sfzImportClient.has_value())
@@ -556,7 +542,15 @@ void MainComponent::resized()
         restoreBanner.setBounds(area.removeFromTop(42));
     else
         restoreBanner.setBounds({});
-    sfzImportProgress.setBounds(area.removeFromTop(42).reduced(8, 2));
+    if (wavImportProgress.isVisible())
+        wavImportProgress.setBounds(area.removeFromTop(58).reduced(8, 2));
+    else
+        wavImportProgress.setBounds({});
+
+    if (sfzImportProgress.isVisible())
+        sfzImportProgress.setBounds(area.removeFromTop(42).reduced(8, 2));
+    else
+        sfzImportProgress.setBounds({});
     workspaceTabs.setBounds(area);
 }
 
@@ -684,6 +678,7 @@ void MainComponent::timerCallback()
     performancePanel.refreshNow();
     authoringPanel.refreshNow();
     updateWindowTitle();
+    pollWavImportService();
     pollSfzImportReviewService();
 }
 
@@ -873,210 +868,58 @@ void MainComponent::importSampleFiles(std::vector<juce::File> selectedFiles)
         if (!ready || safeThis == nullptr || selectedFiles.empty())
             return;
 
-                const auto samplesDirectory = safeThis->currentProjectFile.getParentDirectory().getChildFile("Samples");
-                samplesDirectory.createDirectory();
+        std::vector<std::string> selectedPaths;
+        selectedPaths.reserve(selectedFiles.size());
+        for (const auto& sourceFile : selectedFiles)
+            selectedPaths.push_back(sourceFile.getFullPathName().toStdString());
 
-                struct PendingImportState
-                {
-                    drs::engine::RuntimeProjectModel currentProject;
-                    std::string selectedGroupId;
-                    drs::engine::AuthoringImportQueue importQueue;
-                    std::unordered_set<std::string> usedSampleSourceIds;
-                    std::unordered_set<std::string> usedZoneIds;
-                    std::vector<drs::engine::RuntimeProjectSampleSource> importedSampleSources;
-                    std::vector<drs::engine::RuntimeProjectZoneDefinition> importedZones;
-                    std::size_t warningCount = 0;
-                    std::size_t skippedCount = 0;
-                    std::size_t itemIndex = 0;
-                    std::vector<std::string> details;
-                };
+        const auto& session = safeThis->processor.getAuthoringSession();
+        safeThis->wavImportProjectId = safeThis->currentProjectFile != juce::File()
+            ? safeThis->currentProjectFile.getFullPathName().toStdString()
+            : session.getProject().displayName;
+        safeThis->wavImportBaseRevision = session.getDocumentState().revision;
+        safeThis->wavImportContentRootPath = session.getProject().contentRootPath;
+        safeThis->wavImportSelectedGroupId.clear();
+        safeThis->wavImportPreparedBatch.reset();
+        safeThis->wavImportManualRootDialogOpen = false;
+        safeThis->wavImportClient.emplace(safeThis->processor.getWavImportService().openClient());
 
-                auto state = std::make_shared<PendingImportState>();
+        drs::app::WavImportRequest request;
+        request.sourcePaths = std::move(selectedPaths);
+        request.projectId = safeThis->wavImportProjectId;
+        request.baseRevision = safeThis->wavImportBaseRevision;
+        request.contentRootPath = safeThis->wavImportContentRootPath;
+        if (const auto selectedGroup = session.getSelectedGroup(); selectedGroup.has_value())
+        {
+            request.selectedGroupId = selectedGroup->id;
+            safeThis->wavImportSelectedGroupId = selectedGroup->id;
+        }
 
-                for (const auto& sourceFile : selectedFiles)
-                {
-                    if (!sourceFile.existsAsFile())
-                    {
-                        ++state->skippedCount;
-                        state->details.push_back("Skipped missing file: " + sourceFile.getFullPathName().toStdString());
-                        continue;
-                    }
+        const auto submitted = safeThis->wavImportClient->submit(std::move(request));
+        if (submitted.disposition != drs::app::WavImportSubmitDisposition::accepted)
+        {
+            const auto progressWasVisible = safeThis->wavImportProgress.isVisible();
+            safeThis->wavImportClient.reset();
+            safeThis->wavImportProjectId.clear();
+            safeThis->wavImportBaseRevision = 0;
+            safeThis->wavImportContentRootPath.clear();
+            safeThis->wavImportSelectedGroupId.clear();
+            safeThis->wavImportOwnerId = 0;
+            safeThis->wavImportGeneration = 0;
+            safeThis->wavImportProgress.setVisible(false);
+            if (progressWasVisible)
+                safeThis->resized();
+            juce::AlertWindow::showMessageBoxAsync(
+                juce::AlertWindow::WarningIcon,
+                "Import WAV",
+                submitted.disposition == drs::app::WavImportSubmitDisposition::busy
+                    ? "A WAV import is already in progress."
+                    : "WAV import could not be started.");
+            return;
+        }
 
-                    juce::File managedCopy = sourceFile;
-                    if (sourceFile.getParentDirectory() != samplesDirectory)
-                    {
-                        managedCopy = samplesDirectory.getNonexistentChildFile(sourceFile.getFileNameWithoutExtension(),
-                                                                              sourceFile.getFileExtension(),
-                                                                              false);
-                        if (!sourceFile.copyFileTo(managedCopy))
-                        {
-                            ++state->skippedCount;
-                            state->details.push_back("Could not copy " + sourceFile.getFileName().toStdString()
-                                                     + " into the project Samples folder.");
-                            continue;
-                        }
-                    }
-
-                    drs::engine::AuthoringImportQueueItem queuedItem;
-                    queuedItem.sourcePath = managedCopy.getFullPathName().toStdString();
-                    state->importQueue.items.push_back(std::move(queuedItem));
-                }
-
-                if (state->importQueue.items.empty())
-                {
-                    juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-                                                           "Import WAV Failed",
-                                                           safeThis->buildImportSummaryMessage(0, 0, state->skippedCount, state->details));
-                    return;
-                }
-
-                std::vector<std::string> copiedPaths;
-                copiedPaths.reserve(state->importQueue.items.size());
-                for (const auto& item : state->importQueue.items)
-                    copiedPaths.push_back(item.sourcePath);
-
-                state->currentProject = safeThis->processor.getAuthoringSession().getProject();
-                if (const auto selectedGroup = safeThis->processor.getAuthoringSession().getSelectedGroup();
-                    selectedGroup.has_value())
-                {
-                    state->selectedGroupId = selectedGroup->id;
-                }
-                state->importQueue = drs::engine::createAuthoringImportQueue(copiedPaths, state->currentProject.contentRootPath);
-                while (drs::engine::processNextAuthoringImportQueueItem(state->importQueue).processed)
-                {
-                }
-
-                for (const auto& sampleSource : state->currentProject.sampleSources)
-                    state->usedSampleSourceIds.insert(sampleSource.id);
-
-                for (const auto& zone : state->currentProject.authoring.zones)
-                    state->usedZoneIds.insert(zone.id);
-
-                auto processNextItem = std::make_shared<std::function<void()>>();
-                *processNextItem = [safeThis, state, processNextItem]()
-                {
-                    if (safeThis == nullptr)
-                        return;
-
-                    auto appendImportedItem = [state](const drs::engine::AuthoringImportQueueItem& item,
-                                                      drs::engine::RuntimeProjectZoneDefinition zone)
-                    {
-                        auto sampleSourceId = makeUniqueId(
-                            item.suggestedZone.sourceSampleId.empty()
-                                ? fs::path(item.sourcePath).stem().generic_string()
-                                : item.suggestedZone.sourceSampleId,
-                            state->usedSampleSourceIds);
-
-                        drs::engine::RuntimeProjectSampleSource sampleSource;
-                        sampleSource.id = sampleSourceId;
-                        sampleSource.path = item.sourcePath;
-                        sampleSource.role = item.suggestedZone.zone.articulationId.empty()
-                            ? "imported"
-                            : "imported-" + item.suggestedZone.zone.articulationId;
-
-                        zone.id = makeUniqueId(zone.id.empty() ? sampleSourceId : zone.id, state->usedZoneIds);
-                        zone.sampleSourceId = sampleSourceId;
-                        if (!state->selectedGroupId.empty())
-                            zone.groupId = state->selectedGroupId;
-
-                        state->importedSampleSources.push_back(std::move(sampleSource));
-                        state->importedZones.push_back(std::move(zone));
-                    };
-
-                    while (state->itemIndex < state->importQueue.items.size())
-                    {
-                        const auto& item = state->importQueue.items[state->itemIndex++];
-
-                        if (item.state != drs::engine::AuthoringImportItemState::inferred
-                            && item.state != drs::engine::AuthoringImportItemState::warning)
-                        {
-                            ++state->skippedCount;
-                            if (!item.importResult.issues.empty())
-                                state->details.push_back(item.importResult.issues.front());
-                            else
-                                state->details.push_back("Skipped " + fs::path(item.sourcePath).filename().generic_string() + ".");
-                            continue;
-                        }
-
-                        auto zone = item.suggestedZone.zone;
-                        if (item.suggestedZone.rootKeySource == "manual")
-                        {
-                            safeThis->promptForRootKeySelection(
-                                "Root Key Required",
-                                "Could not infer a root key for '" + juce::String::fromUTF8(fs::path(item.sourcePath).filename().generic_string().c_str())
-                                    + "'. Select the sample's native pitch to continue importing.",
-                                zone.rootKey,
-                                [safeThis, state, processNextItem, item, zone, appendImportedItem](std::optional<int> selectedRootKey) mutable
-                                {
-                                    if (safeThis == nullptr)
-                                        return;
-
-                                    if (!selectedRootKey.has_value())
-                                    {
-                                        ++state->skippedCount;
-                                        state->details.push_back("Skipped " + fs::path(item.sourcePath).filename().generic_string()
-                                                                 + " because its root key was not confirmed.");
-                                        (*processNextItem)();
-                                        return;
-                                    }
-
-                                    zone.rootKey = *selectedRootKey;
-                                    appendImportedItem(item, zone);
-                                    ++state->warningCount;
-                                    state->details.push_back("Selected root key "
-                                                             + juce::MidiMessage::getMidiNoteName(zone.rootKey, true, true, 4).toStdString()
-                                                             + " for " + fs::path(item.sourcePath).filename().generic_string() + ".");
-                                    (*processNextItem)();
-                                });
-                            return;
-                        }
-
-                        appendImportedItem(item, zone);
-
-                        if (item.state == drs::engine::AuthoringImportItemState::warning)
-                        {
-                            ++state->warningCount;
-                            if (!item.findings.empty())
-                                state->details.push_back(item.findings.front().summary + ": " + item.findings.front().detail);
-                        }
-                    }
-
-                    if (state->importedSampleSources.empty() || state->importedZones.empty())
-                    {
-                        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-                                                               "Import WAV Failed",
-                                                               safeThis->buildImportSummaryMessage(0,
-                                                                                                  state->warningCount,
-                                                                                                  state->skippedCount,
-                                                                                                  state->details));
-                        return;
-                    }
-
-                    const auto importedCount = state->importedSampleSources.size();
-                    drs::engine::reconcileBatchInferredRoundRobinDescriptors(state->importedZones);
-                    const auto importResult = safeThis->processor.getAuthoringSession().appendImportedContent(
-                        std::move(state->importedSampleSources),
-                        std::move(state->importedZones),
-                        "Import WAV files");
-                    if (!importResult.applied)
-                    {
-                        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-                                                               "Import WAV Failed",
-                                                               safeThis->buildProjectIssueSummary(importResult.issues));
-                        return;
-                    }
-
-                    safeThis->refreshProjectViews();
-
-                    juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon,
-                                                           "Import WAV Complete",
-                                                           safeThis->buildImportSummaryMessage(importedCount,
-                                                                                              state->warningCount,
-                                                                                              state->skippedCount,
-                                                                                              state->details));
-                };
-
-                (*processNextItem)();
+        safeThis->wavImportOwnerId = safeThis->wavImportClient->ownerId();
+        safeThis->wavImportGeneration = submitted.identity.generation;
     };
 
     if (currentProjectFile == juce::File())
@@ -1086,6 +929,180 @@ void MainComponent::importSampleFiles(std::vector<juce::File> selectedFiles)
     }
 
     beginImport(true);
+}
+
+void MainComponent::pollWavImportService()
+{
+    if (!wavImportClient.has_value())
+        return;
+
+    const auto snapshot = wavImportClient->getSnapshot();
+    if (!snapshot)
+        return;
+
+    const auto progressWasVisible = wavImportProgress.isVisible();
+    wavImportProgress.update(*snapshot);
+    if (progressWasVisible != wavImportProgress.isVisible())
+        resized();
+
+    const auto clearState = [this]
+    {
+        const auto progressVisible = wavImportProgress.isVisible();
+        wavImportPreparedBatch.reset();
+        wavImportManualRootDialogOpen = false;
+        wavImportClient.reset();
+        wavImportProjectId.clear();
+        wavImportBaseRevision = 0;
+        wavImportContentRootPath.clear();
+        wavImportSelectedGroupId.clear();
+        wavImportOwnerId = 0;
+        wavImportGeneration = 0;
+        wavImportProgress.setVisible(false);
+        if (progressVisible)
+            resized();
+    };
+
+    if (snapshot->stage == drs::app::WavImportBatchStage::failed)
+    {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Import WAV Failed",
+                                               juce::String(snapshot->status));
+        clearState();
+        return;
+    }
+
+    if (snapshot->stage == drs::app::WavImportBatchStage::canceled)
+    {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon,
+                                               "Import WAV Canceled",
+                                               juce::String(snapshot->status));
+        clearState();
+        return;
+    }
+
+    if (snapshot->stage == drs::app::WavImportBatchStage::superseded
+        || snapshot->stage == drs::app::WavImportBatchStage::consumed)
+    {
+        clearState();
+        return;
+    }
+
+    if (snapshot->stage != drs::app::WavImportBatchStage::completed || snapshot->completion == nullptr)
+        return;
+
+    const auto currentSelectedGroup = processor.getAuthoringSession().getSelectedGroup();
+    const auto currentSelectedGroupId = currentSelectedGroup.has_value() ? currentSelectedGroup->id : std::string {};
+    const auto currentProjectId = currentProjectFile != juce::File()
+        ? currentProjectFile.getFullPathName().toStdString()
+        : processor.getAuthoringSession().getProject().displayName;
+    const auto currentContentRootPath = processor.getAuthoringSession().getProject().contentRootPath;
+    if (snapshot->identity.ownerId != wavImportOwnerId
+        || snapshot->identity.generation != wavImportGeneration
+        || snapshot->identity.projectId != wavImportProjectId
+        || snapshot->identity.baseRevision != wavImportBaseRevision
+        || snapshot->identity.contentRootPath != wavImportContentRootPath
+        || snapshot->identity.selectedGroupId != wavImportSelectedGroupId
+        || currentProjectId != wavImportProjectId
+        || processor.getAuthoringSession().getDocumentState().revision != wavImportBaseRevision
+        || currentContentRootPath != wavImportContentRootPath
+        || currentSelectedGroupId != wavImportSelectedGroupId)
+    {
+        wavImportClient->consume();
+        clearState();
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Import WAV",
+                                               "The project, group, or destination changed before apply. Please retry.");
+        return;
+    }
+
+    if (wavImportPreparedBatch == nullptr)
+    {
+        wavImportPreparedBatch = std::make_shared<drs::app::PreparedWavImportBatch>(
+            drs::app::prepareWavImportBatchFromCompletion(*snapshot->completion,
+                                                          processor.getAuthoringSession().getProject(),
+                                                          snapshot->completion->identity.selectedGroupId));
+    }
+
+    if (wavImportPreparedBatch->pendingManualRoot.has_value())
+    {
+        if (wavImportManualRootDialogOpen)
+            return;
+
+        const auto prompt = *wavImportPreparedBatch->pendingManualRoot;
+        wavImportManualRootDialogOpen = true;
+        promptForRootKeySelection(
+            "Root Key Required",
+            "Could not infer a root key for '" + juce::String::fromUTF8(prompt.sourceDisplayName.c_str())
+                + "'. Select the sample's native pitch to continue importing.",
+            prompt.initialRootKey,
+            [safeThis = juce::Component::SafePointer<MainComponent>(this)](std::optional<int> selectedRootKey) mutable
+            {
+                if (safeThis == nullptr)
+                    return;
+
+                if (safeThis->wavImportPreparedBatch != nullptr)
+                    drs::app::resolvePreparedWavImportManualRoot(*safeThis->wavImportPreparedBatch,
+                                                                 selectedRootKey);
+                safeThis->wavImportManualRootDialogOpen = false;
+            });
+        return;
+    }
+
+    if (!drs::app::hasPreparedWavImportCommit(*wavImportPreparedBatch))
+    {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Import WAV Failed",
+                                               buildImportSummaryMessage(0,
+                                                                         wavImportPreparedBatch->warningCount,
+                                                                         wavImportPreparedBatch->skippedCount,
+                                                                         wavImportPreparedBatch->details));
+        wavImportClient->consume();
+        clearState();
+        return;
+    }
+
+    auto commit = drs::app::takePreparedWavImportCommit(std::move(*wavImportPreparedBatch));
+    wavImportPreparedBatch.reset();
+    std::vector<std::string> finalizationIssues;
+    if (!drs::app::finalizePreparedWavImportCommit(commit, finalizationIssues))
+    {
+        wavImportClient->consume();
+        clearState();
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Import WAV Failed",
+                                               buildProjectIssueSummary(finalizationIssues));
+        return;
+    }
+
+    const auto importedCount = commit.importedCount;
+    const auto importResult = processor.getAuthoringSession().appendImportedContent(
+        std::move(commit.sampleSources),
+        std::move(commit.zones),
+        "Import WAV files");
+    if (!importResult.applied)
+    {
+        drs::app::rollbackPreparedWavImportCommit(commit);
+        wavImportClient->consume();
+        clearState();
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Import WAV Failed",
+                                               buildProjectIssueSummary(importResult.issues));
+        return;
+    }
+
+    wavImportClient->consume();
+    clearState();
+    refreshProjectViews();
+    const auto partialResult = snapshot->terminalDisposition == drs::app::WavImportTerminalDisposition::partiallyCompleted
+        || commit.skippedCount > 0;
+    juce::AlertWindow::showMessageBoxAsync(partialResult ? juce::AlertWindow::WarningIcon
+                                                         : juce::AlertWindow::InfoIcon,
+                                           partialResult ? "Import WAV Partially Complete"
+                                                         : "Import WAV Complete",
+                                           buildImportSummaryMessage(importedCount,
+                                                                     commit.warningCount,
+                                                                     commit.skippedCount,
+                                                                     commit.details));
 }
 
 void MainComponent::reviewSfzImportFile(const juce::File& selectedFile)
@@ -1205,16 +1222,16 @@ void MainComponent::restoreSelectedZoneRootKey()
         return;
     }
 
-    const auto importResult = drs::engine::importSampleFile(sampleSource->path);
-    if (!importResult.imported)
+    const auto inspectionResult = drs::engine::inspectSampleFile(sampleSource->path);
+    if (!inspectionResult.accepted)
     {
         juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
                                                "Restore Root Key Failed",
-                                               buildProjectIssueSummary(importResult.issues));
+                                               buildProjectIssueSummary(inspectionResult.issues));
         return;
     }
 
-    const auto inference = drs::engine::inferSampleRootKey(sampleSource->path, &importResult.sample.metadata);
+    const auto inference = drs::engine::inferSampleRootKey(sampleSource->path, &inspectionResult.metadata);
     auto applyRestoredRootKey = [this, selectedZone](int restoredRootKey)
     {
         if (restoredRootKey == selectedZone->rootKey)
@@ -1553,22 +1570,7 @@ juce::String MainComponent::buildImportSummaryMessage(std::size_t importedCount,
                                                       std::size_t skippedCount,
                                                       const std::vector<std::string>& details) const
 {
-    juce::String summary("Imported " + juce::String(static_cast<int>(importedCount)) + " file");
-    if (importedCount != 1)
-        summary += "s";
-
-    summary += " into the current project.";
-    summary += "\nWarnings: " + juce::String(static_cast<int>(warningCount));
-    summary += "\nSkipped: " + juce::String(static_cast<int>(skippedCount));
-
-    if (!details.empty())
-    {
-        summary += "\n\nDetails:";
-        for (std::size_t index = 0; index < details.size() && index < 8; ++index)
-            summary += "\n- " + juce::String::fromUTF8(details[index].c_str());
-    }
-
-    return summary;
+    return drs::app::buildWavImportSummaryMessage(importedCount, warningCount, skippedCount, details);
 }
 
 juce::File MainComponent::getLibraryLocation() const

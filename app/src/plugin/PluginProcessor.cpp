@@ -101,6 +101,200 @@ std::uint64_t monotonicMicros()
         std::chrono::steady_clock::now().time_since_epoch()).count());
 }
 
+bool isWavImportItemTerminal(const drs::app::WavImportItemStage stage) noexcept
+{
+    using Stage = drs::app::WavImportItemStage;
+    return stage == Stage::ready
+        || stage == Stage::failed
+        || stage == Stage::canceled
+        || stage == Stage::skipped;
+}
+
+std::string mapWavImportResponsivenessState(const drs::app::WavImportBatchSnapshot& snapshot)
+{
+    using BatchStage = drs::app::WavImportBatchStage;
+    using Disposition = drs::app::WavImportTerminalDisposition;
+
+    switch (snapshot.stage)
+    {
+        case BatchStage::queued:
+        case BatchStage::staging:
+        case BatchStage::inspecting:
+            return "active";
+        case BatchStage::canceled:
+        case BatchStage::superseded:
+            return "canceled";
+        case BatchStage::failed:
+            return "failed";
+        case BatchStage::completed:
+        case BatchStage::consumed:
+            switch (snapshot.terminalDisposition)
+            {
+                case Disposition::canceled:
+                case Disposition::superseded:
+                    return "canceled";
+                case Disposition::failed:
+                    return "failed";
+                case Disposition::partiallyCompleted:
+                    return "completed-partial";
+                case Disposition::completed:
+                case Disposition::consumed:
+                case Disposition::none:
+                    return "completed";
+            }
+            break;
+        case BatchStage::idle:
+            break;
+    }
+
+    return "idle";
+}
+
+bool isRelevantWavImportSnapshot(const drs::app::WavImportBatchSnapshot& snapshot,
+                                 const drs::engine::RuntimeProjectModel& project) noexcept
+{
+    if (snapshot.identity.generation == 0 || snapshot.stage == drs::app::WavImportBatchStage::idle)
+        return false;
+    if (!project.contentRootPath.empty() && !snapshot.identity.contentRootPath.empty()
+        && snapshot.identity.contentRootPath != project.contentRootPath)
+    {
+        return false;
+    }
+    return true;
+}
+
+drs::app::AuthoringImportResponsivenessSnapshot buildImportResponsivenessSnapshotFromWavImport(
+    const drs::app::WavImportBatchSnapshot& snapshot)
+{
+    drs::app::AuthoringImportResponsivenessSnapshot responsiveness;
+    responsiveness.available = true;
+    responsiveness.state = mapWavImportResponsivenessState(snapshot);
+    responsiveness.totalItemCount = snapshot.totalItemCount;
+    responsiveness.pendingCount = snapshot.totalItemCount > snapshot.completedItemCount
+        ? snapshot.totalItemCount - snapshot.completedItemCount
+        : 0;
+    responsiveness.processedCount = snapshot.completedItemCount;
+    responsiveness.warningItemCount = snapshot.warningItemCount;
+    responsiveness.failedItemCount = snapshot.failedItemCount;
+    responsiveness.canceledItemCount = snapshot.canceledItemCount;
+    responsiveness.acceptedItemCount = snapshot.successfulItemCount;
+
+    std::uint64_t totalCompletedDurationMicros = 0;
+    std::size_t completedDurationCount = 0;
+    for (const auto& item : snapshot.items)
+    {
+        if (!isWavImportItemTerminal(item.stage))
+            continue;
+
+        responsiveness.lastProcessedItemId = item.itemId;
+        responsiveness.lastProcessDurationMicros = item.totalDurationMicros;
+        responsiveness.maxProcessDurationMicros = std::max(responsiveness.maxProcessDurationMicros,
+                                                           item.totalDurationMicros);
+        totalCompletedDurationMicros += item.totalDurationMicros;
+        ++completedDurationCount;
+    }
+
+    if (completedDurationCount > 0)
+    {
+        responsiveness.averageProcessDurationMicros
+            = totalCompletedDurationMicros / completedDurationCount;
+    }
+
+    return responsiveness;
+}
+
+bool isRelevantProjectSourceValidationSnapshot(
+    const drs::app::ProjectSourceValidationSnapshot& snapshot,
+    const drs::engine::RuntimeProjectModel& project) noexcept
+{
+    if (snapshot.identity.generation == 0
+        || snapshot.stage == drs::app::ProjectSourceValidationStage::idle)
+    {
+        return false;
+    }
+
+    if (!project.projectId.empty() && snapshot.identity.projectId != project.projectId)
+        return false;
+
+    if (!project.contentRootPath.empty() && !snapshot.identity.contentRootPath.empty()
+        && snapshot.identity.contentRootPath != project.contentRootPath)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+std::string mapProjectSourceValidationState(const drs::app::ProjectSourceValidationStage stage)
+{
+    using Stage = drs::app::ProjectSourceValidationStage;
+    switch (stage)
+    {
+        case Stage::queued:
+        case Stage::fingerprinting:
+        case Stage::inspecting:
+            return "active";
+        case Stage::completed:
+            return "completed";
+        case Stage::canceled:
+            return "canceled";
+        case Stage::failed:
+            return "failed";
+        case Stage::idle:
+            break;
+    }
+
+    return "idle";
+}
+
+drs::app::AuthoringSourceValidationSnapshot buildAuthoringSourceValidationSnapshot(
+    const drs::app::ProjectSourceValidationSnapshot& snapshot)
+{
+    drs::app::AuthoringSourceValidationSnapshot validation;
+    validation.available = true;
+    validation.state = mapProjectSourceValidationState(snapshot.stage);
+    validation.totalItemCount = snapshot.totalItemCount;
+    validation.processedCount = snapshot.completedItemCount;
+    validation.warningItemCount = snapshot.warningItemCount;
+    validation.failedItemCount = snapshot.failedItemCount;
+    validation.canceledItemCount = snapshot.canceledItemCount;
+    validation.totalBytesProcessed = snapshot.totalBytesProcessed;
+    validation.totalBytesExpected = snapshot.totalBytesExpected;
+    validation.totalDurationMicros = snapshot.totalDurationMicros;
+    validation.currentSourceId = snapshot.currentSourceId;
+    validation.currentSourcePath = snapshot.currentSourcePath;
+    return validation;
+}
+
+bool isWaveformPreviewServiceActiveStage(const drs::app::WaveformPreviewServiceStage stage) noexcept
+{
+    using Stage = drs::app::WaveformPreviewServiceStage;
+    return stage == Stage::queued || stage == Stage::building;
+}
+
+std::string mapWaveformPreviewServiceState(const drs::app::WaveformPreviewServiceStage stage)
+{
+    using Stage = drs::app::WaveformPreviewServiceStage;
+    switch (stage)
+    {
+        case Stage::queued:
+        case Stage::building:
+            return "Loading";
+        case Stage::completed:
+            return "Ready";
+        case Stage::canceled:
+            return "Canceled";
+        case Stage::superseded:
+            return "Stale";
+        case Stage::failed:
+            return "Unavailable";
+        case Stage::idle:
+            break;
+    }
+
+    return "Idle";
+}
+
 struct HostTransportObservation
 {
     bool valid = false;
@@ -402,29 +596,6 @@ AuthoringPreviewBlockingHint buildAuthoringPreviewBlockingHint(const drs::engine
              "Zone '" + zoneLabel + "' still has a blocking sample-source problem. Recheck '" + sampleFileLabel + "', then audition the preview again." };
 }
 
-const std::vector<float>* selectWaveformPreviewChannel(const drs::engine::ImportedSampleData& sample)
-{
-    const std::vector<float>* previewChannel = nullptr;
-    auto previewChannelPeak = 0.0f;
-
-    for (const auto& channel : sample.normalizedChannels)
-    {
-        if (channel.empty())
-            continue;
-
-        auto channelPeak = 0.0f;
-        for (const auto value : channel)
-            channelPeak = std::max(channelPeak, std::abs(value));
-
-        if (previewChannel == nullptr || channelPeak > previewChannelPeak)
-        {
-            previewChannel = &channel;
-            previewChannelPeak = channelPeak;
-        }
-    }
-
-    return previewChannel;
-}
 } // namespace
 
 bool Processor::RealtimeNoteEventQueue::push(QueuedRealtimeNoteEvent event) noexcept
@@ -457,12 +628,19 @@ void Processor::RealtimeNoteEventQueue::reset() noexcept
 }
 
 Processor::Processor()
+    : Processor(drs::app::WaveformPreviewServiceOptions {})
+{
+}
+
+Processor::Processor(drs::app::WaveformPreviewServiceOptions waveformPreviewServiceOptions)
     : juce::AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       authoringSession(buildInitialAuthoringProject()),
-      parameterState(*this, nullptr, "macroParameters", buildParameterLayout(engineFacade))
+      parameterState(*this, nullptr, "macroParameters", buildParameterLayout(engineFacade)),
+      waveformPreviewService(std::move(waveformPreviewServiceOptions))
 {
     primeRealtimeSafetyState(512);
     initializeAuthoringImportMetrics();
+    initializeAuthoringSourceValidationSnapshot();
     authoringSession.setDspParameterGesturePreviewListener(
         [this](const std::string& slotId, const std::string& parameterId, const double value)
         {
@@ -483,6 +661,9 @@ Processor::~Processor()
 {
     stopTimer();
     sfzImportReviewService.shutdown();
+    wavImportService.shutdown();
+    projectSourceValidationService.shutdown();
+    waveformPreviewService.shutdown();
     projectRestoreCoordinator.shutdown();
 
     for (const auto& macro : engineFacade.getMacroDescriptors())
@@ -845,11 +1026,35 @@ void Processor::setMacroValueFromShell(const std::string& macroId, double value)
 void Processor::queueAuthoringPreviewNoteOn(int midiNoteNumber, float velocity)
 {
     drs::engine::AuthoringPreviewCommand command;
-    command.type = drs::engine::AuthoringPreviewCommandType::noteOn;
+    const auto previewController = authoringPreviewController.getSnapshot();
+    const auto prepareSelectedZoneOnDemand = !authoringPreviewPreparationAuthorized
+        && !previewController.hasRequest;
+    command.type = prepareSelectedZoneOnDemand
+        ? drs::engine::AuthoringPreviewCommandType::auditionSelectedZone
+        : drs::engine::AuthoringPreviewCommandType::noteOn;
     command.source = drs::engine::AuthoringPreviewAuditionSource::authoringKeyboard;
     command.midiNote = midiNoteNumber;
     command.velocity = velocity;
     submitAuthoringPreviewCommand(command);
+}
+
+bool Processor::requestAuthoringSourceValidation()
+{
+    const auto& project = authoringSession.getProject();
+    if (project.sampleSources.empty())
+        return false;
+
+    drs::app::ProjectSourceValidationRequest request;
+    request.sampleSources = project.sampleSources;
+    request.projectId = project.projectId;
+    request.baseRevision = authoringSession.getDocumentState().revision;
+    request.contentRootPath = project.contentRootPath;
+    return projectSourceValidationService.submit(std::move(request)).accepted;
+}
+
+bool Processor::cancelAuthoringSourceValidation()
+{
+    return projectSourceValidationService.cancel();
 }
 
 void Processor::requestAuthoringPreview(drs::engine::AuthoringPreviewScope scope)
@@ -909,11 +1114,32 @@ bool Processor::submitAuthoringPreviewCommand(
 
     if (dispatch.preparationRequested)
     {
+        authoringPreviewPreparationAuthorized = true;
         authoringPreviewRequestedScope = dispatch.requestedScope;
         authoringPreviewDirectAuditionRequested = true;
         pendingAuthoringPreviewZoneId = command.selectedZoneId;
         pendingAuthoringPreviewGroupId = command.selectedGroupId;
         serviceMessageThreadWork();
+        if (command.emitNote)
+        {
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(1000);
+            while (std::chrono::steady_clock::now() < deadline)
+            {
+                const auto previewContext = authoringPreviewPlaybackContext.getSnapshot();
+                const auto previewController = authoringPreviewController.getSnapshot();
+                if (previewContext.hasPendingActivation
+                    || previewContext.hasActiveActivation
+                    || previewController.hasFailedRequest
+                    || previewController.preparationState
+                        == drs::engine::AuthoringPreviewPreparationState::failed)
+                {
+                    break;
+                }
+
+                if (!serviceMessageThreadWork())
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+        }
     }
 
     if (!dispatch.hasEvent)
@@ -968,6 +1194,8 @@ bool Processor::submitPerformancePublishCommand(
 
 drs::app::AuthoringWaveformPreview Processor::getAuthoringWaveformPreview()
 {
+    consumeAuthoringWaveformPreviewSnapshot();
+
     const auto selectedZone = authoringSession.getSelectedZone();
     if (!selectedZone.has_value())
         return { false, "No zone selected" };
@@ -976,32 +1204,122 @@ drs::app::AuthoringWaveformPreview Processor::getAuthoringWaveformPreview()
     if (!projectSampleSource.has_value())
         return { false, "Selected zone sample source is missing from the project." };
 
-    if (const auto iterator = authoringWaveformPreviewCache.find(projectSampleSource->id);
-        iterator != authoringWaveformPreviewCache.end())
+    const auto currentStampIterator = authoringWaveformPreviewCurrentStampBySourceId.find(projectSampleSource->id);
+    if (currentStampIterator != authoringWaveformPreviewCurrentStampBySourceId.end())
     {
-        auto preview = iterator->second;
-        preview.loopEnabled = selectedZone->loopEnabled;
-        preview.loopStartFrame = selectedZone->loopStartFrame;
-        preview.loopEndFrame = selectedZone->loopEndFrame;
-        return preview;
+        if (const auto* cacheEntry = findAuthoringWaveformPreviewCacheEntryForStamp(currentStampIterator->second);
+            cacheEntry != nullptr)
+        {
+            auto preview = cacheEntry->preview;
+            preview.state = "Ready";
+            preview.loopEnabled = selectedZone->loopEnabled;
+            preview.loopStartFrame = selectedZone->loopStartFrame;
+            preview.loopEndFrame = selectedZone->loopEndFrame;
+            return preview;
+        }
     }
 
-    // Sprint 3 boundary note: waveform preview is a shell-only helper seam.
-    // It may decode for authoring UI today, but it must not become the Preview/Publish playback-preparation path.
-    const auto importResult = drs::engine::importSampleFile(projectSampleSource->path);
-    if (!importResult.imported)
+    if (!authoringWaveformPreviewLoadAuthorized)
     {
         drs::app::AuthoringWaveformPreview preview;
-        preview.state = importResult.state.empty() ? "Waveform preview unavailable" : importResult.state;
+        preview.state = "Preview loads on demand";
         return preview;
     }
 
-    auto preview = buildAuthoringWaveformPreview(importResult.sample,
-                                                 selectedZone->loopEnabled,
-                                                 selectedZone->loopStartFrame,
-                                                 selectedZone->loopEndFrame);
-    authoringWaveformPreviewCache.emplace(projectSampleSource->id, preview);
+    auto preview = drs::app::AuthoringWaveformPreview {};
+    if (const auto snapshot = waveformPreviewService.getSnapshot();
+        snapshot != nullptr
+            && snapshot->identity.sampleSourceId == projectSampleSource->id
+            && currentStampIterator != authoringWaveformPreviewCurrentStampBySourceId.end()
+            && snapshot->identity.requestStamp == currentStampIterator->second)
+    {
+        preview.state = !snapshot->status.empty()
+            ? snapshot->status
+            : mapWaveformPreviewServiceState(snapshot->stage);
+
+        if (snapshot->result != nullptr)
+        {
+            preview.sourcePath = snapshot->result->metadata.sourcePath;
+            preview.formatName = snapshot->result->metadata.formatName;
+            preview.durationSeconds = snapshot->result->metadata.durationSeconds;
+            preview.sampleRate = snapshot->result->metadata.sampleRate;
+            preview.frameCount = snapshot->result->metadata.frameCount;
+            preview.channelCount = snapshot->result->metadata.channelCount;
+        }
+
+        if (isWaveformPreviewServiceActiveStage(snapshot->stage))
+            preview.state = "Loading";
+        else if (snapshot->stage == drs::app::WaveformPreviewServiceStage::canceled)
+            preview.state = "Canceled";
+        else if (snapshot->stage == drs::app::WaveformPreviewServiceStage::failed)
+            preview.state = "Unavailable";
+    }
+    else
+    {
+        preview.state = "Loading";
+    }
+
+    if (const auto* staleCacheEntry = findLatestAuthoringWaveformPreviewCacheEntryForSource(projectSampleSource->id);
+        staleCacheEntry != nullptr)
+    {
+        preview = staleCacheEntry->preview;
+        preview.state = "Stale";
+    }
+
+    preview.loopEnabled = selectedZone->loopEnabled;
+    preview.loopStartFrame = selectedZone->loopStartFrame;
+    preview.loopEndFrame = selectedZone->loopEndFrame;
     return preview;
+}
+
+void Processor::authorizeAuthoringWaveformPreviewLoad()
+{
+    authoringWaveformPreviewLoadAuthorized = true;
+    consumeAuthoringWaveformPreviewSnapshot();
+
+    const auto selectedZone = authoringSession.getSelectedZone();
+    if (!selectedZone.has_value())
+        return;
+
+    const auto projectSampleSource = findProjectSampleSource(authoringSession.getProject(), selectedZone->sampleSourceId);
+    if (!projectSampleSource.has_value())
+        return;
+
+    std::uint64_t sourceFileSizeBytes = 0;
+    std::int64_t sourceModificationTicks = 0;
+    describeAuthoringWaveformPreviewSource(*projectSampleSource,
+                                           sourceFileSizeBytes,
+                                           sourceModificationTicks);
+    const auto requestStamp = buildAuthoringWaveformPreviewRequestStamp(*projectSampleSource,
+                                                                        sourceFileSizeBytes,
+                                                                        sourceModificationTicks);
+    authoringWaveformPreviewCurrentStampBySourceId[projectSampleSource->id] = requestStamp;
+
+    if (findAuthoringWaveformPreviewCacheEntryForStamp(requestStamp) != nullptr)
+        return;
+
+    if (const auto snapshot = waveformPreviewService.getSnapshot();
+        snapshot != nullptr
+            && snapshot->identity.sampleSourceId == projectSampleSource->id
+            && snapshot->identity.requestStamp == requestStamp
+            && isWaveformPreviewServiceActiveStage(snapshot->stage))
+    {
+        return;
+    }
+
+    drs::app::WaveformPreviewRequest request;
+    request.projectId = authoringSession.getProject().projectId;
+    request.baseRevision = authoringSession.getDocumentState().revision;
+    request.contentRootPath = authoringSession.getProject().contentRootPath;
+    request.sampleSourceId = projectSampleSource->id;
+    request.sourcePath = projectSampleSource->path;
+    request.sourceFileSizeBytes = sourceFileSizeBytes;
+    request.sourceModificationTicks = sourceModificationTicks;
+    request.displayPointCount = authoringWaveformPreviewPointCount;
+    request.chunkFrameCount = authoringWaveformPreviewChunkFrameCount;
+    request.channelReduction = authoringWaveformPreviewChannelReduction;
+    request.requestStamp = requestStamp;
+    waveformPreviewService.submit(std::move(request));
 }
 
 drs::app::AuthoringPreviewStatusSnapshot Processor::getAuthoringPreviewStatusSnapshot() const
@@ -1188,7 +1506,26 @@ void Processor::publishAuthoringPreviewStatus()
 
 drs::app::AuthoringImportResponsivenessSnapshot Processor::getAuthoringImportResponsivenessSnapshot() const
 {
+    const auto serviceSnapshot = wavImportService.getSnapshot();
+    if (serviceSnapshot != nullptr
+        && isRelevantWavImportSnapshot(*serviceSnapshot, authoringSession.getProject()))
+    {
+        return buildImportResponsivenessSnapshotFromWavImport(*serviceSnapshot);
+    }
+
     return authoringImportResponsivenessSnapshot;
+}
+
+drs::app::AuthoringSourceValidationSnapshot Processor::getAuthoringSourceValidationSnapshot() const
+{
+    const auto serviceSnapshot = projectSourceValidationService.getSnapshot();
+    if (serviceSnapshot != nullptr
+        && isRelevantProjectSourceValidationSnapshot(*serviceSnapshot, authoringSession.getProject()))
+    {
+        return buildAuthoringSourceValidationSnapshot(*serviceSnapshot);
+    }
+
+    return authoringSourceValidationSnapshot;
 }
 
 std::optional<drs::engine::HostProjectBinding> Processor::buildValidatedAuthoringProjectBinding(
@@ -1269,12 +1606,15 @@ bool Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
         return false;
 
     authoringSession.replaceProject(std::move(project));
+    projectSourceValidationService.cancel("Authoring project replaced");
     authoringProjectBinding = replacementBinding.value_or(drs::engine::HostProjectBinding {});
     performancePlaybackContext.cancelPendingActivation();
     pendingPerformanceActivation.reset();
     engineFacade.closeDraftPlaybackProject(true);
     engineFacade.reopenDraftPlaybackProject(authoringSession.getDocumentState().revision, true);
-    authoringWaveformPreviewCache.clear();
+    clearAuthoringWaveformPreviewCache();
+    resetAuthoringPreviewPreparationAuthorization();
+    resetAuthoringWaveformPreviewAuthorization();
     if (replacingDifferentProject)
     {
         authoringPreviewController.reset();
@@ -1287,6 +1627,7 @@ bool Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
     pendingAuthoringPreviewGroupId.clear();
     observedDraftPlaybackProjectRevision = authoringSession.getDocumentState().revision;
     initializeAuthoringImportMetrics();
+    initializeAuthoringSourceValidationSnapshot();
     serviceMessageThreadWork();
     updateRealtimeSafetyState();
     refreshSerializedHostStatePublication(true);
@@ -1305,6 +1646,11 @@ bool Processor::applyAuthoringProjectMigration(drs::engine::RuntimeProjectModel 
     if (!migration.applied)
         return false;
 
+    projectSourceValidationService.cancel("Authoring project migrated");
+    clearAuthoringWaveformPreviewCache();
+    resetAuthoringPreviewPreparationAuthorization();
+    resetAuthoringWaveformPreviewAuthorization();
+    initializeAuthoringSourceValidationSnapshot();
     serviceMessageThreadWork();
     refreshSerializedHostStatePublication(true);
     return true;
@@ -1312,13 +1658,16 @@ bool Processor::applyAuthoringProjectMigration(drs::engine::RuntimeProjectModel 
 
 void Processor::closeAuthoringProject(drs::engine::RuntimeProjectModel unloadedProject)
 {
+    projectSourceValidationService.cancel("Authoring project closed");
     engineFacade.cancelPreviewPreparation("Authoring project closed");
     performancePlaybackContext.cancelPendingActivation();
     pendingPerformanceActivation.reset();
     engineFacade.closeDraftPlaybackProject();
     authoringSession.replaceProject(std::move(unloadedProject));
     clearAuthoringProjectFileBinding();
-    authoringWaveformPreviewCache.clear();
+    clearAuthoringWaveformPreviewCache();
+    resetAuthoringPreviewPreparationAuthorization();
+    resetAuthoringWaveformPreviewAuthorization();
     authoringPreviewController.reset();
     authoringPreviewCommandAdapter.clearOwnership();
     authoringPreviewCloseRequested.store(true, std::memory_order_release);
@@ -1328,6 +1677,7 @@ void Processor::closeAuthoringProject(drs::engine::RuntimeProjectModel unloadedP
     pendingAuthoringPreviewGroupId.clear();
     observedDraftPlaybackProjectRevision = authoringSession.getDocumentState().revision;
     initializeAuthoringImportMetrics();
+    initializeAuthoringSourceValidationSnapshot();
     updateRealtimeSafetyState();
     publishAuthoringPreviewStatus();
     refreshSerializedHostStatePublication(true);
@@ -1598,8 +1948,11 @@ bool Processor::applyValidatedProjectRestore(
         {
             authoringPreviewPlaybackContext.publishDspControlByIdentity(slotId, parameterId, value);
         });
+    projectSourceValidationService.cancel("Authoring project restored");
     authoringProjectBinding = std::move(restoredBinding);
-    authoringWaveformPreviewCache.clear();
+    clearAuthoringWaveformPreviewCache();
+    resetAuthoringPreviewPreparationAuthorization();
+    resetAuthoringWaveformPreviewAuthorization();
     authoringPreviewController.reset();
     authoringPreviewCommandAdapter.clearOwnership();
     authoringPreviewCloseRequested.store(true, std::memory_order_release);
@@ -1609,6 +1962,7 @@ bool Processor::applyValidatedProjectRestore(
     pendingAuthoringPreviewGroupId.clear();
     observedDraftPlaybackProjectRevision = checkpoint.revision;
     initializeAuthoringImportMetrics();
+    initializeAuthoringSourceValidationSnapshot();
 
     const auto presetRestore = engineFacade.restorePresetStateJson(
         drs::engine::serializeRuntimePresetState(hostState.presetState));
@@ -1910,15 +2264,21 @@ bool Processor::serviceMessageThreadWork()
         invalidationCategory,
         authoredContentFingerprint,
         requestSelectedGroupId);
-    const auto requestResult = authoringPreviewController.request(
-        requestedScope,
-        authoringRevision,
-        requestSelectedZoneId,
-        requestReason,
-        invalidationCategory,
-        requestSignature,
-        serviceTimeMicros,
-        requestSelectedGroupId);
+    const auto allowPassivePreviewPreparation
+        = authoringPreviewDirectAuditionRequested || authoringPreviewPreparationAuthorized;
+    auto requestResult = drs::engine::AuthoringPreviewRequestResult {};
+    if (allowPassivePreviewPreparation)
+    {
+        requestResult = authoringPreviewController.request(
+            requestedScope,
+            authoringRevision,
+            requestSelectedZoneId,
+            requestReason,
+            invalidationCategory,
+            requestSignature,
+            serviceTimeMicros,
+            requestSelectedGroupId);
+    }
     authoringPreviewDirectAuditionRequested = false;
     pendingAuthoringPreviewZoneId.clear();
     pendingAuthoringPreviewGroupId.clear();
@@ -2159,81 +2519,165 @@ void Processor::syncParametersFromEngine()
     }
 }
 
-drs::app::AuthoringWaveformPreview Processor::buildAuthoringWaveformPreview(const drs::engine::ImportedSampleData& sample,
-                                                                            bool loopEnabled,
-                                                                            std::uint64_t loopStartFrame,
-                                                                            std::uint64_t loopEndFrame) const
+drs::app::AuthoringWaveformPreview Processor::buildAuthoringWaveformPreview(
+    const drs::engine::WaveformPeakBuildResult& waveform,
+    const bool loopEnabled,
+    const std::uint64_t loopStartFrame,
+    const std::uint64_t loopEndFrame) const
 {
     drs::app::AuthoringWaveformPreview preview;
     preview.available = true;
-    preview.state = "Waveform preview ready";
-    preview.sourcePath = sample.metadata.sourcePath;
-    preview.formatName = sample.metadata.formatName;
-    preview.durationSeconds = sample.metadata.durationSeconds;
-    preview.sampleRate = sample.metadata.sampleRate;
-    preview.frameCount = sample.metadata.frameCount;
-    preview.channelCount = sample.metadata.channelCount;
+    preview.state = "Ready";
+    preview.sourcePath = waveform.metadata.sourcePath;
+    preview.formatName = waveform.metadata.formatName;
+    preview.durationSeconds = waveform.metadata.durationSeconds;
+    preview.sampleRate = waveform.metadata.sampleRate;
+    preview.frameCount = waveform.metadata.frameCount;
+    preview.channelCount = waveform.metadata.channelCount;
     preview.loopEnabled = loopEnabled;
     preview.loopStartFrame = loopStartFrame;
     preview.loopEndFrame = loopEndFrame;
+    preview.points.reserve(waveform.points.size());
+    for (const auto& point : waveform.points)
+        preview.points.push_back({ point.minValue, point.maxValue });
+    return preview;
+}
 
-    const auto* previewChannel = selectWaveformPreviewChannel(sample);
-    if (previewChannel == nullptr)
-        return preview;
-
-    const auto& monoView = *previewChannel;
-    constexpr std::size_t pointCount = 192;
-    const auto bucketSize = std::max<std::size_t>(1, monoView.size() / pointCount);
-
-    preview.points.reserve(pointCount);
-    for (std::size_t index = 0; index < monoView.size(); index += bucketSize)
+void Processor::consumeAuthoringWaveformPreviewSnapshot()
+{
+    const auto snapshot = waveformPreviewService.getSnapshot();
+    if (snapshot == nullptr || snapshot->identity.generation == 0)
     {
-        const auto bucketEnd = std::min(monoView.size(), index + bucketSize);
-        auto minValue = monoView[index];
-        auto maxValue = monoView[index];
-
-        for (std::size_t sampleIndex = index + 1; sampleIndex < bucketEnd; ++sampleIndex)
-        {
-            minValue = std::min(minValue, monoView[sampleIndex]);
-            maxValue = std::max(maxValue, monoView[sampleIndex]);
-        }
-
-        preview.points.push_back({ minValue, maxValue });
+        return;
     }
 
-    return preview;
+    if (isWaveformPreviewServiceActiveStage(snapshot->stage)
+        || snapshot->stage == drs::app::WaveformPreviewServiceStage::idle
+        || snapshot->identity.generation == authoringWaveformPreviewConsumedGeneration)
+    {
+        return;
+    }
+
+    authoringWaveformPreviewConsumedGeneration = snapshot->identity.generation;
+    if (snapshot->stage != drs::app::WaveformPreviewServiceStage::completed || snapshot->result == nullptr)
+        return;
+
+    WaveformPreviewCacheEntry cacheEntry;
+    cacheEntry.sampleSourceId = snapshot->identity.sampleSourceId;
+    cacheEntry.sourcePath = snapshot->identity.sourcePath;
+    cacheEntry.sourceFileSizeBytes = snapshot->identity.sourceFileSizeBytes;
+    cacheEntry.sourceModificationTicks = snapshot->identity.sourceModificationTicks;
+    cacheEntry.fingerprintHex = snapshot->result->metadata.sourceChecksumHex;
+    cacheEntry.displayPointCount = snapshot->identity.displayPointCount;
+    cacheEntry.channelReduction = snapshot->identity.channelReduction;
+    cacheEntry.requestStamp = snapshot->identity.requestStamp;
+    cacheEntry.preview = buildAuthoringWaveformPreview(*snapshot->result, false, 0, 0);
+    authoringWaveformPreviewCache[cacheEntry.requestStamp] = cacheEntry;
+    authoringWaveformPreviewLatestStampBySourceId[cacheEntry.sampleSourceId] = cacheEntry.requestStamp;
+}
+
+bool Processor::describeAuthoringWaveformPreviewSource(
+    const drs::engine::RuntimeProjectSampleSource& sampleSource,
+    std::uint64_t& fileSizeBytes,
+    std::int64_t& modificationTicks) const
+{
+    fileSizeBytes = 0;
+    modificationTicks = 0;
+
+    const auto sourceFile = juce::File(juce::String::fromUTF8(sampleSource.path.c_str()));
+    if (!sourceFile.existsAsFile())
+        return false;
+
+    fileSizeBytes = static_cast<std::uint64_t>(std::max<juce::int64>(0, sourceFile.getSize()));
+    modificationTicks = sourceFile.getLastModificationTime().toMilliseconds();
+    return true;
+}
+
+std::string Processor::buildAuthoringWaveformPreviewRequestStamp(
+    const drs::engine::RuntimeProjectSampleSource& sampleSource,
+    const std::uint64_t fileSizeBytes,
+    const std::int64_t modificationTicks) const
+{
+    std::ostringstream stamp;
+    stamp << sampleSource.id
+          << "|" << sampleSource.path
+          << "|size=" << fileSizeBytes
+          << "|mtime=" << modificationTicks
+          << "|points=" << authoringWaveformPreviewPointCount
+          << "|policy=" << static_cast<int>(authoringWaveformPreviewChannelReduction);
+    return stamp.str();
+}
+
+const Processor::WaveformPreviewCacheEntry* Processor::findAuthoringWaveformPreviewCacheEntryForStamp(
+    const std::string& requestStamp) const
+{
+    const auto iterator = authoringWaveformPreviewCache.find(requestStamp);
+    return iterator == authoringWaveformPreviewCache.end() ? nullptr : &iterator->second;
+}
+
+const Processor::WaveformPreviewCacheEntry* Processor::findLatestAuthoringWaveformPreviewCacheEntryForSource(
+    const std::string& sampleSourceId) const
+{
+    const auto iterator = authoringWaveformPreviewLatestStampBySourceId.find(sampleSourceId);
+    if (iterator == authoringWaveformPreviewLatestStampBySourceId.end())
+        return nullptr;
+
+    return findAuthoringWaveformPreviewCacheEntryForStamp(iterator->second);
+}
+
+void Processor::clearAuthoringWaveformPreviewCache()
+{
+    waveformPreviewService.cancel("Waveform preview cleared");
+    if (const auto snapshot = waveformPreviewService.getSnapshot(); snapshot != nullptr)
+        authoringWaveformPreviewConsumedGeneration = snapshot->identity.generation;
+    authoringWaveformPreviewCache.clear();
+    authoringWaveformPreviewLatestStampBySourceId.clear();
+    authoringWaveformPreviewCurrentStampBySourceId.clear();
+}
+
+void Processor::resetAuthoringPreviewPreparationAuthorization() noexcept
+{
+    authoringPreviewPreparationAuthorized = false;
+}
+
+void Processor::resetAuthoringWaveformPreviewAuthorization() noexcept
+{
+    authoringWaveformPreviewLoadAuthorized = false;
 }
 
 void Processor::initializeAuthoringImportMetrics()
 {
     const auto& project = authoringSession.getProject();
-    std::vector<std::string> samplePaths;
-    samplePaths.reserve(project.sampleSources.size());
-
-    for (const auto& sampleSource : project.sampleSources)
-        samplePaths.push_back(sampleSource.path);
-
-    auto queue = drs::engine::createAuthoringImportQueue(samplePaths, project.contentRootPath);
-    while (true)
-    {
-        const auto processResult = drs::engine::processNextAuthoringImportQueueItem(queue);
-        if (!processResult.processed)
-            break;
-    }
-
     authoringImportResponsivenessSnapshot.available = true;
-    authoringImportResponsivenessSnapshot.state = queue.metrics.state;
-    authoringImportResponsivenessSnapshot.totalItemCount = queue.metrics.totalItemCount;
-    authoringImportResponsivenessSnapshot.pendingCount = queue.metrics.pendingCount;
-    authoringImportResponsivenessSnapshot.processedCount = queue.metrics.processedCount;
-    authoringImportResponsivenessSnapshot.warningItemCount = queue.metrics.warningItemCount;
-    authoringImportResponsivenessSnapshot.failedItemCount = queue.metrics.failedItemCount;
-    authoringImportResponsivenessSnapshot.canceledItemCount = queue.metrics.canceledItemCount;
-    authoringImportResponsivenessSnapshot.acceptedItemCount = queue.metrics.acceptedItemCount;
-    authoringImportResponsivenessSnapshot.lastProcessDurationMicros = queue.metrics.lastProcessDurationMicros;
-    authoringImportResponsivenessSnapshot.averageProcessDurationMicros = queue.metrics.averageProcessDurationMicros;
-    authoringImportResponsivenessSnapshot.maxProcessDurationMicros = queue.metrics.maxProcessDurationMicros;
-    authoringImportResponsivenessSnapshot.lastProcessedItemId = queue.metrics.lastProcessedItemId;
+    authoringImportResponsivenessSnapshot.state = project.sampleSources.empty() ? "idle" : "not-run";
+    authoringImportResponsivenessSnapshot.totalItemCount = project.sampleSources.size();
+    authoringImportResponsivenessSnapshot.pendingCount = 0;
+    authoringImportResponsivenessSnapshot.processedCount = 0;
+    authoringImportResponsivenessSnapshot.warningItemCount = 0;
+    authoringImportResponsivenessSnapshot.failedItemCount = 0;
+    authoringImportResponsivenessSnapshot.canceledItemCount = 0;
+    authoringImportResponsivenessSnapshot.acceptedItemCount = 0;
+    authoringImportResponsivenessSnapshot.lastProcessDurationMicros = 0;
+    authoringImportResponsivenessSnapshot.averageProcessDurationMicros = 0;
+    authoringImportResponsivenessSnapshot.maxProcessDurationMicros = 0;
+    authoringImportResponsivenessSnapshot.lastProcessedItemId.clear();
+}
+
+void Processor::initializeAuthoringSourceValidationSnapshot()
+{
+    const auto& project = authoringSession.getProject();
+    authoringSourceValidationSnapshot.available = true;
+    authoringSourceValidationSnapshot.state = project.sampleSources.empty() ? "idle" : "not-run";
+    authoringSourceValidationSnapshot.totalItemCount = project.sampleSources.size();
+    authoringSourceValidationSnapshot.processedCount = 0;
+    authoringSourceValidationSnapshot.warningItemCount = 0;
+    authoringSourceValidationSnapshot.failedItemCount = 0;
+    authoringSourceValidationSnapshot.canceledItemCount = 0;
+    authoringSourceValidationSnapshot.totalBytesProcessed = 0;
+    authoringSourceValidationSnapshot.totalBytesExpected = 0;
+    authoringSourceValidationSnapshot.totalDurationMicros = 0;
+    authoringSourceValidationSnapshot.currentSourceId.clear();
+    authoringSourceValidationSnapshot.currentSourcePath.clear();
 }
 
 bool Processor::stageAuthoringPreviewActivation(const drs::engine::AuthoringPreviewRequest& request,

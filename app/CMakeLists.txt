@@ -10,6 +10,8 @@ set(DRS_APP_SHARED_SOURCES
     src/shared/PerformanceBankImport.h
     src/shared/PerformancePanel.cpp
     src/shared/PerformancePanel.h
+    src/shared/ProjectSourceValidationService.cpp
+    src/shared/ProjectSourceValidationService.h
     src/shared/ProjectStorage.cpp
     src/shared/ProjectStorage.h
     src/shared/SfzImportReportModel.h
@@ -19,6 +21,12 @@ set(DRS_APP_SHARED_SOURCES
     src/shared/SfzImportWorkflow.h
     src/shared/StatusPanel.cpp
     src/shared/StatusPanel.h
+    src/shared/WaveformPreviewService.cpp
+    src/shared/WaveformPreviewService.h
+    src/shared/WavImportService.cpp
+    src/shared/WavImportService.h
+    src/shared/WavImportWorkflow.cpp
+    src/shared/WavImportWorkflow.h
     src/shared/authoring/AuthoringViewModels.h
     src/shared/authoring/AuthoringWorkspaceLayout.h
     src/shared/authoring/CompactInspectorPrimitives.cpp
@@ -62,6 +70,7 @@ target_include_directories(drs_app_shared
 target_link_libraries(drs_app_shared
     PUBLIC
         drs_engine_adapter
+        drs_sample_import
         juce::juce_audio_utils
         juce::juce_gui_extra
 )

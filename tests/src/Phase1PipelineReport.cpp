@@ -169,11 +169,11 @@ drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path& output
     const auto sinePath = (contentRoot / "Samples" / "DRS_Sine_A3.wav").lexically_normal();
     const auto trianglePath = (contentRoot / "Samples" / "DRS_TriangleLead_A4.wav").lexically_normal();
 
-    const auto sineImport = drs::engine::importSampleFile(sinePath.generic_string());
-    require(sineImport.imported, "Reference sine sample must import before the pipeline report runs.");
+    const auto sineImport = drs::engine::inspectSampleFile(sinePath.generic_string());
+    require(sineImport.accepted, "Reference sine sample must inspect before the pipeline report runs.");
 
-    const auto triangleImport = drs::engine::importSampleFile(trianglePath.generic_string());
-    require(triangleImport.imported, "Reference triangle sample must import before the pipeline report runs.");
+    const auto triangleImport = drs::engine::inspectSampleFile(trianglePath.generic_string());
+    require(triangleImport.accepted, "Reference triangle sample must inspect before the pipeline report runs.");
 
     drs::engine::RuntimeCompilePlan plan;
     plan.outputProjectPath = projectPath.generic_string();
@@ -200,14 +200,14 @@ drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path& output
     sineSource.id = "sine-a3";
     sineSource.sourcePath = sinePath.generic_string();
     sineSource.role = "core-sustain";
-    sineSource.metadata = sineImport.sample.metadata;
+    sineSource.metadata = sineImport.metadata;
     plan.sampleSources.push_back(std::move(sineSource));
 
     drs::engine::RuntimeCompileSourceDefinition triangleSource;
     triangleSource.id = "triangle-a4";
     triangleSource.sourcePath = trianglePath.generic_string();
     triangleSource.role = "core-lead";
-    triangleSource.metadata = triangleImport.sample.metadata;
+    triangleSource.metadata = triangleImport.metadata;
     plan.sampleSources.push_back(std::move(triangleSource));
 
     drs::engine::RuntimeMacroDefinition tone;
@@ -305,23 +305,23 @@ drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path& output
     return plan;
 }
 
-ordered_json buildImportEntry(const drs::engine::SampleImportResult& result)
+ordered_json buildImportEntry(const drs::engine::SampleInspectionResult& result)
 {
     ordered_json entry;
     entry["sourcePath"] = result.sourcePath;
-    entry["imported"] = result.imported;
+    entry["imported"] = result.accepted;
     entry["state"] = result.state;
     entry["warningCount"] = result.warnings.size();
     entry["issueCount"] = result.issues.size();
     entry["warnings"] = result.warnings;
     entry["issues"] = result.issues;
 
-    if (result.imported)
+    if (result.accepted)
     {
-        entry["formatName"] = result.sample.metadata.formatName;
-        entry["sampleRate"] = result.sample.metadata.sampleRate;
-        entry["frameCount"] = result.sample.metadata.frameCount;
-        entry["channelCount"] = result.sample.metadata.channelCount;
+        entry["formatName"] = result.metadata.formatName;
+        entry["sampleRate"] = result.metadata.sampleRate;
+        entry["frameCount"] = result.metadata.frameCount;
+        entry["channelCount"] = result.metadata.channelCount;
     }
 
     return entry;
@@ -935,9 +935,9 @@ int main(int argc, char* argv[])
         bool importerPassed = true;
         for (const auto& source : referencePlan.sampleSources)
         {
-            const auto importResult = drs::engine::importSampleFile(source.sourcePath);
+            const auto importResult = drs::engine::inspectSampleFile(source.sourcePath);
             importerSection["samples"].push_back(buildImportEntry(importResult));
-            importerPassed = importerPassed && importResult.imported && importResult.issues.empty();
+            importerPassed = importerPassed && importResult.accepted && importResult.issues.empty();
         }
         importerSection["passed"] = importerPassed;
         report["importer"] = std::move(importerSection);

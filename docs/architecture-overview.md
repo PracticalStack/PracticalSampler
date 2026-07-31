@@ -9,6 +9,7 @@ This note captures the intended Phase 0 boundary lines for Decent Rhapsody Studi
 Product-owned JUCE shell code lives here.
 
 - `drs_app_shared` owns the reusable status-panel UI that can surface runtime information in both standalone and plugin shells.
+- `drs_app_shared` also owns shared authoring services for WAV import, project-source validation, and waveform-preview generation, so plugin and standalone shells stay thin clients over one asynchronous workflow.
 - `drs_standalone_shell` owns the standalone-facing root component and window content.
 - `drs_plugin_shell` owns the minimal plugin processor and editor shell.
 
@@ -105,3 +106,12 @@ The sequenced diagnostic frame identifies each context and includes renderer tim
 peak active/releasing voices, steals, core/event-block drops, producer note-queue drops, activation
 identity, payload bytes, and retirement state. UI readers consume immutable snapshots and never
 inspect mutable renderer state.
+
+## WAV import and startup boundary
+
+WAV import now follows the same ownership pattern as the other product services:
+
+- shell chooser callbacks submit immutable requests and return without copy, fingerprint, reader-open, or decode work;
+- `WavImportService` owns staging, fingerprinting, inspection, cancellation, and terminal snapshot publication on a joined worker thread;
+- `WavImportWorkflow` is completion-driven only and prepares apply/finalize/rollback commits from immutable terminal payloads instead of draining a synchronous authoring queue; and
+- startup, project replace, close, migration, restore, and waveform selection all expose honest `idle` or `not-run` diagnostics until explicit import or preview work is requested.

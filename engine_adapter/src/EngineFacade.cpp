@@ -537,8 +537,6 @@ EngineFacade::EngineFacade()
     : referenceManifest(loadPhase1ReferenceInstrumentManifest()),
       preparedPlaybackService("phase1-prepared-playback-v2", 2, true)
 {
-    authoringProject = loadPhase2ReferenceProjectManifest();
-
     if (referenceManifest.loaded)
     {
         currentSessionState = buildDefaultRuntimeSessionState(referenceManifest);
@@ -2194,7 +2192,7 @@ EnginePresetStateRestoreResult EngineFacade::restorePresetStateJson(const std::s
     currentSessionState.transientMetrics.lastFailure.clear();
     referenceInstrumentActive = true;
     previewPlaybackSnapshot = {};
-    initializeDraftPlaybackContract(true);
+    initializeDraftPlaybackContract(false, false);
     previewPlaybackSnapshot.articulationId = currentSessionState.selectedArticulationId;
     refreshDiagnosticsSnapshot();
     markStateChanged();
@@ -2301,7 +2299,8 @@ void EngineFacade::syncPreviewSnapshotFromDraftPlayback()
         previewPlaybackSnapshot.errorMessage = summarizeSnapshotFindings(draftStatus.preview.findings);
 }
 
-void EngineFacade::initializeDraftPlaybackContract(bool activatePerformanceRevision)
+void EngineFacade::initializeDraftPlaybackContract(bool activatePerformanceRevision,
+                                                   bool bootstrapPreparedPlayback)
 {
     clearPendingPreparedCompletions();
     if (activatePerformanceRevision)
@@ -2321,54 +2320,24 @@ void EngineFacade::initializeDraftPlaybackContract(bool activatePerformanceRevis
 
     if (authoringProject.loaded)
     {
-        if (const auto previewRequest = draftPlaybackContract.requestPreviewBuild(); previewRequest.accepted)
+        if (bootstrapPreparedPlayback)
         {
-            const auto previewBuild = buildCurrentPlaybackSnapshot(false);
-            if (!previewBuild.built || !previewBuild.activationEligible)
+            if (const auto previewRequest = draftPlaybackContract.requestPreviewBuild(); previewRequest.accepted)
             {
-                const auto preparedPreview = buildRejectedPreparedPlayback(previewBuild);
-                draftPlaybackContract.completePreviewBuild(previewRequest.requestId, previewBuild, preparedPreview);
-            }
-            else if (!enqueuePreparedPlaybackBuild(previewRequest.requestId,
-                                                   previewBuild,
-                                                   PreparedPlaybackWorkLane::preview))
-            {
-                PreparedPlaybackBuildResult queueRejected;
-                queueRejected.snapshotBuildId = previewBuild.buildId;
-                queueRejected.requestedDraftRevision = previewBuild.requestedDraftRevision;
-                queueRejected.activationRequested = previewBuild.activationRequested;
-                queueRejected.lifecycleState = PlaybackSnapshotLifecycleState::failed;
-                queueRejected.state = "Prepared playback queue is full";
-                queueRejected.metrics.failureCount = 1;
-                queueRejected.findings.push_back({
-                    PlaybackSnapshotFindingSeverity::error,
-                    "prepared-queue-full",
-                    "preparedWorker",
-                    "Prepared playback queue is full."
-                });
-                draftPlaybackContract.completePreviewBuild(previewRequest.requestId, previewBuild, queueRejected);
-            }
-        }
-
-        if (activatePerformanceRevision)
-        {
-            if (const auto publishRequest = draftPlaybackContract.requestPerformanceBuild(); publishRequest.accepted)
-            {
-                const auto publishBuild = buildCurrentPlaybackSnapshot(true);
-                if (!publishBuild.built || !publishBuild.activationEligible)
+                const auto previewBuild = buildCurrentPlaybackSnapshot(false);
+                if (!previewBuild.built || !previewBuild.activationEligible)
                 {
-                    const auto preparedPublish = buildRejectedPreparedPlayback(publishBuild);
-                    draftPlaybackContract.completePerformanceBuild(publishRequest.requestId, publishBuild, preparedPublish);
+                    const auto preparedPreview = buildRejectedPreparedPlayback(previewBuild);
+                    draftPlaybackContract.completePreviewBuild(previewRequest.requestId, previewBuild, preparedPreview);
                 }
-                else if (!enqueuePreparedPlaybackBuild(publishRequest.requestId,
-                                                       publishBuild,
-                                                       PreparedPlaybackWorkLane::performance,
-                                                       true))
+                else if (!enqueuePreparedPlaybackBuild(previewRequest.requestId,
+                                                       previewBuild,
+                                                       PreparedPlaybackWorkLane::preview))
                 {
                     PreparedPlaybackBuildResult queueRejected;
-                    queueRejected.snapshotBuildId = publishBuild.buildId;
-                    queueRejected.requestedDraftRevision = publishBuild.requestedDraftRevision;
-                    queueRejected.activationRequested = publishBuild.activationRequested;
+                    queueRejected.snapshotBuildId = previewBuild.buildId;
+                    queueRejected.requestedDraftRevision = previewBuild.requestedDraftRevision;
+                    queueRejected.activationRequested = previewBuild.activationRequested;
                     queueRejected.lifecycleState = PlaybackSnapshotLifecycleState::failed;
                     queueRejected.state = "Prepared playback queue is full";
                     queueRejected.metrics.failureCount = 1;
@@ -2378,12 +2347,52 @@ void EngineFacade::initializeDraftPlaybackContract(bool activatePerformanceRevis
                         "preparedWorker",
                         "Prepared playback queue is full."
                     });
-                    draftPlaybackContract.completePerformanceBuild(publishRequest.requestId, publishBuild, queueRejected);
+                    draftPlaybackContract.completePreviewBuild(previewRequest.requestId,
+                                                              previewBuild,
+                                                              queueRejected);
                 }
             }
-        }
 
-        waitForPreparedPlaybackIdle(std::chrono::milliseconds(1000));
+            if (activatePerformanceRevision)
+            {
+                if (const auto publishRequest = draftPlaybackContract.requestPerformanceBuild();
+                    publishRequest.accepted)
+                {
+                    const auto publishBuild = buildCurrentPlaybackSnapshot(true);
+                    if (!publishBuild.built || !publishBuild.activationEligible)
+                    {
+                        const auto preparedPublish = buildRejectedPreparedPlayback(publishBuild);
+                        draftPlaybackContract.completePerformanceBuild(publishRequest.requestId,
+                                                                      publishBuild,
+                                                                      preparedPublish);
+                    }
+                    else if (!enqueuePreparedPlaybackBuild(publishRequest.requestId,
+                                                           publishBuild,
+                                                           PreparedPlaybackWorkLane::performance,
+                                                           true))
+                    {
+                        PreparedPlaybackBuildResult queueRejected;
+                        queueRejected.snapshotBuildId = publishBuild.buildId;
+                        queueRejected.requestedDraftRevision = publishBuild.requestedDraftRevision;
+                        queueRejected.activationRequested = publishBuild.activationRequested;
+                        queueRejected.lifecycleState = PlaybackSnapshotLifecycleState::failed;
+                        queueRejected.state = "Prepared playback queue is full";
+                        queueRejected.metrics.failureCount = 1;
+                        queueRejected.findings.push_back({
+                            PlaybackSnapshotFindingSeverity::error,
+                            "prepared-queue-full",
+                            "preparedWorker",
+                            "Prepared playback queue is full."
+                        });
+                        draftPlaybackContract.completePerformanceBuild(publishRequest.requestId,
+                                                                      publishBuild,
+                                                                      queueRejected);
+                    }
+                }
+            }
+
+            waitForPreparedPlaybackIdle(std::chrono::milliseconds(1000));
+        }
     }
     else
     {

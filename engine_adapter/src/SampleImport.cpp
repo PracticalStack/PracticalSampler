@@ -8,8 +8,10 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <istream>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <sstream>
@@ -21,12 +23,85 @@ namespace
 {
 namespace fs = std::filesystem;
 
+thread_local const SampleImportHooks* activeSampleImportHooks = nullptr;
+
+struct SampleImportIoCounterState
+{
+    std::mutex mutex;
+    SampleImportIoCounters counters;
+};
+
+SampleImportIoCounterState& getSampleImportIoCounterState()
+{
+    static SampleImportIoCounterState state;
+    return state;
+}
+
+void incrementFingerprintOpenCount()
+{
+    auto& state = getSampleImportIoCounterState();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    ++state.counters.fingerprintOpenCount;
+}
+
+void incrementReaderOpenCount()
+{
+    auto& state = getSampleImportIoCounterState();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    ++state.counters.readerOpenCount;
+}
+
+void incrementBytesReadCount(const std::uint64_t byteCount)
+{
+    auto& state = getSampleImportIoCounterState();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    state.counters.bytesReadCount += byteCount;
+}
+
+void incrementFullFrameReadCount()
+{
+    auto& state = getSampleImportIoCounterState();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    ++state.counters.fullFrameReadCount;
+}
+
+void incrementCopyCount()
+{
+    auto& state = getSampleImportIoCounterState();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    ++state.counters.copyCount;
+}
+
+void incrementPeakChunkReadCount()
+{
+    auto& state = getSampleImportIoCounterState();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    ++state.counters.peakChunkReadCount;
+}
+
+const SampleImportHooks& currentSampleImportHooks();
+
 void addIssue(SampleImportResult& result, const std::string& issue)
 {
     result.issues.push_back(issue);
 }
 
+void addIssue(SampleInspectionResult& result, const std::string& issue)
+{
+    result.issues.push_back(issue);
+}
+
+void addIssue(WaveformPeakBuildResult& result, const std::string& issue)
+{
+    result.issues.push_back(issue);
+}
+
 void addWarning(SampleImportResult& result, const std::string& warning)
+{
+    result.warnings.push_back(warning);
+}
+
+void addWarning(SampleInspectionResult& result, const std::string& warning)
 {
     result.warnings.push_back(warning);
 }
@@ -64,30 +139,59 @@ std::string toDisplayPath(const fs::path& path)
     return path.lexically_normal().generic_string();
 }
 
-std::string computeFnv1aChecksumHex(const fs::path& path)
+struct FingerprintComputationResult
+{
+    std::string fingerprintHex;
+    std::uint64_t bytesProcessed = 0;
+    bool canceled = false;
+};
+
+FingerprintComputationResult computeFnv1aChecksumHex(const fs::path& path,
+                                                     const SampleFingerprintOptions& options = {})
 {
     constexpr std::uint64_t offsetBasis = 14695981039346656037ull;
     constexpr std::uint64_t prime = 1099511628211ull;
 
-    std::ifstream input(path, std::ios::binary);
-    if (!input.good())
+    auto input = currentSampleImportHooks().openFingerprintStream(path.generic_string());
+    if (input == nullptr || !input->good())
         return {};
 
-    std::uint64_t hash = offsetBasis;
-    char buffer[4096];
+    incrementFingerprintOpenCount();
 
-    while (input.read(buffer, sizeof(buffer)) || input.gcount() > 0)
+    std::uint64_t hash = offsetBasis;
+    const auto chunkSizeBytes = static_cast<std::size_t>(std::max<std::uint64_t>(1, options.chunkSizeBytes));
+    std::vector<char> buffer(chunkSizeBytes);
+    std::uint64_t bytesProcessed = 0;
+
+    while (true)
     {
-        for (std::streamsize index = 0; index < input.gcount(); ++index)
+        if (options.callbacks != nullptr && options.callbacks->isCancellationRequested())
+            return { {}, bytesProcessed, true };
+
+        input->read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+        if (!input->good() && input->gcount() == 0)
+            break;
+
+        const auto bytesRead = static_cast<std::uint64_t>(input->gcount());
+        if (bytesRead == 0)
+            break;
+
+        bytesProcessed += bytesRead;
+        incrementBytesReadCount(bytesRead);
+
+        for (std::streamsize index = 0; index < input->gcount(); ++index)
         {
-            hash ^= static_cast<unsigned char>(buffer[index]);
+            hash ^= static_cast<unsigned char>(buffer[static_cast<std::size_t>(index)]);
             hash *= prime;
         }
+
+        if (options.callbacks != nullptr)
+            options.callbacks->onProgress({ bytesProcessed, 0 });
     }
 
     std::ostringstream stream;
     stream << std::hex << std::setfill('0') << std::setw(16) << hash;
-    return stream.str();
+    return { stream.str(), bytesProcessed, false };
 }
 
 std::string computeFnv1a64Hex(const std::string& text)
@@ -118,6 +222,46 @@ juce::AudioFormatManager& getAudioFormatManager()
 
     juce::ignoreUnused(initialized);
     return manager;
+}
+
+class DefaultSampleImportHooks final : public SampleImportHooks
+{
+public:
+    bool fileExists(const std::string& samplePath) const override
+    {
+        return fs::exists(fs::path(samplePath));
+    }
+
+    bool copyFile(const std::string& sourcePath, const std::string& destinationPath) const override
+    {
+        std::error_code error;
+        const auto copied = fs::copy_file(fs::path(sourcePath),
+                                          fs::path(destinationPath),
+                                          fs::copy_options::none,
+                                          error);
+        return copied && !error;
+    }
+
+    std::unique_ptr<std::istream> openFingerprintStream(const std::string& samplePath) const override
+    {
+        auto input = std::make_unique<std::ifstream>(fs::path(samplePath), std::ios::binary);
+        if (!input->good())
+            return {};
+
+        return input;
+    }
+
+    std::unique_ptr<juce::AudioFormatReader> createAudioReader(const std::string& samplePath) const override
+    {
+        return std::unique_ptr<juce::AudioFormatReader>(
+            getAudioFormatManager().createReaderFor(juce::File(samplePath)));
+    }
+};
+
+const SampleImportHooks& currentSampleImportHooks()
+{
+    static DefaultSampleImportHooks defaultHooks;
+    return activeSampleImportHooks != nullptr ? *activeSampleImportHooks : defaultHooks;
 }
 
 bool tryReadIntMetadata(const juce::StringPairArray& metadataValues,
@@ -683,7 +827,7 @@ std::pair<int, int> velocityBucketRange(int velocity)
 
 AuthoringImportItemState resolvePostImportState(const AuthoringImportQueueItem& item)
 {
-    if (!item.importResult.imported)
+    if (!item.inspectionResult.inspected || !item.inspectionResult.accepted)
         return AuthoringImportItemState::failed;
 
     const auto hasWarnings = std::any_of(item.findings.begin(),
@@ -742,6 +886,94 @@ void refreshQueueMetrics(AuthoringImportQueue& queue)
     metrics.state = metrics.pendingCount == 0 ? "Authoring import queue drained" : "Authoring import queue active";
 }
 } // namespace
+
+bool WaveformPeakBuildCallbacks::isCancellationRequested() const
+{
+    return false;
+}
+
+void WaveformPeakBuildCallbacks::onProgress(const WaveformPeakBuildProgress&) const
+{
+}
+
+bool SampleFingerprintCallbacks::isCancellationRequested() const
+{
+    return false;
+}
+
+void SampleFingerprintCallbacks::onProgress(const SampleFingerprintProgress& progress) const
+{
+    juce::ignoreUnused(progress);
+}
+
+bool SampleImportHooks::fileExists(const std::string& samplePath) const
+{
+    return fs::exists(fs::path(samplePath));
+}
+
+bool SampleImportHooks::copyFile(const std::string& sourcePath, const std::string& destinationPath) const
+{
+    std::error_code error;
+    return fs::copy_file(fs::path(sourcePath),
+                         fs::path(destinationPath),
+                         fs::copy_options::none,
+                         error)
+        && !error;
+}
+
+std::unique_ptr<std::istream> SampleImportHooks::openFingerprintStream(const std::string& samplePath) const
+{
+    auto input = std::make_unique<std::ifstream>(fs::path(samplePath), std::ios::binary);
+    if (!input->good())
+        return {};
+
+    return input;
+}
+
+std::unique_ptr<juce::AudioFormatReader> SampleImportHooks::createAudioReader(const std::string& samplePath) const
+{
+    return std::unique_ptr<juce::AudioFormatReader>(
+        getAudioFormatManager().createReaderFor(juce::File(samplePath)));
+}
+
+ScopedSampleImportHooksOverride::ScopedSampleImportHooksOverride(const SampleImportHooks& hooks) noexcept
+    : previousHooks(activeSampleImportHooks)
+{
+    activeSampleImportHooks = &hooks;
+}
+
+ScopedSampleImportHooksOverride::~ScopedSampleImportHooksOverride()
+{
+    activeSampleImportHooks = previousHooks;
+}
+
+SampleImportIoCounters getSampleImportIoCounters()
+{
+    auto& state = getSampleImportIoCounterState();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    return state.counters;
+}
+
+void resetSampleImportIoCounters()
+{
+    auto& state = getSampleImportIoCounterState();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    state.counters = {};
+}
+
+bool copySampleFileForImport(const std::string& sourcePath, const std::string& destinationPath)
+{
+    incrementCopyCount();
+    return currentSampleImportHooks().copyFile(sourcePath, destinationPath);
+}
+
+void recordWaveformPeakChunkRead(std::uint64_t chunkFrameCount, std::uint32_t channelCount)
+{
+    if (chunkFrameCount == 0 || channelCount == 0)
+        return;
+
+    incrementPeakChunkReadCount();
+}
 
 SampleImportPolicyReport evaluatePhase1SamplePolicy(const ImportedSampleMetadata& metadata,
                                                     const std::string& contentRootPath)
@@ -816,14 +1048,62 @@ SampleImportPolicyReport evaluatePhase1SamplePolicy(const ImportedSampleMetadata
     return report;
 }
 
-SampleSourceFingerprintResult fingerprintSampleSourceFile(const std::string& samplePath)
+template <typename ResultType>
+bool populateImportedSampleMetadata(ResultType& result,
+                                    const fs::path& sampleFsPath,
+                                    juce::AudioFormatReader& reader,
+                                    const std::string& knownFingerprintHex,
+                                    ImportedSampleMetadata& metadata)
+{
+    if (reader.lengthInSamples < 0)
+    {
+        result.state = "Sample length invalid";
+        addIssue(result, "Decoded sample reported a negative frame length.");
+        return false;
+    }
+
+    if (reader.lengthInSamples > static_cast<juce::int64>(std::numeric_limits<int>::max()))
+    {
+        result.state = "Sample too large";
+        addIssue(result, "Decoded sample exceeds the current importer frame limit.");
+        return false;
+    }
+
+    if (reader.numChannels == 0)
+    {
+        result.state = "Sample channel count invalid";
+        addIssue(result, "Decoded sample reported zero channels.");
+        return false;
+    }
+
+    metadata.sourcePath = toDisplayPath(sampleFsPath);
+    metadata.formatName = reader.getFormatName().toStdString();
+    metadata.sourceChecksumHex = knownFingerprintHex.empty()
+        ? computeFnv1aChecksumHex(sampleFsPath).fingerprintHex
+        : knownFingerprintHex;
+    metadata.channelLayout = reader.getChannelLayout().getDescription().toStdString();
+    metadata.sampleRate = reader.sampleRate;
+    metadata.frameCount = static_cast<std::uint64_t>(reader.lengthInSamples);
+    metadata.channelCount = static_cast<std::uint32_t>(reader.numChannels);
+    metadata.bitsPerSample = reader.bitsPerSample;
+    metadata.usesFloatingPointData = reader.usesFloatingPointData;
+    metadata.durationSeconds = metadata.sampleRate > 0.0
+        ? static_cast<double>(metadata.frameCount) / metadata.sampleRate
+        : 0.0;
+
+    populateOptionalMetadata(reader, metadata);
+    return true;
+}
+
+SampleSourceFingerprintResult fingerprintSampleSourceFile(const std::string& samplePath,
+                                                          const SampleFingerprintOptions& options)
 {
     SampleSourceFingerprintResult result;
     result.sourcePath = samplePath;
     result.state = "Source fingerprint not attempted";
 
     const fs::path sampleFsPath(samplePath);
-    if (!fs::exists(sampleFsPath))
+    if (!currentSampleImportHooks().fileExists(samplePath))
     {
         result.state = "Sample missing";
         result.issues.push_back("Sample file was not found at " + samplePath + ".");
@@ -831,7 +1111,20 @@ SampleSourceFingerprintResult fingerprintSampleSourceFile(const std::string& sam
     }
 
     result.fileFound = true;
-    result.fingerprintHex = computeFnv1aChecksumHex(sampleFsPath);
+    const auto fingerprint = computeFnv1aChecksumHex(sampleFsPath, options);
+    if (fingerprint.canceled)
+    {
+        result.canceled = true;
+        result.state = "Source fingerprint canceled";
+        result.issues.push_back("Source fingerprint was canceled after reading "
+                                + std::to_string(fingerprint.bytesProcessed)
+                                + " bytes from "
+                                + toDisplayPath(sampleFsPath)
+                                + ".");
+        return result;
+    }
+
+    result.fingerprintHex = fingerprint.fingerprintHex;
     if (result.fingerprintHex.empty())
     {
         result.state = "Sample fingerprint failed";
@@ -845,15 +1138,15 @@ SampleSourceFingerprintResult fingerprintSampleSourceFile(const std::string& sam
     return result;
 }
 
-SampleImportResult importSampleFile(const std::string& samplePath,
-                                    const std::string& knownFingerprintHex)
+SampleInspectionResult inspectSampleFile(const std::string& samplePath,
+                                         const std::string& knownFingerprintHex)
 {
-    SampleImportResult result;
+    SampleInspectionResult result;
     result.sourcePath = samplePath;
-    result.state = "Sample import not attempted";
+    result.state = "Sample inspection not attempted";
 
     const fs::path sampleFsPath(samplePath);
-    if (!fs::exists(sampleFsPath))
+    if (!currentSampleImportHooks().fileExists(samplePath))
     {
         result.state = "Sample missing";
         addIssue(result, "Sample file was not found at " + samplePath + ".");
@@ -862,8 +1155,8 @@ SampleImportResult importSampleFile(const std::string& samplePath,
 
     result.fileFound = true;
 
-    auto reader = std::unique_ptr<juce::AudioFormatReader>(
-        getAudioFormatManager().createReaderFor(juce::File(sampleFsPath.generic_string())));
+    incrementReaderOpenCount();
+    auto reader = currentSampleImportHooks().createAudioReader(sampleFsPath.generic_string());
     if (reader == nullptr)
     {
         result.state = "Sample format unsupported";
@@ -871,44 +1164,69 @@ SampleImportResult importSampleFile(const std::string& samplePath,
         return result;
     }
 
-    if (reader->lengthInSamples < 0)
+    if (!populateImportedSampleMetadata(result,
+                                        sampleFsPath,
+                                        *reader,
+                                        knownFingerprintHex,
+                                        result.metadata))
     {
-        result.state = "Sample length invalid";
-        addIssue(result, "Decoded sample reported a negative frame length.");
         return result;
     }
 
-    if (reader->lengthInSamples > static_cast<juce::int64>(std::numeric_limits<int>::max()))
+    result.inspected = true;
+
+    const auto policyReport = evaluatePhase1SamplePolicy(result.metadata);
+    for (const auto& warning : policyReport.warnings)
+        addWarning(result, warning);
+
+    result.accepted = policyReport.accepted;
+    if (!policyReport.accepted)
     {
-        result.state = "Sample too large";
-        addIssue(result, "Decoded sample exceeds the current importer frame limit.");
+        result.state = policyReport.state;
+        for (const auto& error : policyReport.errors)
+            addIssue(result, error);
         return result;
     }
 
-    if (reader->numChannels == 0)
+    result.state = result.warnings.empty() ? "Sample inspected" : "Sample inspected with warnings";
+    return result;
+}
+
+SampleImportResult importSampleFile(const std::string& samplePath,
+                                    const std::string& knownFingerprintHex)
+{
+    SampleImportResult result;
+    result.sourcePath = samplePath;
+    result.state = "Sample import not attempted";
+
+    const fs::path sampleFsPath(samplePath);
+    if (!currentSampleImportHooks().fileExists(samplePath))
     {
-        result.state = "Sample channel count invalid";
-        addIssue(result, "Decoded sample reported zero channels.");
+        result.state = "Sample missing";
+        addIssue(result, "Sample file was not found at " + samplePath + ".");
+        return result;
+    }
+
+    result.fileFound = true;
+
+    incrementReaderOpenCount();
+    auto reader = currentSampleImportHooks().createAudioReader(sampleFsPath.generic_string());
+    if (reader == nullptr)
+    {
+        result.state = "Sample format unsupported";
+        addIssue(result, "Sample file could not be decoded as a supported audio format: " + toDisplayPath(sampleFsPath));
         return result;
     }
 
     auto& metadata = result.sample.metadata;
-    metadata.sourcePath = toDisplayPath(sampleFsPath);
-    metadata.formatName = reader->getFormatName().toStdString();
-    metadata.sourceChecksumHex = knownFingerprintHex.empty()
-        ? computeFnv1aChecksumHex(sampleFsPath)
-        : knownFingerprintHex;
-    metadata.channelLayout = reader->getChannelLayout().getDescription().toStdString();
-    metadata.sampleRate = reader->sampleRate;
-    metadata.frameCount = static_cast<std::uint64_t>(reader->lengthInSamples);
-    metadata.channelCount = static_cast<std::uint32_t>(reader->numChannels);
-    metadata.bitsPerSample = reader->bitsPerSample;
-    metadata.usesFloatingPointData = reader->usesFloatingPointData;
-    metadata.durationSeconds = metadata.sampleRate > 0.0
-        ? static_cast<double>(metadata.frameCount) / metadata.sampleRate
-        : 0.0;
-
-    populateOptionalMetadata(*reader, metadata);
+    if (!populateImportedSampleMetadata(result,
+                                        sampleFsPath,
+                                        *reader,
+                                        knownFingerprintHex,
+                                        metadata))
+    {
+        return result;
+    }
 
     juce::AudioBuffer<float> buffer(static_cast<int>(reader->numChannels),
                                     static_cast<int>(reader->lengthInSamples));
@@ -925,6 +1243,8 @@ SampleImportResult importSampleFile(const std::string& samplePath,
         addIssue(result, "Decoded sample reader failed while loading sample frames.");
         return result;
     }
+
+    incrementFullFrameReadCount();
 
     result.sample.normalizedChannels.resize(buffer.getNumChannels());
     for (int channelIndex = 0; channelIndex < buffer.getNumChannels(); ++channelIndex)
@@ -949,6 +1269,171 @@ SampleImportResult importSampleFile(const std::string& samplePath,
     }
 
     result.state = result.warnings.empty() ? "Sample imported" : "Sample imported with warnings";
+    return result;
+}
+
+WaveformPeakBuildResult buildWaveformPeaks(const std::string& samplePath,
+                                           const std::string& knownFingerprintHex,
+                                           const WaveformPeakBuildOptions& options)
+{
+    WaveformPeakBuildResult result;
+    result.sourcePath = samplePath;
+    result.state = "Waveform peak build not attempted";
+
+    const fs::path sampleFsPath(samplePath);
+    if (!currentSampleImportHooks().fileExists(samplePath))
+    {
+        result.state = "Sample missing";
+        addIssue(result, "Sample file was not found at " + samplePath + ".");
+        return result;
+    }
+
+    result.fileFound = true;
+
+    incrementReaderOpenCount();
+    auto reader = currentSampleImportHooks().createAudioReader(sampleFsPath.generic_string());
+    if (reader == nullptr)
+    {
+        result.state = "Sample format unsupported";
+        addIssue(result,
+                 "Sample file could not be decoded as a supported audio format: "
+                     + toDisplayPath(sampleFsPath));
+        return result;
+    }
+
+    if (!populateImportedSampleMetadata(result,
+                                        sampleFsPath,
+                                        *reader,
+                                        knownFingerprintHex,
+                                        result.metadata))
+    {
+        return result;
+    }
+
+    const auto totalFrames = result.metadata.frameCount;
+    if (totalFrames == 0)
+    {
+        result.built = true;
+        result.state = "Waveform peaks built";
+        return result;
+    }
+
+    const auto displayPointCount = std::max<std::size_t>(
+        1,
+        std::min<std::size_t>(options.displayPointCount, static_cast<std::size_t>(totalFrames)));
+    const auto chunkFrameCount = std::max<std::uint64_t>(1, options.chunkFrameCount);
+    const auto readerChannelCount = static_cast<int>(result.metadata.channelCount);
+    const auto bufferFrameCapacity = static_cast<int>(std::min<std::uint64_t>(chunkFrameCount, totalFrames));
+    juce::AudioBuffer<float> chunkBuffer(readerChannelCount, bufferFrameCapacity);
+    std::vector<bool> pointInitialized(displayPointCount, false);
+    result.points.resize(displayPointCount);
+
+    auto publishProgress = [&](const std::uint64_t framesProcessed)
+    {
+        if (options.callbacks == nullptr)
+            return;
+
+        WaveformPeakBuildProgress progress;
+        progress.framesProcessed = framesProcessed;
+        progress.totalFrames = totalFrames;
+        progress.pointsCompleted = std::min<std::size_t>(
+            displayPointCount,
+            static_cast<std::size_t>((framesProcessed * displayPointCount + totalFrames - 1) / totalFrames));
+        progress.totalPointCount = displayPointCount;
+        options.callbacks->onProgress(progress);
+    };
+
+    auto updatePoint = [&](const std::size_t pointIndex, const float frameMin, const float frameMax)
+    {
+        auto& point = result.points[pointIndex];
+        if (!pointInitialized[pointIndex])
+        {
+            point.minValue = frameMin;
+            point.maxValue = frameMax;
+            pointInitialized[pointIndex] = true;
+            return;
+        }
+
+        point.minValue = std::min(point.minValue, frameMin);
+        point.maxValue = std::max(point.maxValue, frameMax);
+    };
+
+    std::uint64_t framesProcessed = 0;
+    while (framesProcessed < totalFrames)
+    {
+        if (options.callbacks != nullptr && options.callbacks->isCancellationRequested())
+        {
+            result.canceled = true;
+            result.state = "Waveform peak build canceled";
+            addIssue(result,
+                     "Waveform peak build was canceled after reading "
+                         + std::to_string(framesProcessed) + " of "
+                         + std::to_string(totalFrames) + " frames.");
+            return result;
+        }
+
+        const auto framesRemaining = totalFrames - framesProcessed;
+        const auto framesThisChunk = static_cast<int>(std::min<std::uint64_t>(chunkFrameCount, framesRemaining));
+        chunkBuffer.clear();
+        if (!reader->read(&chunkBuffer,
+                          0,
+                          framesThisChunk,
+                          static_cast<juce::int64>(framesProcessed),
+                          true,
+                          true))
+        {
+            result.state = "Sample read failed";
+            addIssue(result, "Decoded sample reader failed while building waveform peaks.");
+            return result;
+        }
+
+        recordWaveformPeakChunkRead(static_cast<std::uint64_t>(framesThisChunk),
+                                    static_cast<std::uint32_t>(readerChannelCount));
+
+        for (int frameIndex = 0; frameIndex < framesThisChunk; ++frameIndex)
+        {
+            const auto absoluteFrame = framesProcessed + static_cast<std::uint64_t>(frameIndex);
+            const auto pointIndex = std::min<std::size_t>(
+                displayPointCount - 1,
+                static_cast<std::size_t>((absoluteFrame * displayPointCount) / totalFrames));
+
+            float frameMin = chunkBuffer.getSample(0, frameIndex);
+            float frameMax = frameMin;
+
+            switch (options.channelReduction)
+            {
+                case WaveformPeakChannelReduction::firstChannel:
+                    break;
+                case WaveformPeakChannelReduction::averageChannels:
+                {
+                    auto sampleSum = 0.0f;
+                    for (int channelIndex = 0; channelIndex < readerChannelCount; ++channelIndex)
+                        sampleSum += chunkBuffer.getSample(channelIndex, frameIndex);
+                    frameMin = sampleSum / static_cast<float>(readerChannelCount);
+                    frameMax = frameMin;
+                    break;
+                }
+                case WaveformPeakChannelReduction::channelExtrema:
+                {
+                    for (int channelIndex = 1; channelIndex < readerChannelCount; ++channelIndex)
+                    {
+                        const auto value = chunkBuffer.getSample(channelIndex, frameIndex);
+                        frameMin = std::min(frameMin, value);
+                        frameMax = std::max(frameMax, value);
+                    }
+                    break;
+                }
+            }
+
+            updatePoint(pointIndex, frameMin, frameMax);
+        }
+
+        framesProcessed += static_cast<std::uint64_t>(framesThisChunk);
+        publishProgress(framesProcessed);
+    }
+
+    result.built = true;
+    result.state = "Waveform peaks built";
     return result;
 }
 
@@ -1165,7 +1650,7 @@ AuthoringImportProcessResult processNextAuthoringImportQueueItem(AuthoringImport
 
     auto& item = *iterator;
     item.state = AuthoringImportItemState::parsing;
-    item.importResult = importSampleFile(item.sourcePath);
+    item.inspectionResult = inspectSampleFile(item.sourcePath, item.knownFingerprintHex);
     item.filenameTokens.clear();
     item.findings.clear();
     item.suggestedZone = {};
@@ -1173,15 +1658,15 @@ AuthoringImportProcessResult processNextAuthoringImportQueueItem(AuthoringImport
     result.processed = true;
     result.itemId = item.id;
 
-    if (!item.importResult.imported)
+    if (!item.inspectionResult.inspected || !item.inspectionResult.accepted)
     {
         item.state = AuthoringImportItemState::failed;
         result.state = "Authoring import failed";
-        result.issues = item.importResult.issues;
+        result.issues = item.inspectionResult.issues;
     }
     else
     {
-        for (const auto& warning : item.importResult.warnings)
+        for (const auto& warning : item.inspectionResult.warnings)
         {
             addFinding(item.findings,
                        AuthoringImportFindingSeverity::warning,
@@ -1191,7 +1676,7 @@ AuthoringImportProcessResult processNextAuthoringImportQueueItem(AuthoringImport
                        false);
         }
 
-        const auto heuristics = parseSampleFilenameHeuristics(item.sourcePath, &item.importResult.sample.metadata);
+        const auto heuristics = parseSampleFilenameHeuristics(item.sourcePath, &item.inspectionResult.metadata);
         item.filenameTokens = heuristics.tokens;
         item.findings.insert(item.findings.end(), heuristics.findings.begin(), heuristics.findings.end());
         item.suggestedZone = heuristics.suggestedZone;

@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Asynchronous WAV Import and Startup Metrics &mdash; Development Plan</title>
+  <style>
+    :root {
+      --paper:#f4f0e7; --surface:#fffdf8; --ink:#20272c; --muted:#626a70;
+      --line:#d8d1c5; --accent:#a73d2a; --accent-soft:#f4ded7;
+      --amber:#936015; --amber-soft:#f5e7c9; --green:#1f6a4b;
+      --green-soft:#dfeee7; --blue:#315c75; --blue-soft:#e1ebf0;
+      --slate:#2a3238; --shadow:0 16px 42px rgba(42,37,30,.08);
+    }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body {
+      margin:0; color:var(--ink);
+      background:
+        radial-gradient(circle at 10% 2%,rgba(167,61,42,.08),transparent 24rem),
+        linear-gradient(180deg,#ece6da 0,var(--paper) 34rem);
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      line-height:1.55;
+    }
+    a { color:var(--blue); }
+    code {
+      padding:.12em .35em; color:#26343c; background:#edf0ee;
+      border-radius:4px; font-size:.9em;
+    }
+    .page { width:min(1180px,calc(100% - 40px)); margin:0 auto; padding:34px 0 72px; }
+    .back {
+      display:inline-block; margin:0 0 16px 4px;
+      font-size:.9rem; font-weight:800; text-decoration:none;
+    }
+    .hero {
+      position:relative; overflow:hidden; padding:44px; color:#fffaf1;
+      background:var(--slate); border-radius:24px; box-shadow:var(--shadow);
+    }
+    .hero::after {
+      content:""; position:absolute; top:-140px; right:-80px; width:380px; height:380px;
+      border:1px solid rgba(255,255,255,.15); border-radius:50%;
+      box-shadow:0 0 0 48px rgba(255,255,255,.035),0 0 0 104px rgba(255,255,255,.024);
+    }
+    .eyebrow,.label {
+      margin:0 0 10px; color:#e7b4a6; font-size:.75rem; font-weight:850;
+      letter-spacing:.13em; text-transform:uppercase;
+    }
+    .label { color:var(--accent); }
+    h1,h2,h3,p { margin-top:0; }
+    h1 {
+      position:relative; z-index:1; max-width:920px; margin-bottom:16px;
+      font:500 clamp(2.35rem,5.5vw,4.6rem)/.98 Georgia,"Times New Roman",serif;
+      letter-spacing:-.045em;
+    }
+    .hero-copy {
+      position:relative; z-index:1; max-width:850px;
+      color:#d7dbd8; font-size:1.08rem;
+    }
+    .meta {
+      position:relative; z-index:1; display:flex; flex-wrap:wrap;
+      gap:10px; margin:25px 0 0; padding:0; list-style:none;
+    }
+    .meta li {
+      padding:8px 12px; background:rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.12); border-radius:999px; font-size:.82rem;
+    }
+    .section { margin-top:42px; }
+    .heading {
+      display:grid; grid-template-columns:auto 1fr;
+      gap:16px; align-items:center; margin-bottom:18px;
+    }
+    .heading h2 {
+      margin:0; font:500 clamp(1.75rem,3vw,2.5rem) Georgia,"Times New Roman",serif;
+      letter-spacing:-.025em;
+    }
+    .heading::after { content:""; height:1px; background:var(--line); }
+    .grid2,.grid3,.flow,.timeline { display:grid; gap:14px; }
+    .grid2 { grid-template-columns:repeat(2,1fr); }
+    .grid3 { grid-template-columns:repeat(3,1fr); }
+    .card,.sprint,.acceptance {
+      background:var(--surface); border:1px solid var(--line);
+      border-radius:18px; box-shadow:0 8px 24px rgba(42,37,30,.04);
+    }
+    .card { padding:22px; }
+    .card h3 { margin-bottom:8px; font:600 1.28rem Georgia,"Times New Roman",serif; }
+    .card p:last-child,.card ul:last-child { margin-bottom:0; }
+    .callout {
+      padding:22px 24px; background:var(--accent-soft);
+      border-left:4px solid var(--accent); border-radius:0 14px 14px 0;
+    }
+    .callout.info { background:var(--blue-soft); border-left-color:var(--blue); }
+    .callout.success { background:var(--green-soft); border-left-color:var(--green); }
+    .callout p:last-child { margin-bottom:0; }
+    .flow { grid-template-columns:repeat(7,1fr); }
+    .flow div {
+      position:relative; min-height:166px; padding:17px;
+      background:var(--surface); border:1px solid var(--line); border-radius:14px;
+    }
+    .flow div:not(:last-child)::after {
+      content:"\2192"; position:absolute; z-index:2; top:50%; right:-14px;
+      width:20px; color:var(--accent); background:var(--paper);
+      font-weight:900; text-align:center;
+    }
+    .flow strong { display:block; margin-bottom:7px; color:var(--blue); font-size:.88rem; }
+    .flow span { color:var(--muted); font-size:.84rem; }
+    table {
+      width:100%; overflow:hidden; background:var(--surface);
+      border:1px solid var(--line); border-collapse:separate;
+      border-spacing:0; border-radius:16px;
+    }
+    th,td {
+      padding:13px 14px; vertical-align:top;
+      border-bottom:1px solid var(--line); text-align:left;
+    }
+    th {
+      color:#fffaf1; background:var(--slate);
+      font-size:.73rem; letter-spacing:.08em; text-transform:uppercase;
+    }
+    tbody tr:last-child td { border-bottom:0; }
+    tbody tr:nth-child(even) td { background:rgba(239,235,226,.35); }
+    .sprint { margin-bottom:18px; overflow:hidden; }
+    .sprint-head {
+      display:grid; grid-template-columns:auto 1fr auto;
+      gap:14px; align-items:center; padding:20px 22px;
+      color:#fffaf1; background:var(--slate);
+    }
+    .sprint-number {
+      display:grid; width:42px; height:42px; place-items:center;
+      color:var(--slate); background:#fffaf1; border-radius:50%;
+      font:700 1.25rem Georgia,serif;
+    }
+    .sprint-head h3 { margin:0; font:500 1.42rem Georgia,"Times New Roman",serif; }
+    .window { color:#cbd3d0; font-size:.82rem; font-weight:700; white-space:nowrap; }
+    .sprint-copy {
+      margin:0; padding:17px 22px; color:var(--muted);
+      border-bottom:1px solid var(--line);
+    }
+    .sprint table { border:0; border-radius:0; }
+    .sprint th { background:#3a444b; }
+    .id { color:var(--blue); font-weight:850; white-space:nowrap; }
+    .owner { color:var(--muted); white-space:nowrap; }
+    .gate {
+      margin:0; padding:15px 22px; color:#24563f;
+      background:var(--green-soft); border-top:1px solid #c9dfd3;
+    }
+    .gate strong { color:var(--green); }
+    ul,ol { padding-left:1.25rem; }
+    li+li { margin-top:5px; }
+    .timeline { grid-template-columns:repeat(7,1fr); }
+    .milestone {
+      padding:19px; background:var(--surface);
+      border-top:4px solid var(--blue); border-radius:8px 8px 14px 14px;
+    }
+    .milestone strong { display:block; margin-bottom:6px; color:var(--blue); }
+    .milestone span { color:var(--muted); font-size:.86rem; }
+    .acceptance { padding:25px; border-left:5px solid var(--green); }
+    .acceptance h3 { color:var(--green); font:600 1.4rem Georgia,serif; }
+    .acceptance ul { columns:2; column-gap:44px; margin-bottom:0; }
+    .acceptance li { break-inside:avoid; margin-bottom:8px; }
+    .small { color:var(--muted); font-size:.88rem; }
+    footer {
+      margin-top:42px; padding-top:20px; color:var(--muted);
+      border-top:1px solid var(--line); font-size:.85rem;
+    }
+    @media(max-width:1080px) {
+      .flow { grid-template-columns:repeat(4,1fr); }
+      .flow div:nth-child(4)::after { display:none; }
+      .timeline { grid-template-columns:repeat(4,1fr); }
+    }
+    @media(max-width:760px) {
+      .grid2,.grid3,.timeline { grid-template-columns:1fr; }
+      .flow { grid-template-columns:1fr; }
+      .flow div { min-height:auto; }
+      .flow div:not(:last-child)::after {
+        content:"\2193"; display:block; top:auto; right:50%; bottom:-16px;
+      }
+      table { display:block; overflow-x:auto; }
+    }
+    @media(max-width:640px) {
+      .page { width:calc(100% - 22px); padding-top:20px; }
+      .hero { padding:30px 24px; }
+      .sprint-head { grid-template-columns:auto 1fr; }
+      .window { grid-column:2; white-space:normal; }
+      .acceptance ul { columns:1; }
+    }
+    @media print {
+      body { background:#fff; }
+      .page { width:100%; padding:0; }
+      .back { display:none; }
+      .card,.sprint,.acceptance,table { break-inside:avoid; box-shadow:none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <a class="back" href="code-review.html">&larr; Back to the code review</a>
+
+    <header class="hero">
+      <p class="eyebrow">High finding 03 &middot; Detailed implementation roadmap</p>
+      <h1>Move sample I/O and analysis out of construction and message-thread callbacks</h1>
+      <p class="hero-copy">
+        Replace synchronous WAV copying, fingerprinting, full-file decoding, and synthetic startup
+        queue drains with a processor-owned job service. Import analysis will retain metadata and
+        mapping suggestions only; waveform previews will be produced from bounded decode chunks; and
+        the message thread will be limited to request submission, presentation, and validated project commits.
+      </p>
+      <ul class="meta">
+        <li>Scope: WAV import, startup metrics, waveform peak generation</li>
+        <li>Estimate: 26&ndash;36 engineering days</li>
+        <li>Delivery: 7 gated sprints</li>
+        <li>Primary risk: migration without changing import semantics</li>
+      </ul>
+    </header>
+
+    <section class="section" aria-labelledby="outcome">
+      <div class="heading"><h2 id="outcome">Target outcome</h2></div>
+      <div class="grid3">
+        <article class="card">
+          <p class="label">Responsiveness</p>
+          <h3>Submission is constant-time</h3>
+          <p>File chooser completion captures a request and returns. Directory creation, copying, hashing, inspection, and peak generation occur only on owned background work.</p>
+        </article>
+        <article class="card">
+          <p class="label">Memory</p>
+          <h3>Analysis is not playback decode</h3>
+          <p>Import decisions retain metadata, findings, and zone suggestions. They do not retain a full <code>AudioBuffer</code> followed by another full <code>normalizedChannels</code> copy.</p>
+        </article>
+        <article class="card">
+          <p class="label">Instantiation</p>
+          <h3>Construction performs no sample I/O</h3>
+          <p>Processor construction, project replacement, close, and host-state restore publish lightweight metric state without opening, hashing, or decoding sample files.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="evidence">
+      <div class="heading"><h2 id="evidence">Confirmed execution paths</h2></div>
+      <div class="callout">
+        <p class="label">Finding validated</p>
+        <p>
+          Both shells copy files and completely drain <code>AuthoringImportQueue</code> inside the
+          chooser/message callback. Each queue step calls <code>importSampleFile()</code>, which allocates
+          a complete JUCE buffer, reads every frame, and duplicates every channel into vectors.
+          <code>Processor::initializeAuthoringImportMetrics()</code> repeats the same queue drain during
+          construction and several project lifecycle operations.
+        </p>
+      </div>
+
+      <div class="grid2" style="margin-top:14px">
+        <article class="card">
+          <p class="label">Message and constructor paths</p>
+          <ul>
+            <li><code>app/src/plugin/PluginEditor.cpp:780&ndash;860</code></li>
+            <li><code>app/src/standalone/MainComponent.cpp:868&ndash;947</code></li>
+            <li><code>app/src/plugin/PluginProcessor.cpp:459&ndash;465</code></li>
+            <li><code>app/src/plugin/PluginProcessor.cpp:1251&ndash;1331</code></li>
+            <li><code>app/src/plugin/PluginProcessor.cpp:1584&ndash;1612</code></li>
+          </ul>
+        </article>
+        <article class="card">
+          <p class="label">Decode and retention path</p>
+          <ul>
+            <li><code>engine_adapter/src/SampleImport.cpp:848&ndash;935</code></li>
+            <li><code>engine_adapter/src/SampleImport.cpp:1124&ndash;1224</code></li>
+            <li><code>engine_adapter/include/drs/engine/SampleImport.h:32&ndash;55</code></li>
+            <li><code>app/src/plugin/PluginProcessor.cpp:969&ndash;1004</code></li>
+            <li><code>app/src/plugin/PluginProcessor.cpp:2207&ndash;2237</code></li>
+          </ul>
+        </article>
+      </div>
+
+      <table style="margin-top:16px">
+        <thead>
+          <tr><th>Current operation</th><th>Why it blocks</th><th>Required destination</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Create <code>Samples</code> and copy every selected WAV</td>
+            <td>Unbounded filesystem work runs inside the UI callback.</td>
+            <td>Worker-owned staging area with cancel-safe cleanup and final rename.</td>
+          </tr>
+          <tr>
+            <td>Fingerprint each source</td>
+            <td>The checksum reads the complete file and may repeat work.</td>
+            <td>Streaming worker stage with cancellation checkpoints and a reusable result.</td>
+          </tr>
+          <tr>
+            <td>Decode for metadata and filename inference</td>
+            <td>Metadata-only decisions allocate and retain every decoded frame.</td>
+            <td>A lightweight inspection result that never contains sample frames.</td>
+          </tr>
+          <tr>
+            <td>Build waveform previews</td>
+            <td>The first preview request decodes a complete sample synchronously.</td>
+            <td>Asynchronous fixed-memory min/max peak generation and revision-keyed cache.</td>
+          </tr>
+          <tr>
+            <td>Initialize responsiveness metrics</td>
+            <td>Synthetic queue drains decode project samples during construction and restore.</td>
+            <td>Metrics sourced from actual jobs; lifecycle initialization performs no sample I/O.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section" aria-labelledby="scope">
+      <div class="heading"><h2 id="scope">Scope and boundaries</h2></div>
+      <div class="grid2">
+        <article class="card">
+          <p class="label">In scope</p>
+          <ul>
+            <li>WAV batch copy, fingerprint, inspection, inference, progress, cancellation, and completion.</li>
+            <li>Processor-owned job lifetime with plugin and standalone clients.</li>
+            <li>Project ID and document-revision validation before a completed import is applied.</li>
+            <li>Startup and project-lifecycle metric publication without sample reads.</li>
+            <li>Incremental waveform peak generation and cache invalidation.</li>
+            <li>Deterministic hooks, responsiveness tests, memory bounds, and failure injection.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <p class="label">Non-goals</p>
+          <ul>
+            <li>Do not change filename inference, root-key prompts, warning policy, or round-robin reconciliation semantics.</li>
+            <li>Do not move <code>AuthoringSession</code> mutation off the message thread.</li>
+            <li>Do not replace full decoding required by playback preparation.</li>
+            <li>Do not introduce unbounded worker parallelism or one thread per file.</li>
+            <li>Do not treat timer slicing on the message thread as asynchronous I/O.</li>
+            <li>Do not couple processor construction to availability of project sample files.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="architecture">
+      <div class="heading"><h2 id="architecture">Proposed work boundary</h2></div>
+      <div class="flow">
+        <div><strong>1 &middot; Submit</strong><span>The shell captures selected files, project identity, base revision, selected group, and destination root.</span></div>
+        <div><strong>2 &middot; Schedule</strong><span>A processor-owned service accepts one bounded request and publishes its generation.</span></div>
+        <div><strong>3 &middot; Stage</strong><span>The worker creates a private staging directory and copies sources with byte/item progress.</span></div>
+        <div><strong>4 &middot; Inspect</strong><span>Readers collect format metadata; hashing and optional peaks stream through bounded chunks.</span></div>
+        <div><strong>5 &middot; Infer</strong><span>Filename and embedded metadata produce lightweight findings and draft-zone suggestions.</span></div>
+        <div><strong>6 &middot; Publish</strong><span>An immutable, generation-tagged result is made visible; decoded sample frames are absent.</span></div>
+        <div><strong>7 &middot; Commit</strong><span>The message thread revalidates project/revision, resolves prompts, renames staged files, and appends content once.</span></div>
+      </div>
+
+      <div class="callout info" style="margin-top:16px">
+        <p class="label">Reuse the proven lifecycle pattern</p>
+        <p>
+          Model the new service on the existing processor-owned <code>SfzImportReviewService</code>:
+          RAII clients, one joinable C++17 worker, generation-tagged immutable snapshots, cooperative
+          cancellation, explicit consume, and a processor-destructor shutdown barrier. Share lifecycle
+          conventions and test helpers; keep WAV request/result types separate from SFZ review types.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="contracts">
+      <div class="heading"><h2 id="contracts">Data and lifecycle contracts</h2></div>
+      <div class="grid3">
+        <article class="card">
+          <p class="label">Inspection result</p>
+          <h3>Lightweight by construction</h3>
+          <p>Contains source identity, fingerprint, format metadata, policy results, filename tokens, findings, and suggested zone. It must not contain an <code>AudioBuffer</code> or normalized channel vectors.</p>
+        </article>
+        <article class="card">
+          <p class="label">Request identity</p>
+          <h3>Reject stale completion</h3>
+          <p>Every request carries owner ID, generation, project ID, base document revision, destination root, and selected group ID. All must still match before commit.</p>
+        </article>
+        <article class="card">
+          <p class="label">Terminal states</p>
+          <h3>One explicit disposition</h3>
+          <p>Completed, partially completed, canceled, superseded, failed, and consumed are distinct. Cancellation and failure never mutate the project or leave final destination files behind.</p>
+        </article>
+      </div>
+
+      <table style="margin-top:16px">
+        <thead>
+          <tr><th>Stage</th><th>Thread</th><th>Allowed state</th><th>Forbidden work</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Request capture</td>
+            <td>Message</td>
+            <td>Paths, IDs, immutable project facts</td>
+            <td>Directory creation, file copy, hash, reader open, decode</td>
+          </tr>
+          <tr>
+            <td>Copy and inspection</td>
+            <td>Owned worker</td>
+            <td>Staged files, metadata, findings, progress</td>
+            <td>JUCE component access or authoring-session mutation</td>
+          </tr>
+          <tr>
+            <td>Snapshot publication</td>
+            <td>Worker to atomic/shared publication</td>
+            <td>Immutable lightweight result</td>
+            <td>Lambdas that outlive plugin/editor ownership</td>
+          </tr>
+          <tr>
+            <td>Manual resolution</td>
+            <td>Message</td>
+            <td>Root-key decisions and user cancellation</td>
+            <td>Re-analysis or full-file decoding</td>
+          </tr>
+          <tr>
+            <td>Commit</td>
+            <td>Message, after identity validation</td>
+            <td>Final file moves and one project transaction</td>
+            <td>Applying stale, partial, or unconsumed generations</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section" aria-labelledby="sprints">
+      <div class="heading"><h2 id="sprints">Sprint plan and development tasks</h2></div>
+
+      <article class="sprint">
+        <div class="sprint-head">
+          <span class="sprint-number">1</span>
+          <h3>Freeze behavior and create measurable seams</h3>
+          <span class="window">3&ndash;4 engineering days</span>
+        </div>
+        <p class="sprint-copy">
+          Establish a testable contract before moving work between threads. Record current import
+          outcomes and make file/reader activity observable without changing production behavior.
+        </p>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Primary files</th><th>Done when</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="id">WAV-101</td>
+              <td>Document the current batch-import outcome matrix: missing source, copy failure, unsupported format, policy warning, manual root key, cancellation, and mixed-success batch.</td>
+              <td class="owner">Phase 1/2 sample import tests</td>
+              <td>Golden assertions cover counts, findings, inferred zones, IDs, and summary dispositions.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-102</td>
+              <td>Add injectable file-operation and audio-reader seams for import analysis, including counters for open, bytes read, full-frame reads, copies, and peak chunks.</td>
+              <td class="owner"><code>SampleImport.*</code>, shared test support</td>
+              <td>Tests can prove whether construction or a message callback touched sample content.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-103</td>
+              <td>Create deterministic large/slow reader fixtures and a mixed batch corpus without committing large binaries.</td>
+              <td class="owner"><code>tests/fixtures</code>, generated test helpers</td>
+              <td>Tests can pause copy/read stages and simulate long samples, failures, and cancellation boundaries.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-104</td>
+              <td>Capture baseline constructor, project-replace, restore, import-submit, peak-memory, and full-batch timing diagnostics.</td>
+              <td class="owner">Plugin processor and integration tests</td>
+              <td>A checked-in baseline report identifies the current synchronous I/O counts and memory shape.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="gate"><strong>Sprint gate:</strong> behavior is frozen by tests, and sample I/O is countable independently of wall-clock timing.</p>
+      </article>
+
+      <article class="sprint">
+        <div class="sprint-head">
+          <span class="sprint-number">2</span>
+          <h3>Separate sample inspection from full playback decode</h3>
+          <span class="window">4&ndash;6 engineering days</span>
+        </div>
+        <p class="sprint-copy">
+          Remove frame ownership from the authoring decision path. Preserve the existing full-decoder
+          behavior for consumers that genuinely require PCM while introducing a metadata-only path for imports.
+        </p>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Primary files</th><th>Done when</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="id">WAV-201</td>
+              <td>Introduce a metadata-only sample inspection result and operation that opens the reader, validates dimensions, reads embedded metadata, and evaluates policy without allocating frame-count-sized storage.</td>
+              <td class="owner"><code>engine_adapter/.../SampleImport.h/.cpp</code></td>
+              <td>Inspection produces all facts needed by filename inference and policy checks with zero full-frame reads.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-202</td>
+              <td>Change <code>AuthoringImportQueueItem</code> to retain inspection data rather than <code>SampleImportResult</code> with <code>normalizedChannels</code>.</td>
+              <td class="owner"><code>SampleImport.h</code>, queue tests</td>
+              <td>Queue memory is independent of source duration except for bounded strings/findings.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-203</td>
+              <td>Update <code>processNextAuthoringImportQueueItem()</code> to use inspection, reuse a supplied fingerprint, and preserve state, warning, and inference semantics.</td>
+              <td class="owner"><code>SampleImport.cpp</code>, <code>Phase2AuthoringImportTests.cpp</code></td>
+              <td>Existing import-result golden tests pass without decoding PCM.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-204</td>
+              <td>Make fingerprinting streaming and cancelable, with fixed-size reads and progress based on bytes processed.</td>
+              <td class="owner"><code>SampleImport.cpp</code></td>
+              <td>Hash results remain stable; stop is observed within one configured chunk.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-205</td>
+              <td>Audit every <code>importSampleFile()</code> caller and classify it as inspection, playback preparation, test fixture, or report generation; migrate only metadata-only consumers.</td>
+              <td class="owner">Engine adapter and test call sites</td>
+              <td>No caller accidentally loses PCM it requires, and no authoring-analysis caller retains PCM.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="gate"><strong>Sprint gate:</strong> authoring queue analysis performs no full sample decode and produces behaviorally equivalent suggestions and findings.</p>
+      </article>
+
+      <article class="sprint">
+        <div class="sprint-head">
+          <span class="sprint-number">3</span>
+          <h3>Build the owned WAV import job service</h3>
+          <span class="window">5&ndash;6 engineering days</span>
+        </div>
+        <p class="sprint-copy">
+          Add one bounded background execution path with explicit ownership, cancellation, progress,
+          staging, immutable completion, and shutdown behavior.
+        </p>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Primary files</th><th>Done when</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="id">WAV-301</td>
+              <td>Define WAV request identity, item progress, batch snapshot, terminal disposition, and immutable completion payload types.</td>
+              <td class="owner">New shared import service header</td>
+              <td>Types carry owner/generation/project/revision and never reference UI objects or decoded channels.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-302</td>
+              <td>Implement a processor-owned service with one joinable C++17 worker, one active batch, bounded pending work, RAII clients, cancel, wait, consume, and shutdown.</td>
+              <td class="owner">New shared import service implementation; processor ownership</td>
+              <td>No worker survives processor destruction; editor closure cancels and reaches a terminal state.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-303</td>
+              <td>Move destination-directory creation and copies into a request-specific staging directory. Copy in chunks, preserve source extensions, and never overwrite an existing final file.</td>
+              <td class="owner">Service file-operation layer</td>
+              <td>Copy progress is visible and partial files never appear as committed project samples.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-304</td>
+              <td>Run fingerprint, inspection, policy, and inference after each staged copy with stop checks between and within long stages.</td>
+              <td class="owner">Service worker and engine adapter</td>
+              <td>Cancellation latency is bounded by one copy/hash/read chunk.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-305</td>
+              <td>Publish per-item and aggregate metrics from real service work: stage, bytes, items, durations, warnings, failures, cancellations, and last terminal generation.</td>
+              <td class="owner">Service metrics and processor snapshot adapter</td>
+              <td>Readers can poll immutable snapshots without blocking the worker.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-306</td>
+              <td>Implement cleanup for cancel, supersede, copy failure, decode/inspection failure, stale completion, and processor shutdown.</td>
+              <td class="owner">Service lifecycle tests</td>
+              <td>Injected failures leave no staging directory, partial final file, or project mutation.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="gate"><strong>Sprint gate:</strong> the service can process, cancel, fail, and shut down a mixed batch without UI ownership or leaked artifacts.</p>
+      </article>
+
+      <article class="sprint">
+        <div class="sprint-head">
+          <span class="sprint-number">4</span>
+          <h3>Migrate plugin and standalone WAV workflows</h3>
+          <span class="window">4&ndash;5 engineering days</span>
+        </div>
+        <p class="sprint-copy">
+          Replace the duplicated synchronous shell implementations with thin clients over one shared
+          workflow. Keep project mutation and prompts on the message thread.
+        </p>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Primary files</th><th>Done when</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="id">WAV-401</td>
+              <td>Extract shared request construction, completion projection, summary building, and commit preparation so plugin and standalone cannot drift.</td>
+              <td class="owner"><code>app/src/shared</code></td>
+              <td>Shell-specific code handles chooser, presentation, and owner lifetime only.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-402</td>
+              <td>Replace both synchronous copy/queue drains with service submission and timer-based immutable snapshot consumption.</td>
+              <td class="owner"><code>PluginEditor.cpp</code>, <code>MainComponent.cpp</code></td>
+              <td>No chooser completion callback creates directories, copies, hashes, opens a reader, or drains a queue.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-403</td>
+              <td>Add modeless batch progress, current item/stage, byte/item counts, cancel, and distinct success/partial/canceled/failed states.</td>
+              <td class="owner">Shared authoring UI and both shells</td>
+              <td>Large imports remain interactive and cancellation is user-visible.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-404</td>
+              <td>Resolve manual root-key decisions after analysis without rerunning inspection; allow cancel/skip per item and resume the decision sequence.</td>
+              <td class="owner">Shared completion workflow</td>
+              <td>Existing manual-root behavior is preserved with no background thread touching components.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-405</td>
+              <td>Before commit, revalidate owner, generation, project ID, destination root, base revision, and selected group. Reject or explicitly rebase stale results.</td>
+              <td class="owner">Processor/session boundary</td>
+              <td>Opening, closing, restoring, or editing a project cannot receive an obsolete import.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-406</td>
+              <td>Finalize staged files and append sources/zones as one logical operation with rollback if either file finalization or project mutation fails.</td>
+              <td class="owner">Shared commit workflow and project storage</td>
+              <td>The project never references a missing file and failed commit leaves the previous project intact.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="gate"><strong>Sprint gate:</strong> plugin and standalone pass the same async import contract, stale-result, cancellation, and mixed-batch tests.</p>
+      </article>
+
+      <article class="sprint">
+        <div class="sprint-head">
+          <span class="sprint-number">5</span>
+          <h3>Remove startup decoding and redefine metrics</h3>
+          <span class="window">3&ndash;4 engineering days</span>
+        </div>
+        <p class="sprint-copy">
+          Stop using real sample imports to initialize a responsiveness panel. Metrics will describe
+          actual service activity, while lifecycle transitions publish a cheap idle/reset state.
+        </p>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Primary files</th><th>Done when</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="id">WAV-501</td>
+              <td>Replace <code>initializeAuthoringImportMetrics()</code> with a no-I/O reset/publication operation containing configured source count and idle/not-run state.</td>
+              <td class="owner"><code>PluginProcessor.cpp/.h</code></td>
+              <td>The method does not create or drain an import queue.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-502</td>
+              <td>Feed <code>AuthoringImportResponsivenessSnapshot</code> from completed and active service metrics rather than synthetic project sample processing.</td>
+              <td class="owner">Processor snapshot adapter</td>
+              <td>The panel distinguishes never run, active, completed, canceled, and failed batches.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-503</td>
+              <td>Audit constructor, replace, close, migration, restore, state load, editor creation, and host scanning for indirect sample I/O.</td>
+              <td class="owner">Processor lifecycle paths</td>
+              <td>Instrumentation reports zero import reader opens, bytes read, hashes, and copies on every audited path.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-504</td>
+              <td>Update waveform/host-recall/UI tests that currently expect startup metrics to report fully processed project samples.</td>
+              <td class="owner"><code>Phase2WaveformPreviewTests.cpp</code>, <code>HostProjectRecallTests.cpp</code>, UI tests</td>
+              <td>Tests assert the new honest metric semantics and restore correctness without decoding.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-505</td>
+              <td>If background source validation is still desired, expose it as an explicit user- or idle-service request, separate from constructor and restore success.</td>
+              <td class="owner">Authoring diagnostics workflow</td>
+              <td>Validation can be canceled and never gates plugin instantiation or project restore.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="gate"><strong>Sprint gate:</strong> processor construction and all project lifecycle operations perform zero import-related sample I/O.</p>
+      </article>
+
+      <article class="sprint">
+        <div class="sprint-head">
+          <span class="sprint-number">6</span>
+          <h3>Generate waveform peaks with bounded memory</h3>
+          <span class="window">3&ndash;5 engineering days</span>
+        </div>
+        <p class="sprint-copy">
+          Remove the remaining shell-helper full decode. Waveforms become asynchronous cached peak
+          artifacts built in fixed-size chunks.
+        </p>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Primary files</th><th>Done when</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="id">WAV-601</td>
+              <td>Implement a chunked min/max peak builder with configurable display resolution, channel reduction policy, progress, and cancellation.</td>
+              <td class="owner">Engine adapter waveform utility</td>
+              <td>Peak memory is bounded by chunk frames plus output points, regardless of sample duration.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-602</td>
+              <td>Add waveform requests to an owned background lane or safely serialize them through the sample-work service without starving an active import.</td>
+              <td class="owner">Processor sample-work ownership</td>
+              <td>Rapid zone selection supersedes obsolete requests and never blocks the message thread.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-603</td>
+              <td>Key the peak cache by source identity plus size/modification/fingerprint, display resolution, and channel policy; invalidate on project/source replacement.</td>
+              <td class="owner">Processor waveform cache</td>
+              <td>Changed files cannot reuse stale peaks and unchanged selections reuse cached results.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-604</td>
+              <td>Change the authoring panel contract to display loading, ready, unavailable, canceled, and stale states while preserving loop markers from the selected zone.</td>
+              <td class="owner">Authoring panel and processor preview API</td>
+              <td>The panel never synchronously requests a full decode and remains stable during rapid selection.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-605</td>
+              <td>Compare incremental peaks against the current full-buffer algorithm across mono, stereo, surround, silence, short files, partial final buckets, and looped samples.</td>
+              <td class="owner"><code>Phase2WaveformPreviewTests.cpp</code></td>
+              <td>Point count, bounds, visible shape, and loop-marker behavior meet the agreed tolerance.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="gate"><strong>Sprint gate:</strong> authoring waveform display performs no duration-sized allocation and no message-thread decode.</p>
+      </article>
+
+      <article class="sprint">
+        <div class="sprint-head">
+          <span class="sprint-number">7</span>
+          <h3>Hardening, performance gates, and rollout</h3>
+          <span class="window">4&ndash;6 engineering days</span>
+        </div>
+        <p class="sprint-copy">
+          Exercise lifecycle and failure boundaries under realistic host behavior, then remove the
+          old synchronous path only after parity and performance evidence is complete.
+        </p>
+        <table>
+          <thead><tr><th>ID</th><th>Development task</th><th>Primary files</th><th>Done when</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="id">WAV-701</td>
+              <td>Add deterministic tests proving import submission and waveform request return without running copy, hash, reader, or decode work inline.</td>
+              <td class="owner">Shared service and shell tests</td>
+              <td>Paused worker fixtures do not pause the submitting message callback.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-702</td>
+              <td>Run cancellation and stale-generation matrices at every copy, hash, inspect, publish, prompt, file-finalize, and project-commit boundary.</td>
+              <td class="owner">Failure-injection integration tests</td>
+              <td>Every case has a terminal disposition, bounded cleanup, and no stale mutation.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-703</td>
+              <td>Stress 100 cycles of import/cancel, editor open/close, project replace, restore, processor unload, and rapid waveform selection.</td>
+              <td class="owner">Lifecycle stress harness</td>
+              <td>No deadlock, orphan worker, use-after-free, leaked staging artifact, or post-unload callback occurs.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-704</td>
+              <td>Set CI budgets for constructor I/O count, message-thread forbidden operations, worker cancellation latency, peak memory, and large-batch resident memory.</td>
+              <td class="owner">CTest/CI diagnostics</td>
+              <td>Structural counters are hard gates; timing thresholds are reported with platform-aware tolerance.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-705</td>
+              <td>Validate plugin scanning/instantiation and batch import in supported hosts plus standalone, including missing/removable/network-backed sample locations.</td>
+              <td class="owner">Host validation matrix</td>
+              <td>Hosts remain responsive and missing media does not delay instantiation.</td>
+            </tr>
+            <tr>
+              <td class="id">WAV-706</td>
+              <td>Delete synchronous shell drains and startup queue processing, update architecture/diagnostics docs, and record release evidence.</td>
+              <td class="owner">Legacy paths and documentation</td>
+              <td>No production reference remains to the synchronous authoring import workflow.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="gate"><strong>Sprint gate:</strong> all acceptance criteria below pass in CI and the Windows host-validation matrix before release.</p>
+      </article>
+    </section>
+
+    <section class="section" aria-labelledby="sequence">
+      <div class="heading"><h2 id="sequence">Delivery sequence</h2></div>
+      <div class="timeline">
+        <div class="milestone"><strong>S1 &middot; Observe</strong><span>Freeze behavior and expose sample I/O.</span></div>
+        <div class="milestone"><strong>S2 &middot; Split</strong><span>Inspection no longer owns PCM.</span></div>
+        <div class="milestone"><strong>S3 &middot; Own</strong><span>Background work has a lifecycle.</span></div>
+        <div class="milestone"><strong>S4 &middot; Migrate</strong><span>Both shells become thin clients.</span></div>
+        <div class="milestone"><strong>S5 &middot; Decouple</strong><span>Startup metrics perform no I/O.</span></div>
+        <div class="milestone"><strong>S6 &middot; Bound</strong><span>Waveform memory is duration-independent.</span></div>
+        <div class="milestone"><strong>S7 &middot; Prove</strong><span>Stress, host, and CI gates pass.</span></div>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="acceptance">
+      <div class="heading"><h2 id="acceptance">Release acceptance criteria</h2></div>
+      <div class="acceptance">
+        <h3>The finding is closed only when all conditions hold</h3>
+        <ul>
+          <li>Processor construction opens, hashes, copies, and decodes zero project sample files.</li>
+          <li>Project replace, close, migration, and restore do not drain an import queue.</li>
+          <li>WAV chooser completion performs no directory creation, file copy, fingerprint, reader open, or decode.</li>
+          <li>Authoring queue items contain no duration-sized decoded channel storage.</li>
+          <li>Import inspection preserves current metadata, policy, inference, warning, and root-key behavior.</li>
+          <li>Only one bounded WAV batch is active per processor; no thread is detached.</li>
+          <li>Cancellation is observed inside copy and hash loops and during multi-item processing.</li>
+          <li>Cancel, failure, supersede, and stale completion leave no project mutation or partial final files.</li>
+          <li>Completed imports are applied only after owner, generation, project, root, and revision validation.</li>
+          <li>Plugin and standalone use the same request/result/commit workflow.</li>
+          <li>Responsiveness metrics describe real import jobs and expose an honest idle/not-run state.</li>
+          <li>Waveform peaks are generated asynchronously with memory bounded by chunk size and point count.</li>
+          <li>Rapid selection cannot display peaks from an obsolete source or project revision.</li>
+          <li>Processor/editor teardown joins or terminally resolves every owned request.</li>
+          <li>CI structural counters and the supported-host validation matrix pass.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="risks">
+      <div class="heading"><h2 id="risks">Risks and controls</h2></div>
+      <table>
+        <thead><tr><th>Risk</th><th>Control</th><th>Verification</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Inspection diverges from the full decoder&rsquo;s metadata behavior.</td>
+            <td>Use the same reader and metadata extraction helpers; split only frame ownership.</td>
+            <td>Golden parity tests across WAV, AIFF, FLAC, embedded root/loop metadata, and policy warnings.</td>
+          </tr>
+          <tr>
+            <td>A canceled import leaves copied files that look committed.</td>
+            <td>Use request-private staging and finalization only during validated commit.</td>
+            <td>Failure injection at every filesystem boundary plus scratch-directory inventory checks.</td>
+          </tr>
+          <tr>
+            <td>Background completion targets a changed project.</td>
+            <td>Carry and revalidate project ID, content root, base revision, owner, and generation.</td>
+            <td>Project close/open/edit/restore tests while each worker stage is paused.</td>
+          </tr>
+          <tr>
+            <td>Waveform requests starve batch imports or vice versa.</td>
+            <td>Define explicit serialization/priority and aggressively supersede obsolete waveform requests.</td>
+            <td>Stress rapid selection during a large batch and assert progress for both work classes.</td>
+          </tr>
+          <tr>
+            <td>Time-based CI tests become flaky.</td>
+            <td>Gate forbidden operations and bounded memory with counters; use timing as a secondary platform-aware signal.</td>
+            <td>Repeat tests under debug/release and record percentile diagnostics.</td>
+          </tr>
+          <tr>
+            <td>Full playback decode is accidentally weakened.</td>
+            <td>Keep inspection and playback-decode contracts explicit and audit each call site.</td>
+            <td>Prepared-playback, preview, publish, and voice regression suites remain unchanged and audible.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer>
+      <p>
+        Plan prepared from the current implementation in <code>PluginEditor.cpp</code>,
+        <code>MainComponent.cpp</code>, <code>PluginProcessor.cpp</code>, and
+        <code>SampleImport.cpp</code>. Estimates are engineering effort, not calendar duration,
+        and assume the existing SFZ service lifecycle pattern remains available for reuse.
+      </p>
+    </footer>
+  </main>
+</body>
+</html>

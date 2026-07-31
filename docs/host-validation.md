@@ -78,6 +78,25 @@ The required matrix is:
 Missing, moved, changed, and invalid content must preserve the safe startup state and expose
 non-modal recovery. They must never present the reference instrument as the recalled project.
 
+## WAV import startup validation
+
+WAV startup/import host validation is recorded in
+[wav-import-host-validation-evidence.md](wav-import-host-validation-evidence.md).
+The release-facing closure evidence for retiring the old synchronous shell path is recorded in
+[wav-import-release-evidence.md](wav-import-release-evidence.md).
+
+The required WAV-705 matrix is:
+
+- standalone construction plus project replace with missing-local sample paths;
+- standalone construction plus project replace with removable-drive-like sample paths;
+- standalone construction plus project replace with UNC-like network sample paths; and
+- REAPER startup for the same three project variants with signed evidence for instantiation timing,
+  parameter visibility, and restored track-chunk capture.
+
+All six cases must preserve zero startup sample I/O on the standalone seam, remain `not-run` until
+explicit import/validation work is requested, and keep the REAPER VST3 instance online with the
+safe startup macro values visible immediately after instantiation.
+
 ## Sprint 4 diagnostics spot-check
 
 Once the plugin or standalone shell opens, the Status panel should now also expose a developer diagnostics block.
