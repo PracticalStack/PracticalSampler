@@ -549,6 +549,7 @@ ordered_json serializeProjectMacros(const std::vector<RuntimeProjectMacroDefinit
         macroObject["defaultValue"] = macro.defaultValue;
         macroObject["minValue"] = macro.minValue;
         macroObject["maxValue"] = macro.maxValue;
+        macroObject["exposedInPerformance"] = macro.exposedInPerformance;
         macroObject["targets"] = serializeMacroTargets(macro.targets);
         array.push_back(std::move(macroObject));
     }
@@ -1332,6 +1333,8 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
                         macro.minValue = *minValue;
                     if (const auto maxValue = readRequired<RuntimeProjectLoadResult, double>(macroObject, result, "maxValue", context.c_str()))
                         macro.maxValue = *maxValue;
+                    if (const auto exposedInPerformance = readOptional<RuntimeProjectLoadResult, bool>(macroObject, result, "exposedInPerformance", context.c_str()))
+                        macro.exposedInPerformance = *exposedInPerformance;
 
                     const auto targetsIterator = macroObject.find("targets");
                     if (targetsIterator == macroObject.end() || !isObjectArray(*targetsIterator))
@@ -1850,8 +1853,14 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
             if (macro.name.empty())
                 addIssue(result, "Project macro '" + macro.id + "' must have a name.");
 
+            if (!std::isfinite(macro.minValue) || !std::isfinite(macro.maxValue) || !std::isfinite(macro.defaultValue))
+                addIssue(result, "Project macro '" + macro.id + "' must have finite minValue, maxValue, and defaultValue.");
+
             if (macro.minValue > macro.maxValue)
                 addIssue(result, "Project macro '" + macro.id + "' has minValue greater than maxValue.");
+
+            if (macro.defaultValue < macro.minValue || macro.defaultValue > macro.maxValue)
+                addIssue(result, "Project macro '" + macro.id + "' has defaultValue outside minValue/maxValue.");
 
             for (const auto& target : macro.targets)
             {

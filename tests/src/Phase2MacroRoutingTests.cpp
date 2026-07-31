@@ -74,10 +74,72 @@ int main()
                 "Macro edit should commit successfully.");
         require(session.getProject().authoring.macros.front().targets.front().parameterId == "zone-pan",
                 "Macro parameter assignment did not persist in the authoring session.");
+        require(session.getSelectedMacroIndex().has_value() && *session.getSelectedMacroIndex() == 0,
+                "Session should recover a stable default macro selection.");
         require(session.moveMacro(0, 1, "Move macro later on the compact surface").applied,
                 "Macro reorder should commit successfully.");
         require(session.getProject().authoring.macros[1].id == editedMacro.id,
                 "Macro reorder did not persist the new authoring layout.");
+        require(session.getSelectedMacroIndex().has_value() && session.getProject().authoring.macros[*session.getSelectedMacroIndex()].id == editedMacro.id,
+                "Macro selection should follow the selected macro by stable ID after reordering.");
+
+        drs::engine::RuntimeProjectMacroDefinition createdMacro;
+        createdMacro.name = "Layer Blend";
+        createdMacro.defaultValue = 0.40;
+        createdMacro.minValue = 0.0;
+        createdMacro.maxValue = 1.0;
+        createdMacro.exposedInPerformance = true;
+        const auto createMacroResult = session.createMacro(createdMacro, "Create exposed layer macro");
+        require(createMacroResult.applied,
+                "Macro creation should commit successfully.");
+        require(session.getProject().authoring.macros.size() == 3,
+                "Macro creation should append a new authored macro.");
+        const auto createdMacroIndex = session.getSelectedMacroIndex();
+        require(createdMacroIndex.has_value(),
+                "Macro creation should select the new macro.");
+        const auto createdMacroId = session.getProject().authoring.macros[*createdMacroIndex].id;
+        require(!createdMacroId.empty()
+                    && session.getProject().authoring.macros[*createdMacroIndex].name == "Layer Blend"
+                    && session.getProject().authoring.macros[*createdMacroIndex].exposedInPerformance,
+                "Created macro should preserve its authored name and exposure metadata.");
+
+        const auto duplicateMacroResult = session.duplicateMacro(createdMacroId, "Duplicate exposed layer macro");
+        require(duplicateMacroResult.applied,
+                "Macro duplication should commit successfully.");
+        require(session.getProject().authoring.macros.size() == 4,
+                "Macro duplication should append a distinct authored macro.");
+        const auto duplicatedMacroIndex = session.getSelectedMacroIndex();
+        require(duplicatedMacroIndex.has_value(),
+                "Macro duplication should select the duplicate.");
+        const auto& duplicatedMacro = session.getProject().authoring.macros[*duplicatedMacroIndex];
+        require(duplicatedMacro.id != createdMacroId
+                    && duplicatedMacro.name.find("Layer Blend Copy") != std::string::npos
+                    && duplicatedMacro.exposedInPerformance,
+                "Macro duplication should generate a stable new ID while preserving useful authored metadata.");
+
+        auto invalidMacro = duplicatedMacro;
+        invalidMacro.defaultValue = 1.5;
+        const auto invalidMacroResult = session.updateMacro(*duplicatedMacroIndex,
+                                                            invalidMacro,
+                                                            "Break macro range validation");
+        require(!invalidMacroResult.applied,
+                "Macro edits should reject defaults outside the declared range.");
+
+        auto renamedIdMacro = duplicatedMacro;
+        renamedIdMacro.id = "renamed-id";
+        const auto renamedIdResult = session.updateMacro(*duplicatedMacroIndex,
+                                                         renamedIdMacro,
+                                                         "Attempt illegal macro ID change");
+        require(!renamedIdResult.applied,
+                "Macro IDs should remain immutable once created.");
+
+        require(session.deleteMacro(duplicatedMacro.id, "Delete duplicate macro").applied,
+                "Macro deletion should commit successfully.");
+        require(session.getProject().authoring.macros.size() == 3,
+                "Macro deletion should remove the duplicate authored macro.");
+        require(session.getSelectedMacroIndex().has_value()
+                    && session.getProject().authoring.macros[*session.getSelectedMacroIndex()].id == createdMacroId,
+                "Macro deletion should keep a predictable nearby selection.");
 
         auto editedFxSlot = session.getProject().authoring.fxSlots[1];
         editedFxSlot.effectType = "drs.algorithmicReverb";
@@ -126,6 +188,12 @@ int main()
         require(roundTripLoad.loaded, "Saved Phase 2 Sprint 5 project should load successfully.");
         require(roundTripLoad.project.authoring.macros[1].targets.front().parameterId == "zone-pan",
                 "Saved Sprint 5 project must preserve edited macro assignments.");
+        const auto savedCreatedMacro = std::find_if(roundTripLoad.project.authoring.macros.begin(),
+                                                    roundTripLoad.project.authoring.macros.end(),
+                                                    [&](const auto& macro) { return macro.id == createdMacroId; });
+        require(savedCreatedMacro != roundTripLoad.project.authoring.macros.end()
+                    && savedCreatedMacro->exposedInPerformance,
+                "Saved projects must preserve macro exposure metadata by stable macro ID.");
         const auto savedReverb = std::find_if(roundTripLoad.project.authoring.fxSlots.begin(),
                                               roundTripLoad.project.authoring.fxSlots.end(),
                                               [](const auto& slot) { return slot.id == "shimmer-delay"; });
@@ -136,6 +204,18 @@ int main()
                 "Saved Sprint 5 project must preserve edited routing inputs.");
         require(roundTripLoad.project.authoring.routingBuses[1].fxSlotIds.size() == 2,
                 "Saved Sprint 5 project must preserve edited routing chains.");
+
+        auto invalidProject = roundTripLoad.project;
+        invalidProject.authoring.macros.back().defaultValue = 5.0;
+        const auto invalidProjectValidation = drs::engine::validateRuntimeProjectModel(invalidProject);
+        require(!invalidProjectValidation.valid
+                    && std::any_of(invalidProjectValidation.issues.begin(),
+                                   invalidProjectValidation.issues.end(),
+                                   [](const std::string& issue)
+                                   {
+                                       return issue.find("defaultValue outside minValue/maxValue") != std::string::npos;
+                                   }),
+                "Project validation should reject macros whose defaultValue falls outside the declared range.");
 
         drs::plugin::Processor processor;
         std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());

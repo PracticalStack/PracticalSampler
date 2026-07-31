@@ -99,6 +99,7 @@ struct RuntimeProjectMacroDefinition
     double minValue = 0.0;
     double maxValue = 1.0;
     std::vector<RuntimeProjectMacroTargetDefinition> targets;
+    bool exposedInPerformance = false;
 };
 
 struct RuntimeProjectGroupDefinition

@@ -84,6 +84,8 @@ public:
     std::vector<AuthoringZoneSummary> getZoneSummaries() const;
     std::optional<RuntimeProjectZoneDefinition> getSelectedZone() const;
     std::optional<RuntimeProjectGroupDefinition> getSelectedGroup() const;
+    std::optional<RuntimeProjectMacroDefinition> getSelectedMacro() const;
+    std::optional<std::size_t> getSelectedMacroIndex() const;
     AuthoringGroupRoundRobinStatus getSelectedGroupRoundRobinStatus() const;
     AuthoringDspSelection getDspSelection() const;
     std::optional<RuntimeProjectPerformanceBankDefinition> getSelectedPerformanceBank() const;
@@ -92,6 +94,7 @@ public:
 
     RuntimeProjectDocumentActionResult selectZone(const std::string& zoneId);
     RuntimeProjectDocumentActionResult selectGroup(const std::string& groupId);
+    RuntimeProjectDocumentActionResult selectMacro(const std::string& macroId);
     RuntimeProjectDocumentActionResult selectPerformanceBank(const std::string& performanceBankId);
     RuntimeProjectDocumentActionResult selectDspSlot(const std::string& fxSlotId);
     RuntimeProjectDocumentActionResult updateSelectedZone(const RuntimeProjectZoneDefinition& zone,
@@ -138,6 +141,12 @@ public:
                                                             std::vector<std::string> authoringNotes,
                                                             const std::string& label,
                                                             bool reconcileInferredRoundRobin = true);
+    RuntimeProjectDocumentActionResult createMacro(const RuntimeProjectMacroDefinition& macro,
+                                                   const std::string& label);
+    RuntimeProjectDocumentActionResult duplicateMacro(const std::string& macroId,
+                                                      const std::string& label);
+    RuntimeProjectDocumentActionResult deleteMacro(const std::string& macroId,
+                                                   const std::string& label);
     RuntimeProjectDocumentActionResult updateMacro(std::size_t macroIndex,
                                                    const RuntimeProjectMacroDefinition& macro,
                                                    const std::string& label);
@@ -207,7 +216,9 @@ private:
     std::optional<PendingDspParameterGesture> pendingDspParameterGesture;
     DspParameterGesturePreviewListener dspParameterGesturePreviewListener;
     AuthoringDspSelection dspSelection;
+    std::string selectedMacroId;
 
     void recoverDspSelection();
+    void recoverMacroSelection();
 };
 } // namespace drs::engine

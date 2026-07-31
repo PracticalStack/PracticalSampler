@@ -4,6 +4,7 @@
 #include "drs/engine/RuntimeLoader.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstddef>
 #include <string_view>
@@ -91,6 +92,21 @@ std::optional<std::size_t> findZoneIndexById(const RuntimeProjectModel& project,
         return std::nullopt;
 
     return static_cast<std::size_t>(std::distance(project.authoring.zones.begin(), iterator));
+}
+
+std::optional<std::size_t> findMacroIndexById(const RuntimeProjectModel& project,
+                                              const std::string& macroId)
+{
+    const auto iterator = std::find_if(project.authoring.macros.begin(),
+                                       project.authoring.macros.end(),
+                                       [&](const RuntimeProjectMacroDefinition& macro)
+                                       {
+                                           return macro.id == macroId;
+                                       });
+    if (iterator == project.authoring.macros.end())
+        return std::nullopt;
+
+    return static_cast<std::size_t>(std::distance(project.authoring.macros.begin(), iterator));
 }
 
 std::optional<std::size_t> findFxSlotIndexById(const RuntimeProjectModel& project,
@@ -186,6 +202,165 @@ std::optional<std::string> findRepresentativeZoneIdForGroup(const RuntimeProject
         return std::nullopt;
 
     return iterator->id;
+}
+
+std::string slugifyIdentifier(const std::string& text, std::string_view fallback)
+{
+    std::string slug;
+    slug.reserve(text.size());
+
+    bool previousWasSeparator = false;
+    for (const auto character : text)
+    {
+        const auto ascii = static_cast<unsigned char>(character);
+        if (std::isalnum(ascii) != 0)
+        {
+            slug.push_back(static_cast<char>(std::tolower(ascii)));
+            previousWasSeparator = false;
+            continue;
+        }
+
+        if (!slug.empty() && !previousWasSeparator)
+        {
+            slug.push_back('-');
+            previousWasSeparator = true;
+        }
+    }
+
+    while (!slug.empty() && slug.front() == '-')
+        slug.erase(slug.begin());
+    while (!slug.empty() && slug.back() == '-')
+        slug.pop_back();
+
+    return slug.empty() ? std::string(fallback) : slug;
+}
+
+std::string buildDefaultMacroName(const RuntimeProjectModel& project)
+{
+    return "Macro " + std::to_string(project.authoring.macros.size() + 1);
+}
+
+std::string makeUniqueMacroId(const RuntimeProjectModel& project,
+                              const std::string& preferredBase,
+                              const std::string& ignoredMacroId = {})
+{
+    std::unordered_set<std::string> usedIds;
+    usedIds.reserve(project.authoring.macros.size());
+    for (const auto& macro : project.authoring.macros)
+    {
+        if (!ignoredMacroId.empty() && macro.id == ignoredMacroId)
+            continue;
+        usedIds.insert(macro.id);
+    }
+
+    const auto baseId = slugifyIdentifier(preferredBase, "macro");
+    if (!usedIds.count(baseId))
+        return baseId;
+
+    auto suffix = 2;
+    for (;; ++suffix)
+    {
+        const auto candidate = baseId + "-" + std::to_string(suffix);
+        if (!usedIds.count(candidate))
+            return candidate;
+    }
+}
+
+std::string buildDuplicateMacroName(const RuntimeProjectModel& project,
+                                    const RuntimeProjectMacroDefinition& source)
+{
+    const auto baseName = source.name.empty() ? "Macro" : source.name;
+    const auto preferredName = baseName + " Copy";
+
+    std::unordered_set<std::string> usedNames;
+    usedNames.reserve(project.authoring.macros.size());
+    for (const auto& macro : project.authoring.macros)
+        usedNames.insert(macro.name);
+
+    if (!usedNames.count(preferredName))
+        return preferredName;
+
+    auto suffix = 2;
+    for (;; ++suffix)
+    {
+        const auto candidate = preferredName + " " + std::to_string(suffix);
+        if (!usedNames.count(candidate))
+            return candidate;
+    }
+}
+
+std::optional<std::string> validateMacroDefinition(const RuntimeProjectModel& project,
+                                                   const RuntimeProjectMacroDefinition& macro,
+                                                   std::optional<std::size_t> editedMacroIndex = std::nullopt)
+{
+    if (macro.id.empty())
+        return "Macro ids must be non-empty.";
+    if (macro.name.empty())
+        return "Macro names must be non-empty.";
+
+    const auto finite = std::isfinite(macro.minValue)
+        && std::isfinite(macro.maxValue)
+        && std::isfinite(macro.defaultValue);
+    if (!finite)
+        return "Macro ranges and default values must be finite.";
+    if (macro.minValue > macro.maxValue)
+        return "Macro minValue must not exceed maxValue.";
+    if (macro.defaultValue < macro.minValue || macro.defaultValue > macro.maxValue)
+        return "Macro defaultValue must stay within the declared min/max range.";
+
+    for (std::size_t index = 0; index < project.authoring.macros.size(); ++index)
+    {
+        if (editedMacroIndex.has_value() && *editedMacroIndex == index)
+            continue;
+        if (project.authoring.macros[index].id == macro.id)
+            return "Macro id '" + macro.id + "' already exists.";
+    }
+
+    for (const auto& target : macro.targets)
+    {
+        if (target.parameterId.empty())
+            return "Macro '" + macro.id + "' contains a target without parameterId.";
+        if (target.parameterPath.empty())
+            return "Macro '" + macro.id + "' contains a target without parameterPath.";
+        if (target.role.empty())
+            return "Macro '" + macro.id + "' contains a target without role.";
+
+        const auto hasDspIdentity = !target.dspSlotId.empty() || !target.dspParameterId.empty();
+        if (!hasDspIdentity)
+            continue;
+
+        const auto finiteTargetRange = std::isfinite(target.sourceMinimum)
+            && std::isfinite(target.sourceMaximum)
+            && std::isfinite(target.destinationMinimum)
+            && std::isfinite(target.destinationMaximum);
+        const auto validCurve = target.curve == "linear" || target.curve == "logarithmic";
+        const auto validLogRange = target.curve != "logarithmic"
+            || (target.destinationMinimum > 0.0 && target.destinationMaximum > 0.0);
+        if (target.dspSlotId.empty()
+            || target.dspParameterId.empty()
+            || !finiteTargetRange
+            || target.sourceMinimum >= target.sourceMaximum
+            || target.destinationMinimum > target.destinationMaximum
+            || !validCurve
+            || !validLogRange)
+        {
+            return "Macro '" + macro.id + "' contains an invalid structured DSP target.";
+        }
+    }
+
+    return std::nullopt;
+}
+
+RuntimeProjectMacroDefinition normalizeCreatedMacro(const RuntimeProjectModel& project,
+                                                    RuntimeProjectMacroDefinition macro)
+{
+    if (macro.name.empty())
+        macro.name = buildDefaultMacroName(project);
+
+    if (macro.id.empty())
+        macro.id = makeUniqueMacroId(project, macro.name);
+
+    return macro;
 }
 
 void normalizeGroupDisplayOrder(RuntimeProjectModel& project)
@@ -827,6 +1002,7 @@ AuthoringSession::AuthoringSession(RuntimeProjectModel project)
     : documentController(prepareAuthoringProject(std::move(project)))
 {
     recoverDspSelection();
+    recoverMacroSelection();
 }
 
 const RuntimeProjectModel& AuthoringSession::getProject() const
@@ -849,7 +1025,11 @@ RuntimeProjectDocumentActionResult AuthoringSession::restoreCheckpoint(
     RuntimeProjectDocumentCheckpointConstraints constraints)
 {
     auto result = documentController.restoreCheckpoint(std::move(checkpoint), std::move(constraints));
-    if (result.applied) recoverDspSelection();
+    if (result.applied)
+    {
+        recoverDspSelection();
+        recoverMacroSelection();
+    }
     return result;
 }
 
@@ -857,6 +1037,7 @@ void AuthoringSession::replaceProject(RuntimeProjectModel project)
 {
     documentController = RuntimeProjectDocumentController(prepareAuthoringProject(std::move(project)));
     recoverDspSelection();
+    recoverMacroSelection();
 }
 
 std::vector<AuthoringZoneSummary> AuthoringSession::getZoneSummaries() const
@@ -883,6 +1064,23 @@ std::optional<RuntimeProjectGroupDefinition> AuthoringSession::getSelectedGroup(
         return std::nullopt;
 
     return getProject().authoring.groups[*groupIndex];
+}
+
+std::optional<RuntimeProjectMacroDefinition> AuthoringSession::getSelectedMacro() const
+{
+    const auto selectedMacroIndex = getSelectedMacroIndex();
+    if (!selectedMacroIndex.has_value())
+        return std::nullopt;
+
+    return getProject().authoring.macros[*selectedMacroIndex];
+}
+
+std::optional<std::size_t> AuthoringSession::getSelectedMacroIndex() const
+{
+    if (selectedMacroId.empty())
+        return std::nullopt;
+
+    return findMacroIndexById(getProject(), selectedMacroId);
 }
 
 AuthoringGroupRoundRobinStatus AuthoringSession::getSelectedGroupRoundRobinStatus() const
@@ -1077,6 +1275,21 @@ RuntimeProjectDocumentActionResult AuthoringSession::selectGroup(const std::stri
     }
 
     return documentController.commitSnapshot(project, "Select group", changedPaths);
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::selectMacro(const std::string& macroId)
+{
+    if (!findMacroIndexById(getProject(), macroId).has_value())
+        return makeRejectedResult(getDocumentState(),
+                                  "Macro selection rejected",
+                                  "Macro '" + macroId + "' does not exist in the current authoring project.");
+
+    selectedMacroId = macroId;
+    RuntimeProjectDocumentActionResult result;
+    result.applied = true;
+    result.state = "Macro selected";
+    result.documentState = getDocumentState();
+    return result;
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::createGroup(const RuntimeProjectGroupDefinition& group,
@@ -1848,6 +2061,83 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
     return documentController.commitSnapshot(project, label, changedPaths);
 }
 
+RuntimeProjectDocumentActionResult AuthoringSession::createMacro(const RuntimeProjectMacroDefinition& macro,
+                                                                 const std::string& label)
+{
+    auto project = getProject();
+    auto createdMacro = normalizeCreatedMacro(project, macro);
+    if (const auto validationIssue = validateMacroDefinition(project, createdMacro))
+    {
+        return makeRejectedResult(getDocumentState(),
+                                  "Macro creation rejected",
+                                  *validationIssue);
+    }
+
+    project.authoring.macros.push_back(std::move(createdMacro));
+    const auto result = documentController.commitSnapshot(project, label, { "authoring.macros" });
+    if (result.applied)
+        selectedMacroId = project.authoring.macros.back().id;
+    return result;
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::duplicateMacro(const std::string& macroId,
+                                                                    const std::string& label)
+{
+    auto project = getProject();
+    const auto sourceIndex = findMacroIndexById(project, macroId);
+    if (!sourceIndex.has_value())
+        return makeRejectedResult(getDocumentState(),
+                                  "Macro duplication rejected",
+                                  "Macro '" + macroId + "' does not exist in the current authoring project.");
+
+    auto duplicate = project.authoring.macros[*sourceIndex];
+    duplicate.name = buildDuplicateMacroName(project, duplicate);
+    duplicate.id = makeUniqueMacroId(project, duplicate.id + "-copy");
+    if (const auto validationIssue = validateMacroDefinition(project, duplicate))
+    {
+        return makeRejectedResult(getDocumentState(),
+                                  "Macro duplication rejected",
+                                  *validationIssue);
+    }
+
+    project.authoring.macros.push_back(std::move(duplicate));
+    const auto result = documentController.commitSnapshot(project, label, { "authoring.macros" });
+    if (result.applied)
+        selectedMacroId = project.authoring.macros.back().id;
+    return result;
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::deleteMacro(const std::string& macroId,
+                                                                 const std::string& label)
+{
+    auto project = getProject();
+    const auto macroIndex = findMacroIndexById(project, macroId);
+    if (!macroIndex.has_value())
+        return makeRejectedResult(getDocumentState(),
+                                  "Macro deletion rejected",
+                                  "Macro '" + macroId + "' does not exist in the current authoring project.");
+
+    std::string fallbackSelectedMacroId;
+    if (selectedMacroId == macroId)
+    {
+        const auto nextIndex = *macroIndex + 1;
+        if (nextIndex < project.authoring.macros.size())
+            fallbackSelectedMacroId = project.authoring.macros[nextIndex].id;
+        else if (*macroIndex > 0)
+            fallbackSelectedMacroId = project.authoring.macros[*macroIndex - 1].id;
+    }
+
+    project.authoring.macros.erase(project.authoring.macros.begin()
+                                   + static_cast<std::ptrdiff_t>(*macroIndex));
+    const auto result = documentController.commitSnapshot(project, label, { "authoring.macros" });
+    if (result.applied)
+    {
+        selectedMacroId = fallbackSelectedMacroId;
+        recoverMacroSelection();
+    }
+    return result;
+}
+
 RuntimeProjectDocumentActionResult AuthoringSession::updateMacro(std::size_t macroIndex,
                                                                  const RuntimeProjectMacroDefinition& macro,
                                                                  const std::string& label)
@@ -1856,6 +2146,18 @@ RuntimeProjectDocumentActionResult AuthoringSession::updateMacro(std::size_t mac
         return makeRejectedResult(getDocumentState(),
                                   "Macro edit rejected",
                                   "Macro index " + std::to_string(macroIndex) + " is out of range.");
+
+    if (macro.id != getProject().authoring.macros[macroIndex].id)
+        return makeRejectedResult(getDocumentState(),
+                                  "Macro edit rejected",
+                                  "Macro ids are immutable once created.");
+
+    if (const auto validationIssue = validateMacroDefinition(getProject(), macro, macroIndex))
+    {
+        return makeRejectedResult(getDocumentState(),
+                                  "Macro edit rejected",
+                                  *validationIssue);
+    }
 
     auto project = getProject();
     project.authoring.macros[macroIndex] = macro;
@@ -2262,14 +2564,22 @@ RuntimeProjectDocumentActionResult AuthoringSession::updatePerformanceBank(
 RuntimeProjectDocumentActionResult AuthoringSession::undo()
 {
     auto result = documentController.undo();
-    if (result.applied) recoverDspSelection();
+    if (result.applied)
+    {
+        recoverDspSelection();
+        recoverMacroSelection();
+    }
     return result;
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::redo()
 {
     auto result = documentController.redo();
-    if (result.applied) recoverDspSelection();
+    if (result.applied)
+    {
+        recoverDspSelection();
+        recoverMacroSelection();
+    }
     return result;
 }
 
@@ -2281,7 +2591,10 @@ RuntimeProjectDocumentActionResult AuthoringSession::applyProjectMigration(
         "Upgrade project to curated DSP schema",
         { "schemaVersion", "authoring.schemaVersion", "authoring.fxSlots", "authoring.routingBuses" });
     if (result.applied)
+    {
         recoverDspSelection();
+        recoverMacroSelection();
+    }
     return result;
 }
 
@@ -2316,6 +2629,16 @@ void AuthoringSession::recoverDspSelection()
             return;
         }
     }
+}
+
+void AuthoringSession::recoverMacroSelection()
+{
+    if (!selectedMacroId.empty() && findMacroIndexById(getProject(), selectedMacroId).has_value())
+        return;
+
+    selectedMacroId = getProject().authoring.macros.empty()
+        ? std::string {}
+        : getProject().authoring.macros.front().id;
 }
 
 void AuthoringSession::markSaved()
