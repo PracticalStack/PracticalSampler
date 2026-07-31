@@ -48,7 +48,25 @@ DspGraphPlanBuildResult compileDspGraphPlan(const ImmutablePlaybackSnapshot& sna
     std::unordered_map<std::string, std::string> zoneGroups;
     for (const auto& zone : snapshot.zones) zoneGroups.emplace(zone.id, zone.groupId);
 
-    for (std::size_t busIndex = 0; busIndex < snapshot.routingBuses.size(); ++busIndex)
+    std::vector<std::size_t> orderedBusIndices;
+    orderedBusIndices.reserve(snapshot.routingBuses.size());
+    for (std::size_t index = 0; index < snapshot.routingBuses.size(); ++index)
+        orderedBusIndices.push_back(index);
+    const auto ownerDepth = [&](const std::size_t index)
+    {
+        const auto& source = snapshot.routingBuses[index].inputSourceId;
+        if (source.rfind("zones/", 0) == 0) return 0;
+        if (source.rfind("groups/", 0) == 0) return 1;
+        if (source == "master") return 2;
+        return 3;
+    };
+    std::stable_sort(orderedBusIndices.begin(), orderedBusIndices.end(),
+                     [&](const auto left, const auto right)
+                     {
+                         return ownerDepth(left) < ownerDepth(right);
+                     });
+
+    for (const auto busIndex : orderedBusIndices)
     {
         const auto& bus = snapshot.routingBuses[busIndex];
         if (bus.chainBypassed) continue;

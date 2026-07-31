@@ -75,6 +75,15 @@ int main()
                 "Each plan node must resolve its fixed output destination without a project pointer.");
         require(plan.plan.costUnits == 16 && !plan.plan.directFastPath,
                 "Unknown unavailable slots must be bypassed while resolved node costs are accumulated.");
+        auto reverseAuthoredOrder = snapshot;
+        std::reverse(reverseAuthoredOrder.routingBuses.begin(), reverseAuthoredOrder.routingBuses.end());
+        const auto reverseOrderPlan = drs::engine::compileDspGraphPlan(reverseAuthoredOrder);
+        require(reverseOrderPlan.compiled
+                    && reverseOrderPlan.plan.nodes.size() == plan.plan.nodes.size()
+                    && reverseOrderPlan.plan.nodes[0].ownerKind == drs::engine::DspGraphOwnerKind::zone
+                    && reverseOrderPlan.plan.nodes[1].ownerKind == drs::engine::DspGraphOwnerKind::group
+                    && reverseOrderPlan.plan.nodes[2].ownerKind == drs::engine::DspGraphOwnerKind::master,
+                "Graph compilation must derive zone -> group -> master order independently of authored bus order.");
         const auto repeatedPlan = drs::engine::compileDspGraphPlan(snapshot);
         require(repeatedPlan.compiled && repeatedPlan.plan.planDigest == plan.plan.planDigest
                     && repeatedPlan.plan.nodes.size() == plan.plan.nodes.size()

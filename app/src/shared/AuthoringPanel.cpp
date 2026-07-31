@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <tuple>
 #include <utility>
 
@@ -53,17 +54,14 @@ constexpr std::array<const char*, 5> curatedMacroRoles
     "placement"
 };
 
-constexpr std::array<const char*, 9> curatedFxTypes
+constexpr std::array<const char*, 6> curatedFxTypes
 {
     "drs.gain",
     "drs.saturator",
     "drs.stereoDelay",
     "drs.algorithmicReverb",
-    "eq",
-    "delay",
-    "reverb",
-    "chorus",
-    "saturator"
+    "drs.compactEq",
+    "drs.chorus"
 };
 
 constexpr std::array<const char*, 3> curatedTriggerEvents
@@ -519,6 +517,18 @@ bool hasFindingCode(const std::vector<drs::engine::PlaybackSnapshotFinding>& fin
                        });
 }
 
+const drs::engine::PlaybackSnapshotFinding* findBlockingPlaybackFinding(
+    const std::vector<drs::engine::PlaybackSnapshotFinding>& findings)
+{
+    const auto error = std::find_if(findings.begin(), findings.end(), [](const auto& finding)
+    {
+        return finding.severity == drs::engine::PlaybackSnapshotFindingSeverity::error;
+    });
+    if (error != findings.end())
+        return &*error;
+    return findings.empty() ? nullptr : &findings.front();
+}
+
 DraftPlaybackGuidance buildDraftPlaybackGuidance(const drs::engine::AuthoringSession& authoringSession,
                                                  const drs::engine::DraftPlaybackStatus& playbackStatus)
 {
@@ -562,6 +572,28 @@ DraftPlaybackGuidance buildDraftPlaybackGuidance(const drs::engine::AuthoringSes
     {
         guidance.statusText = "playback busy: Wait for the current playback build to finish applying.";
         return guidance;
+    }
+
+    const auto previewFailed = playbackStatus.preview.state == "Failed"
+        || playbackStatus.preview.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::failed;
+    if (previewFailed)
+    {
+        if (const auto* finding = findBlockingPlaybackFinding(playbackStatus.preview.findings))
+        {
+            guidance.statusText = "playback blocked: " + finding->code + ": " + finding->message;
+            return guidance;
+        }
+    }
+
+    const auto performanceFailed = playbackStatus.performance.state == "Failed"
+        || playbackStatus.performance.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::failed;
+    if (performanceFailed)
+    {
+        if (const auto* finding = findBlockingPlaybackFinding(playbackStatus.performance.findings))
+        {
+            guidance.statusText = "playback blocked: " + finding->code + ": " + finding->message;
+            return guidance;
+        }
     }
 
     if (playbackStatus.preview.revision != playbackStatus.draftRevision
@@ -3399,8 +3431,7 @@ void AuthoringPanel::refreshContextualAccessibility()
         ? juce::String::fromUTF8(project.authoring.fxSlots[static_cast<std::size_t>(selectedFxSlotIndex)].displayName.c_str())
         : juce::String("the selected FX slot");
     const auto fxType = hasSelectedFxSlot
-        ? describeCurrentValue(juce::String::fromUTF8(project.authoring.fxSlots[static_cast<std::size_t>(selectedFxSlotIndex)].effectType.c_str()),
-                               "(unspecified)")
+        ? describeCurrentValue(fxTypeSelector.getText(), "(unspecified)")
         : juce::String{};
     const auto fxState = hasSelectedFxSlot
         ? juce::String(project.authoring.fxSlots[static_cast<std::size_t>(selectedFxSlotIndex)].bypassed ? "bypassed"
@@ -4883,12 +4914,23 @@ void AuthoringPanel::applySelectedFxSlotEdit(const juce::String& label)
         editedFxSlot.effectVersion = 1;
         editedFxSlot.unavailable = false;
         editedFxSlot.legacyInert = false;
+        std::vector<drs::engine::RuntimeProjectFxSlotDefinition::ParameterValue> normalizedParameters;
+        normalizedParameters.reserve(descriptor->parameters.size());
         for (const auto& parameter : descriptor->parameters)
         {
-            if (std::none_of(editedFxSlot.parameters.begin(), editedFxSlot.parameters.end(),
-                             [&](const auto& value) { return value.id == parameter.id; }))
-                editedFxSlot.parameters.push_back({ std::string(parameter.id), parameter.defaultValue });
+            const auto authored = std::find_if(editedFxSlot.parameters.begin(),
+                                               editedFxSlot.parameters.end(),
+                                               [&](const auto& value) { return value.id == parameter.id; });
+            const auto authoredValueIsUsable = authored != editedFxSlot.parameters.end()
+                && std::isfinite(authored->value)
+                && authored->value >= parameter.minimum
+                && authored->value <= parameter.maximum;
+            normalizedParameters.push_back({
+                std::string(parameter.id),
+                authoredValueIsUsable ? authored->value : parameter.defaultValue
+            });
         }
+        editedFxSlot.parameters = std::move(normalizedParameters);
     }
     editedFxSlot.bypassed = fxBypassedToggle.getToggleState();
 

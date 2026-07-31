@@ -144,6 +144,18 @@ std::optional<drs::engine::RuntimeProjectModel> upgradeLoadedProjectToLatestSche
         upgradedProject = zoneGroupMigration.project;
     }
 
+    if (upgradedProject.schemaVersion == 4 && upgradedProject.authoring.schemaVersion == 3)
+    {
+        const auto dspMigration = drs::engine::migrateRuntimeProjectToCuratedDspSchema(upgradedProject);
+        if (!dspMigration.valid)
+        {
+            issues = dspMigration.issues;
+            return std::nullopt;
+        }
+
+        upgradedProject = dspMigration.project;
+    }
+
     return upgradedProject;
 }
 
@@ -1265,12 +1277,18 @@ bool Editor::loadProjectFromFile(const juce::File& file)
         return false;
     }
 
-    if (!processor.replaceAuthoringProject(*upgradedProject, targetFile))
+    const auto projectWasMigrated = upgradedProject->schemaVersion != loadResult.project.schemaVersion
+        || upgradedProject->authoring.schemaVersion != loadResult.project.authoring.schemaVersion;
+    const auto projectInstalled = projectWasMigrated
+        ? processor.replaceAuthoringProject(loadResult.project, targetFile)
+            && processor.applyAuthoringProjectMigration(*upgradedProject)
+        : processor.replaceAuthoringProject(*upgradedProject, targetFile);
+    if (!projectInstalled)
     {
         juce::AlertWindow::showMessageBoxAsync(
             juce::AlertWindow::WarningIcon,
             "Open Project Failed",
-            "The manifest was loaded but did not match the authored project identity or canonical content.");
+            "The manifest was loaded, but its authored project or schema migration could not be activated.");
         return false;
     }
 
@@ -1363,10 +1381,10 @@ drs::engine::RuntimeProjectModel Editor::buildUnloadedProjectState() const
 {
     drs::engine::RuntimeProjectModel project;
     project.schemaName = "drs.project";
-    project.schemaVersion = 4;
+    project.schemaVersion = 5;
     project.displayName = "No Project Loaded";
     project.authoring.schemaName = "drs.authoring";
-    project.authoring.schemaVersion = 3;
+    project.authoring.schemaVersion = 4;
     project.authoring.notes = { "Open a project or create a new one to begin authoring." };
     project.notes = { "This session starts without loading the checked-in reference project." };
     return project;
@@ -1379,16 +1397,16 @@ drs::engine::RuntimeProjectModel Editor::buildEmptyProjectTemplate() const
 
     drs::engine::RuntimeProjectModel project;
     project.schemaName = "drs.project";
-    project.schemaVersion = 4;
+    project.schemaVersion = 5;
     project.projectId = makeProjectId();
     project.displayName = "Untitled Project";
     project.contentRootPath = defaultProjectDirectory.getFullPathName().toStdString();
     project.defaultInstrumentManifestPath = defaultInstrumentFile.getFullPathName().toStdString();
     project.authoring.schemaName = "drs.authoring";
-    project.authoring.schemaVersion = 3;
+    project.authoring.schemaVersion = 4;
     project.authoring.notes = { "Created in the plug-in authoring shell." };
     project.notes = {
-        "Created as a new Zone Groups authoring project from the plug-in shell.",
+        "Created as a new curated DSP authoring project from the plug-in shell.",
         "Sample sources and zones can be added in later authoring sprints."
     };
     return project;

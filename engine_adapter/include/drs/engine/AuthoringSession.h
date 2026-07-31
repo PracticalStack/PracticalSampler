@@ -192,6 +192,7 @@ public:
                                                              const std::string& label);
     RuntimeProjectDocumentActionResult undo();
     RuntimeProjectDocumentActionResult redo();
+    RuntimeProjectDocumentActionResult applyProjectMigration(RuntimeProjectModel migratedProject);
     void markSaved();
 
 private:

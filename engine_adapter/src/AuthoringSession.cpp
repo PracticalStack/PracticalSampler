@@ -2273,6 +2273,18 @@ RuntimeProjectDocumentActionResult AuthoringSession::redo()
     return result;
 }
 
+RuntimeProjectDocumentActionResult AuthoringSession::applyProjectMigration(
+    RuntimeProjectModel migratedProject)
+{
+    auto result = documentController.commitSnapshot(
+        migratedProject,
+        "Upgrade project to curated DSP schema",
+        { "schemaVersion", "authoring.schemaVersion", "authoring.fxSlots", "authoring.routingBuses" });
+    if (result.applied)
+        recoverDspSelection();
+    return result;
+}
+
 void AuthoringSession::recoverDspSelection()
 {
     if (!dspSelection.fxSlotId.empty())

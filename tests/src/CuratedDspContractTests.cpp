@@ -176,6 +176,66 @@ int main()
                     && !migratedAuthoring.getDspSelection().routingBusId.empty(),
                 "A migrated project must recover a deterministic editor-only DSP selection.");
 
+        drs::engine::RuntimeProjectModel schemaFourCuratedProject;
+        schemaFourCuratedProject.schemaName = "drs.project";
+        schemaFourCuratedProject.schemaVersion = 4;
+        schemaFourCuratedProject.projectId = "schema-four-curated-project";
+        schemaFourCuratedProject.displayName = "Schema Four Curated Project";
+        schemaFourCuratedProject.contentRootPath = "content";
+        schemaFourCuratedProject.defaultInstrumentManifestPath = "instrument.drinst";
+        schemaFourCuratedProject.authoring.schemaName = "drs.authoring";
+        schemaFourCuratedProject.authoring.schemaVersion = 3;
+        drs::engine::RuntimeProjectFxSlotDefinition schemaFourReverb;
+        schemaFourReverb.id = "master-reverb";
+        schemaFourReverb.displayName = "Reverb";
+        schemaFourReverb.effectType = "drs.algorithmicReverb";
+        schemaFourReverb.bypassed = false;
+        schemaFourCuratedProject.authoring.fxSlots = { schemaFourReverb };
+        schemaFourCuratedProject.authoring.routingBuses = {
+            { "master-chain", "Instrument Inserts", "master", { schemaFourReverb.id } }
+        };
+        const auto curatedMigration
+            = drs::engine::migrateRuntimeProjectToCuratedDspSchema(schemaFourCuratedProject);
+        const auto* reverbDescriptor = drs::engine::findCuratedDspEffect("drs.algorithmicReverb", 1);
+        require(curatedMigration.valid && curatedMigration.project.schemaVersion == 5
+                    && curatedMigration.project.authoring.schemaVersion == 4
+                    && reverbDescriptor != nullptr,
+                "A schema-4 project authored with curated identities must migrate to the executable DSP schema.");
+        const auto& migratedReverb = curatedMigration.project.authoring.fxSlots.front();
+        require(migratedReverb.effectVersion == 1 && !migratedReverb.bypassed
+                    && !migratedReverb.legacyInert && !migratedReverb.unavailable
+                    && migratedReverb.parameters.size() == reverbDescriptor->parameters.size(),
+                "A schema-4 curated reverb must recover active versioned default parameters during migration.");
+        for (std::size_t index = 0; index < reverbDescriptor->parameters.size(); ++index)
+        {
+            require(migratedReverb.parameters[index].id == reverbDescriptor->parameters[index].id
+                        && migratedReverb.parameters[index].value
+                            == reverbDescriptor->parameters[index].defaultValue,
+                    "Recovered schema-4 curated parameters must use deterministic catalog order and defaults.");
+        }
+        drs::engine::PlaybackSnapshotBuilder curatedMigrationSnapshots;
+        const auto curatedMigrationSnapshot = curatedMigrationSnapshots.buildSnapshot(
+            curatedMigrationSnapshots.requestBuild(1, false), curatedMigration.project);
+        const auto curatedMigrationPlan
+            = drs::engine::compileDspGraphPlan(curatedMigrationSnapshot.snapshot);
+        require(curatedMigrationPlan.compiled
+                    && curatedMigrationPlan.plan.nodes.size() == 1
+                    && curatedMigrationPlan.plan.nodes.front().effectType == "drs.algorithmicReverb",
+                "A recovered schema-4 curated reverb must compile into an executable master graph.");
+        drs::engine::AuthoringSession migrationSession(schemaFourCuratedProject);
+        const auto migrationTransaction
+            = migrationSession.applyProjectMigration(curatedMigration.project);
+        require(migrationTransaction.applied
+                    && migrationSession.getDocumentState().dirty
+                    && migrationSession.getDocumentState().revision == 1
+                    && migrationSession.getProject().schemaVersion == 5,
+                "Opening a migrated project must create a dirty, saveable migration transaction.");
+        const auto undoMigration = migrationSession.undo();
+        require(undoMigration.applied
+                    && !migrationSession.getDocumentState().dirty
+                    && migrationSession.getProject().schemaVersion == 4,
+                "Undoing the migration transaction must restore the original schema-4 project.");
+
         const auto fixture = drs::engine::parseRuntimeProjectManifest(
             readTextFile(std::string(DRS_CURATED_DSP_FIXTURE_ROOT) + "/valid-all-scopes.json"),
             "valid-all-scopes.json", false);

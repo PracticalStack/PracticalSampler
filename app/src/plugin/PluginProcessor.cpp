@@ -284,10 +284,10 @@ drs::engine::RuntimeProjectModel buildInitialAuthoringProject()
 {
     drs::engine::RuntimeProjectModel project;
     project.schemaName = "drs.project";
-    project.schemaVersion = 4;
+    project.schemaVersion = 5;
     project.displayName = "No Project Loaded";
     project.authoring.schemaName = "drs.authoring";
-    project.authoring.schemaVersion = 3;
+    project.authoring.schemaVersion = 4;
     project.authoring.notes = { "Open a project or create a new one to begin authoring." };
     project.notes = { "This session starts without loading the checked-in reference project." };
     return project;
@@ -1289,6 +1289,23 @@ bool Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
     initializeAuthoringImportMetrics();
     serviceMessageThreadWork();
     updateRealtimeSafetyState();
+    refreshSerializedHostStatePublication(true);
+    return true;
+}
+
+bool Processor::applyAuthoringProjectMigration(drs::engine::RuntimeProjectModel migratedProject)
+{
+    if (migratedProject.projectId.empty()
+        || migratedProject.projectId != authoringSession.getProject().projectId)
+    {
+        return false;
+    }
+
+    const auto migration = authoringSession.applyProjectMigration(std::move(migratedProject));
+    if (!migration.applied)
+        return false;
+
+    serviceMessageThreadWork();
     refreshSerializedHostStatePublication(true);
     return true;
 }

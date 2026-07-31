@@ -175,6 +175,7 @@ public:
     drs::app::AuthoringImportResponsivenessSnapshot getAuthoringImportResponsivenessSnapshot() const;
     bool replaceAuthoringProject(drs::engine::RuntimeProjectModel project,
                                  juce::File resolvedProjectFile = {});
+    bool applyAuthoringProjectMigration(drs::engine::RuntimeProjectModel migratedProject);
     void closeAuthoringProject(drs::engine::RuntimeProjectModel unloadedProject);
     bool bindAuthoringProjectFile(const juce::File& resolvedProjectFile);
     void clearAuthoringProjectFileBinding();

@@ -2239,6 +2239,7 @@ RuntimeProjectMigrationResult migrateRuntimeProjectToCuratedDspSchema(const Runt
     }
     for (auto& slot : migrated.authoring.fxSlots)
     {
+        const auto alreadyUsesCuratedIdentity = slot.effectType.rfind("drs.", 0) == 0;
         if (slot.effectType == "delay") slot.effectType = "drs.stereoDelay";
         else if (slot.effectType == "reverb") slot.effectType = "drs.algorithmicReverb";
         else if (slot.effectType == "saturator") slot.effectType = "drs.saturator";
@@ -2246,8 +2247,27 @@ RuntimeProjectMigrationResult migrateRuntimeProjectToCuratedDspSchema(const Runt
         else if (slot.effectType == "eq") slot.effectType = "drs.compactEq";
         else if (slot.effectType == "chorus") slot.effectType = "drs.chorus";
         slot.effectVersion = 1;
-        slot.legacyInert = true;
-        slot.bypassed = true;
+        slot.parameters.clear();
+        if (alreadyUsesCuratedIdentity)
+        {
+            if (const auto* descriptor = findCuratedDspEffect(slot.effectType, slot.effectVersion))
+            {
+                for (const auto& parameter : descriptor->parameters)
+                    slot.parameters.push_back({ std::string(parameter.id), parameter.defaultValue });
+                slot.legacyInert = false;
+                slot.unavailable = false;
+            }
+            else
+            {
+                slot.legacyInert = true;
+                slot.bypassed = true;
+            }
+        }
+        else
+        {
+            slot.legacyInert = true;
+            slot.bypassed = true;
+        }
     }
     for (auto& bus : migrated.authoring.routingBuses)
         if (bus.inputSourceId != "master" && bus.inputSourceId.rfind("groups/", 0) != 0 && bus.inputSourceId.rfind("zones/", 0) != 0)

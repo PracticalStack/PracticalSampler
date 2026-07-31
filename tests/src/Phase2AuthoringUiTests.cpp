@@ -1,4 +1,5 @@
 #include "drs/engine/AuthoringSession.h"
+#include "drs/engine/CuratedDspCatalog.h"
 #include "drs/engine/RuntimeLoader.h"
 #include "shared/AuthoringPanel.h"
 #include "shared/AuthoringPreviewModel.h"
@@ -747,6 +748,48 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
     require(publishDraftRequests == 1, "Summary strip should emit exactly one publish-draft callback once enabled.");
 
     saveComponentPng(strip, outputDirectory / "leaf-summary-strip.png");
+}
+
+void exerciseDraftPlaybackFailureVisibility()
+{
+    const auto projectLoad = drs::engine::loadPhase2ReferenceProjectManifest();
+    require(projectLoad.loaded,
+            "Draft playback failure visibility requires the reference authoring project.");
+    drs::engine::AuthoringSession session(projectLoad.project);
+    auto playbackStatus = makeDraftPlaybackStatusFixture();
+    playbackStatus.preview.revision = playbackStatus.draftRevision;
+    playbackStatus.preview.state = "Failed";
+    playbackStatus.preview.lifecycleState = drs::engine::PlaybackSnapshotLifecycleState::failed;
+    playbackStatus.preview.findings = {
+        {
+            drs::engine::PlaybackSnapshotFindingSeverity::error,
+            "graph-unresolved-effect",
+            "fxSlots.master-reverb",
+            "Active effects must resolve to a curated catalog entry."
+        }
+    };
+
+    drs::app::AuthoringPanel panel(
+        session,
+        {},
+        {},
+        {},
+        drs::app::AuthoringPanel::LayoutMode::expanded,
+        {},
+        [&playbackStatus]() { return playbackStatus; });
+    panel.setSize(1200, 760);
+    panel.setVisible(true);
+    panel.resized();
+    panel.reloadFromSession();
+
+    const auto expectedFailure
+        = "playback blocked: graph-unresolved-effect: Active effects must resolve to a curated catalog entry.";
+    require(requireLabel(panel, "authoringSummaryStatusLabel").getText().contains(expectedFailure),
+            "The summary strip must expose the concrete DSP graph rejection after Prepare Draft fails.");
+    require(requireLabel(panel, "authoringPlaybackBannerLabel").getText().contains(expectedFailure),
+            "The workspace banner must expose the concrete DSP graph rejection after Prepare Draft fails.");
+    require(requireButton(panel, "authoringPlaybackBannerPrepareButton").isEnabled(),
+            "A failed draft build should retain an enabled retry action after the project is corrected.");
 }
 
 void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
@@ -1516,6 +1559,16 @@ void exerciseDrawerEditorTransactions(drs::app::AuthoringPanel& panel,
             "Routing drawer edits should create one undo transaction per committed selection.");
     require(session.getProject().authoring.fxSlots.front().effectType == fxTypeSelector.getText().toStdString(),
             "Routing drawer edits should persist through the authoring session.");
+    const auto& editedSlot = session.getProject().authoring.fxSlots.front();
+    const auto* descriptor = drs::engine::findCuratedDspEffect(editedSlot.effectType,
+                                                               editedSlot.effectVersion);
+    require(descriptor != nullptr && editedSlot.parameters.size() == descriptor->parameters.size(),
+            "Changing an FX type must replace stale parameters with the selected catalog surface.");
+    for (std::size_t index = 0; index < descriptor->parameters.size(); ++index)
+    {
+        require(editedSlot.parameters[index].id == descriptor->parameters[index].id,
+                "FX type changes must retain only parameters valid for the selected descriptor.");
+    }
 }
 
 void exerciseRoutingViewportReachability(drs::app::AuthoringPanel& panel,
@@ -3097,6 +3150,7 @@ int main()
         std::vector<std::string> baselineFindings;
 
         exerciseSummaryStripLeaf(outputDirectory);
+        exerciseDraftPlaybackFailureVisibility();
         exerciseZoneMappingEditorLeaf(outputDirectory);
         exerciseCrossfadeDebugVisibility();
         exerciseRepeatedStructureListComponent();
