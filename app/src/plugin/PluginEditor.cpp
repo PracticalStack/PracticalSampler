@@ -527,8 +527,7 @@ Editor::Editor(Processor& owner)
         if (wavImportClient.has_value())
             wavImportClient->cancel("Canceled by user");
     });
-    wavImportProgress.setVisible(false);
-    workspaceShell.addAndMakeVisible(wavImportProgress);
+    workspaceShell.addChildComponent(wavImportProgress);
     sfzImportProgress.setCancelCallback([this]
     {
         if (sfzImportClient.has_value())

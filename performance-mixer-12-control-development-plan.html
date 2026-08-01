@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>Decent Rhapsody Studio - 12-Control Performance Mixer Development Plan</title>
+  <style>
+    :root {
+      --paper: #f2eee6;
+      --surface: #fffdf8;
+      --surface-alt: #f7f3eb;
+      --ink: #252b2f;
+      --muted: #687077;
+      --line: #d9d1c4;
+      --brown: #87430d;
+      --brown-soft: #f2dfcb;
+      --blue: #286b82;
+      --blue-soft: #deedf1;
+      --green: #24705d;
+      --green-soft: #dfeee8;
+      --amber: #956315;
+      --red: #9a3d37;
+      --charcoal: #263238;
+      --shadow: 0 18px 42px rgba(54, 44, 33, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 8% 0%, rgba(135, 67, 13, 0.10), transparent 30rem),
+        radial-gradient(circle at 94% 8%, rgba(40, 107, 130, 0.10), transparent 28rem),
+        var(--paper);
+      font-family: Inter, "Segoe UI Variable Text", "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+
+    a { color: var(--blue); }
+    h1, h2, h3, h4, p { margin-top: 0; }
+    h1, h2, h3 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-weight: 500;
+      letter-spacing: -0.025em;
+    }
+    h1 { max-width: 930px; margin-bottom: 18px; font-size: clamp(2.45rem, 5vw, 4.9rem); line-height: 0.98; }
+    h2 { margin-bottom: 14px; font-size: clamp(1.7rem, 3vw, 2.55rem); line-height: 1.08; }
+    h3 { margin-bottom: 9px; font-size: 1.35rem; }
+    h4 { margin-bottom: 6px; font-size: 0.96rem; letter-spacing: 0.02em; }
+    p { margin-bottom: 14px; }
+    ul, ol { margin: 10px 0 0; padding-left: 1.3rem; }
+    li + li { margin-top: 6px; }
+    code {
+      padding: 0.12em 0.35em;
+      border-radius: 5px;
+      color: #26343c;
+      background: #e9edeb;
+      font: 0.9em "Cascadia Code", Consolas, monospace;
+    }
+
+    .page { width: min(1260px, calc(100% - 36px)); margin: 0 auto; padding: 30px 0 72px; }
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 46px;
+      border-radius: 26px;
+      color: #fffaf3;
+      background: linear-gradient(135deg, #263238, #34464d);
+      box-shadow: var(--shadow);
+    }
+    .hero::after {
+      content: "12";
+      position: absolute;
+      right: 28px;
+      bottom: -48px;
+      color: rgba(255, 255, 255, 0.055);
+      font: 700 17rem/1 Georgia, serif;
+      pointer-events: none;
+    }
+    .eyebrow, .section-label {
+      display: inline-block;
+      margin-bottom: 10px;
+      color: #efc39f;
+      font-size: 0.75rem;
+      font-weight: 850;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    .section-label { color: var(--brown); }
+    .lede { position: relative; z-index: 1; max-width: 880px; color: #dce2df; font-size: 1.08rem; }
+    .meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 9px; margin-top: 24px; }
+    .chip { padding: 8px 12px; border: 1px solid rgba(255,255,255,0.14); border-radius: 999px; background: rgba(255,255,255,0.08); font-size: 0.83rem; }
+
+    .summary-grid, .grid-2, .grid-3, .decision-grid, .gate-grid { display: grid; gap: 15px; }
+    .summary-grid { position: relative; z-index: 1; grid-template-columns: repeat(4, 1fr); margin-top: 28px; }
+    .summary-card { padding: 17px; border: 1px solid rgba(255,255,255,0.13); border-radius: 15px; background: rgba(255,255,255,0.07); }
+    .summary-card strong { display: block; margin-bottom: 3px; color: #fff; font: 600 1.7rem Georgia, serif; }
+    .summary-card span { color: #d7dedb; font-size: 0.84rem; }
+
+    .toc, .section, .sprint, .callout {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .toc { margin-top: 20px; padding: 20px 24px; }
+    .toc ol { columns: 3; column-gap: 34px; }
+    .toc li { break-inside: avoid; }
+    .section, .sprint { margin-top: 24px; padding: 30px; }
+    .heading { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; margin-bottom: 18px; }
+    .heading h2 { margin: 0; }
+    .heading::after { content: ""; height: 1px; background: var(--line); }
+
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .decision-grid { grid-template-columns: repeat(2, 1fr); }
+    .gate-grid { grid-template-columns: 1.1fr 0.9fr; }
+    .card { padding: 21px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-alt); }
+    .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+    .card.accent { border-top: 4px solid var(--blue); }
+    .card.good { border-top: 4px solid var(--green); }
+    .card.warn { border-top: 4px solid var(--amber); }
+
+    .callout { margin-top: 18px; padding: 18px 21px; border-left: 6px solid var(--blue); }
+    .callout.problem { border-left-color: var(--red); background: #fff8f6; }
+    .callout.decision { border-left-color: var(--green); background: #f7fcfa; }
+    .callout p:last-child { margin-bottom: 0; }
+
+    .flow { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 18px; }
+    .flow-step { position: relative; min-height: 136px; padding: 17px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-alt); }
+    .flow-step:not(:last-child)::after { content: "\2192"; position: absolute; z-index: 2; top: 50%; right: -14px; width: 20px; color: var(--brown); background: var(--paper); font-weight: 900; text-align: center; }
+    .flow-step strong { display: block; margin-bottom: 7px; color: var(--blue); }
+    .flow-step span { color: var(--muted); font-size: 0.86rem; }
+
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 16px; }
+    table { width: 100%; min-width: 900px; border-collapse: collapse; background: var(--surface); }
+    th, td { padding: 13px 15px; border-bottom: 1px solid var(--line); vertical-align: top; text-align: left; }
+    th { color: #fffaf3; background: var(--charcoal); font-size: 0.73rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    tbody tr:nth-child(even) td { background: rgba(242, 238, 230, 0.45); }
+    tbody tr:last-child td { border-bottom: 0; }
+    .id { color: var(--blue); font-weight: 850; white-space: nowrap; }
+    .priority { display: inline-block; min-width: 34px; padding: 3px 8px; border-radius: 999px; color: var(--brown); background: var(--brown-soft); font-size: 0.74rem; font-weight: 850; text-align: center; }
+
+    .sprint { overflow: hidden; padding: 0; }
+    .sprint-head { display: grid; grid-template-columns: auto 1fr auto; gap: 15px; align-items: center; padding: 22px 25px; color: #fffaf3; background: var(--charcoal); }
+    .sprint-number { display: grid; width: 46px; height: 46px; place-items: center; border-radius: 50%; color: var(--charcoal); background: #fffaf3; font: 700 1.25rem Georgia, serif; }
+    .sprint-head h2 { margin: 0; font-size: 1.65rem; }
+    .sprint-focus { color: #ccd6d3; font-size: 0.82rem; font-weight: 700; text-align: right; }
+    .sprint-intent { margin: 0; padding: 18px 25px; color: var(--muted); border-bottom: 1px solid var(--line); }
+    .sprint-body { padding: 23px 25px 26px; }
+    .task-list { margin: 0; padding: 0; list-style: none; }
+    .task-list li { position: relative; padding: 11px 12px 11px 42px; border-bottom: 1px solid var(--line); }
+    .task-list li:last-child { border-bottom: 0; }
+    .task-list li::before { content: "[ ]"; position: absolute; left: 10px; color: var(--green); font: 700 0.9rem "Cascadia Code", Consolas, monospace; }
+    .task-id { color: var(--blue); font-family: "Cascadia Code", Consolas, monospace; font-weight: 800; }
+    .exit { padding: 18px; border-left: 5px solid var(--green); border-radius: 0 13px 13px 0; background: var(--green-soft); }
+    .exit h3 { color: var(--green); }
+    .files { margin-top: 15px; color: var(--muted); font-size: 0.88rem; }
+
+    .wireframe { overflow-x: auto; margin-top: 18px; padding: 20px; border-radius: 15px; color: #eaf2ef; background: #202a2f; font: 0.82rem/1.5 "Cascadia Code", Consolas, monospace; white-space: pre; }
+    .status { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 850; text-transform: uppercase; }
+    .status.must { color: var(--red); background: #f4dfdc; }
+    .status.should { color: var(--amber); background: #f5e8cd; }
+    .status.later { color: var(--blue); background: var(--blue-soft); }
+    footer { margin-top: 30px; padding: 20px 3px 0; color: var(--muted); border-top: 1px solid var(--line); font-size: 0.84rem; }
+
+    @media (max-width: 1000px) {
+      .summary-grid, .grid-3 { grid-template-columns: repeat(2, 1fr); }
+      .grid-2, .decision-grid, .gate-grid { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: repeat(3, 1fr); }
+      .flow-step:nth-child(3)::after { display: none; }
+      .toc ol { columns: 2; }
+    }
+    @media (max-width: 680px) {
+      .page { width: calc(100% - 22px); padding-top: 18px; }
+      .hero, .section { padding: 25px 22px; }
+      .summary-grid, .grid-3, .flow { grid-template-columns: 1fr; }
+      .flow-step:not(:last-child)::after { content: "\2193"; top: auto; right: 50%; bottom: -17px; }
+      .flow-step:nth-child(3)::after { display: block; }
+      .toc ol { columns: 1; }
+      .sprint-head { grid-template-columns: auto 1fr; }
+      .sprint-focus { grid-column: 2; text-align: left; }
+      .sprint-body { padding: 20px; }
+    }
+    @media print {
+      body { background: #fff; }
+      .page { width: 100%; padding: 0; }
+      .hero, .toc, .section, .sprint { box-shadow: none; }
+      .sprint, .card, .callout, table { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <span class="eyebrow">Next iteration execution plan</span>
+      <h1>12-Control Performance Mixer</h1>
+      <p class="lede">
+        Make creator-authored controls publish reliably, remain stable in DAW automation, and render as a compact, labeled Performance mixer. This iteration repairs the two-slot implementation defect first, then builds a responsive player surface for up to twelve exposed controls without reopening host topology later.
+      </p>
+      <div class="meta">
+        <span class="chip">Planning date: July 31, 2026</span>
+        <span class="chip">Delivery shape: 6 sprints</span>
+        <span class="chip">Technical topology: 16 permanent slots</span>
+        <span class="chip">Product surface: 12 exposed controls</span>
+        <span class="chip">Primary fixture: three-layer mixer</span>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-card"><strong>16</strong><span>fixed technical slots created once per processor</span></div>
+        <div class="summary-card"><strong>12</strong><span>maximum player-facing controls in Perform</span></div>
+        <div class="summary-card"><strong>4</strong><span>controls per row at the expanded target width</span></div>
+        <div class="summary-card"><strong>0</strong><span>runtime allocation or topology mutation on audio</span></div>
+      </div>
+    </header>
+
+    <nav class="toc" aria-label="Plan contents">
+      <span class="section-label">Contents</span>
+      <ol>
+        <li><a href="#outcome">Outcome and boundaries</a></li>
+        <li><a href="#evidence">Current defect and evidence</a></li>
+        <li><a href="#decisions">Architecture decisions</a></li>
+        <li><a href="#ux">Target mixer UX</a></li>
+        <li><a href="#roadmap">Sprint roadmap</a></li>
+        <li><a href="#s0">Sprint 0 - contract and red tests</a></li>
+        <li><a href="#s1">Sprint 1 - fixed host topology</a></li>
+        <li><a href="#s2">Sprint 2 - publication truth</a></li>
+        <li><a href="#s3">Sprint 3 - presentation model</a></li>
+        <li><a href="#s4">Sprint 4 - compact mixer UI</a></li>
+        <li><a href="#s5">Sprint 5 - host and release gate</a></li>
+        <li><a href="#matrix">Validation matrix</a></li>
+        <li><a href="#risks">Risks and non-goals</a></li>
+        <li><a href="#done">Iteration definition of done</a></li>
+      </ol>
+    </nav>
+
+    <section class="section" id="outcome">
+      <div class="heading"><h2>Outcome and boundaries</h2></div>
+      <div class="grid-3">
+        <article class="card accent">
+          <h3>Creator outcome</h3>
+          <p>An author can create up to twelve exposed controls, publish once, and immediately verify the same labels and ordering in Perform.</p>
+        </article>
+        <article class="card good">
+          <h3>Player outcome</h3>
+          <p>Perform shows a compact mixer with readable source labels, parameter labels, values, and control semantics without exposing helper macros.</p>
+        </article>
+        <article class="card warn">
+          <h3>Host outcome</h3>
+          <p>DAWs see one stable parameter topology. Project edits may rebind slots, but may never add, remove, or reorder host parameters.</p>
+        </article>
+      </div>
+      <div class="callout decision">
+        <strong>Iteration boundary:</strong> support twelve visible controls now, backed by sixteen permanent host slots. The remaining four slots are capacity for hidden helpers and compatibility. Do not ship a four-slot intermediate topology.
+      </div>
+    </section>
+
+    <section class="section" id="evidence">
+      <div class="heading"><h2>Current defect and evidence</h2></div>
+      <div class="grid-2">
+        <article class="card">
+          <h3>Confirmed user scenario</h3>
+          <ul>
+            <li>The saved project contains 3 groups, 3 group-owned Gain inserts, and 3 macros.</li>
+            <li>All 3 macros are marked <code>exposedInPerformance</code>.</li>
+            <li>Two exposed macros publish and render; the third prevents activation.</li>
+            <li>The Plucks macro currently targets <code>mute</code>, not <code>gainDb</code>; that is a separate authoring correction.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Root cause</h3>
+          <ul>
+            <li><code>maximumPublishedMacroHostSlots</code> declares 16.</li>
+            <li>The actual parameter layout is generated from the two reference macros.</li>
+            <li>Published host slots are also generated from those same two reference macros.</li>
+            <li>A third exposed macro produces <code>published-macro-exposed-slot-missing</code>.</li>
+            <li>The activation rejection loses the detailed finding and does not reliably refresh the UI presentation.</li>
+          </ul>
+        </article>
+      </div>
+      <div class="callout problem">
+        <strong>Product consequence:</strong> the current UI allows authors to create a valid-looking configuration that the runtime cannot activate, and then fails to explain the mismatch. Capacity enforcement and failure presentation must become part of the same contract.
+      </div>
+    </section>
+
+    <section class="section" id="decisions">
+      <div class="heading"><h2>Architecture decisions to freeze</h2></div>
+      <div class="decision-grid">
+        <article class="card">
+          <h3>1. One fixed topology</h3>
+          <p>Create exactly sixteen host parameters when the processor is constructed. The topology is defined by product code, never by the loaded reference manifest or current authored project.</p>
+        </article>
+        <article class="card">
+          <h3>2. Preserve compatibility IDs</h3>
+          <p>Retain <code>macro.tone</code> and <code>macro.motion</code> as the first two host IDs. Add stable generic IDs for slots 3 through 16. Never recycle a host parameter ID for a different slot.</p>
+        </article>
+        <article class="card">
+          <h3>3. Twelve visible, sixteen total</h3>
+          <p>Allow at most twelve exposed controls and at most sixteen authored macros total. Exposed controls receive slots first; hidden helpers use the remaining capacity.</p>
+        </article>
+        <article class="card">
+          <h3>4. Authored identity is separate</h3>
+          <p>A published binding maps an authored stable ID to a fixed host slot. Rename and reorder preserve the binding; delete retires it; a newly added control receives an available slot deterministically.</p>
+        </article>
+        <article class="card">
+          <h3>5. Presentation stays off audio</h3>
+          <p>Labels, section names, units, control type, and ordering are immutable publication metadata prepared on the message/worker side. The audio callback consumes only the existing primitive slot view.</p>
+        </article>
+        <article class="card">
+          <h3>6. Last-known-good remains audible</h3>
+          <p>A failed publication must leave the active generation untouched, report the exact failure, and allow a corrected draft to publish without restarting DRS or the host.</p>
+        </article>
+      </div>
+      <div class="flow" aria-label="Publication flow">
+        <div class="flow-step"><strong>Author</strong><span>Create, name, assign, expose, and order controls.</span></div>
+        <div class="flow-step"><strong>Preflight</strong><span>Validate totals, exposed count, targets, ranges, and slot eligibility.</span></div>
+        <div class="flow-step"><strong>Prepare</strong><span>Capture immutable playback and presentation metadata.</span></div>
+        <div class="flow-step"><strong>Bind</strong><span>Map stable authored IDs onto fixed host slots.</span></div>
+        <div class="flow-step"><strong>Activate</strong><span>Install audio and macro generations at the same block boundary.</span></div>
+        <div class="flow-step"><strong>Render</strong><span>Build the labeled 12-control surface from active bindings only.</span></div>
+      </div>
+    </section>
+
+    <section class="section" id="ux">
+      <div class="heading"><h2>Target mixer UX</h2></div>
+      <div class="grid-2">
+        <article class="card">
+          <h3>Expanded layout</h3>
+          <ul>
+            <li>Four controls per row; up to three rows.</li>
+            <li>Group/source label above the authored control name.</li>
+            <li>Vertical fader for gain, knob for continuous non-gain parameters, toggle for boolean parameters.</li>
+            <li>Persistent value and unit text below each control.</li>
+            <li>Authored order is preserved left-to-right, top-to-bottom.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Compact layout</h3>
+          <ul>
+            <li>Two controls per row inside a bounded viewport.</li>
+            <li>No label truncation without a tooltip or accessible full name.</li>
+            <li>Status/diagnostic copy must not consume mixer space when healthy.</li>
+            <li>Keyboard traversal follows visible order; hidden controls are absent from focus.</li>
+            <li>An empty state explains whether no controls are exposed or Publish failed.</li>
+          </ul>
+        </article>
+      </div>
+      <div class="wireframe" aria-label="Proposed four-column mixer wireframe">PERFORMANCE MIXER                                          Published r18  Active
+
+  LAYERS / GROUP MIX
+  +------------------+  +------------------+  +------------------+  +------------------+
+  | BELL             |  | EPIANO           |  | PLUCKS           |  | PAD              |
+  | Group Gain       |  | Group Gain       |  | Group Gain       |  | Group Gain       |
+  |       [fader]    |  |       [fader]    |  |       [fader]    |  |       [fader]    |
+  |       -6.0 dB    |  |       -3.5 dB    |  |      -12.0 dB    |  |       -9.0 dB    |
+  +------------------+  +------------------+  +------------------+  +------------------+
+
+  TONE / EFFECTS
+  +------------------+  +------------------+  +------------------+  +------------------+
+  | WARMTH           |  | WIDTH            |  | ROOM             |  | DELAY MIX        |
+  | Saturation Drive |  | Stereo Width     |  | Reverb Mix       |  | Delay Mix        |
+  |       (knob)     |  |       (knob)     |  |       (knob)     |  |       (knob)     |
+  |         28 %     |  |        110 %     |  |         18 %     |  |         12 %     |
+  +------------------+  +------------------+  +------------------+  +------------------+</div>
+    </section>
+
+    <section class="section" id="roadmap">
+      <div class="heading"><h2>Sprint roadmap</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Sprint</th><th>Theme</th><th>Primary result</th><th>Depends on</th><th>Gate</th></tr></thead>
+          <tbody>
+            <tr><td><span class="id">S0</span></td><td>Contract and red tests</td><td>Capacity, identity, compatibility, and failure semantics are executable before implementation.</td><td>Current baseline</td><td>Required tests fail for the intended reasons.</td></tr>
+            <tr><td><span class="id">S1</span></td><td>Fixed host topology</td><td>Three and twelve exposed macros can bind to permanent slots without changing processor topology.</td><td>S0</td><td>Topology and callback-boundary suites pass.</td></tr>
+            <tr><td><span class="id">S2</span></td><td>Publication truth</td><td>Invalid drafts fail early and visibly; valid retries activate without restart.</td><td>S1</td><td>Shell parity and recovery suites pass.</td></tr>
+            <tr><td><span class="id">S3</span></td><td>Presentation model</td><td>Active descriptors contain deterministic source labels, parameter labels, units, types, and order.</td><td>S1-S2</td><td>Model/persistence tests pass with no audio-thread metadata work.</td></tr>
+            <tr><td><span class="id">S4</span></td><td>Compact mixer UI</td><td>One through twelve exposed controls render accessibly at compact and expanded sizes.</td><td>S3</td><td>Layout, interaction, and visual characterization pass.</td></tr>
+            <tr><td><span class="id">S5</span></td><td>Host and release gate</td><td>Automation, recall, migration, realtime safety, and representative instruments are validated.</td><td>S1-S4</td><td>Clean Debug/Release and host matrix are green.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="sprint" id="s0">
+      <header class="sprint-head">
+        <span class="sprint-number">0</span>
+        <h2>Contract and red tests</h2>
+        <span class="sprint-focus">Freeze behavior before changing topology</span>
+      </header>
+      <p class="sprint-intent">Turn the discovered two-slot defect into a permanent regression and define the compatibility rules that every later sprint must preserve.</p>
+      <div class="sprint-body">
+        <div class="gate-grid">
+          <div>
+            <h3>Development tasks</h3>
+            <ul class="task-list">
+              <li><span class="task-id">PM0.1</span> Add a product constant for <strong>12 exposed controls</strong>, distinct from the existing <strong>16 total host slots</strong>.</li>
+              <li><span class="task-id">PM0.2</span> Define the complete ordered host-slot table, including compatibility IDs for Tone/Motion and stable IDs for slots 3-16.</li>
+              <li><span class="task-id">PM0.3</span> Add a three-layer project fixture modeled on Bell, EPiano, and Plucks with three group-owned Gain inserts and three exposed macros.</li>
+              <li><span class="task-id">PM0.4</span> Add red binding tests for 3, 12, and 16 authored macros plus 13 exposed and 17 total overflow cases.</li>
+              <li><span class="task-id">PM0.5</span> Add red processor integration coverage proving parameter count/order/IDs do not change across project load, edit, publish, close, and restore.</li>
+              <li><span class="task-id">PM0.6</span> Add a red shell test requiring the detailed <code>published-macro-exposed-slot-missing</code> failure to appear in both standalone and plug-in surfaces.</li>
+              <li><span class="task-id">PM0.7</span> Record the compatibility policy in a focused contract document and link it from the existing Sprint 6 macro automation contract.</li>
+            </ul>
+          </div>
+          <aside>
+            <div class="exit">
+              <h3>Exit gate</h3>
+              <ul>
+                <li>Every intended behavior has a named failing test.</li>
+                <li>Failures demonstrate the two-slot defect, not fixture or loader errors.</li>
+                <li>Slot IDs and ordering are explicitly approved before implementation.</li>
+              </ul>
+            </div>
+            <p class="files"><strong>Primary files:</strong> <code>PublishedMacroBinding.h</code>, <code>Sprint6PublishedMacroBindingTests.cpp</code>, new topology contract tests, <code>tests/CMakeLists.txt</code>, and <code>docs/phase1-sprint6-published-macro-automation.md</code>.</p>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="sprint" id="s1">
+      <header class="sprint-head">
+        <span class="sprint-number">1</span>
+        <h2>Fixed 16-slot host topology</h2>
+        <span class="sprint-focus">Make twelve controls technically possible</span>
+      </header>
+      <p class="sprint-intent">Remove the reference manifest from topology ownership and make one canonical slot definition drive parameter construction, binding, listeners, state, and callback views.</p>
+      <div class="sprint-body">
+        <div class="gate-grid">
+          <div>
+            <h3>Development tasks</h3>
+            <ul class="task-list">
+              <li><span class="task-id">PM1.1</span> Introduce a shared immutable <code>PublishedMacroHostTopology</code> definition with 16 ordered slots.</li>
+              <li><span class="task-id">PM1.2</span> Change <code>Processor::buildParameterLayout</code> to instantiate the shared topology instead of iterating <code>EngineFacade::getMacroDescriptors()</code>.</li>
+              <li><span class="task-id">PM1.3</span> Change <code>initializePublishedMacroRealtimeState</code> to initialize all 16 slots, listeners, atomic values, sequence baselines, and inactive callback entries.</li>
+              <li><span class="task-id">PM1.4</span> Change <code>EngineFacade::buildPublishedHostSlots</code> to consume the shared topology rather than <code>referenceManifest.instrument.macros</code>.</li>
+              <li><span class="task-id">PM1.5</span> Keep authored stable IDs separate from host parameter IDs throughout binding, parameter-change dispatch, and descriptor generation.</li>
+              <li><span class="task-id">PM1.6</span> Preserve deterministic slot retention across rename, reorder, hide/unhide, delete/re-add, and republish.</li>
+              <li><span class="task-id">PM1.7</span> Ensure inactive slots are neutral and cannot affect DSP, voice behavior, diagnostics, or displayed controls.</li>
+              <li><span class="task-id">PM1.8</span> Prove slot installation remains a bounded primitive copy with no allocation, lock, or shared-ownership release on the audio thread.</li>
+            </ul>
+          </div>
+          <aside>
+            <div class="exit">
+              <h3>Exit gate</h3>
+              <ul>
+                <li>Three and twelve exposed controls publish and activate.</li>
+                <li>Sixteen total bindings remain supported within the fixed callback view.</li>
+                <li>Host parameter count, IDs, and order remain identical through all project operations.</li>
+                <li>Existing two-macro sessions retain their first two parameter IDs.</li>
+              </ul>
+            </div>
+            <p class="files"><strong>Primary files:</strong> <code>PluginProcessor.cpp/.h</code>, <code>EngineFacade.cpp/.h</code>, <code>PublishedMacroBinding.cpp/.h</code>, <code>PerformancePublishController</code>, and host parameter contract tests.</p>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="sprint" id="s2">
+      <header class="sprint-head">
+        <span class="sprint-number">2</span>
+        <h2>Publication truth and recovery</h2>
+        <span class="sprint-focus">Never fail silently</span>
+      </header>
+      <p class="sprint-intent">Move capacity and target failures into actionable preflight where possible, and make every later activation failure update the immutable presentation snapshot immediately.</p>
+      <div class="sprint-body">
+        <div class="gate-grid">
+          <div>
+            <h3>Development tasks</h3>
+            <ul class="task-list">
+              <li><span class="task-id">PM2.1</span> Add publish preflight for more than 12 exposed controls, more than 16 total macros, invalid target identity, missing DSP control, duplicate ID, and invalid range/default.</li>
+              <li><span class="task-id">PM2.2</span> Preserve the most specific binding finding instead of replacing it with generic <code>performance-macro-binding-rejected</code>.</li>
+              <li><span class="task-id">PM2.3</span> On every authorization failure, update transient status, diagnostics, publish presentation, and engine state revision exactly once.</li>
+              <li><span class="task-id">PM2.4</span> Show failure code, affected macro label, capacity count, and repair guidance in both Map and Perform.</li>
+              <li><span class="task-id">PM2.5</span> Keep the last-known-good generation and binding table active after a rejected replacement.</li>
+              <li><span class="task-id">PM2.6</span> Allow a corrected draft to retry immediately without reopening the project, restarting audio, or changing unrelated controls.</li>
+              <li><span class="task-id">PM2.7</span> Add diagnostic counters for exposed, hidden, assigned, unassigned, available-slot, and active-slot counts.</li>
+              <li><span class="task-id">PM2.8</span> Add shell parity, duplicate request, supersede, cancellation, and failed-then-successful recovery tests.</li>
+            </ul>
+          </div>
+          <aside>
+            <div class="exit">
+              <h3>Exit gate</h3>
+              <ul>
+                <li>A 13th exposed control is rejected before activation with exact repair guidance.</li>
+                <li>Perform never claims Active for a failed revision.</li>
+                <li>Last-known-good audio and controls remain usable.</li>
+                <li>A valid retry becomes Active without application restart.</li>
+              </ul>
+            </div>
+            <p class="files"><strong>Primary files:</strong> <code>EngineFacade.cpp</code>, <code>PerformancePublishPresentation.cpp</code>, <code>PerformancePublishController.cpp</code>, <code>PerformancePanel.cpp</code>, <code>AuthoringPanel.cpp</code>, and Sprint 6 recovery/shell tests.</p>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="sprint" id="s3">
+      <header class="sprint-head">
+        <span class="sprint-number">3</span>
+        <h2>Published presentation model</h2>
+        <span class="sprint-focus">Give the UI trustworthy labels and semantics</span>
+      </header>
+      <p class="sprint-intent">Publish enough immutable metadata for a concise mixer without coupling UI layout to mutable authoring structures or inspecting DSP descriptors during rendering.</p>
+      <div class="sprint-body">
+        <div class="gate-grid">
+          <div>
+            <h3>Development tasks</h3>
+            <ul class="task-list">
+              <li><span class="task-id">PM3.1</span> Define a lightweight <code>PublishedMacroPresentation</code> record: authored label, section/source label, parameter label, value unit, control kind, order, and accessibility description.</li>
+              <li><span class="task-id">PM3.2</span> Derive source labels from DSP ownership: group display name for group buses, zone name for zone buses, and Instrument for the global bus.</li>
+              <li><span class="task-id">PM3.3</span> Derive control kind and unit from curated DSP descriptors: gain fader/dB, boolean toggle, and continuous knob or fader for other parameters.</li>
+              <li><span class="task-id">PM3.4</span> Preserve authored macro order as the default visible order; do not alphabetize or order by host slot.</li>
+              <li><span class="task-id">PM3.5</span> Carry presentation metadata in the immutable published binding table or a revision-matched companion snapshot.</li>
+              <li><span class="task-id">PM3.6</span> Extend <code>EngineMacroDescriptor</code> so Perform never reconstructs source ownership from the mutable project.</li>
+              <li><span class="task-id">PM3.7</span> Define deterministic fallback labels for deleted/legacy metadata and keep malformed presentation hints non-fatal to audio publication.</li>
+              <li><span class="task-id">PM3.8</span> Add serializer/migration support only if presentation overrides are persisted; otherwise document that Sprint 3 labels are derived.</li>
+            </ul>
+          </div>
+          <aside>
+            <div class="exit">
+              <h3>Exit gate</h3>
+              <ul>
+                <li>The active descriptor set is sufficient to render all labels and control types.</li>
+                <li>Group renames appear only after Publish and preserve slot identity/value.</li>
+                <li>No UI code walks mutable authoring routing or FX collections.</li>
+                <li>No presentation formatting runs on the audio callback.</li>
+              </ul>
+            </div>
+            <p class="files"><strong>Primary files:</strong> <code>PublishedMacroBinding.h/.cpp</code>, <code>PlaybackSnapshot.h/.cpp</code>, <code>EngineFacade.cpp</code>, curated DSP descriptors, runtime serializers if needed, and presentation-model tests.</p>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="sprint" id="s4">
+      <header class="sprint-head">
+        <span class="sprint-number">4</span>
+        <h2>Compact labeled Performance mixer</h2>
+        <span class="sprint-focus">Make twelve controls readable, not merely present</span>
+      </header>
+      <p class="sprint-intent">Extract a dedicated mixer component and make its layout responsive at the supported plug-in and standalone dimensions.</p>
+      <div class="sprint-body">
+        <div class="gate-grid">
+          <div>
+            <h3>Development tasks</h3>
+            <ul class="task-list">
+              <li><span class="task-id">PM4.1</span> Extract the published control strip from <code>PerformancePanel</code> into a focused <code>PerformanceMixer</code> component with an immutable view model.</li>
+              <li><span class="task-id">PM4.2</span> Implement a responsive grid: four columns expanded, two columns compact, with a bounded viewport when all twelve cannot fit vertically.</li>
+              <li><span class="task-id">PM4.3</span> Render source/section label, authored control name, control widget, formatted value, and unit for every visible lane.</li>
+              <li><span class="task-id">PM4.4</span> Render gain as a compact vertical fader, boolean parameters as toggles, and other continuous parameters with a consistent knob/fader policy.</li>
+              <li><span class="task-id">PM4.5</span> Keep healthy publish status compact; expand actionable failure text without permanently consuming mixer space.</li>
+              <li><span class="task-id">PM4.6</span> Preserve stable component IDs based on authored ID and add full-name tooltips for elided labels.</li>
+              <li><span class="task-id">PM4.7</span> Implement keyboard order, focus visibility, accessible names/value text, and screen-reader descriptions for all control kinds.</li>
+              <li><span class="task-id">PM4.8</span> Add layout characterization at 0, 1, 2, 3, 4, 5, 8, and 12 controls in compact and expanded shells.</li>
+              <li><span class="task-id">PM4.9</span> Add interaction tests proving UI moves update the intended authored binding and never an adjacent or retired slot.</li>
+            </ul>
+          </div>
+          <aside>
+            <div class="exit">
+              <h3>Exit gate</h3>
+              <ul>
+                <li>Twelve controls are reachable with no overlap or clipped value labels.</li>
+                <li>Four-column expanded and two-column compact layouts are deterministic.</li>
+                <li>Gain, continuous, and boolean controls have distinct correct presentations.</li>
+                <li>Mouse, keyboard, and accessibility paths operate the same bindings.</li>
+              </ul>
+            </div>
+            <p class="files"><strong>Primary files:</strong> <code>PerformancePanel.cpp/.h</code>, new <code>PerformanceMixer.cpp/.h</code>, shell layout code, <code>Phase2PerformanceUiTests.cpp</code>, and UI characterization fixtures.</p>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="sprint" id="s5">
+      <header class="sprint-head">
+        <span class="sprint-number">5</span>
+        <h2>Host, migration, and release hardening</h2>
+        <span class="sprint-focus">Prove the topology survives real projects</span>
+      </header>
+      <p class="sprint-intent">Close the iteration only after automation, state recall, old sessions, failure recovery, realtime rules, and representative mixer sizes are validated together.</p>
+      <div class="sprint-body">
+        <div class="gate-grid">
+          <div>
+            <h3>Development tasks</h3>
+            <ul class="task-list">
+              <li><span class="task-id">PM5.1</span> Add migration coverage for old two-parameter sessions and verify Tone/Motion automation and values remain attached.</li>
+              <li><span class="task-id">PM5.2</span> Add project and host-state round trips for 3- and 12-control published mixers, including DSP target identity and current values.</li>
+              <li><span class="task-id">PM5.3</span> Validate rename, reorder, hide/unhide, delete/re-add, target replacement, and failed publish against slot/value migration rules.</li>
+              <li><span class="task-id">PM5.4</span> Validate automation writes immediately before and after the activation boundary for slot 1, slot 3, slot 12, and a hidden helper slot.</li>
+              <li><span class="task-id">PM5.5</span> Run realtime guards and concurrency soak with all 16 callback slots active and rapid republish churn.</li>
+              <li><span class="task-id">PM5.6</span> Add a permanent three-layer hostile regression based on the verified user project, with corrected Plucks <code>gainDb</code> binding.</li>
+              <li><span class="task-id">PM5.7</span> Add representative 4-mic, 8-layer, and 12-control fixtures plus a 13-exposed rejection fixture.</li>
+              <li><span class="task-id">PM5.8</span> Validate standalone and VST3 behavior in REAPER: parameter enumeration, automation record/playback, save/reopen, and replacement publish.</li>
+              <li><span class="task-id">PM5.9</span> Update creator documentation and in-product guidance for capacity, labels, exposure, Publish, and repair actions.</li>
+              <li><span class="task-id">PM5.10</span> Run clean Debug and Release build/test matrices and record an evidence report with known limitations.</li>
+            </ul>
+          </div>
+          <aside>
+            <div class="exit">
+              <h3>Release gate</h3>
+              <ul>
+                <li>Existing DAW sessions retain their original first two automation IDs.</li>
+                <li>Three and twelve controls survive save, close, reopen, and republish.</li>
+                <li>All 16 callback slots pass realtime and churn tests.</li>
+                <li>Standalone and VST3 show equivalent active control labels/order.</li>
+                <li>No known silent publication failure remains.</li>
+              </ul>
+            </div>
+            <p class="files"><strong>Primary files:</strong> host-state codec/coordinator tests, Sprint 6 activation and macro suites, realtime safety tests, REAPER validation assets, creator docs, and release evidence.</p>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="matrix">
+      <div class="heading"><h2>Validation matrix</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Area</th><th>Required cases</th><th>Expected result</th><th>Primary evidence</th></tr></thead>
+          <tbody>
+            <tr><td>Capacity</td><td>0, 1, 2, 3, 4, 8, 12 exposed; 13 exposed; 16 total; 17 total</td><td>Up to 12 exposed succeeds; overflow rejects with exact counts and repair guidance.</td><td>Binding and publish integration tests</td></tr>
+            <tr><td>Identity</td><td>Rename, reorder, hide, unhide, delete, re-add</td><td>Compatible stable IDs retain slots/values; retired IDs cannot affect audio.</td><td>Migration matrix</td></tr>
+            <tr><td>DSP targets</td><td>Group gain, mute, continuous FX parameter, deleted target, moved owner</td><td>Correct widget/units and exact DSP control; invalid target blocks Publish.</td><td>DSP binding tests</td></tr>
+            <tr><td>Activation</td><td>First publish, replacement, duplicate, supersede, fail then retry</td><td>Exact revision becomes active once; last-known-good survives failures.</td><td>Sprint 6 controller/recovery suites</td></tr>
+            <tr><td>UI layout</td><td>Compact/expanded at every representative count</td><td>No overlap, clipping, unreachable controls, or hidden focus targets.</td><td>Performance UI characterization</td></tr>
+            <tr><td>Automation</td><td>Slots 1, 3, 12, hidden helper; before/after boundary</td><td>Writes address the intended active binding and survive recall.</td><td>Host automation tests and REAPER evidence</td></tr>
+            <tr><td>Persistence</td><td><code>.drsproj</code>, <code>.drinst</code>, preset, host state</td><td>IDs, order, exposure, targets, values, and active checkpoint round-trip.</td><td>Serializer and restore tests</td></tr>
+            <tr><td>Realtime</td><td>16 active callback slots under note/automation/publish churn</td><td>No allocation, lock, file I/O, ownership release, or callback budget regression.</td><td>Realtime guard and soak</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="risks">
+      <div class="heading"><h2>Risks and non-goals</h2></div>
+      <div class="grid-2">
+        <article class="card">
+          <h3>Primary risks</h3>
+          <ul>
+            <li><span class="status must">Must control</span> Adding host parameters can affect DAW compatibility if the first two IDs or ordering change.</li>
+            <li><span class="status must">Must control</span> Slot mapping must be installed atomically with the audio generation.</li>
+            <li><span class="status must">Must control</span> Dynamic authored labels cannot become dynamic host parameter topology.</li>
+            <li><span class="status should">Should control</span> Twelve labeled controls can overwhelm the current panel without viewport and status compaction.</li>
+            <li><span class="status should">Should control</span> Derived group labels can become ambiguous when several controls share one owner.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Explicit non-goals</h3>
+          <ul>
+            <li><span class="status later">Later</span> Arbitrary drag-and-drop control placement.</li>
+            <li><span class="status later">Later</span> Creator-defined colors, artwork, themes, or freeform panels.</li>
+            <li><span class="status later">Later</span> More than twelve player-facing controls.</li>
+            <li><span class="status later">Later</span> Nested pages or user-authored section hierarchy.</li>
+            <li><span class="status later">Later</span> Runtime mutation of host parameter count, IDs, or ordering.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="done">
+      <div class="heading"><h2>Iteration definition of done</h2></div>
+      <div class="callout decision">
+        <ul>
+          <li>The original three-layer project publishes all three corrected gain controls and renders them in Perform.</li>
+          <li>A twelve-control instrument renders in a readable four-column expanded grid and a reachable two-column compact grid.</li>
+          <li>The processor exposes one stable 16-slot host topology independent of loaded content.</li>
+          <li>Old Tone/Motion automation remains compatible, while new authored IDs bind deterministically to the remaining slots.</li>
+          <li>Thirteen exposed controls fail before activation with actionable capacity guidance; no failure is silent.</li>
+          <li>Save/reload, host recall, replacement Publish, automation, realtime safety, and both application shells pass their release gates.</li>
+        </ul>
+      </div>
+    </section>
+
+    <footer>
+      Decent Rhapsody Studio - 12-Control Performance Mixer Development Plan. This is an execution companion to the existing published-macro automation, group mixer workflow, host-state recall, and UI compaction contracts.
+    </footer>
+  </main>
+</body>
+</html>

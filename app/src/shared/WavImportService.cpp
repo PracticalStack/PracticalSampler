@@ -576,6 +576,7 @@ WavImportProgressComponent::WavImportProgressComponent(CancelCallback callback)
             cancelCallback();
     };
     addAndMakeVisible(cancelButton);
+    setVisible(false);
 }
 
 void WavImportProgressComponent::setCancelCallback(CancelCallback callback)
@@ -589,8 +590,7 @@ void WavImportProgressComponent::update(const WavImportBatchSnapshot& snapshot)
     statusLabel.setText(buildProgressStatusText(snapshot), juce::dontSendNotification);
     detailLabel.setText(buildProgressDetailText(snapshot), juce::dontSendNotification);
     cancelButton.setEnabled(isActiveStage(snapshot.stage));
-    setVisible(snapshot.stage != WavImportBatchStage::idle
-               && snapshot.stage != WavImportBatchStage::consumed);
+    setVisible(isActiveStage(snapshot.stage));
 }
 
 void WavImportProgressComponent::resized()

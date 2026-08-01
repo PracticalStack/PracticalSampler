@@ -33,6 +33,8 @@ int main()
         });
         component.setSize(720, 64);
         component.resized();
+        require(!component.isVisible(),
+                "WAV import progress should be hidden before a batch becomes active.");
 
         drs::app::WavImportBatchSnapshot activeSnapshot;
         activeSnapshot.stage = drs::app::WavImportBatchStage::staging;
@@ -94,6 +96,8 @@ int main()
                 "Terminal partial WAV batches should surface a distinct partial-complete state.");
         require(!cancelButton->isEnabled(),
                 "The WAV progress cancel button should disable once the batch reaches a terminal state.");
+        require(!component.isVisible(),
+                "Completed WAV batches should release their modeless layout space immediately.");
 
         auto canceledSnapshot = partialSnapshot;
         canceledSnapshot.stage = drs::app::WavImportBatchStage::canceled;
@@ -101,6 +105,8 @@ int main()
         component.update(canceledSnapshot);
         require(statusLabel->getText().containsIgnoreCase("canceled"),
                 "Canceled WAV batches should surface a distinct canceled state.");
+        require(!component.isVisible(),
+                "Canceled WAV batches should not retain modeless layout space.");
 
         auto failedSnapshot = partialSnapshot;
         failedSnapshot.stage = drs::app::WavImportBatchStage::failed;
@@ -108,6 +114,8 @@ int main()
         component.update(failedSnapshot);
         require(statusLabel->getText().containsIgnoreCase("failed"),
                 "Failed WAV batches should surface a distinct failed state.");
+        require(!component.isVisible(),
+                "Failed WAV batches should not retain modeless layout space.");
 
         auto consumedSnapshot = failedSnapshot;
         consumedSnapshot.stage = drs::app::WavImportBatchStage::consumed;

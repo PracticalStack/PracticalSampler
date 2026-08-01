@@ -501,8 +501,7 @@ MainComponent::MainComponent(bool enableAudioOutput)
         if (wavImportClient.has_value())
             wavImportClient->cancel("Canceled by user");
     });
-    wavImportProgress.setVisible(false);
-    addAndMakeVisible(wavImportProgress);
+    addChildComponent(wavImportProgress);
     sfzImportProgress.setCancelCallback([this]
     {
         if (sfzImportClient.has_value())

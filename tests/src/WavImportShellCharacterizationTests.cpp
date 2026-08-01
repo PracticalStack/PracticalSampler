@@ -47,6 +47,7 @@ int main()
                          {
                              "getWavImportService().openClient()",
                              "wavImportProgress.setCancelCallback(",
+                             "addChildComponent(wavImportProgress);",
                              "wavImportProgress.update(*snapshot);",
                              "WavImportRequest request;",
                              "wavImportClient->ownerId()",
@@ -70,7 +71,8 @@ int main()
                             "prepareWavImportBatch(",
                             "createAuthoringImportQueue",
                             "processNextAuthoringImportQueueItem",
-                            "copySampleFileForImport"
+                            "copySampleFileForImport",
+                            "addAndMakeVisible(wavImportProgress)"
                         }))
         {
             std::cerr << "shell-specific WAV import implementation leaked back into " << file << '\n';
