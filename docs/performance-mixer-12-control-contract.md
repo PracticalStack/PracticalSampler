@@ -82,3 +82,16 @@ identities, show source and control labels plus formatted value/unit, and retain
 labels in tooltips and accessibility descriptions. Gain uses a vertical fader,
 booleans a toggle, and other continuous values a knob. A compact Publish chip remains
 visible while failure repair guidance expands in the existing keyboard/status hint.
+
+## Host recall and release hardening
+
+Host-state recall treats every permanent `macro.*` runtime ID as a valid normalized
+macro value, not just the legacy Tone and Motion IDs. The saved preset continues to
+retain structured DSP target identity separately from host values. Restore rebuilds
+the captured published identity before audio is enabled; it does not infer an
+authored binding from the current draft.
+
+Regression coverage exercises compatibility recall for Tone/Motion, serialized DSP
+target identity for the three-layer gain fixture, slot-12 state for a twelve-control
+fixture, automation at slots 1/3/12/16 across a publication boundary, and repeated
+sixteen-slot republish churn with the realtime guard clean.

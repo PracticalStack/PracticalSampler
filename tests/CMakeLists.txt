@@ -2088,6 +2088,18 @@ foreach(DRS_PERFORMANCE_MIXER_S3_SEAM IN ITEMS
     )
 endforeach()
 
+foreach(DRS_PERFORMANCE_MIXER_S5_SEAM IN ITEMS
+        host-state-roundtrip
+        automation-boundary-16-slots
+        republish-churn-realtime)
+    string(REPLACE "-" "_" DRS_PERFORMANCE_MIXER_S5_TEST_SUFFIX
+           "${DRS_PERFORMANCE_MIXER_S5_SEAM}")
+    add_test(
+        NAME "drs.performance_mixer.s5.${DRS_PERFORMANCE_MIXER_S5_TEST_SUFFIX}"
+        COMMAND drs_performance_mixer_s0_red_tests "${DRS_PERFORMANCE_MIXER_S5_SEAM}"
+    )
+endforeach()
+
 foreach(DRS_PERFORMANCE_MIXER_S2_SEAM IN ITEMS
         overflow-13-exposed
         overflow-17-authored

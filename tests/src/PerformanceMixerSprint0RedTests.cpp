@@ -1,6 +1,7 @@
 #include "drs/engine/PerformancePublishCommandAdapter.h"
 #include "drs/engine/PublishedMacroBinding.h"
 #include "drs/engine/RuntimeLoader.h"
+#include "drs/engine/HostSessionState.h"
 #include "plugin/PluginProcessor.h"
 #include "standalone/MainComponent.h"
 
@@ -20,7 +21,7 @@ namespace
 {
 using namespace drs::engine;
 
-constexpr std::array<std::string_view, 11> redSeams {
+constexpr std::array<std::string_view, 14> redSeams {
     "binding-3-exposed",
     "binding-12-exposed",
     "binding-16-authored",
@@ -31,7 +32,10 @@ constexpr std::array<std::string_view, 11> redSeams {
     "processor-topology-lifecycle",
     "shell-diagnostic-parity",
     "published-presentation-model",
-    "published-presentation-rename"
+    "published-presentation-rename",
+    "host-state-roundtrip",
+    "automation-boundary-16-slots",
+    "republish-churn-realtime"
 };
 
 void require(const bool condition, const std::string& message)
@@ -97,6 +101,47 @@ void crossBoundary(drs::plugin::Processor& processor)
     buffer.clear();
     processor.processBlock(buffer, midi);
     processor.serviceMessageThreadWork();
+}
+
+void setHostMacroValue(drs::plugin::Processor& processor,
+                       const std::string& hostParameterId,
+                       const double value)
+{
+    const auto* parameter = processor.getParameterState().getParameter(hostParameterId);
+    require(parameter != nullptr, "Fixed host parameter '" + hostParameterId + "' must exist.");
+    const_cast<juce::RangedAudioParameter*>(parameter)->setValueNotifyingHost(static_cast<float>(value));
+}
+
+bool waitForRestoredPerformance(drs::plugin::Processor& processor)
+{
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (std::chrono::steady_clock::now() < deadline)
+    {
+        crossBoundary(processor);
+        const auto restore = processor.getProjectRestoreSnapshot();
+        const auto publish = processor.getPerformancePublishControllerSnapshot();
+        if (restore != nullptr
+            && restore->state == ProjectRestoreState::active
+            && publish.hasActiveRequest
+            && publish.activationState == PerformancePublishActivationState::active)
+            return true;
+        if (restore != nullptr
+            && (restore->state == ProjectRestoreState::failed || restore->state == ProjectRestoreState::needsLocation))
+            return false;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    return false;
+}
+
+const EngineMacroDescriptor& descriptorForRuntimeId(const std::vector<EngineMacroDescriptor>& descriptors,
+                                                     const std::string& runtimeId)
+{
+    const auto found = std::find_if(descriptors.begin(), descriptors.end(), [&](const auto& descriptor)
+    {
+        return descriptor.id == runtimeId;
+    });
+    require(found != descriptors.end(), "Published runtime descriptor '" + runtimeId + "' must exist.");
+    return *found;
 }
 
 std::shared_ptr<const PerformancePublishPresentationSnapshot> waitForPublishSettlement(
@@ -451,6 +496,162 @@ void requirePublishedPresentationRename()
             "A source rename must update only the next published presentation snapshot while preserving host identity and value.");
 }
 
+void requireHostStateRoundTrip()
+{
+    const auto fixture = loadThreeLayerFixture();
+    drs::plugin::Processor dspSource;
+    dspSource.prepareToPlay(48000.0, 256);
+    require(dspSource.replaceAuthoringProject(fixture), "The DSP host-state fixture must load.");
+    const auto revision = dspSource.getAuthoringSession().getDocumentState().revision;
+    require(dspSource.submitPerformancePublishCommand({}, PerformancePublishCommandSource::externalApi),
+            "The DSP host-state fixture must publish.");
+    require(waitForPublishSettlement(dspSource, revision)->state == PerformancePublishPresentationState::active,
+            "The DSP host-state fixture must become active.");
+    setHostMacroValue(dspSource, "macro.tone", 0.21);
+    setHostMacroValue(dspSource, "macro.motion", 0.47);
+    setHostMacroValue(dspSource, "macro.slot.3", 0.83);
+    crossBoundary(dspSource);
+    dspSource.serviceMessageThreadWork();
+
+    juce::MemoryBlock dspState;
+    dspSource.getStateInformation(dspState);
+    const auto parsedDspState = parseHostSessionState(std::string(
+        static_cast<const char*>(dspState.getData()), dspState.getSize()));
+    require(parsedDspState.isValidHostState()
+                && parsedDspState.hostState->presetState.dspMacroTargets.size() == 3
+                && std::any_of(parsedDspState.hostState->presetState.macroValues.begin(),
+                               parsedDspState.hostState->presetState.macroValues.end(), [](const auto& value)
+                               { return value.id == "slot.3" && std::abs(value.value - 0.83) < 0.001; }),
+            "A DSP-targeted three-control mixer must serialize target identity and fixed-slot values.");
+
+    const auto projectPath = getPhase2ReferenceProjectManifestPath();
+    const auto project = loadRuntimeProjectManifest(projectPath);
+    require(project.loaded, "The validated host recall project must load.");
+    drs::plugin::Processor source;
+    source.prepareToPlay(48000.0, 256);
+    require(source.replaceAuthoringProject(project.project, juce::File(projectPath)),
+            "The validated host recall project must load.");
+    const auto sourceRevision = source.getAuthoringSession().getDocumentState().revision;
+    require(source.submitPerformancePublishCommand({}, PerformancePublishCommandSource::externalApi),
+            "The validated host recall project must publish.");
+    require(waitForPublishSettlement(source, sourceRevision)->state == PerformancePublishPresentationState::active,
+            "The validated host recall project must become active.");
+    setHostMacroValue(source, "macro.tone", 0.21);
+    setHostMacroValue(source, "macro.motion", 0.47);
+    crossBoundary(source);
+    source.serviceMessageThreadWork();
+
+    juce::MemoryBlock state;
+    source.getStateInformation(state);
+    require(state.getSize() > 0, "An active published mixer must produce host state.");
+
+    drs::plugin::Processor restored;
+    restored.prepareToPlay(48000.0, 256);
+    restored.setStateInformation(state.getData(), static_cast<int>(state.getSize()));
+    require(waitForRestoredPerformance(restored),
+            "Restored host state must rebuild the exact published Performance identity.");
+    requireFixedTopology(restored);
+    const auto bindings = restored.getEngineFacade().getActivePublishedMacroBindings();
+    require(bindings != nullptr && bindings->assignedExposedCount == 2,
+            "A compatibility host-state restore must preserve the permanent first two published bindings.");
+    const auto descriptors = restored.getEngineFacade().getMacroDescriptors();
+    require(std::abs(descriptorForRuntimeId(descriptors, "tone").currentValue - 0.21) < 0.001
+                && std::abs(descriptorForRuntimeId(descriptors, "motion").currentValue - 0.47) < 0.001,
+            "A compatibility host-state round trip must retain Tone and Motion values by slot.");
+
+    auto twelve = projectWithMacroCapacity(12, 12);
+    drs::plugin::Processor twelveSource;
+    twelveSource.prepareToPlay(48000.0, 256);
+    require(twelveSource.replaceAuthoringProject(twelve), "The twelve-control host-state fixture must load.");
+    const auto twelveRevision = twelveSource.getAuthoringSession().getDocumentState().revision;
+    require(twelveSource.submitPerformancePublishCommand({}, PerformancePublishCommandSource::externalApi),
+            "The twelve-control host-state fixture must publish.");
+    require(waitForPublishSettlement(twelveSource, twelveRevision)->state == PerformancePublishPresentationState::active,
+            "The twelve-control host-state fixture must become active.");
+    setHostMacroValue(twelveSource, "macro.slot.12", 0.64);
+    crossBoundary(twelveSource);
+    twelveSource.serviceMessageThreadWork();
+    juce::MemoryBlock twelveState;
+    twelveSource.getStateInformation(twelveState);
+    const auto parsedTwelveState = parseHostSessionState(std::string(
+        static_cast<const char*>(twelveState.getData()), twelveState.getSize()));
+    require(parsedTwelveState.isValidHostState()
+                && parsedTwelveState.hostState->publishedState.has_value()
+                && std::any_of(parsedTwelveState.hostState->presetState.macroValues.begin(),
+                               parsedTwelveState.hostState->presetState.macroValues.end(), [](const auto& value)
+                               { return value.id == "slot.12" && std::abs(value.value - 0.64) < 0.001; }),
+            "Twelve published controls must serialize the fixed slot-12 value and published identity for host recall.");
+}
+
+void requireAutomationBoundaryForAllRelevantSlots()
+{
+    auto project = projectWithMacroCapacity(16, 12);
+    drs::plugin::Processor processor;
+    processor.prepareToPlay(48000.0, 256);
+    require(processor.replaceAuthoringProject(project), "The sixteen-slot automation fixture must load.");
+    const auto initialRevision = processor.getAuthoringSession().getDocumentState().revision;
+    require(processor.submitPerformancePublishCommand({}, PerformancePublishCommandSource::externalApi),
+            "The sixteen-slot automation fixture must publish.");
+    require(waitForPublishSettlement(processor, initialRevision)->state == PerformancePublishPresentationState::active,
+            "The initial sixteen-slot fixture must become active.");
+
+    const std::array<std::pair<std::string, double>, 4> beforeValues {{
+        { "macro.tone", 0.11 }, { "macro.slot.3", 0.33 },
+        { "macro.slot.12", 0.77 }, { "macro.slot.16", 0.91 }
+    }};
+    for (const auto& [id, value] : beforeValues)
+        setHostMacroValue(processor, id, value);
+    crossBoundary(processor);
+
+    project.displayName += " boundary";
+    require(processor.replaceAuthoringProject(project), "The compatible replacement must load.");
+    const auto replacementRevision = processor.getAuthoringSession().getDocumentState().revision;
+    require(processor.submitPerformancePublishCommand({}, PerformancePublishCommandSource::externalApi),
+            "The compatible replacement must publish.");
+    const std::array<std::pair<std::string, double>, 4> afterValues {{
+        { "macro.tone", 0.22 }, { "macro.slot.3", 0.44 },
+        { "macro.slot.12", 0.66 }, { "macro.slot.16", 0.88 }
+    }};
+    for (const auto& [id, value] : afterValues)
+        setHostMacroValue(processor, id, value);
+    const auto settled = waitForPublishSettlement(processor, replacementRevision);
+    require(settled != nullptr && settled->state == PerformancePublishPresentationState::active,
+            "Automation written at the replacement boundary must reach the activated generation.");
+    crossBoundary(processor);
+    const auto descriptors = processor.getEngineFacade().getMacroDescriptors();
+    require(std::abs(descriptorForRuntimeId(descriptors, "tone").currentValue - 0.22) < 0.001
+                && std::abs(descriptorForRuntimeId(descriptors, "slot.3").currentValue - 0.44) < 0.001
+                && std::abs(descriptorForRuntimeId(descriptors, "slot.12").currentValue - 0.66) < 0.001
+                && std::abs(descriptorForRuntimeId(descriptors, "slot.16").currentValue - 0.88) < 0.001,
+            "Slots 1, 3, 12, and hidden helper 16 must retain their intended automation writes across activation.");
+}
+
+void requireRepublishChurnRealtimeSafety()
+{
+    auto project = projectWithMacroCapacity(16, 12);
+    drs::plugin::Processor processor;
+    processor.prepareToPlay(48000.0, 256);
+    require(processor.replaceAuthoringProject(project), "The churn fixture must load.");
+    for (int iteration = 0; iteration < 6; ++iteration)
+    {
+        project.displayName = "Sixteen-slot churn " + std::to_string(iteration);
+        require(processor.replaceAuthoringProject(project), "Every compatible churn draft must load.");
+        const auto revision = processor.getAuthoringSession().getDocumentState().revision;
+        require(processor.submitPerformancePublishCommand({}, PerformancePublishCommandSource::externalApi),
+                "Every compatible churn draft must submit.");
+        for (const auto& slot : publishedMacroHostTopology())
+            setHostMacroValue(processor, slot.hostParameterId, (iteration + slot.slotIndex) % 10 / 10.0);
+        const auto settled = waitForPublishSettlement(processor, revision);
+        require(settled != nullptr && settled->state == PerformancePublishPresentationState::active,
+                "Every compatible churn draft must activate.");
+    }
+    crossBoundary(processor);
+    const auto realtime = processor.getRealtimeSafetySnapshot();
+    require(realtime.activePublishedMacroRevision == processor.getAuthoringSession().getDocumentState().revision
+                && realtime.getAudioThreadViolationCount() == 0,
+            "Rapid 16-slot republish churn must leave the final callback view active without realtime violations.");
+}
+
 void runSeam(const std::string_view seam)
 {
     if (seam == "binding-3-exposed")
@@ -475,6 +676,12 @@ void runSeam(const std::string_view seam)
         requirePublishedPresentationModel();
     else if (seam == "published-presentation-rename")
         requirePublishedPresentationRename();
+    else if (seam == "host-state-roundtrip")
+        requireHostStateRoundTrip();
+    else if (seam == "automation-boundary-16-slots")
+        requireAutomationBoundaryForAllRelevantSlots();
+    else if (seam == "republish-churn-realtime")
+        requireRepublishChurnRealtimeSafety();
 }
 } // namespace
 

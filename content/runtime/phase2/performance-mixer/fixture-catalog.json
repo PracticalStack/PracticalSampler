@@ -1,0 +1,32 @@
+{
+  "schemaName": "drs.performanceMixer.fixtureCatalog",
+  "schemaVersion": 1,
+  "baseProject": "three-layer-gain-mixer.drsproj",
+  "cases": [
+    {
+      "id": "four-mic",
+      "description": "Four visible continuous controls sharing the fixed topology.",
+      "authoredMacroCount": 4,
+      "exposedMacroCount": 4
+    },
+    {
+      "id": "eight-layer",
+      "description": "Eight visible continuous controls for compact-grid characterization.",
+      "authoredMacroCount": 8,
+      "exposedMacroCount": 8
+    },
+    {
+      "id": "twelve-control",
+      "description": "Twelve visible controls occupying the player-facing product maximum.",
+      "authoredMacroCount": 12,
+      "exposedMacroCount": 12
+    },
+    {
+      "id": "thirteen-exposed-rejected",
+      "description": "Thirteen exposed controls; publication must reject before worker preparation.",
+      "authoredMacroCount": 13,
+      "exposedMacroCount": 13,
+      "expectedFinding": "published-macro-exposed-capacity-exceeded"
+    }
+  ]
+}

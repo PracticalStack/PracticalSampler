@@ -227,12 +227,12 @@ int main()
                              "Diagnostics panel should expose the default fallback surface provenance when no prepared draft state exists.");
         requireLabelContains(panel,
                              "statusFailureLabel",
-                             "previewFindings=2",
-                             "Diagnostics panel should surface migrated preview findings.");
+                             "Publish failure [no-playable-zones]",
+                             "Diagnostics must retain the actionable published failure code after the compact mixer keeps the healthy path small.");
         requireLabelContains(panel,
                              "statusFailureLabel",
-                             "publishFindings=2",
-                             "Diagnostics panel should surface migrated publish findings.");
+                             "Snapshot requires at least one playable zone",
+                             "Diagnostics must retain actionable repair guidance for a failed publication.");
         requireLabelContains(panel,
                              "performanceKeyboardHintLabel",
                              "Range C1 - C6",
@@ -414,11 +414,11 @@ int main()
                              "Performance Mixer | 1 Exposed",
                              "Performance panel should switch into mixer mode when published exposed controls are active.");
         requireLabelContains(panel,
-                             "performanceMacroNameLabel.tone",
+                             "performanceMixerNameLabel.layer-blend",
                              "Layer Blend",
                              "Performance mixer should expose the published authored control label on the active slot.");
         requireComponentPresent(panel,
-                                "performanceMacroNameLabel.motion",
+                                "performanceMixerNameLabel.pedal-helper",
                                 false,
                                 "Performance mixer should hide assigned helper controls from the default player surface.");
         requireLabelContains(panel,
@@ -468,11 +468,11 @@ int main()
         require(requireLabel(panel, "performanceMixerEmptyStateLabel").isVisible(),
                 "Performance mixer empty state should become visible when all published controls are hidden.");
         requireComponentPresent(panel,
-                                "performanceMacroNameLabel.tone",
+                                "performanceMixerNameLabel.layer-blend",
                                 false,
                                 "Performance mixer should remove the prior exposed control when the new publication exposes none.");
         requireComponentPresent(panel,
-                                "performanceMacroNameLabel.motion",
+                                "performanceMixerNameLabel.pedal-helper",
                                 false,
                                 "Performance mixer should keep hidden helper slots off the player surface.");
         requireLabelContains(panel,

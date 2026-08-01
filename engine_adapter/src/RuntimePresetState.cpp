@@ -1,4 +1,5 @@
 #include "drs/engine/RuntimePresetState.h"
+#include "drs/engine/PublishedMacroBinding.h"
 
 #include "drs/engine/RuntimeLoadProfile.h"
 
@@ -22,6 +23,19 @@ using ordered_json = nlohmann::ordered_json;
 
 constexpr auto phase1PresetSchemaName = "drs.presetState";
 constexpr auto phase1PresetSchemaVersion = 1;
+
+bool isPublishedHostRuntimeMacroId(const std::string& macroId)
+{
+    constexpr std::string_view prefix { "macro." };
+    for (const auto& slot : publishedMacroHostTopology())
+    {
+        const std::string_view hostId { slot.hostParameterId };
+        if (hostId.rfind(prefix, 0) == 0
+            && macroId == hostId.substr(prefix.size()))
+            return true;
+    }
+    return false;
+}
 
 template <typename TResult>
 void addIssue(TResult& result, const std::string& issue)
@@ -497,7 +511,11 @@ RuntimePresetStateValidationResult validateRuntimePresetState(const RuntimePrese
         const auto definitionIterator = macroDefinitions.find(macroValue.id);
         if (definitionIterator == macroDefinitions.end())
         {
-            addIssue(result, "Preset state references unknown macro id '" + macroValue.id + "'.");
+            if (!isPublishedHostRuntimeMacroId(macroValue.id))
+                addIssue(result, "Preset state references unknown macro id '" + macroValue.id + "'.");
+            else if (macroValue.value < 0.0 || macroValue.value > 1.0)
+                addIssue(result, "Preset state published host macro '" + macroValue.id
+                                 + "' is outside the normalized range.");
             continue;
         }
 
