@@ -105,6 +105,11 @@ PerformanceMacroSurfaceModel buildPerformanceMacroSurfaceModel(
             ++model.hiddenPublishedMacroCount;
     }
 
+    std::stable_sort(model.displayedMacros.begin(), model.displayedMacros.end(), [](const auto& left, const auto& right)
+    {
+        return left.authoredOrder < right.authoredOrder;
+    });
+
     return model;
 }
 

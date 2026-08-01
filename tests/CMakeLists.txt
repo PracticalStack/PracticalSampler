@@ -2033,8 +2033,8 @@ add_test(
 )
 
 # Performance mixer Sprint 0 introduced direct expected-red characterization.
-# Sprints 1 and 2 promote the implemented topology, preflight, presentation,
-# and recovery seams into the regular test matrix.
+# Sprints 1 through 3 promote the implemented topology, preflight, recovery,
+# and immutable presentation seams into the regular test matrix.
 juce_add_console_app(drs_performance_mixer_s0_red_tests
     PRODUCT_NAME "Decent Rhapsody Studio Performance Mixer Sprint 0 Red Tests"
 )
@@ -2074,6 +2074,17 @@ foreach(DRS_PERFORMANCE_MIXER_S1_SEAM IN ITEMS
     add_test(
         NAME "drs.performance_mixer.s1.${DRS_PERFORMANCE_MIXER_S1_TEST_SUFFIX}"
         COMMAND drs_performance_mixer_s0_red_tests "${DRS_PERFORMANCE_MIXER_S1_SEAM}"
+    )
+endforeach()
+
+foreach(DRS_PERFORMANCE_MIXER_S3_SEAM IN ITEMS
+        published-presentation-model
+        published-presentation-rename)
+    string(REPLACE "-" "_" DRS_PERFORMANCE_MIXER_S3_TEST_SUFFIX
+           "${DRS_PERFORMANCE_MIXER_S3_SEAM}")
+    add_test(
+        NAME "drs.performance_mixer.s3.${DRS_PERFORMANCE_MIXER_S3_TEST_SUFFIX}"
+        COMMAND drs_performance_mixer_s0_red_tests "${DRS_PERFORMANCE_MIXER_S3_SEAM}"
     )
 endforeach()
 

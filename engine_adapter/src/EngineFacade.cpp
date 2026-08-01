@@ -1,4 +1,5 @@
 #include "drs/engine/EngineFacade.h"
+#include "drs/engine/CuratedDspCatalog.h"
 #include "drs/engine/DspGraphPlan.h"
 #include "drs/engine/DspParameterControl.h"
 #include "drs/engine/HiseFrontendBridge.h"
@@ -18,6 +19,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cctype>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -257,6 +259,158 @@ bool isPublishedHostSlotPlaceholderId(const std::string& stableAuthoredId)
     return stableAuthoredId.rfind(prefix.data(), 0) == 0;
 }
 
+std::string humanizePresentationIdentifier(const std::string& identifier)
+{
+    std::string result;
+    result.reserve(identifier.size());
+    bool capitalize = true;
+    for (const auto character : identifier)
+    {
+        if (character == '.' || character == '_' || character == '-')
+        {
+            if (!result.empty() && result.back() != ' ')
+                result.push_back(' ');
+            capitalize = true;
+            continue;
+        }
+        if (std::isupper(static_cast<unsigned char>(character)) && !result.empty()
+            && result.back() != ' ')
+            result.push_back(' ');
+        result.push_back(capitalize ? static_cast<char>(std::toupper(static_cast<unsigned char>(character)))
+                                    : character);
+        capitalize = false;
+    }
+    return result.empty() ? "Control" : result;
+}
+
+std::string curatedParameterLabel(const std::string& parameterId)
+{
+    const auto hasSuffix = [&](const std::string_view suffix)
+    {
+        return parameterId.size() > suffix.size()
+            && parameterId.compare(parameterId.size() - suffix.size(), suffix.size(), suffix) == 0;
+    };
+    if (hasSuffix("Db"))
+        return humanizePresentationIdentifier(parameterId.substr(0, parameterId.size() - 2));
+    if (hasSuffix("Ms"))
+        return humanizePresentationIdentifier(parameterId.substr(0, parameterId.size() - 2));
+    if (hasSuffix("Hz"))
+        return humanizePresentationIdentifier(parameterId.substr(0, parameterId.size() - 2));
+    return humanizePresentationIdentifier(parameterId);
+}
+
+std::string valueUnitLabel(const CuratedDspParameterUnit unit)
+{
+    switch (unit)
+    {
+        case CuratedDspParameterUnit::decibels: return "dB";
+        case CuratedDspParameterUnit::milliseconds: return "ms";
+        case CuratedDspParameterUnit::seconds: return "s";
+        case CuratedDspParameterUnit::hertz: return "Hz";
+        case CuratedDspParameterUnit::ratio: return "ratio";
+        case CuratedDspParameterUnit::semitones: return "semitones";
+        case CuratedDspParameterUnit::normalized:
+        case CuratedDspParameterUnit::boolean: return {};
+    }
+    return {};
+}
+
+PublishedMacroControlKind controlKindForUnit(const CuratedDspParameterUnit unit)
+{
+    if (unit == CuratedDspParameterUnit::boolean)
+        return PublishedMacroControlKind::toggle;
+    if (unit == CuratedDspParameterUnit::decibels)
+        return PublishedMacroControlKind::fader;
+    return PublishedMacroControlKind::knob;
+}
+
+std::string sourceLabelForDspSlot(const ImmutablePlaybackSnapshot& snapshot,
+                                  const std::string& slotId)
+{
+    const auto bus = std::find_if(snapshot.routingBuses.begin(), snapshot.routingBuses.end(),
+                                  [&](const auto& candidate)
+                                  {
+                                      return std::find(candidate.fxSlotIds.begin(), candidate.fxSlotIds.end(), slotId)
+                                          != candidate.fxSlotIds.end();
+                                  });
+    if (bus == snapshot.routingBuses.end())
+        return "Instrument";
+
+    constexpr std::string_view groupPrefix { "groups/" };
+    constexpr std::string_view zonePrefix { "zones/" };
+    if (bus->inputSourceId.rfind(groupPrefix.data(), 0) == 0)
+    {
+        const auto groupId = bus->inputSourceId.substr(groupPrefix.size());
+        const auto group = std::find_if(snapshot.groupRoutes.begin(), snapshot.groupRoutes.end(),
+                                        [&](const auto& route) { return route.groupId == groupId; });
+        return group != snapshot.groupRoutes.end() && !group->displayName.empty()
+            ? group->displayName : (groupId.empty() ? "Instrument" : groupId);
+    }
+    if (bus->inputSourceId.rfind(zonePrefix.data(), 0) == 0)
+    {
+        const auto zoneId = bus->inputSourceId.substr(zonePrefix.size());
+        const auto zone = std::find_if(snapshot.zones.begin(), snapshot.zones.end(),
+                                       [&](const auto& candidate) { return candidate.id == zoneId; });
+        return zone != snapshot.zones.end() && !zone->displayName.empty()
+            ? zone->displayName : (zoneId.empty() ? "Instrument" : zoneId);
+    }
+    return "Instrument";
+}
+
+std::vector<PublishedMacroBindingBuildRequest::PresentationHint> buildPresentationHints(
+    const ImmutablePlaybackSnapshot& snapshot)
+{
+    std::vector<PublishedMacroBindingBuildRequest::PresentationHint> hints;
+    hints.reserve(snapshot.macroDefaults.size());
+    for (std::size_t authoredOrder = 0; authoredOrder < snapshot.macroDefaults.size(); ++authoredOrder)
+    {
+        const auto& macro = snapshot.macroDefaults[authoredOrder];
+        PublishedMacroPresentation presentation;
+        presentation.authoredLabel = macro.name.empty()
+            ? humanizePresentationIdentifier(macro.id) : macro.name;
+        presentation.sectionLabel = "Instrument";
+        presentation.parameterLabel = "Control";
+        presentation.authoredOrder = authoredOrder;
+
+        const auto target = std::find_if(macro.targets.begin(), macro.targets.end(), [](const auto& candidate)
+        {
+            return !candidate.dspSlotId.empty() && !candidate.dspParameterId.empty();
+        });
+        if (target != macro.targets.end())
+        {
+            presentation.sectionLabel = sourceLabelForDspSlot(snapshot, target->dspSlotId);
+            presentation.parameterLabel = curatedParameterLabel(target->dspParameterId);
+            const auto slot = std::find_if(snapshot.fxSlots.begin(), snapshot.fxSlots.end(),
+                                           [&](const auto& candidate) { return candidate.id == target->dspSlotId; });
+            if (slot != snapshot.fxSlots.end())
+            {
+                if (const auto* effect = findCuratedDspEffect(slot->effectType, slot->effectVersion))
+                {
+                    const auto parameter = std::find_if(effect->parameters.begin(), effect->parameters.end(),
+                                                        [&](const auto& candidate)
+                                                        { return candidate.id == target->dspParameterId; });
+                    if (parameter != effect->parameters.end())
+                    {
+                        presentation.valueUnit = valueUnitLabel(parameter->unit);
+                        presentation.controlKind = controlKindForUnit(parameter->unit);
+                    }
+                }
+            }
+        }
+        else if (macro.id == "tone" || macro.id == "motion")
+        {
+            presentation.parameterLabel = macro.id == "tone" ? "Tone" : "Motion";
+        }
+
+        presentation.accessibilityDescription = presentation.authoredLabel + ", "
+            + presentation.sectionLabel + ", " + presentation.parameterLabel;
+        if (!presentation.valueUnit.empty())
+            presentation.accessibilityDescription += ", " + presentation.valueUnit;
+        hints.push_back({ macro.id, std::move(presentation) });
+    }
+    return hints;
+}
+
 EngineMacroDescriptor makePublishedMacroDescriptor(const PublishedMacroBinding& binding,
                                                    const RuntimeSessionStateSnapshot& sessionState)
 {
@@ -299,7 +453,13 @@ EngineMacroDescriptor makePublishedMacroDescriptor(const PublishedMacroBinding& 
         std::move(soundIntent),
         std::move(currentEffect),
         true,
-        binding.exposedInPerformance
+        binding.exposedInPerformance,
+        binding.presentation.sectionLabel,
+        binding.presentation.parameterLabel,
+        binding.presentation.valueUnit,
+        binding.presentation.controlKind,
+        binding.presentation.authoredOrder,
+        binding.presentation.accessibilityDescription
     };
 }
 
@@ -1972,6 +2132,7 @@ PerformancePublishActivationPayloadPtr EngineFacade::authorizePerformanceActivat
     macroBindingRequest.macroSchemaDigest = payload->macroSchemaDigest;
     macroBindingRequest.dspGraphDigest = payload->snapshot->dspGraphDigest;
     macroBindingRequest.authoredMacros = payload->snapshot->macroDefaults;
+    macroBindingRequest.presentationHints = buildPresentationHints(*payload->snapshot);
     macroBindingRequest.previousActiveTable = getActivePublishedMacroBindings();
     macroBindingRequest.hostSlots = buildPublishedHostSlots(
         macroBindingRequest.authoredMacros,

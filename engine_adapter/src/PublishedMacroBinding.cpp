@@ -1,6 +1,7 @@
 #include "drs/engine/PublishedMacroBinding.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <unordered_map>
 #include <unordered_set>
@@ -60,6 +61,61 @@ const PublishedMacroBinding* findPreviousBinding(
                                       });
     return iterator != table->bindings.end() ? &*iterator : nullptr;
 }
+
+std::string humanizeIdentifier(const std::string& identifier)
+{
+    std::string result;
+    result.reserve(identifier.size());
+    bool capitalize = true;
+    for (const auto character : identifier)
+    {
+        if (character == '.' || character == '_' || character == '-')
+        {
+            if (!result.empty() && result.back() != ' ')
+                result.push_back(' ');
+            capitalize = true;
+            continue;
+        }
+        if (std::isupper(static_cast<unsigned char>(character)) && !result.empty()
+            && result.back() != ' ')
+            result.push_back(' ');
+        result.push_back(capitalize ? static_cast<char>(std::toupper(static_cast<unsigned char>(character)))
+                                    : character);
+        capitalize = false;
+    }
+    return result.empty() ? "Control" : result;
+}
+
+PublishedMacroPresentation fallbackPresentation(const PlaybackSnapshotMacroDefault& macro,
+                                                const std::size_t authoredOrder)
+{
+    PublishedMacroPresentation presentation;
+    presentation.authoredLabel = macro.name.empty() ? humanizeIdentifier(macro.id) : macro.name;
+    presentation.sectionLabel = "Instrument";
+    presentation.parameterLabel = "Control";
+    presentation.authoredOrder = authoredOrder;
+    presentation.accessibilityDescription = presentation.authoredLabel + ", "
+        + presentation.sectionLabel + ", " + presentation.parameterLabel;
+    return presentation;
+}
+
+void finalizePresentation(PublishedMacroPresentation& presentation,
+                          const PlaybackSnapshotMacroDefault& macro,
+                          const std::size_t authoredOrder)
+{
+    const auto fallback = fallbackPresentation(macro, authoredOrder);
+    if (presentation.authoredLabel.empty()) presentation.authoredLabel = fallback.authoredLabel;
+    if (presentation.sectionLabel.empty()) presentation.sectionLabel = fallback.sectionLabel;
+    if (presentation.parameterLabel.empty()) presentation.parameterLabel = fallback.parameterLabel;
+    presentation.authoredOrder = authoredOrder;
+    if (presentation.accessibilityDescription.empty())
+    {
+        presentation.accessibilityDescription = presentation.authoredLabel + ", "
+            + presentation.sectionLabel + ", " + presentation.parameterLabel;
+        if (!presentation.valueUnit.empty())
+            presentation.accessibilityDescription += ", " + presentation.valueUnit;
+    }
+}
 } // namespace
 
 PublishedMacroBindingBuildResult buildPublishedMacroBindingTable(
@@ -99,6 +155,7 @@ PublishedMacroBindingBuildResult buildPublishedMacroBindingTable(
     }
 
     std::unordered_map<std::string, const PlaybackSnapshotMacroDefault*> authoredById;
+    std::unordered_map<std::string, std::size_t> authoredOrders;
     for (std::size_t index = 0; index < request.authoredMacros.size(); ++index)
     {
         const auto& macro = request.authoredMacros[index];
@@ -114,6 +171,7 @@ PublishedMacroBindingBuildResult buildPublishedMacroBindingTable(
             addFinding(result, PublishedMacroBindingFindingSeverity::error,
                        "published-macro-authored-range-invalid", path,
                        "Published macro ranges and defaults must be finite and internally valid.");
+        authoredOrders.emplace(macro.id, index);
     }
 
     if (std::any_of(result.findings.begin(), result.findings.end(), [](const auto& finding)
@@ -123,6 +181,10 @@ PublishedMacroBindingBuildResult buildPublishedMacroBindingTable(
     std::unordered_map<std::string, double> currentValues;
     for (const auto& value : request.currentValues)
         currentValues.emplace(value.stableAuthoredId, value.value);
+
+    std::unordered_map<std::string, PublishedMacroPresentation> presentationHints;
+    for (const auto& hint : request.presentationHints)
+        presentationHints.emplace(hint.stableAuthoredId, hint.presentation);
 
     auto table = std::make_shared<ImmutablePublishedMacroBindingTable>();
     table->revision = request.revision;
@@ -145,6 +207,12 @@ PublishedMacroBindingBuildResult buildPublishedMacroBindingTable(
             const auto& macro = *authored->second;
             binding.assigned = true;
             binding.publishedName = macro.name;
+            const auto authoredOrder = authoredOrders.at(macro.id);
+            const auto hint = presentationHints.find(macro.id);
+            binding.presentation = hint != presentationHints.end()
+                ? hint->second : fallbackPresentation(macro, authoredOrder);
+            finalizePresentation(binding.presentation, macro, authoredOrder);
+            binding.publishedName = binding.presentation.authoredLabel;
             binding.minValue = macro.minValue;
             binding.maxValue = macro.maxValue;
             binding.defaultValue = macro.defaultValue;

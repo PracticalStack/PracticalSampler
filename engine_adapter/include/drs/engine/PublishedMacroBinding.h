@@ -68,6 +68,27 @@ enum class PublishedMacroRenderTarget : std::uint8_t
 
 enum class PublishedMacroCurve : std::uint8_t { linear = 0, logarithmic };
 
+// Presentation is prepared with the published table. The audio callback only
+// receives PublishedMacroCallbackView, so none of these strings enter the
+// realtime path.
+enum class PublishedMacroControlKind : std::uint8_t
+{
+    knob = 0,
+    fader,
+    toggle
+};
+
+struct PublishedMacroPresentation
+{
+    std::string authoredLabel;
+    std::string sectionLabel;
+    std::string parameterLabel;
+    std::string valueUnit;
+    PublishedMacroControlKind controlKind = PublishedMacroControlKind::knob;
+    std::size_t authoredOrder = 0;
+    std::string accessibilityDescription;
+};
+
 struct PublishedMacroHostSlotDefinition
 {
     std::size_t slotIndex = 0;
@@ -109,6 +130,7 @@ struct PublishedMacroBinding
     std::string hostParameterId;
     std::string stableAuthoredId;
     std::string publishedName;
+    PublishedMacroPresentation presentation;
     double minValue = 0.0;
     double maxValue = 1.0;
     double defaultValue = 0.0;
@@ -164,6 +186,14 @@ struct PublishedMacroBindingBuildRequest
     std::string macroSchemaDigest;
     std::vector<PublishedMacroHostSlotDefinition> hostSlots;
     std::vector<PlaybackSnapshotMacroDefault> authoredMacros;
+    // Derived from the immutable playback snapshot by EngineFacade; no UI
+    // surface needs to reconstruct source ownership from authoring state.
+    struct PresentationHint
+    {
+        std::string stableAuthoredId;
+        PublishedMacroPresentation presentation;
+    };
+    std::vector<PresentationHint> presentationHints;
     std::vector<PublishedMacroCurrentValue> currentValues;
     ImmutablePublishedMacroBindingTablePtr previousActiveTable;
     const DspParameterControlLayout* dspControlLayout = nullptr;

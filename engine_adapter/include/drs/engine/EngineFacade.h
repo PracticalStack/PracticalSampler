@@ -4,6 +4,7 @@
 #include "drs/engine/PlaybackSnapshot.h"
 #include "drs/engine/PerformancePublishController.h"
 #include "drs/engine/PerformancePublishPresentation.h"
+#include "drs/engine/PublishedMacroBinding.h"
 #include "drs/engine/PreparedPlayback.h"
 #include "drs/engine/RuntimePresetState.h"
 #include "drs/engine/RuntimeModel.h"
@@ -53,6 +54,12 @@ struct EngineMacroDescriptor
     std::string currentEffect;
     bool publishedControl = false;
     bool exposedInPerformance = true;
+    std::string sectionLabel;
+    std::string parameterLabel;
+    std::string valueUnit;
+    PublishedMacroControlKind controlKind = PublishedMacroControlKind::knob;
+    std::size_t authoredOrder = 0;
+    std::string accessibilityDescription;
 };
 
 struct EngineArticulationDescriptor

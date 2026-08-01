@@ -20,7 +20,7 @@ namespace
 {
 using namespace drs::engine;
 
-constexpr std::array<std::string_view, 9> redSeams {
+constexpr std::array<std::string_view, 11> redSeams {
     "binding-3-exposed",
     "binding-12-exposed",
     "binding-16-authored",
@@ -29,7 +29,9 @@ constexpr std::array<std::string_view, 9> redSeams {
     "invalid-dsp-target",
     "failed-then-successful-recovery",
     "processor-topology-lifecycle",
-    "shell-diagnostic-parity"
+    "shell-diagnostic-parity",
+    "published-presentation-model",
+    "published-presentation-rename"
 };
 
 void require(const bool condition, const std::string& message)
@@ -360,6 +362,95 @@ void requireShellDiagnosticParity()
             "Both shell surfaces must retain the detailed exposed-slot finding and identical repair text.");
 }
 
+void requirePublishedPresentationModel()
+{
+    const auto project = loadThreeLayerFixture();
+    drs::plugin::Processor processor;
+    processor.prepareToPlay(48000.0, 256);
+    require(processor.replaceAuthoringProject(project), "The presentation fixture must load.");
+    const auto revision = processor.getAuthoringSession().getDocumentState().revision;
+    require(processor.submitPerformancePublishCommand({}, PerformancePublishCommandSource::externalApi),
+            "The presentation fixture must publish.");
+    const auto presentation = waitForPublishSettlement(processor, revision);
+    require(presentation != nullptr && presentation->state == PerformancePublishPresentationState::active,
+            "The presentation fixture must become active.");
+
+    const auto bindings = processor.getEngineFacade().getActivePublishedMacroBindings();
+    require(bindings != nullptr, "Active published bindings must carry presentation metadata.");
+    const std::array<std::string, 3> labels { "Bell Gain", "EPiano Gain", "Plucks Gain" };
+    const std::array<std::string, 3> sections { "Bell", "EPiano", "Plucks" };
+    for (std::size_t index = 0; index < labels.size(); ++index)
+    {
+        const auto binding = std::find_if(bindings->bindings.begin(), bindings->bindings.end(),
+                                          [&](const auto& candidate) { return candidate.publishedName == labels[index]; });
+        require(binding != bindings->bindings.end()
+                    && binding->presentation.authoredLabel == labels[index]
+                    && binding->presentation.sectionLabel == sections[index]
+                    && binding->presentation.parameterLabel == "Gain"
+                    && binding->presentation.valueUnit == "dB"
+                    && binding->presentation.controlKind == PublishedMacroControlKind::fader
+                    && binding->presentation.authoredOrder == index
+                    && !binding->presentation.accessibilityDescription.empty(),
+                "Each published group gain must retain immutable label, source, unit, kind, and authored order.");
+    }
+
+    const auto descriptors = processor.getEngineFacade().getMacroDescriptors();
+    const auto descriptor = std::find_if(descriptors.begin(), descriptors.end(), [](const auto& candidate)
+    {
+        return candidate.name == "Bell Gain";
+    });
+    require(descriptor != descriptors.end()
+                && descriptor->sectionLabel == "Bell"
+                && descriptor->parameterLabel == "Gain"
+                && descriptor->valueUnit == "dB"
+                && descriptor->controlKind == PublishedMacroControlKind::fader
+                && !descriptor->accessibilityDescription.empty(),
+            "Perform descriptors must expose published presentation metadata without authoring traversal.");
+}
+
+void requirePublishedPresentationRename()
+{
+    auto project = loadThreeLayerFixture();
+    drs::plugin::Processor processor;
+    processor.prepareToPlay(48000.0, 256);
+    require(processor.replaceAuthoringProject(project), "The rename fixture must load.");
+    const auto firstRevision = processor.getAuthoringSession().getDocumentState().revision;
+    require(processor.submitPerformancePublishCommand({}, PerformancePublishCommandSource::externalApi),
+            "The initial rename fixture must publish.");
+    require(waitForPublishSettlement(processor, firstRevision)->state == PerformancePublishPresentationState::active,
+            "The initial rename fixture must become active.");
+    const auto firstBindings = processor.getEngineFacade().getActivePublishedMacroBindings();
+    const auto firstBell = std::find_if(firstBindings->bindings.begin(), firstBindings->bindings.end(), [](const auto& binding)
+    {
+        return binding.stableAuthoredId == "bell-gain";
+    });
+    require(firstBell != firstBindings->bindings.end(), "Bell Gain must receive a fixed host slot.");
+    const auto firstHostId = firstBell->hostParameterId;
+    constexpr std::string_view macroPrefix { "macro." };
+    require(firstHostId.rfind(macroPrefix.data(), 0) == 0
+                && processor.getEngineFacade().setMacroValue(firstHostId.substr(macroPrefix.size()), 0.23),
+            "The active Bell Gain host binding must accept a migrated current value.");
+
+    project.authoring.groups.front().displayName = "Bell Pad";
+    require(processor.replaceAuthoringProject(project), "The renamed draft must load.");
+    const auto renamedRevision = processor.getAuthoringSession().getDocumentState().revision;
+    require(processor.submitPerformancePublishCommand({}, PerformancePublishCommandSource::externalApi),
+            "The renamed draft must publish.");
+    const auto renamedPresentation = waitForPublishSettlement(processor, renamedRevision);
+    require(renamedPresentation != nullptr && renamedPresentation->state == PerformancePublishPresentationState::active,
+            "The renamed draft must become active.");
+    const auto renamedBindings = processor.getEngineFacade().getActivePublishedMacroBindings();
+    const auto renamedBell = std::find_if(renamedBindings->bindings.begin(), renamedBindings->bindings.end(), [](const auto& binding)
+    {
+        return binding.stableAuthoredId == "bell-gain";
+    });
+    require(renamedBell != renamedBindings->bindings.end()
+                && renamedBell->hostParameterId == firstHostId
+                && renamedBell->presentation.sectionLabel == "Bell Pad"
+                && std::abs(renamedBell->publishedValue - 0.23) < 0.001,
+            "A source rename must update only the next published presentation snapshot while preserving host identity and value.");
+}
+
 void runSeam(const std::string_view seam)
 {
     if (seam == "binding-3-exposed")
@@ -380,6 +471,10 @@ void runSeam(const std::string_view seam)
         requireLifecycleTopology();
     else if (seam == "shell-diagnostic-parity")
         requireShellDiagnosticParity();
+    else if (seam == "published-presentation-model")
+        requirePublishedPresentationModel();
+    else if (seam == "published-presentation-rename")
+        requirePublishedPresentationRename();
 }
 } // namespace
 

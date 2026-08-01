@@ -55,3 +55,20 @@ the three-, twelve-, and sixteen-binding cases plus lifecycle topology stability
 registered green tests. Sprint 2 promotes the 13-exposed and 17-total preflight
 limits, structured-DSP target validation, shell diagnostic parity, and a failed-then-
 successful recovery sequence.
+
+## Published presentation model
+
+Every assigned binding carries an immutable presentation record: authored label,
+section/source label, parameter label, value unit, control kind, authored order,
+and accessibility description. The record is derived during publication from the
+captured playback snapshot and the curated DSP catalog. Group-bus targets use the
+published group display name, zone-bus targets use the published zone display name,
+and all other targets fall back to `Instrument`.
+
+Curated gain parameters use a dB fader; boolean parameters use toggles; all other
+parameters use knobs. The Performance surface orders exposed controls by authored
+order, never by host slot. These derived labels are deliberately not serialized as
+authoring overrides: a group rename appears only after the next successful Publish,
+while its fixed host slot and current value migrate unchanged. Missing legacy source
+metadata remains publishable using deterministic `Instrument` / `Control` fallback
+labels.
