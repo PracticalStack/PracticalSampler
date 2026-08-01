@@ -50,8 +50,7 @@ deterministically. A failed replacement keeps the last-known-good published gene
 active. Both the plug-in and standalone Performance surfaces must show the most specific
 failure code, path, and repair guidance.
 
-Sprint 0's direct-only expected-red suite is `drs_performance_mixer_s0_red_tests`.
-It records the intentionally failing baseline for three, twelve, and sixteen bindings,
-the 13-exposed and 17-total limits, lifecycle topology stability, and shell diagnostic
-parity. Sprint 1 converts topology cases to registered green tests; Sprint 2 converts
-the capacity and diagnostic cases.
+`drs_performance_mixer_s0_red_tests` is the contract seam runner. Sprint 1 promotes
+the three-, twelve-, and sixteen-binding cases plus lifecycle topology stability to
+registered green tests. The 13-exposed and 17-total capacity cases and shell-diagnostic
+parity remain direct expected-red commands until Sprint 2.

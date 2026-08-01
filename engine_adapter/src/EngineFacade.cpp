@@ -305,25 +305,30 @@ EngineMacroDescriptor makePublishedMacroDescriptor(const PublishedMacroBinding& 
 
 std::vector<PublishedMacroHostSlotDefinition> buildPublishedHostSlots(
     const std::vector<PlaybackSnapshotMacroDefault>& authoredMacros,
-    const std::vector<RuntimeMacroDefinition>& hostMacros,
     const ImmutablePublishedMacroBindingTablePtr& previousActiveTable)
 {
+    const auto& topology = publishedMacroHostTopology();
     std::vector<PublishedMacroHostSlotDefinition> hostSlots;
-    hostSlots.reserve(hostMacros.size());
-    std::vector<std::string> assignedStableIds(hostMacros.size());
-    std::vector<bool> retainedStableIds(hostMacros.size(), false);
+    hostSlots.reserve(topology.size());
+    std::vector<std::string> assignedStableIds(topology.size());
+    std::vector<bool> retainedStableIds(topology.size(), false);
     for (std::size_t index = 0; index < assignedStableIds.size(); ++index)
         assignedStableIds[index] = buildPublishedHostSlotPlaceholderId(index);
 
     std::unordered_set<std::string> assignedIds;
     assignedIds.reserve(authoredMacros.size());
+    std::unordered_set<std::string> authoredIds;
+    authoredIds.reserve(authoredMacros.size());
+    for (const auto& macro : authoredMacros)
+        authoredIds.insert(macro.id);
 
     if (previousActiveTable != nullptr)
     {
         for (const auto& binding : previousActiveTable->bindings)
         {
-            if (binding.hostSlotIndex >= hostMacros.size()
-                || binding.stableAuthoredId.empty())
+            if (binding.hostSlotIndex >= topology.size() || binding.stableAuthoredId.empty()
+                || (!isPublishedHostSlotPlaceholderId(binding.stableAuthoredId)
+                    && !authoredIds.count(binding.stableAuthoredId)))
             {
                 continue;
             }
@@ -375,7 +380,7 @@ std::vector<PublishedMacroHostSlotDefinition> buildPublishedHostSlots(
 
     for (std::size_t index = 0; index < assignedStableIds.size(); ++index)
         hostSlots.push_back(
-            { index, "macro." + hostMacros[index].id, assignedStableIds[index] });
+            { topology[index].slotIndex, topology[index].hostParameterId, assignedStableIds[index] });
 
     return hostSlots;
 }
@@ -1423,16 +1428,41 @@ bool EngineFacade::setMacroValue(const std::string& macroId, double value)
     if (!referenceInstrumentActive || !referenceManifest.loaded)
         return false;
 
-    const auto definitionIterator = std::find_if(referenceManifest.instrument.macros.begin(),
-                                                 referenceManifest.instrument.macros.end(),
-                                                 [&](const RuntimeMacroDefinition& macro)
-                                                 {
-                                                     return macro.id == macroId;
-                                                 });
-    if (definitionIterator == referenceManifest.instrument.macros.end())
-        return false;
+    auto minimum = 0.0;
+    auto maximum = 1.0;
+    auto found = false;
+    if (const auto activeBindings = getActivePublishedMacroBindings(); activeBindings != nullptr)
+    {
+        const auto binding = std::find_if(activeBindings->bindings.begin(), activeBindings->bindings.end(),
+                                          [&](const PublishedMacroBinding& candidate)
+                                          {
+                                              return candidate.assigned
+                                                  && runtimeMacroIdFromHostParameterId(
+                                                         candidate.hostParameterId) == macroId;
+                                          });
+        if (binding != activeBindings->bindings.end())
+        {
+            minimum = binding->minValue;
+            maximum = binding->maxValue;
+            found = true;
+        }
+    }
 
-    const auto clampedValue = normalizeMacroValue(std::clamp(value, definitionIterator->minValue, definitionIterator->maxValue));
+    if (!found)
+    {
+        const auto definition = std::find_if(referenceManifest.instrument.macros.begin(),
+                                             referenceManifest.instrument.macros.end(),
+                                             [&](const RuntimeMacroDefinition& macro)
+                                             {
+                                                 return macro.id == macroId;
+                                             });
+        if (definition == referenceManifest.instrument.macros.end())
+            return false;
+        minimum = definition->minValue;
+        maximum = definition->maxValue;
+    }
+
+    const auto clampedValue = normalizeMacroValue(std::clamp(value, minimum, maximum));
     const auto currentIterator = std::find_if(currentSessionState.macroValues.begin(),
                                               currentSessionState.macroValues.end(),
                                               [&](const RuntimePresetMacroValue& currentValue)
@@ -1765,7 +1795,6 @@ PerformancePublishActivationPayloadPtr EngineFacade::authorizePerformanceActivat
     macroBindingRequest.previousActiveTable = getActivePublishedMacroBindings();
     macroBindingRequest.hostSlots = buildPublishedHostSlots(
         macroBindingRequest.authoredMacros,
-        referenceManifest.instrument.macros,
         macroBindingRequest.previousActiveTable);
     macroBindingRequest.currentValues = buildPublishedCurrentValues(
         currentSessionState,

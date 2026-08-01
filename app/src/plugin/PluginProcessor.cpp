@@ -666,7 +666,7 @@ Processor::Processor()
 Processor::Processor(drs::app::WaveformPreviewServiceOptions waveformPreviewServiceOptions)
     : juce::AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       authoringSession(buildInitialAuthoringProject()),
-      parameterState(*this, nullptr, "macroParameters", buildParameterLayout(engineFacade)),
+      parameterState(*this, nullptr, "macroParameters", buildParameterLayout()),
       waveformPreviewService(std::move(waveformPreviewServiceOptions))
 {
     primeRealtimeSafetyState(512);
@@ -678,8 +678,8 @@ Processor::Processor(drs::app::WaveformPreviewServiceOptions waveformPreviewServ
             authoringPreviewPlaybackContext.publishDspControlByIdentity(slotId, parameterId, value);
         });
 
-    for (const auto& macro : engineFacade.getMacroDescriptors())
-        parameterState.addParameterListener(buildMacroParameterId(macro.id), this);
+    for (const auto& slot : drs::engine::publishedMacroHostTopology())
+        parameterState.addParameterListener(slot.hostParameterId, this);
 
     initializePublishedMacroRealtimeState();
     syncParametersFromEngine();
@@ -697,8 +697,8 @@ Processor::~Processor()
     waveformPreviewService.shutdown();
     projectRestoreCoordinator.shutdown();
 
-    for (const auto& macro : engineFacade.getMacroDescriptors())
-        parameterState.removeParameterListener(buildMacroParameterId(macro.id), this);
+    for (const auto& slot : drs::engine::publishedMacroHostTopology())
+        parameterState.removeParameterListener(slot.hostParameterId, this);
 
     performancePlaybackContext.closeAtBlockBoundary();
     authoringPreviewPlaybackContext.closeAtBlockBoundary();
@@ -2428,19 +2428,17 @@ juce::String Processor::buildMacroParameterId(const std::string& macroId)
     return "macro." + juce::String::fromUTF8(macroId.c_str());
 }
 
-juce::AudioProcessorValueTreeState::ParameterLayout Processor::buildParameterLayout(
-    const drs::engine::EngineFacade& facade)
+juce::AudioProcessorValueTreeState::ParameterLayout Processor::buildParameterLayout()
 {
     juce::AudioProcessorValueTreeState::ParameterLayout layout;
 
-    for (const auto& macro : facade.getMacroDescriptors())
+    for (const auto& slot : drs::engine::publishedMacroHostTopology())
     {
         layout.add(std::make_unique<juce::AudioParameterFloat>(
-            juce::ParameterID(buildMacroParameterId(macro.id), 1),
-            juce::String::fromUTF8(macro.name.c_str()),
-            juce::NormalisableRange<float>(static_cast<float>(macro.minValue),
-                                           static_cast<float>(macro.maxValue)),
-            static_cast<float>(macro.defaultValue)));
+            juce::ParameterID(slot.hostParameterId, 1),
+            juce::String::fromUTF8(slot.hostParameterName),
+            juce::NormalisableRange<float>(0.0f, 1.0f),
+            static_cast<float>(slot.defaultValue)));
     }
 
     return layout;
@@ -2464,27 +2462,19 @@ void Processor::parameterChanged(const juce::String& parameterID, float newValue
 
 void Processor::initializePublishedMacroRealtimeState()
 {
-    const auto macros = engineFacade.getMacroDescriptors();
-    hostMacroParameterIds.reserve(std::min(macros.size(), maxPublishedMacroSlots));
-    hostMacroStableIds.reserve(std::min(macros.size(), maxPublishedMacroSlots));
-    activePublishedMacroCallbackView.hostSlotCount
-        = std::min(macros.size(), maxPublishedMacroSlots);
-    for (std::size_t index = 0; index < activePublishedMacroCallbackView.hostSlotCount; ++index)
+    const auto& topology = drs::engine::publishedMacroHostTopology();
+    hostMacroParameterIds.reserve(topology.size());
+    hostMacroStableIds.reserve(topology.size());
+    activePublishedMacroCallbackView = {};
+    activePublishedMacroCallbackView.hostSlotCount = topology.size();
+    for (const auto& definition : topology)
     {
-        const auto& macro = macros[index];
-        hostMacroParameterIds.push_back(buildMacroParameterId(macro.id));
-        hostMacroStableIds.push_back(macro.id);
-        hostMacroValues[index].store(static_cast<float>(macro.currentValue), std::memory_order_relaxed);
+        const auto index = definition.slotIndex;
+        hostMacroParameterIds.push_back(definition.hostParameterId);
+        hostMacroStableIds.push_back(runtimeMacroIdFromHostParameterId(definition.hostParameterId));
+        hostMacroValues[index].store(static_cast<float>(definition.defaultValue),
+                                     std::memory_order_relaxed);
         hostMacroValueSequences[index].store(1, std::memory_order_relaxed);
-        auto& slot = activePublishedMacroCallbackView.slots[index];
-        slot.assigned = true;
-        slot.minValue = macro.minValue;
-        slot.maxValue = macro.maxValue;
-        slot.publishedValue = macro.currentValue;
-        if (macro.id == "tone")
-            slot.renderTarget = drs::engine::PublishedMacroRenderTarget::toneVelocity;
-        else if (macro.id == "motion")
-            slot.renderTarget = drs::engine::PublishedMacroRenderTarget::motionPitch;
     }
 }
 
@@ -2583,11 +2573,14 @@ void Processor::syncParametersFromEngine()
         {
             parameter->setValueNotifyingHost(parameter->convertTo0to1(static_cast<float>(macro.currentValue)));
         }
-        if (index < maxPublishedMacroSlots)
+        const auto slot = std::find(hostMacroParameterIds.begin(), hostMacroParameterIds.end(), parameterId);
+        if (slot != hostMacroParameterIds.end())
         {
-            hostMacroValues[index].store(static_cast<float>(macro.currentValue),
+            const auto slotIndex = static_cast<std::size_t>(
+                std::distance(hostMacroParameterIds.begin(), slot));
+            hostMacroValues[slotIndex].store(static_cast<float>(macro.currentValue),
                                          std::memory_order_relaxed);
-            hostMacroValueSequences[index].fetch_add(1, std::memory_order_release);
+            hostMacroValueSequences[slotIndex].fetch_add(1, std::memory_order_release);
         }
     }
 }

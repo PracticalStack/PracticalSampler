@@ -2032,9 +2032,9 @@ add_test(
     COMMAND drs_sprint6_published_macro_binding_tests
 )
 
-# Performance mixer Sprint 0 is a direct-only expected-red characterization suite.
-# Do not register it with CTest or drs_all_tests until the corresponding behavior
-# is implemented in Sprints 1 and 2.
+# Performance mixer Sprint 0 introduced direct expected-red characterization.
+# Sprint 1 promotes fixed-topology seams; the capacity and presentation seams
+# remain direct expected-red commands until Sprint 2.
 juce_add_console_app(drs_performance_mixer_s0_red_tests
     PRODUCT_NAME "Decent Rhapsody Studio Performance Mixer Sprint 0 Red Tests"
 )
@@ -2063,6 +2063,19 @@ target_compile_definitions(drs_performance_mixer_s0_red_tests
     PRIVATE
         DRS_PERFORMANCE_MIXER_S0_FIXTURE_PATH="${CMAKE_SOURCE_DIR}/content/runtime/phase2/performance-mixer/three-layer-gain-mixer.drsproj"
 )
+
+foreach(DRS_PERFORMANCE_MIXER_S1_SEAM IN ITEMS
+        binding-3-exposed
+        binding-12-exposed
+        binding-16-authored
+        processor-topology-lifecycle)
+    string(REPLACE "-" "_" DRS_PERFORMANCE_MIXER_S1_TEST_SUFFIX
+           "${DRS_PERFORMANCE_MIXER_S1_SEAM}")
+    add_test(
+        NAME "drs.performance_mixer.s1.${DRS_PERFORMANCE_MIXER_S1_TEST_SUFFIX}"
+        COMMAND drs_performance_mixer_s0_red_tests "${DRS_PERFORMANCE_MIXER_S1_SEAM}"
+    )
+endforeach()
 
 juce_add_console_app(drs_sprint6_publish_shell_parity_tests
     PRODUCT_NAME "Decent Rhapsody Studio Sprint 6 Publish Shell Parity Tests"
@@ -3270,6 +3283,7 @@ add_dependencies(drs_all_tests
     drs_sprint6_performance_activation_recovery_tests
     drs_sprint6_voice_generation_cutover_tests
     drs_sprint6_published_macro_binding_tests
+    drs_performance_mixer_s0_red_tests
     drs_sprint6_publish_shell_parity_tests
     drs_sprint6_integration_hardening_tests
     drs_phase0_smoke_tests

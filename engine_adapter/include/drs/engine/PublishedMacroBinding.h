@@ -22,6 +22,8 @@ struct PublishedMacroHostTopologySlot
 {
     std::size_t slotIndex = 0;
     const char* hostParameterId = "";
+    const char* hostParameterName = "";
+    double defaultValue = 0.5;
 };
 
 // This is the compatibility contract for the permanent host topology.  The
@@ -33,22 +35,22 @@ publishedMacroHostTopology()
 {
     static const std::array<PublishedMacroHostTopologySlot, maximumPublishedMacroHostSlots>
         topology {{
-            { 0, "macro.tone" },
-            { 1, "macro.motion" },
-            { 2, "macro.slot.3" },
-            { 3, "macro.slot.4" },
-            { 4, "macro.slot.5" },
-            { 5, "macro.slot.6" },
-            { 6, "macro.slot.7" },
-            { 7, "macro.slot.8" },
-            { 8, "macro.slot.9" },
-            { 9, "macro.slot.10" },
-            { 10, "macro.slot.11" },
-            { 11, "macro.slot.12" },
-            { 12, "macro.slot.13" },
-            { 13, "macro.slot.14" },
-            { 14, "macro.slot.15" },
-            { 15, "macro.slot.16" }
+            { 0, "macro.tone", "Tone", 0.35 },
+            { 1, "macro.motion", "Motion", 0.15 },
+            { 2, "macro.slot.3", "Performance Slot 3", 0.5 },
+            { 3, "macro.slot.4", "Performance Slot 4", 0.5 },
+            { 4, "macro.slot.5", "Performance Slot 5", 0.5 },
+            { 5, "macro.slot.6", "Performance Slot 6", 0.5 },
+            { 6, "macro.slot.7", "Performance Slot 7", 0.5 },
+            { 7, "macro.slot.8", "Performance Slot 8", 0.5 },
+            { 8, "macro.slot.9", "Performance Slot 9", 0.5 },
+            { 9, "macro.slot.10", "Performance Slot 10", 0.5 },
+            { 10, "macro.slot.11", "Performance Slot 11", 0.5 },
+            { 11, "macro.slot.12", "Performance Slot 12", 0.5 },
+            { 12, "macro.slot.13", "Performance Slot 13", 0.5 },
+            { 13, "macro.slot.14", "Performance Slot 14", 0.5 },
+            { 14, "macro.slot.15", "Performance Slot 15", 0.5 },
+            { 15, "macro.slot.16", "Performance Slot 16", 0.5 }
         }};
     return topology;
 }

@@ -129,8 +129,9 @@ void requireFixedTopology(const drs::plugin::Processor& processor)
 
     for (const auto& slot : topology)
     {
-        require(slot.slotIndex < topology.size()
-                    && processor.getParameterState().getParameter(slot.hostParameterId) != nullptr,
+        const auto* parameter = processor.getParameterState().getParameter(slot.hostParameterId);
+        require(slot.slotIndex < topology.size() && parameter != nullptr
+                    && processor.getParameters()[static_cast<int>(slot.slotIndex)] == parameter,
                 "The processor is missing ordered host parameter '"
                     + std::string(slot.hostParameterId) + "'.");
     }
@@ -138,7 +139,9 @@ void requireFixedTopology(const drs::plugin::Processor& processor)
 
 void requireActiveBindingCount(const std::size_t authoredCount, const std::size_t exposedCount)
 {
-    auto project = projectWithMacroCapacity(authoredCount, exposedCount);
+    auto project = authoredCount == 3 && exposedCount == 3
+        ? loadThreeLayerFixture()
+        : projectWithMacroCapacity(authoredCount, exposedCount);
     drs::plugin::Processor processor;
     processor.prepareToPlay(48000.0, 256);
     require(processor.replaceAuthoringProject(project),
@@ -159,6 +162,36 @@ void requireActiveBindingCount(const std::size_t authoredCount, const std::size_
                 && bindings->assignedExposedCount == exposedCount
                 && bindings->assignedHiddenCount == authoredCount - exposedCount,
             "Published bindings must retain the full topology and exact exposed/hidden counts.");
+    require(std::all_of(publishedMacroHostTopology().begin(), publishedMacroHostTopology().end(),
+                        [&](const auto& slot)
+                        {
+                            return slot.slotIndex < bindings->bindings.size()
+                                && bindings->bindings[slot.slotIndex].hostSlotIndex == slot.slotIndex
+                                && bindings->bindings[slot.slotIndex].hostParameterId
+                                    == slot.hostParameterId;
+                        }),
+            "Every published binding must use the canonical host-slot order and parameter ID.");
+    if (authoredCount == 3 && exposedCount == 3)
+    {
+        require(std::all_of(bindings->bindings.begin(), bindings->bindings.end(), [](const auto& binding)
+                            {
+                                return !binding.assigned
+                                    || binding.renderTarget == PublishedMacroRenderTarget::dspControl;
+                            }),
+                "The Bell, EPiano, and Plucks fixture must bind all exposed controls to group Gain DSP targets.");
+    }
+    if (authoredCount >= 12)
+    {
+        processor.setMacroValueFromShell("mixer-control-3", 0.22);
+        const auto descriptors = processor.getEngineFacade().getMacroDescriptors();
+        const auto genericSlot = std::find_if(descriptors.begin(), descriptors.end(), [](const auto& descriptor)
+                                              {
+                                                  return descriptor.id == "slot.3";
+                                              });
+        require(genericSlot != descriptors.end()
+                    && genericSlot->currentValue > 0.219 && genericSlot->currentValue < 0.221,
+                "Automation written through an authored control must reach its assigned generic host slot.");
+    }
 }
 
 void requireOverflowFinding(const std::size_t authoredCount,
@@ -199,6 +232,16 @@ void requireLifecycleTopology()
 
     require(processor.replaceAuthoringProject(project), "Project load must succeed.");
     requireFixedTopology(processor);
+    const auto publishRevision = processor.getAuthoringSession().getDocumentState().revision;
+    require(processor.submitPerformancePublishCommand(
+                {}, PerformancePublishCommandSource::externalApi),
+            "The loaded project must submit a Publish request.");
+    const auto activePresentation = waitForPublishSettlement(processor, publishRevision);
+    require(activePresentation != nullptr
+                && activePresentation->state == PerformancePublishPresentationState::active
+                && activePresentation->activePublishedRevision == publishRevision,
+            "Publish must not change the fixed host parameter topology.");
+    requireFixedTopology(processor);
     auto edited = project;
     edited.displayName += " edited";
     require(processor.replaceAuthoringProject(edited), "Project edit must succeed.");
@@ -214,20 +257,20 @@ void requireLifecycleTopology()
 
 void requireShellDiagnosticParity()
 {
-    const auto project = projectWithMacroCapacity(3, 3);
+    const auto project = projectWithMacroCapacity(13, 13);
     auto publishAndReadFailure = [&](drs::plugin::Processor& processor)
     {
         processor.prepareToPlay(48000.0, 256);
-        require(processor.replaceAuthoringProject(project), "The three-control fixture must load.");
+        require(processor.replaceAuthoringProject(project), "The thirteen-control fixture must load as a draft.");
         const auto revision = processor.getAuthoringSession().getDocumentState().revision;
         require(processor.submitPerformancePublishCommand(
                     {}, PerformancePublishCommandSource::externalApi),
-                "The three-control fixture must submit a Publish request.");
+                "The thirteen-control fixture must submit a Publish request.");
         const auto presentation = waitForPublishSettlement(processor, revision);
         const auto controller = processor.getPerformancePublishControllerSnapshot();
         require(presentation != nullptr
                     && presentation->state == PerformancePublishPresentationState::failed,
-                "The baseline three-control fixture must reach a visible failed Publish state "
+                "The over-capacity fixture must reach a visible failed Publish state "
                     "(state=" + (presentation != nullptr ? presentation->stateLabel : "null")
                     + ", finding=" + controller.failureFinding.code + ").");
         return presentation;
@@ -239,7 +282,7 @@ void requireShellDiagnosticParity()
     drs::standalone::MainComponent standalone(false);
     const auto standalonePresentation = publishAndReadFailure(standalone.getProcessor());
 
-    constexpr std::string_view detailedFinding = "published-macro-exposed-slot-missing";
+    constexpr std::string_view detailedFinding = "published-macro-exposed-capacity-exceeded";
     require(pluginPresentation->findingCode == detailedFinding
                 && standalonePresentation->findingCode == detailedFinding
                 && pluginPresentation->findingMessage == standalonePresentation->findingMessage,
@@ -265,9 +308,9 @@ void runSeam(const std::string_view seam)
 }
 } // namespace
 
-// Direct-only Sprint 0 characterization. Each named command remains red until
-// its later sprint turns the contract into production behavior; it is deliberately
-// excluded from CTest and drs_all_tests.
+// Sprint 0 created direct-only red characterization. Sprint 1 promotes the
+// topology seams to CTest; the capacity and shell-diagnostic seams remain direct
+// expected-red commands until Sprint 2.
 int main(int argc, char** argv)
 {
     if (argc != 2 || !isKnownSeam(argv[1]))
@@ -281,8 +324,8 @@ int main(int argc, char** argv)
     try
     {
         runSeam(argv[1]);
-        std::cout << "PASS: Sprint 0 contract seam '" << argv[1]
-                  << "' is now implemented. Convert it to its registered green suite.\n";
+        std::cout << "PASS: Performance mixer contract seam '" << argv[1]
+                  << "' is implemented.\n";
         return 0;
     }
     catch (const std::exception& exception)

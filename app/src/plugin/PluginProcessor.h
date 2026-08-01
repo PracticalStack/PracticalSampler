@@ -259,8 +259,7 @@ private:
     };
 
     static juce::String buildMacroParameterId(const std::string& macroId);
-    static juce::AudioProcessorValueTreeState::ParameterLayout buildParameterLayout(
-        const drs::engine::EngineFacade& engineFacade);
+    static juce::AudioProcessorValueTreeState::ParameterLayout buildParameterLayout();
     void resetAuthoringPreviewPreparationAuthorization() noexcept;
     void resetAuthoringWaveformPreviewAuthorization() noexcept;
     void initializePublishedMacroRealtimeState();

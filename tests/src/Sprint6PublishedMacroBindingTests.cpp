@@ -33,6 +33,15 @@ const drs::engine::PublishedMacroBinding& bindingFor(
     return *found;
 }
 
+bool hasAssignedBindingFor(const drs::engine::ImmutablePublishedMacroBindingTable& table,
+                           const std::string& stableId)
+{
+    return std::any_of(table.bindings.begin(), table.bindings.end(), [&](const auto& binding)
+    {
+        return binding.assigned && binding.stableAuthoredId == stableId;
+    });
+}
+
 bool hasFinding(const drs::engine::PublishedMacroBindingBuildResult& result,
                 const std::string& code)
 {
@@ -394,9 +403,12 @@ int main()
         require(changedActive != nullptr && changedActive->revision == changedRevision
                     && changedActive->macroSchemaDigest != firstActive->macroSchemaDigest
                     && bindingFor(*changedActive, "tone").publishedValue == 0.6
-                    && !bindingFor(*changedActive, "motion").assigned
+                    && !hasAssignedBindingFor(*changedActive, "motion")
+                    && std::find(changedActive->retiredStableAuthoredIds.begin(),
+                                 changedActive->retiredStableAuthoredIds.end(), "motion")
+                        != changedActive->retiredStableAuthoredIds.end()
                     && processor.getParameters().size() == stableHostParameterCount,
-                "Audio, automation binding, revision, and stable host topology must cut over coherently.");
+                "Audio, automation binding retirement, revision, and stable host topology must cut over coherently.");
 
         processor.setMacroValueFromShell("motion", 0.95);
         crossAudioBoundary(processor);
