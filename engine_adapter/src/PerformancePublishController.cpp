@@ -357,6 +357,23 @@ bool PerformancePublishController::fail(const PerformancePublishRequestIdentity&
     return true;
 }
 
+void PerformancePublishController::setMacroCapacityDiagnostics(
+    const std::size_t exposedCount,
+    const std::size_t hiddenCount,
+    const std::size_t assignedCount,
+    const std::size_t unassignedCount,
+    const std::size_t availableSlotCount,
+    const std::size_t activeSlotCount)
+{
+    snapshot.exposedMacroCount = exposedCount;
+    snapshot.hiddenMacroCount = hiddenCount;
+    snapshot.assignedMacroCount = assignedCount;
+    snapshot.unassignedMacroCount = unassignedCount;
+    snapshot.availableHostSlotCount = availableSlotCount;
+    snapshot.activeHostSlotCount = activeSlotCount;
+    publishSnapshot();
+}
+
 bool PerformancePublishController::cancelCurrent()
 {
     if (!snapshot.hasRequest)

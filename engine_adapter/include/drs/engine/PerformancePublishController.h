@@ -41,6 +41,12 @@ struct PerformancePublishControllerSnapshot
     bool hasFailedRequest = false;
     PerformancePublishRequestIdentity failedRequestIdentity;
     PerformancePublishFinding failureFinding;
+    std::size_t exposedMacroCount = 0;
+    std::size_t hiddenMacroCount = 0;
+    std::size_t assignedMacroCount = 0;
+    std::size_t unassignedMacroCount = 0;
+    std::size_t availableHostSlotCount = 0;
+    std::size_t activeHostSlotCount = 0;
     PerformancePublishPreparationState preparationState = PerformancePublishPreparationState::idle;
     PerformancePublishActivationState activationState = PerformancePublishActivationState::noActivation;
     std::uint64_t acceptedPreparedBuildId = 0;
@@ -114,6 +120,12 @@ public:
                                  PerformancePublishFinding finding);
     bool fail(const PerformancePublishRequestIdentity& identity,
               PerformancePublishFinding finding);
+    void setMacroCapacityDiagnostics(std::size_t exposedCount,
+                                     std::size_t hiddenCount,
+                                     std::size_t assignedCount,
+                                     std::size_t unassignedCount,
+                                     std::size_t availableSlotCount,
+                                     std::size_t activeSlotCount);
     bool cancelCurrent();
     void reset(bool clearActive = true, bool advanceCancellationGeneration = true);
 

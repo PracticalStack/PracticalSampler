@@ -68,6 +68,12 @@ PerformancePublishPresentationSnapshot buildPerformancePublishPresentationSnapsh
         result.findingPath = controller.failureFinding.path;
         result.findingMessage = controller.failureFinding.message;
     }
+    result.exposedMacroCount = controller.exposedMacroCount;
+    result.hiddenMacroCount = controller.hiddenMacroCount;
+    result.assignedMacroCount = controller.assignedMacroCount;
+    result.unassignedMacroCount = controller.unassignedMacroCount;
+    result.availableHostSlotCount = controller.availableHostSlotCount;
+    result.activeHostSlotCount = controller.activeHostSlotCount;
 
     result.pendingWorkCount = worker.pendingWorkCount;
     result.inFlightWorkCount = worker.inFlightWorkCount;

@@ -409,8 +409,19 @@ void StatusPanel::refreshSnapshot()
                 + " | draft r" + juce::String(static_cast<juce::int64>(publish.draftRevision))
                 + " | requested r" + juce::String(static_cast<juce::int64>(publish.requestedPublishRevision))
                 + " | active r" + juce::String(static_cast<juce::int64>(publish.activePublishedRevision))
+                + " | macros=" + juce::String(static_cast<int>(publish.exposedMacroCount))
+                + " exposed/" + juce::String(static_cast<int>(publish.hiddenMacroCount))
+                + " hidden"
                 + (publish.dirty ? " | dirty" : " | current"),
             juce::dontSendNotification);
+        if (publish.hasFailure)
+        {
+            failureLabel.setText(
+                "Publish failure [" + juce::String::fromUTF8(publish.findingCode.c_str()) + "]: "
+                    + juce::String::fromUTF8(publish.guidance.c_str()),
+                juce::dontSendNotification);
+            failureLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(166, 35, 35));
+        }
     }
 
     modeLabel.setText("Mode: " + juce::String::fromUTF8(snapshot.mode.c_str()), juce::dontSendNotification);
@@ -455,18 +466,21 @@ void StatusPanel::refreshSnapshot()
             + " | dormantPurges=" + juce::String(static_cast<int>(diagnostics.dormantPurgeCount)),
         juce::dontSendNotification);
 
-    auto failureText = diagnostics.failureState.empty()
-        ? juce::String("Failure state: none")
-        : juce::String("Failure state: ") + juce::String::fromUTF8(diagnostics.failureState.c_str());
-    failureText << " | previewFindings=" << juce::String(static_cast<int>(diagnostics.previewFindings.size()))
-                << " (" << summarizeFindings(diagnostics.previewFindings) << ")"
-                << " | publishFindings=" << juce::String(static_cast<int>(diagnostics.publishedFindings.size()))
-                << " (" << summarizeFindings(diagnostics.publishedFindings) << ")";
-    failureLabel.setText(failureText, juce::dontSendNotification);
-    failureLabel.setColour(juce::Label::textColourId,
-                           diagnostics.failureState.empty()
-                               ? juce::Colour::fromRGB(37, 99, 63)
-                               : juce::Colour::fromRGB(166, 35, 35));
+    if (publishPresentation == nullptr || !publishPresentation->hasFailure)
+    {
+        auto failureText = diagnostics.failureState.empty()
+            ? juce::String("Failure state: none")
+            : juce::String("Failure state: ") + juce::String::fromUTF8(diagnostics.failureState.c_str());
+        failureText << " | previewFindings=" << juce::String(static_cast<int>(diagnostics.previewFindings.size()))
+                    << " (" << summarizeFindings(diagnostics.previewFindings) << ")"
+                    << " | publishFindings=" << juce::String(static_cast<int>(diagnostics.publishedFindings.size()))
+                    << " (" << summarizeFindings(diagnostics.publishedFindings) << ")";
+        failureLabel.setText(failureText, juce::dontSendNotification);
+        failureLabel.setColour(juce::Label::textColourId,
+                               diagnostics.failureState.empty()
+                                   ? juce::Colour::fromRGB(37, 99, 63)
+                                   : juce::Colour::fromRGB(166, 35, 35));
+    }
     routedZonesLabel.setText("Routed zones: " + joinLines(diagnostics.routedZones), juce::dontSendNotification);
 
     if (macros.size() != macroControls.size())

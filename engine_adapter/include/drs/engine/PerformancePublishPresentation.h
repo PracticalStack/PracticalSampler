@@ -43,6 +43,12 @@ struct PerformancePublishPresentationSnapshot final
     std::string findingCode;
     std::string findingPath;
     std::string findingMessage;
+    std::size_t exposedMacroCount = 0;
+    std::size_t hiddenMacroCount = 0;
+    std::size_t assignedMacroCount = 0;
+    std::size_t unassignedMacroCount = 0;
+    std::size_t availableHostSlotCount = 0;
+    std::size_t activeHostSlotCount = 0;
     std::uint64_t preparedBuildId = 0;
     std::uint64_t activePayloadBytes = 0;
     std::size_t pendingWorkCount = 0;

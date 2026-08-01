@@ -424,6 +424,156 @@ std::vector<PublishedMacroCurrentValue> buildPublishedCurrentValues(
     return currentValues;
 }
 
+struct PublishedMacroPreflightResult
+{
+    std::size_t exposedCount = 0;
+    std::size_t hiddenCount = 0;
+    std::optional<PerformancePublishFinding> finding;
+};
+
+std::string describeAuthoredMacro(const RuntimeProjectMacroDefinition& macro,
+                                  const std::size_t index)
+{
+    if (!macro.name.empty())
+        return macro.name;
+    if (!macro.id.empty())
+        return macro.id;
+    return "Macro " + std::to_string(index + 1);
+}
+
+PublishedMacroPreflightResult preflightPublishedMacros(
+    const RuntimeProjectAuthoringState& authoring)
+{
+    PublishedMacroPreflightResult result;
+    for (const auto& macro : authoring.macros)
+    {
+        if (macro.exposedInPerformance)
+            ++result.exposedCount;
+        else
+            ++result.hiddenCount;
+    }
+
+    const auto makeFinding = [](std::string code, std::string path, std::string message)
+    {
+        return PerformancePublishFinding {
+            PerformancePublishFindingSeverity::error,
+            std::move(code),
+            std::move(path),
+            std::move(message)
+        };
+    };
+
+    if (result.exposedCount > maximumExposedPerformanceControls)
+    {
+        const auto overflowIndex = std::find_if(authoring.macros.begin(), authoring.macros.end(),
+                                                 [exposed = std::size_t { 0 }](const auto& macro) mutable
+                                                 {
+                                                     return macro.exposedInPerformance
+                                                         && ++exposed > maximumExposedPerformanceControls;
+                                                 });
+        const auto index = static_cast<std::size_t>(
+            std::distance(authoring.macros.begin(), overflowIndex));
+        result.finding = makeFinding(
+            "published-macro-exposed-capacity-exceeded",
+            "authoring.macros[" + std::to_string(index) + "].exposedInPerformance",
+            "Performance supports at most " + std::to_string(maximumExposedPerformanceControls)
+                + " exposed controls; '" + describeAuthoredMacro(*overflowIndex, index)
+                + "' is control " + std::to_string(maximumExposedPerformanceControls + 1)
+                + ". Hide it or reduce exposed controls to "
+                + std::to_string(maximumExposedPerformanceControls) + ".");
+        return result;
+    }
+
+    if (authoring.macros.size() > maximumPublishedMacroHostSlots)
+    {
+        const auto index = maximumPublishedMacroHostSlots;
+        result.finding = makeFinding(
+            "published-macro-authored-capacity-exceeded",
+            "authoring.macros[" + std::to_string(index) + "]",
+            "Performance supports at most " + std::to_string(maximumPublishedMacroHostSlots)
+                + " authored macros; '" + describeAuthoredMacro(authoring.macros[index], index)
+                + "' is macro " + std::to_string(index + 1)
+                + ". Remove a macro before publishing.");
+        return result;
+    }
+
+    std::unordered_set<std::string> macroIds;
+    for (std::size_t macroIndex = 0; macroIndex < authoring.macros.size(); ++macroIndex)
+    {
+        const auto& macro = authoring.macros[macroIndex];
+        const auto path = "authoring.macros[" + std::to_string(macroIndex) + "]";
+        if (macro.id.empty() || !macroIds.insert(macro.id).second)
+        {
+            result.finding = makeFinding(
+                "published-macro-authored-id-invalid", path + ".id",
+                "Published macro '" + describeAuthoredMacro(macro, macroIndex)
+                    + "' needs a unique stable ID before publishing.");
+            return result;
+        }
+        if (!std::isfinite(macro.minValue) || !std::isfinite(macro.maxValue)
+            || !std::isfinite(macro.defaultValue) || macro.minValue > macro.maxValue
+            || macro.defaultValue < macro.minValue || macro.defaultValue > macro.maxValue)
+        {
+            result.finding = makeFinding(
+                "published-macro-authored-range-invalid", path,
+                "Published macro '" + describeAuthoredMacro(macro, macroIndex)
+                    + "' needs a finite default inside its minimum and maximum range.");
+            return result;
+        }
+
+        for (std::size_t targetIndex = 0; targetIndex < macro.targets.size(); ++targetIndex)
+        {
+            const auto& target = macro.targets[targetIndex];
+            const auto targetPath = path + ".targets[" + std::to_string(targetIndex) + "]";
+            const auto hasSlotId = !target.dspSlotId.empty();
+            const auto hasParameterId = !target.dspParameterId.empty();
+            if (hasSlotId != hasParameterId)
+            {
+                result.finding = makeFinding(
+                    "published-macro-dsp-target-invalid", targetPath,
+                    "Published macro '" + describeAuthoredMacro(macro, macroIndex)
+                        + "' must provide both DSP slot and parameter IDs for a structured target.");
+                return result;
+            }
+            if (!hasSlotId)
+                continue;
+
+            const auto slot = std::find_if(authoring.fxSlots.begin(), authoring.fxSlots.end(),
+                                           [&](const auto& candidate)
+                                           {
+                                               return candidate.id == target.dspSlotId;
+                                           });
+            const auto parameterExists = slot != authoring.fxSlots.end()
+                && std::any_of(slot->parameters.begin(), slot->parameters.end(),
+                               [&](const auto& parameter)
+                               {
+                                   return parameter.id == target.dspParameterId;
+                               });
+            if (!parameterExists)
+            {
+                result.finding = makeFinding(
+                    "published-macro-dsp-target-missing", targetPath,
+                    "Published macro '" + describeAuthoredMacro(macro, macroIndex)
+                        + "' targets missing DSP control '" + target.dspSlotId + "."
+                        + target.dspParameterId + "'. Repair the target before publishing.");
+                return result;
+            }
+        }
+    }
+    return result;
+}
+
+std::size_t assignedBindingCount(const ImmutablePublishedMacroBindingTablePtr& table)
+{
+    if (table == nullptr)
+        return 0;
+    return static_cast<std::size_t>(std::count_if(
+        table->bindings.begin(), table->bindings.end(), [](const auto& binding)
+        {
+            return binding.assigned;
+        }));
+}
+
 std::string resolveDraftSurfaceSource(const DraftPlaybackStatus& status)
 {
     if (status.performance.available)
@@ -1634,6 +1784,27 @@ bool EngineFacade::publishCurrentDraft()
                                                         monotonicMicros()))
         return false;
 
+    const auto macroPreflight = preflightPublishedMacros(authoringProject.project.authoring);
+    const auto activeBindings = getActivePublishedMacroBindings();
+    const auto activeSlotCount = assignedBindingCount(activeBindings);
+    performancePublishController.setMacroCapacityDiagnostics(
+        macroPreflight.exposedCount,
+        macroPreflight.hiddenCount,
+        activeSlotCount,
+        macroPreflight.exposedCount + macroPreflight.hiddenCount,
+        maximumPublishedMacroHostSlots - std::min(activeSlotCount, maximumPublishedMacroHostSlots),
+        activeSlotCount);
+    if (macroPreflight.finding.has_value())
+    {
+        performancePublishController.fail(controllerRequest.request.identity, *macroPreflight.finding);
+        currentSessionState.transientMetrics.integrationState = "Publish preflight failed";
+        currentSessionState.transientMetrics.lastFailure = "[" + macroPreflight.finding->code
+            + "] " + macroPreflight.finding->message;
+        refreshDiagnosticsSnapshot();
+        markStateChanged();
+        return false;
+    }
+
     const auto request = draftPlaybackContract.requestPerformanceBuild();
     if (!request.accepted)
     {
@@ -1643,6 +1814,10 @@ bool EngineFacade::publishCurrentDraft()
                                           request.state.empty()
                                               ? std::string("Publish request was rejected.")
                                               : request.state));
+        currentSessionState.transientMetrics.integrationState = "Publish preparation failed";
+        currentSessionState.transientMetrics.lastFailure = "Publish request was rejected.";
+        refreshDiagnosticsSnapshot();
+        markStateChanged();
         return false;
     }
 
@@ -1729,12 +1904,25 @@ PerformancePublishActivationPayloadPtr EngineFacade::authorizePerformanceActivat
     std::uint64_t nowMicros)
 {
     const auto controller = performancePublishController.getSnapshot();
+    const auto activeSlotCount = assignedBindingCount(getActivePublishedMacroBindings());
     if (!controller.hasRequest
         || controller.preparationState != PerformancePublishPreparationState::ready
         || controller.activationState != PerformancePublishActivationState::noActivation)
     {
         return {};
     }
+
+    const auto failAuthorization = [this, &controller](PerformancePublishFinding finding)
+    {
+        const auto message = finding.message;
+        const auto code = finding.code;
+        performancePublishController.fail(controller.currentRequest.identity, std::move(finding));
+        currentSessionState.transientMetrics.integrationState = "Publish activation staging failed";
+        currentSessionState.transientMetrics.lastFailure = "[" + code + "] " + message;
+        refreshDiagnosticsSnapshot();
+        markStateChanged();
+        return PerformancePublishActivationPayloadPtr {};
+    };
 
     const auto& prepared = draftPlaybackContract.getStatus().performance;
     const auto& payload = prepared.activationPayload;
@@ -1757,18 +1945,10 @@ PerformancePublishActivationPayloadPtr EngineFacade::authorizePerformanceActivat
         && payload->macroSchemaDigest == controller.currentRequest.identity.macroSchemaDigest;
     if (!exactPayload)
     {
-        performancePublishController.fail(
-            controller.currentRequest.identity,
-            makePerformancePublishFailure(
+        return failAuthorization(makePerformancePublishFailure(
                 "performance-activation-payload-mismatch",
                 "performance.activationPayload",
                 "The prepared Performance payload no longer matches the controller-authorized identity."));
-        currentSessionState.transientMetrics.integrationState = "Publish activation staging failed";
-        currentSessionState.transientMetrics.lastFailure =
-            "The prepared Performance payload no longer matches the controller-authorized identity.";
-        refreshDiagnosticsSnapshot();
-        markStateChanged();
-        return {};
     }
 
     auto authorization = std::make_shared<PerformancePublishActivationPayload>();
@@ -1816,22 +1996,16 @@ PerformancePublishActivationPayloadPtr EngineFacade::authorizePerformanceActivat
         const auto graphPlan = compileDspGraphPlan(*payload->snapshot);
         if (!graphPlan.compiled)
         {
-            performancePublishController.fail(
-                controller.currentRequest.identity,
-                makePerformancePublishFailure(
+            return failAuthorization(makePerformancePublishFailure(
                     "performance-macro-dsp-graph-rejected", "performance.macroBindings",
                     "The structured DSP macro target could not compile the published graph."));
-            return {};
         }
         const auto controlLayout = compileDspParameterControlLayout(graphPlan.plan);
         if (!controlLayout.compiled)
         {
-            performancePublishController.fail(
-                controller.currentRequest.identity,
-                makePerformancePublishFailure(
+            return failAuthorization(makePerformancePublishFailure(
                     "performance-macro-dsp-control-layout-rejected", "performance.macroBindings",
                     "The structured DSP macro target could not compile the published control layout."));
-            return {};
         }
         dspControlLayout = controlLayout.layout;
         macroBindingRequest.dspControlLayout = &dspControlLayout;
@@ -1840,14 +2014,31 @@ PerformancePublishActivationPayloadPtr EngineFacade::authorizePerformanceActivat
     const auto macroBindingResult = buildPublishedMacroBindingTable(macroBindingRequest);
     if (!macroBindingResult.built || macroBindingResult.table == nullptr)
     {
-        performancePublishController.fail(
-            controller.currentRequest.identity,
-            makePerformancePublishFailure(
+        const auto finding = !macroBindingResult.findings.empty()
+            ? PerformancePublishFinding {
+                macroBindingResult.findings.front().severity
+                        == PublishedMacroBindingFindingSeverity::error
+                    ? PerformancePublishFindingSeverity::error
+                    : PerformancePublishFindingSeverity::warning,
+                macroBindingResult.findings.front().code,
+                macroBindingResult.findings.front().path,
+                macroBindingResult.findings.front().message }
+            : makePerformancePublishFailure(
                 "performance-macro-binding-rejected",
                 "performance.macroBindings",
-                "The immutable published macro binding table could not be constructed."));
-        return {};
+                "The immutable published macro binding table could not be constructed.");
+        return failAuthorization(finding);
     }
+    performancePublishController.setMacroCapacityDiagnostics(
+        macroBindingResult.table->assignedExposedCount,
+        macroBindingResult.table->assignedHiddenCount,
+        macroBindingResult.table->assignedExposedCount + macroBindingResult.table->assignedHiddenCount,
+        macroBindingResult.table->unassignedExposedCount + macroBindingResult.table->unassignedHiddenCount,
+        maximumPublishedMacroHostSlots
+            - std::min(maximumPublishedMacroHostSlots,
+                       macroBindingResult.table->assignedExposedCount
+                           + macroBindingResult.table->assignedHiddenCount),
+        activeSlotCount);
     authorization->macroBindings = macroBindingResult.table;
     if (!performancePublishController.authorizeActivation(*authorization, nowMicros))
         return {};
@@ -1879,6 +2070,19 @@ bool EngineFacade::acknowledgePerformanceActivation(
         || !performancePublishController.acknowledgeActivation(*payload, nowMicros))
     {
         return false;
+    }
+    if (payload->macroBindings != nullptr)
+    {
+        const auto& bindings = *payload->macroBindings;
+        const auto assignedCount = bindings.assignedExposedCount + bindings.assignedHiddenCount;
+        performancePublishController.setMacroCapacityDiagnostics(
+            bindings.assignedExposedCount,
+            bindings.assignedHiddenCount,
+            assignedCount,
+            bindings.unassignedExposedCount + bindings.unassignedHiddenCount,
+            maximumPublishedMacroHostSlots
+                - std::min(maximumPublishedMacroHostSlots, assignedCount),
+            assignedCount);
     }
     currentSessionState.transientMetrics.integrationState = "Published revision active";
     currentSessionState.transientMetrics.lastFailure.clear();

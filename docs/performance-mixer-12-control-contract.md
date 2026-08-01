@@ -52,5 +52,6 @@ failure code, path, and repair guidance.
 
 `drs_performance_mixer_s0_red_tests` is the contract seam runner. Sprint 1 promotes
 the three-, twelve-, and sixteen-binding cases plus lifecycle topology stability to
-registered green tests. The 13-exposed and 17-total capacity cases and shell-diagnostic
-parity remain direct expected-red commands until Sprint 2.
+registered green tests. Sprint 2 promotes the 13-exposed and 17-total preflight
+limits, structured-DSP target validation, shell diagnostic parity, and a failed-then-
+successful recovery sequence.

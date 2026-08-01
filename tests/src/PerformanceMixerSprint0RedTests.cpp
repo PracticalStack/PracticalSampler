@@ -20,12 +20,14 @@ namespace
 {
 using namespace drs::engine;
 
-constexpr std::array<std::string_view, 7> redSeams {
+constexpr std::array<std::string_view, 9> redSeams {
     "binding-3-exposed",
     "binding-12-exposed",
     "binding-16-authored",
     "overflow-13-exposed",
     "overflow-17-authored",
+    "invalid-dsp-target",
+    "failed-then-successful-recovery",
     "processor-topology-lifecycle",
     "shell-diagnostic-parity"
 };
@@ -206,14 +208,83 @@ void requireOverflowFinding(const std::size_t authoredCount,
     requireFixedTopology(processor);
 
     const auto revision = processor.getAuthoringSession().getDocumentState().revision;
-    require(processor.submitPerformancePublishCommand(
+    require(!processor.submitPerformancePublishCommand(
                 {}, PerformancePublishCommandSource::externalApi),
-            "The overflow fixture must submit a publish request for preflight rejection.");
+            "The overflow fixture must be rejected before worker preparation.");
     const auto presentation = waitForPublishSettlement(processor, revision);
     require(presentation != nullptr
                 && presentation->state == PerformancePublishPresentationState::failed
-                && presentation->findingCode == expectedFinding,
+                && presentation->findingCode == expectedFinding
+                && presentation->exposedMacroCount == exposedCount
+                && presentation->hiddenMacroCount == authoredCount - exposedCount
+                && presentation->unassignedMacroCount == authoredCount
+                && presentation->availableHostSlotCount == maximumPublishedMacroHostSlots,
             "Overflow must fail preflight with the exact capacity finding '" + expectedFinding + "'.");
+}
+
+void requireInvalidDspTargetFinding()
+{
+    auto project = loadThreeLayerFixture();
+    project.authoring.macros.front().targets.front().dspParameterId = "missing-gain-control";
+    drs::plugin::Processor processor;
+    processor.prepareToPlay(48000.0, 256);
+    require(processor.replaceAuthoringProject(project),
+            "The invalid-target fixture must be accepted as a draft before preflight.");
+    const auto revision = processor.getAuthoringSession().getDocumentState().revision;
+    require(!processor.submitPerformancePublishCommand(
+                {}, PerformancePublishCommandSource::externalApi),
+            "A missing DSP control must be rejected before worker preparation.");
+    const auto presentation = waitForPublishSettlement(processor, revision);
+    require(presentation != nullptr
+                && presentation->state == PerformancePublishPresentationState::failed
+                && presentation->findingCode == "published-macro-dsp-target-missing"
+                && presentation->findingMessage.find("Bell Gain") != std::string::npos,
+            "Target preflight must identify the affected macro and missing DSP control.");
+}
+
+void requireFailureThenSuccessfulRecovery()
+{
+    drs::plugin::Processor processor;
+    processor.prepareToPlay(48000.0, 256);
+    const auto validProject = projectWithMacroCapacity(3, 3);
+    require(processor.replaceAuthoringProject(validProject), "The valid recovery fixture must load.");
+    const auto firstRevision = processor.getAuthoringSession().getDocumentState().revision;
+    require(processor.submitPerformancePublishCommand(
+                {}, PerformancePublishCommandSource::externalApi),
+            "The initial valid fixture must publish.");
+    const auto firstActive = waitForPublishSettlement(processor, firstRevision);
+    require(firstActive != nullptr && firstActive->state == PerformancePublishPresentationState::active,
+            "The initial valid fixture must become active.");
+
+    auto rejectedProject = projectWithMacroCapacity(13, 13);
+    rejectedProject.projectId = validProject.projectId;
+    require(processor.replaceAuthoringProject(rejectedProject),
+            "The over-capacity replacement must load as a draft.");
+    const auto rejectedRevision = processor.getAuthoringSession().getDocumentState().revision;
+    require(!processor.submitPerformancePublishCommand(
+                {}, PerformancePublishCommandSource::externalApi),
+            "The over-capacity replacement must reject before preparation.");
+    const auto rejected = waitForPublishSettlement(processor, rejectedRevision);
+    require(rejected != nullptr && rejected->state == PerformancePublishPresentationState::failed
+                && rejected->findingCode == "published-macro-exposed-capacity-exceeded"
+                && rejected->hasLastKnownGood
+                && rejected->activePublishedRevision == firstRevision
+                && rejected->canPublish,
+            "A rejected replacement must retain last-known-good Performance and allow an immediate retry.");
+
+    auto correctedProject = validProject;
+    correctedProject.displayName += " corrected";
+    require(processor.replaceAuthoringProject(correctedProject),
+            "The corrected recovery fixture must replace the rejected draft.");
+    const auto retryRevision = processor.getAuthoringSession().getDocumentState().revision;
+    require(processor.submitPerformancePublishCommand(
+                {}, PerformancePublishCommandSource::externalApi),
+            "A corrected draft must submit without restarting the processor.");
+    const auto retried = waitForPublishSettlement(processor, retryRevision);
+    require(retried != nullptr && retried->state == PerformancePublishPresentationState::active
+                && retried->activePublishedRevision == retryRevision
+                && !retried->hasFailure,
+            "A corrected draft must become active after a failed publication without restart.");
 }
 
 void requireLifecycleTopology()
@@ -263,9 +334,9 @@ void requireShellDiagnosticParity()
         processor.prepareToPlay(48000.0, 256);
         require(processor.replaceAuthoringProject(project), "The thirteen-control fixture must load as a draft.");
         const auto revision = processor.getAuthoringSession().getDocumentState().revision;
-        require(processor.submitPerformancePublishCommand(
+        require(!processor.submitPerformancePublishCommand(
                     {}, PerformancePublishCommandSource::externalApi),
-                "The thirteen-control fixture must submit a Publish request.");
+                "The thirteen-control fixture must reject before worker preparation.");
         const auto presentation = waitForPublishSettlement(processor, revision);
         const auto controller = processor.getPerformancePublishControllerSnapshot();
         require(presentation != nullptr
@@ -301,6 +372,10 @@ void runSeam(const std::string_view seam)
         requireOverflowFinding(13, 13, "published-macro-exposed-capacity-exceeded");
     else if (seam == "overflow-17-authored")
         requireOverflowFinding(17, 12, "published-macro-authored-capacity-exceeded");
+    else if (seam == "invalid-dsp-target")
+        requireInvalidDspTargetFinding();
+    else if (seam == "failed-then-successful-recovery")
+        requireFailureThenSuccessfulRecovery();
     else if (seam == "processor-topology-lifecycle")
         requireLifecycleTopology();
     else if (seam == "shell-diagnostic-parity")
@@ -308,9 +383,8 @@ void runSeam(const std::string_view seam)
 }
 } // namespace
 
-// Sprint 0 created direct-only red characterization. Sprint 1 promotes the
-// topology seams to CTest; the capacity and shell-diagnostic seams remain direct
-// expected-red commands until Sprint 2.
+// Sprint 0 created direct-only red characterization. Sprints 1 and 2 promote
+// the topology, capacity, diagnostic-parity, and recovery seams to CTest.
 int main(int argc, char** argv)
 {
     if (argc != 2 || !isKnownSeam(argv[1]))
