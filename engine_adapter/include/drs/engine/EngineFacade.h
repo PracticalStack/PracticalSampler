@@ -60,6 +60,9 @@ struct EngineMacroDescriptor
     PublishedMacroControlKind controlKind = PublishedMacroControlKind::knob;
     std::size_t authoredOrder = 0;
     std::string accessibilityDescription;
+    double displayMinimum = 0.0;
+    double displayMaximum = 1.0;
+    std::string authoredId;
 };
 
 struct EngineArticulationDescriptor

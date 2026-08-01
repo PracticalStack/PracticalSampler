@@ -442,6 +442,11 @@ EngineMacroDescriptor makePublishedMacroDescriptor(const PublishedMacroBinding& 
         currentEffect = binding.dspSlotId + " / " + binding.dspParameterId;
     }
 
+    const auto displayMinimum = binding.renderTarget == PublishedMacroRenderTarget::dspControl
+        ? binding.destinationMinimum : binding.minValue;
+    const auto displayMaximum = binding.renderTarget == PublishedMacroRenderTarget::dspControl
+        ? binding.destinationMaximum : binding.maxValue;
+
     return {
         runtimeId,
         binding.publishedName,
@@ -459,7 +464,10 @@ EngineMacroDescriptor makePublishedMacroDescriptor(const PublishedMacroBinding& 
         binding.presentation.valueUnit,
         binding.presentation.controlKind,
         binding.presentation.authoredOrder,
-        binding.presentation.accessibilityDescription
+        binding.presentation.accessibilityDescription,
+        displayMinimum,
+        displayMaximum,
+        binding.stableAuthoredId
     };
 }
 

@@ -130,6 +130,33 @@ bool sameMacroLayout(const std::vector<std::string>& currentIds,
     return true;
 }
 
+std::vector<PerformanceMixerControlView> buildPublishedMixerControls(
+    const std::vector<drs::engine::EngineMacroDescriptor>& macros)
+{
+    std::vector<PerformanceMixerControlView> controls;
+    controls.reserve(macros.size());
+    for (const auto& macro : macros)
+    {
+        PerformanceMixerControlView control;
+        control.authoredId = macro.authoredId.empty() ? macro.id : macro.authoredId;
+        control.runtimeId = macro.id;
+        control.sectionLabel = macro.sectionLabel;
+        control.controlLabel = macro.name;
+        control.parameterLabel = macro.parameterLabel;
+        control.valueUnit = macro.valueUnit;
+        control.accessibilityDescription = macro.accessibilityDescription;
+        control.controlKind = macro.controlKind;
+        control.authoredOrder = macro.authoredOrder;
+        control.minimum = macro.minValue;
+        control.maximum = macro.maxValue;
+        control.displayMinimum = macro.displayMinimum;
+        control.displayMaximum = macro.displayMaximum;
+        control.value = macro.currentValue;
+        controls.push_back(std::move(control));
+    }
+    return controls;
+}
+
 juce::String buildMacroStripTitle(const PerformanceMacroSurfaceModel& model)
 {
     if (!model.showingPublishedMixer)
@@ -182,6 +209,13 @@ PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
       onPerformanceNoteOff(std::move(performanceNoteOff)),
       publishPresentationProvider(std::move(presentationProvider)),
       audioCallbackActiveProvider(std::move(callbackActiveProvider)),
+      publishedMixer([this](const std::string& macroId, const double value)
+      {
+          if (onMacroValueChanged)
+              onMacroValueChanged(macroId, value);
+          else
+              engineFacade.setMacroValue(macroId, value);
+      }),
       keyboardComponent(keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard),
       diagnosticsPanel(facade, onMacroValueChanged, std::move(publishCommand),
                        publishPresentationProvider)
@@ -271,6 +305,7 @@ PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
     addAndMakeVisible(loadLeadButton);
     addAndMakeVisible(diagnosticsToggle);
     addAndMakeVisible(keyboardComponent);
+    addChildComponent(publishedMixer);
     addChildComponent(diagnosticsPanel);
 
     rebuildArticulationButtons();
@@ -344,49 +379,23 @@ void PerformancePanel::resized()
 
     if (showingPublishedMixer)
     {
-        if (macroControls.empty())
+        if (publishedMixer.getControlCount() == 0)
         {
+            publishedMixer.setBounds({});
             mixerEmptyStateLabel.setBounds(area.removeFromTop(56));
             area.removeFromTop(8);
         }
         else
         {
-            constexpr int maximumMixerColumns = 8;
-            constexpr int mixerRowHeight = 188;
-            constexpr int mixerGap = 12;
-            const auto controlCount = static_cast<int>(macroControls.size());
-            const auto columnCount = std::max(1, std::min(maximumMixerColumns, controlCount));
-            const auto rowCount = (controlCount + columnCount - 1) / columnCount;
-            const auto mixerHeight = rowCount * mixerRowHeight + (rowCount - 1) * mixerGap;
-            auto mixerArea = area.removeFromTop(mixerHeight);
-
-            const auto cellWidth = (mixerArea.getWidth() - mixerGap * (columnCount - 1)) / columnCount;
-            const auto cellHeight = (mixerArea.getHeight() - mixerGap * (rowCount - 1)) / rowCount;
-
-            for (int index = 0; index < controlCount; ++index)
-            {
-                const auto row = index / columnCount;
-                const auto column = index % columnCount;
-                auto cell = juce::Rectangle<int>(
-                    mixerArea.getX() + column * (cellWidth + mixerGap),
-                    mixerArea.getY() + row * (cellHeight + mixerGap),
-                    cellWidth,
-                    cellHeight);
-                cell.reduce(6, 4);
-
-                auto& control = macroControls[static_cast<std::size_t>(index)];
-                control->nameLabel.setBounds(cell.removeFromTop(24));
-                cell.removeFromTop(6);
-                auto footer = cell.removeFromBottom(38);
-                control->valueLabel.setBounds(footer);
-                control->slider.setBounds(cell.reduced(18, 0));
-            }
+            const auto mixerHeight = std::min(396, std::max(184, area.getHeight() - 180));
+            publishedMixer.setBounds(area.removeFromTop(mixerHeight));
 
             area.removeFromTop(10);
         }
     }
     else
     {
+        publishedMixer.setBounds({});
         mixerEmptyStateLabel.setBounds({});
         for (auto& control : macroControls)
         {
@@ -447,6 +456,15 @@ void PerformancePanel::rebuildMacroControls(
     visibleMacroIds.clear();
     macroControls.clear();
     showingPublishedMixer = mixerControl;
+    publishedMixer.setVisible(mixerControl);
+
+    if (mixerControl)
+    {
+        publishedMixer.setControls(buildPublishedMixerControls(macros));
+        return;
+    }
+
+    publishedMixer.setControls({});
 
     for (const auto& macro : macros)
     {
@@ -534,6 +552,10 @@ void PerformancePanel::refreshSurface()
     {
         rebuildMacroControls(macroSurface.displayedMacros, macroSurface.showingPublishedMixer);
         resized();
+    }
+    else if (macroSurface.showingPublishedMixer)
+    {
+        publishedMixer.setControls(buildPublishedMixerControls(macroSurface.displayedMacros));
     }
 
     instrumentLabel.setText(juce::String::fromUTF8(performanceSnapshot.instrumentDisplayName.c_str()),
@@ -726,7 +748,7 @@ void PerformancePanel::syncKeyboardPlayableRange()
     }
     else
     {
-        if (showingPublishedMixer && macroControls.empty())
+        if (showingPublishedMixer && publishedMixer.getControlCount() == 0)
         {
             keyboardHint = "Published performance is active. This instrument publishes no exposed performance controls. ";
             if (hiddenPublishedMacroCount > 0)

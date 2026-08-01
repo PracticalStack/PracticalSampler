@@ -8,6 +8,8 @@ set(DRS_APP_SHARED_SOURCES
     src/shared/midi/DrumPadComponent.h
     src/shared/PerformanceBankImport.cpp
     src/shared/PerformanceBankImport.h
+    src/shared/PerformanceMixer.cpp
+    src/shared/PerformanceMixer.h
     src/shared/PerformancePanel.cpp
     src/shared/PerformancePanel.h
     src/shared/ProjectSourceValidationService.cpp

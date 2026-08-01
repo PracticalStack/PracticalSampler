@@ -1,6 +1,7 @@
 #pragma once
 
 #include "drs/engine/EngineFacade.h"
+#include "shared/PerformanceMixer.h"
 #include "shared/StatusPanel.h"
 
 #include <juce_audio_utils/juce_audio_utils.h>
@@ -72,6 +73,7 @@ private:
     std::size_t hiddenPublishedMacroCount = 0;
     std::vector<std::string> visibleMacroIds;
     std::vector<std::unique_ptr<MacroControl>> macroControls;
+    PerformanceMixer publishedMixer;
     std::vector<std::unique_ptr<juce::TextButton>> articulationButtons;
     juce::MidiKeyboardState keyboardState;
     juce::MidiKeyboardComponent keyboardComponent;

@@ -72,3 +72,13 @@ authoring overrides: a group rename appears only after the next successful Publi
 while its fixed host slot and current value migrate unchanged. Missing legacy source
 metadata remains publishable using deterministic `Instrument` / `Control` fallback
 labels.
+
+## Compact Performance mixer surface
+
+The player surface consumes only the published descriptor view. It presents exposed
+controls in authored order as a four-column expanded grid or two-column compact grid,
+with a bounded vertical viewport for larger sets. Lanes use authored-ID component
+identities, show source and control labels plus formatted value/unit, and retain full
+labels in tooltips and accessibility descriptions. Gain uses a vertical fader,
+booleans a toggle, and other continuous values a knob. A compact Publish chip remains
+visible while failure repair guidance expands in the existing keyboard/status hint.
