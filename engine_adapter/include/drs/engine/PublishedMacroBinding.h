@@ -12,7 +12,49 @@
 
 namespace drs::engine
 {
+// Product capacity is deliberately separate from the physical host topology.  The
+// four remaining slots are reserved for hidden helpers and compatibility; they do
+// not make additional player-facing controls available.
+constexpr std::size_t maximumExposedPerformanceControls = 12;
 constexpr std::size_t maximumPublishedMacroHostSlots = 16;
+
+struct PublishedMacroHostTopologySlot
+{
+    std::size_t slotIndex = 0;
+    const char* hostParameterId = "";
+};
+
+// This is the compatibility contract for the permanent host topology.  The
+// first two identifiers are already visible to existing sessions, while the
+// remaining identifiers use one-based product slot numbering.  Authored macro
+// identities are intentionally not stored here: publication binds them later.
+inline const std::array<PublishedMacroHostTopologySlot, maximumPublishedMacroHostSlots>&
+publishedMacroHostTopology()
+{
+    static const std::array<PublishedMacroHostTopologySlot, maximumPublishedMacroHostSlots>
+        topology {{
+            { 0, "macro.tone" },
+            { 1, "macro.motion" },
+            { 2, "macro.slot.3" },
+            { 3, "macro.slot.4" },
+            { 4, "macro.slot.5" },
+            { 5, "macro.slot.6" },
+            { 6, "macro.slot.7" },
+            { 7, "macro.slot.8" },
+            { 8, "macro.slot.9" },
+            { 9, "macro.slot.10" },
+            { 10, "macro.slot.11" },
+            { 11, "macro.slot.12" },
+            { 12, "macro.slot.13" },
+            { 13, "macro.slot.14" },
+            { 14, "macro.slot.15" },
+            { 15, "macro.slot.16" }
+        }};
+    return topology;
+}
+
+static_assert(maximumPublishedMacroHostSlots - maximumExposedPerformanceControls == 4,
+              "Performance controls reserve exactly four hidden-helper/compatibility slots.");
 
 enum class PublishedMacroRenderTarget : std::uint8_t
 {

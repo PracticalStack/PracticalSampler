@@ -5,10 +5,14 @@ Status: Implemented
 
 ## Stable topology and immutable publication
 
-The plug-in host parameter layout is constructed once from the runtime manifest and never changes
-when an authored project adds, removes, reorders, or renames macros. Publication maps authored
-macros to those fixed host slots by stable authored ID, never by authored position or display name.
-The fixed table is bounded to 16 host/authored entries.
+The legacy plug-in host parameter layout is constructed once and never changes when an authored
+project adds, removes, reorders, or renames macros. Publication maps authored macros to fixed host
+slots by stable authored ID, never by authored position or display name. The 12-control mixer
+iteration replaces the legacy manifest-owned slot source with the product-owned 16-slot table;
+the fixed table remains bounded to 16 host/authored entries.
+
+The fixed host parameter IDs and the 12-visible/16-total capacity split are frozen in
+[the 12-control Performance mixer contract](performance-mixer-12-control-contract.md).
 
 Every controller-authorized Performance activation carries an
 `ImmutablePublishedMacroBindingTable`. Its revision and macro-schema digest must equal the

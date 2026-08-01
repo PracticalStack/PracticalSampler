@@ -2032,6 +2032,38 @@ add_test(
     COMMAND drs_sprint6_published_macro_binding_tests
 )
 
+# Performance mixer Sprint 0 is a direct-only expected-red characterization suite.
+# Do not register it with CTest or drs_all_tests until the corresponding behavior
+# is implemented in Sprints 1 and 2.
+juce_add_console_app(drs_performance_mixer_s0_red_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Performance Mixer Sprint 0 Red Tests"
+)
+
+target_sources(drs_performance_mixer_s0_red_tests
+    PRIVATE
+        src/PerformanceMixerSprint0RedTests.cpp
+)
+
+target_link_libraries(drs_performance_mixer_s0_red_tests
+    PRIVATE
+        drs_engine_adapter
+        drs_sampler_core
+        drs_plugin_shell
+        drs_standalone_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_performance_mixer_s0_red_tests PRIVATE cxx_std_17)
+
+target_compile_definitions(drs_performance_mixer_s0_red_tests
+    PRIVATE
+        DRS_PERFORMANCE_MIXER_S0_FIXTURE_PATH="${CMAKE_SOURCE_DIR}/content/runtime/phase2/performance-mixer/three-layer-gain-mixer.drsproj"
+)
+
 juce_add_console_app(drs_sprint6_publish_shell_parity_tests
     PRODUCT_NAME "Decent Rhapsody Studio Sprint 6 Publish Shell Parity Tests"
 )
