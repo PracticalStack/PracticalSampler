@@ -173,6 +173,7 @@ add_library(drs_engine_adapter STATIC
     src/AuthoringPreviewController.cpp
     src/AuthoringPreviewRecovery.cpp
     src/AuthoringSession.cpp
+    src/ControlLaw.cpp
     src/CuratedDspCatalog.cpp
     src/DraftPlaybackContract.cpp
     src/DspGain.cpp
@@ -212,6 +213,7 @@ add_library(drs_engine_adapter STATIC
     include/drs/engine/AuthoringPreviewController.h
     include/drs/engine/AuthoringPreviewRecovery.h
     include/drs/engine/AuthoringSession.h
+    include/drs/engine/ControlLaw.h
     include/drs/engine/CuratedDspCatalog.h
     include/drs/engine/DraftPlaybackContract.h
     include/drs/engine/DspGain.h
@@ -284,6 +286,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     src/AuthoringPreviewController.cpp
     src/AuthoringPreviewRecovery.cpp
     src/AuthoringSession.cpp
+    src/ControlLaw.cpp
     src/DraftPlaybackContract.cpp
     src/EngineFacade.cpp
     src/HiseFrontendBridge.cpp
@@ -318,6 +321,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     include/drs/engine/AuthoringPreviewController.h
     include/drs/engine/AuthoringPreviewRecovery.h
     include/drs/engine/AuthoringSession.h
+    include/drs/engine/ControlLaw.h
     include/drs/engine/DraftPlaybackContract.h
     include/drs/engine/EngineFacade.h
     include/drs/engine/Phase1Baseline.h

@@ -497,18 +497,18 @@ set_target_properties(drs_curated_dsp_contract_red_tests PROPERTIES
     FOLDER "Tests"
 )
 
-# Control-law Sprint 0 is intentionally direct-only: these table-driven seams
-# stay red until Sprint 1 adds the shared, bidirectional ControlLaw core.
-juce_add_console_app(drs_control_law_s0_red_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Control Law Sprint 0 Red Tests"
+# Sprint 1 converts the Sprint 0 direct-only red seams into the shared-core
+# deterministic and randomized property suite.
+juce_add_console_app(drs_control_law_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Control Law Tests"
 )
 
-target_sources(drs_control_law_s0_red_tests
+target_sources(drs_control_law_tests
     PRIVATE
-        src/ControlLawSprint0RedTests.cpp
+        src/ControlLawTests.cpp
 )
 
-target_link_libraries(drs_control_law_s0_red_tests
+target_link_libraries(drs_control_law_tests
     PRIVATE
         drs_engine_adapter
     PUBLIC
@@ -517,14 +517,19 @@ target_link_libraries(drs_control_law_s0_red_tests
         juce::juce_recommended_warning_flags
 )
 
-target_compile_features(drs_control_law_s0_red_tests PRIVATE cxx_std_17)
+target_compile_features(drs_control_law_tests PRIVATE cxx_std_17)
 
-target_compile_definitions(drs_control_law_s0_red_tests
+target_compile_definitions(drs_control_law_tests
     PRIVATE
         DRS_CONTROL_LAW_S0_FIXTURE_PATH="${CMAKE_SOURCE_DIR}/content/runtime/phase2/control-law/three-group-linear-gain.drsproj"
 )
 
-set_target_properties(drs_control_law_s0_red_tests PROPERTIES
+add_test(
+    NAME drs.control_law
+    COMMAND drs_control_law_tests
+)
+
+set_target_properties(drs_control_law_tests PROPERTIES
     FOLDER "Tests"
 )
 
@@ -566,6 +571,14 @@ add_test(
 set_target_properties(drs_curated_dsp_contract_tests PROPERTIES
     FOLDER "Tests"
 )
+
+add_executable(drs_curated_dsp_control_law_tests
+    src/CuratedDspControlLawTests.cpp
+)
+target_link_libraries(drs_curated_dsp_control_law_tests PRIVATE drs_engine_adapter)
+target_compile_features(drs_curated_dsp_control_law_tests PRIVATE cxx_std_17)
+add_test(NAME drs.curated_dsp.control_law COMMAND drs_curated_dsp_control_law_tests)
+set_target_properties(drs_curated_dsp_control_law_tests PROPERTIES FOLDER "Tests")
 
 add_executable(drs_curated_dsp_graph_plan_tests
     src/CuratedDspGraphPlanTests.cpp
@@ -3307,6 +3320,8 @@ add_dependencies(drs_all_tests
     drs_host_state_recovery_ui_tests
     drs_host_state_restore_stress_tests
     drs_curated_dsp_contract_tests
+    drs_curated_dsp_control_law_tests
+    drs_control_law_tests
     drs_curated_dsp_graph_plan_tests
     drs_curated_dsp_gain_tests
     drs_curated_dsp_reverb_tests

@@ -2,7 +2,7 @@
 
 Status: Accepted for implementation  
 Decision date: August 2, 2026  
-Scope: Control-law initiative Sprint 0 (CL-001 through CL-006)
+Scope: Control-law initiative Sprints 0–1 (CL-001 through CL-106)
 
 ## Decision
 
@@ -57,10 +57,38 @@ The inverse law must return the matching normalized anchor and round-trip a fini
 physical value within the tolerance introduced by the shared-core tests. Endpoints
 are exact.
 
+## Sprint 1 shared-core implementation
+
+`ControlLaw.h/.cpp` compiles an ID plus resolved physical range into a bounded
+`CompiledControlLaw` with at most eight anchors. `normalizedToPhysical` and
+`physicalToNormalized` are `noexcept`, reject non-finite inputs, clamp finite inputs
+at the endpoints, and do not allocate, lock, or inspect UI state. Mixer gain accepts
+only its frozen -96…+6 dB range. Positive-log requires a strictly positive range;
+bipolar-centered requires a range spanning zero. Formatting is intentionally a
+separate UI-facing helper and is never carried in callback data.
+
+## Sprint 2 descriptor policy
+
+Each curated parameter now declares a default law, an allow-list, and optional
+role-specific recommendations. Catalog construction rejects unknown laws, duplicate
+allow-list entries or roles, defaults outside the allow-list, invalid recommendation
+ranges, and any law/range combination the shared core cannot compile. The pure
+resolver applies explicit allowed override, then role recommendation, descriptor
+default, and finally a unit-based compatibility fallback for incomplete legacy
+descriptors.
+
+`drs.gain/gainDb` defaults to `drs.linearDb.v1`, permits
+`drs.mixerGain.v1`, and recommends that law with -96…+6 dB for the `mix` role.
+Boolean controls use the toggle law; selector-like `character` and `mode` use the
+stepped law; positive time/frequency controls use positive-log where their range
+permits it; EQ gain uses bipolar-linear. `divisionBeats` is intentionally classified
+as continuous positive-log for now: its discrete beat grid and labels are not yet a
+catalog contract, so it must not claim a stepped enumeration prematurely.
+
 ## Current-state parameter inventory
 
-At Sprint 0 the descriptor contains unit/range/default/smoothing only; it has no
-role or law metadata. The authoring UI creates every selected DSP target with role
+Before Sprint 2 the descriptor contained unit/range/default/smoothing only. The
+authoring UI still creates every selected DSP target with role
 `mix` and `curve: "linear"`; its editable role vocabulary is `timbre`, `motion`,
 `mix`, `placement`, and `other` (plus custom text). A hand-authored `logarithmic`
 curve is honored only for positive destination ranges. Thus every entry below is
@@ -79,7 +107,7 @@ in the last column is inventory for Sprint 2, not implemented behavior.
 |  | `outputDb` | dB, -24…+24 | linear | mix / modulation |
 | `drs.stereoDelay` | `timeMs` | ms, 1…2000 | linear (log may be authored) | time / log-positive |
 |  | `sync` | boolean, 0…1 | linear | toggle |
-|  | `divisionBeats` | ratio, 0.0625…4 | linear (log may be authored) | stepped |
+|  | `divisionBeats` | ratio, 0.0625…4 | linear (log may be authored) | log-positive; stepped grid intentionally unresolved |
 |  | `feedback` | ratio, 0…0.95 | linear | modulation |
 |  | `pingPong` | boolean, 0…1 | linear | toggle |
 |  | `tone` | normalized, 0…1 | linear | timbre |
@@ -102,15 +130,15 @@ in the last column is inventory for Sprint 2, not implemented behavior.
 |  | `width` | normalized, 0…1 | linear | placement |
 |  | `mix` | normalized, 0…1 | linear | mix |
 
-## Sprint 0 fixture and red-test rule
+## Sprint 0 fixture and Sprint 1 core proof
 
 `content/runtime/phase2/control-law/three-group-linear-gain.drsproj` is the
 regression fixture for the reported three-group Perform mixer failure. Each exposed
 group target uses the legacy 0…1 to -96…+24 dB linear mapping: unity is at 80% travel
 and the midpoint is -36 dB. It must remain legacy-linear until an explicit migration.
 
-`drs_control_law_s0_red_tests` is direct-only and intentionally exits non-zero. Its
-table encodes anchors, monotonicity, endpoints, inverse round trips, clamping,
-non-finite rejection, and formatting requirements. It is not registered with CTest
-until the shared `ControlLaw` core exists in Sprint 1; its red result demonstrates the
-absence of that core rather than normalizing the future mapping into local code.
+`drs_control_law_tests` converts the direct-only Sprint 0 seams into registered
+deterministic and randomized property tests. It covers anchors, monotonicity,
+endpoints, inverse round trips, clamping, non-finite rejection, formatting, and the
+legacy fixture. `ControlLaw` is engine-only; its compiled representation is fixed-size
+and trivially copyable, while strings are used only by the presentation formatter.
