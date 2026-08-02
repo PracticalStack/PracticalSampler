@@ -34,11 +34,11 @@ struct PerformanceLaneStateSnapshot
 };
 
 // Fixed action storage makes one normalized event all-or-nothing. Future trigger actions use
-// this same scratch; Sprint 4 only emits one forwarded semantic event per accepted input.
+// this same scratch; release fan-out remains fixed and is committed atomically per raw input.
 class PerformanceActionScratch final
 {
 public:
-    static constexpr std::size_t capacity = 128;
+    static constexpr std::size_t capacity = 512;
     bool push(SamplerRenderEvent event) noexcept;
     void clear() noexcept { count = 0; }
     SamplerRenderEventView view() const noexcept { return { events.data(), count }; }
@@ -71,6 +71,10 @@ private:
     void recordNoteOn(const SamplerRenderEvent& event, std::uint64_t generation, bool consumed) noexcept;
     void recordNoteOff(const SamplerRenderEvent& event) noexcept;
     void setPedal(bool down) noexcept;
+    static SamplerRenderEvent makeTriggerEvent(const SamplerRenderEvent& source,
+                                               const PerformanceHeldNoteRecord& held,
+                                               PerformanceEventKind kind,
+                                               bool pedalDown) noexcept;
 
     std::array<PerformanceHeldNoteRecord, channelCount * noteCount> heldNotes {};
     std::uint32_t selectedArticulationIndex = kInvalidPerformanceProgramIndex;

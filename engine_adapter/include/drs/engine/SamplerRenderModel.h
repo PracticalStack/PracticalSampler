@@ -47,6 +47,8 @@ struct SamplerRenderEvent
     float noteOffVelocity = 0.0f;
     std::uint32_t inputSequence = 0;
     std::uint32_t articulationIndex = kInvalidPerformanceProgramIndex;
+    PerformanceEventKind performanceEvent = PerformanceEventKind::noteOn;
+    bool sustainPedalDown = false;
 };
 
 // Non-owning callback views. Their backing storage is owned and bounded by the playback context.
@@ -150,6 +152,9 @@ struct SamplerRenderRoute
     VelocityCrossfadeDescriptor velocityCrossfade;
     VelocityCrossfadeRuntimeDescriptor velocityCrossfadeRuntime;
     std::uint32_t performanceArticulationIndex = kInvalidPerformanceProgramIndex;
+    PerformanceEventKind performanceEvent = PerformanceEventKind::noteOn;
+    PerformanceSustainCondition performanceSustain = PerformanceSustainCondition::any;
+    PerformancePitchSource performancePitchSource = PerformancePitchSource::eventNote;
 };
 
 struct SamplerRenderModelBuildResult;

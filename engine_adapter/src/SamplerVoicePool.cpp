@@ -77,8 +77,14 @@ bool sameRoundRobinPool(std::string_view leftPoolId,
 bool routeCouldRespondToTrigger(const SamplerRenderRoute& route,
                                 int midiNote,
                                 int physicalVelocity,
-                                int effectiveVelocity) noexcept
+                                int effectiveVelocity,
+                                const PerformanceEventKind performanceEvent,
+                                const bool sustainPedalDown) noexcept
 {
+    if (route.performanceEvent != performanceEvent
+        || (route.performanceSustain == PerformanceSustainCondition::pedalDown && !sustainPedalDown)
+        || (route.performanceSustain == PerformanceSustainCondition::pedalUp && sustainPedalDown))
+        return false;
     if (midiNote < route.keyLow || midiNote > route.keyHigh)
         return false;
 
@@ -154,10 +160,16 @@ bool routeMatches(const SamplerRenderRoute& route,
                   int velocity,
                   const SelectedRoundRobinSlot* roundRobinSelections,
                   std::size_t roundRobinSelectionCount,
-                  std::uint32_t selectedArticulationIndex) noexcept
+                  std::uint32_t selectedArticulationIndex,
+                  const PerformanceEventKind performanceEvent,
+                  const bool sustainPedalDown) noexcept
 {
     if (selectedArticulationIndex != kInvalidPerformanceProgramIndex
         && route.performanceArticulationIndex != selectedArticulationIndex)
+        return false;
+    if (route.performanceEvent != performanceEvent
+        || (route.performanceSustain == PerformanceSustainCondition::pedalDown && !sustainPedalDown)
+        || (route.performanceSustain == PerformanceSustainCondition::pedalUp && sustainPedalDown))
         return false;
     const auto rangeMatches = midiNote >= route.keyLow && midiNote <= route.keyHigh
         && velocity >= route.velocityLow && velocity <= route.velocityHigh;
@@ -510,7 +522,8 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 if (event.articulationIndex != kInvalidPerformanceProgramIndex
                     && route.performanceArticulationIndex != event.articulationIndex)
                     continue;
-                if (!routeCouldRespondToTrigger(route, sourceMidiNote, eventVelocity, effectiveVelocity))
+                if (!routeCouldRespondToTrigger(route, sourceMidiNote, eventVelocity, effectiveVelocity,
+                                                 event.performanceEvent, event.sustainPedalDown))
                     continue;
 
                 if (!routeUsesRoundRobin(route))
@@ -581,7 +594,9 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                                     eventVelocity,
                                     roundRobinSelections.data(),
                                     roundRobinSelectionCount,
-                                    event.articulationIndex);
+                                    event.articulationIndex,
+                                    event.performanceEvent,
+                                    event.sustainPedalDown);
             });
             const auto routingVelocity = hasPhysicalVelocityRoute ? eventVelocity : effectiveVelocity;
             const auto hasMatchingRoute = hasPhysicalVelocityRoute
@@ -593,7 +608,9 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                                             effectiveVelocity,
                                             roundRobinSelections.data(),
                                             roundRobinSelectionCount,
-                                            event.articulationIndex);
+                                            event.articulationIndex,
+                                            event.performanceEvent,
+                                            event.sustainPedalDown);
                     }));
             if (!hasMatchingRoute)
             {
@@ -633,7 +650,9 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                                   routingVelocity,
                                   roundRobinSelections.data(),
                                   roundRobinSelectionCount,
-                                  event.articulationIndex))
+                                  event.articulationIndex,
+                                  event.performanceEvent,
+                                  event.sustainPedalDown))
                     continue;
 
                 if (!routeHasCrossfade(routes[routeIndex]))
@@ -734,7 +753,9 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                                       routingVelocity,
                                       roundRobinSelections.data(),
                                       roundRobinSelectionCount,
-                                      event.articulationIndex))
+                                      event.articulationIndex,
+                                      event.performanceEvent,
+                                      event.sustainPedalDown))
                         continue;
 
                     startRoute(routeIndex, 1.0, false);
@@ -752,7 +773,9 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                                   routingVelocity,
                                   roundRobinSelections.data(),
                                   roundRobinSelectionCount,
-                                  event.articulationIndex)
+                                  event.articulationIndex,
+                                  event.performanceEvent,
+                                  event.sustainPedalDown)
                     || routeHasCrossfade(routes[routeIndex]))
                 {
                     continue;

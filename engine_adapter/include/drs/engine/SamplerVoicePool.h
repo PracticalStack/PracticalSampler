@@ -12,7 +12,7 @@ namespace drs::engine
 class SamplerEventBlock final
 {
 public:
-    static constexpr std::size_t capacity = 128;
+    static constexpr std::size_t capacity = 512;
 
     bool push(SamplerRenderEvent event) noexcept;
     void clear() noexcept;

@@ -628,6 +628,26 @@ set_target_properties(drs_performance_engine_s5_keyswitch_tests PROPERTIES
     FOLDER "Tests"
 )
 
+add_executable(drs_performance_engine_s6_release_tests
+    src/PerformanceEngineSprint6ReleaseTests.cpp
+)
+
+target_link_libraries(drs_performance_engine_s6_release_tests
+    PRIVATE
+        drs_sampler_core
+)
+
+target_compile_features(drs_performance_engine_s6_release_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.performance_engine.s6.release
+    COMMAND drs_performance_engine_s6_release_tests
+)
+
+set_target_properties(drs_performance_engine_s6_release_tests PROPERTIES
+    FOLDER "Tests"
+)
+
 add_executable(drs_curated_dsp_contract_red_tests
     src/CuratedDspContractRedTests.cpp
 )

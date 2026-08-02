@@ -92,7 +92,7 @@ void verifyIsolationMigrationAndOverflow()
                 "Scratch must accept its exact capacity.");
     require(!overflow.normalize(event(SamplerRenderEventType::noteOn, 127, 127), 1, program, scratch)
                 && overflow.getSnapshot().actionOverflowCount == 1
-                && overflow.getSnapshot().heldNoteCount == PerformanceActionScratch::capacity,
+                && overflow.getSnapshot().heldNoteCount == PerformanceLaneState::noteCount,
             "Overflow must reject an entire event without partial state.");
 }
 } // namespace

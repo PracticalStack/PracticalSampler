@@ -5,6 +5,31 @@
 
 namespace drs::engine
 {
+namespace
+{
+bool hasTriggerRoute(const CompiledPerformanceProgram& program,
+                     const PerformanceEventKind event,
+                     const std::uint32_t articulationIndex,
+                     const bool pedalDown) noexcept
+{
+    const auto eventIndex = static_cast<std::size_t>(event);
+    if (eventIndex >= program.eventRanges.size()) return false;
+    const auto& range = program.eventRanges[eventIndex];
+    const auto first = std::min<std::size_t>(range.firstRoute, program.triggerRoutes.size());
+    const auto last = std::min<std::size_t>(first + range.routeCount, program.triggerRoutes.size());
+    for (std::size_t index = first; index < last; ++index)
+    {
+        const auto& route = program.triggerRoutes[index];
+        if (route.articulationIndex != articulationIndex) continue;
+        if (route.sustain == PerformanceSustainCondition::any
+            || (route.sustain == PerformanceSustainCondition::pedalDown && pedalDown)
+            || (route.sustain == PerformanceSustainCondition::pedalUp && !pedalDown))
+            return true;
+    }
+    return false;
+}
+} // namespace
+
 bool PerformanceActionScratch::push(const SamplerRenderEvent event) noexcept
 {
     if (count >= events.size()) return false;
@@ -82,16 +107,31 @@ void PerformanceLaneState::recordNoteOff(const SamplerRenderEvent& event) noexce
     held.physicalKeyDown = false;
     held.noteOffVelocity = toMidiVelocity(event.noteOffVelocity > 0.0f
                                                ? event.noteOffVelocity : event.velocity);
+    if (held.noteOffVelocity == 0)
+        held.noteOffVelocity = held.attackVelocity;
     held.pedalDeferred = pedalIsDown;
 }
 
 void PerformanceLaneState::setPedal(const bool down) noexcept
 {
     pedalIsDown = down;
-    if (!down)
-        for (auto& held : heldNotes)
-            if (held.active && !held.physicalKeyDown)
-                held.pedalDeferred = false;
+}
+
+SamplerRenderEvent PerformanceLaneState::makeTriggerEvent(const SamplerRenderEvent& source,
+                                                           const PerformanceHeldNoteRecord& held,
+                                                           const PerformanceEventKind kind,
+                                                           const bool pedalDown) noexcept
+{
+    SamplerRenderEvent result = source;
+    result.type = SamplerRenderEventType::noteOn;
+    result.midiChannel = held.midiChannel;
+    result.midiNote = held.midiNote;
+    result.velocity = static_cast<float>(held.noteOffVelocity) / 127.0f;
+    result.noteOffVelocity = static_cast<float>(held.noteOffVelocity) / 127.0f;
+    result.articulationIndex = held.articulationAtAttack;
+    result.performanceEvent = kind;
+    result.sustainPedalDown = pedalDown;
+    return result;
 }
 
 bool PerformanceLaneState::normalize(const SamplerRenderEvent& raw,
@@ -99,17 +139,16 @@ bool PerformanceLaneState::normalize(const SamplerRenderEvent& raw,
                                      const CompiledPerformanceProgram& program,
                                      PerformanceActionScratch& scratch) noexcept
 {
-    // Preflight reserves the entire action set before mutating lane state.
-    if (scratch.size() >= PerformanceActionScratch::capacity)
-    {
-        ++actionOverflowCount;
-        return false;
-    }
     auto event = raw;
     switch (raw.type)
     {
         case SamplerRenderEventType::noteOn:
         {
+            if (scratch.size() + 1 > PerformanceActionScratch::capacity)
+            {
+                ++actionOverflowCount;
+                return false;
+            }
             const auto activation = program.activationByMidiNote[raw.midiNote];
             const auto isActivation = activation.articulationIndex < program.articulationCount;
             if (isActivation)
@@ -122,46 +161,148 @@ bool PerformanceLaneState::normalize(const SamplerRenderEvent& raw,
             ++semanticEventCounts[static_cast<std::size_t>(PerformanceEventKind::noteOn)];
             if (isActivation && activation.consume) return true;
             event.articulationIndex = selectedArticulationIndex;
+            event.performanceEvent = PerformanceEventKind::noteOn;
+            event.sustainPedalDown = pedalIsDown;
             return scratch.push(event);
         }
         case SamplerRenderEventType::noteOff:
         {
-            const auto consumed = heldNotes[heldIndex(event.midiChannel, event.midiNote)].active
-                && heldNotes[heldIndex(event.midiChannel, event.midiNote)].consumed;
+            auto& held = heldNotes[heldIndex(event.midiChannel, event.midiNote)];
+            const auto consumed = held.active && held.consumed;
+            const auto emitsPhysicalTrigger = held.active && !consumed
+                && hasTriggerRoute(program, PerformanceEventKind::noteOff, held.articulationAtAttack, pedalIsDown);
+            const auto emitsEffectiveRelease = held.active && !consumed && !pedalIsDown && !held.releaseEmitted;
+            const auto emitsReleaseTrigger = emitsEffectiveRelease
+                && hasTriggerRoute(program, PerformanceEventKind::release, held.articulationAtAttack, false);
+            const auto actionCount = consumed ? 0u : (1u + (emitsPhysicalTrigger ? 1u : 0u)
+                + (emitsReleaseTrigger ? 1u : 0u));
+            if (scratch.size() + actionCount > PerformanceActionScratch::capacity)
+            {
+                ++actionOverflowCount;
+                return false;
+            }
             recordNoteOff(event);
             ++semanticEventCounts[static_cast<std::size_t>(PerformanceEventKind::noteOff)];
             if (consumed)
             {
-                heldNotes[heldIndex(event.midiChannel, event.midiNote)] = {};
+                held = {};
                 return true;
             }
-            event.articulationIndex = heldNotes[heldIndex(event.midiChannel, event.midiNote)].articulationAtAttack;
-            return scratch.push(event);
+            if (!held.active)
+            {
+                event.performanceEvent = PerformanceEventKind::noteOff;
+                event.sustainPedalDown = pedalIsDown;
+                return scratch.push(event);
+            }
+            event.articulationIndex = held.articulationAtAttack;
+            event.performanceEvent = PerformanceEventKind::noteOff;
+            event.sustainPedalDown = pedalIsDown;
+            if (emitsPhysicalTrigger)
+                scratch.push(makeTriggerEvent(event, held, PerformanceEventKind::noteOff, pedalIsDown));
+            scratch.push(event);
+            if (emitsEffectiveRelease)
+            {
+                if (emitsReleaseTrigger)
+                    scratch.push(makeTriggerEvent(event, held, PerformanceEventKind::release, false));
+                held.releaseEmitted = true;
+                held.pedalDeferred = false;
+                held.active = false;
+                ++semanticEventCounts[static_cast<std::size_t>(PerformanceEventKind::release)];
+            }
+            return true;
         }
         case SamplerRenderEventType::sustainPedal:
         {
             const auto down = event.velocity >= (64.0f / 127.0f);
             if (down == pedalIsDown) return true;
+            std::size_t releaseCount = 0;
+            if (!down)
+                for (const auto& held : heldNotes)
+                    if (held.active && !held.consumed && !held.physicalKeyDown
+                        && held.pedalDeferred && !held.releaseEmitted
+                        && hasTriggerRoute(program, PerformanceEventKind::release,
+                                           held.articulationAtAttack, false))
+                        ++releaseCount;
+            if (scratch.size() + 1 + releaseCount > PerformanceActionScratch::capacity)
+            {
+                ++actionOverflowCount;
+                return false;
+            }
             setPedal(down);
             event.type = down ? SamplerRenderEventType::pedalDown : SamplerRenderEventType::pedalUp;
+            event.performanceEvent = down ? PerformanceEventKind::pedalDown : PerformanceEventKind::pedalUp;
+            event.sustainPedalDown = down;
             ++semanticEventCounts[static_cast<std::size_t>(down ? PerformanceEventKind::pedalDown
                                                                   : PerformanceEventKind::pedalUp)];
-            return scratch.push(event);
+            scratch.push(event);
+            if (!down)
+                for (auto& held : heldNotes)
+                    if (held.active && !held.consumed && !held.physicalKeyDown
+                        && held.pedalDeferred && !held.releaseEmitted)
+                    {
+                        if (hasTriggerRoute(program, PerformanceEventKind::release,
+                                            held.articulationAtAttack, false))
+                            scratch.push(makeTriggerEvent(event, held, PerformanceEventKind::release, false));
+                        held.releaseEmitted = true;
+                        held.pedalDeferred = false;
+                        held.active = false;
+                        ++semanticEventCounts[static_cast<std::size_t>(PerformanceEventKind::release)];
+                    }
+            return true;
         }
         case SamplerRenderEventType::pedalDown:
         case SamplerRenderEventType::pedalUp:
         {
             const auto down = raw.type == SamplerRenderEventType::pedalDown;
             if (down == pedalIsDown) return true;
+            std::size_t releaseCount = 0;
+            if (!down)
+                for (const auto& held : heldNotes)
+                    if (held.active && !held.consumed && !held.physicalKeyDown
+                        && held.pedalDeferred && !held.releaseEmitted
+                        && hasTriggerRoute(program, PerformanceEventKind::release,
+                                           held.articulationAtAttack, false))
+                        ++releaseCount;
+            if (scratch.size() + 1 + releaseCount > PerformanceActionScratch::capacity)
+            {
+                ++actionOverflowCount;
+                return false;
+            }
             setPedal(down);
+            event.performanceEvent = down ? PerformanceEventKind::pedalDown : PerformanceEventKind::pedalUp;
+            event.sustainPedalDown = down;
             ++semanticEventCounts[static_cast<std::size_t>(down ? PerformanceEventKind::pedalDown
                                                                   : PerformanceEventKind::pedalUp)];
-            return scratch.push(event);
+            scratch.push(event);
+            if (!down)
+                for (auto& held : heldNotes)
+                    if (held.active && !held.consumed && !held.physicalKeyDown
+                        && held.pedalDeferred && !held.releaseEmitted)
+                    {
+                        if (hasTriggerRoute(program, PerformanceEventKind::release,
+                                            held.articulationAtAttack, false))
+                            scratch.push(makeTriggerEvent(event, held, PerformanceEventKind::release, false));
+                        held.releaseEmitted = true;
+                        held.pedalDeferred = false;
+                        held.active = false;
+                        ++semanticEventCounts[static_cast<std::size_t>(PerformanceEventKind::release)];
+                    }
+            return true;
         }
         case SamplerRenderEventType::allNotesOff:
-            for (auto& held : heldNotes) if (held.active) held.physicalKeyDown = false;
+            if (scratch.size() + 1 > PerformanceActionScratch::capacity)
+            {
+                ++actionOverflowCount;
+                return false;
+            }
+            heldNotes = {};
             return scratch.push(event);
         case SamplerRenderEventType::reset:
+            if (scratch.size() + 1 > PerformanceActionScratch::capacity)
+            {
+                ++actionOverflowCount;
+                return false;
+            }
             heldNotes = {};
             pedalIsDown = false;
             return scratch.push(event);

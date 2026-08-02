@@ -530,6 +530,12 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
         const auto pan = snapshotGroupRoute == nullptr
             ? zone.pan
             : combineGroupPan(zone.pan, snapshotGroupRoute->pan);
+        const auto triggerRoute = std::find_if(prepared.performanceProgram.triggerRoutes.begin(),
+                                               prepared.performanceProgram.triggerRoutes.end(),
+                                               [index](const auto& route)
+                                               {
+                                                   return route.zoneIndex == index;
+                                               });
         model->routes.push_back({ index,
                                   zone.preparedSampleIndex,
                                   zone.zoneId,
@@ -556,7 +562,13 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
                                       : zone.velocityCrossfadeRuntime,
                                   index < prepared.performanceProgram.zoneArticulationIndices.size()
                                       ? prepared.performanceProgram.zoneArticulationIndices[index]
-                                      : kInvalidPerformanceProgramIndex });
+                                      : kInvalidPerformanceProgramIndex,
+                                  triggerRoute == prepared.performanceProgram.triggerRoutes.end()
+                                      ? PerformanceEventKind::noteOn : triggerRoute->event,
+                                  triggerRoute == prepared.performanceProgram.triggerRoutes.end()
+                                      ? PerformanceSustainCondition::any : triggerRoute->sustain,
+                                  triggerRoute == prepared.performanceProgram.triggerRoutes.end()
+                                      ? PerformancePitchSource::eventNote : triggerRoute->pitchSource });
     }
 
     result.built = true;
