@@ -1,0 +1,45 @@
+{
+  "schemaName": "drs.project",
+  "schemaVersion": 5,
+  "projectId": "drs.control-law.three-group-legacy-linear",
+  "displayName": "Control Law Three-Group Legacy Linear Fixture",
+  "contentRoot": "../../../hise_project",
+  "defaultInstrumentManifest": "../../phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drinst",
+  "sampleSources": [
+    { "id": "bell-source", "path": "../../../hise_project/Samples/DRS_Sine_A3.wav", "role": "bell" },
+    { "id": "epiano-source", "path": "../../../hise_project/Samples/DRS_TriangleLead_A4.wav", "role": "epiano" },
+    { "id": "plucks-source", "path": "../../../hise_project/Samples/DRS_Sine_A3.wav", "role": "plucks" }
+  ],
+  "authoring": {
+    "schemaName": "drs.authoring", "schemaVersion": 4,
+    "selectedZoneId": "bell-zone", "selectedGroupId": "bell", "selectedPerformanceBankId": "",
+    "zones": [
+      { "id": "bell-zone", "sampleSourceId": "bell-source", "displayName": "Bell", "groupId": "bell", "articulationId": "default", "rootKey": 60, "keyLow": 0, "keyHigh": 127, "velocityLow": 1, "velocityHigh": 127, "gainDb": 0.0, "pan": 0.0, "sampleStartFrame": 0, "loopEnabled": false, "loopStartFrame": 0, "loopEndFrame": 0, "releaseSeconds": 0.0, "triggerMode": "gated" },
+      { "id": "epiano-zone", "sampleSourceId": "epiano-source", "displayName": "EPiano", "groupId": "epiano", "articulationId": "default", "rootKey": 64, "keyLow": 0, "keyHigh": 127, "velocityLow": 1, "velocityHigh": 127, "gainDb": 0.0, "pan": 0.0, "sampleStartFrame": 0, "loopEnabled": false, "loopStartFrame": 0, "loopEndFrame": 0, "releaseSeconds": 0.0, "triggerMode": "gated" },
+      { "id": "plucks-zone", "sampleSourceId": "plucks-source", "displayName": "Plucks", "groupId": "plucks", "articulationId": "default", "rootKey": 67, "keyLow": 0, "keyHigh": 127, "velocityLow": 1, "velocityHigh": 127, "gainDb": 0.0, "pan": 0.0, "sampleStartFrame": 0, "loopEnabled": false, "loopStartFrame": 0, "loopEndFrame": 0, "releaseSeconds": 0.0, "triggerMode": "gated" }
+    ],
+    "groups": [
+      { "id": "bell", "displayName": "Bell", "displayOrder": 0, "workspaceVisible": true, "gainDb": 0.0, "pan": 0.0, "routingBusId": "bell-bus", "auditionAnchorZoneId": "bell-zone" },
+      { "id": "epiano", "displayName": "EPiano", "displayOrder": 1, "workspaceVisible": true, "gainDb": 0.0, "pan": 0.0, "routingBusId": "epiano-bus", "auditionAnchorZoneId": "epiano-zone" },
+      { "id": "plucks", "displayName": "Plucks", "displayOrder": 2, "workspaceVisible": true, "gainDb": 0.0, "pan": 0.0, "routingBusId": "plucks-bus", "auditionAnchorZoneId": "plucks-zone" }
+    ],
+    "macros": [
+      { "id": "bell-gain", "name": "Bell Gain", "defaultValue": 0.8, "minValue": 0.0, "maxValue": 1.0, "exposedInPerformance": true, "targets": [{ "parameterId": "gainDb", "parameterPath": "groups/bell/gainDb", "role": "mix", "dspSlotId": "bell-gain-insert", "dspParameterId": "gainDb", "sourceMinimum": 0.0, "sourceMaximum": 1.0, "destinationMinimum": -96.0, "destinationMaximum": 24.0, "curve": "linear" }] },
+      { "id": "epiano-gain", "name": "EPiano Gain", "defaultValue": 0.8, "minValue": 0.0, "maxValue": 1.0, "exposedInPerformance": true, "targets": [{ "parameterId": "gainDb", "parameterPath": "groups/epiano/gainDb", "role": "mix", "dspSlotId": "epiano-gain-insert", "dspParameterId": "gainDb", "sourceMinimum": 0.0, "sourceMaximum": 1.0, "destinationMinimum": -96.0, "destinationMaximum": 24.0, "curve": "linear" }] },
+      { "id": "plucks-gain", "name": "Plucks Gain", "defaultValue": 0.8, "minValue": 0.0, "maxValue": 1.0, "exposedInPerformance": true, "targets": [{ "parameterId": "gainDb", "parameterPath": "groups/plucks/gainDb", "role": "mix", "dspSlotId": "plucks-gain-insert", "dspParameterId": "gainDb", "sourceMinimum": 0.0, "sourceMaximum": 1.0, "destinationMinimum": -96.0, "destinationMaximum": 24.0, "curve": "linear" }] }
+    ],
+    "fxSlots": [
+      { "id": "bell-gain-insert", "displayName": "Bell Gain", "effectType": "drs.gain", "bypassed": false, "effectVersion": 1, "legacyInert": false, "parameters": [{ "id": "gainDb", "value": 0.0 }] },
+      { "id": "epiano-gain-insert", "displayName": "EPiano Gain", "effectType": "drs.gain", "bypassed": false, "effectVersion": 1, "legacyInert": false, "parameters": [{ "id": "gainDb", "value": 0.0 }] },
+      { "id": "plucks-gain-insert", "displayName": "Plucks Gain", "effectType": "drs.gain", "bypassed": false, "effectVersion": 1, "legacyInert": false, "parameters": [{ "id": "gainDb", "value": 0.0 }] }
+    ],
+    "routingBuses": [
+      { "id": "bell-bus", "displayName": "Bell", "inputSourceId": "groups/bell", "fxSlotIds": ["bell-gain-insert"], "chainBypassed": false },
+      { "id": "epiano-bus", "displayName": "EPiano", "inputSourceId": "groups/epiano", "fxSlotIds": ["epiano-gain-insert"], "chainBypassed": false },
+      { "id": "plucks-bus", "displayName": "Plucks", "inputSourceId": "groups/plucks", "fxSlotIds": ["plucks-gain-insert"], "chainBypassed": false }
+    ],
+    "performanceBanks": [],
+    "notes": ["Sprint 0 regression fixture: legacy linear gain reaches unity at 80 percent travel."]
+  },
+  "notes": ["This fixture is intentionally legacy linear and must not auto-migrate."]
+}

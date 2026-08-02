@@ -497,6 +497,37 @@ set_target_properties(drs_curated_dsp_contract_red_tests PROPERTIES
     FOLDER "Tests"
 )
 
+# Control-law Sprint 0 is intentionally direct-only: these table-driven seams
+# stay red until Sprint 1 adds the shared, bidirectional ControlLaw core.
+juce_add_console_app(drs_control_law_s0_red_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Control Law Sprint 0 Red Tests"
+)
+
+target_sources(drs_control_law_s0_red_tests
+    PRIVATE
+        src/ControlLawSprint0RedTests.cpp
+)
+
+target_link_libraries(drs_control_law_s0_red_tests
+    PRIVATE
+        drs_engine_adapter
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_control_law_s0_red_tests PRIVATE cxx_std_17)
+
+target_compile_definitions(drs_control_law_s0_red_tests
+    PRIVATE
+        DRS_CONTROL_LAW_S0_FIXTURE_PATH="${CMAKE_SOURCE_DIR}/content/runtime/phase2/control-law/three-group-linear-gain.drsproj"
+)
+
+set_target_properties(drs_control_law_s0_red_tests PROPERTIES
+    FOLDER "Tests"
+)
+
 juce_add_console_app(drs_curated_dsp_contract_tests
     PRODUCT_NAME "Decent Rhapsody Studio Curated DSP Contract Tests"
 )

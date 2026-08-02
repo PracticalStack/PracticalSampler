@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DRS Control Laws and Curated DSP Parameters — Development Plan</title>
+  <style>
+    :root {
+      --ink: #18252b;
+      --muted: #5e6b70;
+      --paper: #fbfaf6;
+      --panel: #ffffff;
+      --line: #d8d5ca;
+      --teal: #287d70;
+      --teal-soft: #e8f4f0;
+      --amber: #9b5716;
+      --amber-soft: #fff2dd;
+      --blue: #315f87;
+      --blue-soft: #eaf2f8;
+      --red: #914135;
+      --red-soft: #faece9;
+      --code: #243239;
+      --shadow: 0 12px 34px rgba(24, 37, 43, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(40, 125, 112, 0.10), transparent 34rem),
+        linear-gradient(180deg, #f4f1e8 0, var(--paper) 28rem);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+
+    a { color: var(--teal); }
+    code {
+      padding: 0.12rem 0.35rem;
+      border-radius: 0.3rem;
+      background: #edf0ee;
+      color: #203238;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.9em;
+    }
+    pre {
+      overflow-x: auto;
+      margin: 0;
+      padding: 1rem;
+      border-radius: 0.65rem;
+      color: #e9f3ef;
+      background: var(--code);
+      font: 0.84rem/1.55 "Cascadia Code", Consolas, monospace;
+    }
+
+    .shell { width: min(1180px, calc(100% - 2rem)); margin: 0 auto; }
+    .hero { padding: 4.3rem 0 2.5rem; }
+    .eyebrow {
+      margin: 0 0 0.7rem;
+      color: var(--teal);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    h1 {
+      max-width: 920px;
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(2.25rem, 5vw, 4.25rem);
+      font-weight: 500;
+      letter-spacing: -0.035em;
+      line-height: 1.04;
+    }
+    .lede {
+      max-width: 850px;
+      margin: 1.25rem 0 0;
+      color: #435258;
+      font-size: clamp(1.03rem, 2vw, 1.23rem);
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      margin-top: 1.5rem;
+    }
+    .pill {
+      padding: 0.38rem 0.7rem;
+      border: 1px solid #b8cec7;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.68);
+      color: #30564f;
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    nav {
+      position: sticky;
+      z-index: 3;
+      top: 0;
+      border-block: 1px solid rgba(216, 213, 202, 0.9);
+      background: rgba(251, 250, 246, 0.93);
+      backdrop-filter: blur(12px);
+    }
+    nav .shell { display: flex; gap: 1rem; overflow-x: auto; padding-block: 0.75rem; }
+    nav a { color: #39484d; font-size: 0.85rem; font-weight: 750; text-decoration: none; white-space: nowrap; }
+
+    main { padding: 2.2rem 0 4.5rem; }
+    section { scroll-margin-top: 4rem; margin: 0 0 3rem; }
+    h2 {
+      margin: 0 0 1rem;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(1.6rem, 3vw, 2.35rem);
+      font-weight: 500;
+      letter-spacing: -0.02em;
+    }
+    h3 { margin: 0 0 0.55rem; font-size: 1.05rem; }
+    p { margin: 0.5rem 0; }
+    ul, ol { margin: 0.55rem 0 0; padding-left: 1.25rem; }
+    li + li { margin-top: 0.38rem; }
+    .muted { color: var(--muted); }
+
+    .grid { display: grid; gap: 1rem; }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 0.85rem;
+      background: rgba(255, 255, 255, 0.88);
+      box-shadow: var(--shadow);
+      padding: 1.15rem;
+    }
+    .card.teal { border-top: 4px solid var(--teal); }
+    .card.amber { border-top: 4px solid var(--amber); }
+    .card.blue { border-top: 4px solid var(--blue); }
+    .card.red { border-top: 4px solid var(--red); }
+    .callout {
+      margin: 1rem 0;
+      padding: 1rem 1.1rem;
+      border-left: 4px solid var(--teal);
+      border-radius: 0 0.6rem 0.6rem 0;
+      background: var(--teal-soft);
+    }
+    .callout.warning { border-left-color: var(--amber); background: var(--amber-soft); }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0.55rem;
+      align-items: stretch;
+    }
+    .flow .node {
+      position: relative;
+      padding: 0.85rem 0.75rem;
+      border: 1px solid #bfd3cc;
+      border-radius: 0.65rem;
+      background: var(--teal-soft);
+      font-size: 0.86rem;
+      text-align: center;
+    }
+    .flow .node:not(:last-child)::after {
+      position: absolute;
+      top: 50%; right: -0.53rem;
+      content: "›";
+      transform: translateY(-54%);
+      color: var(--teal);
+      font-size: 1.35rem;
+      font-weight: 900;
+    }
+
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 0.75rem; background: var(--panel); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th, td { padding: 0.72rem 0.78rem; border-bottom: 1px solid #e7e4da; text-align: left; vertical-align: top; }
+    th { color: #33464b; background: #f1f2ed; font-size: 0.78rem; letter-spacing: 0.035em; text-transform: uppercase; }
+    tr:last-child td { border-bottom: 0; }
+    .status { font-weight: 800; white-space: nowrap; }
+    .status.now { color: var(--red); }
+    .status.target { color: var(--teal); }
+
+    .sprint {
+      overflow: hidden;
+      margin: 1.15rem 0;
+      border: 1px solid var(--line);
+      border-radius: 0.9rem;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+    .sprint-head {
+      display: grid;
+      grid-template-columns: 7rem 1fr auto;
+      gap: 1rem;
+      align-items: center;
+      padding: 1rem 1.15rem;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(100deg, #edf5f1, #faf9f4);
+    }
+    .sprint-no { color: var(--teal); font-size: 0.77rem; font-weight: 850; letter-spacing: 0.1em; text-transform: uppercase; }
+    .sprint-title { margin: 0; font-size: 1.2rem; }
+    .duration { color: var(--muted); font-size: 0.82rem; white-space: nowrap; }
+    .sprint-body { display: grid; grid-template-columns: 2fr 1fr; gap: 1.2rem; padding: 1.15rem; }
+    .tasks { list-style: none; padding: 0; }
+    .tasks li { display: grid; grid-template-columns: 4.2rem 1fr; gap: 0.55rem; padding: 0.52rem 0; border-bottom: 1px dashed #dddcd5; }
+    .tasks li:last-child { border-bottom: 0; }
+    .task-id { color: var(--teal); font: 700 0.78rem/1.5 "Cascadia Code", Consolas, monospace; }
+    .gate { padding: 0.9rem; border-radius: 0.65rem; background: var(--blue-soft); }
+    .gate h3 { color: var(--blue); }
+    .files { margin-top: 0.8rem; padding: 0.85rem; border-radius: 0.65rem; background: #f5f3ed; }
+    .files code { display: inline-block; margin: 0.1rem; }
+
+    .checklist { columns: 2; column-gap: 2rem; }
+    .checklist li { break-inside: avoid; }
+    footer { padding: 1.5rem 0 3rem; color: var(--muted); font-size: 0.85rem; }
+
+    @media (max-width: 820px) {
+      .grid.two, .grid.three, .sprint-body { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: 1fr; }
+      .flow .node:not(:last-child)::after { top: auto; right: 50%; bottom: -1.15rem; transform: translateX(50%) rotate(90deg); }
+      .sprint-head { grid-template-columns: 1fr; gap: 0.25rem; }
+      .checklist { columns: 1; }
+    }
+
+    @media print {
+      body { background: #fff; font-size: 10.5pt; }
+      nav { display: none; }
+      .hero { padding-top: 1rem; }
+      .shell { width: 100%; }
+      .card, .sprint { box-shadow: none; break-inside: avoid; }
+      section { break-before: auto; }
+      a { color: inherit; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="shell">
+      <p class="eyebrow">Decent Rhapsody Studio · Engineering Initiative</p>
+      <h1>Control Laws &amp; Curated DSP Parameter Descriptors</h1>
+      <p class="lede">A six-sprint plan to make every exposed control feel musical, remain deterministic across save/publish/reload, and deliver the exact physical value the DSP expects.</p>
+      <div class="meta">
+        <span class="pill">6 sprints</span>
+        <span class="pill">39 implementation tasks</span>
+        <span class="pill">Backward-compatible migration</span>
+        <span class="pill">Realtime-safe publication</span>
+        <span class="pill">Prepared 1 August 2026</span>
+      </div>
+    </div>
+  </header>
+
+  <nav aria-label="Plan sections">
+    <div class="shell">
+      <a href="#outcome">Outcome</a>
+      <a href="#diagnosis">Diagnosis</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#selection">Law selection</a>
+      <a href="#roadmap">Sprints</a>
+      <a href="#validation">Validation</a>
+      <a href="#done">Definition of done</a>
+    </div>
+  </nav>
+
+  <main class="shell">
+    <section id="outcome">
+      <h2>Outcome</h2>
+      <div class="grid three">
+        <article class="card teal">
+          <h3>Musical controls</h3>
+          <p>Group volume spends useful travel around normal mixing levels, reaches silence deliberately, and reserves only a small top segment for boost.</p>
+        </article>
+        <article class="card blue">
+          <h3>One mapping contract</h3>
+          <p>Authoring, project storage, publication, Perform UI, automation, and DSP callbacks use the same versioned forward and inverse law.</p>
+        </article>
+        <article class="card amber">
+          <h3>Curated choices</h3>
+          <p>The DSP catalog declares what is valid and recommended; authors see safe choices without needing to understand transfer-function math.</p>
+        </article>
+      </div>
+      <div class="callout">
+        <strong>Scope decision:</strong> evolve the existing <code>CuratedDspParameterDescriptor</code>. Do not introduce a parallel descriptor. It remains the numeric DSP contract and gains control-law metadata that informs authoring defaults and validation.
+      </div>
+    </section>
+
+    <section id="diagnosis">
+      <h2>Current-state diagnosis</h2>
+      <div class="grid two">
+        <div class="card red">
+          <h3>Why volume feels almost binary</h3>
+          <p>The current published macro maps normalized travel linearly across approximately <code>-96 dB</code> to <code>+24 dB</code>. That puts unity gain at 80% travel.</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Fader</th><th>Current dB</th><th>Audible consequence</th></tr></thead>
+              <tbody>
+                <tr><td>50%</td><td>-36 dB</td><td>Very quiet</td></tr>
+                <tr><td>70%</td><td>-12 dB</td><td>Still attenuated</td></tr>
+                <tr><td>80%</td><td>0 dB</td><td>Sudden arrival at unity</td></tr>
+                <tr><td>100%</td><td>+24 dB</td><td>Excessive boost</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card teal">
+          <h3>What is already correct</h3>
+          <p>The gain DSP accepts physical dB and converts it to amplitude with the standard <code>10^(dB/20)</code> relationship. That behavior should remain owned by the DSP.</p>
+          <ul>
+            <li>The fault is the normalized-control-to-physical-value mapping.</li>
+            <li>The DSP should not know whether input came from a fader, knob, automation lane, or macro.</li>
+            <li>The same dB parameter may need different laws for a mixer fader, EQ gain, or generic modulation.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="table-wrap" style="margin-top: 1rem;">
+        <table>
+          <thead><tr><th>Concern</th><th>Current location</th><th>Required change</th></tr></thead>
+          <tbody>
+            <tr><td>Catalog metadata</td><td><code>CuratedDspCatalog.h</code> has unit, min/max, default, smoothing</td><td>Add allowed and recommended law metadata.</td></tr>
+            <tr><td>Authoring target</td><td><code>RuntimeProjectMacroTargetDefinition::curve</code>, usually forced to <code>linear</code></td><td>Persist an explicit versioned law plus resolved range.</td></tr>
+            <tr><td>Published binding</td><td><code>PublishedMacroCurve</code> supports linear/logarithmic</td><td>Compile to an allocation-free runtime law specification.</td></tr>
+            <tr><td>DSP callback</td><td><code>mapPublishedDspMacroValue()</code> implements local mapping</td><td>Delegate to the shared control-law core.</td></tr>
+            <tr><td>Perform UI</td><td>Slider and display use direct physical min/max interpolation</td><td>Use the same forward/inverse law as publication.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="architecture">
+      <h2>Target architecture</h2>
+      <div class="flow" aria-label="Control law data flow">
+        <div class="node"><strong>DSP catalog</strong><br />valid range + law recommendations</div>
+        <div class="node"><strong>Authoring</strong><br />resolves and stores intent</div>
+        <div class="node"><strong>Publisher</strong><br />validates and compiles law</div>
+        <div class="node"><strong>Perform / automation</strong><br />normalized position</div>
+        <div class="node"><strong>DSP</strong><br />physical unit value</div>
+      </div>
+
+      <div class="grid two" style="margin-top: 1rem;">
+        <article class="card">
+          <h3>Authoring/storage representation</h3>
+          <pre>struct MacroTargetControlLaw {
+    std::string id;          // "drs.mixerGain.v1"
+    std::uint32_t version;
+};
+
+struct RuntimeProjectMacroTargetDefinition {
+    // existing target identity and ranges...
+    MacroTargetControlLaw controlLaw;
+};</pre>
+          <p class="muted">The saved target is explicit so a future catalog recommendation cannot silently change an existing instrument.</p>
+        </article>
+        <article class="card">
+          <h3>Published/realtime representation</h3>
+          <pre>struct CompiledControlLaw {
+    ControlLawKind kind;
+    std::uint8_t pointCount;
+    std::array&lt;ControlLawPoint, 8&gt; points;
+};
+
+double normalizedToPhysical(...);
+double physicalToNormalized(...);</pre>
+          <p class="muted">No strings, lookup tables with dynamic ownership, locks, or allocations on the audio thread.</p>
+        </article>
+      </div>
+
+      <h3 style="margin-top: 1.35rem;">Descriptor evolution</h3>
+      <div class="card blue">
+        <pre>struct CuratedDspControlRecommendation {
+    std::string role;               // "mix", "modulation", "eqGain"
+    std::string controlLawId;
+    double recommendedMinimum;
+    double recommendedMaximum;
+};
+
+struct CuratedDspParameterDescriptor {
+    // existing: id, unit, min/max, default, smoothing
+    std::string defaultControlLawId;
+    std::vector&lt;std::string&gt; allowedControlLawIds;
+    std::vector&lt;CuratedDspControlRecommendation&gt; recommendations;
+};</pre>
+        <p>The exact container types can follow catalog conventions. The contract matters: the descriptor describes allowed behavior; the project stores the resolved behavior; the published binding contains a compiled behavior.</p>
+      </div>
+
+      <div class="callout warning">
+        <strong>Boundary rule:</strong> a parameter unit alone is not enough to select a law. A dB-valued mixer fader, a bipolar EQ gain knob, and a generic dB modulation target have different interaction semantics. Assignment role is therefore part of resolution.
+      </div>
+    </section>
+
+    <section id="selection">
+      <h2>Control-law selection policy</h2>
+      <p>The resolver runs when a control is assigned or deliberately upgraded—not during audio processing. It applies this priority:</p>
+      <ol>
+        <li>Explicit authored override, if the descriptor allows it.</li>
+        <li>Role-specific descriptor recommendation, such as <code>mix</code>.</li>
+        <li>Descriptor default law.</li>
+        <li>Unit-based compatibility fallback for legacy or incomplete descriptors.</li>
+      </ol>
+
+      <div class="table-wrap" style="margin-top: 1rem;">
+        <table>
+          <thead><tr><th>Parameter intent</th><th>Recommended law</th><th>Typical physical range</th><th>Presentation</th></tr></thead>
+          <tbody>
+            <tr><td>Group or bus volume</td><td><code>drs.mixerGain.v1</code></td><td>-96 to +6 dB</td><td>Vertical fader; −∞ at minimum; 0 dB reference mark</td></tr>
+            <tr><td>Generic gain modulation</td><td><code>drs.linearDb.v1</code></td><td>Descriptor range</td><td>Knob or macro; linear in dB</td></tr>
+            <tr><td>EQ boost/cut</td><td><code>drs.bipolarLinear.v1</code></td><td>e.g. -18 to +18 dB</td><td>Centered knob; detent at zero</td></tr>
+            <tr><td>Frequency / positive time</td><td><code>drs.logPositive.v1</code></td><td>Positive descriptor range</td><td>Log-spaced knob</td></tr>
+            <tr><td>Pan / balance</td><td><code>drs.bipolarCentered.v1</code></td><td>-1 to +1</td><td>Centered knob; C/L/R formatting</td></tr>
+            <tr><td>Discrete choice</td><td><code>drs.stepped.v1</code></td><td>Enumerated</td><td>Selector or stepped knob</td></tr>
+            <tr><td>Boolean</td><td><code>drs.toggle.v1</code></td><td>0 or 1</td><td>Switch/button</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 style="margin-top: 1.3rem;">Proposed <code>drs.mixerGain.v1</code> anchor contract</h3>
+      <p class="muted">Use monotonic piecewise interpolation in dB between fixed anchors. Sprint 0 listening tests may tune these exact points once; after release, changes require a new law version.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Normalized position</th><th>Physical value</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td>0.00</td><td>-96 dB, displayed as −∞</td><td>Deterministic silence endpoint</td></tr>
+            <tr><td>0.05</td><td>-60 dB</td><td>Fine travel near silence</td></tr>
+            <tr><td>0.25</td><td>-30 dB</td><td>Quiet material remains controllable</td></tr>
+            <tr><td>0.50</td><td>-15 dB</td><td>Useful attenuation at midpoint</td></tr>
+            <tr><td>0.75</td><td>-6 dB</td><td>Fine control near mix level</td></tr>
+            <tr><td>0.85</td><td>0 dB</td><td>Visible unity reference</td></tr>
+            <tr><td>1.00</td><td>+6 dB</td><td>Limited headroom boost</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="roadmap">
+      <h2>Sprint roadmap</h2>
+      <p>Six short sprints keep the change reviewable. Each sprint ends with a shippable contract or vertical slice; later work does not depend on untested mapping assumptions.</p>
+
+      <article class="sprint" id="sprint-0">
+        <div class="sprint-head">
+          <div class="sprint-no">Sprint 0</div>
+          <h3 class="sprint-title">Contract, fixtures, and red tests</h3>
+          <div class="duration">2–3 days</div>
+        </div>
+        <div class="sprint-body">
+          <div>
+            <p><strong>Goal:</strong> freeze vocabulary, compatibility rules, and measurable interaction behavior before implementation.</p>
+            <ul class="tasks">
+              <li><span class="task-id">CL-001</span><span>Write an ADR defining ownership: descriptors recommend, authoring resolves, projects persist, publication compiles, DSP consumes physical values.</span></li>
+              <li><span class="task-id">CL-002</span><span>Inventory every curated DSP parameter, its units, ranges, assignment roles, and current control treatment.</span></li>
+              <li><span class="task-id">CL-003</span><span>Approve stable law IDs and versioning rules; prohibit changing released law behavior in place.</span></li>
+              <li><span class="task-id">CL-004</span><span>Create table-driven red tests for mixer-gain anchors, monotonicity, endpoints, inverse round trips, clamping, NaN/Inf rejection, and formatting.</span></li>
+              <li><span class="task-id">CL-005</span><span>Add a regression fixture reproducing the current “silent until 75–80%” three-group Perform mixer project.</span></li>
+              <li><span class="task-id">CL-006</span><span>Record the legacy compatibility policy: existing saved <code>linear</code> targets retain their sound until an explicit migration.</span></li>
+            </ul>
+          </div>
+          <aside>
+            <div class="gate">
+              <h3>Exit gate</h3>
+              <p>Tests fail for the right reasons, the anchor table is approved through a short listening pass, and legacy behavior is specified without ambiguity.</p>
+            </div>
+            <div class="files">
+              <strong>Primary areas</strong><br />
+              <code>engine_adapter/tests</code>
+              <code>app/tests</code>
+              <code>docs/adr</code>
+            </div>
+          </aside>
+        </div>
+      </article>
+
+      <article class="sprint" id="sprint-1">
+        <div class="sprint-head">
+          <div class="sprint-no">Sprint 1</div>
+          <h3 class="sprint-title">Shared control-law core</h3>
+          <div class="duration">3–4 days</div>
+        </div>
+        <div class="sprint-body">
+          <div>
+            <p><strong>Goal:</strong> introduce one dependency-light, bidirectional mapping implementation usable by engine publication and UI code.</p>
+            <ul class="tasks">
+              <li><span class="task-id">CL-101</span><span>Add <code>ControlLaw.h/.cpp</code> with stable IDs, version, compiled kind, and bounded fixed-size coefficient/anchor storage.</span></li>
+              <li><span class="task-id">CL-102</span><span>Implement <code>normalizedToPhysical</code> and <code>physicalToNormalized</code> with explicit clamping and finite-value handling.</span></li>
+              <li><span class="task-id">CL-103</span><span>Implement linear, positive-log, mixer-gain v1, bipolar-centered, stepped, and toggle laws.</span></li>
+              <li><span class="task-id">CL-104</span><span>Add shared unit formatting, including −∞, dB precision, Hz/kHz, milliseconds/seconds, percent, and pan labels.</span></li>
+              <li><span class="task-id">CL-105</span><span>Guarantee audio-thread suitability: trivially copyable compiled data, no allocation, no locks, no exceptions, bounded execution.</span></li>
+              <li><span class="task-id">CL-106</span><span>Complete property tests for monotonic laws, inverse error tolerance, endpoint exactness, and randomized finite inputs.</span></li>
+            </ul>
+          </div>
+          <aside>
+            <div class="gate">
+              <h3>Exit gate</h3>
+              <p>The core passes deterministic unit/property tests and has no JUCE UI dependency. Mixer gain maps 85% to unity and 100% to +6 dB.</p>
+            </div>
+            <div class="files">
+              <strong>Primary areas</strong><br />
+              <code>engine_adapter/include/drs/engine</code>
+              <code>engine_adapter/src</code>
+              <code>engine_adapter/tests</code>
+            </div>
+          </aside>
+        </div>
+      </article>
+
+      <article class="sprint" id="sprint-2">
+        <div class="sprint-head">
+          <div class="sprint-no">Sprint 2</div>
+          <h3 class="sprint-title">Curated descriptor evolution</h3>
+          <div class="duration">3–4 days</div>
+        </div>
+        <div class="sprint-body">
+          <div>
+            <p><strong>Goal:</strong> make the DSP catalog the authoritative source of legal parameter behavior without confusing DSP range with interaction intent.</p>
+            <ul class="tasks">
+              <li><span class="task-id">CL-201</span><span>Extend <code>CuratedDspParameterDescriptor</code> with default law, allowed laws, and optional role-specific recommendations and ranges.</span></li>
+              <li><span class="task-id">CL-202</span><span>Add catalog construction validation: known IDs, legal ranges, compatible units, unique roles, valid defaults, and log-positive constraints.</span></li>
+              <li><span class="task-id">CL-203</span><span>Annotate the curated gain parameter so <code>mix</code> recommends mixer-gain v1 while generic modulation remains linear dB.</span></li>
+              <li><span class="task-id">CL-204</span><span>Classify all currently curated Wave 1 parameters and document any intentionally unresolved controls.</span></li>
+              <li><span class="task-id">CL-205</span><span>Add descriptor lookup tests and a snapshot/golden report to catch accidental catalog metadata changes.</span></li>
+              <li><span class="task-id">CL-206</span><span>Expose a pure resolver API that accepts descriptor + assignment role + optional override and returns a validated resolved specification.</span></li>
+            </ul>
+          </div>
+          <aside>
+            <div class="gate">
+              <h3>Exit gate</h3>
+              <p>Every curated parameter either has an intentional recommendation or an explicit documented fallback. Invalid descriptor combinations fail at test/startup boundaries.</p>
+            </div>
+            <div class="files">
+              <strong>Primary areas</strong><br />
+              <code>CuratedDspCatalog.h</code>
+              <code>CuratedDspCatalog.cpp</code>
+              <code>engine_adapter/tests</code>
+            </div>
+          </aside>
+        </div>
+      </article>
+
+      <article class="sprint" id="sprint-3">
+        <div class="sprint-head">
+          <div class="sprint-no">Sprint 3</div>
+          <h3 class="sprint-title">Project schema, authoring defaults, and migration</h3>
+          <div class="duration">4–5 days</div>
+        </div>
+        <div class="sprint-body">
+          <div>
+            <p><strong>Goal:</strong> store resolved intent and let authors get correct behavior automatically, with a controlled path for old projects.</p>
+            <ul class="tasks">
+              <li><span class="task-id">CL-301</span><span>Add versioned control-law identity to <code>RuntimeProjectMacroTargetDefinition</code>; retain legacy <code>curve</code> parsing during transition.</span></li>
+              <li><span class="task-id">CL-302</span><span>Update project serialization, parsing, validation, equality/dirty checks, undo/redo snapshots, and save round-trip tests.</span></li>
+              <li><span class="task-id">CL-303</span><span>Apply resolver priority when controls are created: explicit override → role recommendation → descriptor default → unit fallback.</span></li>
+              <li><span class="task-id">CL-304</span><span>Assign group/bus gain controls the <code>mix</code> role, mixer-gain v1, and the approved -96 to +6 dB authored range.</span></li>
+              <li><span class="task-id">CL-305</span><span>Show law and resulting range in the authoring inspector; initially make the recommendation automatic and the detail read-only.</span></li>
+              <li><span class="task-id">CL-306</span><span>Add an Advanced selector limited to descriptor-approved laws only if a real authoring use case requires an override.</span></li>
+              <li><span class="task-id">CL-307</span><span>Add an explicit, previewable “Upgrade mixer taper” command; never silently rewrite legacy linear targets on load.</span></li>
+            </ul>
+          </div>
+          <aside>
+            <div class="gate">
+              <h3>Exit gate</h3>
+              <p>New group gain controls save with mixer-gain v1; old projects load/save unchanged; migration is undoable, marks dirty, and shows affected controls before commit.</p>
+            </div>
+            <div class="files">
+              <strong>Primary areas</strong><br />
+              <code>RuntimeModel.h</code>
+              <code>RuntimeLoader.cpp</code>
+              <code>AuthoringPanel.cpp</code>
+              <code>ProjectStorage tests</code>
+            </div>
+          </aside>
+        </div>
+      </article>
+
+      <article class="sprint" id="sprint-4">
+        <div class="sprint-head">
+          <div class="sprint-no">Sprint 4</div>
+          <h3 class="sprint-title">Publication, runtime, and Perform UI convergence</h3>
+          <div class="duration">4–5 days</div>
+        </div>
+        <div class="sprint-body">
+          <div>
+            <p><strong>Goal:</strong> complete the vertical slice so one law controls display, gestures, automation, preview, and audio.</p>
+            <ul class="tasks">
+              <li><span class="task-id">CL-401</span><span>Replace the two-value <code>PublishedMacroCurve</code> contract with a compiled <code>ControlLawKind</code> plus bounded law data in callback slots.</span></li>
+              <li><span class="task-id">CL-402</span><span>Validate and compile authored laws during publish; reject unknown/incompatible laws before activation and retain the last-known-good publication.</span></li>
+              <li><span class="task-id">CL-403</span><span>Replace <code>mapPublishedDspMacroValue()</code> local math with the shared forward mapping.</span></li>
+              <li><span class="task-id">CL-404</span><span>Refactor Perform controls to operate in normalized coordinates and derive physical display values through the shared law.</span></li>
+              <li><span class="task-id">CL-405</span><span>Use the inverse mapping for project recall, external automation, double-click reset, text entry, and any physical-value-to-position update.</span></li>
+              <li><span class="task-id">CL-406</span><span>Add unity tick/detent and −∞ display behavior for mixer faders while retaining accessible keyboard increments and value announcements.</span></li>
+              <li><span class="task-id">CL-407</span><span>Verify all 12 published control slots use the same mapping and remain stable when fewer slots are occupied.</span></li>
+            </ul>
+          </div>
+          <aside>
+            <div class="gate">
+              <h3>Exit gate</h3>
+              <p>A saved normalized position produces the same physical DSP value and displayed label before publish, after publish, after reload, and under host automation.</p>
+            </div>
+            <div class="files">
+              <strong>Primary areas</strong><br />
+              <code>PublishedMacroBinding.h</code>
+              <code>PluginProcessor.cpp</code>
+              <code>PerformanceMixer.cpp</code>
+              <code>publication tests</code>
+            </div>
+          </aside>
+        </div>
+      </article>
+
+      <article class="sprint" id="sprint-5">
+        <div class="sprint-head">
+          <div class="sprint-no">Sprint 5</div>
+          <h3 class="sprint-title">Hardening, compatibility, and release proof</h3>
+          <div class="duration">3–5 days</div>
+        </div>
+        <div class="sprint-body">
+          <div>
+            <p><strong>Goal:</strong> prove the behavior under real project, plugin-host, and realtime conditions.</p>
+            <ul class="tasks">
+              <li><span class="task-id">CL-501</span><span>Add end-to-end assertions at every mixer anchor comparing UI label, published physical value, and measured output amplitude.</span></li>
+              <li><span class="task-id">CL-502</span><span>Test new, legacy, migrated, malformed, missing-law, and future-version project files across save/open/publish cycles.</span></li>
+              <li><span class="task-id">CL-503</span><span>Run 1-, 2-, 3-, and 12-control mixer scenarios, including rapid automation, reset, undo/redo, republish, and project reload.</span></li>
+              <li><span class="task-id">CL-504</span><span>Run realtime guards for allocation, locks, denormals, non-finite values, block-boundary changes, and smoothing continuity.</span></li>
+              <li><span class="task-id">CL-505</span><span>Validate standalone and VST3 behavior in the supported host matrix, including REAPER automation write/read.</span></li>
+              <li><span class="task-id">CL-506</span><span>Update author/user documentation and release notes with law behavior, migration policy, and troubleshooting guidance.</span></li>
+              <li><span class="task-id">CL-507</span><span>Capture baseline screenshots and a short audio/reference project for permanent regression coverage.</span></li>
+            </ul>
+          </div>
+          <aside>
+            <div class="gate">
+              <h3>Exit gate</h3>
+              <p>No regression in legacy project output, no realtime violation, no UI/DSP mismatch, and sign-off from both listening and automated host tests.</p>
+            </div>
+            <div class="files">
+              <strong>Primary areas</strong><br />
+              <code>app/tests</code>
+              <code>engine_adapter/tests</code>
+              <code>validation/reaper</code>
+              <code>docs</code>
+            </div>
+          </aside>
+        </div>
+      </article>
+    </section>
+
+    <section id="validation">
+      <h2>Validation matrix</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Layer</th><th>Proof</th><th>Failure caught</th></tr></thead>
+          <tbody>
+            <tr><td>Mathematics</td><td>Golden anchors, monotonicity, endpoint, inverse, random property tests</td><td>Dead travel, discontinuities, bad inverse, illegal logarithms</td></tr>
+            <tr><td>Catalog</td><td>Descriptor validation and metadata snapshot</td><td>Unsupported laws, wrong defaults, accidental catalog drift</td></tr>
+            <tr><td>Storage</td><td>Round-trip, legacy fixtures, future-version rejection, migration tests</td><td>Silent behavior changes or lost authored intent</td></tr>
+            <tr><td>Publication</td><td>Compile/activate/last-known-good integration tests</td><td>Invalid law reaching realtime state</td></tr>
+            <tr><td>UI</td><td>Position ↔ display ↔ physical-value assertions across 1–12 controls</td><td>UI/runtime mapping divergence</td></tr>
+            <tr><td>DSP/audio</td><td>Measured amplitude at anchor dB values and smoothing tests</td><td>Wrong units, jumps, mute leakage, zipper noise</td></tr>
+            <tr><td>Host</td><td>REAPER recall and automation write/read</td><td>Normalization or state-recall mismatch</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="grid two" style="margin-top: 1rem;">
+        <div class="card amber">
+          <h3>Key risks and mitigations</h3>
+          <ul>
+            <li><strong>Sound changes on open:</strong> preserve legacy linear laws until explicit migration.</li>
+            <li><strong>UI/DSP divergence:</strong> one shared bidirectional implementation; no copied formulas.</li>
+            <li><strong>Descriptor overreach:</strong> use role-specific recommendations, not unit-only selection.</li>
+            <li><strong>Realtime regression:</strong> compile strings/metadata before activation into fixed data.</li>
+            <li><strong>Future retuning:</strong> publish a new law version; never mutate v1.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Explicit non-goals</h3>
+          <ul>
+            <li>Changing the gain DSP’s dB-to-linear amplitude math.</li>
+            <li>Exposing arbitrary user-authored transfer curves in this iteration.</li>
+            <li>Building a general modulation graph or replacing macro routing.</li>
+            <li>Silently upgrading existing instruments.</li>
+            <li>Redesigning the entire Perform mixer beyond mapping-related affordances.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="done">
+      <h2>Initiative definition of done</h2>
+      <div class="card teal">
+        <ul class="checklist">
+          <li>Group gain has useful travel throughout the fader and unity is clearly marked.</li>
+          <li>DSP continues receiving physical dB values and owns no presentation policy.</li>
+          <li><code>CuratedDspParameterDescriptor</code> identifies allowed/default/role-recommended laws.</li>
+          <li>Every saved new target contains an explicit versioned law.</li>
+          <li>Legacy projects retain their existing response unless intentionally migrated.</li>
+          <li>Authoring, Perform UI, automation, publication, and recall agree at every anchor.</li>
+          <li>Published callback data is fixed-size and realtime-safe.</li>
+          <li>All 12 Perform control slots work with labels, formatting, reset, and accessibility.</li>
+          <li>Malformed or unsupported laws fail publication without replacing last-known-good state.</li>
+          <li>Standalone and VST3 host regression suites pass.</li>
+        </ul>
+      </div>
+      <div class="callout">
+        <strong>Recommended release cut:</strong> ship the new law automatically for newly authored mixer gain controls, plus the explicit legacy upgrade command. Defer arbitrary curve editing until real instrument-author feedback demonstrates a need.
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="shell">Decent Rhapsody Studio · Control Laws and Curated DSP Parameter Descriptors · Development plan</div>
+  </footer>
+</body>
+</html>
