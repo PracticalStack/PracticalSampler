@@ -51,6 +51,9 @@ struct CompiledPerformanceProgram
     std::vector<CompiledPerformanceRoundRobinReset> roundRobinResets;
     // Stable-ID hashes support allocation-free selection migration between published programs.
     std::vector<std::uint64_t> articulationStableIds;
+    // Indexed by the authored/prepared zone order, this bridges render routes to an
+    // articulation without retaining string IDs on the callback path.
+    std::vector<std::uint32_t> zoneArticulationIndices;
     std::uint32_t articulationCount = 0;
     std::uint32_t defaultArticulationIndex = kInvalidPerformanceProgramIndex;
     std::uint32_t exclusiveGroupCount = 0;

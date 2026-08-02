@@ -68,6 +68,14 @@ CompiledPerformanceProgramResult compilePerformanceProgram(const RuntimeProjectA
         break;
     }
 
+    result.program.zoneArticulationIndices.resize(authoring.zones.size(), kInvalidPerformanceProgramIndex);
+    for (std::size_t zoneIndex = 0; zoneIndex < authoring.zones.size(); ++zoneIndex)
+    {
+        const auto articulation = articulationIndex.find(authoring.zones[zoneIndex].articulationId);
+        if (articulation != articulationIndex.end())
+            result.program.zoneArticulationIndices[zoneIndex] = articulation->second;
+    }
+
     std::vector<std::string> groupIds;
     for (const auto& zone : authoring.zones)
     {
@@ -179,7 +187,8 @@ CompiledPerformanceProgramResult compilePerformanceProgram(const RuntimeProjectA
     result.program.retainedBytes = sizeof(CompiledPerformanceProgram)
         + result.program.triggerRoutes.size() * sizeof(CompiledPerformanceTriggerRoute)
         + result.program.roundRobinResets.size() * sizeof(CompiledPerformanceRoundRobinReset)
-        + result.program.articulationStableIds.size() * sizeof(std::uint64_t);
+        + result.program.articulationStableIds.size() * sizeof(std::uint64_t)
+        + result.program.zoneArticulationIndices.size() * sizeof(std::uint32_t);
     result.compiled = result.issues.empty();
     return result;
 }
@@ -204,6 +213,7 @@ std::string serializeCompiledPerformanceProgram(const CompiledPerformanceProgram
     }
     root["activations"] = std::move(activations);
     root["articulationStableIds"] = program.articulationStableIds;
+    root["zoneArticulationIndices"] = program.zoneArticulationIndices;
     nlohmann::ordered_json routes = nlohmann::ordered_json::array();
     for (const auto& route : program.triggerRoutes)
         routes.push_back({ { "zoneIndex", route.zoneIndex }, { "articulationIndex", route.articulationIndex },

@@ -60,7 +60,8 @@ void PerformanceLaneState::migrateProgram(const CompiledPerformanceProgram& prog
 }
 
 void PerformanceLaneState::recordNoteOn(const SamplerRenderEvent& event,
-                                        const std::uint64_t generation) noexcept
+                                        const std::uint64_t generation,
+                                        const bool consumed) noexcept
 {
     auto& held = heldNotes[heldIndex(event.midiChannel, event.midiNote)];
     held = {};
@@ -71,6 +72,7 @@ void PerformanceLaneState::recordNoteOn(const SamplerRenderEvent& event,
     held.midiNote = event.midiNote;
     held.articulationAtAttack = selectedArticulationIndex;
     held.activationGeneration = generation;
+    held.consumed = consumed;
 }
 
 void PerformanceLaneState::recordNoteOff(const SamplerRenderEvent& event) noexcept
@@ -94,6 +96,7 @@ void PerformanceLaneState::setPedal(const bool down) noexcept
 
 bool PerformanceLaneState::normalize(const SamplerRenderEvent& raw,
                                      const std::uint64_t activationGeneration,
+                                     const CompiledPerformanceProgram& program,
                                      PerformanceActionScratch& scratch) noexcept
 {
     // Preflight reserves the entire action set before mutating lane state.
@@ -106,13 +109,35 @@ bool PerformanceLaneState::normalize(const SamplerRenderEvent& raw,
     switch (raw.type)
     {
         case SamplerRenderEventType::noteOn:
-            recordNoteOn(event, activationGeneration);
+        {
+            const auto activation = program.activationByMidiNote[raw.midiNote];
+            const auto isActivation = activation.articulationIndex < program.articulationCount;
+            if (isActivation)
+            {
+                selectedArticulationIndex = activation.articulationIndex;
+                selectedArticulationStableId = activation.articulationIndex < program.articulationStableIds.size()
+                    ? program.articulationStableIds[activation.articulationIndex] : 0;
+            }
+            recordNoteOn(event, activationGeneration, isActivation && activation.consume);
             ++semanticEventCounts[static_cast<std::size_t>(PerformanceEventKind::noteOn)];
+            if (isActivation && activation.consume) return true;
+            event.articulationIndex = selectedArticulationIndex;
             return scratch.push(event);
+        }
         case SamplerRenderEventType::noteOff:
+        {
+            const auto consumed = heldNotes[heldIndex(event.midiChannel, event.midiNote)].active
+                && heldNotes[heldIndex(event.midiChannel, event.midiNote)].consumed;
             recordNoteOff(event);
             ++semanticEventCounts[static_cast<std::size_t>(PerformanceEventKind::noteOff)];
+            if (consumed)
+            {
+                heldNotes[heldIndex(event.midiChannel, event.midiNote)] = {};
+                return true;
+            }
+            event.articulationIndex = heldNotes[heldIndex(event.midiChannel, event.midiNote)].articulationAtAttack;
             return scratch.push(event);
+        }
         case SamplerRenderEventType::sustainPedal:
         {
             const auto down = event.velocity >= (64.0f / 127.0f);

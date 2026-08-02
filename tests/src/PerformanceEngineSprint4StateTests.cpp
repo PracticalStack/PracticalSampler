@@ -36,20 +36,21 @@ void verifyStateVectors()
 {
     PerformanceLaneState state;
     PerformanceActionScratch scratch;
-    state.migrateProgram(makeProgram(), 7);
+    const auto program = makeProgram();
+    state.migrateProgram(program, 7);
     require(state.getSnapshot().selectedArticulationIndex == 1, "New lanes must choose the compiled default articulation.");
-    require(state.normalize(event(SamplerRenderEventType::noteOn, 3, 61, 0.75f, 2), 7, scratch), "Note-on must normalize.");
+    require(state.normalize(event(SamplerRenderEventType::noteOn, 3, 61, 0.75f, 2), 7, program, scratch), "Note-on must normalize.");
     const auto attack = state.getHeldNote(2, 61);
     require(attack.active && attack.physicalKeyDown && attack.attackVelocity == 95
                 && attack.articulationAtAttack == 1 && attack.activationGeneration == 7,
             "Held notes must retain attack velocity, articulation, channel, and generation.");
-    require(state.normalize(event(SamplerRenderEventType::sustainPedal, 5, 0, 1.0f, 2), 7, scratch), "CC64 down must normalize.");
-    require(state.normalize(event(SamplerRenderEventType::sustainPedal, 6, 0, 1.0f, 2), 7, scratch), "Repeated CC64 is valid.");
-    require(state.normalize(event(SamplerRenderEventType::noteOff, 7, 61, 0.0f, 2, 0.5f), 7, scratch), "Note-off must normalize.");
+    require(state.normalize(event(SamplerRenderEventType::sustainPedal, 5, 0, 1.0f, 2), 7, program, scratch), "CC64 down must normalize.");
+    require(state.normalize(event(SamplerRenderEventType::sustainPedal, 6, 0, 1.0f, 2), 7, program, scratch), "Repeated CC64 is valid.");
+    require(state.normalize(event(SamplerRenderEventType::noteOff, 7, 61, 0.0f, 2, 0.5f), 7, program, scratch), "Note-off must normalize.");
     const auto release = state.getHeldNote(2, 61);
     require(!release.physicalKeyDown && release.pedalDeferred && release.noteOffVelocity == 64,
             "Held records must retain physical release and pedal deferral without a release trigger.");
-    require(state.normalize(event(SamplerRenderEventType::sustainPedal, 9, 0, 0.0f, 2), 7, scratch), "CC64 up must normalize.");
+    require(state.normalize(event(SamplerRenderEventType::sustainPedal, 9, 0, 0.0f, 2), 7, program, scratch), "CC64 up must normalize.");
     require(scratch.size() == 4 && scratch.view()[0].sampleOffset == 3
                 && scratch.view()[1].type == SamplerRenderEventType::pedalDown
                 && scratch.view()[1].sampleOffset == 5
@@ -67,10 +68,11 @@ void verifyIsolationMigrationAndOverflow()
 {
     PerformanceLaneState preview, performance;
     PerformanceActionScratch previewScratch, performanceScratch;
-    preview.migrateProgram(makeProgram(), 10);
-    performance.migrateProgram(makeProgram(), 20);
-    preview.normalize(event(SamplerRenderEventType::noteOn, 0, 60), 10, previewScratch);
-    performance.normalize(event(SamplerRenderEventType::sustainPedal, 0, 0, 1.0f), 20, performanceScratch);
+    const auto program = makeProgram();
+    preview.migrateProgram(program, 10);
+    performance.migrateProgram(program, 20);
+    preview.normalize(event(SamplerRenderEventType::noteOn, 0, 60), 10, program, previewScratch);
+    performance.normalize(event(SamplerRenderEventType::sustainPedal, 0, 0, 1.0f), 20, program, performanceScratch);
     require(preview.getSnapshot().heldNoteCount == 1 && !preview.getSnapshot().pedalDown
                 && performance.getSnapshot().heldNoteCount == 0 && performance.getSnapshot().pedalDown,
             "Preview and Performance mutable state must be isolated.");
@@ -86,9 +88,9 @@ void verifyIsolationMigrationAndOverflow()
     overflow.migrateProgram(makeProgram(), 1);
     for (std::size_t index = 0; index < PerformanceActionScratch::capacity; ++index)
         require(overflow.normalize(event(SamplerRenderEventType::noteOn, static_cast<std::uint32_t>(index),
-                                         static_cast<std::uint8_t>(index & 0x7f)), 1, scratch),
+                                         static_cast<std::uint8_t>(index & 0x7f)), 1, program, scratch),
                 "Scratch must accept its exact capacity.");
-    require(!overflow.normalize(event(SamplerRenderEventType::noteOn, 127, 127), 1, scratch)
+    require(!overflow.normalize(event(SamplerRenderEventType::noteOn, 127, 127), 1, program, scratch)
                 && overflow.getSnapshot().actionOverflowCount == 1
                 && overflow.getSnapshot().heldNoteCount == PerformanceActionScratch::capacity,
             "Overflow must reject an entire event without partial state.");

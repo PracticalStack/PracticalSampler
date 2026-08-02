@@ -69,6 +69,9 @@ void verifyProgramAndSnapshot()
             "Equivalent rule sets must compile byte deterministically.");
     require(first.program.activationByMidiNote[12].articulationIndex != kInvalidPerformanceProgramIndex,
             "Key switches must compile to numeric articulation indices.");
+    require(first.program.zoneArticulationIndices.size() == project.authoring.zones.size()
+                && first.program.zoneArticulationIndices[0] != kInvalidPerformanceProgramIndex,
+            "Every authored zone must compile to a numeric articulation route identity.");
     require(first.program.eventRanges[static_cast<std::size_t>(PerformanceEventKind::noteOn)].routeCount == 1
                 && first.program.eventRanges[static_cast<std::size_t>(PerformanceEventKind::release)].routeCount == 1,
             "Event table ranges must isolate note and release routes.");

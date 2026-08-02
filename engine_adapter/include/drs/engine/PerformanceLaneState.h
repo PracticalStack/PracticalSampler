@@ -60,6 +60,7 @@ public:
                         std::uint64_t activationGeneration) noexcept;
     bool normalize(const SamplerRenderEvent& raw,
                    std::uint64_t activationGeneration,
+                   const CompiledPerformanceProgram& program,
                    PerformanceActionScratch& scratch) noexcept;
     PerformanceLaneStateSnapshot getSnapshot() const noexcept;
     PerformanceHeldNoteRecord getHeldNote(std::uint8_t channel, std::uint8_t note) const noexcept;
@@ -67,7 +68,7 @@ public:
 private:
     static std::size_t heldIndex(std::uint8_t channel, std::uint8_t note) noexcept;
     static std::uint8_t toMidiVelocity(float value) noexcept;
-    void recordNoteOn(const SamplerRenderEvent& event, std::uint64_t generation) noexcept;
+    void recordNoteOn(const SamplerRenderEvent& event, std::uint64_t generation, bool consumed) noexcept;
     void recordNoteOff(const SamplerRenderEvent& event) noexcept;
     void setPedal(bool down) noexcept;
 

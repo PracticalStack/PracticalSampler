@@ -231,15 +231,19 @@ SamplerPlaybackContextRenderResult SamplerPlaybackContext::renderBlock(
     result.activationApplied = applyPendingActivationAtBlockBoundary();
     eventScratch.clear();
     actionScratch.clear();
+    const CompiledPerformanceProgram emptyProgram;
+    const auto& program = activeRenderModel == nullptr
+        ? emptyProgram : activeRenderModel->getPerformanceProgram();
     auto hasPanicReset = false;
     for (std::size_t index = 0; index < events.size; ++index)
     {
         auto raw = events[index];
-        raw.inputSequence = static_cast<std::uint32_t>(index + 1);
+        if (raw.inputSequence == 0)
+            raw.inputSequence = static_cast<std::uint32_t>(index + 1);
         const auto beforeActions = actionScratch.size();
         const auto generation = activeActivationSlot >= 0
             ? activationSlots[static_cast<std::size_t>(activeActivationSlot)].serial : 0;
-        if (!performanceState.normalize(raw, generation, actionScratch))
+        if (!performanceState.normalize(raw, generation, program, actionScratch))
         {
             ++counters.droppedEventCount;
             continue;

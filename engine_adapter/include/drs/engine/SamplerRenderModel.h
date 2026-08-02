@@ -46,6 +46,7 @@ struct SamplerRenderEvent
     std::uint8_t midiChannel = 0;
     float noteOffVelocity = 0.0f;
     std::uint32_t inputSequence = 0;
+    std::uint32_t articulationIndex = kInvalidPerformanceProgramIndex;
 };
 
 // Non-owning callback views. Their backing storage is owned and bounded by the playback context.
@@ -148,6 +149,7 @@ struct SamplerRenderRoute
     ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;
     VelocityCrossfadeDescriptor velocityCrossfade;
     VelocityCrossfadeRuntimeDescriptor velocityCrossfadeRuntime;
+    std::uint32_t performanceArticulationIndex = kInvalidPerformanceProgramIndex;
 };
 
 struct SamplerRenderModelBuildResult;

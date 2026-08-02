@@ -271,7 +271,8 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
         != sizeof(CompiledPerformanceProgram)
             + prepared.performanceProgram.triggerRoutes.size() * sizeof(CompiledPerformanceTriggerRoute)
             + prepared.performanceProgram.roundRobinResets.size() * sizeof(CompiledPerformanceRoundRobinReset)
-            + prepared.performanceProgram.articulationStableIds.size() * sizeof(std::uint64_t))
+            + prepared.performanceProgram.articulationStableIds.size() * sizeof(std::uint64_t)
+            + prepared.performanceProgram.zoneArticulationIndices.size() * sizeof(std::uint32_t))
     {
         addError(result, "render-model-performance-program-size-invalid", "payload.prepared.performanceProgram",
                  "Prepared performance-program memory accounting does not match its retained numeric records.");
@@ -283,6 +284,19 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
         {
             addError(result, "render-model-performance-program-index-invalid", "payload.prepared.performanceProgram",
                      "Prepared performance program contains an out-of-range numeric route index.");
+            break;
+        }
+    }
+    const auto& zoneArticulationIndices = prepared.performanceProgram.zoneArticulationIndices;
+    if (!zoneArticulationIndices.empty() && zoneArticulationIndices.size() != prepared.zones.size())
+        addError(result, "render-model-performance-zone-map-size-invalid", "payload.prepared.performanceProgram",
+                 "A non-legacy performance program must map every prepared zone to an articulation.");
+    for (const auto articulationIndex : zoneArticulationIndices)
+    {
+        if (articulationIndex >= prepared.performanceProgram.articulationCount)
+        {
+            addError(result, "render-model-performance-zone-map-index-invalid", "payload.prepared.performanceProgram",
+                     "Prepared performance program contains an out-of-range zone articulation index.");
             break;
         }
     }
@@ -539,7 +553,10 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
                                   options.auditionSelectedZone ? VelocityCrossfadeDescriptor {} : zone.velocityCrossfade,
                                   options.auditionSelectedZone
                                       ? VelocityCrossfadeRuntimeDescriptor {}
-                                      : zone.velocityCrossfadeRuntime });
+                                      : zone.velocityCrossfadeRuntime,
+                                  index < prepared.performanceProgram.zoneArticulationIndices.size()
+                                      ? prepared.performanceProgram.zoneArticulationIndices[index]
+                                      : kInvalidPerformanceProgramIndex });
     }
 
     result.built = true;

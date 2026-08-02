@@ -153,8 +153,12 @@ bool routeMatches(const SamplerRenderRoute& route,
                   int midiNote,
                   int velocity,
                   const SelectedRoundRobinSlot* roundRobinSelections,
-                  std::size_t roundRobinSelectionCount) noexcept
+                  std::size_t roundRobinSelectionCount,
+                  std::uint32_t selectedArticulationIndex) noexcept
 {
+    if (selectedArticulationIndex != kInvalidPerformanceProgramIndex
+        && route.performanceArticulationIndex != selectedArticulationIndex)
+        return false;
     const auto rangeMatches = midiNote >= route.keyLow && midiNote <= route.keyHigh
         && velocity >= route.velocityLow && velocity <= route.velocityHigh;
     if (!rangeMatches)
@@ -503,6 +507,9 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
             bool sawRoundRobinCandidate = false;
             for (const auto& route : renderModel->getRoutes())
             {
+                if (event.articulationIndex != kInvalidPerformanceProgramIndex
+                    && route.performanceArticulationIndex != event.articulationIndex)
+                    continue;
                 if (!routeCouldRespondToTrigger(route, sourceMidiNote, eventVelocity, effectiveVelocity))
                     continue;
 
@@ -573,7 +580,8 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                                     sourceMidiNote,
                                     eventVelocity,
                                     roundRobinSelections.data(),
-                                    roundRobinSelectionCount);
+                                    roundRobinSelectionCount,
+                                    event.articulationIndex);
             });
             const auto routingVelocity = hasPhysicalVelocityRoute ? eventVelocity : effectiveVelocity;
             const auto hasMatchingRoute = hasPhysicalVelocityRoute
@@ -584,7 +592,8 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                                             sourceMidiNote,
                                             effectiveVelocity,
                                             roundRobinSelections.data(),
-                                            roundRobinSelectionCount);
+                                            roundRobinSelectionCount,
+                                            event.articulationIndex);
                     }));
             if (!hasMatchingRoute)
             {
@@ -623,7 +632,8 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                                   sourceMidiNote,
                                   routingVelocity,
                                   roundRobinSelections.data(),
-                                  roundRobinSelectionCount))
+                                  roundRobinSelectionCount,
+                                  event.articulationIndex))
                     continue;
 
                 if (!routeHasCrossfade(routes[routeIndex]))
@@ -723,7 +733,8 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                                       sourceMidiNote,
                                       routingVelocity,
                                       roundRobinSelections.data(),
-                                      roundRobinSelectionCount))
+                                      roundRobinSelectionCount,
+                                      event.articulationIndex))
                         continue;
 
                     startRoute(routeIndex, 1.0, false);
@@ -740,7 +751,8 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                                   sourceMidiNote,
                                   routingVelocity,
                                   roundRobinSelections.data(),
-                                  roundRobinSelectionCount)
+                                  roundRobinSelectionCount,
+                                  event.articulationIndex)
                     || routeHasCrossfade(routes[routeIndex]))
                 {
                     continue;
