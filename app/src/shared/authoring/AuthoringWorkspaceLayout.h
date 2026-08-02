@@ -28,6 +28,7 @@ inline constexpr int minimumMapVisibleHeight = 160;
 inline constexpr int drawerTabStripHeight = 36;
 inline constexpr int compactDrawerOpenHeight = 220;
 inline constexpr int expandedDrawerOpenHeight = 250;
+inline constexpr int macroDrawerOpenHeight = 272;
 inline constexpr int shortHeightBreakpoint = 650;
 inline constexpr int shortInspectorDrawerOpenHeight = 184;
 } // namespace drs::app::authoring

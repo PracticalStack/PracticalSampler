@@ -1623,6 +1623,89 @@ void exerciseDrawerEditorTransactions(drs::app::AuthoringPanel& panel,
     }
 }
 
+void exerciseMacroDrawerLayout(drs::app::AuthoringPanel& panel,
+                               bool shortHost)
+{
+    requireButton(panel, "authoringDrawerMacrosTab").onClick();
+    auto& viewport = requireViewport(panel, "authoringMacroViewport");
+    auto* content = findDescendantById(panel, "authoringMacroContent");
+    require(viewport.isVisible() && content != nullptr && viewport.getViewedComponent() == content,
+            "Macro drawer should host its controls in a height-aware viewport.");
+
+    if (shortHost)
+    {
+        require(content->getHeight() > viewport.getHeight()
+                    && viewport.getVerticalScrollBar().isVisible(),
+                "An unusually short host should keep full-size macro controls reachable by scrolling.");
+    }
+    else
+    {
+        require(content->getHeight() <= viewport.getHeight()
+                    && !viewport.getVerticalScrollBar().isVisible(),
+                "Standard workspace heights should display the complete macro editor without scrolling.");
+        auto* zoneMap = findDescendantById(panel, "authoringZoneMap");
+        require(zoneMap != nullptr
+                    && zoneMap->getHeight() >= drs::app::authoring::minimumMapVisibleHeight,
+                "The taller Macro drawer should preserve the minimum usable map height.");
+    }
+
+    const auto contentBounds = content->getLocalBounds();
+    for (const auto& componentId : {
+             juce::String("authoringMacroList"),
+             juce::String("authoringMacroCreateButton"),
+             juce::String("authoringMacroDuplicateButton"),
+             juce::String("authoringMacroDeleteButton"),
+             juce::String("authoringMacroMoveUpButton"),
+             juce::String("authoringMacroMoveDownButton"),
+             juce::String("authoringMacroNameEditor"),
+             juce::String("authoringMacroExposeToggle"),
+             juce::String("authoringMacroAssignmentSelector"),
+             juce::String("authoringMacroRoleSelector"),
+             juce::String("authoringMacroDefaultSlider"),
+             juce::String("authoringMacroMinSlider"),
+             juce::String("authoringMacroMaxSlider")
+         })
+    {
+        auto* component = findDescendantById(panel, componentId);
+        require(component != nullptr && component->getParentComponent() == content,
+                "Macro control should be hosted by the scroll-safe macro content: "
+                    + componentId.toStdString());
+        require(contentBounds.contains(component->getBounds()),
+                "Macro control should remain inside the macro content bounds: "
+                    + componentId.toStdString());
+    }
+
+    require(requireButton(panel, "authoringMacroCreateButton").getHeight() >= 28
+                && requireTextEditor(panel, "authoringMacroNameEditor").getHeight() >= 28
+                && requireComboBox(panel, "authoringMacroAssignmentSelector").getHeight() >= 28
+                && requireSlider(panel, "authoringMacroDefaultSlider").getHeight() >= 32
+                && requireRepeatedStructureList(panel, "authoringMacroList").getHeight() >= 44,
+            "Macro actions, fields, value controls, and list must retain comfortable usable heights.");
+
+    viewport.setViewPosition(0, 0);
+    if (!shortHost)
+    {
+        const auto viewportBoundsInPanel = panel.getLocalArea(&viewport, viewport.getLocalBounds());
+        for (const auto& componentId : {
+                 juce::String("authoringMacroCreateButton"),
+                 juce::String("authoringMacroList"),
+                 juce::String("authoringMacroNameEditor"),
+                 juce::String("authoringMacroAssignmentSelector"),
+                 juce::String("authoringMacroDefaultSlider"),
+                 juce::String("authoringMacroMinSlider"),
+                 juce::String("authoringMacroMaxSlider")
+             })
+        {
+            auto* component = findDescendantById(panel, componentId);
+            require(component != nullptr
+                        && viewportBoundsInPanel.contains(
+                            panel.getLocalArea(component, component->getLocalBounds())),
+                    "Standard-height Macro drawer should show every editor control at once: "
+                        + componentId.toStdString());
+        }
+    }
+}
+
 void exerciseRoutingViewportReachability(drs::app::AuthoringPanel& panel,
                                          bool requireMinimumMapHeight)
 {
@@ -3394,6 +3477,7 @@ int main()
             {
                 exerciseShortHeightGroupLayout(panel, outputDirectory);
                 exerciseRoutingViewportReachability(panel, true);
+                exerciseMacroDrawerLayout(panel, true);
                 return;
             }
 
@@ -3417,6 +3501,7 @@ int main()
                                    validationCancelCount);
             exerciseAccessibilityAndFocusBehavior(panel, shellName);
             exerciseDrawerEditorTransactions(panel, session);
+            exerciseMacroDrawerLayout(panel, false);
             exerciseGroupUi(panel, session, shellName, outputDirectory, inventory);
             if (layoutMode == drs::app::AuthoringPanel::LayoutMode::expanded)
                 exerciseScopedDspWorkflow(panel, session);

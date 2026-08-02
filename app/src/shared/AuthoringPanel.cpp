@@ -1153,6 +1153,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     drawerRegion.setComponentID("authoringDrawer");
     drawerTabStrip.setComponentID("authoringDrawerTabStrip");
     drawerContentHost.setComponentID("authoringDrawerContentHost");
+    macroDrawerContent.setComponentID("authoringMacroContent");
+    macroDrawerViewport.setComponentID("authoringMacroViewport");
     routingDrawerContent.setComponentID("authoringRoutingContent");
     routingDrawerViewport.setComponentID("authoringRoutingViewport");
     drawerToggleButton.setComponentID("authoringDrawerToggleButton");
@@ -1774,6 +1776,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&zoneMappingEditor),
              static_cast<juce::Component*>(&waveformPreview),
              static_cast<juce::Component*>(&drawerGroupsTabButton),
+             static_cast<juce::Component*>(&macroDrawerViewport),
              static_cast<juce::Component*>(&macroList),
              static_cast<juce::Component*>(&macroCreateButton),
              static_cast<juce::Component*>(&macroDuplicateButton),
@@ -1862,6 +1865,38 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
          })
     {
         addAndMakeVisible(component);
+    }
+
+    macroDrawerViewport.setViewedComponent(&macroDrawerContent, false);
+    macroDrawerViewport.setScrollBarsShown(true, false);
+    macroDrawerViewport.setScrollBarThickness(12);
+    macroDrawerViewport.setWantsKeyboardFocus(false);
+    macroDrawerContent.setSize(1, 1);
+    for (auto* component : {
+             static_cast<juce::Component*>(&macroList),
+             static_cast<juce::Component*>(&macroCreateButton),
+             static_cast<juce::Component*>(&macroDuplicateButton),
+             static_cast<juce::Component*>(&macroDeleteButton),
+             static_cast<juce::Component*>(&macroNameLabel),
+             static_cast<juce::Component*>(&macroNameEditor),
+             static_cast<juce::Component*>(&macroExposeLabel),
+             static_cast<juce::Component*>(&macroExposeToggle),
+             static_cast<juce::Component*>(&macroAssignmentLabel),
+             static_cast<juce::Component*>(&macroAssignmentSelector),
+             static_cast<juce::Component*>(&macroRoleLabel),
+             static_cast<juce::Component*>(&macroRoleSelector),
+             static_cast<juce::Component*>(&macroDefaultLabel),
+             static_cast<juce::Component*>(&macroDefaultSlider),
+             static_cast<juce::Component*>(&macroMinLabel),
+             static_cast<juce::Component*>(&macroMinSlider),
+             static_cast<juce::Component*>(&macroMaxLabel),
+             static_cast<juce::Component*>(&macroMaxSlider),
+             static_cast<juce::Component*>(&macroSummaryLabel),
+             static_cast<juce::Component*>(&macroMoveUpButton),
+             static_cast<juce::Component*>(&macroMoveDownButton)
+         })
+    {
+        macroDrawerContent.addAndMakeVisible(component);
     }
 
     routingDrawerViewport.setViewedComponent(&routingDrawerContent, false);
@@ -2016,6 +2051,10 @@ void AuthoringPanel::configureAccessibilityAndFocus()
     configureAccessibleMetadata(drawerContentHost,
                                 "Drawer content",
                                 "Displays the active drawer body when the drawer is open.");
+    configureAccessibleMetadata(macroDrawerViewport,
+                                "Macro editor",
+                                "Provides access to project macro creation, assignment, range, and ordering controls.",
+                                "All macro controls are visible at standard workspace heights. Scroll vertically in unusually short host windows.");
     configureAccessibleMetadata(routingDrawerViewport,
                                 "Scrollable routing inspector",
                                 "Provides access to project routing, FX chain, ownership, and parameter controls.",
@@ -2473,8 +2512,10 @@ void AuthoringPanel::resized()
         ? authoring::shortInspectorDrawerOpenHeight
         : (macroDrawerInShortLayout
                ? std::max(authoring::compactDrawerOpenHeight, 252)
-               : (expanded ? authoring::expandedDrawerOpenHeight
-                           : authoring::compactDrawerOpenHeight));
+               : (drawerState.activeTab == authoring::DrawerTab::macros
+                      ? authoring::macroDrawerOpenHeight
+                      : (expanded ? authoring::expandedDrawerOpenHeight
+                                  : authoring::compactDrawerOpenHeight)));
     const auto drawerHeight = authoring::drawerTabStripHeight + (drawerState.open ? drawerOpenHeight : 0);
     auto drawerArea = area.removeFromBottom(std::min(drawerHeight, area.getHeight()));
     drawerRegion.setBounds(drawerArea);
@@ -2597,12 +2638,16 @@ void AuthoringPanel::resized()
     }
     else if (drawerState.activeTab == authoring::DrawerTab::macros)
     {
-        const auto compactMacroDrawerLayout = true;
-        const auto macroListHeight = expanded ? 36 : 24;
-        const auto macroFieldRowHeight = 18;
-        const auto macroSummaryRowHeight = 16;
-        auto actionRow = drawerEditorArea.removeFromTop(18);
-        constexpr auto macroActionGap = 4;
+        macroDrawerViewport.setBounds(drawerEditorArea);
+        const auto macroContentWidth = std::max(420,
+                                                macroDrawerViewport.getWidth()
+                                                    - macroDrawerViewport.getScrollBarThickness());
+        const auto macroContentHeight = expanded ? 196 : 176;
+        macroDrawerContent.setSize(macroContentWidth, macroContentHeight);
+
+        auto macroEditorArea = macroDrawerContent.getLocalBounds();
+        auto actionRow = macroEditorArea.removeFromTop(28);
+        constexpr auto macroActionGap = 6;
         const auto buttonWidth = std::max(52, (actionRow.getWidth() - (macroActionGap * 4)) / 5);
         macroCreateButton.setBounds(actionRow.removeFromLeft(buttonWidth));
         actionRow.removeFromLeft(std::min(macroActionGap, actionRow.getWidth()));
@@ -2613,49 +2658,44 @@ void AuthoringPanel::resized()
         macroMoveUpButton.setBounds(actionRow.removeFromLeft(buttonWidth));
         actionRow.removeFromLeft(std::min(macroActionGap, actionRow.getWidth()));
         macroMoveDownButton.setBounds(actionRow);
-        drawerEditorArea.removeFromTop(1);
-        macroList.setBounds(drawerEditorArea.removeFromTop(macroListHeight));
+        macroEditorArea.removeFromTop(4);
+        macroList.setBounds(macroEditorArea.removeFromTop(44));
 
-        drawerEditorArea.removeFromTop(compactMacroDrawerLayout ? 1 : 2);
-        auto row = drawerEditorArea.removeFromTop(macroFieldRowHeight);
+        macroEditorArea.removeFromTop(4);
+        auto row = macroEditorArea.removeFromTop(28);
         layoutDualLabelAndFieldRow(row,
                                    macroNameLabel,
                                    macroNameEditor,
-                                   compactMacroDrawerLayout ? 64 : 76,
+                                   76,
                                    macroExposeLabel,
                                    macroExposeToggle,
-                                   compactMacroDrawerLayout ? 44 : 54);
-        drawerEditorArea.removeFromTop(compactMacroDrawerLayout ? 1 : 2);
+                                   54);
+        macroEditorArea.removeFromTop(4);
 
-        row = drawerEditorArea.removeFromTop(macroFieldRowHeight);
+        row = macroEditorArea.removeFromTop(28);
         layoutDualLabelAndFieldRow(row,
                                    macroAssignmentLabel,
                                    macroAssignmentSelector,
-                                   compactMacroDrawerLayout ? 60 : 76,
+                                   76,
                                    macroRoleLabel,
                                    macroRoleSelector,
-                                   compactMacroDrawerLayout ? 40 : 56);
-        drawerEditorArea.removeFromTop(compactMacroDrawerLayout ? 1 : 2);
+                                   56);
+        macroEditorArea.removeFromTop(4);
 
-        row = drawerEditorArea.removeFromTop(macroFieldRowHeight);
-        layoutDualLabelAndFieldRow(row,
-                                   macroDefaultLabel,
-                                   macroDefaultSlider,
-                                   compactMacroDrawerLayout ? 46 : 56,
-                                   macroMinLabel,
-                                   macroMinSlider,
-                                   compactMacroDrawerLayout ? 30 : 40);
-        drawerEditorArea.removeFromTop(compactMacroDrawerLayout ? 1 : 2);
-
-        row = drawerEditorArea.removeFromTop(macroFieldRowHeight);
-        layoutLabelAndField(row,
-                            macroMaxLabel,
-                            macroMaxSlider,
-                            compactMacroDrawerLayout ? 34 : 44);
+        row = macroEditorArea.removeFromTop(32);
+        constexpr auto valueColumnGap = 12;
+        const auto valueColumnWidth = (row.getWidth() - (valueColumnGap * 2)) / 3;
+        auto defaultColumn = row.removeFromLeft(valueColumnWidth);
+        row.removeFromLeft(std::min(valueColumnGap, row.getWidth()));
+        auto minimumColumn = row.removeFromLeft(valueColumnWidth);
+        row.removeFromLeft(std::min(valueColumnGap, row.getWidth()));
+        layoutLabelAndField(defaultColumn, macroDefaultLabel, macroDefaultSlider, 56);
+        layoutLabelAndField(minimumColumn, macroMinLabel, macroMinSlider, 40);
+        layoutLabelAndField(row, macroMaxLabel, macroMaxSlider, 40);
         if (expanded)
         {
-            drawerEditorArea.removeFromTop(2);
-            macroSummaryLabel.setBounds(drawerEditorArea.removeFromTop(macroSummaryRowHeight));
+            macroEditorArea.removeFromTop(4);
+            macroSummaryLabel.setBounds(macroEditorArea.removeFromTop(16));
         }
     }
     else if (drawerState.activeTab == authoring::DrawerTab::routing)
@@ -3505,6 +3545,7 @@ void AuthoringPanel::refreshDrawerVisibility()
     setVisibleAndAccessible(groupRoundRobinToggle, drawerContentVisible && groupsTab);
     setVisibleAndAccessible(groupRoundRobinModeSelector, drawerContentVisible && groupsTab);
 
+    setVisibleAndAccessible(macroDrawerViewport, drawerContentVisible && macrosTab);
     setVisibleAndAccessible(macroList, drawerContentVisible && macrosTab);
     setVisibleAndAccessible(macroCreateButton, drawerContentVisible && macrosTab);
     setVisibleAndAccessible(macroDuplicateButton, drawerContentVisible && macrosTab);

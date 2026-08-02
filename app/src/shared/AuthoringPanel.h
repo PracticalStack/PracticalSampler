@@ -249,6 +249,8 @@ private:
     juce::TextButton groupVisibilityButton;
     juce::Label groupVisibilityHintLabel;
 
+    juce::Component macroDrawerContent;
+    juce::Viewport macroDrawerViewport;
     authoring::RepeatedStructureList macroList;
     juce::TextButton macroCreateButton;
     juce::TextButton macroDuplicateButton;
