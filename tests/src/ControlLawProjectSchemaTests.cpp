@@ -86,6 +86,15 @@ void verifyLegacyRoundTripAndNewDefaults()
     require(!parseRuntimeProjectManifest(incompleteIdentity, "incomplete-law.drsproj", false).loaded,
             "A present control-law object requires a non-zero version.");
 
+    auto malformedIdentity = serialized;
+    const auto lawStart = malformedIdentity.find("\"controlLaw\": {");
+    require(lawStart != std::string::npos, "The serialized project must contain a control-law object.");
+    const auto lawEnd = malformedIdentity.find('}', lawStart);
+    require(lawEnd != std::string::npos, "The serialized control-law object must close.");
+    malformedIdentity.replace(lawStart, lawEnd - lawStart + 1, "\"controlLaw\": 1");
+    require(!parseRuntimeProjectManifest(malformedIdentity, "malformed-law.drsproj", false).loaded,
+            "A malformed non-object control law must reject project load rather than guessing a curve.");
+
     auto futureIdentity = serialized;
     futureIdentity.replace(versionPosition, std::string("\"version\": 1").size(), "\"version\": 2");
     const auto futureParsed = parseRuntimeProjectManifest(futureIdentity, "future-law.drsproj", false);

@@ -176,3 +176,12 @@ inverse function to place the frozen mixer law's unity detent at 85% travel. Mix
 faders show `−∞` at their -96 dB floor, render a unity reference tick, and describe
 both the unity reset and infinity floor to assistive technology. Host values and all
 published control positions remain normalized, including recall and automation.
+
+## Sprint 5 hardening and release proof
+
+`drs.control_law.release_proof` runs all seven frozen mixer anchors through publication, the
+Perform label, and measured Gain DSP amplitude. It also verifies that 1, 2, 3, and 12 published
+controls carry valid bounded callback laws. The broader publication, host-recall,
+automation-boundary, republish-churn, realtime-guard, and UI tests remain required release
+evidence. The operational checklist and manual REAPER sign-off instructions are in
+`docs/control-law-release-evidence.md`.

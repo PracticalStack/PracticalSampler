@@ -162,13 +162,16 @@ void runCleanMaximumLoadCase()
     require(processor.serviceMessageThreadWork(),
             "Maximum-load case should install the selected preview activation off audio.");
     require(processor.getEngineFacade().refreshPreviewToCurrentDraft()
-                && processor.getEngineFacade().waitForPreparedPlaybackIdle()
-                && processor.serviceMessageThreadWork(),
+                && processor.getEngineFacade().waitForPreparedPlaybackIdle(),
             "Maximum-load case should prepare the normalized Preview payload off audio.");
+    // Completion may already have been staged by an earlier message-thread poll.
+    // The following render assertions prove the active payload instead of relying
+    // on whether this exact poll happened to consume a queue item.
+    processor.serviceMessageThreadWork();
     require(processor.getEngineFacade().publishCurrentDraft()
-                && processor.getEngineFacade().waitForPreparedPlaybackIdle()
-                && processor.serviceMessageThreadWork(),
+                && processor.getEngineFacade().waitForPreparedPlaybackIdle(),
             "Maximum-load case should install the normalized Performance payload off audio.");
+    processor.serviceMessageThreadWork();
 
     for (std::size_t index = 0; index < Profile::targetPolyphonyPerContext; ++index)
     {

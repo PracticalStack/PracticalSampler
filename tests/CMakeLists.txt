@@ -545,6 +545,27 @@ target_compile_definitions(drs_control_law_project_schema_tests
 add_test(NAME drs.control_law.project_schema COMMAND drs_control_law_project_schema_tests)
 set_target_properties(drs_control_law_project_schema_tests PROPERTIES FOLDER "Tests")
 
+juce_add_console_app(drs_control_law_release_proof_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Control Law Release Proof Tests"
+)
+target_sources(drs_control_law_release_proof_tests
+    PRIVATE
+        src/ControlLawReleaseProofTests.cpp
+)
+target_link_libraries(drs_control_law_release_proof_tests
+    PRIVATE
+        drs_engine_adapter
+        drs_app_shared
+        juce::juce_gui_extra
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+target_compile_features(drs_control_law_release_proof_tests PRIVATE cxx_std_17)
+add_test(NAME drs.control_law.release_proof COMMAND drs_control_law_release_proof_tests)
+set_target_properties(drs_control_law_release_proof_tests PROPERTIES FOLDER "Tests")
+
 juce_add_console_app(drs_curated_dsp_contract_tests
     PRODUCT_NAME "Decent Rhapsody Studio Curated DSP Contract Tests"
 )
@@ -3335,6 +3356,7 @@ add_dependencies(drs_all_tests
     drs_curated_dsp_control_law_tests
     drs_control_law_tests
     drs_control_law_project_schema_tests
+    drs_control_law_release_proof_tests
     drs_curated_dsp_graph_plan_tests
     drs_curated_dsp_gain_tests
     drs_curated_dsp_reverb_tests
@@ -3433,6 +3455,7 @@ add_dependencies(drs_all_tests
     drs_phase2_macro_routing_tests
     drs_phase2_performance_bank_tests
     drs_phase2_performance_ui_tests
+    drs_performance_mixer_ui_tests
     drs_phase2_authoring_playback_integration_tests
     drs_phase2_authoring_ui_tests
     drs_phase2_repeated_structure_density_tests
