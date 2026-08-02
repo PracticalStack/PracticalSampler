@@ -1,0 +1,45 @@
+{
+  "schemaName": "drs.performanceEngine.eventTimeline",
+  "schemaVersion": 1,
+  "fixtureId": "piano-lite-semantic-timeline",
+  "purpose": "Sprint 0 physical note-off, effective release, and pedal transition ordering",
+  "routes": [
+    { "id": "piano-c4-main", "event": "note-on", "sustain": "any", "pitchSource": "event-note", "triggerMode": "gated" },
+    { "id": "piano-c4-key-up", "event": "note-off", "sustain": "any", "pitchSource": "event-note", "triggerMode": "one-shot" },
+    { "id": "piano-c4-damper", "event": "release", "sustain": "pedal-up", "pitchSource": "event-note", "triggerMode": "one-shot" },
+    { "id": "piano-pedal-down", "event": "pedal-down", "sustain": "pedal-down", "pitchSource": "fixed-root", "triggerMode": "one-shot" },
+    { "id": "piano-pedal-up", "event": "pedal-up", "sustain": "pedal-up", "pitchSource": "fixed-root", "triggerMode": "one-shot" }
+  ],
+  "timeline": [
+    {
+      "sampleOffset": 0,
+      "input": { "type": "note-on", "midiNote": 60, "velocity": 100 },
+      "expectedActionOrder": [ "record-attack-context:60", "route:piano-c4-main" ],
+      "expectedStartedVoices": [ "piano-c4-main" ]
+    },
+    {
+      "sampleOffset": 96,
+      "input": { "type": "cc", "controller": 64, "value": 127 },
+      "expectedActionOrder": [ "set-pedal-down", "route:piano-pedal-down" ],
+      "expectedStartedVoices": [ "piano-pedal-down" ]
+    },
+    {
+      "sampleOffset": 160,
+      "input": { "type": "note-off", "midiNote": 60, "velocity": 48 },
+      "expectedActionOrder": [ "mark-physical-key-released:60", "route:piano-c4-key-up", "defer-effective-release:60" ],
+      "expectedStartedVoices": [ "piano-c4-key-up" ]
+    },
+    {
+      "sampleOffset": 256,
+      "input": { "type": "cc", "controller": 64, "value": 0 },
+      "expectedActionOrder": [ "set-pedal-up", "emit-release:60", "route:piano-c4-damper", "route:piano-pedal-up" ],
+      "expectedStartedVoices": [ "piano-c4-damper", "piano-pedal-up" ]
+    },
+    {
+      "sampleOffset": 320,
+      "input": { "type": "cc", "controller": 64, "value": 0 },
+      "expectedActionOrder": [],
+      "expectedStartedVoices": []
+    }
+  ]
+}

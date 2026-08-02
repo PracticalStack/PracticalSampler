@@ -477,7 +477,39 @@ add_test(
     COMMAND drs_sprint4_shell_cutover_tests
 )
 
-# Sprint 4.7 deterministic shell-free offline render conformance matrix.
+# Declarative performance-engine Sprint 0 contract, fixture, and direct-red baseline.
+add_executable(drs_performance_engine_s0_red_tests
+    src/PerformanceEngineSprint0RedTests.cpp
+)
+
+target_compile_features(drs_performance_engine_s0_red_tests PRIVATE cxx_std_17)
+
+# The declarative-event Sprint 0 seams are intentionally direct-only expected-red
+# checks. Later sprints replace each named seam with a registered green test.
+set_target_properties(drs_performance_engine_s0_red_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+add_executable(drs_performance_engine_s0_fixture_tests
+    src/PerformanceEngineSprint0FixtureTests.cpp
+)
+
+target_compile_definitions(drs_performance_engine_s0_fixture_tests
+    PRIVATE
+        DRS_PERFORMANCE_ENGINE_S0_FIXTURE_ROOT="${CMAKE_SOURCE_DIR}/content/runtime/performance-engine/sprint0"
+)
+
+target_compile_features(drs_performance_engine_s0_fixture_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.performance_engine.s0.fixtures
+    COMMAND drs_performance_engine_s0_fixture_tests
+)
+
+set_target_properties(drs_performance_engine_s0_fixture_tests PROPERTIES
+    FOLDER "Tests"
+)
+
 add_executable(drs_curated_dsp_contract_red_tests
     src/CuratedDspContractRedTests.cpp
 )
@@ -3353,6 +3385,7 @@ add_dependencies(drs_all_tests
     drs_host_state_recovery_ui_tests
     drs_host_state_restore_stress_tests
     drs_curated_dsp_contract_tests
+    drs_performance_engine_s0_fixture_tests
     drs_curated_dsp_control_law_tests
     drs_control_law_tests
     drs_control_law_project_schema_tests

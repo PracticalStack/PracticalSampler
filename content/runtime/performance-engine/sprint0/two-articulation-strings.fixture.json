@@ -1,0 +1,86 @@
+{
+  "schemaName": "drs.performanceEngine.fixture",
+  "schemaVersion": 1,
+  "fixtureId": "two-articulation-strings",
+  "purpose": "Sprint 0 latch key-switch and consumed-note contract",
+  "articulations": [
+    {
+      "id": "sustain",
+      "displayName": "Sustain",
+      "isDefault": true,
+      "activation": {
+        "event": "note-on",
+        "midiNote": 12,
+        "mode": "latch",
+        "consume": true
+      }
+    },
+    {
+      "id": "staccato",
+      "displayName": "Staccato",
+      "isDefault": false,
+      "activation": {
+        "event": "note-on",
+        "midiNote": 14,
+        "mode": "latch",
+        "consume": true
+      }
+    }
+  ],
+  "routes": [
+    {
+      "id": "strings-sustain-main",
+      "articulationId": "sustain",
+      "event": "note-on",
+      "sustain": "any",
+      "pitchSource": "event-note",
+      "triggerMode": "gated"
+    },
+    {
+      "id": "strings-staccato-main",
+      "articulationId": "staccato",
+      "event": "note-on",
+      "sustain": "any",
+      "pitchSource": "event-note",
+      "triggerMode": "gated"
+    }
+  ],
+  "timeline": [
+    {
+      "sampleOffset": 0,
+      "input": { "type": "note-on", "midiNote": 12, "velocity": 100 },
+      "expectedActions": [ "select-articulation:sustain", "consume-note-on:12" ],
+      "expectedStartedVoices": []
+    },
+    {
+      "sampleOffset": 24,
+      "input": { "type": "note-off", "midiNote": 12, "velocity": 64 },
+      "expectedActions": [ "consume-note-off:12" ],
+      "expectedStartedVoices": []
+    },
+    {
+      "sampleOffset": 48,
+      "input": { "type": "note-on", "midiNote": 60, "velocity": 96 },
+      "expectedActions": [ "route:strings-sustain-main" ],
+      "expectedStartedVoices": [ "strings-sustain-main" ]
+    },
+    {
+      "sampleOffset": 96,
+      "input": { "type": "note-on", "midiNote": 14, "velocity": 100 },
+      "expectedActions": [ "select-articulation:staccato", "consume-note-on:14" ],
+      "expectedStartedVoices": []
+    },
+    {
+      "sampleOffset": 120,
+      "input": { "type": "note-off", "midiNote": 14, "velocity": 64 },
+      "expectedActions": [ "consume-note-off:14" ],
+      "expectedStartedVoices": []
+    },
+    {
+      "sampleOffset": 144,
+      "input": { "type": "note-on", "midiNote": 62, "velocity": 96 },
+      "expectedActions": [ "route:strings-staccato-main" ],
+      "expectedStartedVoices": [ "strings-staccato-main" ]
+    }
+  ]
+}
