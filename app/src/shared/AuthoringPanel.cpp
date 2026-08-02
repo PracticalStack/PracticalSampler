@@ -1,6 +1,7 @@
 #include "shared/AuthoringPanel.h"
 
 #include "shared/authoring/AuthoringWorkspaceLayout.h"
+#include "drs/engine/ControlLaw.h"
 #include "drs/engine/CuratedDspCatalog.h"
 
 #include <algorithm>
@@ -4596,6 +4597,12 @@ void AuthoringPanel::refreshFromSession()
                              + juce::String::fromUTF8(macro.targets.front().parameterPath.c_str()))
                 + " | range " + juce::String(macro.minValue, 2)
                 + " to " + juce::String(macro.maxValue, 2)
+                + (macro.targets.empty() ? juce::String {}
+                   : macro.targets.front().controlLaw.id.empty()
+                       ? " | legacy curve " + juce::String::fromUTF8(macro.targets.front().curve.c_str())
+                       : " | law " + juce::String::fromUTF8(macro.targets.front().controlLaw.id.c_str())
+                           + " (" + juce::String(macro.targets.front().destinationMinimum, 1)
+                           + " to " + juce::String(macro.targets.front().destinationMaximum, 1) + ")")
                 + " | Release scope: group gain lanes only (mic, layer, pedal/noise).",
             juce::dontSendNotification);
         macroCreateButton.setEnabled(true);
@@ -5812,6 +5819,20 @@ void AuthoringPanel::assignSelectedFxParameterToMacro()
     target.destinationMinimum = parameterIterator->minimum;
     target.destinationMaximum = parameterIterator->maximum;
     target.curve = "linear";
+    const auto resolution = drs::engine::resolveCuratedDspControlLaw({ &*parameterIterator, target.role, {} });
+    if (resolution.resolved)
+    {
+        target.controlLaw.id = std::string(resolution.controlLawId);
+        target.controlLaw.version = 1;
+        target.destinationMinimum = resolution.minimum;
+        target.destinationMaximum = resolution.maximum;
+        drs::engine::CompiledControlLaw compiledLaw;
+        double resolvedDefault = macro.defaultValue;
+        if (drs::engine::compileControlLaw(target.controlLaw.id, target.destinationMinimum,
+                                           target.destinationMaximum, compiledLaw)
+            && drs::engine::physicalToNormalized(compiledLaw, parameterValue, resolvedDefault))
+            macro.defaultValue = resolvedDefault;
+    }
     macro.targets.push_back(std::move(target));
 
     const auto result = authoringSession.createMacro(macro, "Create control from FX parameter");

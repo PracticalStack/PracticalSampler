@@ -533,6 +533,18 @@ set_target_properties(drs_control_law_tests PROPERTIES
     FOLDER "Tests"
 )
 
+add_executable(drs_control_law_project_schema_tests
+    src/ControlLawProjectSchemaTests.cpp
+)
+target_link_libraries(drs_control_law_project_schema_tests PRIVATE drs_engine_adapter)
+target_compile_features(drs_control_law_project_schema_tests PRIVATE cxx_std_17)
+target_compile_definitions(drs_control_law_project_schema_tests
+    PRIVATE
+        DRS_CONTROL_LAW_S0_FIXTURE_PATH="${CMAKE_SOURCE_DIR}/content/runtime/phase2/control-law/three-group-linear-gain.drsproj"
+)
+add_test(NAME drs.control_law.project_schema COMMAND drs_control_law_project_schema_tests)
+set_target_properties(drs_control_law_project_schema_tests PROPERTIES FOLDER "Tests")
+
 juce_add_console_app(drs_curated_dsp_contract_tests
     PRODUCT_NAME "Decent Rhapsody Studio Curated DSP Contract Tests"
 )
@@ -3322,6 +3334,7 @@ add_dependencies(drs_all_tests
     drs_curated_dsp_contract_tests
     drs_curated_dsp_control_law_tests
     drs_control_law_tests
+    drs_control_law_project_schema_tests
     drs_curated_dsp_graph_plan_tests
     drs_curated_dsp_gain_tests
     drs_curated_dsp_reverb_tests

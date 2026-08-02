@@ -67,6 +67,12 @@ struct AuthoringDspSelection
     std::string routingBusId;
 };
 
+struct AuthoringMixerTaperUpgradePreview
+{
+    std::vector<std::string> affectedMacroIds;
+    std::vector<std::string> affectedTargetPaths;
+};
+
 class AuthoringSession
 {
 public:
@@ -153,6 +159,8 @@ public:
     RuntimeProjectDocumentActionResult moveMacro(std::size_t macroIndex,
                                                  int direction,
                                                  const std::string& label);
+    AuthoringMixerTaperUpgradePreview previewMixerTaperUpgrade() const;
+    RuntimeProjectDocumentActionResult upgradeMixerTaper(const std::string& label);
     RuntimeProjectDocumentActionResult createFxSlot(const RuntimeProjectFxSlotDefinition& fxSlot,
                                                     const std::string& ownerBusId,
                                                     const std::string& label);

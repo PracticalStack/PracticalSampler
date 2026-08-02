@@ -47,6 +47,7 @@ struct PlaybackSnapshotMacroTarget
     double destinationMinimum = 0.0;
     double destinationMaximum = 1.0;
     std::string curve = "linear";
+    RuntimeProjectMacroTargetControlLaw controlLaw;
 };
 
 struct PlaybackSnapshotMacroDefault

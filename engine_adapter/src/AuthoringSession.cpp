@@ -1,4 +1,5 @@
 #include "drs/engine/AuthoringSession.h"
+#include "drs/engine/ControlLaw.h"
 #include "drs/engine/CuratedDspCatalog.h"
 #include "drs/engine/SampleImport.h"
 #include "drs/engine/RuntimeLoader.h"
@@ -336,19 +337,65 @@ std::optional<std::string> validateMacroDefinition(const RuntimeProjectModel& pr
         const auto validCurve = target.curve == "linear" || target.curve == "logarithmic";
         const auto validLogRange = target.curve != "logarithmic"
             || (target.destinationMinimum > 0.0 && target.destinationMaximum > 0.0);
+        const auto completeControlLaw = (target.controlLaw.id.empty() && target.controlLaw.version == 0)
+            || (!target.controlLaw.id.empty() && target.controlLaw.version != 0);
+        CompiledControlLaw compiledLaw;
+        const auto knownControlLawIsCompatible = target.controlLaw.id.empty()
+            || target.controlLaw.version != 1
+            || compileControlLaw(target.controlLaw.id, target.destinationMinimum,
+                                 target.destinationMaximum, compiledLaw);
         if (target.dspSlotId.empty()
             || target.dspParameterId.empty()
             || !finiteTargetRange
             || target.sourceMinimum >= target.sourceMaximum
             || target.destinationMinimum > target.destinationMaximum
             || !validCurve
-            || !validLogRange)
+            || !validLogRange
+            || !completeControlLaw
+            || !knownControlLawIsCompatible)
         {
             return "Macro '" + macro.id + "' contains an invalid structured DSP target.";
         }
     }
 
     return std::nullopt;
+}
+
+bool resolveNewDspTargetControlLaw(const RuntimeProjectModel& project,
+                                   RuntimeProjectMacroTargetDefinition& target)
+{
+    if (!target.controlLaw.id.empty() || target.dspSlotId.empty() || target.dspParameterId.empty())
+        return !target.controlLaw.id.empty();
+    const auto slotIndex = findFxSlotIndexById(project, target.dspSlotId);
+    if (!slotIndex.has_value()) return false;
+    const auto* parameter = findCatalogParameter(project.authoring.fxSlots[*slotIndex], target.dspParameterId);
+    if (parameter == nullptr) return false;
+    const auto resolution = resolveCuratedDspControlLaw({ parameter, target.role, {} });
+    if (!resolution.resolved) return false;
+    target.controlLaw.id = std::string(resolution.controlLawId);
+    target.controlLaw.version = 1;
+    target.destinationMinimum = resolution.minimum;
+    target.destinationMaximum = resolution.maximum;
+    return true;
+}
+
+void resolveNewDspTargetControlLaws(const RuntimeProjectModel& project,
+                                    RuntimeProjectMacroDefinition& macro)
+{
+    for (auto& target : macro.targets)
+        resolveNewDspTargetControlLaw(project, target);
+}
+
+bool isLegacyMixerGainTarget(const RuntimeProjectModel& project,
+                             const RuntimeProjectMacroTargetDefinition& target)
+{
+    if (!target.controlLaw.id.empty() || target.role != "mix"
+        || target.dspSlotId.empty() || target.dspParameterId != "gainDb")
+        return false;
+    const auto slotIndex = findFxSlotIndexById(project, target.dspSlotId);
+    return slotIndex.has_value()
+        && project.authoring.fxSlots[*slotIndex].effectType == "drs.gain"
+        && project.authoring.fxSlots[*slotIndex].effectVersion == 1;
 }
 
 RuntimeProjectMacroDefinition normalizeCreatedMacro(const RuntimeProjectModel& project,
@@ -359,6 +406,8 @@ RuntimeProjectMacroDefinition normalizeCreatedMacro(const RuntimeProjectModel& p
 
     if (macro.id.empty())
         macro.id = makeUniqueMacroId(project, macro.name);
+
+    resolveNewDspTargetControlLaws(project, macro);
 
     return macro;
 }
@@ -2152,7 +2201,23 @@ RuntimeProjectDocumentActionResult AuthoringSession::updateMacro(std::size_t mac
                                   "Macro edit rejected",
                                   "Macro ids are immutable once created.");
 
-    if (const auto validationIssue = validateMacroDefinition(getProject(), macro, macroIndex))
+    auto updatedMacro = macro;
+    const auto& previousMacro = getProject().authoring.macros[macroIndex];
+    for (std::size_t targetIndex = 0; targetIndex < updatedMacro.targets.size(); ++targetIndex)
+    {
+        auto& target = updatedMacro.targets[targetIndex];
+        const auto hasPreviousTarget = targetIndex < previousMacro.targets.size();
+        const auto sameStructuredIdentity = hasPreviousTarget
+            && target.dspSlotId == previousMacro.targets[targetIndex].dspSlotId
+            && target.dspParameterId == previousMacro.targets[targetIndex].dspParameterId;
+        if (target.controlLaw.id.empty() && hasPreviousTarget && sameStructuredIdentity
+            && !previousMacro.targets[targetIndex].controlLaw.id.empty())
+            target.controlLaw = previousMacro.targets[targetIndex].controlLaw;
+        else if (target.controlLaw.id.empty() && !sameStructuredIdentity)
+            resolveNewDspTargetControlLaw(getProject(), target);
+    }
+
+    if (const auto validationIssue = validateMacroDefinition(getProject(), updatedMacro, macroIndex))
     {
         return makeRejectedResult(getDocumentState(),
                                   "Macro edit rejected",
@@ -2160,7 +2225,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::updateMacro(std::size_t mac
     }
 
     auto project = getProject();
-    project.authoring.macros[macroIndex] = macro;
+    project.authoring.macros[macroIndex] = std::move(updatedMacro);
     return documentController.commitSnapshot(project,
                                              label,
                                              {"authoring.macros[" + std::to_string(macroIndex) + "]"});
@@ -2199,6 +2264,46 @@ RuntimeProjectDocumentActionResult AuthoringSession::moveMacro(std::size_t macro
                                                  "authoring.macros[" + std::to_string(macroIndex) + "]",
                                                  "authoring.macros[" + std::to_string(targetIndex) + "]"
                                              });
+}
+
+AuthoringMixerTaperUpgradePreview AuthoringSession::previewMixerTaperUpgrade() const
+{
+    AuthoringMixerTaperUpgradePreview preview;
+    const auto& project = getProject();
+    for (const auto& macro : project.authoring.macros)
+    {
+        for (const auto& target : macro.targets)
+        {
+            if (!isLegacyMixerGainTarget(project, target)) continue;
+            preview.affectedMacroIds.push_back(macro.id);
+            preview.affectedTargetPaths.push_back(target.parameterPath);
+        }
+    }
+    return preview;
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::upgradeMixerTaper(const std::string& label)
+{
+    auto project = getProject();
+    auto affectedCount = std::size_t { 0 };
+    for (auto& macro : project.authoring.macros)
+    {
+        for (auto& target : macro.targets)
+        {
+            if (!isLegacyMixerGainTarget(project, target)) continue;
+            target.controlLaw.id = std::string(controlLawMixerGainV1);
+            target.controlLaw.version = 1;
+            target.destinationMinimum = -96.0;
+            target.destinationMaximum = 6.0;
+            target.curve = "linear"; // retained for pre-law compatibility readers.
+            ++affectedCount;
+        }
+    }
+    if (affectedCount == 0)
+        return makeRejectedResult(getDocumentState(),
+                                  "Mixer taper upgrade rejected",
+                                  "No legacy group or bus gain targets are eligible for the mixer taper upgrade.");
+    return documentController.commitSnapshot(project, label, { "authoring.macros" });
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::createFxSlot(

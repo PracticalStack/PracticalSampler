@@ -363,6 +363,13 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
             targetObject["sourceMaximum"] = target.sourceMaximum;
             targetObject["destinationMinimum"] = target.destinationMinimum;
             targetObject["destinationMaximum"] = target.destinationMaximum;
+            if (!target.controlLaw.id.empty())
+            {
+                targetObject["controlLaw"] = {
+                    { "id", target.controlLaw.id },
+                    { "version", target.controlLaw.version }
+                };
+            }
             targetObject["curve"] = target.curve;
             targets.push_back(std::move(targetObject));
         }
@@ -606,7 +613,8 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
             snapshotMacro.targets.push_back({ target.parameterId, target.parameterPath, target.role,
                                               target.dspSlotId, target.dspParameterId,
                                               target.sourceMinimum, target.sourceMaximum,
-                                              target.destinationMinimum, target.destinationMaximum, target.curve });
+                                              target.destinationMinimum, target.destinationMaximum,
+                                              target.curve, target.controlLaw });
 
         result.snapshot.macroDefaults.push_back(std::move(snapshotMacro));
     }

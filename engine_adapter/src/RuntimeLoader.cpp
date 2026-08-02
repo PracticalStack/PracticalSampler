@@ -1,4 +1,5 @@
 #include "drs/engine/RuntimeLoader.h"
+#include "drs/engine/ControlLaw.h"
 #include "drs/engine/CuratedDspCatalog.h"
 
 #include "drs/engine/WorkspacePaths.generated.h"
@@ -529,6 +530,13 @@ ordered_json serializeMacroTargets(const std::vector<RuntimeProjectMacroTargetDe
             targetObject["sourceMaximum"] = target.sourceMaximum;
             targetObject["destinationMinimum"] = target.destinationMinimum;
             targetObject["destinationMaximum"] = target.destinationMaximum;
+            if (!target.controlLaw.id.empty())
+            {
+                targetObject["controlLaw"] = {
+                    { "id", target.controlLaw.id },
+                    { "version", target.controlLaw.version }
+                };
+            }
             targetObject["curve"] = target.curve;
         }
         array.push_back(std::move(targetObject));
@@ -1367,6 +1375,22 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
                             if (const auto value = readOptional<RuntimeProjectLoadResult, double>(targetObject, result, "sourceMaximum", targetContext.c_str())) target.sourceMaximum = *value;
                             if (const auto value = readOptional<RuntimeProjectLoadResult, double>(targetObject, result, "destinationMinimum", targetContext.c_str())) target.destinationMinimum = *value;
                             if (const auto value = readOptional<RuntimeProjectLoadResult, double>(targetObject, result, "destinationMaximum", targetContext.c_str())) target.destinationMaximum = *value;
+                            if (const auto controlLaw = targetObject.find("controlLaw"); controlLaw != targetObject.end())
+                            {
+                                if (!controlLaw->is_object())
+                                {
+                                    addIssue(result, targetContext + " field 'controlLaw' must be an object.");
+                                }
+                                else
+                                {
+                                    if (const auto id = readRequired<RuntimeProjectLoadResult, std::string>(
+                                            *controlLaw, result, "id", (targetContext + ".controlLaw").c_str()))
+                                        target.controlLaw.id = *id;
+                                    if (const auto version = readRequired<RuntimeProjectLoadResult, std::uint32_t>(
+                                            *controlLaw, result, "version", (targetContext + ".controlLaw").c_str()))
+                                        target.controlLaw.version = *version;
+                                }
+                            }
                             if (const auto value = readOptional<RuntimeProjectLoadResult, std::string>(targetObject, result, "curve", targetContext.c_str())) target.curve = *value;
 
                             macro.targets.push_back(std::move(target));
@@ -1885,6 +1909,17 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
                     || (target.curve == "logarithmic"
                         && (target.destinationMinimum <= 0.0 || target.destinationMaximum <= 0.0))))
                     addIssue(result, "Project macro '" + macro.id + "' contains an invalid structured DSP target.");
+                if (hasDspIdentity && ((!target.controlLaw.id.empty() && target.controlLaw.version == 0)
+                    || (target.controlLaw.id.empty() && target.controlLaw.version != 0)))
+                    addIssue(result, "Project macro '" + macro.id + "' contains an incomplete control-law identity.");
+                if (hasDspIdentity && !target.controlLaw.id.empty()
+                    && target.controlLaw.version == 1)
+                {
+                    CompiledControlLaw compiledLaw;
+                    if (!compileControlLaw(target.controlLaw.id, target.destinationMinimum,
+                                           target.destinationMaximum, compiledLaw))
+                        addIssue(result, "Project macro '" + macro.id + "' contains an unsupported or incompatible control law.");
+                }
             }
         }
 

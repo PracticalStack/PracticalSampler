@@ -75,6 +75,12 @@ struct RuntimeProjectZoneDefinition
     ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;
 };
 
+struct RuntimeProjectMacroTargetControlLaw
+{
+    std::string id;
+    std::uint32_t version = 0;
+};
+
 struct RuntimeProjectMacroTargetDefinition
 {
     std::string parameterId;
@@ -89,6 +95,9 @@ struct RuntimeProjectMacroTargetDefinition
     double destinationMinimum = 0.0;
     double destinationMaximum = 1.0;
     std::string curve = "linear";
+    // Empty means a pre-control-law legacy target. Its persisted curve remains
+    // authoritative until the explicit upgrade command is applied.
+    RuntimeProjectMacroTargetControlLaw controlLaw;
 };
 
 struct RuntimeProjectMacroDefinition

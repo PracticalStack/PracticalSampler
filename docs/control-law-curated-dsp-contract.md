@@ -85,6 +85,21 @@ permits it; EQ gain uses bipolar-linear. `divisionBeats` is intentionally classi
 as continuous positive-log for now: its discrete beat grid and labels are not yet a
 catalog contract, so it must not claim a stepped enumeration prematurely.
 
+## Sprint 3 project schema and migration
+
+Structured DSP macro targets may now persist `controlLaw.id` and
+`controlLaw.version` beside their resolved destination range. New targets resolve
+through the catalog before they are saved; a new `mix`-role Gain target therefore
+saves `drs.mixerGain.v1` version 1 and -96…+6 dB. The authoring inspector summary
+shows that read-only law/range detail.
+
+An absent control-law object is an intentional legacy representation. Its existing
+`curve` and range serialize unchanged and remain the audible compatibility contract.
+`AuthoringSession::previewMixerTaperUpgrade()` lists eligible legacy group/bus Gain
+targets, while `upgradeMixerTaper()` is the explicit transactional command that
+changes them to the mixer law. It marks the project dirty and is fully undoable and
+redoable; loading or saving alone never invokes it.
+
 ## Current-state parameter inventory
 
 Before Sprint 2 the descriptor contained unit/range/default/smoothing only. The
