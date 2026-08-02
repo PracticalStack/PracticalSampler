@@ -85,7 +85,9 @@ bool routeCouldRespondToTrigger(const SamplerRenderRoute& route,
         || (route.performanceSustain == PerformanceSustainCondition::pedalDown && !sustainPedalDown)
         || (route.performanceSustain == PerformanceSustainCondition::pedalUp && sustainPedalDown))
         return false;
-    if (midiNote < route.keyLow || midiNote > route.keyHigh)
+    const auto routeMidiNote = route.performancePitchSource == PerformancePitchSource::fixedRoot
+        ? route.rootKey : midiNote;
+    if (routeMidiNote < route.keyLow || routeMidiNote > route.keyHigh)
         return false;
 
     const auto physicalVelocityMatches = physicalVelocity >= route.velocityLow
@@ -171,7 +173,9 @@ bool routeMatches(const SamplerRenderRoute& route,
         || (route.performanceSustain == PerformanceSustainCondition::pedalDown && !sustainPedalDown)
         || (route.performanceSustain == PerformanceSustainCondition::pedalUp && sustainPedalDown))
         return false;
-    const auto rangeMatches = midiNote >= route.keyLow && midiNote <= route.keyHigh
+    const auto routeMidiNote = route.performancePitchSource == PerformancePitchSource::fixedRoot
+        ? route.rootKey : midiNote;
+    const auto rangeMatches = routeMidiNote >= route.keyLow && routeMidiNote <= route.keyHigh
         && velocity >= route.velocityLow && velocity <= route.velocityHigh;
     if (!rangeMatches)
         return false;
@@ -506,7 +510,6 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
             const auto sourceMidiNote = static_cast<int>(event.midiNote);
             const auto midiNoteOffset = controls.overrideMidiNoteOffset
                 ? controls.midiNoteOffset : renderModel->getMidiNoteOffset();
-            const auto effectiveMidiNote = std::clamp(sourceMidiNote + midiNoteOffset, 0, 127);
             const auto eventVelocity = std::clamp(
                 static_cast<int>(std::lround(event.velocity * 127.0f)), 1, 127);
             const auto fixedVelocity = controls.overrideFixedVelocity
@@ -710,12 +713,16 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 bool releasingStolen = false;
                 const auto slotIndex = acquireSlot(stolen, generationStolen, releasingStolen);
                 auto& slot = slots[slotIndex];
+                const auto& route = routes[routeIndex];
+                const auto routeSourceMidiNote = route.performancePitchSource == PerformancePitchSource::fixedRoot
+                    ? route.rootKey : sourceMidiNote;
+                const auto routeEffectiveMidiNote = std::clamp(routeSourceMidiNote + midiNoteOffset, 0, 127);
                 SamplerVoiceStartRequest request;
                 request.voiceId = nextVoiceId;
                 request.activationGeneration = activeGeneration;
                 request.routeIndex = routeIndex;
-                request.sourceMidiNote = sourceMidiNote;
-                request.effectiveMidiNote = effectiveMidiNote;
+                request.sourceMidiNote = routeSourceMidiNote;
+                request.effectiveMidiNote = routeEffectiveMidiNote;
                 request.effectiveVelocity = effectiveVelocity;
                 request.routeGainMultiplier = routeGainMultiplier;
                 request.outputSampleRate = sampleRate;

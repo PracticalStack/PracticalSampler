@@ -75,6 +75,10 @@ private:
                                                const PerformanceHeldNoteRecord& held,
                                                PerformanceEventKind kind,
                                                bool pedalDown) noexcept;
+    static SamplerRenderEvent makePedalTriggerEvent(const SamplerRenderEvent& source,
+                                                    std::uint32_t articulationIndex,
+                                                    PerformanceEventKind kind,
+                                                    bool pedalDown) noexcept;
 
     std::array<PerformanceHeldNoteRecord, channelCount * noteCount> heldNotes {};
     std::uint32_t selectedArticulationIndex = kInvalidPerformanceProgramIndex;

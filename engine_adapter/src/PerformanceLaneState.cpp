@@ -134,6 +134,24 @@ SamplerRenderEvent PerformanceLaneState::makeTriggerEvent(const SamplerRenderEve
     return result;
 }
 
+SamplerRenderEvent PerformanceLaneState::makePedalTriggerEvent(const SamplerRenderEvent& source,
+                                                                const std::uint32_t articulationIndex,
+                                                                const PerformanceEventKind kind,
+                                                                const bool pedalDown) noexcept
+{
+    SamplerRenderEvent result = source;
+    result.type = SamplerRenderEventType::noteOn;
+    result.midiNote = 0;
+    // V1 has no authored pedal-velocity enablement. Use the deterministic full trigger
+    // velocity for layer selection; fixed-root route pitch is resolved by the voice pool.
+    result.velocity = 1.0f;
+    result.noteOffVelocity = 0.0f;
+    result.articulationIndex = articulationIndex;
+    result.performanceEvent = kind;
+    result.sustainPedalDown = pedalDown;
+    return result;
+}
+
 bool PerformanceLaneState::normalize(const SamplerRenderEvent& raw,
                                      const std::uint64_t activationGeneration,
                                      const CompiledPerformanceProgram& program,
@@ -215,6 +233,8 @@ bool PerformanceLaneState::normalize(const SamplerRenderEvent& raw,
         {
             const auto down = event.velocity >= (64.0f / 127.0f);
             if (down == pedalIsDown) return true;
+            const auto pedalEvent = down ? PerformanceEventKind::pedalDown : PerformanceEventKind::pedalUp;
+            const auto emitsPedalTrigger = hasTriggerRoute(program, pedalEvent, selectedArticulationIndex, down);
             std::size_t releaseCount = 0;
             if (!down)
                 for (const auto& held : heldNotes)
@@ -223,14 +243,15 @@ bool PerformanceLaneState::normalize(const SamplerRenderEvent& raw,
                         && hasTriggerRoute(program, PerformanceEventKind::release,
                                            held.articulationAtAttack, false))
                         ++releaseCount;
-            if (scratch.size() + 1 + releaseCount > PerformanceActionScratch::capacity)
+            if (scratch.size() + 1 + releaseCount + (emitsPedalTrigger ? 1u : 0u)
+                > PerformanceActionScratch::capacity)
             {
                 ++actionOverflowCount;
                 return false;
             }
             setPedal(down);
             event.type = down ? SamplerRenderEventType::pedalDown : SamplerRenderEventType::pedalUp;
-            event.performanceEvent = down ? PerformanceEventKind::pedalDown : PerformanceEventKind::pedalUp;
+            event.performanceEvent = pedalEvent;
             event.sustainPedalDown = down;
             ++semanticEventCounts[static_cast<std::size_t>(down ? PerformanceEventKind::pedalDown
                                                                   : PerformanceEventKind::pedalUp)];
@@ -248,6 +269,8 @@ bool PerformanceLaneState::normalize(const SamplerRenderEvent& raw,
                         held.active = false;
                         ++semanticEventCounts[static_cast<std::size_t>(PerformanceEventKind::release)];
                     }
+            if (emitsPedalTrigger)
+                scratch.push(makePedalTriggerEvent(event, selectedArticulationIndex, pedalEvent, down));
             return true;
         }
         case SamplerRenderEventType::pedalDown:
@@ -255,6 +278,8 @@ bool PerformanceLaneState::normalize(const SamplerRenderEvent& raw,
         {
             const auto down = raw.type == SamplerRenderEventType::pedalDown;
             if (down == pedalIsDown) return true;
+            const auto pedalEvent = down ? PerformanceEventKind::pedalDown : PerformanceEventKind::pedalUp;
+            const auto emitsPedalTrigger = hasTriggerRoute(program, pedalEvent, selectedArticulationIndex, down);
             std::size_t releaseCount = 0;
             if (!down)
                 for (const auto& held : heldNotes)
@@ -263,13 +288,14 @@ bool PerformanceLaneState::normalize(const SamplerRenderEvent& raw,
                         && hasTriggerRoute(program, PerformanceEventKind::release,
                                            held.articulationAtAttack, false))
                         ++releaseCount;
-            if (scratch.size() + 1 + releaseCount > PerformanceActionScratch::capacity)
+            if (scratch.size() + 1 + releaseCount + (emitsPedalTrigger ? 1u : 0u)
+                > PerformanceActionScratch::capacity)
             {
                 ++actionOverflowCount;
                 return false;
             }
             setPedal(down);
-            event.performanceEvent = down ? PerformanceEventKind::pedalDown : PerformanceEventKind::pedalUp;
+            event.performanceEvent = pedalEvent;
             event.sustainPedalDown = down;
             ++semanticEventCounts[static_cast<std::size_t>(down ? PerformanceEventKind::pedalDown
                                                                   : PerformanceEventKind::pedalUp)];
@@ -287,6 +313,8 @@ bool PerformanceLaneState::normalize(const SamplerRenderEvent& raw,
                         held.active = false;
                         ++semanticEventCounts[static_cast<std::size_t>(PerformanceEventKind::release)];
                     }
+            if (emitsPedalTrigger)
+                scratch.push(makePedalTriggerEvent(event, selectedArticulationIndex, pedalEvent, down));
             return true;
         }
         case SamplerRenderEventType::allNotesOff:
