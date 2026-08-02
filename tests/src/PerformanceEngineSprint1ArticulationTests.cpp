@@ -46,6 +46,8 @@ RuntimeProjectModel loadLegacyFixture()
     project.authoring.zones[1].articulationId = "staccato";
     for (std::size_t index = 2; index < project.authoring.zones.size(); ++index)
         project.authoring.zones[index].articulationId = "sustain";
+    for (auto& zone : project.authoring.zones)
+        zone.keyLow = 36;
     project.authoring.selectedZoneId = project.authoring.zones[1].id;
     return project;
 }
@@ -114,7 +116,8 @@ void verifyAuthoringTransactions()
     RuntimeProjectArticulationDefinition pizzicato;
     pizzicato.id = "pizzicato";
     pizzicato.displayName = "Pizzicato";
-    pizzicato.activation = RuntimeProjectArticulationActivationDefinition { "note-on", 12, "latch", true };
+    pizzicato.activation = RuntimeProjectArticulationActivationDefinition {
+        PerformanceEventKind::noteOn, 12, ArticulationActivationMode::latch, true };
     require(session.createArticulation(pizzicato, "Create pizzicato").applied,
             "Creating a first-class articulation must be undoable.");
     auto edited = findArticulation(session.getProject(), "pizzicato");

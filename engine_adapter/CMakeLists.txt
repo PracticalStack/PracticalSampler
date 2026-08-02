@@ -193,6 +193,7 @@ add_library(drs_engine_adapter STATIC
     src/PerformancePublishCommandAdapter.cpp
     src/PerformancePublishPreparation.cpp
     src/PerformancePublishPresentation.cpp
+    src/PerformanceRuleContract.cpp
     src/PublishedMacroBinding.cpp
     src/PreparedPlayback.cpp
     src/Phase1Baseline.cpp
@@ -232,6 +233,7 @@ add_library(drs_engine_adapter STATIC
     include/drs/engine/PerformancePublishController.h
     include/drs/engine/PerformancePublishPreparation.h
     include/drs/engine/PerformancePublishPresentation.h
+    include/drs/engine/PerformanceRuleContract.h
     include/drs/engine/PublishedMacroBinding.h
     include/drs/engine/PreparedPlayback.h
     include/drs/engine/ProjectDocument.h
@@ -298,6 +300,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     src/PerformancePublishCommandAdapter.cpp
     src/PerformancePublishPreparation.cpp
     src/PerformancePublishPresentation.cpp
+    src/PerformanceRuleContract.cpp
     src/PublishedMacroBinding.cpp
     src/PreparedPlayback.cpp
     src/Phase1Baseline.cpp
@@ -332,6 +335,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     include/drs/engine/PerformancePublishContract.h
     include/drs/engine/PerformancePublishController.h
     include/drs/engine/PerformancePublishPreparation.h
+    include/drs/engine/PerformanceRuleContract.h
     include/drs/engine/PreparedPlayback.h
     include/drs/engine/ProjectDocument.h
     include/drs/engine/RuntimeCompiler.h

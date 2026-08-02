@@ -21,6 +21,39 @@ enum class RoundRobinMode : std::uint8_t
     random
 };
 
+enum class PerformanceEventKind : std::uint8_t
+{
+    noteOn,
+    noteOff,
+    release,
+    pedalDown,
+    pedalUp
+};
+
+enum class PerformanceSustainCondition : std::uint8_t
+{
+    any,
+    pedalUp,
+    pedalDown
+};
+
+enum class PerformancePitchSource : std::uint8_t
+{
+    eventNote,
+    fixedRoot
+};
+
+enum class ArticulationActivationMode : std::uint8_t
+{
+    latch
+};
+
+enum class RoundRobinResetEvent : std::uint8_t
+{
+    articulationChange,
+    pedalUp
+};
+
 struct RoundRobinDescriptor
 {
     std::string poolId;
@@ -49,6 +82,13 @@ struct RuntimeProjectSampleSource
     std::string role;
 };
 
+struct RuntimeProjectZonePerformanceDefinition
+{
+    PerformanceEventKind event = PerformanceEventKind::noteOn;
+    PerformanceSustainCondition sustain = PerformanceSustainCondition::any;
+    PerformancePitchSource pitchSource = PerformancePitchSource::eventNote;
+};
+
 struct RuntimeProjectZoneDefinition
 {
     std::string id;
@@ -73,6 +113,10 @@ struct RuntimeProjectZoneDefinition
     int roundRobinLength = 0;
     int roundRobinPosition = 0;
     ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;
+    RuntimeProjectZonePerformanceDefinition performance;
+    std::string exclusiveGroupId;
+    std::vector<std::string> exclusiveTargetGroupIds;
+    std::optional<double> chokeReleaseSeconds;
 };
 
 // Sprint 1 stores articulation identity independently from zone membership. The
@@ -80,9 +124,9 @@ struct RuntimeProjectZoneDefinition
 // deliberately begins in Sprint 2 and later.
 struct RuntimeProjectArticulationActivationDefinition
 {
-    std::string event = "note-on";
+    PerformanceEventKind event = PerformanceEventKind::noteOn;
     int midiNote = 0;
-    std::string mode = "latch";
+    ArticulationActivationMode mode = ArticulationActivationMode::latch;
     bool consume = true;
 };
 
@@ -93,6 +137,13 @@ struct RuntimeProjectArticulationDefinition
     bool isDefault = false;
     int displayOrder = 0;
     std::optional<RuntimeProjectArticulationActivationDefinition> activation;
+};
+
+struct RuntimeProjectRoundRobinResetRuleDefinition
+{
+    RoundRobinResetEvent event = RoundRobinResetEvent::articulationChange;
+    bool targetAll = true;
+    std::string targetPoolId;
 };
 
 struct RuntimeProjectMacroTargetControlLaw
@@ -220,6 +271,7 @@ struct RuntimeProjectAuthoringState
     std::string selectedGroupId;
     std::string selectedPerformanceBankId;
     std::vector<RuntimeProjectArticulationDefinition> articulations;
+    std::vector<RuntimeProjectRoundRobinResetRuleDefinition> roundRobinResetRules;
     std::vector<RuntimeProjectZoneDefinition> zones;
     std::vector<RuntimeProjectGroupDefinition> groups;
     std::vector<RuntimeProjectMacroDefinition> macros;

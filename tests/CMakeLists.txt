@@ -535,6 +535,31 @@ set_target_properties(drs_performance_engine_s1_articulation_tests PROPERTIES
     FOLDER "Tests"
 )
 
+add_executable(drs_performance_engine_s2_rule_tests
+    src/PerformanceEngineSprint2RuleTests.cpp
+)
+
+target_link_libraries(drs_performance_engine_s2_rule_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_definitions(drs_performance_engine_s2_rule_tests
+    PRIVATE
+        DRS_PERFORMANCE_ENGINE_S2_LEGACY_FIXTURE_PATH="${CMAKE_SOURCE_DIR}/content/runtime/phase2/control-law/three-group-linear-gain.drsproj"
+)
+
+target_compile_features(drs_performance_engine_s2_rule_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.performance_engine.s2.rules
+    COMMAND drs_performance_engine_s2_rule_tests
+)
+
+set_target_properties(drs_performance_engine_s2_rule_tests PROPERTIES
+    FOLDER "Tests"
+)
+
 add_executable(drs_curated_dsp_contract_red_tests
     src/CuratedDspContractRedTests.cpp
 )
@@ -3412,6 +3437,7 @@ add_dependencies(drs_all_tests
     drs_curated_dsp_contract_tests
     drs_performance_engine_s0_fixture_tests
     drs_performance_engine_s1_articulation_tests
+    drs_performance_engine_s2_rule_tests
     drs_curated_dsp_control_law_tests
     drs_control_law_tests
     drs_control_law_project_schema_tests

@@ -1,6 +1,7 @@
 #include "drs/engine/RuntimeLoader.h"
 #include "drs/engine/ControlLaw.h"
 #include "drs/engine/CuratedDspCatalog.h"
+#include "drs/engine/PerformanceRuleContract.h"
 
 #include "drs/engine/WorkspacePaths.generated.h"
 
@@ -808,7 +809,8 @@ void populateVelocityCrossfadeRuntimeDescriptors(std::vector<RuntimeZoneDefiniti
 }
 
 ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinition>& zones,
-                                   bool useExplicitRoundRobin)
+                                   bool useExplicitRoundRobin,
+                                   bool usePerformanceRules)
 {
     ordered_json array = ordered_json::array();
 
@@ -846,6 +848,20 @@ ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinitio
         }
         if (zone.triggerMode == ZoneTriggerMode::oneShot)
             zoneObject["triggerMode"] = "one-shot";
+        if (usePerformanceRules)
+        {
+            zoneObject["performance"] = {
+                { "event", performanceEventKindId(zone.performance.event) },
+                { "sustain", performanceSustainConditionId(zone.performance.sustain) },
+                { "pitchSource", performancePitchSourceId(zone.performance.pitchSource) }
+            };
+            if (!zone.exclusiveGroupId.empty())
+                zoneObject["exclusiveGroupId"] = zone.exclusiveGroupId;
+            if (!zone.exclusiveTargetGroupIds.empty())
+                zoneObject["exclusiveTargetGroupIds"] = serializeStringArray(zone.exclusiveTargetGroupIds);
+            if (zone.chokeReleaseSeconds.has_value())
+                zoneObject["chokeReleaseSeconds"] = *zone.chokeReleaseSeconds;
+        }
         array.push_back(std::move(zoneObject));
     }
 
@@ -890,13 +906,30 @@ ordered_json serializeProjectArticulations(
         {
             const auto& activation = *articulation.activation;
             articulationObject["activation"] = {
-                { "event", activation.event },
+                { "event", performanceEventKindId(activation.event) },
                 { "midiNote", activation.midiNote },
-                { "mode", activation.mode },
+                { "mode", articulationActivationModeId(activation.mode) },
                 { "consume", activation.consume }
             };
         }
         array.push_back(std::move(articulationObject));
+    }
+    return array;
+}
+
+ordered_json serializeRoundRobinResetRules(
+    const std::vector<RuntimeProjectRoundRobinResetRuleDefinition>& rules)
+{
+    ordered_json array = ordered_json::array();
+    for (const auto& rule : rules)
+    {
+        ordered_json object;
+        object["event"] = roundRobinResetEventId(rule.event);
+        if (rule.targetAll)
+            object["target"] = "all";
+        else
+            object["targetPoolId"] = rule.targetPoolId;
+        array.push_back(std::move(object));
     }
     return array;
 }
@@ -1230,9 +1263,13 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
                             else
                             {
                                 RuntimeProjectArticulationActivationDefinition activation;
-                                if (const auto event = readRequired<RuntimeProjectLoadResult, std::string>(*activationIterator, result, "event", context.c_str())) activation.event = *event;
+                                if (const auto event = readRequired<RuntimeProjectLoadResult, std::string>(*activationIterator, result, "event", context.c_str()))
+                                    if (!parsePerformanceEventKind(*event, activation.event))
+                                        addIssue(result, context + " activation field 'event' is unsupported.");
                                 if (const auto midiNote = readRequired<RuntimeProjectLoadResult, int>(*activationIterator, result, "midiNote", context.c_str())) activation.midiNote = *midiNote;
-                                if (const auto mode = readRequired<RuntimeProjectLoadResult, std::string>(*activationIterator, result, "mode", context.c_str())) activation.mode = *mode;
+                                if (const auto mode = readRequired<RuntimeProjectLoadResult, std::string>(*activationIterator, result, "mode", context.c_str()))
+                                    if (!parseArticulationActivationMode(*mode, activation.mode))
+                                        addIssue(result, context + " activation field 'mode' is unsupported.");
                                 if (const auto consume = readRequired<RuntimeProjectLoadResult, bool>(*activationIterator, result, "consume", context.c_str())) activation.consume = *consume;
                                 articulation.activation = std::move(activation);
                             }
@@ -1338,6 +1375,30 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
                             addIssue(result, context + " field 'triggerMode' must be 'gated' or 'one-shot'.");
                     }
 
+                    const auto performanceIterator = zoneObject.find("performance");
+                    if (performanceIterator != zoneObject.end())
+                    {
+                        if (!performanceIterator->is_object())
+                        {
+                            addIssue(result, context + " field 'performance' must be an object.");
+                        }
+                        else
+                        {
+                            if (const auto event = readRequired<RuntimeProjectLoadResult, std::string>(*performanceIterator, result, "event", context.c_str()))
+                                if (!parsePerformanceEventKind(*event, zone.performance.event)) addIssue(result, context + " performance field 'event' is unsupported.");
+                            if (const auto sustain = readRequired<RuntimeProjectLoadResult, std::string>(*performanceIterator, result, "sustain", context.c_str()))
+                                if (!parsePerformanceSustainCondition(*sustain, zone.performance.sustain)) addIssue(result, context + " performance field 'sustain' is unsupported.");
+                            if (const auto pitchSource = readRequired<RuntimeProjectLoadResult, std::string>(*performanceIterator, result, "pitchSource", context.c_str()))
+                                if (!parsePerformancePitchSource(*pitchSource, zone.performance.pitchSource)) addIssue(result, context + " performance field 'pitchSource' is unsupported.");
+                        }
+                    }
+                    if (const auto exclusiveGroupId = readOptional<RuntimeProjectLoadResult, std::string>(zoneObject, result, "exclusiveGroupId", context.c_str()))
+                        zone.exclusiveGroupId = *exclusiveGroupId;
+                    if (zoneObject.find("exclusiveTargetGroupIds") != zoneObject.end())
+                        zone.exclusiveTargetGroupIds = readRequiredStringArray(zoneObject, result, "exclusiveTargetGroupIds", context.c_str());
+                    if (const auto chokeReleaseSeconds = readOptional<RuntimeProjectLoadResult, double>(zoneObject, result, "chokeReleaseSeconds", context.c_str()))
+                        zone.chokeReleaseSeconds = *chokeReleaseSeconds;
+
                     if (!hasExplicitRoundRobinField)
                     {
                         if (const auto synthesizedRoundRobin = synthesizeRoundRobinFromLegacyScalars(zone))
@@ -1345,6 +1406,43 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
                     }
 
                     authoring.zones.push_back(std::move(zone));
+                }
+            }
+
+            if (project.schemaVersion >= 6 && authoring.schemaVersion >= 5)
+            {
+                const auto resetRulesIterator = authoringIterator->find("roundRobinResetRules");
+                if (resetRulesIterator != authoringIterator->end())
+                {
+                    if (!isObjectArray(*resetRulesIterator))
+                    {
+                        addIssue(result, "Project authoring field 'roundRobinResetRules' must be an array of objects.");
+                    }
+                    else
+                    {
+                        authoring.roundRobinResetRules.reserve(resetRulesIterator->size());
+                        for (std::size_t index = 0; index < resetRulesIterator->size(); ++index)
+                        {
+                            const auto& ruleObject = resetRulesIterator->at(index);
+                            const auto context = "RoundRobinResetRule[" + std::to_string(index) + "]";
+                            RuntimeProjectRoundRobinResetRuleDefinition rule;
+                            if (const auto event = readRequired<RuntimeProjectLoadResult, std::string>(ruleObject, result, "event", context.c_str()))
+                                if (!parseRoundRobinResetEvent(*event, rule.event)) addIssue(result, context + " field 'event' is unsupported.");
+                            const auto target = readOptional<RuntimeProjectLoadResult, std::string>(ruleObject, result, "target", context.c_str());
+                            const auto targetPoolId = readOptional<RuntimeProjectLoadResult, std::string>(ruleObject, result, "targetPoolId", context.c_str());
+                            if (target.has_value())
+                            {
+                                rule.targetAll = *target == "all";
+                                if (!rule.targetAll) addIssue(result, context + " field 'target' must be 'all'.");
+                            }
+                            if (targetPoolId.has_value())
+                            {
+                                rule.targetPoolId = *targetPoolId;
+                                rule.targetAll = false;
+                            }
+                            authoring.roundRobinResetRules.push_back(std::move(rule));
+                        }
+                    }
                 }
             }
 
@@ -1848,7 +1946,6 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
         std::unordered_set<std::string> zoneIds;
         std::unordered_set<std::string> articulationIds;
-        std::unordered_set<int> activationMidiNotes;
         std::size_t defaultArticulationCount = 0;
         if (explicitArticulationsRequired)
         {
@@ -1866,16 +1963,6 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
                     addIssue(result, "Project articulation '" + articulation.id + "' must not have a negative displayOrder.");
                 if (articulation.isDefault)
                     ++defaultArticulationCount;
-                if (articulation.activation.has_value())
-                {
-                    const auto& activation = *articulation.activation;
-                    if (activation.event != "note-on" || activation.mode != "latch" || !activation.consume)
-                        addIssue(result, "Project articulation '" + articulation.id + "' must use a consuming note-on latch activation.");
-                    if (activation.midiNote < 0 || activation.midiNote > 127)
-                        addIssue(result, "Project articulation '" + articulation.id + "' activation midiNote must be in 0-127.");
-                    else if (!activationMidiNotes.insert(activation.midiNote).second)
-                        addIssue(result, "Project articulation activation midiNote '" + std::to_string(activation.midiNote) + "' must be unique.");
-                }
             }
             if (defaultArticulationCount != 1)
                 addIssue(result, "Project authoring schema 5 must declare exactly one default articulation.");
@@ -2222,6 +2309,14 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
                 }
             }
         }
+    }
+
+    if (project.schemaVersion >= 6 && project.authoring.schemaVersion >= 5)
+    {
+        const auto performanceRules = validatePerformanceRuleDeclarations(project.authoring);
+        for (const auto& finding : performanceRules.findings)
+            addIssue(result, "[" + finding.code + "] " + finding.path + ": " + finding.message
+                           + " Repair: " + finding.repair);
     }
 
     if (result.issues.empty())
@@ -2946,8 +3041,12 @@ std::string serializeRuntimeProjectManifest(const RuntimeProjectModel& project, 
             authoring["selectedGroupId"] = project.authoring.selectedGroupId;
         authoring["selectedPerformanceBankId"] = project.authoring.selectedPerformanceBankId;
         if (project.schemaVersion >= 6)
+        {
             authoring["articulations"] = serializeProjectArticulations(project.authoring.articulations);
-        authoring["zones"] = serializeProjectZones(project.authoring.zones, project.schemaVersion >= 3);
+            authoring["roundRobinResetRules"] = serializeRoundRobinResetRules(project.authoring.roundRobinResetRules);
+        }
+        authoring["zones"] = serializeProjectZones(project.authoring.zones, project.schemaVersion >= 3,
+                                                     project.schemaVersion >= 6);
         if (project.schemaVersion >= 4)
             authoring["groups"] = serializeProjectGroups(project.authoring.groups);
         authoring["macros"] = serializeProjectMacros(project.authoring.macros);

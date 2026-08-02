@@ -1349,7 +1349,8 @@ RuntimeProjectDocumentActionResult AuthoringSession::createArticulation(
     if (articulation.activation.has_value())
     {
         const auto& activation = *articulation.activation;
-        if (activation.event != "note-on" || activation.mode != "latch" || !activation.consume
+        if (activation.event != PerformanceEventKind::noteOn
+            || activation.mode != ArticulationActivationMode::latch || !activation.consume
             || activation.midiNote < 0 || activation.midiNote > 127)
             return makeRejectedResult(getDocumentState(), "Articulation creation rejected",
                                       "Articulation activation must be a consuming note-on latch in MIDI range 0-127.");
@@ -1368,6 +1369,9 @@ RuntimeProjectDocumentActionResult AuthoringSession::createArticulation(
     created.displayOrder = static_cast<int>(project.authoring.articulations.size());
     created.isDefault = project.authoring.articulations.empty();
     project.authoring.articulations.push_back(std::move(created));
+    const auto validation = validateRuntimeProjectModel(project);
+    if (!validation.valid)
+        return makeRejectedResult(getDocumentState(), "Articulation creation rejected", validation.issues.front());
     return documentController.commitSnapshot(project, label, { "authoring.articulations" });
 }
 

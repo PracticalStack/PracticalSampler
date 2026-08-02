@@ -4,8 +4,7 @@
 
 namespace
 {
-constexpr std::array<std::string_view, 8> redSeams {
-    "zone-event-condition-schema",
+constexpr std::array<std::string_view, 7> redSeams {
     "compiled-event-index-tables",
     "lane-local-attack-context",
     "latch-switch-note-consumption",
