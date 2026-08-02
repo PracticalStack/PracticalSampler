@@ -28,6 +28,7 @@ struct PerformanceMixerControlView
     double displayMinimum = 0.0;
     double displayMaximum = 1.0;
     double value = 0.0;
+    drs::engine::CompiledControlLaw controlLaw;
 };
 
 class PerformanceMixer final : public juce::Component

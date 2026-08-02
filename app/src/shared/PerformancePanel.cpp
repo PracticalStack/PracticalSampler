@@ -152,6 +152,7 @@ std::vector<PerformanceMixerControlView> buildPublishedMixerControls(
         control.displayMinimum = macro.displayMinimum;
         control.displayMaximum = macro.displayMaximum;
         control.value = macro.currentValue;
+        control.controlLaw = macro.controlLaw;
         controls.push_back(std::move(control));
     }
     return controls;

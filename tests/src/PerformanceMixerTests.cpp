@@ -1,4 +1,5 @@
 #include "shared/PerformanceMixer.h"
+#include "drs/engine/ControlLaw.h"
 
 #include <algorithm>
 #include <array>
@@ -47,6 +48,15 @@ std::vector<drs::app::PerformanceMixerControlView> makeControls(const std::size_
         control.minimum = 0.0;
         control.maximum = 1.0;
         control.value = index == 1 ? 1.0 : 0.5;
+        if (index == 0)
+        {
+            control.displayMinimum = -96.0;
+            control.displayMaximum = 6.0;
+            control.value = 0.85;
+            require(drs::engine::compileControlLaw(drs::engine::controlLawMixerGainV1,
+                                                   -96.0, 6.0, control.controlLaw),
+                    "Mixer fixture must compile the frozen mixer law.");
+        }
         controls.push_back(std::move(control));
     }
     return controls;
@@ -97,6 +107,9 @@ int main()
         });
         mixer.setSize(1000, 330);
         mixer.setControls(makeControls(3));
+        require(findDescendantById(mixer, "performanceMixerValueLabel.authored-0")
+                    ->getDescription().contains("0.0 dB"),
+                "Mixer faders must format their published normalized value through the shared mixer law.");
         auto* continuous = dynamic_cast<juce::Slider*>(findDescendantById(
             mixer, "performanceMixerWidget.authored-2"));
         require(continuous != nullptr, "Continuous controls must render a slider widget.");
@@ -113,6 +126,12 @@ int main()
         toggle->onClick();
         require(receivedRuntimeId == "runtime-1" && receivedValue == 0.0,
                 "A boolean widget must update its own published runtime binding.");
+
+        auto* mixerFader = dynamic_cast<juce::Slider*>(findDescendantById(
+            mixer, "performanceMixerWidget.authored-0"));
+        require(mixerFader != nullptr && mixerFader->getDescription().contains("unity gain")
+                    && mixerFader->getDescription().contains("minus infinity"),
+                "Mixer faders must expose the unity detent and minus-infinity floor to assistive technology.");
         return 0;
     }
     catch (const std::exception& exception)

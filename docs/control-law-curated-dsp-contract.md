@@ -157,3 +157,22 @@ deterministic and randomized property tests. It covers anchors, monotonicity,
 endpoints, inverse round trips, clamping, non-finite rejection, formatting, and the
 legacy fixture. `ControlLaw` is engine-only; its compiled representation is fixed-size
 and trivially copyable, while strings are used only by the presentation formatter.
+
+## Sprint 4 publication, runtime, and Perform convergence
+
+Publication now compiles every published macro into `CompiledControlLaw`. The
+callback view carries this bounded payload instead of a linear/logarithmic curve flag;
+it contains no law ID strings or dynamically allocated data. A structured target with
+an authored law must use supported version 1 and compile for its resolved destination
+range. Unknown, future, or incompatible laws reject the pending publication before
+activation, so the prior immutable published table remains active. Legacy `curve`
+values are accepted only as an input bridge and compile immediately to the equivalent
+shared law.
+
+The plugin callback converts its normalized source coordinate through
+`normalizedToPhysical`; it has no local taper implementation. The published Perform
+model carries that same compiled law for labels and accessibility, and uses the core
+inverse function to place the frozen mixer law's unity detent at 85% travel. Mixer
+faders show `−∞` at their -96 dB floor, render a unity reference tick, and describe
+both the unity reset and infinity floor to assistive technology. Host values and all
+published control positions remain normalized, including recall and automation.

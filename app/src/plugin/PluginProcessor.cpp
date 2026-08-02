@@ -111,14 +111,9 @@ double mapPublishedDspMacroValue(const drs::engine::PublishedMacroCallbackSlot& 
         return slot.destinationMinimum;
 
     const auto normalized = std::clamp((value - slot.sourceMinimum) / sourceSpan, 0.0, 1.0);
-    if (slot.curve == drs::engine::PublishedMacroCurve::logarithmic
-        && slot.destinationMinimum > 0.0 && slot.destinationMaximum > 0.0)
-    {
-        return slot.destinationMinimum * std::pow(
-            slot.destinationMaximum / slot.destinationMinimum, normalized);
-    }
-    return slot.destinationMinimum
-        + (slot.destinationMaximum - slot.destinationMinimum) * normalized;
+    double physical = slot.destinationMinimum;
+    return drs::engine::normalizedToPhysical(slot.controlLaw, normalized, physical)
+        ? physical : slot.destinationMinimum;
 }
 
 int clampMidiValue(int value)

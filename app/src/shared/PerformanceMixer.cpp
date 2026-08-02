@@ -12,21 +12,41 @@ const auto mixerTextColour = juce::Colour::fromRGB(25, 37, 53);
 const auto mixerMutedTextColour = juce::Colour::fromRGB(73, 87, 105);
 const auto mixerAccentColour = juce::Colour::fromRGB(28, 126, 214);
 
+drs::engine::ControlLawUnit controlLawUnitFor(const std::string& valueUnit)
+{
+    if (valueUnit == "dB") return drs::engine::ControlLawUnit::decibels;
+    if (valueUnit == "Hz") return drs::engine::ControlLawUnit::hertz;
+    if (valueUnit == "ms") return drs::engine::ControlLawUnit::milliseconds;
+    if (valueUnit == "s") return drs::engine::ControlLawUnit::seconds;
+    if (valueUnit == "%") return drs::engine::ControlLawUnit::percent;
+    if (valueUnit == "pan") return drs::engine::ControlLawUnit::pan;
+    return drs::engine::ControlLawUnit::generic;
+}
+
+double sourceValueToNormalized(const PerformanceMixerControlView& control) noexcept
+{
+    const auto sourceSpan = control.maximum - control.minimum;
+    return std::abs(sourceSpan) > 0.000001
+        ? std::clamp((control.value - control.minimum) / sourceSpan, 0.0, 1.0) : 0.0;
+}
+
 juce::String formatValue(const PerformanceMixerControlView& control)
 {
     if (control.controlKind == drs::engine::PublishedMacroControlKind::toggle)
         return control.value >= 0.5 ? "On" : "Off";
 
-    const auto sourceSpan = control.maximum - control.minimum;
-    const auto normalized = std::abs(sourceSpan) > 0.000001
-        ? std::clamp((control.value - control.minimum) / sourceSpan, 0.0, 1.0) : 0.0;
-    const auto displayValue = control.displayMinimum
-        + normalized * (control.displayMaximum - control.displayMinimum);
-    const auto precision = control.valueUnit == "dB" ? 1 : 2;
-    auto result = juce::String(displayValue, precision);
-    if (!control.valueUnit.empty())
-        result << " " << juce::String::fromUTF8(control.valueUnit.c_str());
-    return result;
+    double physical = 0.0;
+    if (!drs::engine::normalizedToPhysical(control.controlLaw,
+                                           sourceValueToNormalized(control), physical))
+        return "Unavailable";
+
+    drs::engine::ControlLawFormatOptions options;
+    options.precision = control.valueUnit == "dB" ? 1u : 2u;
+    options.renderMinimumAsNegativeInfinity
+        = control.controlLaw.kind == drs::engine::ControlLawKind::mixerGainV1;
+    options.negativeInfinityThreshold = control.displayMinimum;
+    return juce::String::fromUTF8(drs::engine::formatControlLawValue(
+        physical, controlLawUnitFor(control.valueUnit), options).c_str());
 }
 
 juce::String laneDescription(const PerformanceMixerControlView& control)
@@ -90,6 +110,7 @@ public:
     {
         view = next;
         const auto description = laneDescription(view);
+        auto sliderDescription = description;
         setDescription(description);
         sectionLabel.setText(juce::String::fromUTF8(view.sectionLabel.c_str()), juce::dontSendNotification);
         nameLabel.setText(juce::String::fromUTF8(view.controlLabel.c_str()), juce::dontSendNotification);
@@ -124,8 +145,24 @@ public:
                                       ? juce::Slider::LinearVertical : juce::Slider::RotaryHorizontalVerticalDrag);
             slider.setRange(view.minimum, view.maximum, 0.001);
             slider.setValue(view.value, juce::dontSendNotification);
+            if (view.controlKind == drs::engine::PublishedMacroControlKind::fader
+                && view.controlLaw.kind == drs::engine::ControlLawKind::mixerGainV1)
+            {
+                double unityNormalized = 0.0;
+                if (drs::engine::physicalToNormalized(view.controlLaw, 0.0, unityNormalized))
+                {
+                    const auto sourceUnity = view.minimum + unityNormalized
+                        * (view.maximum - view.minimum);
+                    slider.setDoubleClickReturnValue(true, sourceUnity);
+                }
+                sliderDescription += " Double-click returns to unity gain; the minimum value is minus infinity.";
+            }
+            else
+            {
+                slider.setDoubleClickReturnValue(false, 0.0);
+            }
             slider.setTitle(juce::String::fromUTF8(view.controlLabel.c_str()));
-            slider.setDescription(description);
+            slider.setDescription(sliderDescription);
             slider.setTooltip(description);
         }
         syncing = false;
@@ -136,6 +173,20 @@ public:
     {
         graphics.setColour(mixerCardColour);
         graphics.fillRoundedRectangle(getLocalBounds().toFloat(), 10.0f);
+        if (view.controlKind == drs::engine::PublishedMacroControlKind::fader
+            && view.controlLaw.kind == drs::engine::ControlLawKind::mixerGainV1)
+        {
+            double unityNormalized = 0.0;
+            if (drs::engine::physicalToNormalized(view.controlLaw, 0.0, unityNormalized))
+            {
+                const auto sliderBounds = slider.getBounds();
+                const auto y = static_cast<float>(sliderBounds.getBottom()
+                    - unityNormalized * static_cast<double>(sliderBounds.getHeight()));
+                graphics.setColour(mixerTextColour.withAlpha(0.65f));
+                graphics.drawLine(static_cast<float>(sliderBounds.getX() - 5), y,
+                                  static_cast<float>(sliderBounds.getRight() + 5), y, 1.5f);
+            }
+        }
     }
 
     void resized() override

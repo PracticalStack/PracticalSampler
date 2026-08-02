@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -115,6 +116,56 @@ void finalizePresentation(PublishedMacroPresentation& presentation,
         if (!presentation.valueUnit.empty())
             presentation.accessibilityDescription += ", " + presentation.valueUnit;
     }
+}
+
+bool compilePublishedControlLaw(const PlaybackSnapshotMacroTarget* target,
+                                const std::string_view fallbackLawId,
+                                const double destinationMinimum,
+                                const double destinationMaximum,
+                                CompiledControlLaw& result,
+                                std::string& code,
+                                std::string& message)
+{
+    // Legacy projects persisted a curve string. Keep that input readable, but
+    // immediately compile it into the same immutable payload as authored laws.
+    std::string_view lawId = fallbackLawId;
+    if (target != nullptr)
+    {
+        if (!target->controlLaw.id.empty())
+        {
+            if (target->controlLaw.version != 1)
+            {
+                code = "published-macro-control-law-version-unsupported";
+                message = "The authored control-law version is not supported by this runtime.";
+                return false;
+            }
+            lawId = target->controlLaw.id;
+        }
+        else if (target->controlLaw.version != 0)
+        {
+            code = "published-macro-control-law-incomplete";
+            message = "The authored control-law version requires a non-empty law id.";
+            return false;
+        }
+        else if (target->curve == "logarithmic")
+        {
+            lawId = controlLawLogPositiveV1;
+        }
+        else if (target->curve != "linear")
+        {
+            code = "published-macro-control-law-legacy-curve-invalid";
+            message = "The legacy macro curve cannot be compiled into a control law.";
+            return false;
+        }
+    }
+
+    if (!compileControlLaw(lawId, destinationMinimum, destinationMaximum, result))
+    {
+        code = "published-macro-control-law-incompatible";
+        message = "The authored control law is unknown or incompatible with its destination range.";
+        return false;
+    }
+    return true;
 }
 } // namespace
 
@@ -249,8 +300,38 @@ PublishedMacroBindingBuildResult buildPublishedMacroBindingTable(
                 binding.sourceMaximum = dspTarget->sourceMaximum;
                 binding.destinationMinimum = dspTarget->destinationMinimum;
                 binding.destinationMaximum = dspTarget->destinationMaximum;
-                binding.curve = dspTarget->curve == "logarithmic"
-                    ? PublishedMacroCurve::logarithmic : PublishedMacroCurve::linear;
+                std::string lawFindingCode;
+                std::string lawFindingMessage;
+                if (!compilePublishedControlLaw(dspTarget,
+                                               controlLawLinearDbV1,
+                                               binding.destinationMinimum,
+                                               binding.destinationMaximum,
+                                               binding.controlLaw,
+                                               lawFindingCode,
+                                               lawFindingMessage))
+                {
+                    addFinding(result, PublishedMacroBindingFindingSeverity::error,
+                               std::move(lawFindingCode), "authoredMacros." + macro.id + ".controlLaw",
+                               std::move(lawFindingMessage));
+                    continue;
+                }
+            }
+            else
+            {
+                std::string lawFindingCode;
+                std::string lawFindingMessage;
+                const auto fallbackLaw = binding.presentation.controlKind
+                        == PublishedMacroControlKind::toggle
+                    ? controlLawToggleV1 : controlLawLinearDbV1;
+                if (!compilePublishedControlLaw(nullptr, fallbackLaw,
+                                               binding.minValue, binding.maxValue,
+                                               binding.controlLaw, lawFindingCode, lawFindingMessage))
+                {
+                    addFinding(result, PublishedMacroBindingFindingSeverity::error,
+                               std::move(lawFindingCode), "authoredMacros." + macro.id,
+                               std::move(lawFindingMessage));
+                    continue;
+                }
             }
 
             const auto* previous = findPreviousBinding(request.previousActiveTable, macro.id);
@@ -285,7 +366,7 @@ PublishedMacroBindingBuildResult buildPublishedMacroBindingTable(
             callbackSlot.sourceMaximum = binding.sourceMaximum;
             callbackSlot.destinationMinimum = binding.destinationMinimum;
             callbackSlot.destinationMaximum = binding.destinationMaximum;
-            callbackSlot.curve = binding.curve;
+            callbackSlot.controlLaw = binding.controlLaw;
         }
         table->bindings.push_back(std::move(binding));
     }

@@ -63,6 +63,7 @@ struct EngineMacroDescriptor
     double displayMinimum = 0.0;
     double displayMaximum = 1.0;
     std::string authoredId;
+    CompiledControlLaw controlLaw;
 };
 
 struct EngineArticulationDescriptor

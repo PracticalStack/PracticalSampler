@@ -467,7 +467,8 @@ EngineMacroDescriptor makePublishedMacroDescriptor(const PublishedMacroBinding& 
         binding.presentation.accessibilityDescription,
         displayMinimum,
         displayMaximum,
-        binding.stableAuthoredId
+        binding.stableAuthoredId,
+        binding.controlLaw
     };
 }
 

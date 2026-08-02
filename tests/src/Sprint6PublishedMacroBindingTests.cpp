@@ -211,6 +211,39 @@ int main()
                     && bindingFor(*dspTarget.table, "tone").destinationMaximum == 6.0,
                 "Structured DSP macro targets must resolve stable slot and parameter ids into callback indices.");
 
+        auto mixerLawRequest = baselineRequest();
+        mixerLawRequest.authoredMacros.front().targets = {
+            { "dsp.zone-gain.gainDb", "curatedDsp.zone-gain.gainDb", "mix",
+              "zone-gain", "gainDb", 0.0, 1.0, -96.0, 6.0, "linear",
+              { std::string(controlLawMixerGainV1), 1 } }
+        };
+        mixerLawRequest.dspControlLayout = &dspLayout;
+        const auto mixerLaw = buildPublishedMacroBindingTable(mixerLawRequest);
+        double unityGain = -999.0;
+        require(mixerLaw.built && mixerLaw.table != nullptr
+                    && bindingFor(*mixerLaw.table, "tone").controlLaw.kind
+                        == ControlLawKind::mixerGainV1
+                    && normalizedToPhysical(mixerLaw.table->callbackView.slots[0].controlLaw,
+                                            0.85, unityGain)
+                    && std::abs(unityGain) < 0.0001,
+                "Publication must compile the curated mixer law into the bounded callback payload.");
+
+        auto invalidLawRequest = mixerLawRequest;
+        invalidLawRequest.authoredMacros.front().targets.front().controlLaw.id = "drs.unknown.v1";
+        const auto invalidLaw = buildPublishedMacroBindingTable(invalidLawRequest);
+        require(!invalidLaw.built
+                    && hasFinding(invalidLaw, "published-macro-control-law-incompatible")
+                    && mixerLaw.table->callbackView.slots[0].controlLaw.kind
+                        == ControlLawKind::mixerGainV1,
+                "An incompatible authored law must reject the pending publication without mutating the prior immutable table.");
+
+        auto incompleteLawRequest = mixerLawRequest;
+        incompleteLawRequest.authoredMacros.front().targets.front().controlLaw = { {}, 2 };
+        const auto incompleteLaw = buildPublishedMacroBindingTable(incompleteLawRequest);
+        require(!incompleteLaw.built
+                    && hasFinding(incompleteLaw, "published-macro-control-law-incomplete"),
+                "An incomplete authored law must never fall back to a legacy curve at publication.");
+
         std::reverse(dspLayout.controls.begin(), dspLayout.controls.end());
         dspLayout.graphPlanDigest = "graph-after-reorder";
         const auto reorderedDspTarget = buildPublishedMacroBindingTable(dspTargetRequest);

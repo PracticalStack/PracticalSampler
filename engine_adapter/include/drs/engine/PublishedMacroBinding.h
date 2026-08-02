@@ -1,6 +1,7 @@
 #pragma once
 
 #include "drs/engine/PlaybackSnapshot.h"
+#include "drs/engine/ControlLaw.h"
 #include "drs/engine/DspParameterControl.h"
 
 #include <array>
@@ -66,8 +67,6 @@ enum class PublishedMacroRenderTarget : std::uint8_t
     dspControl
 };
 
-enum class PublishedMacroCurve : std::uint8_t { linear = 0, logarithmic };
-
 // Presentation is prepared with the published table. The audio callback only
 // receives PublishedMacroCallbackView, so none of these strings enter the
 // realtime path.
@@ -114,7 +113,8 @@ struct PublishedMacroCallbackSlot
     double sourceMaximum = 1.0;
     double destinationMinimum = 0.0;
     double destinationMaximum = 1.0;
-    PublishedMacroCurve curve = PublishedMacroCurve::linear;
+    // Bounded, allocation-free law payload used directly by the audio callback.
+    CompiledControlLaw controlLaw;
 };
 
 struct PublishedMacroCallbackView
@@ -145,7 +145,7 @@ struct PublishedMacroBinding
     double sourceMaximum = 1.0;
     double destinationMinimum = 0.0;
     double destinationMaximum = 1.0;
-    PublishedMacroCurve curve = PublishedMacroCurve::linear;
+    CompiledControlLaw controlLaw;
 };
 
 struct ImmutablePublishedMacroBindingTable final
