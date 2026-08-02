@@ -102,6 +102,8 @@ private:
     struct RoundRobinPoolState
     {
         RoundRobinPoolKey key;
+        std::uint64_t stableId = 0;
+        std::uint64_t initialRandomState = 0;
         int nextSlotIndex = 1;
         std::uint64_t randomState = 0;
     };
@@ -128,6 +130,8 @@ private:
                      SamplerVoicePoolRenderResult& result,
                      std::uint64_t preEventVoiceIdLimit) noexcept;
     void resetRoundRobinPools() noexcept;
+    void resetRoundRobinPool(RoundRobinPoolState& pool) noexcept;
+    void applyRoundRobinResets(RoundRobinResetEvent event) noexcept;
     void rebuildRoundRobinPools(const SamplerRenderModel& model) noexcept;
     bool peekRoundRobinSlot(std::string_view poolId,
                             int slotCount,

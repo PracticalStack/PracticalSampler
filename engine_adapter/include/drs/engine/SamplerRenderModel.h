@@ -33,6 +33,7 @@ enum class SamplerRenderEventType : std::uint8_t
     pedalDown,
     pedalUp,
     allNotesOff,
+    roundRobinReset,
     reset
 };
 
@@ -49,6 +50,7 @@ struct SamplerRenderEvent
     std::uint32_t articulationIndex = kInvalidPerformanceProgramIndex;
     PerformanceEventKind performanceEvent = PerformanceEventKind::noteOn;
     bool sustainPedalDown = false;
+    RoundRobinResetEvent roundRobinResetEvent = RoundRobinResetEvent::articulationChange;
 };
 
 // Non-owning callback views. Their backing storage is owned and bounded by the playback context.

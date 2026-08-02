@@ -688,6 +688,26 @@ set_target_properties(drs_performance_engine_s8_choke_tests PROPERTIES
     FOLDER "Tests"
 )
 
+add_executable(drs_performance_engine_s9_round_robin_tests
+    src/PerformanceEngineSprint9RoundRobinTests.cpp
+)
+
+target_link_libraries(drs_performance_engine_s9_round_robin_tests
+    PRIVATE
+        drs_sampler_core
+)
+
+target_compile_features(drs_performance_engine_s9_round_robin_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.performance_engine.s9.round_robin
+    COMMAND drs_performance_engine_s9_round_robin_tests
+)
+
+set_target_properties(drs_performance_engine_s9_round_robin_tests PROPERTIES
+    FOLDER "Tests"
+)
+
 add_executable(drs_curated_dsp_contract_red_tests
     src/CuratedDspContractRedTests.cpp
 )

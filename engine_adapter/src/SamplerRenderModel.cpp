@@ -273,6 +273,7 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
             + prepared.performanceProgram.roundRobinResets.size() * sizeof(CompiledPerformanceRoundRobinReset)
             + prepared.performanceProgram.articulationStableIds.size() * sizeof(std::uint64_t)
             + prepared.performanceProgram.exclusiveGroupStableIds.size() * sizeof(std::uint64_t)
+            + prepared.performanceProgram.roundRobinPoolStableIds.size() * sizeof(std::uint64_t)
             + prepared.performanceProgram.zoneArticulationIndices.size() * sizeof(std::uint32_t))
     {
         addError(result, "render-model-performance-program-size-invalid", "payload.prepared.performanceProgram",

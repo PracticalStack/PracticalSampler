@@ -98,6 +98,9 @@ CompiledPerformanceProgramResult compilePerformanceProgram(const RuntimeProjectA
     poolIds.erase(std::unique(poolIds.begin(), poolIds.end()), poolIds.end());
     const auto poolIndex = makeIndex(poolIds);
     result.program.roundRobinPoolCount = static_cast<std::uint32_t>(poolIds.size());
+    result.program.roundRobinPoolStableIds.reserve(poolIds.size());
+    for (const auto& id : poolIds)
+        result.program.roundRobinPoolStableIds.push_back(stableIdHash(id));
 
     for (const auto& articulation : authoring.articulations)
     {
@@ -192,6 +195,7 @@ CompiledPerformanceProgramResult compilePerformanceProgram(const RuntimeProjectA
         + result.program.roundRobinResets.size() * sizeof(CompiledPerformanceRoundRobinReset)
         + result.program.articulationStableIds.size() * sizeof(std::uint64_t)
         + result.program.exclusiveGroupStableIds.size() * sizeof(std::uint64_t)
+        + result.program.roundRobinPoolStableIds.size() * sizeof(std::uint64_t)
         + result.program.zoneArticulationIndices.size() * sizeof(std::uint32_t);
     result.compiled = result.issues.empty();
     return result;
@@ -218,6 +222,7 @@ std::string serializeCompiledPerformanceProgram(const CompiledPerformanceProgram
     root["activations"] = std::move(activations);
     root["articulationStableIds"] = program.articulationStableIds;
     root["exclusiveGroupStableIds"] = program.exclusiveGroupStableIds;
+    root["roundRobinPoolStableIds"] = program.roundRobinPoolStableIds;
     root["zoneArticulationIndices"] = program.zoneArticulationIndices;
     nlohmann::ordered_json routes = nlohmann::ordered_json::array();
     for (const auto& route : program.triggerRoutes)

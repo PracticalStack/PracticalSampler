@@ -66,7 +66,10 @@ std::string_view roundRobinResetEventId(const RoundRobinResetEvent value) noexce
 {
     switch (value)
     {
+        case RoundRobinResetEvent::programActivation: return "program-activation";
         case RoundRobinResetEvent::articulationChange: return "articulation-change";
+        case RoundRobinResetEvent::allNotesOff: return "all-notes-off";
+        case RoundRobinResetEvent::pedalDown: return "pedal-down";
         case RoundRobinResetEvent::pedalUp: return "pedal-up";
     }
     return {};
@@ -105,7 +108,10 @@ bool parseArticulationActivationMode(const std::string_view value, ArticulationA
 
 bool parseRoundRobinResetEvent(const std::string_view value, RoundRobinResetEvent& result) noexcept
 {
+    if (value == "program-activation") { result = RoundRobinResetEvent::programActivation; return true; }
     if (value == "articulation-change") { result = RoundRobinResetEvent::articulationChange; return true; }
+    if (value == "all-notes-off") { result = RoundRobinResetEvent::allNotesOff; return true; }
+    if (value == "pedal-down") { result = RoundRobinResetEvent::pedalDown; return true; }
     if (value == "pedal-up") { result = RoundRobinResetEvent::pedalUp; return true; }
     return false;
 }

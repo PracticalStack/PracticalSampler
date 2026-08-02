@@ -28,6 +28,15 @@ bool hasTriggerRoute(const CompiledPerformanceProgram& program,
     }
     return false;
 }
+
+bool hasRoundRobinResetRule(const CompiledPerformanceProgram& program,
+                            const RoundRobinResetEvent event) noexcept
+{
+    for (const auto& rule : program.roundRobinResets)
+        if (rule.event == event)
+            return true;
+    return false;
+}
 } // namespace
 
 bool PerformanceActionScratch::push(const SamplerRenderEvent event) noexcept
@@ -162,13 +171,19 @@ bool PerformanceLaneState::normalize(const SamplerRenderEvent& raw,
     {
         case SamplerRenderEventType::noteOn:
         {
-            if (scratch.size() + 1 > PerformanceActionScratch::capacity)
+            const auto activation = program.activationByMidiNote[raw.midiNote];
+            const auto isActivation = activation.articulationIndex < program.articulationCount;
+            const auto articulationChanged = isActivation
+                && selectedArticulationIndex != activation.articulationIndex;
+            const auto emitsRoundRobinReset = articulationChanged
+                && hasRoundRobinResetRule(program, RoundRobinResetEvent::articulationChange);
+            const auto actionCount = (isActivation && activation.consume ? 0u : 1u)
+                + (emitsRoundRobinReset ? 1u : 0u);
+            if (scratch.size() + actionCount > PerformanceActionScratch::capacity)
             {
                 ++actionOverflowCount;
                 return false;
             }
-            const auto activation = program.activationByMidiNote[raw.midiNote];
-            const auto isActivation = activation.articulationIndex < program.articulationCount;
             if (isActivation)
             {
                 selectedArticulationIndex = activation.articulationIndex;
@@ -177,6 +192,13 @@ bool PerformanceLaneState::normalize(const SamplerRenderEvent& raw,
             }
             recordNoteOn(event, activationGeneration, isActivation && activation.consume);
             ++semanticEventCounts[static_cast<std::size_t>(PerformanceEventKind::noteOn)];
+            if (emitsRoundRobinReset)
+            {
+                event.type = SamplerRenderEventType::roundRobinReset;
+                event.roundRobinResetEvent = RoundRobinResetEvent::articulationChange;
+                scratch.push(event);
+                event = raw;
+            }
             if (isActivation && activation.consume) return true;
             event.articulationIndex = selectedArticulationIndex;
             event.performanceEvent = PerformanceEventKind::noteOn;

@@ -50,7 +50,10 @@ enum class ArticulationActivationMode : std::uint8_t
 
 enum class RoundRobinResetEvent : std::uint8_t
 {
+    programActivation,
     articulationChange,
+    allNotesOff,
+    pedalDown,
     pedalUp
 };
 

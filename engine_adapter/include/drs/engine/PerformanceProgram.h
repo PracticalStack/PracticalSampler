@@ -53,6 +53,8 @@ struct CompiledPerformanceProgram
     std::vector<std::uint64_t> articulationStableIds;
     // Stable group hashes keep choke targets comparable across activation generations.
     std::vector<std::uint64_t> exclusiveGroupStableIds;
+    // Stable pool hashes map compiled reset targets to callback-owned RR cursors.
+    std::vector<std::uint64_t> roundRobinPoolStableIds;
     // Indexed by the authored/prepared zone order, this bridges render routes to an
     // articulation without retaining string IDs on the callback path.
     std::vector<std::uint32_t> zoneArticulationIndices;

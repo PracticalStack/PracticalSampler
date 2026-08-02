@@ -142,16 +142,18 @@ int eventPriorityAtSharedOffset(const SamplerRenderEvent& event) noexcept
     {
         case SamplerRenderEventType::reset:
             return 0;
-        case SamplerRenderEventType::allNotesOff:
+        case SamplerRenderEventType::roundRobinReset:
             return 1;
+        case SamplerRenderEventType::allNotesOff:
+            return 2;
         case SamplerRenderEventType::sustainPedal:
         case SamplerRenderEventType::pedalDown:
         case SamplerRenderEventType::pedalUp:
-            return 2;
-        case SamplerRenderEventType::noteOff:
             return 3;
-        case SamplerRenderEventType::noteOn:
+        case SamplerRenderEventType::noteOff:
             return 4;
+        case SamplerRenderEventType::noteOn:
+            return 5;
     }
 
     return std::numeric_limits<int>::max();
@@ -312,6 +314,7 @@ bool SamplerVoicePool::activateModel(const SamplerRenderModel& model,
     sampleRate = outputSampleRate;
     activeGeneration = activationGeneration;
     rebuildRoundRobinPools(model);
+    applyRoundRobinResets(RoundRobinResetEvent::programActivation);
     return true;
 }
 
@@ -537,6 +540,14 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                                   SamplerVoicePoolRenderResult& result,
                                   const SamplerRenderControlValues& controls) noexcept
 {
+    if (event.type == SamplerRenderEventType::roundRobinReset)
+    {
+        applyRoundRobinResets(event.roundRobinResetEvent);
+        return;
+    }
+    if (event.type == SamplerRenderEventType::allNotesOff)
+        applyRoundRobinResets(RoundRobinResetEvent::allNotesOff);
+
     switch (event.type)
     {
         case SamplerRenderEventType::noteOn:
@@ -894,6 +905,8 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
             if (pressed == sustainPedalDown)
                 return;
             sustainPedalDown = pressed;
+            applyRoundRobinResets(pressed ? RoundRobinResetEvent::pedalDown
+                                          : RoundRobinResetEvent::pedalUp);
             if (sustainPedalDown)
                 return;
             for (auto& slot : slots)
@@ -951,6 +964,44 @@ void SamplerVoicePool::resetRoundRobinPools() noexcept
         pool = {};
 }
 
+void SamplerVoicePool::resetRoundRobinPool(RoundRobinPoolState& pool) noexcept
+{
+    if (pool.key.slotCount <= 0) return;
+    if (pool.key.mode == RoundRobinMode::random)
+    {
+        pool.randomState = advanceRandomState(pool.initialRandomState);
+        pool.nextSlotIndex = static_cast<int>(pool.randomState
+            % static_cast<std::uint64_t>(pool.key.slotCount)) + 1;
+    }
+    else
+    {
+        pool.randomState = pool.initialRandomState;
+        pool.nextSlotIndex = 1;
+    }
+}
+
+void SamplerVoicePool::applyRoundRobinResets(const RoundRobinResetEvent event) noexcept
+{
+    if (renderModel == nullptr) return;
+    const auto& program = renderModel->getPerformanceProgram();
+    for (const auto& action : program.roundRobinResets)
+    {
+        if (action.event != event) continue;
+        if (action.targetPoolIndex == kInvalidPerformanceProgramIndex)
+        {
+            for (std::size_t pool = 0; pool < roundRobinPoolCount; ++pool)
+                resetRoundRobinPool(roundRobinPools[pool]);
+            continue;
+        }
+        if (action.targetPoolIndex >= program.roundRobinPoolStableIds.size())
+            continue;
+        const auto targetStableId = program.roundRobinPoolStableIds[action.targetPoolIndex];
+        for (std::size_t pool = 0; pool < roundRobinPoolCount; ++pool)
+            if (roundRobinPools[pool].stableId == targetStableId)
+                resetRoundRobinPool(roundRobinPools[pool]);
+    }
+}
+
 void SamplerVoicePool::rebuildRoundRobinPools(const SamplerRenderModel& model) noexcept
 {
     resetRoundRobinPools();
@@ -987,20 +1038,10 @@ void SamplerVoicePool::rebuildRoundRobinPools(const SamplerRenderModel& model) n
         roundRobinPools[roundRobinPoolCount].key.slotCount = slotCount;
         roundRobinPools[roundRobinPoolCount].key.usesLegacyScalarKey = usesLegacyScalarKey;
         roundRobinPools[roundRobinPoolCount].key.mode = mode;
-        roundRobinPools[roundRobinPoolCount].randomState =
-            computeFnv1a64(poolId) ^ static_cast<std::uint64_t>(slotCount);
-        if (mode == RoundRobinMode::random)
-        {
-            roundRobinPools[roundRobinPoolCount].randomState =
-                advanceRandomState(roundRobinPools[roundRobinPoolCount].randomState);
-            roundRobinPools[roundRobinPoolCount].nextSlotIndex =
-                static_cast<int>(roundRobinPools[roundRobinPoolCount].randomState
-                                 % static_cast<std::uint64_t>(slotCount)) + 1;
-        }
-        else
-        {
-            roundRobinPools[roundRobinPoolCount].nextSlotIndex = 1;
-        }
+        roundRobinPools[roundRobinPoolCount].stableId = computeFnv1a64(poolId);
+        roundRobinPools[roundRobinPoolCount].initialRandomState =
+            roundRobinPools[roundRobinPoolCount].stableId ^ static_cast<std::uint64_t>(slotCount);
+        resetRoundRobinPool(roundRobinPools[roundRobinPoolCount]);
         ++roundRobinPoolCount;
     }
 }
