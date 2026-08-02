@@ -492,6 +492,47 @@ void SamplerVoicePool::renderRange(SamplerAudioBufferView output,
     }
 }
 
+void SamplerVoicePool::applyChokes(const SamplerRenderRoute& sourceRoute,
+                                   SamplerVoicePoolRenderResult& result,
+                                   const std::uint64_t preEventVoiceIdLimit) noexcept
+{
+    if (renderModel == nullptr || sourceRoute.performanceChokeTargetMask == 0)
+        return;
+
+    const auto& targetGroupIds = renderModel->getPerformanceProgram().exclusiveGroupStableIds;
+    if (targetGroupIds.empty()) return;
+    auto releaseSeconds = static_cast<double>(sourceRoute.performanceChokeReleaseSeconds);
+    if (!std::isfinite(releaseSeconds) || releaseSeconds < 0.001)
+        releaseSeconds = 0.001;
+
+    for (auto& slot : slots)
+    {
+        if (slot.state != SamplerVoiceSlotState::active
+            || slot.voice.getVoiceId() >= preEventVoiceIdLimit)
+            continue;
+        const auto* voiceModel = slot.voice.getRenderModel();
+        const auto routeIndex = slot.voice.getRouteIndex();
+        if (voiceModel == nullptr || routeIndex >= voiceModel->getRoutes().size())
+            continue;
+        const auto groupId = voiceModel->getRoutes()[routeIndex].performanceExclusiveGroupStableId;
+        if (groupId == 0) continue;
+
+        auto targeted = false;
+        for (std::size_t target = 0; target < targetGroupIds.size() && target < 64; ++target)
+            if ((sourceRoute.performanceChokeTargetMask & (std::uint64_t { 1 } << target)) != 0
+                && targetGroupIds[target] == groupId)
+            {
+                targeted = true;
+                break;
+            }
+        if (!targeted || !slot.voice.beginRelease(releaseSeconds))
+            continue;
+        slot.state = SamplerVoiceSlotState::releasing;
+        slot.sustainDeferred = false;
+        ++result.render.chokedVoiceCount;
+    }
+}
+
 void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                                   SamplerVoicePoolRenderResult& result,
                                   const SamplerRenderControlValues& controls) noexcept
@@ -704,6 +745,7 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                     ++result.render.crossfadeFallbackCount;
             }
 
+            const auto chokeExistingVoiceIdLimit = nextVoiceId;
             const auto startRoute = [&](std::size_t routeIndex,
                                         double routeGainMultiplier,
                                         bool countAsCrossfade) noexcept
@@ -711,6 +753,7 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 bool stolen = false;
                 bool generationStolen = false;
                 bool releasingStolen = false;
+                applyChokes(routes[routeIndex], result, chokeExistingVoiceIdLimit);
                 const auto slotIndex = acquireSlot(stolen, generationStolen, releasingStolen);
                 auto& slot = slots[slotIndex];
                 const auto& route = routes[routeIndex];

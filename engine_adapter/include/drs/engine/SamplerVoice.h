@@ -51,7 +51,7 @@ public:
     static constexpr std::uint32_t compatibilityReleaseSampleCount = 2048;
 
     bool start(const SamplerRenderModel& model, const SamplerVoiceStartRequest& request) noexcept;
-    bool beginRelease() noexcept;
+    bool beginRelease(double overrideReleaseSeconds = 0.0) noexcept;
     SamplerVoiceRenderResult render(SamplerAudioBufferView output,
                                     std::uint32_t outputStartFrame,
                                     std::uint32_t frameCount) noexcept;

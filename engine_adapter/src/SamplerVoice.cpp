@@ -73,7 +73,7 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
     return true;
 }
 
-bool SamplerVoice::beginRelease() noexcept
+bool SamplerVoice::beginRelease(const double overrideReleaseSeconds) noexcept
 {
     if (lifecycleState == SamplerVoiceLifecycleState::releasing)
         return false;
@@ -81,10 +81,12 @@ bool SamplerVoice::beginRelease() noexcept
         return false;
 
     lifecycleState = SamplerVoiceLifecycleState::releasing;
-    if (route != nullptr && route->releaseSeconds > 0.0 && std::isfinite(outputSampleRate) && outputSampleRate > 0.0)
+    const auto releaseSeconds = overrideReleaseSeconds > 0.0
+        ? overrideReleaseSeconds : (route != nullptr ? route->releaseSeconds : 0.0);
+    if (releaseSeconds > 0.0 && std::isfinite(outputSampleRate) && outputSampleRate > 0.0)
     {
         releaseSamplesTotal = static_cast<std::uint32_t>(
-            std::max(1ll, static_cast<long long>(std::llround(route->releaseSeconds * outputSampleRate))));
+            std::max(1ll, static_cast<long long>(std::llround(releaseSeconds * outputSampleRate))));
     }
     else
     {

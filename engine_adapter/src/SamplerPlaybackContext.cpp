@@ -390,6 +390,7 @@ SamplerPlaybackContextSnapshot SamplerPlaybackContext::getSnapshot() const noexc
             = diagnosticRoundRobinPoolMissCount.load(std::memory_order_relaxed);
         snapshot.counters.roundRobinFallbackCount
             = diagnosticRoundRobinFallbackCount.load(std::memory_order_relaxed);
+        snapshot.counters.chokedVoiceCount = diagnosticChokedVoiceCount.load(std::memory_order_relaxed);
         snapshot.counters.appliedActivationCount = diagnosticAppliedActivationCount.load(std::memory_order_relaxed);
         snapshot.counters.enqueuedRetirementCount = diagnosticEnqueuedRetirementCount.load(std::memory_order_relaxed);
         if (before == diagnosticRealtimeSequence.load(std::memory_order_acquire))
@@ -571,6 +572,7 @@ void SamplerPlaybackContext::accumulate(const SamplerVoicePoolRenderResult& resu
     counters.roundRobinPoolHitCount += result.render.roundRobinPoolHitCount;
     counters.roundRobinPoolMissCount += result.render.roundRobinPoolMissCount;
     counters.roundRobinFallbackCount += result.render.roundRobinFallbackCount;
+    counters.chokedVoiceCount += result.render.chokedVoiceCount;
 }
 
 void SamplerPlaybackContext::publishRealtimeDiagnostics() noexcept
@@ -640,6 +642,7 @@ void SamplerPlaybackContext::publishRealtimeDiagnostics() noexcept
                                             std::memory_order_release);
     diagnosticRoundRobinFallbackCount.store(counters.roundRobinFallbackCount,
                                             std::memory_order_release);
+    diagnosticChokedVoiceCount.store(counters.chokedVoiceCount, std::memory_order_release);
     diagnosticAppliedActivationCount.store(counters.appliedActivationCount, std::memory_order_release);
     diagnosticEnqueuedRetirementCount.store(counters.enqueuedRetirementCount, std::memory_order_release);
     diagnosticRealtimeSequence.fetch_add(1, std::memory_order_release);

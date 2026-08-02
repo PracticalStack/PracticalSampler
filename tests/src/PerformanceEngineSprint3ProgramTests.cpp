@@ -75,8 +75,10 @@ void verifyProgramAndSnapshot()
     require(first.program.eventRanges[static_cast<std::size_t>(PerformanceEventKind::noteOn)].routeCount == 1
                 && first.program.eventRanges[static_cast<std::size_t>(PerformanceEventKind::release)].routeCount == 1,
             "Event table ranges must isolate note and release routes.");
-    require(first.program.triggerRoutes.front().chokeTargetMask != 0 && first.program.retainedBytes > 0,
-            "Trigger routes must retain numeric choke masks and memory accounting.");
+    require(first.program.triggerRoutes.front().chokeTargetMask != 0
+                && first.program.exclusiveGroupStableIds.size() == first.program.exclusiveGroupCount
+                && first.program.retainedBytes > 0,
+            "Trigger routes must retain numeric choke masks, stable group identities, and memory accounting.");
 
     PlaybackSnapshotBuilder builder;
     const auto snapshot = builder.buildSnapshot(builder.requestBuild(3, true), project);

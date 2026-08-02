@@ -114,6 +114,7 @@ struct SamplerRenderResult
     std::uint32_t roundRobinPoolHitCount = 0;
     std::uint32_t roundRobinPoolMissCount = 0;
     std::uint32_t roundRobinFallbackCount = 0;
+    std::uint32_t chokedVoiceCount = 0;
 };
 
 struct SamplerRenderSample
@@ -155,6 +156,9 @@ struct SamplerRenderRoute
     PerformanceEventKind performanceEvent = PerformanceEventKind::noteOn;
     PerformanceSustainCondition performanceSustain = PerformanceSustainCondition::any;
     PerformancePitchSource performancePitchSource = PerformancePitchSource::eventNote;
+    std::uint64_t performanceExclusiveGroupStableId = 0;
+    std::uint64_t performanceChokeTargetMask = 0;
+    float performanceChokeReleaseSeconds = 0.0f;
 };
 
 struct SamplerRenderModelBuildResult;

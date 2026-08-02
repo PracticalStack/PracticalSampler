@@ -124,6 +124,9 @@ private:
     void applyEvent(const SamplerRenderEvent& event,
                     SamplerVoicePoolRenderResult& result,
                     const SamplerRenderControlValues& controls) noexcept;
+    void applyChokes(const SamplerRenderRoute& sourceRoute,
+                     SamplerVoicePoolRenderResult& result,
+                     std::uint64_t preEventVoiceIdLimit) noexcept;
     void resetRoundRobinPools() noexcept;
     void rebuildRoundRobinPools(const SamplerRenderModel& model) noexcept;
     bool peekRoundRobinSlot(std::string_view poolId,

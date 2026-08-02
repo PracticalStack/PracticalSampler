@@ -86,6 +86,9 @@ CompiledPerformanceProgramResult compilePerformanceProgram(const RuntimeProjectA
     groupIds.erase(std::unique(groupIds.begin(), groupIds.end()), groupIds.end());
     const auto groupIndex = makeIndex(groupIds);
     result.program.exclusiveGroupCount = static_cast<std::uint32_t>(groupIds.size());
+    result.program.exclusiveGroupStableIds.reserve(groupIds.size());
+    for (const auto& id : groupIds)
+        result.program.exclusiveGroupStableIds.push_back(stableIdHash(id));
 
     std::vector<std::string> poolIds;
     for (const auto& zone : authoring.zones)
@@ -188,6 +191,7 @@ CompiledPerformanceProgramResult compilePerformanceProgram(const RuntimeProjectA
         + result.program.triggerRoutes.size() * sizeof(CompiledPerformanceTriggerRoute)
         + result.program.roundRobinResets.size() * sizeof(CompiledPerformanceRoundRobinReset)
         + result.program.articulationStableIds.size() * sizeof(std::uint64_t)
+        + result.program.exclusiveGroupStableIds.size() * sizeof(std::uint64_t)
         + result.program.zoneArticulationIndices.size() * sizeof(std::uint32_t);
     result.compiled = result.issues.empty();
     return result;
@@ -213,6 +217,7 @@ std::string serializeCompiledPerformanceProgram(const CompiledPerformanceProgram
     }
     root["activations"] = std::move(activations);
     root["articulationStableIds"] = program.articulationStableIds;
+    root["exclusiveGroupStableIds"] = program.exclusiveGroupStableIds;
     root["zoneArticulationIndices"] = program.zoneArticulationIndices;
     nlohmann::ordered_json routes = nlohmann::ordered_json::array();
     for (const auto& route : program.triggerRoutes)

@@ -668,6 +668,26 @@ set_target_properties(drs_performance_engine_s7_pedal_tests PROPERTIES
     FOLDER "Tests"
 )
 
+add_executable(drs_performance_engine_s8_choke_tests
+    src/PerformanceEngineSprint8ChokeTests.cpp
+)
+
+target_link_libraries(drs_performance_engine_s8_choke_tests
+    PRIVATE
+        drs_sampler_core
+)
+
+target_compile_features(drs_performance_engine_s8_choke_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.performance_engine.s8.choke
+    COMMAND drs_performance_engine_s8_choke_tests
+)
+
+set_target_properties(drs_performance_engine_s8_choke_tests PROPERTIES
+    FOLDER "Tests"
+)
+
 add_executable(drs_curated_dsp_contract_red_tests
     src/CuratedDspContractRedTests.cpp
 )

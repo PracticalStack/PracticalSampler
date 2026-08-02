@@ -272,6 +272,7 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
             + prepared.performanceProgram.triggerRoutes.size() * sizeof(CompiledPerformanceTriggerRoute)
             + prepared.performanceProgram.roundRobinResets.size() * sizeof(CompiledPerformanceRoundRobinReset)
             + prepared.performanceProgram.articulationStableIds.size() * sizeof(std::uint64_t)
+            + prepared.performanceProgram.exclusiveGroupStableIds.size() * sizeof(std::uint64_t)
             + prepared.performanceProgram.zoneArticulationIndices.size() * sizeof(std::uint32_t))
     {
         addError(result, "render-model-performance-program-size-invalid", "payload.prepared.performanceProgram",
@@ -568,7 +569,14 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
                                   triggerRoute == prepared.performanceProgram.triggerRoutes.end()
                                       ? PerformanceSustainCondition::any : triggerRoute->sustain,
                                   triggerRoute == prepared.performanceProgram.triggerRoutes.end()
-                                      ? PerformancePitchSource::eventNote : triggerRoute->pitchSource });
+                                      ? PerformancePitchSource::eventNote : triggerRoute->pitchSource,
+                                  triggerRoute == prepared.performanceProgram.triggerRoutes.end()
+                                      || triggerRoute->exclusiveGroupIndex >= prepared.performanceProgram.exclusiveGroupStableIds.size()
+                                      ? 0 : prepared.performanceProgram.exclusiveGroupStableIds[triggerRoute->exclusiveGroupIndex],
+                                  triggerRoute == prepared.performanceProgram.triggerRoutes.end()
+                                      ? 0 : triggerRoute->chokeTargetMask,
+                                  triggerRoute == prepared.performanceProgram.triggerRoutes.end()
+                                      ? 0.0f : triggerRoute->chokeReleaseSeconds });
     }
 
     result.built = true;

@@ -28,6 +28,7 @@ struct SamplerPlaybackContextCounters
     std::uint64_t roundRobinPoolHitCount = 0;
     std::uint64_t roundRobinPoolMissCount = 0;
     std::uint64_t roundRobinFallbackCount = 0;
+    std::uint64_t chokedVoiceCount = 0;
     std::uint64_t appliedActivationCount = 0;
     std::uint64_t enqueuedRetirementCount = 0;
     std::uint64_t reclaimedActivationCount = 0;
@@ -218,6 +219,7 @@ private:
     std::atomic<std::uint64_t> diagnosticRoundRobinPoolHitCount { 0 };
     std::atomic<std::uint64_t> diagnosticRoundRobinPoolMissCount { 0 };
     std::atomic<std::uint64_t> diagnosticRoundRobinFallbackCount { 0 };
+    std::atomic<std::uint64_t> diagnosticChokedVoiceCount { 0 };
     std::atomic<std::uint64_t> diagnosticAppliedActivationCount { 0 };
     std::atomic<std::uint64_t> diagnosticEnqueuedRetirementCount { 0 };
     std::uint64_t nextActivationSerial = 1;
