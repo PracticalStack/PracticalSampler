@@ -75,6 +75,26 @@ struct RuntimeProjectZoneDefinition
     ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;
 };
 
+// Sprint 1 stores articulation identity independently from zone membership. The
+// activation record is persisted here, but its typed rule compilation/execution
+// deliberately begins in Sprint 2 and later.
+struct RuntimeProjectArticulationActivationDefinition
+{
+    std::string event = "note-on";
+    int midiNote = 0;
+    std::string mode = "latch";
+    bool consume = true;
+};
+
+struct RuntimeProjectArticulationDefinition
+{
+    std::string id;
+    std::string displayName;
+    bool isDefault = false;
+    int displayOrder = 0;
+    std::optional<RuntimeProjectArticulationActivationDefinition> activation;
+};
+
 struct RuntimeProjectMacroTargetControlLaw
 {
     std::string id;
@@ -199,6 +219,7 @@ struct RuntimeProjectAuthoringState
     std::string selectedZoneId;
     std::string selectedGroupId;
     std::string selectedPerformanceBankId;
+    std::vector<RuntimeProjectArticulationDefinition> articulations;
     std::vector<RuntimeProjectZoneDefinition> zones;
     std::vector<RuntimeProjectGroupDefinition> groups;
     std::vector<RuntimeProjectMacroDefinition> macros;

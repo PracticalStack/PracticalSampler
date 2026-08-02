@@ -65,6 +65,32 @@ bool usesExplicitZoneGroupsSchema(const RuntimeProjectModel& project) noexcept
     return project.schemaVersion >= 4 && project.authoring.schemaVersion >= 3;
 }
 
+bool usesExplicitArticulationSchema(const RuntimeProjectModel& project) noexcept
+{
+    return project.schemaVersion >= 6 && project.authoring.schemaVersion >= 5;
+}
+
+std::optional<std::size_t> findArticulationIndexById(const RuntimeProjectModel& project,
+                                                     const std::string& articulationId)
+{
+    const auto iterator = std::find_if(project.authoring.articulations.begin(),
+                                       project.authoring.articulations.end(),
+                                       [&](const RuntimeProjectArticulationDefinition& articulation)
+                                       {
+                                           return articulation.id == articulationId;
+                                       });
+    if (iterator == project.authoring.articulations.end())
+        return std::nullopt;
+    return static_cast<std::size_t>(
+        std::distance(project.authoring.articulations.begin(), iterator));
+}
+
+void normalizeArticulationDisplayOrder(RuntimeProjectModel& project)
+{
+    for (std::size_t index = 0; index < project.authoring.articulations.size(); ++index)
+        project.authoring.articulations[index].displayOrder = static_cast<int>(index);
+}
+
 std::optional<std::size_t> findGroupIndexById(const RuntimeProjectModel& project,
                                               const std::string& groupId)
 {
@@ -1103,6 +1129,11 @@ std::optional<RuntimeProjectZoneDefinition> AuthoringSession::getSelectedZone() 
     return getProject().authoring.zones[*selectedZoneIndex];
 }
 
+std::vector<RuntimeProjectArticulationDefinition> AuthoringSession::getArticulations() const
+{
+    return getProject().authoring.articulations;
+}
+
 std::optional<RuntimeProjectGroupDefinition> AuthoringSession::getSelectedGroup() const
 {
     if (!usesExplicitZoneGroupsSchema(getProject()))
@@ -1296,6 +1327,160 @@ RuntimeProjectDocumentActionResult AuthoringSession::updateSelectedZone(const Ru
         changedPaths.push_back("authoring.selectedGroupId");
 
     return documentController.commitSnapshot(project, label, changedPaths);
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::createArticulation(
+    const RuntimeProjectArticulationDefinition& articulation,
+    const std::string& label)
+{
+    auto project = getProject();
+    if (!usesExplicitArticulationSchema(project))
+        return makeRejectedResult(getDocumentState(), "Articulation creation rejected",
+                                  "This project schema does not support explicit authored articulations.");
+    if (articulation.id.empty() || articulation.displayName.empty())
+        return makeRejectedResult(getDocumentState(), "Articulation creation rejected",
+                                  "Articulation ids and display names must be non-empty.");
+    if (findArticulationIndexById(project, articulation.id).has_value())
+        return makeRejectedResult(getDocumentState(), "Articulation creation rejected",
+                                  "Articulation id '" + articulation.id + "' already exists.");
+    if (project.authoring.articulations.size() >= 64)
+        return makeRejectedResult(getDocumentState(), "Articulation creation rejected",
+                                  "The 64-articulation project limit has been reached.");
+    if (articulation.activation.has_value())
+    {
+        const auto& activation = *articulation.activation;
+        if (activation.event != "note-on" || activation.mode != "latch" || !activation.consume
+            || activation.midiNote < 0 || activation.midiNote > 127)
+            return makeRejectedResult(getDocumentState(), "Articulation creation rejected",
+                                      "Articulation activation must be a consuming note-on latch in MIDI range 0-127.");
+        const auto collides = std::any_of(project.authoring.articulations.begin(),
+                                          project.authoring.articulations.end(),
+                                          [&](const RuntimeProjectArticulationDefinition& candidate)
+                                          {
+                                              return candidate.activation.has_value()
+                                                  && candidate.activation->midiNote == activation.midiNote;
+                                          });
+        if (collides)
+            return makeRejectedResult(getDocumentState(), "Articulation creation rejected",
+                                      "Another articulation already uses this activation MIDI note.");
+    }
+    auto created = articulation;
+    created.displayOrder = static_cast<int>(project.authoring.articulations.size());
+    created.isDefault = project.authoring.articulations.empty();
+    project.authoring.articulations.push_back(std::move(created));
+    return documentController.commitSnapshot(project, label, { "authoring.articulations" });
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::updateArticulation(
+    const std::size_t articulationIndex,
+    const RuntimeProjectArticulationDefinition& articulation,
+    const std::string& label)
+{
+    auto project = getProject();
+    if (!usesExplicitArticulationSchema(project) || articulationIndex >= project.authoring.articulations.size())
+        return makeRejectedResult(getDocumentState(), "Articulation edit rejected",
+                                  "The requested articulation does not exist in an explicit-articulation project.");
+    const auto& previous = project.authoring.articulations[articulationIndex];
+    if (articulation.id != previous.id || articulation.id.empty() || articulation.displayName.empty())
+        return makeRejectedResult(getDocumentState(), "Articulation edit rejected",
+                                  "Articulation ids are immutable and display names must be non-empty.");
+    auto updated = articulation;
+    updated.displayOrder = previous.displayOrder;
+    updated.isDefault = previous.isDefault;
+    project.authoring.articulations[articulationIndex] = std::move(updated);
+    const auto validation = validateRuntimeProjectModel(project);
+    if (!validation.valid)
+        return makeRejectedResult(getDocumentState(), "Articulation edit rejected", validation.issues.front());
+    return documentController.commitSnapshot(project, label,
+                                             { "authoring.articulations[" + std::to_string(articulationIndex) + "]" });
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::moveArticulation(const std::size_t articulationIndex,
+                                                                       const int direction,
+                                                                       const std::string& label)
+{
+    auto project = getProject();
+    if (!usesExplicitArticulationSchema(project) || articulationIndex >= project.authoring.articulations.size()
+        || (direction != -1 && direction != 1))
+        return makeRejectedResult(getDocumentState(), "Articulation reorder rejected",
+                                  "Choose an existing articulation and a direction of -1 or 1.");
+    const auto targetSigned = static_cast<int>(articulationIndex) + direction;
+    if (targetSigned < 0 || targetSigned >= static_cast<int>(project.authoring.articulations.size()))
+        return makeRejectedResult(getDocumentState(), "Articulation reorder rejected",
+                                  "Articulation cannot move beyond the authoring order bounds.");
+    const auto target = static_cast<std::size_t>(targetSigned);
+    std::swap(project.authoring.articulations[articulationIndex], project.authoring.articulations[target]);
+    normalizeArticulationDisplayOrder(project);
+    return documentController.commitSnapshot(project, label,
+                                             { "authoring.articulations[" + std::to_string(articulationIndex) + "]",
+                                               "authoring.articulations[" + std::to_string(target) + "]" });
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::setDefaultArticulation(const std::string& articulationId,
+                                                                              const std::string& label)
+{
+    auto project = getProject();
+    const auto selected = findArticulationIndexById(project, articulationId);
+    if (!usesExplicitArticulationSchema(project) || !selected.has_value())
+        return makeRejectedResult(getDocumentState(), "Set default articulation rejected",
+                                  "The requested articulation does not exist in an explicit-articulation project.");
+    for (auto& articulation : project.authoring.articulations)
+        articulation.isDefault = articulation.id == articulationId;
+    return documentController.commitSnapshot(project, label, { "authoring.articulations" });
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::deleteArticulation(
+    const std::string& articulationId,
+    const std::string& reassignmentArticulationId,
+    const std::string& label)
+{
+    auto project = getProject();
+    const auto removed = findArticulationIndexById(project, articulationId);
+    const auto replacement = findArticulationIndexById(project, reassignmentArticulationId);
+    if (!usesExplicitArticulationSchema(project) || !removed.has_value() || !replacement.has_value()
+        || articulationId == reassignmentArticulationId)
+        return makeRejectedResult(getDocumentState(), "Articulation deletion rejected",
+                                  "Delete requires an existing different reassignment articulation.");
+    if (project.authoring.articulations.size() <= 1)
+        return makeRejectedResult(getDocumentState(), "Articulation deletion rejected",
+                                  "A playable project must retain one default articulation.");
+    for (auto& zone : project.authoring.zones)
+        if (zone.articulationId == articulationId)
+            zone.articulationId = reassignmentArticulationId;
+    for (auto& bank : project.authoring.performanceBanks)
+        for (auto& slot : bank.triggerSlots)
+            if (slot.targetArticulationId == articulationId)
+                slot.targetArticulationId = reassignmentArticulationId;
+    const auto removedWasDefault = project.authoring.articulations[*removed].isDefault;
+    project.authoring.articulations.erase(project.authoring.articulations.begin()
+                                          + static_cast<std::ptrdiff_t>(*removed));
+    if (removedWasDefault)
+        for (auto& articulation : project.authoring.articulations)
+            articulation.isDefault = articulation.id == reassignmentArticulationId;
+    normalizeArticulationDisplayOrder(project);
+    return documentController.commitSnapshot(project, label,
+                                             { "authoring.articulations", "authoring.zones", "authoring.performanceBanks" });
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::reassignZonesToArticulation(
+    const std::vector<std::string>& zoneIds,
+    const std::string& articulationId,
+    const std::string& label)
+{
+    auto project = getProject();
+    if (!usesExplicitArticulationSchema(project) || zoneIds.empty()
+        || !findArticulationIndexById(project, articulationId).has_value())
+        return makeRejectedResult(getDocumentState(), "Zone articulation reassignment rejected",
+                                  "Choose at least one zone and an existing articulation.");
+    for (const auto& zoneId : zoneIds)
+    {
+        const auto zone = findZoneIndexById(project, zoneId);
+        if (!zone.has_value())
+            return makeRejectedResult(getDocumentState(), "Zone articulation reassignment rejected",
+                                      "Zone '" + zoneId + "' does not exist in the current authoring project.");
+        project.authoring.zones[*zone].articulationId = articulationId;
+    }
+    return documentController.commitSnapshot(project, label, { "authoring.zones" });
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::selectGroup(const std::string& groupId)

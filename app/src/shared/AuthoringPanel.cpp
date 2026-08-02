@@ -516,6 +516,16 @@ std::vector<std::string> buildArticulationIds(const drs::engine::RuntimeProjectM
 {
     std::vector<std::string> articulationIds;
 
+    if (project.schemaVersion >= 6 && project.authoring.schemaVersion >= 5)
+    {
+        articulationIds.reserve(project.authoring.articulations.size());
+        for (const auto& articulation : project.authoring.articulations)
+            articulationIds.push_back(articulation.id);
+        return articulationIds;
+    }
+
+    // Compatibility display only. Loaded projects are migrated before editing;
+    // Sprint 1 no longer derives the authoritative articulation model from zones.
     for (const auto& zone : project.authoring.zones)
     {
         if (std::find(articulationIds.begin(), articulationIds.end(), zone.articulationId) == articulationIds.end())

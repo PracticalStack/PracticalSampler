@@ -875,6 +875,32 @@ ordered_json serializeProjectGroups(const std::vector<RuntimeProjectGroupDefinit
     return array;
 }
 
+ordered_json serializeProjectArticulations(
+    const std::vector<RuntimeProjectArticulationDefinition>& articulations)
+{
+    ordered_json array = ordered_json::array();
+    for (const auto& articulation : articulations)
+    {
+        ordered_json articulationObject;
+        articulationObject["id"] = articulation.id;
+        articulationObject["displayName"] = articulation.displayName;
+        articulationObject["isDefault"] = articulation.isDefault;
+        articulationObject["displayOrder"] = articulation.displayOrder;
+        if (articulation.activation.has_value())
+        {
+            const auto& activation = *articulation.activation;
+            articulationObject["activation"] = {
+                { "event", activation.event },
+                { "midiNote", activation.midiNote },
+                { "mode", activation.mode },
+                { "consume", activation.consume }
+            };
+        }
+        array.push_back(std::move(articulationObject));
+    }
+    return array;
+}
+
 ordered_json serializeFxSlots(const std::vector<RuntimeProjectFxSlotDefinition>& fxSlots, const bool dspSchema)
 {
     ordered_json array = ordered_json::array();
@@ -1145,7 +1171,7 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
 
     project.notes = readRequiredStringArray(root, result, "notes", "Project");
 
-    if (project.schemaVersion >= 2 && project.schemaVersion <= 5)
+    if (project.schemaVersion >= 2 && project.schemaVersion <= 6)
     {
         const auto authoringIterator = root.find("authoring");
         if (authoringIterator == root.end() || !authoringIterator->is_object())
@@ -1170,6 +1196,51 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
 
             if (const auto selectedPerformanceBankId = readOptional<RuntimeProjectLoadResult, std::string>(*authoringIterator, result, "selectedPerformanceBankId", "Project authoring"))
                 authoring.selectedPerformanceBankId = *selectedPerformanceBankId;
+
+            if (project.schemaVersion >= 6 && authoring.schemaVersion >= 5)
+            {
+                const auto articulationsIterator = authoringIterator->find("articulations");
+                if (articulationsIterator == authoringIterator->end() || !isObjectArray(*articulationsIterator))
+                {
+                    addIssue(result, "Project authoring field 'articulations' must be an array of objects.");
+                }
+                else
+                {
+                    authoring.articulations.reserve(articulationsIterator->size());
+                    for (std::size_t index = 0; index < articulationsIterator->size(); ++index)
+                    {
+                        const auto& articulationObject = articulationsIterator->at(index);
+                        const auto context = "ProjectArticulation[" + std::to_string(index) + "]";
+                        RuntimeProjectArticulationDefinition articulation;
+                        if (const auto id = readRequired<RuntimeProjectLoadResult, std::string>(articulationObject, result, "id", context.c_str()))
+                            articulation.id = *id;
+                        if (const auto displayName = readRequired<RuntimeProjectLoadResult, std::string>(articulationObject, result, "displayName", context.c_str()))
+                            articulation.displayName = *displayName;
+                        if (const auto isDefault = readRequired<RuntimeProjectLoadResult, bool>(articulationObject, result, "isDefault", context.c_str()))
+                            articulation.isDefault = *isDefault;
+                        if (const auto displayOrder = readRequired<RuntimeProjectLoadResult, int>(articulationObject, result, "displayOrder", context.c_str()))
+                            articulation.displayOrder = *displayOrder;
+                        const auto activationIterator = articulationObject.find("activation");
+                        if (activationIterator != articulationObject.end())
+                        {
+                            if (!activationIterator->is_object())
+                            {
+                                addIssue(result, context + " field 'activation' must be an object.");
+                            }
+                            else
+                            {
+                                RuntimeProjectArticulationActivationDefinition activation;
+                                if (const auto event = readRequired<RuntimeProjectLoadResult, std::string>(*activationIterator, result, "event", context.c_str())) activation.event = *event;
+                                if (const auto midiNote = readRequired<RuntimeProjectLoadResult, int>(*activationIterator, result, "midiNote", context.c_str())) activation.midiNote = *midiNote;
+                                if (const auto mode = readRequired<RuntimeProjectLoadResult, std::string>(*activationIterator, result, "mode", context.c_str())) activation.mode = *mode;
+                                if (const auto consume = readRequired<RuntimeProjectLoadResult, bool>(*activationIterator, result, "consume", context.c_str())) activation.consume = *consume;
+                                articulation.activation = std::move(activation);
+                            }
+                        }
+                        authoring.articulations.push_back(std::move(articulation));
+                    }
+                }
+            }
 
             const auto zonesIterator = authoringIterator->find("zones");
             if (zonesIterator == authoringIterator->end() || !isObjectArray(*zonesIterator))
@@ -1671,9 +1742,9 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         addIssue(result, "Project schemaName must be 'drs.project'.");
 
     if (project.schemaVersion != 1 && project.schemaVersion != 2 && project.schemaVersion != 3
-        && project.schemaVersion != 4 && project.schemaVersion != 5)
+        && project.schemaVersion != 4 && project.schemaVersion != 5 && project.schemaVersion != 6)
     {
-        addIssue(result, "Project schemaVersion must be 1, 2, 3, 4, or 5.");
+        addIssue(result, "Project schemaVersion must be 1, 2, 3, 4, 5, or 6.");
     }
 
     if (project.projectId.empty())
@@ -1708,7 +1779,7 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         }
     }
 
-    if (project.schemaVersion >= 2 && project.schemaVersion <= 5)
+    if (project.schemaVersion >= 2 && project.schemaVersion <= 6)
     {
         const auto& authoring = project.authoring;
         const auto explicitRoundRobinRequired = project.schemaVersion >= 3;
@@ -1727,9 +1798,15 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
             addIssue(result, "Project authoring schemaVersion must be 3 for schemaVersion 4 projects.");
         if (project.schemaVersion == 5 && authoring.schemaVersion != 4)
             addIssue(result, "Project authoring schemaVersion must be 4 for schemaVersion 5 projects.");
+        if (project.schemaVersion == 6 && authoring.schemaVersion != 5)
+            addIssue(result, "Project authoring schemaVersion must be 5 for schemaVersion 6 projects.");
 
         if (hasDuplicateIds(authoring.zones))
             addIssue(result, "Project authoring zone ids must be unique.");
+
+        const auto explicitArticulationsRequired = project.schemaVersion >= 6;
+        if (explicitArticulationsRequired && hasDuplicateIds(authoring.articulations))
+            addIssue(result, "Project authoring articulation ids must be unique.");
 
         if (explicitGroupsRequired && hasDuplicateIds(authoring.groups))
             addIssue(result, "Project authoring group ids must be unique.");
@@ -1770,6 +1847,41 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         }
 
         std::unordered_set<std::string> zoneIds;
+        std::unordered_set<std::string> articulationIds;
+        std::unordered_set<int> activationMidiNotes;
+        std::size_t defaultArticulationCount = 0;
+        if (explicitArticulationsRequired)
+        {
+            if (authoring.articulations.empty())
+                addIssue(result, "Project authoring schema 5 must declare at least one articulation.");
+            for (const auto& articulation : authoring.articulations)
+            {
+                if (articulation.id.empty())
+                    addIssue(result, "Project articulations must have non-empty ids.");
+                else
+                    articulationIds.insert(articulation.id);
+                if (articulation.displayName.empty())
+                    addIssue(result, "Project articulation '" + articulation.id + "' must have a displayName.");
+                if (articulation.displayOrder < 0)
+                    addIssue(result, "Project articulation '" + articulation.id + "' must not have a negative displayOrder.");
+                if (articulation.isDefault)
+                    ++defaultArticulationCount;
+                if (articulation.activation.has_value())
+                {
+                    const auto& activation = *articulation.activation;
+                    if (activation.event != "note-on" || activation.mode != "latch" || !activation.consume)
+                        addIssue(result, "Project articulation '" + articulation.id + "' must use a consuming note-on latch activation.");
+                    if (activation.midiNote < 0 || activation.midiNote > 127)
+                        addIssue(result, "Project articulation '" + articulation.id + "' activation midiNote must be in 0-127.");
+                    else if (!activationMidiNotes.insert(activation.midiNote).second)
+                        addIssue(result, "Project articulation activation midiNote '" + std::to_string(activation.midiNote) + "' must be unique.");
+                }
+            }
+            if (defaultArticulationCount != 1)
+                addIssue(result, "Project authoring schema 5 must declare exactly one default articulation.");
+            if (authoring.articulations.size() > 64)
+                addIssue(result, "Project authoring articulation count exceeds the 64-item limit.");
+        }
         for (const auto& zone : authoring.zones)
         {
             if (!zone.id.empty())
@@ -1793,6 +1905,8 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
             if (zone.articulationId.empty())
                 addIssue(result, "Project zone '" + zone.id + "' must have an articulationId.");
+            else if (explicitArticulationsRequired && !articulationIds.count(zone.articulationId))
+                addIssue(result, "Project zone '" + zone.id + "' references unknown articulationId '" + zone.articulationId + "'.");
 
             if (zone.keyLow > zone.keyHigh)
                 addIssue(result, "Project zone '" + zone.id + "' has keyLow greater than keyHigh.");
@@ -1984,6 +2098,8 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
                 if (triggerSlot.targetArticulationId.empty())
                     addIssue(result, "Project trigger slot '" + triggerSlot.id + "' must have a targetArticulationId.");
+                else if (explicitArticulationsRequired && !articulationIds.count(triggerSlot.targetArticulationId))
+                    addIssue(result, "Project trigger slot '" + triggerSlot.id + "' references unknown targetArticulationId '" + triggerSlot.targetArticulationId + "'.");
 
                 if (triggerSlot.triggerEvent == "phrase-trigger" && triggerSlot.phraseAssetId.empty())
                     addIssue(result, "Project trigger slot '" + triggerSlot.id + "' must reference a phraseAssetId when triggerEvent is 'phrase-trigger'.");
@@ -2328,6 +2444,79 @@ RuntimeProjectMigrationResult migrateRuntimeProjectToCuratedDspSchema(const Runt
     result.valid = validation.valid;
     result.migrated = validation.valid;
     result.state = validation.valid ? "Project migrated to curated DSP schema" : validation.state;
+    return result;
+}
+
+RuntimeProjectMigrationResult migrateRuntimeProjectToPerformanceArticulationSchema(
+    const RuntimeProjectModel& project)
+{
+    RuntimeProjectMigrationResult result;
+    result.state = "Project articulation migration failed";
+
+    if (project.schemaVersion == 6 && project.authoring.schemaVersion == 5)
+    {
+        result.project = project;
+        const auto validation = validateRuntimeProjectModel(result.project);
+        result.issues = validation.issues;
+        result.valid = validation.valid;
+        result.state = validation.valid ? "Project already uses the articulation schema" : validation.state;
+        return result;
+    }
+    if (project.schemaVersion != 5 || project.authoring.schemaVersion != 4)
+    {
+        addIssue(result, "Only Project schemaVersion 5 with authoring schemaVersion 4 can migrate to the articulation schema.");
+        return result;
+    }
+
+    auto migrated = project;
+    migrated.schemaVersion = 6;
+    migrated.authoring.schemaVersion = 5;
+    migrated.authoring.articulations.clear();
+    std::unordered_set<std::string> seenIds;
+    const auto selectedZone = std::find_if(migrated.authoring.zones.begin(), migrated.authoring.zones.end(),
+                                           [&](const RuntimeProjectZoneDefinition& zone)
+                                           {
+                                               return zone.id == migrated.authoring.selectedZoneId;
+                                           });
+    const auto preferredDefaultId = selectedZone != migrated.authoring.zones.end()
+        && !selectedZone->articulationId.empty() ? selectedZone->articulationId : std::string {};
+
+    for (auto& zone : migrated.authoring.zones)
+    {
+        if (zone.articulationId.empty())
+            zone.articulationId = "legacy-default";
+        if (!seenIds.insert(zone.articulationId).second)
+            continue;
+        RuntimeProjectArticulationDefinition articulation;
+        articulation.id = zone.articulationId;
+        articulation.displayName = zone.articulationId;
+        if (!articulation.displayName.empty())
+        {
+            articulation.displayName.front() = static_cast<char>(std::toupper(
+                static_cast<unsigned char>(articulation.displayName.front())));
+            std::replace(articulation.displayName.begin(), articulation.displayName.end(), '-', ' ');
+            std::replace(articulation.displayName.begin(), articulation.displayName.end(), '_', ' ');
+        }
+        articulation.displayOrder = static_cast<int>(migrated.authoring.articulations.size());
+        migrated.authoring.articulations.push_back(std::move(articulation));
+    }
+    if (!migrated.authoring.articulations.empty())
+    {
+        const auto defaultIterator = std::find_if(migrated.authoring.articulations.begin(), migrated.authoring.articulations.end(),
+                                                  [&](const RuntimeProjectArticulationDefinition& articulation)
+                                                  {
+                                                      return articulation.id == preferredDefaultId;
+                                                  });
+        (defaultIterator != migrated.authoring.articulations.end()
+            ? defaultIterator : migrated.authoring.articulations.begin())->isDefault = true;
+    }
+
+    const auto validation = validateRuntimeProjectModel(migrated);
+    result.project = std::move(migrated);
+    result.issues = validation.issues;
+    result.valid = validation.valid;
+    result.migrated = validation.valid;
+    result.state = validation.valid ? "Project migrated to the articulation schema" : validation.state;
     return result;
 }
 
@@ -2756,6 +2945,8 @@ std::string serializeRuntimeProjectManifest(const RuntimeProjectModel& project, 
         if (project.schemaVersion >= 4)
             authoring["selectedGroupId"] = project.authoring.selectedGroupId;
         authoring["selectedPerformanceBankId"] = project.authoring.selectedPerformanceBankId;
+        if (project.schemaVersion >= 6)
+            authoring["articulations"] = serializeProjectArticulations(project.authoring.articulations);
         authoring["zones"] = serializeProjectZones(project.authoring.zones, project.schemaVersion >= 3);
         if (project.schemaVersion >= 4)
             authoring["groups"] = serializeProjectGroups(project.authoring.groups);

@@ -4,8 +4,7 @@
 
 namespace
 {
-constexpr std::array<std::string_view, 10> redSeams {
-    "authored-articulation-schema",
+constexpr std::array<std::string_view, 8> redSeams {
     "zone-event-condition-schema",
     "compiled-event-index-tables",
     "lane-local-attack-context",
@@ -13,8 +12,7 @@ constexpr std::array<std::string_view, 10> redSeams {
     "physical-note-off-and-effective-release",
     "pedal-transition-trigger-routes",
     "compiled-choke-target-mask",
-    "rr-reset-before-route-selection",
-    "schema6-explicit-migration"
+    "rr-reset-before-route-selection"
 };
 
 bool isKnownSeam(const std::string_view value)

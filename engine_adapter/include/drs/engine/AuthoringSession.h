@@ -89,6 +89,7 @@ public:
 
     std::vector<AuthoringZoneSummary> getZoneSummaries() const;
     std::optional<RuntimeProjectZoneDefinition> getSelectedZone() const;
+    std::vector<RuntimeProjectArticulationDefinition> getArticulations() const;
     std::optional<RuntimeProjectGroupDefinition> getSelectedGroup() const;
     std::optional<RuntimeProjectMacroDefinition> getSelectedMacro() const;
     std::optional<std::size_t> getSelectedMacroIndex() const;
@@ -105,6 +106,25 @@ public:
     RuntimeProjectDocumentActionResult selectDspSlot(const std::string& fxSlotId);
     RuntimeProjectDocumentActionResult updateSelectedZone(const RuntimeProjectZoneDefinition& zone,
                                                           const std::string& label);
+    RuntimeProjectDocumentActionResult createArticulation(
+        const RuntimeProjectArticulationDefinition& articulation,
+        const std::string& label);
+    RuntimeProjectDocumentActionResult updateArticulation(
+        std::size_t articulationIndex,
+        const RuntimeProjectArticulationDefinition& articulation,
+        const std::string& label);
+    RuntimeProjectDocumentActionResult moveArticulation(std::size_t articulationIndex,
+                                                        int direction,
+                                                        const std::string& label);
+    RuntimeProjectDocumentActionResult setDefaultArticulation(const std::string& articulationId,
+                                                              const std::string& label);
+    RuntimeProjectDocumentActionResult deleteArticulation(const std::string& articulationId,
+                                                          const std::string& reassignmentArticulationId,
+                                                          const std::string& label);
+    RuntimeProjectDocumentActionResult reassignZonesToArticulation(
+        const std::vector<std::string>& zoneIds,
+        const std::string& articulationId,
+        const std::string& label);
     RuntimeProjectDocumentActionResult createGroup(const RuntimeProjectGroupDefinition& group,
                                                    const std::string& label);
     RuntimeProjectDocumentActionResult updateGroup(std::size_t groupIndex,

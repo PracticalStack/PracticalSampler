@@ -119,6 +119,18 @@ std::optional<drs::engine::RuntimeProjectModel> upgradeLoadedProjectToLatestSche
         upgradedProject = dspMigration.project;
     }
 
+    if (upgradedProject.schemaVersion == 5 && upgradedProject.authoring.schemaVersion == 4)
+    {
+        const auto articulationMigration = drs::engine::migrateRuntimeProjectToPerformanceArticulationSchema(upgradedProject);
+        if (!articulationMigration.valid)
+        {
+            issues = articulationMigration.issues;
+            return std::nullopt;
+        }
+
+        upgradedProject = articulationMigration.project;
+    }
+
     return upgradedProject;
 }
 
@@ -1404,10 +1416,11 @@ drs::engine::RuntimeProjectModel Editor::buildUnloadedProjectState() const
 {
     drs::engine::RuntimeProjectModel project;
     project.schemaName = "drs.project";
-    project.schemaVersion = 5;
+    project.schemaVersion = 6;
     project.displayName = "No Project Loaded";
     project.authoring.schemaName = "drs.authoring";
-    project.authoring.schemaVersion = 4;
+    project.authoring.schemaVersion = 5;
+    project.authoring.articulations = { { "default", "Default", true, 0, std::nullopt } };
     project.authoring.notes = { "Open a project or create a new one to begin authoring." };
     project.notes = { "This session starts without loading the checked-in reference project." };
     return project;
@@ -1420,13 +1433,14 @@ drs::engine::RuntimeProjectModel Editor::buildEmptyProjectTemplate() const
 
     drs::engine::RuntimeProjectModel project;
     project.schemaName = "drs.project";
-    project.schemaVersion = 5;
+    project.schemaVersion = 6;
     project.projectId = makeProjectId();
     project.displayName = "Untitled Project";
     project.contentRootPath = defaultProjectDirectory.getFullPathName().toStdString();
     project.defaultInstrumentManifestPath = defaultInstrumentFile.getFullPathName().toStdString();
     project.authoring.schemaName = "drs.authoring";
-    project.authoring.schemaVersion = 4;
+    project.authoring.schemaVersion = 5;
+    project.authoring.articulations = { { "default", "Default", true, 0, std::nullopt } };
     project.authoring.notes = { "Created in the plug-in authoring shell." };
     project.notes = {
         "Created as a new curated DSP authoring project from the plug-in shell.",

@@ -279,9 +279,26 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
         instrument.groups.push_back(std::move(group));
     }
 
+    if (project.schemaVersion >= 6 && project.authoring.schemaVersion >= 5)
+    {
+        instrument.articulations.reserve(project.authoring.articulations.size());
+        for (const auto& projectArticulation : project.authoring.articulations)
+        {
+            if (projectArticulation.id.empty() || articulationIndexes.count(projectArticulation.id))
+                continue;
+            drs::engine::RuntimeArticulationDefinition articulation;
+            articulation.id = projectArticulation.id;
+            articulation.name = projectArticulation.displayName;
+            articulation.isDefault = projectArticulation.isDefault;
+            articulationIndexes.emplace(articulation.id, instrument.articulations.size());
+            instrument.articulations.push_back(std::move(articulation));
+        }
+    }
+
     for (const auto& projectZone : project.authoring.zones)
     {
-        if (!projectZone.articulationId.empty() && !articulationIndexes.count(projectZone.articulationId))
+        if (project.schemaVersion < 6 && !projectZone.articulationId.empty()
+            && !articulationIndexes.count(projectZone.articulationId))
         {
             drs::engine::RuntimeArticulationDefinition articulation;
             articulation.id = projectZone.articulationId;
