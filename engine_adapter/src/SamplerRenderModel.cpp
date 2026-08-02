@@ -266,6 +266,24 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
     if (snapshot.zones.size() != prepared.zones.size())
         addError(result, "render-model-route-count-mismatch", "payload.prepared.zones",
                  "Snapshot and prepared route counts must agree.");
+    if (prepared.performanceProgram.retainedBytes
+        != sizeof(CompiledPerformanceProgram)
+            + prepared.performanceProgram.triggerRoutes.size() * sizeof(CompiledPerformanceTriggerRoute)
+            + prepared.performanceProgram.roundRobinResets.size() * sizeof(CompiledPerformanceRoundRobinReset))
+    {
+        addError(result, "render-model-performance-program-size-invalid", "payload.prepared.performanceProgram",
+                 "Prepared performance-program memory accounting does not match its retained numeric records.");
+    }
+    for (const auto& route : prepared.performanceProgram.triggerRoutes)
+    {
+        if (route.zoneIndex >= prepared.zones.size()
+            || route.articulationIndex >= prepared.performanceProgram.articulationCount)
+        {
+            addError(result, "render-model-performance-program-index-invalid", "payload.prepared.performanceProgram",
+                     "Prepared performance program contains an out-of-range numeric route index.");
+            break;
+        }
+    }
 
     for (std::size_t index = 0; index < snapshot.zones.size(); ++index)
     {
@@ -463,6 +481,7 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
     model->preparedBuildId = payload->preparedBuildId;
     model->snapshotContentDigest = payload->snapshotContentDigest;
     model->preparedContentDigest = payload->preparedContentDigest;
+    model->performanceProgram = prepared.performanceProgram;
     model->midiNoteOffset = options.midiNoteOffset;
     model->fixedVelocity = options.fixedVelocity;
     model->retainedActivationPayload = payload;

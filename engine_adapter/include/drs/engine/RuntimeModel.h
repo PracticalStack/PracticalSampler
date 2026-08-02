@@ -308,6 +308,7 @@ struct RuntimeArticulationDefinition
     std::string id;
     std::string name;
     bool isDefault = false;
+    std::optional<RuntimeProjectArticulationActivationDefinition> activation;
 };
 
 struct RuntimeGroupDefinition
@@ -338,6 +339,10 @@ struct RuntimeZoneDefinition
     int roundRobinLength = 0;
     int roundRobinPosition = 0;
     ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;
+    RuntimeProjectZonePerformanceDefinition performance;
+    std::string exclusiveGroupId;
+    std::vector<std::string> exclusiveTargetGroupIds;
+    std::optional<double> chokeReleaseSeconds;
 };
 
 struct RuntimeInstrumentModel
@@ -353,6 +358,7 @@ struct RuntimeInstrumentModel
     std::vector<RuntimeArticulationDefinition> articulations;
     std::vector<RuntimeGroupDefinition> groups;
     std::vector<RuntimeZoneDefinition> zones;
+    std::vector<RuntimeProjectRoundRobinResetRuleDefinition> roundRobinResetRules;
     std::vector<std::string> validationNotes;
 };
 

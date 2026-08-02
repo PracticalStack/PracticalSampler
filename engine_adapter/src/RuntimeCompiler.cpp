@@ -274,10 +274,29 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
                 || zone.roundRobin.has_value()
                 || zone.roundRobinLength > 0
                 || zone.roundRobinPosition > 0
-                || zone.triggerMode != ZoneTriggerMode::gated;
+                || zone.triggerMode != ZoneTriggerMode::gated
+                || zone.performance.event != PerformanceEventKind::noteOn
+                || zone.performance.sustain != PerformanceSustainCondition::any
+                || zone.performance.pitchSource != PerformancePitchSource::eventNote
+                || !zone.exclusiveGroupId.empty()
+                || !zone.exclusiveTargetGroupIds.empty()
+                || zone.chokeReleaseSeconds.has_value();
+        });
+    const auto requiresPerformanceInstrumentSchema = !plan.roundRobinResetRules.empty()
+        || std::any_of(plan.articulations.begin(), plan.articulations.end(),
+                       [](const RuntimeArticulationDefinition& value) { return value.activation.has_value(); })
+        || std::any_of(plan.zones.begin(), plan.zones.end(), [](const RuntimeCompileZoneDefinition& zone)
+        {
+            return zone.performance.event != PerformanceEventKind::noteOn
+                || zone.performance.sustain != PerformanceSustainCondition::any
+                || zone.performance.pitchSource != PerformancePitchSource::eventNote
+                || !zone.exclusiveGroupId.empty()
+                || !zone.exclusiveTargetGroupIds.empty()
+                || zone.chokeReleaseSeconds.has_value();
         });
     result.instrument.schemaName = "drs.instrument";
-    result.instrument.schemaVersion = requiresExtendedInstrumentSchema ? 2 : 1;
+    result.instrument.schemaVersion = requiresPerformanceInstrumentSchema ? 3
+        : (requiresExtendedInstrumentSchema ? 2 : 1);
     result.instrument.instrumentId = plan.instrumentId;
     result.instrument.displayName = plan.instrumentDisplayName;
     result.instrument.sourceProjectPath = plan.outputProjectPath;
@@ -286,6 +305,7 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
     result.instrument.macros = plan.macros;
     result.instrument.articulations = plan.articulations;
     result.instrument.groups = plan.groups;
+    result.instrument.roundRobinResetRules = plan.roundRobinResetRules;
     result.instrument.validationNotes = plan.instrumentValidationNotes;
 
     std::unordered_map<std::string, bool> articulationIds;
@@ -462,6 +482,10 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         zone.roundRobinLength = zonePlan.roundRobinLength;
         zone.roundRobinPosition = zonePlan.roundRobinPosition;
         zone.triggerMode = zonePlan.triggerMode;
+        zone.performance = zonePlan.performance;
+        zone.exclusiveGroupId = zonePlan.exclusiveGroupId;
+        zone.exclusiveTargetGroupIds = zonePlan.exclusiveTargetGroupIds;
+        zone.chokeReleaseSeconds = zonePlan.chokeReleaseSeconds;
         result.instrument.zones.push_back(std::move(zone));
     }
 

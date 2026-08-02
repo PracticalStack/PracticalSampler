@@ -33,6 +33,10 @@ struct RuntimeCompileZoneDefinition
     int roundRobinLength = 0;
     int roundRobinPosition = 0;
     ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;
+    RuntimeProjectZonePerformanceDefinition performance;
+    std::string exclusiveGroupId;
+    std::vector<std::string> exclusiveTargetGroupIds;
+    std::optional<double> chokeReleaseSeconds;
     std::uint64_t prefetchBytes = 16384;
 };
 
@@ -53,6 +57,7 @@ struct RuntimeCompilePlan
     std::vector<RuntimeArticulationDefinition> articulations;
     std::vector<RuntimeGroupDefinition> groups;
     std::vector<RuntimeCompileZoneDefinition> zones;
+    std::vector<RuntimeProjectRoundRobinResetRuleDefinition> roundRobinResetRules;
     std::vector<std::string> projectNotes;
     std::vector<std::string> instrumentValidationNotes;
     std::vector<std::string> streamNotes;

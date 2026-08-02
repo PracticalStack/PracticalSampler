@@ -157,6 +157,7 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
     root["containerPath"] = prepared.containerPath;
     root["payloadEncoding"] = prepared.payloadEncoding;
     root["pageSizeBytes"] = prepared.pageSizeBytes;
+    root["performanceProgram"] = ordered_json::parse(serializeCompiledPerformanceProgram(prepared.performanceProgram));
 
     if (includeDigest)
         root["snapshotBuildId"] = prepared.snapshotBuildId;
@@ -1062,6 +1063,9 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     result.metrics.preparedSampleCount = result.prepared.samples.size();
     result.metrics.preparedStreamCount = result.prepared.streams.size();
     result.metrics.preparedZoneCount = result.prepared.zones.size();
+    result.prepared.performanceProgram = snapshotResult.snapshot.performanceProgram;
+    result.metrics.preparedPerformanceProgramBytes = result.prepared.performanceProgram.retainedBytes;
+    result.metrics.preparedBytes += result.metrics.preparedPerformanceProgramBytes;
     result.metrics.preparedOwnershipRecordCount = result.prepared.ownershipRecords.size();
     result.metrics.preparedOwnershipBytes = std::accumulate(
         result.prepared.ownershipRecords.begin(),
@@ -2032,6 +2036,8 @@ bool operator==(const ImmutablePreparedPlayback& left, const ImmutablePreparedPl
         && left.streams == right.streams
         && left.groupRoutes == right.groupRoutes
         && left.zones == right.zones
+        && serializeCompiledPerformanceProgram(left.performanceProgram)
+            == serializeCompiledPerformanceProgram(right.performanceProgram)
         && left.notes == right.notes;
 }
 

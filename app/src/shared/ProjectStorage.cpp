@@ -239,7 +239,7 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
 {
     drs::engine::RuntimeInstrumentModel instrument;
     instrument.schemaName = "drs.instrument";
-    instrument.schemaVersion = 2;
+    instrument.schemaVersion = project.schemaVersion >= 6 && project.authoring.schemaVersion >= 5 ? 3 : 2;
     instrument.instrumentId = project.projectId.empty() ? "instrument" : project.projectId + ".instrument";
     instrument.displayName = project.displayName;
     instrument.sourceProjectPath = projectFile.getFullPathName().toStdString();
@@ -290,6 +290,7 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
             articulation.id = projectArticulation.id;
             articulation.name = projectArticulation.displayName;
             articulation.isDefault = projectArticulation.isDefault;
+            articulation.activation = projectArticulation.activation;
             articulationIndexes.emplace(articulation.id, instrument.articulations.size());
             instrument.articulations.push_back(std::move(articulation));
         }
@@ -356,8 +357,15 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
             zone.roundRobinPosition = projectZone.roundRobinPosition;
         }
         zone.triggerMode = projectZone.triggerMode;
+        zone.performance = projectZone.performance;
+        zone.exclusiveGroupId = projectZone.exclusiveGroupId;
+        zone.exclusiveTargetGroupIds = projectZone.exclusiveTargetGroupIds;
+        zone.chokeReleaseSeconds = projectZone.chokeReleaseSeconds;
         instrument.zones.push_back(std::move(zone));
     }
+
+    if (instrument.schemaVersion >= 3)
+        instrument.roundRobinResetRules = project.authoring.roundRobinResetRules;
 
     populateCrossfadeRuntimeDescriptors(instrument.zones);
 

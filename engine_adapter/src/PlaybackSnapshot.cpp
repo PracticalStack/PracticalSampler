@@ -426,6 +426,27 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
     }
     root["articulationRoutes"] = std::move(articulationRoutes);
 
+    ordered_json articulationDefinitions = ordered_json::array();
+    for (const auto& articulation : snapshot.articulationDefinitions)
+    {
+        ordered_json value;
+        value["id"] = articulation.id;
+        value["displayName"] = articulation.displayName;
+        value["isDefault"] = articulation.isDefault;
+        value["displayOrder"] = articulation.displayOrder;
+        if (articulation.activation.has_value())
+        {
+            value["activation"] = {
+                { "event", static_cast<int>(articulation.activation->event) },
+                { "midiNote", articulation.activation->midiNote },
+                { "mode", static_cast<int>(articulation.activation->mode) },
+                { "consume", articulation.activation->consume }
+            };
+        }
+        articulationDefinitions.push_back(std::move(value));
+    }
+    root["articulationDefinitions"] = std::move(articulationDefinitions);
+
     ordered_json groupRoutes = ordered_json::array();
     for (const auto& route : snapshot.groupRoutes)
         groupRoutes.push_back(serializeGroupRoute(route, includeDigest));
@@ -460,9 +481,23 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
             zoneObject["roundRobin"] = serializeRoundRobin(*zone.roundRobin);
         if (zone.triggerMode == ZoneTriggerMode::oneShot)
             zoneObject["triggerMode"] = "one-shot";
+        zoneObject["performance"] = {
+            { "event", static_cast<int>(zone.performance.event) },
+            { "sustain", static_cast<int>(zone.performance.sustain) },
+            { "pitchSource", static_cast<int>(zone.performance.pitchSource) }
+        };
+        if (!zone.exclusiveGroupId.empty()) zoneObject["exclusiveGroupId"] = zone.exclusiveGroupId;
+        if (!zone.exclusiveTargetGroupIds.empty()) zoneObject["exclusiveTargetGroupIds"] = serializeStringArray(zone.exclusiveTargetGroupIds);
+        if (zone.chokeReleaseSeconds.has_value()) zoneObject["chokeReleaseSeconds"] = *zone.chokeReleaseSeconds;
         zones.push_back(std::move(zoneObject));
     }
     root["zones"] = std::move(zones);
+    ordered_json resetRules = ordered_json::array();
+    for (const auto& rule : snapshot.roundRobinResetRules)
+        resetRules.push_back({ { "event", static_cast<int>(rule.event) }, { "targetAll", rule.targetAll },
+                               { "targetPoolId", rule.targetPoolId } });
+    root["roundRobinResetRules"] = std::move(resetRules);
+    root["performanceProgram"] = nlohmann::ordered_json::parse(serializeCompiledPerformanceProgram(snapshot.performanceProgram));
     root["notes"] = serializeStringArray(snapshot.notes);
     return root;
 }
@@ -548,6 +583,12 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
     result.snapshot.notes.insert(result.snapshot.notes.end(),
                                  project.authoring.notes.begin(),
                                  project.authoring.notes.end());
+    result.snapshot.articulationDefinitions.reserve(project.authoring.articulations.size());
+    for (const auto& articulation : project.authoring.articulations)
+        result.snapshot.articulationDefinitions.push_back({ articulation.id, articulation.displayName,
+                                                             articulation.isDefault, articulation.displayOrder,
+                                                             articulation.activation });
+    result.snapshot.roundRobinResetRules = project.authoring.roundRobinResetRules;
 
     std::unordered_map<std::string, std::size_t> sampleIndices;
     result.snapshot.sampleIdentities.reserve(project.sampleSources.size());
@@ -1094,7 +1135,11 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
             roundRobin,
             zone.roundRobinLength,
             zone.roundRobinPosition,
-            zone.triggerMode
+            zone.triggerMode,
+            zone.performance,
+            zone.exclusiveGroupId,
+            zone.exclusiveTargetGroupIds,
+            zone.chokeReleaseSeconds
         });
 
         if (!zone.articulationId.empty())
@@ -1222,6 +1267,21 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
     {
         addFinding(result, PlaybackSnapshotFindingSeverity::error, "no-sample-identities", "sampleSources",
                    "Snapshot requires at least one sample identity before it can become activation-eligible.");
+    }
+
+    if (project.schemaVersion >= 6 && project.authoring.schemaVersion >= 5)
+    {
+        const auto compilation = compilePerformanceProgram(project.authoring);
+        if (!compilation.compiled)
+        {
+            for (const auto& issue : compilation.issues)
+                addFinding(result, PlaybackSnapshotFindingSeverity::error, "performance-program-compile-failed",
+                           "authoring", issue);
+        }
+        else
+        {
+            result.snapshot.performanceProgram = compilation.program;
+        }
     }
 
     const auto errorCount = countFindings(result, PlaybackSnapshotFindingSeverity::error);

@@ -193,6 +193,7 @@ add_library(drs_engine_adapter STATIC
     src/PerformancePublishCommandAdapter.cpp
     src/PerformancePublishPreparation.cpp
     src/PerformancePublishPresentation.cpp
+    src/PerformanceProgram.cpp
     src/PerformanceRuleContract.cpp
     src/PublishedMacroBinding.cpp
     src/PreparedPlayback.cpp
@@ -233,6 +234,7 @@ add_library(drs_engine_adapter STATIC
     include/drs/engine/PerformancePublishController.h
     include/drs/engine/PerformancePublishPreparation.h
     include/drs/engine/PerformancePublishPresentation.h
+    include/drs/engine/PerformanceProgram.h
     include/drs/engine/PerformanceRuleContract.h
     include/drs/engine/PublishedMacroBinding.h
     include/drs/engine/PreparedPlayback.h

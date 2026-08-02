@@ -1,6 +1,7 @@
 #pragma once
 
 #include "drs/engine/DraftPlaybackContract.h"
+#include "drs/engine/PerformanceProgram.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -165,6 +166,7 @@ public:
     const std::string& getPreparedContentDigest() const noexcept { return preparedContentDigest; }
     const std::vector<SamplerRenderSample>& getSamples() const noexcept { return samples; }
     const std::vector<SamplerRenderRoute>& getRoutes() const noexcept { return routes; }
+    const CompiledPerformanceProgram& getPerformanceProgram() const noexcept { return performanceProgram; }
     int getMidiNoteOffset() const noexcept { return midiNoteOffset; }
     int getFixedVelocity() const noexcept { return fixedVelocity; }
     const PlaybackActivationPayloadPtr& getRetainedActivationPayload() const noexcept
@@ -186,6 +188,7 @@ private:
     std::string preparedContentDigest;
     std::vector<SamplerRenderSample> samples;
     std::vector<SamplerRenderRoute> routes;
+    CompiledPerformanceProgram performanceProgram;
     int midiNoteOffset = 0;
     int fixedVelocity = 0;
     PlaybackActivationPayloadPtr retainedActivationPayload;

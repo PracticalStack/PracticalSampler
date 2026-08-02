@@ -164,6 +164,7 @@ struct ImmutablePreparedPlayback
     std::vector<PreparedPlaybackStreamHandle> streams;
     std::vector<PreparedPlaybackGroupRoute> groupRoutes;
     std::vector<PreparedPlaybackZoneHandle> zones;
+    CompiledPerformanceProgram performanceProgram;
     std::vector<std::string> notes;
 };
 
@@ -180,6 +181,7 @@ struct PreparedPlaybackMetrics
     // Decoded PCM retained by prepared sample handles.
     std::uint64_t preparedSampleDataBytes = 0;
     std::uint64_t decodedBytes = 0;
+    std::uint64_t preparedPerformanceProgramBytes = 0;
     std::size_t cacheHitCount = 0;
     std::size_t cacheMissCount = 0;
     std::size_t failureCount = 0;

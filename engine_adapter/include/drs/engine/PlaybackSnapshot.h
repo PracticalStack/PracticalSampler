@@ -2,6 +2,7 @@
 
 #include "drs/engine/RuntimeModel.h"
 #include "drs/engine/CuratedDspCatalog.h"
+#include "drs/engine/PerformanceProgram.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -98,6 +99,15 @@ struct PlaybackSnapshotArticulationRoute
     std::vector<std::string> zoneIds;
 };
 
+struct PlaybackSnapshotArticulationDefinition
+{
+    std::string id;
+    std::string displayName;
+    bool isDefault = false;
+    int displayOrder = 0;
+    std::optional<RuntimeProjectArticulationActivationDefinition> activation;
+};
+
 struct PlaybackSnapshotGroupRoute
 {
     std::string groupId;
@@ -138,6 +148,10 @@ struct PlaybackSnapshotZone
     int roundRobinLength = 0;
     int roundRobinPosition = 0;
     ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;
+    RuntimeProjectZonePerformanceDefinition performance;
+    std::string exclusiveGroupId;
+    std::vector<std::string> exclusiveTargetGroupIds;
+    std::optional<double> chokeReleaseSeconds;
 };
 
 // S3.7-T5 deferral note: this remains a public aggregate for current builder, facade, and
@@ -165,8 +179,11 @@ struct ImmutablePlaybackSnapshot
     std::vector<PlaybackSnapshotFxSlotReference> fxSlots;
     std::vector<PlaybackSnapshotRoutingBusReference> routingBuses;
     std::vector<PlaybackSnapshotArticulationRoute> articulationRoutes;
+    std::vector<PlaybackSnapshotArticulationDefinition> articulationDefinitions;
     std::vector<PlaybackSnapshotGroupRoute> groupRoutes;
     std::vector<PlaybackSnapshotZone> zones;
+    std::vector<RuntimeProjectRoundRobinResetRuleDefinition> roundRobinResetRules;
+    CompiledPerformanceProgram performanceProgram;
     std::vector<std::string> notes;
 };
 

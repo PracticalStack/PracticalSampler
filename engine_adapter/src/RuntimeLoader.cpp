@@ -2728,6 +2728,26 @@ RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manif
                 articulation.name = *name;
 
             articulation.isDefault = articulationObject.value("isDefault", false);
+            if (instrument.schemaVersion >= 3 && articulationObject.contains("activation"))
+            {
+                const auto& activationObject = articulationObject["activation"];
+                if (!activationObject.is_object())
+                {
+                    addIssue(result, context + " field 'activation' must be an object.");
+                }
+                else
+                {
+                    RuntimeProjectArticulationActivationDefinition activation;
+                    const auto event = readRequired<RuntimeManifestLoadResult, std::string>(activationObject, result, "event", context.c_str());
+                    const auto note = readRequired<RuntimeManifestLoadResult, int>(activationObject, result, "midiNote", context.c_str());
+                    const auto mode = readRequired<RuntimeManifestLoadResult, std::string>(activationObject, result, "mode", context.c_str());
+                    if (event && !parsePerformanceEventKind(*event, activation.event)) addIssue(result, context + " activation event is unsupported.");
+                    if (note) activation.midiNote = *note;
+                    if (mode && !parseArticulationActivationMode(*mode, activation.mode)) addIssue(result, context + " activation mode is unsupported.");
+                    activation.consume = activationObject.value("consume", true);
+                    articulation.activation = activation;
+                }
+            }
             defaultArticulationFound = defaultArticulationFound || articulation.isDefault;
 
             if (!articulation.id.empty())
@@ -2915,6 +2935,29 @@ RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manif
                 else
                     addIssue(result, context + " field 'triggerMode' must be 'gated' or 'one-shot'.");
             }
+            if (instrument.schemaVersion >= 3 && zoneObject.contains("performance"))
+            {
+                const auto& performance = zoneObject["performance"];
+                if (!performance.is_object())
+                {
+                    addIssue(result, context + " field 'performance' must be an object.");
+                }
+                else
+                {
+                    const auto event = readRequired<RuntimeManifestLoadResult, std::string>(performance, result, "event", context.c_str());
+                    const auto sustain = readRequired<RuntimeManifestLoadResult, std::string>(performance, result, "sustain", context.c_str());
+                    const auto pitch = readRequired<RuntimeManifestLoadResult, std::string>(performance, result, "pitchSource", context.c_str());
+                    if (event && !parsePerformanceEventKind(*event, zone.performance.event)) addIssue(result, context + " performance event is unsupported.");
+                    if (sustain && !parsePerformanceSustainCondition(*sustain, zone.performance.sustain)) addIssue(result, context + " performance sustain is unsupported.");
+                    if (pitch && !parsePerformancePitchSource(*pitch, zone.performance.pitchSource)) addIssue(result, context + " performance pitchSource is unsupported.");
+                }
+            }
+            if (instrument.schemaVersion >= 3)
+            {
+                if (const auto group = readOptional<RuntimeManifestLoadResult, std::string>(zoneObject, result, "exclusiveGroupId", context.c_str())) zone.exclusiveGroupId = *group;
+                if (zoneObject.contains("exclusiveTargetGroupIds")) zone.exclusiveTargetGroupIds = readRequiredStringArray(zoneObject, result, "exclusiveTargetGroupIds", context.c_str());
+                if (const auto release = readOptional<RuntimeManifestLoadResult, double>(zoneObject, result, "chokeReleaseSeconds", context.c_str())) zone.chokeReleaseSeconds = *release;
+            }
 
             if (!hasExplicitRoundRobinField)
             {
@@ -2970,6 +3013,29 @@ RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manif
 
     populateVelocityCrossfadeRuntimeDescriptors(instrument.zones);
 
+    if (instrument.schemaVersion >= 3 && root.contains("roundRobinResetRules"))
+    {
+        const auto& resetRules = root["roundRobinResetRules"];
+        if (!isObjectArray(resetRules))
+        {
+            addIssue(result, "Manifest field 'roundRobinResetRules' must be an array of objects.");
+        }
+        else
+        {
+            for (std::size_t index = 0; index < resetRules.size(); ++index)
+            {
+                const auto& value = resetRules[index];
+                RuntimeProjectRoundRobinResetRuleDefinition rule;
+                const auto context = "RoundRobinResetRule[" + std::to_string(index) + "]";
+                const auto event = readRequired<RuntimeManifestLoadResult, std::string>(value, result, "event", context.c_str());
+                if (event && !parseRoundRobinResetEvent(*event, rule.event)) addIssue(result, context + " event is unsupported.");
+                rule.targetAll = value.value("targetAll", true);
+                if (const auto pool = readOptional<RuntimeManifestLoadResult, std::string>(value, result, "targetPoolId", context.c_str())) rule.targetPoolId = *pool;
+                instrument.roundRobinResetRules.push_back(std::move(rule));
+            }
+        }
+    }
+
     instrument.validationNotes = readRequiredStringArray(root, result, "validationNotes", "Manifest");
 
     result.metrics.macroCount = instrument.macros.size();
@@ -2981,8 +3047,8 @@ RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manif
     if (instrument.schemaName != "drs.instrument")
         addIssue(result, "Manifest schemaName must be 'drs.instrument' for the Sprint 1 loader.");
 
-    if (instrument.schemaVersion != 1 && instrument.schemaVersion != 2)
-        addIssue(result, "Manifest schemaVersion must be 1 or 2.");
+    if (instrument.schemaVersion != 1 && instrument.schemaVersion != 2 && instrument.schemaVersion != 3)
+        addIssue(result, "Manifest schemaVersion must be 1, 2, or 3.");
 
     if (instrument.zones.empty())
         addIssue(result, "Manifest must declare at least one zone.");
@@ -3093,6 +3159,15 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
         articulationObject["id"] = articulation.id;
         articulationObject["name"] = articulation.name;
         articulationObject["isDefault"] = articulation.isDefault;
+        if (instrument.schemaVersion >= 3 && articulation.activation.has_value())
+        {
+            articulationObject["activation"] = {
+                { "event", performanceEventKindId(articulation.activation->event) },
+                { "midiNote", articulation.activation->midiNote },
+                { "mode", articulationActivationModeId(articulation.activation->mode) },
+                { "consume", articulation.activation->consume }
+            };
+        }
         articulations.push_back(std::move(articulationObject));
     }
     root["articulations"] = std::move(articulations);
@@ -3141,9 +3216,34 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
         }
         if (zone.triggerMode == ZoneTriggerMode::oneShot)
             zoneObject["triggerMode"] = "one-shot";
+        if (instrument.schemaVersion >= 3)
+        {
+            zoneObject["performance"] = {
+                { "event", performanceEventKindId(zone.performance.event) },
+                { "sustain", performanceSustainConditionId(zone.performance.sustain) },
+                { "pitchSource", performancePitchSourceId(zone.performance.pitchSource) }
+            };
+            if (!zone.exclusiveGroupId.empty()) zoneObject["exclusiveGroupId"] = zone.exclusiveGroupId;
+            if (!zone.exclusiveTargetGroupIds.empty()) zoneObject["exclusiveTargetGroupIds"] = serializeStringArray(zone.exclusiveTargetGroupIds);
+            if (zone.chokeReleaseSeconds.has_value()) zoneObject["chokeReleaseSeconds"] = *zone.chokeReleaseSeconds;
+        }
         zones.push_back(std::move(zoneObject));
     }
     root["zones"] = std::move(zones);
+
+    if (instrument.schemaVersion >= 3)
+    {
+        ordered_json resetRules = ordered_json::array();
+        for (const auto& rule : instrument.roundRobinResetRules)
+        {
+            ordered_json value;
+            value["event"] = roundRobinResetEventId(rule.event);
+            value["targetAll"] = rule.targetAll;
+            if (!rule.targetPoolId.empty()) value["targetPoolId"] = rule.targetPoolId;
+            resetRules.push_back(std::move(value));
+        }
+        root["roundRobinResetRules"] = std::move(resetRules);
+    }
 
     root["validationNotes"] = serializeStringArray(instrument.validationNotes);
     return root.dump(2) + "\n";
