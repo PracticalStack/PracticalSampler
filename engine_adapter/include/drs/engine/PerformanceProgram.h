@@ -49,7 +49,10 @@ struct CompiledPerformanceProgram
     std::array<CompiledPerformanceActivation, 128> activationByMidiNote {};
     std::vector<CompiledPerformanceTriggerRoute> triggerRoutes;
     std::vector<CompiledPerformanceRoundRobinReset> roundRobinResets;
+    // Stable-ID hashes support allocation-free selection migration between published programs.
+    std::vector<std::uint64_t> articulationStableIds;
     std::uint32_t articulationCount = 0;
+    std::uint32_t defaultArticulationIndex = kInvalidPerformanceProgramIndex;
     std::uint32_t exclusiveGroupCount = 0;
     std::uint32_t roundRobinPoolCount = 0;
     std::uint64_t retainedBytes = 0;

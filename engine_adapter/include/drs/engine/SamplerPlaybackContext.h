@@ -1,6 +1,7 @@
 #pragma once
 
 #include "drs/engine/SamplerVoicePool.h"
+#include "drs/engine/PerformanceLaneState.h"
 #include "drs/engine/DspRenderGeneration.h"
 
 #include <array>
@@ -59,6 +60,12 @@ struct SamplerPlaybackContextSnapshot
     std::uint32_t activeGenerationVoiceCount = 0;
     std::uint32_t retiredGenerationVoiceCount = 0;
     std::uint32_t sustainDeferredVoiceCount = 0;
+    std::uint32_t selectedArticulationIndex = kInvalidPerformanceProgramIndex;
+    bool pedalDown = false;
+    std::uint32_t heldNoteCount = 0;
+    std::uint32_t consumedNoteCount = 0;
+    std::uint64_t actionOverflowCount = 0;
+    std::array<std::uint64_t, 5> semanticEventCounts {};
     std::size_t retiredActivationBacklog = 0;
     SamplerPlaybackContextCounters counters;
 };
@@ -154,6 +161,8 @@ private:
     PlaybackActivationLane contextLane;
     SamplerVoicePool voicePool;
     SamplerEventBlock eventScratch;
+    PerformanceActionScratch actionScratch;
+    PerformanceLaneState performanceState;
     double sampleRate = 0.0;
     bool isPrepared = false;
     const SamplerRenderModel* activeRenderModel = nullptr;
@@ -188,6 +197,12 @@ private:
     std::atomic<std::uint32_t> diagnosticActiveGenerationVoiceCount { 0 };
     std::atomic<std::uint32_t> diagnosticRetiredGenerationVoiceCount { 0 };
     std::atomic<std::uint32_t> diagnosticSustainDeferredVoiceCount { 0 };
+    std::atomic<std::uint32_t> diagnosticSelectedArticulationIndex { kInvalidPerformanceProgramIndex };
+    std::atomic<bool> diagnosticPedalDown { false };
+    std::atomic<std::uint32_t> diagnosticHeldNoteCount { 0 };
+    std::atomic<std::uint32_t> diagnosticConsumedNoteCount { 0 };
+    std::atomic<std::uint64_t> diagnosticActionOverflowCount { 0 };
+    std::array<std::atomic<std::uint64_t>, 5> diagnosticSemanticEventCounts {};
     std::atomic<std::uint64_t> diagnosticRenderedBlockCount { 0 };
     std::atomic<std::uint64_t> diagnosticStartedVoiceCount { 0 };
     std::atomic<std::uint64_t> diagnosticReleasedVoiceCount { 0 };

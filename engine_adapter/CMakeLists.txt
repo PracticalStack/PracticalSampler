@@ -150,11 +150,13 @@ target_compile_features(drs_sample_import PUBLIC cxx_std_17)
 
 add_library(drs_sampler_core STATIC
     src/AuthoringPreviewPreparation.cpp
+    src/PerformanceLaneState.cpp
     src/SamplerPlaybackContext.cpp
     src/SamplerRenderModel.cpp
     src/SamplerVoice.cpp
     src/SamplerVoicePool.cpp
     include/drs/engine/AuthoringPreviewPreparation.h
+    include/drs/engine/PerformanceLaneState.h
     include/drs/engine/SamplerPlaybackContext.h
     include/drs/engine/SamplerRenderModel.h
     include/drs/engine/SamplerVoice.h

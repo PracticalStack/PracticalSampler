@@ -22,12 +22,19 @@ bool SamplerPlaybackContext::prepare(double outputSampleRate) noexcept
         activeDspGeneration->setControlSampleRate(sampleRate);
     isPrepared = true;
     if (activeRenderModel != nullptr)
+    {
         voicePool.prepare(*activeRenderModel,
                           sampleRate,
                           activationSlots[static_cast<std::size_t>(activeActivationSlot)].serial);
+        performanceState.migrateProgram(
+            activeRenderModel->getPerformanceProgram(),
+            activationSlots[static_cast<std::size_t>(activeActivationSlot)].serial);
+    }
     else
         voicePool.clearRenderModel();
     eventScratch.clear();
+    actionScratch.clear();
+    performanceState.reset();
     collectFinishedRetirements();
     publishRealtimeDiagnostics();
     return true;
@@ -223,13 +230,27 @@ SamplerPlaybackContextRenderResult SamplerPlaybackContext::renderBlock(
 
     result.activationApplied = applyPendingActivationAtBlockBoundary();
     eventScratch.clear();
+    actionScratch.clear();
     auto hasPanicReset = false;
     for (std::size_t index = 0; index < events.size; ++index)
     {
-        if (!eventScratch.push(events[index]))
+        auto raw = events[index];
+        raw.inputSequence = static_cast<std::uint32_t>(index + 1);
+        const auto beforeActions = actionScratch.size();
+        const auto generation = activeActivationSlot >= 0
+            ? activationSlots[static_cast<std::size_t>(activeActivationSlot)].serial : 0;
+        if (!performanceState.normalize(raw, generation, actionScratch))
+        {
             ++counters.droppedEventCount;
-        else if (events[index].type == SamplerRenderEventType::reset)
-            hasPanicReset = true;
+            continue;
+        }
+        for (std::size_t action = beforeActions; action < actionScratch.size(); ++action)
+        {
+            if (!eventScratch.push(actionScratch.view()[action]))
+                ++counters.droppedEventCount;
+            else if (actionScratch.view()[action].type == SamplerRenderEventType::reset)
+                hasPanicReset = true;
+        }
     }
 
     if (activeRenderModel == nullptr)
@@ -274,6 +295,7 @@ void SamplerPlaybackContext::resetAtBlockBoundary() noexcept
     const auto resetCount = voicePool.activeVoiceCount() + voicePool.releasingVoiceCount();
     counters.resetVoiceCount += resetCount;
     voicePool.resetVoices();
+    performanceState.reset();
     if (activeDspGeneration != nullptr)
         activeDspGeneration->resetEffectState();
     eventScratch.clear();
@@ -333,6 +355,14 @@ SamplerPlaybackContextSnapshot SamplerPlaybackContext::getSnapshot() const noexc
             = diagnosticRetiredGenerationVoiceCount.load(std::memory_order_relaxed);
         snapshot.sustainDeferredVoiceCount
             = diagnosticSustainDeferredVoiceCount.load(std::memory_order_relaxed);
+        snapshot.selectedArticulationIndex
+            = diagnosticSelectedArticulationIndex.load(std::memory_order_relaxed);
+        snapshot.pedalDown = diagnosticPedalDown.load(std::memory_order_relaxed);
+        snapshot.heldNoteCount = diagnosticHeldNoteCount.load(std::memory_order_relaxed);
+        snapshot.consumedNoteCount = diagnosticConsumedNoteCount.load(std::memory_order_relaxed);
+        snapshot.actionOverflowCount = diagnosticActionOverflowCount.load(std::memory_order_relaxed);
+        for (std::size_t event = 0; event < snapshot.semanticEventCounts.size(); ++event)
+            snapshot.semanticEventCounts[event] = diagnosticSemanticEventCounts[event].load(std::memory_order_relaxed);
         snapshot.counters.renderedBlockCount = diagnosticRenderedBlockCount.load(std::memory_order_relaxed);
         snapshot.counters.startedVoiceCount = diagnosticStartedVoiceCount.load(std::memory_order_relaxed);
         snapshot.counters.releasedVoiceCount = diagnosticReleasedVoiceCount.load(std::memory_order_relaxed);
@@ -416,6 +446,7 @@ bool SamplerPlaybackContext::applyPendingActivationAtBlockBoundary() noexcept
     activeDspGeneration = slot.dspGeneration.get();
     activeRevision = model->getRevision();
     activePreparedBuildId = model->getPreparedBuildId();
+    performanceState.migrateProgram(model->getPerformanceProgram(), slot.serial);
     ++counters.appliedActivationCount;
     return true;
 }
@@ -575,6 +606,14 @@ void SamplerPlaybackContext::publishRealtimeDiagnostics() noexcept
     diagnosticSustainDeferredVoiceCount.store(
         static_cast<std::uint32_t>(voicePool.sustainDeferredVoiceCount()),
         std::memory_order_release);
+    const auto performance = performanceState.getSnapshot();
+    diagnosticSelectedArticulationIndex.store(performance.selectedArticulationIndex, std::memory_order_release);
+    diagnosticPedalDown.store(performance.pedalDown, std::memory_order_release);
+    diagnosticHeldNoteCount.store(performance.heldNoteCount, std::memory_order_release);
+    diagnosticConsumedNoteCount.store(performance.consumedNoteCount, std::memory_order_release);
+    diagnosticActionOverflowCount.store(performance.actionOverflowCount, std::memory_order_release);
+    for (std::size_t event = 0; event < performance.semanticEventCounts.size(); ++event)
+        diagnosticSemanticEventCounts[event].store(performance.semanticEventCounts[event], std::memory_order_release);
     diagnosticRenderedBlockCount.store(counters.renderedBlockCount, std::memory_order_release);
     diagnosticStartedVoiceCount.store(counters.startedVoiceCount, std::memory_order_release);
     diagnosticReleasedVoiceCount.store(counters.releasedVoiceCount, std::memory_order_release);

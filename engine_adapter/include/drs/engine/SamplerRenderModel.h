@@ -30,6 +30,8 @@ enum class SamplerRenderEventType : std::uint8_t
     noteOn,
     noteOff,
     sustainPedal,
+    pedalDown,
+    pedalUp,
     allNotesOff,
     reset
 };
@@ -40,6 +42,10 @@ struct SamplerRenderEvent
     std::uint32_t sampleOffset = 0;
     std::uint8_t midiNote = 60;
     float velocity = 1.0f;
+    // Kept now for future per-channel routing; v1 continues to route omni.
+    std::uint8_t midiChannel = 0;
+    float noteOffVelocity = 0.0f;
+    std::uint32_t inputSequence = 0;
 };
 
 // Non-owning callback views. Their backing storage is owned and bounded by the playback context.

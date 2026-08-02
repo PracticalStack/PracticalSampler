@@ -121,6 +121,24 @@ int clampMidiValue(int value)
     return std::clamp(value, 0, 127);
 }
 
+drs::engine::SamplerRenderEvent normalizeHostMidiEvent(
+    const drs::engine::SamplerRenderEventType type,
+    const std::uint32_t sampleOffset,
+    const int midiNote,
+    const int velocity,
+    const int channel,
+    const int noteOffVelocity = 0) noexcept
+{
+    drs::engine::SamplerRenderEvent event;
+    event.type = type;
+    event.sampleOffset = sampleOffset;
+    event.midiNote = static_cast<std::uint8_t>(clampMidiValue(midiNote));
+    event.velocity = static_cast<float>(clampMidiValue(velocity)) / 127.0f;
+    event.midiChannel = static_cast<std::uint8_t>(std::clamp(channel, 0, 15));
+    event.noteOffVelocity = static_cast<float>(clampMidiValue(noteOffVelocity)) / 127.0f;
+    return event;
+}
+
 std::uint64_t monotonicMicros()
 {
     return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
@@ -810,10 +828,17 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
     drainRealtimeNoteEvents(authoringPreviewNoteQueue, authoringPreviewEvents,
                             static_cast<std::uint32_t>(std::max(frameCount, 0)));
 
+    std::uint32_t hostMidiInputSequence = 1;
+    const auto queueHostEvent = [&](drs::engine::SamplerRenderEvent event)
+    {
+        event.inputSequence = hostMidiInputSequence++;
+        performanceEvents.push(event);
+    };
     for (const auto metadata : midiMessages)
     {
         const auto* eventData = metadata.data;
         const auto command = metadata.numBytes > 0 ? static_cast<int>(eventData[0] & 0xf0u) : 0;
+        const auto channel = metadata.numBytes > 0 ? static_cast<int>(eventData[0] & 0x0fu) : 0;
         const auto noteNumber = metadata.numBytes > 1 ? static_cast<int>(eventData[1] & 0x7fu) : 0;
         const auto velocity = metadata.numBytes > 2 ? static_cast<int>(eventData[2] & 0x7fu) : 0;
         const auto eventSample = frameCount > 0
@@ -821,38 +846,28 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
             : 0u;
         if (command == 0x90 && velocity > 0)
         {
-            performanceEvents.push({ drs::engine::SamplerRenderEventType::noteOn,
-                                     eventSample,
-                                     static_cast<std::uint8_t>(noteNumber),
-                                     static_cast<float>(velocity) / 127.0f });
+            queueHostEvent(normalizeHostMidiEvent(drs::engine::SamplerRenderEventType::noteOn,
+                                                  eventSample, noteNumber, velocity, channel));
         }
         else if (command == 0x80 || (command == 0x90 && velocity == 0))
         {
-            performanceEvents.push({ drs::engine::SamplerRenderEventType::noteOff,
-                                     eventSample,
-                                     static_cast<std::uint8_t>(noteNumber),
-                                     0.0f });
+            queueHostEvent(normalizeHostMidiEvent(drs::engine::SamplerRenderEventType::noteOff,
+                                                  eventSample, noteNumber, 0, channel, velocity));
         }
         else if (command == 0xb0 && metadata.numBytes > 2 && eventData[1] == 64u)
         {
-            performanceEvents.push({ drs::engine::SamplerRenderEventType::sustainPedal,
-                                     eventSample,
-                                     0,
-                                     static_cast<float>(eventData[2] & 0x7fu) / 127.0f });
+            queueHostEvent(normalizeHostMidiEvent(drs::engine::SamplerRenderEventType::sustainPedal,
+                                                  eventSample, 0, eventData[2] & 0x7fu, channel));
         }
         else if (command == 0xb0 && metadata.numBytes > 1 && eventData[1] == 123u)
         {
-            performanceEvents.push({ drs::engine::SamplerRenderEventType::allNotesOff,
-                                     eventSample,
-                                     0,
-                                     0.0f });
+            queueHostEvent(normalizeHostMidiEvent(drs::engine::SamplerRenderEventType::allNotesOff,
+                                                  eventSample, 0, 0, channel));
         }
         else if (command == 0xb0 && metadata.numBytes > 1 && eventData[1] == 120u)
         {
-            performanceEvents.push({ drs::engine::SamplerRenderEventType::reset,
-                                     eventSample,
-                                     0,
-                                     0.0f });
+            queueHostEvent(normalizeHostMidiEvent(drs::engine::SamplerRenderEventType::reset,
+                                                  eventSample, 0, 0, channel));
         }
     }
 

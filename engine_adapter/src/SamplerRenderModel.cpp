@@ -266,10 +266,12 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
     if (snapshot.zones.size() != prepared.zones.size())
         addError(result, "render-model-route-count-mismatch", "payload.prepared.zones",
                  "Snapshot and prepared route counts must agree.");
-    if (prepared.performanceProgram.retainedBytes
+    if (prepared.performanceProgram.retainedBytes != 0
+        && prepared.performanceProgram.retainedBytes
         != sizeof(CompiledPerformanceProgram)
             + prepared.performanceProgram.triggerRoutes.size() * sizeof(CompiledPerformanceTriggerRoute)
-            + prepared.performanceProgram.roundRobinResets.size() * sizeof(CompiledPerformanceRoundRobinReset))
+            + prepared.performanceProgram.roundRobinResets.size() * sizeof(CompiledPerformanceRoundRobinReset)
+            + prepared.performanceProgram.articulationStableIds.size() * sizeof(std::uint64_t))
     {
         addError(result, "render-model-performance-program-size-invalid", "payload.prepared.performanceProgram",
                  "Prepared performance-program memory accounting does not match its retained numeric records.");

@@ -588,6 +588,26 @@ set_target_properties(drs_performance_engine_s3_program_tests PROPERTIES
     FOLDER "Tests"
 )
 
+add_executable(drs_performance_engine_s4_state_tests
+    src/PerformanceEngineSprint4StateTests.cpp
+)
+
+target_link_libraries(drs_performance_engine_s4_state_tests
+    PRIVATE
+        drs_sampler_core
+)
+
+target_compile_features(drs_performance_engine_s4_state_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.performance_engine.s4.state
+    COMMAND drs_performance_engine_s4_state_tests
+)
+
+set_target_properties(drs_performance_engine_s4_state_tests PROPERTIES
+    FOLDER "Tests"
+)
+
 add_executable(drs_curated_dsp_contract_red_tests
     src/CuratedDspContractRedTests.cpp
 )

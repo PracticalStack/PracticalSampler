@@ -137,6 +137,8 @@ int eventPriorityAtSharedOffset(const SamplerRenderEvent& event) noexcept
         case SamplerRenderEventType::allNotesOff:
             return 1;
         case SamplerRenderEventType::sustainPedal:
+        case SamplerRenderEventType::pedalDown:
+        case SamplerRenderEventType::pedalUp:
             return 2;
         case SamplerRenderEventType::noteOff:
             return 3;
@@ -224,7 +226,9 @@ bool SamplerEventBlock::push(SamplerRenderEvent event) noexcept
         if (previous.sampleOffset < event.sampleOffset)
             break;
         if (previous.sampleOffset == event.sampleOffset
-            && eventPriorityAtSharedOffset(previous) <= eventPriorityAtSharedOffset(event))
+            && ((previous.inputSequence != 0 && event.inputSequence != 0)
+                    ? previous.inputSequence <= event.inputSequence
+                    : eventPriorityAtSharedOffset(previous) <= eventPriorityAtSharedOffset(event)))
         {
             break;
         }
@@ -797,8 +801,11 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
             return;
 
         case SamplerRenderEventType::sustainPedal:
+        case SamplerRenderEventType::pedalDown:
+        case SamplerRenderEventType::pedalUp:
         {
-            const auto pressed = event.velocity >= 0.5f;
+            const auto pressed = event.type == SamplerRenderEventType::pedalDown
+                || (event.type == SamplerRenderEventType::sustainPedal && event.velocity >= 0.5f);
             if (pressed == sustainPedalDown)
                 return;
             sustainPedalDown = pressed;

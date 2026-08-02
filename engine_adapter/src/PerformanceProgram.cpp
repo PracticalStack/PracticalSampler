@@ -14,6 +14,17 @@ std::size_t eventIndex(PerformanceEventKind event) noexcept
     return static_cast<std::size_t>(event);
 }
 
+std::uint64_t stableIdHash(std::string_view text) noexcept
+{
+    std::uint64_t hash = 14695981039346656037ull;
+    for (const auto character : text)
+    {
+        hash ^= static_cast<unsigned char>(character);
+        hash *= 1099511628211ull;
+    }
+    return hash;
+}
+
 template <typename Value, typename ReadId>
 std::vector<std::string> sortedIds(const std::vector<Value>& values, const ReadId& readId)
 {
@@ -46,6 +57,16 @@ CompiledPerformanceProgramResult compilePerformanceProgram(const RuntimeProjectA
     const auto articulationIds = sortedIds(authoring.articulations, [](const auto& item) -> const std::string& { return item.id; });
     const auto articulationIndex = makeIndex(articulationIds);
     result.program.articulationCount = static_cast<std::uint32_t>(articulationIds.size());
+    result.program.articulationStableIds.reserve(articulationIds.size());
+    for (const auto& id : articulationIds)
+        result.program.articulationStableIds.push_back(stableIdHash(id));
+    for (const auto& articulation : authoring.articulations)
+    {
+        if (!articulation.isDefault) continue;
+        const auto index = articulationIndex.find(articulation.id);
+        if (index != articulationIndex.end()) result.program.defaultArticulationIndex = index->second;
+        break;
+    }
 
     std::vector<std::string> groupIds;
     for (const auto& zone : authoring.zones)
@@ -157,7 +178,8 @@ CompiledPerformanceProgramResult compilePerformanceProgram(const RuntimeProjectA
 
     result.program.retainedBytes = sizeof(CompiledPerformanceProgram)
         + result.program.triggerRoutes.size() * sizeof(CompiledPerformanceTriggerRoute)
-        + result.program.roundRobinResets.size() * sizeof(CompiledPerformanceRoundRobinReset);
+        + result.program.roundRobinResets.size() * sizeof(CompiledPerformanceRoundRobinReset)
+        + result.program.articulationStableIds.size() * sizeof(std::uint64_t);
     result.compiled = result.issues.empty();
     return result;
 }
@@ -166,6 +188,7 @@ std::string serializeCompiledPerformanceProgram(const CompiledPerformanceProgram
 {
     nlohmann::ordered_json root;
     root["articulationCount"] = program.articulationCount;
+    root["defaultArticulationIndex"] = program.defaultArticulationIndex;
     root["exclusiveGroupCount"] = program.exclusiveGroupCount;
     root["roundRobinPoolCount"] = program.roundRobinPoolCount;
     root["retainedBytes"] = program.retainedBytes;
@@ -180,6 +203,7 @@ std::string serializeCompiledPerformanceProgram(const CompiledPerformanceProgram
             activations.push_back({ { "midiNote", note }, { "articulationIndex", activation.articulationIndex }, { "consume", activation.consume } });
     }
     root["activations"] = std::move(activations);
+    root["articulationStableIds"] = program.articulationStableIds;
     nlohmann::ordered_json routes = nlohmann::ordered_json::array();
     for (const auto& route : program.triggerRoutes)
         routes.push_back({ { "zoneIndex", route.zoneIndex }, { "articulationIndex", route.articulationIndex },
