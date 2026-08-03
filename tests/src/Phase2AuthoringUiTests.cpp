@@ -3079,11 +3079,19 @@ void exerciseMapSelectionBehavior(drs::app::AuthoringPanel& panel,
     require(zoneMap.endActiveRangeGesture(keyHighTarget),
             "A horizontal multi-zone handle drag should commit on release.");
     const auto selectedAfterKeyExpansion = collectSelectedSummaries();
+    const auto keyScale = static_cast<double>(expandedKeyHigh - primaryBeforeKeyExpansion.keyLow + 1)
+        / static_cast<double>(primaryBeforeKeyExpansion.keyHigh - primaryBeforeKeyExpansion.keyLow + 1);
     for (const auto& original : selectedBeforeKeyExpansion)
     {
         const auto& edited = findSummaryById(selectedAfterKeyExpansion, original.id);
-        require(edited.keyLow == original.keyLow && edited.keyHigh == original.keyHigh + 3,
-                "Dragging a horizontal boundary should widen every selected zone by the same amount.");
+        const auto expectedLow = static_cast<int>(std::lround(
+            primaryBeforeKeyExpansion.keyLow
+            + static_cast<double>(original.keyLow - primaryBeforeKeyExpansion.keyLow) * keyScale));
+        const auto expectedHighBoundary = static_cast<int>(std::lround(
+            primaryBeforeKeyExpansion.keyLow
+            + static_cast<double>(original.keyHigh + 1 - primaryBeforeKeyExpansion.keyLow) * keyScale));
+        require(edited.keyLow == expectedLow && edited.keyHigh == expectedHighBoundary - 1,
+                "Dragging a horizontal boundary should proportionally widen and reposition every selected zone.");
     }
     require(session.getDocumentState().undoDepth == initialUndoDepth + 5,
             "One horizontal multi-zone drag should create one undo transaction.");
@@ -3454,6 +3462,64 @@ void exerciseZoneMapViewportGestures()
                 && zoneMap.getViewportOrigin() == juce::Point<float> {},
             "Resetting the Zone Map viewport should restore the complete mapping extent.");
 }
+
+void exerciseZoneMapProportionalMultiZoneExpansion()
+{
+    using drs::app::authoring::ZoneMapCanvas;
+
+    ZoneMapCanvas zoneMap;
+    zoneMap.setBounds(0, 0, 800, 320);
+    std::vector<drs::engine::AuthoringZoneSummary> zones(10);
+    for (std::size_t index = 0; index < zones.size(); ++index)
+    {
+        zones[index].id = "scale-zone-" + std::to_string(index);
+        zones[index].displayName = zones[index].id;
+        zones[index].rootKey = 60 + static_cast<int>(index);
+        zones[index].keyLow = zones[index].rootKey;
+        zones[index].keyHigh = zones[index].rootKey;
+        zones[index].velocityLow = 1;
+        zones[index].velocityHigh = 127;
+    }
+    zones.front().selected = true;
+    for (std::size_t index = 1; index < zones.size(); ++index)
+        zones[index].additionallySelected = true;
+    zoneMap.setZoneSummaries(zones);
+    std::vector<std::string> selectedZoneIds;
+    selectedZoneIds.reserve(zones.size());
+    for (const auto& zone : zones)
+        selectedZoneIds.push_back(zone.id);
+    zoneMap.setSelectionState({ std::move(selectedZoneIds), zones[0].id });
+
+    std::vector<drs::engine::AuthoringZoneSummary> committedZones;
+    zoneMap.setOnZoneRangeCommitRequested(
+        [&](const std::vector<drs::engine::AuthoringZoneSummary>& editedZones, const std::string&)
+        {
+            committedZones = editedZones;
+        });
+
+    const auto handle = computeZoneMapHandlePoint(zoneMap,
+                                                  zones.front(),
+                                                  ZoneMapCanvas::RangeHandle::keyHigh);
+    const auto target = computeZoneMapTargetPointForKey(zoneMap, zones.front(), 61);
+    require(zoneMap.beginRangeGestureAt(handle)
+                && zoneMap.updateActiveRangeGesture(target)
+                && zoneMap.endActiveRangeGesture(target),
+            "A selected run of one-note zones should support proportional horizontal expansion.");
+    require(committedZones.size() == zones.size(),
+            "Proportional horizontal expansion should commit every selected zone together.");
+    for (std::size_t index = 0; index < committedZones.size(); ++index)
+    {
+        const auto expectedLow = 60 + static_cast<int>(index) * 2;
+        require(committedZones[index].keyLow == expectedLow
+                    && committedZones[index].keyHigh == expectedLow + 1,
+                "Doubling one selected zone's width should double all selected widths and spacing without overlap.");
+        if (index > 0)
+        {
+            require(committedZones[index - 1].keyHigh + 1 == committedZones[index].keyLow,
+                    "Proportional horizontal expansion should keep an originally contiguous zone run contiguous.");
+        }
+    }
+}
 } // namespace
 
 int main()
@@ -3462,6 +3528,7 @@ int main()
     {
         juce::ScopedJuceInitialiser_GUI gui;
         exerciseZoneMapViewportGestures();
+        exerciseZoneMapProportionalMultiZoneExpansion();
 
         drs::app::authoring::ZoneMapCanvas dropTargetZoneMap;
         std::vector<juce::File> droppedSampleFiles;

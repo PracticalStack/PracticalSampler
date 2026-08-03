@@ -832,14 +832,69 @@ std::vector<drs::engine::AuthoringZoneSummary> ZoneMapCanvas::buildRangePreviews
     auto previews = gesture.originalZones;
     auto primaryPreview = gesture.originalZones.front();
 
+    if (gesture.handle == RangeHandle::keyLow || gesture.handle == RangeHandle::keyHigh)
+    {
+        const auto primaryLowBoundary = primaryPreview.keyLow;
+        const auto primaryHighBoundary = primaryPreview.keyHigh + 1;
+        const auto anchor = gesture.handle == RangeHandle::keyHigh
+            ? primaryLowBoundary : primaryHighBoundary;
+        const auto targetKey = positionToMidiKey(position);
+        const auto requestedPrimaryWidth = gesture.handle == RangeHandle::keyHigh
+            ? juce::jlimit(1, 128 - primaryLowBoundary, targetKey - primaryLowBoundary + 1)
+            : juce::jlimit(1, primaryHighBoundary, primaryHighBoundary - targetKey);
+        const auto originalPrimaryWidth = primaryHighBoundary - primaryLowBoundary;
+        auto scale = static_cast<double>(requestedPrimaryWidth)
+            / static_cast<double>(originalPrimaryWidth);
+
+        auto minimumBoundary = 128;
+        auto maximumBoundary = 0;
+        auto minimumScale = 0.0;
+        for (const auto& zone : gesture.originalZones)
+        {
+            minimumBoundary = std::min(minimumBoundary, zone.keyLow);
+            maximumBoundary = std::max(maximumBoundary, zone.keyHigh + 1);
+            minimumScale = std::max(minimumScale,
+                                    1.0 / static_cast<double>(zone.keyHigh - zone.keyLow + 1));
+        }
+
+        auto maximumScale = 128.0;
+        if (minimumBoundary < anchor)
+        {
+            maximumScale = std::min(maximumScale,
+                                    static_cast<double>(anchor)
+                                        / static_cast<double>(anchor - minimumBoundary));
+        }
+        if (maximumBoundary > anchor)
+        {
+            maximumScale = std::min(maximumScale,
+                                    static_cast<double>(128 - anchor)
+                                        / static_cast<double>(maximumBoundary - anchor));
+        }
+        scale = juce::jlimit(minimumScale, maximumScale, scale);
+
+        const auto scaleBoundary = [anchor, scale](int boundary)
+        {
+            return juce::jlimit(0, 128,
+                                static_cast<int>(std::lround(
+                                    static_cast<double>(anchor)
+                                    + static_cast<double>(boundary - anchor) * scale)));
+        };
+        for (auto& preview : previews)
+        {
+            auto scaledLow = scaleBoundary(preview.keyLow);
+            auto scaledHighBoundary = scaleBoundary(preview.keyHigh + 1);
+            if (scaledHighBoundary <= scaledLow)
+                scaledHighBoundary = std::min(128, scaledLow + 1);
+            if (scaledHighBoundary <= scaledLow)
+                scaledLow = std::max(0, scaledHighBoundary - 1);
+            preview.keyLow = scaledLow;
+            preview.keyHigh = scaledHighBoundary - 1;
+        }
+        return previews;
+    }
+
     switch (gesture.handle)
     {
-        case RangeHandle::keyLow:
-            primaryPreview.keyLow = juce::jlimit(0, primaryPreview.keyHigh, positionToMidiKey(position));
-            break;
-        case RangeHandle::keyHigh:
-            primaryPreview.keyHigh = juce::jlimit(primaryPreview.keyLow, 127, positionToMidiKey(position));
-            break;
         case RangeHandle::velocityHigh:
             primaryPreview.velocityHigh = juce::jlimit(primaryPreview.velocityLow, 127,
                                                        positionToMidiVelocity(position));
@@ -848,13 +903,13 @@ std::vector<drs::engine::AuthoringZoneSummary> ZoneMapCanvas::buildRangePreviews
             primaryPreview.velocityLow = juce::jlimit(1, primaryPreview.velocityHigh,
                                                       positionToMidiVelocity(position));
             break;
+        case RangeHandle::keyLow:
+        case RangeHandle::keyHigh:
         case RangeHandle::none:
             break;
     }
 
     const auto& primaryOriginal = gesture.originalZones.front();
-    const auto keyLowDelta = primaryPreview.keyLow - primaryOriginal.keyLow;
-    const auto keyHighDelta = primaryPreview.keyHigh - primaryOriginal.keyHigh;
     const auto velocityLowDelta = primaryPreview.velocityLow - primaryOriginal.velocityLow;
     const auto velocityHighDelta = primaryPreview.velocityHigh - primaryOriginal.velocityHigh;
 
@@ -862,12 +917,6 @@ std::vector<drs::engine::AuthoringZoneSummary> ZoneMapCanvas::buildRangePreviews
     {
         switch (gesture.handle)
         {
-            case RangeHandle::keyLow:
-                preview.keyLow = juce::jlimit(0, preview.keyHigh, preview.keyLow + keyLowDelta);
-                break;
-            case RangeHandle::keyHigh:
-                preview.keyHigh = juce::jlimit(preview.keyLow, 127, preview.keyHigh + keyHighDelta);
-                break;
             case RangeHandle::velocityHigh:
                 preview.velocityHigh = juce::jlimit(preview.velocityLow, 127,
                                                     preview.velocityHigh + velocityHighDelta);
@@ -876,6 +925,8 @@ std::vector<drs::engine::AuthoringZoneSummary> ZoneMapCanvas::buildRangePreviews
                 preview.velocityLow = juce::jlimit(1, preview.velocityHigh,
                                                    preview.velocityLow + velocityLowDelta);
                 break;
+            case RangeHandle::keyLow:
+            case RangeHandle::keyHigh:
             case RangeHandle::none:
                 break;
         }
