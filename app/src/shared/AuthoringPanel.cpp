@@ -1346,6 +1346,52 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         if (result.applied)
             refreshFromSession();
     };
+    zoneCallbacks.onCreateVelocityCrossfadeRequested = [this](const std::string& lowerZoneId,
+                                                               const std::string& upperZoneId,
+                                                               const int overlapLow,
+                                                               const int overlapHigh)
+    {
+        const auto result = authoringSession.createVelocityCrossfadePair(
+            { lowerZoneId, upperZoneId, overlapLow, overlapHigh }, "Create velocity crossfade");
+        if (result.applied)
+        {
+            refreshFromSession();
+            return;
+        }
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Crossfade Unavailable",
+                                               buildIssueSummary(result.issues));
+    };
+    zoneCallbacks.onUpdateVelocityCrossfadeRequested = [this](const std::string& lowerZoneId,
+                                                               const std::string& upperZoneId,
+                                                               const int overlapLow,
+                                                               const int overlapHigh)
+    {
+        const auto result = authoringSession.updateVelocityCrossfadePair(
+            { lowerZoneId, upperZoneId, overlapLow, overlapHigh }, "Update velocity crossfade");
+        if (result.applied)
+        {
+            refreshFromSession();
+            return;
+        }
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Crossfade Update Unavailable",
+                                               buildIssueSummary(result.issues));
+    };
+    zoneCallbacks.onRemoveVelocityCrossfadeRequested = [this](const std::string& lowerZoneId,
+                                                               const std::string& upperZoneId)
+    {
+        const auto result = authoringSession.removeVelocityCrossfadePair(
+            lowerZoneId, upperZoneId, "Remove velocity crossfade");
+        if (result.applied)
+        {
+            refreshFromSession();
+            return;
+        }
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Crossfade Removal Unavailable",
+                                               buildIssueSummary(result.issues));
+    };
     zoneCallbacks.onCreateChokeGroupRequested = [this]
     {
         const auto selectedZone = authoringSession.getSelectedZone();
@@ -3450,6 +3496,137 @@ authoring::ZoneFieldValuesViewModel AuthoringPanel::buildZoneFieldValuesViewMode
             viewModel.roundRobinHintText = compatibleUnpooledZoneCount > 0
                 ? "Compatible unpooled zones: " + std::to_string(compatibleUnpooledZoneCount)
                 : "No compatible unpooled zones available for grouping";
+        }
+
+        const auto displayNameForZoneId = [&](const std::string& zoneId)
+        {
+            const auto iterator = std::find_if(project.authoring.zones.begin(), project.authoring.zones.end(),
+                                               [&](const auto& candidate) { return candidate.id == zoneId; });
+            return iterator == project.authoring.zones.end() ? zoneId : iterator->displayName;
+        };
+        viewModel.crossfadeFadeInText = "Fade In: none";
+        viewModel.crossfadeFadeOutText = "Fade Out: none";
+        viewModel.crossfadeGuidanceText =
+            "Select two compatible velocity layers to create a shared linear overlap.";
+
+        const auto setRelationship = [&](const std::string& lowerZoneId,
+                                         const std::string& upperZoneId,
+                                         int overlapLow,
+                                         int overlapHigh,
+                                         bool isFadeIn)
+        {
+            const auto text = std::string(isFadeIn ? "Fade In: Linear " : "Fade Out: Linear ")
+                + std::to_string(overlapLow) + "-" + std::to_string(overlapHigh)
+                + " with " + displayNameForZoneId(isFadeIn ? lowerZoneId : upperZoneId);
+            if (isFadeIn)
+            {
+                viewModel.crossfadeHasFadeIn = true;
+                viewModel.crossfadeFadeInText = text;
+                viewModel.crossfadeFadeInLowerZoneId = lowerZoneId;
+                viewModel.crossfadeFadeInUpperZoneId = upperZoneId;
+            }
+            else
+            {
+                viewModel.crossfadeHasFadeOut = true;
+                viewModel.crossfadeFadeOutText = text;
+                viewModel.crossfadeFadeOutLowerZoneId = lowerZoneId;
+                viewModel.crossfadeFadeOutUpperZoneId = upperZoneId;
+            }
+        };
+
+        if (drs::engine::hasCompleteFadeIn(zone->velocityCrossfade))
+        {
+            const auto discovery = drs::engine::discoverVelocityCrossfadePartner(
+                project, zone->id, drs::engine::VelocityCrossfadeDirection::fadeIn);
+            if (discovery.eligible())
+            {
+                setRelationship(discovery.partnerZoneIds.front(), zone->id,
+                                zone->velocityCrossfade.fadeInLowVelocity,
+                                zone->velocityCrossfade.fadeInHighVelocity, true);
+            }
+            else
+            {
+                viewModel.crossfadeFadeInText = "Fade In: needs review — "
+                    + (discovery.blockingIssues.empty() ? std::string("partner unavailable")
+                                                        : discovery.blockingIssues.front());
+            }
+        }
+        if (drs::engine::hasCompleteFadeOut(zone->velocityCrossfade))
+        {
+            const auto discovery = drs::engine::discoverVelocityCrossfadePartner(
+                project, zone->id, drs::engine::VelocityCrossfadeDirection::fadeOut);
+            if (discovery.eligible())
+            {
+                setRelationship(zone->id, discovery.partnerZoneIds.front(),
+                                zone->velocityCrossfade.fadeOutLowVelocity,
+                                zone->velocityCrossfade.fadeOutHighVelocity, false);
+            }
+            else
+            {
+                viewModel.crossfadeFadeOutText = "Fade Out: needs review — "
+                    + (discovery.blockingIssues.empty() ? std::string("partner unavailable")
+                                                        : discovery.blockingIssues.front());
+            }
+        }
+
+        if (viewModel.crossfadeHasFadeIn)
+        {
+            viewModel.crossfadeLowerZoneId = viewModel.crossfadeFadeInLowerZoneId;
+            viewModel.crossfadeUpperZoneId = viewModel.crossfadeFadeInUpperZoneId;
+            viewModel.crossfadeOverlapLow = zone->velocityCrossfade.fadeInLowVelocity;
+            viewModel.crossfadeOverlapHigh = zone->velocityCrossfade.fadeInHighVelocity;
+            viewModel.crossfadeCanEdit = true;
+            viewModel.crossfadeCanRemove = true;
+            viewModel.crossfadeGuidanceText = "Edit or remove the complete Fade In relationship with its lower layer.";
+        }
+        else if (viewModel.crossfadeHasFadeOut)
+        {
+            viewModel.crossfadeLowerZoneId = viewModel.crossfadeFadeOutLowerZoneId;
+            viewModel.crossfadeUpperZoneId = viewModel.crossfadeFadeOutUpperZoneId;
+            viewModel.crossfadeOverlapLow = zone->velocityCrossfade.fadeOutLowVelocity;
+            viewModel.crossfadeOverlapHigh = zone->velocityCrossfade.fadeOutHighVelocity;
+            viewModel.crossfadeCanEdit = true;
+            viewModel.crossfadeCanRemove = true;
+            viewModel.crossfadeGuidanceText = "Edit or remove the complete Fade Out relationship with its upper layer.";
+        }
+
+        auto selectedZoneIds = zoneMapSelectedZoneIds;
+        if (selectedZoneIds.empty())
+            selectedZoneIds.push_back(zone->id);
+        std::sort(selectedZoneIds.begin(), selectedZoneIds.end());
+        selectedZoneIds.erase(std::unique(selectedZoneIds.begin(), selectedZoneIds.end()), selectedZoneIds.end());
+        if (selectedZoneIds.size() == 2)
+        {
+            const auto first = std::find_if(project.authoring.zones.begin(), project.authoring.zones.end(),
+                                            [&](const auto& candidate) { return candidate.id == selectedZoneIds[0]; });
+            const auto second = std::find_if(project.authoring.zones.begin(), project.authoring.zones.end(),
+                                             [&](const auto& candidate) { return candidate.id == selectedZoneIds[1]; });
+            if (first != project.authoring.zones.end() && second != project.authoring.zones.end())
+            {
+                const auto* lower = &*first;
+                const auto* upper = &*second;
+                if (lower->velocityLow > upper->velocityLow
+                    || (lower->velocityLow == upper->velocityLow && lower->id > upper->id))
+                    std::swap(lower, upper);
+
+                const auto seam = (lower->velocityHigh + upper->velocityLow) / 2;
+                const auto overlapLow = std::clamp(seam - 7, 1, 126);
+                const auto overlapHigh = std::clamp(seam + 8, overlapLow + 1, 127);
+                const drs::engine::VelocityCrossfadePairRequest request {
+                    lower->id, upper->id, overlapLow, overlapHigh
+                };
+                const auto plan = drs::engine::planVelocityCrossfadePair(project, request);
+                viewModel.crossfadeLowerZoneId = lower->id;
+                viewModel.crossfadeUpperZoneId = upper->id;
+                viewModel.crossfadeOverlapLow = overlapLow;
+                viewModel.crossfadeOverlapHigh = overlapHigh;
+                viewModel.crossfadeCanCreate = plan.changesProject();
+                if (plan.changesProject())
+                    viewModel.crossfadeGuidanceText = "Create a Linear " + std::to_string(overlapLow)
+                        + "-" + std::to_string(overlapHigh) + " overlap for the two selected layers.";
+                else if (!plan.blockingIssues.empty())
+                    viewModel.crossfadeGuidanceText = plan.blockingIssues.front();
+            }
         }
     }
 

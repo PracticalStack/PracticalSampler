@@ -32,6 +32,7 @@ ZoneMappingEditor::ZoneMappingEditor()
     : emptyStateMessage("authoringZoneFieldEmptyState", juce::Justification::centred),
       mapSection("Map", "authoringMapInspectorSection", true),
       sampleSection("Sample", "authoringSampleInspectorSection", false),
+      crossfadeSection("Velocity Crossfades", "authoringVelocityCrossfadeInspectorSection", false),
       roundRobinSection("Round Robin", "authoringRoundRobinInspectorSection", false),
       mixSection("Mix", "authoringMixInspectorSection", false),
       advancedSection("Advanced", "authoringAdvancedInspectorSection", false),
@@ -40,6 +41,13 @@ ZoneMappingEditor::ZoneMappingEditor()
       keyRangeRow("Key Range", "authoringKeyRangeRow", "Low", "High", 0, 127, 1),
       articulationRow("Articulation", "authoringZoneArticulationRow"),
       velocityRangeRow("Velocity Range", "authoringVelocityRangeRow", "Low", "High", 1, 127, 1),
+      crossfadeFadeInMessage("authoringCrossfadeFadeInStatus", juce::Justification::centredLeft),
+      crossfadeFadeOutMessage("authoringCrossfadeFadeOutStatus", juce::Justification::centredLeft),
+      crossfadeOverlapRow("Overlap", "authoringCrossfadeOverlapRow", "Low", "High", 1, 127, 1),
+      createCrossfadeRow("Relationship", "authoringCreateCrossfadeRow", "Create Crossfade"),
+      updateCrossfadeRow("Overlap", "authoringUpdateCrossfadeRow", "Apply Overlap"),
+      removeCrossfadeRow("Relationship", "authoringRemoveCrossfadeRow", "Remove Crossfade"),
+      crossfadeGuidanceMessage("authoringCrossfadeGuidance", juce::Justification::centredLeft),
       roundRobinPoolMessage("authoringRoundRobinPoolMessage", juce::Justification::centredLeft),
       roundRobinSlotMessage("authoringRoundRobinSlotMessage", juce::Justification::centredLeft),
       roundRobinHintMessage("authoringRoundRobinHintMessage", juce::Justification::centredLeft),
@@ -76,6 +84,11 @@ ZoneMappingEditor::ZoneMappingEditor()
     articulationRow.getComboBox().setComponentID("authoringZoneArticulationSelector");
     velocityRangeRow.getLowSlider().setComponentID("authoringVelocityLowSlider");
     velocityRangeRow.getHighSlider().setComponentID("authoringVelocityHighSlider");
+    crossfadeOverlapRow.getLowSlider().setComponentID("authoringCrossfadeOverlapLowSlider");
+    crossfadeOverlapRow.getHighSlider().setComponentID("authoringCrossfadeOverlapHighSlider");
+    createCrossfadeRow.getButton().setComponentID("authoringCreateCrossfadeButton");
+    updateCrossfadeRow.getButton().setComponentID("authoringUpdateCrossfadeButton");
+    removeCrossfadeRow.getButton().setComponentID("authoringRemoveCrossfadeButton");
     gainRow.getSlider().setComponentID("authoringGainSlider");
     panRow.getSlider().setComponentID("authoringPanSlider");
     loopToggleRow.getToggle().setComponentID("authoringLoopEnabledToggle");
@@ -113,27 +126,33 @@ ZoneMappingEditor::ZoneMappingEditor()
     sampleSection.getDisclosureButton().setExplicitFocusOrder(45);
     velocityRangeRow.getLowSlider().setExplicitFocusOrder(46);
     velocityRangeRow.getHighSlider().setExplicitFocusOrder(47);
-    roundRobinSection.getDisclosureButton().setExplicitFocusOrder(48);
-    createRoundRobinPoolRow.getButton().setExplicitFocusOrder(49);
-    addCompatibleZonesRow.getButton().setExplicitFocusOrder(50);
-    normalizeRoundRobinPoolRow.getButton().setExplicitFocusOrder(51);
-    removeRoundRobinPoolRow.getButton().setExplicitFocusOrder(52);
-    mixSection.getDisclosureButton().setExplicitFocusOrder(53);
-    gainRow.getSlider().setExplicitFocusOrder(54);
-    panRow.getSlider().setExplicitFocusOrder(55);
-    advancedSection.getDisclosureButton().setExplicitFocusOrder(56);
-    loopToggleRow.getToggle().setExplicitFocusOrder(57);
-    triggerModeRow.getComboBox().setExplicitFocusOrder(58);
-    previewZoneRow.getButton().setExplicitFocusOrder(59);
-    restoreRootKeyRow.getButton().setExplicitFocusOrder(60);
-    performanceSection.getDisclosureButton().setExplicitFocusOrder(61);
-    performanceEventRow.getComboBox().setExplicitFocusOrder(62);
-    sustainConditionRow.getComboBox().setExplicitFocusOrder(63);
-    pitchSourceRow.getComboBox().setExplicitFocusOrder(64);
-    chokeGroupRow.getComboBox().setExplicitFocusOrder(65);
-    chokeTargetRow.getComboBox().setExplicitFocusOrder(66);
-    chokeFadeRow.getSlider().setExplicitFocusOrder(67);
-    createChokeGroupRow.getButton().setExplicitFocusOrder(68);
+    crossfadeSection.getDisclosureButton().setExplicitFocusOrder(48);
+    crossfadeOverlapRow.getLowSlider().setExplicitFocusOrder(49);
+    crossfadeOverlapRow.getHighSlider().setExplicitFocusOrder(50);
+    createCrossfadeRow.getButton().setExplicitFocusOrder(51);
+    updateCrossfadeRow.getButton().setExplicitFocusOrder(52);
+    removeCrossfadeRow.getButton().setExplicitFocusOrder(53);
+    roundRobinSection.getDisclosureButton().setExplicitFocusOrder(54);
+    createRoundRobinPoolRow.getButton().setExplicitFocusOrder(55);
+    addCompatibleZonesRow.getButton().setExplicitFocusOrder(56);
+    normalizeRoundRobinPoolRow.getButton().setExplicitFocusOrder(57);
+    removeRoundRobinPoolRow.getButton().setExplicitFocusOrder(58);
+    mixSection.getDisclosureButton().setExplicitFocusOrder(59);
+    gainRow.getSlider().setExplicitFocusOrder(60);
+    panRow.getSlider().setExplicitFocusOrder(61);
+    advancedSection.getDisclosureButton().setExplicitFocusOrder(62);
+    loopToggleRow.getToggle().setExplicitFocusOrder(63);
+    triggerModeRow.getComboBox().setExplicitFocusOrder(64);
+    previewZoneRow.getButton().setExplicitFocusOrder(65);
+    restoreRootKeyRow.getButton().setExplicitFocusOrder(66);
+    performanceSection.getDisclosureButton().setExplicitFocusOrder(67);
+    performanceEventRow.getComboBox().setExplicitFocusOrder(68);
+    sustainConditionRow.getComboBox().setExplicitFocusOrder(69);
+    pitchSourceRow.getComboBox().setExplicitFocusOrder(70);
+    chokeGroupRow.getComboBox().setExplicitFocusOrder(71);
+    chokeTargetRow.getComboBox().setExplicitFocusOrder(72);
+    chokeFadeRow.getSlider().setExplicitFocusOrder(73);
+    createChokeGroupRow.getButton().setExplicitFocusOrder(74);
     triggerModeRow.getComboBox().setHelpText(
         "Gated samples release on note-off. One-shot samples play to their natural end.");
     previewZoneRow.getButton().setHelpText("Auditions the selected zone from the mapping inspector.");
@@ -147,6 +166,16 @@ ZoneMappingEditor::ZoneMappingEditor()
         "Renumbers the selected Round Robin pool so slots are dense and ordered.");
     removeRoundRobinPoolRow.getButton().setHelpText(
         "Removes the selected zone from its Round Robin pool and explicitly reindexes remaining peers.");
+    crossfadeOverlapRow.getLowSlider().setHelpText(
+        "Sets the low MIDI velocity of the shared linear crossfade overlap. Changes commit only when applied.");
+    crossfadeOverlapRow.getHighSlider().setHelpText(
+        "Sets the high MIDI velocity of the shared linear crossfade overlap. Changes commit only when applied.");
+    createCrossfadeRow.getButton().setHelpText(
+        "Creates one atomic linear velocity crossfade between the two selected compatible layers.");
+    updateCrossfadeRow.getButton().setHelpText(
+        "Applies the displayed overlap to both sides of the selected crossfade relationship.");
+    removeCrossfadeRow.getButton().setHelpText(
+        "Removes both sides of the selected crossfade relationship without changing other ranges.");
 
     addOwnedRow(mapSectionContent, rootKeyRow, sliderRowHeight);
     addOwnedRow(mapSectionContent, keyRangeRow, rangeRowHeight);
@@ -154,7 +183,17 @@ ZoneMappingEditor::ZoneMappingEditor()
     mapSectionContent.setSize(0, sliderRowHeight + 6 + rangeRowHeight + 6 + comboRowHeight);
 
     addOwnedRow(sampleSectionContent, velocityRangeRow, rangeRowHeight);
-    sampleSectionContent.setSize(0, rangeRowHeight);
+    addOwnedRow(crossfadeSectionContent, crossfadeFadeInMessage, messageRowHeight);
+    addOwnedRow(crossfadeSectionContent, crossfadeFadeOutMessage, messageRowHeight);
+    addOwnedRow(crossfadeSectionContent, crossfadeOverlapRow, rangeRowHeight);
+    addOwnedRow(crossfadeSectionContent, createCrossfadeRow, actionRowHeight);
+    addOwnedRow(crossfadeSectionContent, updateCrossfadeRow, actionRowHeight);
+    addOwnedRow(crossfadeSectionContent, removeCrossfadeRow, actionRowHeight);
+    addOwnedRow(crossfadeSectionContent, crossfadeGuidanceMessage, messageRowHeight);
+    crossfadeSectionContent.setSize(0, messageRowHeight * 3 + rangeRowHeight + actionRowHeight * 3 + 6 * 6);
+    crossfadeSection.setContent(&crossfadeSectionContent);
+    sampleSectionContent.addAndMakeVisible(crossfadeSection);
+    updateSampleSectionContentHeight();
 
     addOwnedRow(mixSectionContent, gainRow, sliderRowHeight);
     addOwnedRow(mixSectionContent, panRow, sliderRowHeight);
@@ -179,12 +218,16 @@ ZoneMappingEditor::ZoneMappingEditor()
                                              + messageRowHeight + 7 * 6);
 
     mapSection.setContent(&mapSectionContent);
-    sampleSection.setContent(&sampleSectionContent);
     mixSection.setContent(&mixSectionContent);
     advancedSection.setContent(&advancedSectionContent);
     performanceSection.setContent(&performanceSectionContent);
     mapSection.setOnExpandedChanged([this](bool) { resized(); });
     sampleSection.setOnExpandedChanged([this](bool) { resized(); });
+    crossfadeSection.setOnExpandedChanged([this](bool)
+    {
+        updateSampleSectionContentHeight();
+        resized();
+    });
     mixSection.setOnExpandedChanged([this](bool) { resized(); });
     advancedSection.setOnExpandedChanged([this](bool) { resized(); });
     performanceSection.setOnExpandedChanged([this](bool) { resized(); });
@@ -229,6 +272,14 @@ ZoneMappingEditor::ZoneMappingEditor()
     {
         if (callbacks.onArticulationCommitRequested && viewModel.hasSelection)
             callbacks.onArticulationCommitRequested(articulationRow.getComboBox().getText().toStdString());
+    };
+    createCrossfadeRow.getButton().onClick = [this] { invokeCrossfadeAction(true); };
+    updateCrossfadeRow.getButton().onClick = [this] { invokeCrossfadeAction(false); };
+    removeCrossfadeRow.getButton().onClick = [this]
+    {
+        if (callbacks.onRemoveVelocityCrossfadeRequested && viewModel.crossfadeCanRemove)
+            callbacks.onRemoveVelocityCrossfadeRequested(viewModel.crossfadeLowerZoneId,
+                                                         viewModel.crossfadeUpperZoneId);
     };
 
     restoreRootKeyRow.getButton().onClick = [this]
@@ -291,6 +342,17 @@ void ZoneMappingEditor::resized()
 
     auto sampleArea = sampleSectionContent.getLocalBounds();
     velocityRangeRow.setBounds(sampleArea.removeFromTop(rangeRowHeight));
+    sampleArea.removeFromTop(6);
+    crossfadeSection.setBounds(sampleArea.removeFromTop(crossfadeSection.getPreferredHeight()));
+
+    auto crossfadeArea = crossfadeSectionContent.getLocalBounds();
+    crossfadeFadeInMessage.setBounds(crossfadeArea.removeFromTop(messageRowHeight)); crossfadeArea.removeFromTop(6);
+    crossfadeFadeOutMessage.setBounds(crossfadeArea.removeFromTop(messageRowHeight)); crossfadeArea.removeFromTop(6);
+    crossfadeOverlapRow.setBounds(crossfadeArea.removeFromTop(rangeRowHeight)); crossfadeArea.removeFromTop(6);
+    createCrossfadeRow.setBounds(crossfadeArea.removeFromTop(actionRowHeight)); crossfadeArea.removeFromTop(6);
+    updateCrossfadeRow.setBounds(crossfadeArea.removeFromTop(actionRowHeight)); crossfadeArea.removeFromTop(6);
+    removeCrossfadeRow.setBounds(crossfadeArea.removeFromTop(actionRowHeight)); crossfadeArea.removeFromTop(6);
+    crossfadeGuidanceMessage.setBounds(crossfadeArea.removeFromTop(messageRowHeight));
 
     auto mixArea = mixSectionContent.getLocalBounds();
     gainRow.setBounds(mixArea.removeFromTop(sliderRowHeight));
@@ -332,11 +394,13 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
     for (auto* component : {
              static_cast<juce::Component*>(&mapSection),
              static_cast<juce::Component*>(&sampleSection),
+             static_cast<juce::Component*>(&crossfadeSection),
              static_cast<juce::Component*>(&mixSection),
              static_cast<juce::Component*>(&advancedSection),
              static_cast<juce::Component*>(&performanceSection),
              static_cast<juce::Component*>(&mapSectionContent),
              static_cast<juce::Component*>(&sampleSectionContent),
+             static_cast<juce::Component*>(&crossfadeSectionContent),
              static_cast<juce::Component*>(&mixSectionContent),
              static_cast<juce::Component*>(&advancedSectionContent),
              static_cast<juce::Component*>(&performanceSectionContent),
@@ -344,6 +408,13 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
              static_cast<juce::Component*>(&keyRangeRow),
              static_cast<juce::Component*>(&articulationRow),
              static_cast<juce::Component*>(&velocityRangeRow),
+             static_cast<juce::Component*>(&crossfadeFadeInMessage),
+             static_cast<juce::Component*>(&crossfadeFadeOutMessage),
+             static_cast<juce::Component*>(&crossfadeOverlapRow),
+             static_cast<juce::Component*>(&createCrossfadeRow),
+             static_cast<juce::Component*>(&updateCrossfadeRow),
+             static_cast<juce::Component*>(&removeCrossfadeRow),
+             static_cast<juce::Component*>(&crossfadeGuidanceMessage),
              static_cast<juce::Component*>(&gainRow),
              static_cast<juce::Component*>(&panRow),
              static_cast<juce::Component*>(&loopToggleRow),
@@ -365,6 +436,11 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
              static_cast<juce::Component*>(&articulationRow.getComboBox()),
              static_cast<juce::Component*>(&velocityRangeRow.getLowSlider()),
              static_cast<juce::Component*>(&velocityRangeRow.getHighSlider()),
+             static_cast<juce::Component*>(&crossfadeOverlapRow.getLowSlider()),
+             static_cast<juce::Component*>(&crossfadeOverlapRow.getHighSlider()),
+             static_cast<juce::Component*>(&createCrossfadeRow.getButton()),
+             static_cast<juce::Component*>(&updateCrossfadeRow.getButton()),
+             static_cast<juce::Component*>(&removeCrossfadeRow.getButton()),
              static_cast<juce::Component*>(&gainRow.getSlider()),
              static_cast<juce::Component*>(&panRow.getSlider()),
              static_cast<juce::Component*>(&loopToggleRow.getToggle()),
@@ -516,6 +592,17 @@ void ZoneMappingEditor::applyValuesToControls(const ZoneFieldValuesViewModel& va
     velocityRangeRow.getHighSlider().setHelpText(values.hasMultipleZoneSelection
         ? "Sets the high velocity for every selected zone."
         : "Sets the selected zone's high velocity.");
+    crossfadeFadeInMessage.setText(juce::String::fromUTF8(values.crossfadeFadeInText.c_str()));
+    crossfadeFadeOutMessage.setText(juce::String::fromUTF8(values.crossfadeFadeOutText.c_str()));
+    crossfadeOverlapRow.getLowSlider().setValue(values.crossfadeOverlapLow, juce::dontSendNotification);
+    crossfadeOverlapRow.getHighSlider().setValue(values.crossfadeOverlapHigh, juce::dontSendNotification);
+    crossfadeGuidanceMessage.setText(juce::String::fromUTF8(values.crossfadeGuidanceText.c_str()));
+    createCrossfadeRow.getButton().setEnabled(values.crossfadeCanCreate);
+    updateCrossfadeRow.getButton().setEnabled(values.crossfadeCanEdit);
+    removeCrossfadeRow.getButton().setEnabled(values.crossfadeCanRemove);
+    createCrossfadeRow.getButton().setButtonText("Create Crossfade");
+    updateCrossfadeRow.getButton().setButtonText("Apply Overlap");
+    removeCrossfadeRow.getButton().setButtonText("Remove Crossfade");
     gainRow.getSlider().setValue(values.gainDb, juce::dontSendNotification);
     panRow.getSlider().setValue(values.pan, juce::dontSendNotification);
     loopToggleRow.getToggle().setToggleState(values.loopEnabled, juce::dontSendNotification);
@@ -566,6 +653,42 @@ void ZoneMappingEditor::applyValuesToControls(const ZoneFieldValuesViewModel& va
     performanceHintMessage.setText(eventNeedsOneShot
         ? "This event uses one-shot playback; incompatible pedal conditions are unavailable."
         : "Event note is used for note-on, note-off, and effective-release routes. Fixed root is available for pedal routes.");
+}
+
+void ZoneMappingEditor::updateSampleSectionContentHeight()
+{
+    sampleSectionContent.setSize(0, rangeRowHeight + 6 + crossfadeSection.getPreferredHeight());
+    sampleSection.setContent(&sampleSectionContent);
+}
+
+void ZoneMappingEditor::invokeCrossfadeAction(const bool create)
+{
+    if (!viewModel.hasSelection || (create ? !viewModel.crossfadeCanCreate : !viewModel.crossfadeCanEdit))
+        return;
+
+    auto low = static_cast<int>(crossfadeOverlapRow.getLowSlider().getValue());
+    auto high = static_cast<int>(crossfadeOverlapRow.getHighSlider().getValue());
+    if (low > high)
+    {
+        std::swap(low, high);
+        crossfadeOverlapRow.getLowSlider().setValue(low, juce::dontSendNotification);
+        crossfadeOverlapRow.getHighSlider().setValue(high, juce::dontSendNotification);
+        crossfadeGuidanceMessage.setText("Crossfade overlap was normalized to keep Low < High.");
+    }
+    if (low >= high)
+    {
+        crossfadeGuidanceMessage.setText("Crossfade overlap needs at least two MIDI velocity values.");
+        return;
+    }
+
+    if (create && callbacks.onCreateVelocityCrossfadeRequested)
+        callbacks.onCreateVelocityCrossfadeRequested(viewModel.crossfadeLowerZoneId,
+                                                     viewModel.crossfadeUpperZoneId,
+                                                     low, high);
+    else if (!create && callbacks.onUpdateVelocityCrossfadeRequested)
+        callbacks.onUpdateVelocityCrossfadeRequested(viewModel.crossfadeLowerZoneId,
+                                                     viewModel.crossfadeUpperZoneId,
+                                                     low, high);
 }
 
 void ZoneMappingEditor::refreshValidationMessage(const juce::String& messageText)

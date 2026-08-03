@@ -27,6 +27,8 @@ private:
     void commitCurrentValues(const juce::String& label);
     void applyValuesToControls(const ZoneFieldValuesViewModel& values);
     void refreshValidationMessage(const juce::String& messageText);
+    void updateSampleSectionContentHeight();
+    void invokeCrossfadeAction(bool create);
 
     ZoneFieldValuesViewModel viewModel;
     ZoneFieldCallbacks callbacks;
@@ -34,6 +36,7 @@ private:
     CompactInspectorMessage emptyStateMessage;
     CompactInspectorSection mapSection;
     CompactInspectorSection sampleSection;
+    CompactInspectorSection crossfadeSection;
     CompactInspectorSection roundRobinSection;
     CompactInspectorSection mixSection;
     CompactInspectorSection advancedSection;
@@ -41,6 +44,7 @@ private:
 
     juce::Component mapSectionContent;
     juce::Component sampleSectionContent;
+    juce::Component crossfadeSectionContent;
     juce::Component roundRobinSectionContent;
     juce::Component mixSectionContent;
     juce::Component advancedSectionContent;
@@ -50,6 +54,13 @@ private:
     CompactInspectorRangeRow keyRangeRow;
     CompactInspectorComboRow articulationRow;
     CompactInspectorRangeRow velocityRangeRow;
+    CompactInspectorMessage crossfadeFadeInMessage;
+    CompactInspectorMessage crossfadeFadeOutMessage;
+    CompactInspectorRangeRow crossfadeOverlapRow;
+    CompactInspectorActionRow createCrossfadeRow;
+    CompactInspectorActionRow updateCrossfadeRow;
+    CompactInspectorActionRow removeCrossfadeRow;
+    CompactInspectorMessage crossfadeGuidanceMessage;
     CompactInspectorMessage roundRobinPoolMessage;
     CompactInspectorMessage roundRobinSlotMessage;
     CompactInspectorMessage roundRobinHintMessage;

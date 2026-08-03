@@ -72,6 +72,22 @@ struct ZoneFieldValuesViewModel
     std::string articulationId;
     std::vector<std::string> articulationIds;
     bool hasMultipleZoneSelection = false;
+    bool crossfadeHasFadeIn = false;
+    bool crossfadeHasFadeOut = false;
+    bool crossfadeCanCreate = false;
+    bool crossfadeCanEdit = false;
+    bool crossfadeCanRemove = false;
+    int crossfadeOverlapLow = 1;
+    int crossfadeOverlapHigh = 2;
+    std::string crossfadeLowerZoneId;
+    std::string crossfadeUpperZoneId;
+    std::string crossfadeFadeInLowerZoneId;
+    std::string crossfadeFadeInUpperZoneId;
+    std::string crossfadeFadeOutLowerZoneId;
+    std::string crossfadeFadeOutUpperZoneId;
+    std::string crossfadeFadeInText;
+    std::string crossfadeFadeOutText;
+    std::string crossfadeGuidanceText;
     std::string emptyStateText;
 };
 
@@ -132,6 +148,9 @@ struct ZoneFieldCallbacks
 {
     std::function<void(const ZoneFieldValuesViewModel&, const std::string&)> onCommitRequested;
     std::function<void(const std::string&)> onArticulationCommitRequested;
+    std::function<void(const std::string&, const std::string&, int, int)> onCreateVelocityCrossfadeRequested;
+    std::function<void(const std::string&, const std::string&, int, int)> onUpdateVelocityCrossfadeRequested;
+    std::function<void(const std::string&, const std::string&)> onRemoveVelocityCrossfadeRequested;
     std::function<void()> onCreateChokeGroupRequested;
     std::function<void()> onRestoreRootKeyRequested;
     std::function<void()> onPreviewRequested;
