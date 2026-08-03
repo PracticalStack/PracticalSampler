@@ -115,8 +115,22 @@ int main()
                     && findButton(banner, "hostStateRecoveryRetry").isVisible(),
                 "Degraded content must show a non-modal retry notice.");
 
-        const auto active = makeSnapshot(
+        const auto articulationMismatch = makeSnapshot(
             5,
+            drs::engine::ProjectRestoreState::failed,
+            drs::engine::ProjectRestoreFinding::articulationMismatch,
+            "Saved articulation 'default' belongs to restored project 'drs.test.authored-project'. "
+            "Authored articulations: default; default: default.");
+        banner.update(articulationMismatch);
+        require(banner.isVisible()
+                    && banner.getDisplayedStatusText().contains("ArticulationMismatch")
+                    && banner.getDisplayedMessageText().contains("default")
+                    && banner.getDisplayedMessageText().contains("drs.test.authored-project")
+                    && findButton(banner, "hostStateRecoveryRetry").isVisible(),
+                "An articulation mismatch must show its actionable project and articulation details with Retry.");
+
+        const auto active = makeSnapshot(
+            6,
             drs::engine::ProjectRestoreState::active,
             drs::engine::ProjectRestoreFinding::none,
             "Exact restored content active.");

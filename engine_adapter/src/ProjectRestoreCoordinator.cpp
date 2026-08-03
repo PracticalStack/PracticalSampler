@@ -509,6 +509,12 @@ const char* toString(const ProjectRestoreFinding finding) noexcept
         case ProjectRestoreFinding::contentChanged: return "ContentChanged";
         case ProjectRestoreFinding::projectLoadFailed: return "ProjectLoadFailed";
         case ProjectRestoreFinding::checkpointInvalid: return "CheckpointInvalid";
+        case ProjectRestoreFinding::projectBindingInvalid: return "ProjectBindingInvalid";
+        case ProjectRestoreFinding::presetStateInvalid: return "PresetStateInvalid";
+        case ProjectRestoreFinding::articulationMismatch: return "ArticulationMismatch";
+        case ProjectRestoreFinding::draftPlaybackFailed: return "DraftPlaybackFailed";
+        case ProjectRestoreFinding::publishSchedulingFailed: return "PublishSchedulingFailed";
+        case ProjectRestoreFinding::publishedIdentityMismatch: return "PublishedIdentityMismatch";
         case ProjectRestoreFinding::preparationFailed: return "PreparationFailed";
         case ProjectRestoreFinding::shutdown: return "Shutdown";
     }

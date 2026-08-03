@@ -42,6 +42,12 @@ enum class ProjectRestoreFinding
     contentChanged,
     projectLoadFailed,
     checkpointInvalid,
+    projectBindingInvalid,
+    presetStateInvalid,
+    articulationMismatch,
+    draftPlaybackFailed,
+    publishSchedulingFailed,
+    publishedIdentityMismatch,
     preparationFailed,
     shutdown
 };

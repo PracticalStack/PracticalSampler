@@ -17,6 +17,7 @@
 #include <optional>
 #include <sstream>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 
 namespace drs::plugin
@@ -143,6 +144,61 @@ std::uint64_t monotonicMicros()
 {
     return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
         std::chrono::steady_clock::now().time_since_epoch()).count());
+}
+
+std::string describeAuthoredArticulations(const drs::engine::RuntimeProjectModel& project)
+{
+    std::vector<std::string> articulationIds;
+    std::unordered_set<std::string> seen;
+    std::string defaultId;
+
+    for (const auto& articulation : project.authoring.articulations)
+    {
+        if (!articulation.id.empty() && seen.insert(articulation.id).second)
+            articulationIds.push_back(articulation.id);
+        if (articulation.isDefault)
+            defaultId = articulation.id;
+    }
+    for (const auto& zone : project.authoring.zones)
+    {
+        if (!zone.articulationId.empty() && seen.insert(zone.articulationId).second)
+            articulationIds.push_back(zone.articulationId);
+    }
+    if (defaultId.empty() && seen.count("default") != 0)
+        defaultId = "default";
+    if (defaultId.empty() && !articulationIds.empty())
+        defaultId = articulationIds.front();
+
+    std::ostringstream description;
+    for (std::size_t index = 0; index < articulationIds.size(); ++index)
+    {
+        if (index != 0)
+            description << ", ";
+        description << articulationIds[index];
+    }
+    if (description.str().empty())
+        description << "(none)";
+    description << "; default: " << (defaultId.empty() ? "(none)" : defaultId);
+    return description.str();
+}
+
+bool projectDeclaresArticulation(const drs::engine::RuntimeProjectModel& project,
+                                 const std::string& articulationId)
+{
+    return std::any_of(project.authoring.articulations.begin(),
+                       project.authoring.articulations.end(),
+                       [&](const auto& articulation) { return articulation.id == articulationId; })
+        || std::any_of(project.authoring.zones.begin(),
+                       project.authoring.zones.end(),
+                       [&](const auto& zone) { return zone.articulationId == articulationId; });
+}
+
+bool instrumentDeclaresArticulation(const drs::engine::RuntimeInstrumentModel& instrument,
+                                    const std::string& articulationId)
+{
+    return std::any_of(instrument.articulations.begin(),
+                       instrument.articulations.end(),
+                       [&](const auto& articulation) { return articulation.id == articulationId; });
 }
 
 bool isWavImportItemTerminal(const drs::app::WavImportItemStage stage) noexcept
@@ -1242,6 +1298,13 @@ bool Processor::submitPerformancePublishCommand(
 
     const auto accepted = engineFacade.publishCurrentDraft();
     performancePublishCommandAdapter.recordExecutionResult(accepted);
+    if (accepted)
+    {
+        supersedeFailedProjectRestoreForManualAction();
+        awaitingRestoreActivationGeneration = 0;
+        expectedRestoredPublishedState.reset();
+        setPendingRestoreAudioPolicy(false);
+    }
     publishMessageDiagnostics();
     return accepted;
 }
@@ -1657,6 +1720,14 @@ bool Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
             return false;
     }
 
+    // A deliberate project replacement supersedes a queued or failed host recall before
+    // the new project is permitted to publish.
+    supersedeFailedProjectRestoreForManualAction();
+    handledRestoreGeneration = projectRestoreCoordinator.latestGeneration();
+    awaitingRestoreActivationGeneration = 0;
+    expectedRestoredPublishedState.reset();
+    setPendingRestoreAudioPolicy(false);
+
     const auto& previousProject = authoringSession.getProject();
     const auto replacingDifferentProject = !previousProject.projectId.empty()
         && !project.projectId.empty()
@@ -1930,6 +2001,22 @@ void Processor::setPendingRestoreAudioPolicy(const bool pending) noexcept
         restoreAudioSilenceApplied.store(false, std::memory_order_release);
 }
 
+void Processor::supersedeFailedProjectRestoreForManualAction()
+{
+    const auto restore = projectRestoreCoordinator.getSnapshot();
+    if (restore == nullptr || restore->generation == 0
+        || restore->state != drs::engine::ProjectRestoreState::failed)
+    {
+        return;
+    }
+
+    projectRestoreCoordinator.publishLifecycleState(
+        restore->generation,
+        drs::engine::ProjectRestoreState::idle,
+        drs::engine::ProjectRestoreFinding::requestSuperseded,
+        "Host restore failure superseded by a valid manual project action.");
+}
+
 bool Processor::restorePublishIdentityMatches(
     const drs::engine::PerformancePublishControllerSnapshot& published) const
 {
@@ -1945,20 +2032,21 @@ bool Processor::restorePublishIdentityMatches(
         && published.activePreparedDigest == expected.preparedContentDigest;
 }
 
-bool Processor::applyValidatedProjectRestore(
+Processor::ProjectRestoreApplicationOutcome Processor::applyValidatedProjectRestore(
     const drs::engine::ProjectRestoreSnapshot& restore)
 {
+    const auto failed = [](const drs::engine::ProjectRestoreFinding finding,
+                           std::string message)
+    {
+        return ProjectRestoreApplicationOutcome { false, finding, std::move(message) };
+    };
+
     if (!restore.hostState.has_value() || !restore.checkpoint.has_value())
-        return false;
+        return failed(drs::engine::ProjectRestoreFinding::checkpointInvalid,
+                      "The restore request did not contain a validated project checkpoint.");
 
     const auto& hostState = *restore.hostState;
     const auto& checkpoint = *restore.checkpoint;
-    const auto reference = engineFacade.loadPhase1ReferenceInstrument();
-    const auto presetValidation = drs::engine::validateRuntimePresetState(
-        hostState.presetState,
-        reference.instrument);
-    if (!reference.loaded || !presetValidation.valid)
-        return false;
 
     drs::engine::RuntimeProjectDocumentCheckpointConstraints constraints;
     constraints.expectedProjectId = hostState.projectBinding.projectId;
@@ -1968,11 +2056,19 @@ bool Processor::applyValidatedProjectRestore(
     const auto checkpointValidation
         = drs::engine::validateRuntimeProjectDocumentCheckpoint(checkpoint, constraints);
     if (!checkpointValidation.valid)
-        return false;
+    {
+        return failed(drs::engine::ProjectRestoreFinding::checkpointInvalid,
+                      checkpointValidation.issues.empty()
+                          ? std::string("The project checkpoint failed validation.")
+                          : checkpointValidation.issues.front());
+    }
 
     auto restoredSession = drs::engine::AuthoringSession(checkpoint.project);
     if (!restoredSession.restoreCheckpoint(checkpoint, constraints).applied)
-        return false;
+    {
+        return failed(drs::engine::ProjectRestoreFinding::checkpointInvalid,
+                      "The validated project checkpoint could not be applied to the authoring document.");
+    }
 
     auto restoredBinding = hostState.projectBinding;
     if (!restore.resolvedManifestPath.empty())
@@ -1990,17 +2086,55 @@ bool Processor::applyValidatedProjectRestore(
              restoredBinding,
              checkpoint.project,
              bindingPath).matched())
-        return false;
+    {
+        return failed(drs::engine::ProjectRestoreFinding::projectBindingInvalid,
+                      "The restored project no longer matches the validated host binding.");
+    }
+
+    const auto reference = engineFacade.loadPhase1ReferenceInstrument();
+    if (!reference.loaded)
+    {
+        return failed(drs::engine::ProjectRestoreFinding::presetStateInvalid,
+                      "The reference preset contract is unavailable while restoring the project state.");
+    }
+
+    const auto presetValidation = drs::engine::validateRuntimePresetState(
+        hostState.presetState,
+        reference.instrument);
+    if (!presetValidation.valid)
+    {
+        const auto& selectedArticulationId = hostState.presetState.selectedArticulationId;
+        if (projectDeclaresArticulation(checkpoint.project, selectedArticulationId)
+            && !instrumentDeclaresArticulation(reference.instrument, selectedArticulationId))
+        {
+            return failed(
+                drs::engine::ProjectRestoreFinding::articulationMismatch,
+                "Saved articulation '" + selectedArticulationId + "' belongs to restored project '"
+                    + checkpoint.project.projectId
+                    + "' but is rejected by the current reference preset contract. Authored articulations: "
+                    + describeAuthoredArticulations(checkpoint.project) + ".");
+        }
+        return failed(drs::engine::ProjectRestoreFinding::presetStateInvalid,
+                      presetValidation.issues.empty()
+                          ? std::string("The saved preset state failed validation.")
+                          : presetValidation.issues.front());
+    }
 
     auto playbackProject = checkpoint.project;
     if (!engineFacade.replaceDraftPlaybackAuthoringProject(std::move(playbackProject)))
-        return false;
+    {
+        return failed(drs::engine::ProjectRestoreFinding::draftPlaybackFailed,
+                      "The validated project could not replace the draft playback model.");
+    }
 
     performancePlaybackContext.cancelPendingActivation();
     pendingPerformanceActivation.reset();
     engineFacade.closeDraftPlaybackProject(false);
     if (!engineFacade.reopenDraftPlaybackProject(checkpoint.revision, false))
-        return false;
+    {
+        return failed(drs::engine::ProjectRestoreFinding::draftPlaybackFailed,
+                      "The restored draft playback model could not be reopened.");
+    }
 
     authoringSession = std::move(restoredSession);
     authoringSession.setDspParameterGesturePreviewListener(
@@ -2027,7 +2161,10 @@ bool Processor::applyValidatedProjectRestore(
     const auto presetRestore = engineFacade.restorePresetStateJson(
         drs::engine::serializeRuntimePresetState(hostState.presetState));
     if (!presetRestore.restored)
-        return false;
+    {
+        return failed(drs::engine::ProjectRestoreFinding::presetStateInvalid,
+                      presetRestore.issues.empty() ? presetRestore.state : presetRestore.issues.front());
+    }
     syncParametersFromEngine();
 
     expectedRestoredPublishedState = hostState.publishedState;
@@ -2036,9 +2173,15 @@ bool Processor::applyValidatedProjectRestore(
     {
         if (!engineFacade.restorePerformancePublishProjectGeneration(
                 expectedRestoredPublishedState->projectGeneration))
-            return false;
+        {
+            return failed(drs::engine::ProjectRestoreFinding::publishSchedulingFailed,
+                          "The saved Performance publish generation could not be restored.");
+        }
         if (!engineFacade.publishCurrentDraft())
-            return false;
+        {
+            return failed(drs::engine::ProjectRestoreFinding::publishSchedulingFailed,
+                          "The restored draft could not be scheduled for Performance publication.");
+        }
         awaitingRestoreActivationGeneration = restore.generation;
         projectRestoreCoordinator.publishLifecycleState(
             restore.generation,
@@ -2050,7 +2193,7 @@ bool Processor::applyValidatedProjectRestore(
     refreshSerializedHostStatePublication(true);
     updateRealtimeSafetyState();
     publishAuthoringPreviewStatus();
-    return true;
+    return { true, drs::engine::ProjectRestoreFinding::none, {} };
 }
 
 bool Processor::serviceProjectRestore()
@@ -2083,7 +2226,7 @@ bool Processor::serviceProjectRestore()
             projectRestoreCoordinator.publishLifecycleState(
                 restore->generation,
                 drs::engine::ProjectRestoreState::failed,
-                drs::engine::ProjectRestoreFinding::preparationFailed,
+                drs::engine::ProjectRestoreFinding::publishedIdentityMismatch,
                 "The rebuilt Performance identity did not match the saved host checkpoint "
                 "(generation " + std::to_string(published.activeRequestIdentity.projectGeneration)
                     + "/" + std::to_string(expectedRestoredPublishedState->projectGeneration)
@@ -2099,6 +2242,7 @@ bool Processor::serviceProjectRestore()
                     + "/" + expectedRestoredPublishedState->preparedContentDigest + ").");
             awaitingRestoreActivationGeneration = 0;
             expectedRestoredPublishedState.reset();
+            setPendingRestoreAudioPolicy(false);
             return true;
         }
 
@@ -2113,6 +2257,7 @@ bool Processor::serviceProjectRestore()
                     : published.failureFinding.message);
             awaitingRestoreActivationGeneration = 0;
             expectedRestoredPublishedState.reset();
+            setPendingRestoreAudioPolicy(false);
             return true;
         }
         return false;
@@ -2124,8 +2269,9 @@ bool Processor::serviceProjectRestore()
     if (restore->state == drs::engine::ProjectRestoreState::failed)
     {
         handledRestoreGeneration = restore->generation;
-        if (restore->expectedProjectId.empty())
-            setPendingRestoreAudioPolicy(false);
+        awaitingRestoreActivationGeneration = 0;
+        expectedRestoredPublishedState.reset();
+        setPendingRestoreAudioPolicy(false);
         return true;
     }
 
@@ -2144,6 +2290,7 @@ bool Processor::serviceProjectRestore()
                 drs::engine::ProjectRestoreState::failed,
                 drs::engine::ProjectRestoreFinding::invalidHostState,
                 result.state);
+            setPendingRestoreAudioPolicy(false);
             return true;
         }
 
@@ -2159,13 +2306,15 @@ bool Processor::serviceProjectRestore()
     }
 
     handledRestoreGeneration = restore->generation;
-    if (!applyValidatedProjectRestore(*restore))
+    const auto application = applyValidatedProjectRestore(*restore);
+    if (!application.applied)
     {
+        setPendingRestoreAudioPolicy(false);
         projectRestoreCoordinator.publishLifecycleState(
             restore->generation,
             drs::engine::ProjectRestoreState::failed,
-            drs::engine::ProjectRestoreFinding::checkpointInvalid,
-            "The validated restore checkpoint could not be applied atomically.");
+            application.finding,
+            application.message);
         return true;
     }
 

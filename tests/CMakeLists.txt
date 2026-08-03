@@ -35,6 +35,41 @@ add_test(
     COMMAND drs_phase0_smoke_tests
 )
 
+juce_add_console_app(drs_vst3_host_state_qualification_tests
+    PRODUCT_NAME "Decent Rhapsody Studio VST3 Host State Qualification Tests"
+)
+
+target_sources(drs_vst3_host_state_qualification_tests
+    PRIVATE
+        src/Vst3HostStateQualificationTests.cpp
+)
+
+target_link_libraries(drs_vst3_host_state_qualification_tests
+    PRIVATE
+        drs_engine_adapter
+        drs_plugin_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_vst3_host_state_qualification_tests PRIVATE cxx_std_17)
+
+target_compile_definitions(drs_vst3_host_state_qualification_tests
+    PRIVATE
+        JUCE_PLUGINHOST_VST3=1
+        JUCE_MODAL_LOOPS_PERMITTED=1
+)
+
+add_dependencies(drs_vst3_host_state_qualification_tests DecentRhapsodyStudioPlugin)
+
+add_test(
+    NAME drs.host_state.vst3_qualification
+    COMMAND drs_vst3_host_state_qualification_tests
+)
+
 juce_add_console_app(drs_phase1_runtime_contract_tests
     PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Runtime Contract Tests"
 )

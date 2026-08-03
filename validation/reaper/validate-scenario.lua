@@ -1,11 +1,54 @@
 local script_path = debug.getinfo(1, "S").source:sub(2)
-local output_dir = script_path:match("^(.*)[/\\][^/\\]+$")
+local script_output_dir = script_path:match("^(.*)[/\\][^/\\]+$")
+local output_dir = os.getenv("DRS_REAPER_EVIDENCE_DIR") or script_output_dir
 local _, project_path = reaper.EnumProjects(-1, "")
 local project_name = project_path:match("([^/\\]+)%.rpp$") or "unknown"
 local log_path = output_dir .. "\\" .. project_name .. ".reaper-evidence.txt"
 local chunk_path = output_dir .. "\\" .. project_name .. ".restored-track-chunks.txt"
 local started = reaper.time_precise()
 local duplicate_prepared = false
+local observed_peak_left = 0.0
+local observed_peak_right = 0.0
+local observed_master_peak_left = 0.0
+local observed_master_peak_right = 0.0
+local peak_square_sum = 0.0
+local peak_probe_count = 0
+local nonzero_peak_observations = 0
+local nonfinite_peak_observations = 0
+
+local function observe_peak(value)
+  if value ~= value or value == math.huge or value == -math.huge then
+    nonfinite_peak_observations = nonfinite_peak_observations + 1
+    return 0.0
+  end
+  local magnitude = math.abs(value)
+  peak_square_sum = peak_square_sum + magnitude * magnitude
+  peak_probe_count = peak_probe_count + 1
+  if magnitude > 0.000001 then
+    nonzero_peak_observations = nonzero_peak_observations + 1
+  end
+  return magnitude
+end
+
+local function insert_validation_midi()
+  local track = reaper.GetTrack(0, 0)
+  if track == nil then
+    return false
+  end
+  local item = reaper.CreateNewMIDIItemInProj(track, 0.25, 4.0, false)
+  if item == nil then
+    return false
+  end
+  local take = reaper.GetActiveTake(item)
+  if take == nil then
+    return false
+  end
+  reaper.MIDI_InsertNote(take, false, false, 0, 3840, 0, 60, 100, false)
+  reaper.MIDI_Sort(take)
+  return true
+end
+
+local midi_inserted = insert_validation_midi()
 
 reaper.GetSet_LoopTimeRange(true, false, 0.0, 60.0, false)
 reaper.GetSetRepeat(1)
@@ -44,7 +87,17 @@ local function capture()
     "project_path=" .. project_path,
     "sample_rate=" .. tostring(reaper.GetSetProjectInfo(0, "PROJECT_SRATE", 0, false)),
     "play_state=" .. tostring(reaper.GetPlayState()),
-    "track_count=" .. tostring(reaper.CountTracks(0))
+    "track_count=" .. tostring(reaper.CountTracks(0)),
+    "validation_midi_inserted=" .. tostring(midi_inserted),
+    "track_peak_left=" .. tostring(observed_peak_left),
+    "track_peak_right=" .. tostring(observed_peak_right),
+    "master_peak_left=" .. tostring(observed_master_peak_left),
+    "master_peak_right=" .. tostring(observed_master_peak_right),
+    "peak_rms_proxy=" .. tostring(peak_probe_count > 0
+      and math.sqrt(peak_square_sum / peak_probe_count) or 0.0),
+    "peak_probe_count=" .. tostring(peak_probe_count),
+    "nonzero_peak_observations=" .. tostring(nonzero_peak_observations),
+    "nonfinite_peak_observations=" .. tostring(nonfinite_peak_observations)
   }
   local chunks = {}
 
@@ -95,6 +148,18 @@ local function capture()
 end
 
 local function wait_for_restore()
+  local track = reaper.GetTrack(0, 0)
+  if track ~= nil then
+    observed_peak_left = math.max(observed_peak_left,
+      observe_peak(reaper.Track_GetPeakInfo(track, 0)))
+    observed_peak_right = math.max(observed_peak_right,
+      observe_peak(reaper.Track_GetPeakInfo(track, 1)))
+    local master = reaper.GetMasterTrack(0)
+    observed_master_peak_left = math.max(observed_master_peak_left,
+      observe_peak(reaper.Track_GetPeakInfo(master, 0)))
+    observed_master_peak_right = math.max(observed_master_peak_right,
+      observe_peak(reaper.Track_GetPeakInfo(master, 1)))
+  end
   if reaper.time_precise() - started >= 15.0 then
     if prepare_duplicate_instance() then
       started = reaper.time_precise()

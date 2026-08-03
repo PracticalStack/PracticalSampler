@@ -1,0 +1,93 @@
+{
+  "schemaName": "drs.project",
+  "schemaVersion": 4,
+  "projectId": "drs.host-state.default-articulation",
+  "displayName": "Host State Default Articulation Fixture",
+  "contentRoot": "../../../../hise_project",
+  "defaultInstrumentManifest": "../../../phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drinst",
+  "sampleSources": [
+    {
+      "id": "sine-a3",
+      "path": "../../../../hise_project/Samples/DRS_Sine_A3.wav",
+      "role": "host-recall-fixture"
+    }
+  ],
+  "authoring": {
+    "schemaName": "drs.authoring",
+    "schemaVersion": 3,
+    "selectedZoneId": "default-a3",
+    "selectedGroupId": "default-core",
+    "selectedPerformanceBankId": "",
+    "zones": [
+      {
+        "id": "default-a3",
+        "sampleSourceId": "sine-a3",
+        "displayName": "Default Articulation Sine",
+        "groupId": "default-core",
+        "articulationId": "default",
+        "rootKey": 57,
+        "keyLow": 36,
+        "keyHigh": 76,
+        "velocityLow": 1,
+        "velocityHigh": 127,
+        "gainDb": 0.0,
+        "pan": 0.0,
+        "sampleStartFrame": 0,
+        "loopEnabled": true,
+        "loopStartFrame": 512,
+        "loopEndFrame": 22016,
+        "releaseSeconds": 0.0
+      }
+    ],
+    "groups": [
+      {
+        "id": "default-core",
+        "displayName": "Default Core",
+        "displayOrder": 0,
+        "workspaceVisible": true,
+        "gainDb": 0.0,
+        "pan": 0.0,
+        "auditionAnchorZoneId": "default-a3"
+      }
+    ],
+    "macros": [
+      {
+        "id": "tone",
+        "name": "Tone",
+        "defaultValue": 0.35,
+        "minValue": 0.0,
+        "maxValue": 1.0,
+        "targets": [
+          {
+            "parameterId": "filter-cutoff",
+            "parameterPath": "engine.filter.main.cutoff",
+            "role": "timbre"
+          }
+        ]
+      },
+      {
+        "id": "motion",
+        "name": "Motion",
+        "defaultValue": 0.15,
+        "minValue": 0.0,
+        "maxValue": 1.0,
+        "targets": [
+          {
+            "parameterId": "voice-pitch",
+            "parameterPath": "engine.pitch.main.semitones",
+            "role": "motion"
+          }
+        ]
+      }
+    ],
+    "fxSlots": [],
+    "routingBuses": [],
+    "performanceBanks": [],
+    "notes": [
+      "Minimal project-aware host restore fixture. Its only authored articulation is default."
+    ]
+  },
+  "notes": [
+    "Uses the existing tiny sine source so the fixture adds no binary sample payload."
+  ]
+}

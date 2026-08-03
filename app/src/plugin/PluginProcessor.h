@@ -26,6 +26,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -318,12 +319,21 @@ private:
     std::optional<drs::engine::HostProjectBinding> buildValidatedAuthoringProjectBinding(
         const juce::File& resolvedProjectFile,
         const drs::engine::RuntimeProjectModel& project) const;
-    bool applyValidatedProjectRestore(
+    struct ProjectRestoreApplicationOutcome
+    {
+        bool applied = false;
+        drs::engine::ProjectRestoreFinding finding
+            = drs::engine::ProjectRestoreFinding::checkpointInvalid;
+        std::string message;
+    };
+
+    ProjectRestoreApplicationOutcome applyValidatedProjectRestore(
         const drs::engine::ProjectRestoreSnapshot& restore);
     bool serviceProjectRestore();
     void refreshSerializedHostStatePublication(bool force = false);
     std::string buildHostStatePublicationKey() const;
     void setPendingRestoreAudioPolicy(bool pending) noexcept;
+    void supersedeFailedProjectRestoreForManualAction();
     bool restorePublishIdentityMatches(
         const drs::engine::PerformancePublishControllerSnapshot& published) const;
     void publishAuthoringPreviewStatus();

@@ -228,6 +228,75 @@ facade/host parameter mirror until the matching project manifest and macro schem
 Preset validation failure rejects the complete host-state restore atomically. Parameter
 synchronization uses the existing host-notification path and must not create automation feedback.
 
+## Contextual articulation restore freeze (HSR Sprint 1)
+
+`drs.hostState` version 1 remains the persisted envelope. No schema migration is required merely
+because a field is interpreted in the context of the restored authored project. The nested preset
+continues to retain its existing strict schema and compatibility rules.
+
+For a project-bound host restore, validation and application ownership is frozen as follows:
+
+| Restored field | Validation/apply owner | Rule |
+|---|---|---|
+| Preset schema, target identity, and legacy compatibility | Reference preset contract | Keep the current strict preset codec and compatibility checks. |
+| Load profile | Runtime load-profile registry | Require the saved profile to be known; do not infer or substitute a profile. |
+| Published host macro values | Published host topology plus restored authored bindings | Validate host slots and authored ranges after the project checkpoint is available. |
+| Selected articulation | Runtime instrument projected from the validated restored checkpoint | Require the saved articulation ID to exist in that authored project, not in an unrelated reference instrument. |
+| Project checkpoint | Project-restore coordinator and document checkpoint validator | Validate project identity, binding digest, revision, and document constraints before any state is committed. |
+| Published identity | Existing publish controller | Rebuild and retain the exact generation, revision, authored, macro-schema, and prepared-content identity gate. |
+
+The Sprint 1 inventory identifies two reference-only calls that currently make project-bound
+articulation recall fail: `Processor::applyValidatedProjectRestore()` calls
+`validateRuntimePresetState(..., loadPhase1ReferenceInstrument().instrument)`, and
+`EngineFacade::restorePresetStateJson()` independently validates and applies the same state
+against `referenceManifest`. Sprint 2 must replace both decisions for project-bound host restore
+with one typed, project-aware facade contract. Ordinary reference preset loading and legacy raw
+`drs.presetState` restore keep the reference-owned path unchanged.
+
+The `host-state-default-articulation.drsproj` regression fixture captures the consequence: its
+only authored articulation is `default`, whereas the Phase 1 reference fixture accepts `sustain`.
+Until the project-aware path is implemented, a valid project-bound capture fails as
+`ArticulationMismatch`; changing only that saved ID to `sustain` reaches active playback. The
+latter is diagnostic evidence of the wrong validation owner, never a compatibility workaround.
+
+## Failure recovery and actionable diagnostics (HSR Sprint 2)
+
+Project-bound application failures are terminal and typed. Checkpoint, binding, preset,
+articulation, draft-playback, publish-scheduling, and published-identity failures remain separate
+restore findings; they must never be collapsed into `CheckpointInvalid`. In particular, an
+articulation mismatch reports the saved articulation ID, restored project ID, and the authored
+articulation inventory including its default. The recovery banner presents that exact immutable
+message off the audio thread.
+
+After every terminal failure, the pending host-restore silence gate is cleared without activating
+mismatched content. An explicit `replaceAuthoringProject()` or accepted manual Performance publish
+supersedes the failed generation, clears stale expected identity state, and can activate a valid
+manual project in the same plug-in instance. This policy does not weaken project binding or
+published-identity checks, and `processBlock()` remains limited to its existing activation and
+render exchange.
+
+## Compiled VST3 and REAPER qualification (HSR Sprint 4)
+
+`drs.host_state.vst3_qualification` is a host-side Debug test of the compiled VST3 bundle. It
+discovers and instantiates the bundle through JUCE's VST3 host, wraps the captured processor
+state in the VST3 `IComponent` stream that an actual host persists, restores it, renders MIDI,
+and verifies finite nonzero samples plus the reserialized `drs.hostState` project binding. This
+prevents a raw processor chunk from being mistaken for a VST3 component-state test.
+
+`validation/reaper/run-host-state-qualification-matrix.ps1` creates a separate REAPER resource
+directory and temporary project for each 44.1/48 kHz and 128/256/512-frame combination. It runs
+both editor-open and editor-closed saved-reopen scenarios, inserts a MIDI note, and requires
+enabled/online plug-in state, nonzero peak observations, and no non-finite observations. The
+runner refuses to start if REAPER is already open: REAPER can forward command-line projects and
+scripts to an existing user session, which is not isolated validation. Its `-cfgfile` argument is
+therefore the resource *directory*, containing `reaper.ini`, rather than the ini file itself.
+
+The compiled-VST3 Debug test passed on this workspace. The REAPER matrix remains an explicit
+host gate until it is run with all REAPER sessions closed and produces its signed evidence files.
+Also, the default-articulation authored fixture remains expected to report `ArticulationMismatch`
+until the project-aware application path identified in Sprint 1 is implemented; it must not be
+declared qualified by the successful diagnostic `sustain` project alone.
+
 ## Legacy migration
 
 A raw valid `drs.presetState` version 1 payload remains accepted:
