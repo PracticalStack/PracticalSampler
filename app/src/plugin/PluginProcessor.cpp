@@ -182,25 +182,6 @@ std::string describeAuthoredArticulations(const drs::engine::RuntimeProjectModel
     return description.str();
 }
 
-bool projectDeclaresArticulation(const drs::engine::RuntimeProjectModel& project,
-                                 const std::string& articulationId)
-{
-    return std::any_of(project.authoring.articulations.begin(),
-                       project.authoring.articulations.end(),
-                       [&](const auto& articulation) { return articulation.id == articulationId; })
-        || std::any_of(project.authoring.zones.begin(),
-                       project.authoring.zones.end(),
-                       [&](const auto& zone) { return zone.articulationId == articulationId; });
-}
-
-bool instrumentDeclaresArticulation(const drs::engine::RuntimeInstrumentModel& instrument,
-                                    const std::string& articulationId)
-{
-    return std::any_of(instrument.articulations.begin(),
-                       instrument.articulations.end(),
-                       [&](const auto& articulation) { return articulation.id == articulationId; });
-}
-
 bool isWavImportItemTerminal(const drs::app::WavImportItemStage stage) noexcept
 {
     using Stage = drs::app::WavImportItemStage;
@@ -2091,27 +2072,19 @@ Processor::ProjectRestoreApplicationOutcome Processor::applyValidatedProjectRest
                       "The restored project no longer matches the validated host binding.");
     }
 
-    const auto reference = engineFacade.loadPhase1ReferenceInstrument();
-    if (!reference.loaded)
-    {
-        return failed(drs::engine::ProjectRestoreFinding::presetStateInvalid,
-                      "The reference preset contract is unavailable while restoring the project state.");
-    }
-
-    const auto presetValidation = drs::engine::validateRuntimePresetState(
+    const auto presetValidation = engineFacade.validateProjectPresetState(
         hostState.presetState,
-        reference.instrument);
+        checkpoint.project);
     if (!presetValidation.valid)
     {
         const auto& selectedArticulationId = hostState.presetState.selectedArticulationId;
-        if (projectDeclaresArticulation(checkpoint.project, selectedArticulationId)
-            && !instrumentDeclaresArticulation(reference.instrument, selectedArticulationId))
+        if (presetValidation.issues.size() == 1
+            && presetValidation.issues.front().find("unknown articulation") != std::string::npos)
         {
             return failed(
                 drs::engine::ProjectRestoreFinding::articulationMismatch,
-                "Saved articulation '" + selectedArticulationId + "' belongs to restored project '"
-                    + checkpoint.project.projectId
-                    + "' but is rejected by the current reference preset contract. Authored articulations: "
+                "Saved articulation '" + selectedArticulationId + "' does not exist in restored project '"
+                    + checkpoint.project.projectId + "'. Authored articulations: "
                     + describeAuthoredArticulations(checkpoint.project) + ".");
         }
         return failed(drs::engine::ProjectRestoreFinding::presetStateInvalid,
@@ -2158,8 +2131,9 @@ Processor::ProjectRestoreApplicationOutcome Processor::applyValidatedProjectRest
     initializeAuthoringImportMetrics();
     initializeAuthoringSourceValidationSnapshot();
 
-    const auto presetRestore = engineFacade.restorePresetStateJson(
-        drs::engine::serializeRuntimePresetState(hostState.presetState));
+    const auto presetRestore = engineFacade.restoreProjectPresetState(
+        hostState.presetState,
+        checkpoint.project);
     if (!presetRestore.restored)
     {
         return failed(drs::engine::ProjectRestoreFinding::presetStateInvalid,

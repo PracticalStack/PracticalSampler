@@ -245,19 +245,19 @@ For a project-bound host restore, validation and application ownership is frozen
 | Project checkpoint | Project-restore coordinator and document checkpoint validator | Validate project identity, binding digest, revision, and document constraints before any state is committed. |
 | Published identity | Existing publish controller | Rebuild and retain the exact generation, revision, authored, macro-schema, and prepared-content identity gate. |
 
-The Sprint 1 inventory identifies two reference-only calls that currently make project-bound
-articulation recall fail: `Processor::applyValidatedProjectRestore()` calls
-`validateRuntimePresetState(..., loadPhase1ReferenceInstrument().instrument)`, and
-`EngineFacade::restorePresetStateJson()` independently validates and applies the same state
-against `referenceManifest`. Sprint 2 must replace both decisions for project-bound host restore
-with one typed, project-aware facade contract. Ordinary reference preset loading and legacy raw
-`drs.presetState` restore keep the reference-owned path unchanged.
+The Sprint 1 inventory identified two reference-only calls that made project-bound articulation
+recall fail. The hosted path now calls the typed `validateProjectPresetState()` and
+`restoreProjectPresetState()` facade contract. That contract retains strict reference-owned
+schema, target, and load-profile validation while projecting articulations and authored macro
+ranges from the restored project. It applies the validated state without reinitializing the
+reference draft playback contract. Ordinary reference preset loading and legacy raw
+`drs.presetState` restore continue to use the unchanged reference-owned path.
 
-The `host-state-default-articulation.drsproj` regression fixture captures the consequence: its
-only authored articulation is `default`, whereas the Phase 1 reference fixture accepts `sustain`.
-Until the project-aware path is implemented, a valid project-bound capture fails as
-`ArticulationMismatch`; changing only that saved ID to `sustain` reaches active playback. The
-latter is diagnostic evidence of the wrong validation owner, never a compatibility workaround.
+The `host-state-default-articulation.drsproj` regression fixture proves the corrected ownership:
+its only authored articulation is `default`, whereas the Phase 1 reference fixture accepts
+`sustain`. A valid project-bound capture must now reach `Active` and render finite, nonzero audio.
+Changing that saved ID to the project-absent `sustain` must fail as `ArticulationMismatch` and
+remain silent.
 
 ## Failure recovery and actionable diagnostics (HSR Sprint 2)
 
@@ -289,13 +289,19 @@ both editor-open and editor-closed saved-reopen scenarios, inserts a MIDI note, 
 enabled/online plug-in state, nonzero peak observations, and no non-finite observations. The
 runner refuses to start if REAPER is already open: REAPER can forward command-line projects and
 scripts to an existing user session, which is not isolated validation. Its `-cfgfile` argument is
-therefore the resource *directory*, containing `reaper.ini`, rather than the ini file itself.
+the full path to the isolated `reaper.ini`; REAPER treats that file's parent as the alternate
+resource directory. The timeout includes first-run resource initialization and plug-in scanning.
 
-The compiled-VST3 Debug test passed on this workspace. The REAPER matrix remains an explicit
-host gate until it is run with all REAPER sessions closed and produces its signed evidence files.
-Also, the default-articulation authored fixture remains expected to report `ArticulationMismatch`
-until the project-aware application path identified in Sprint 1 is implemented; it must not be
-declared qualified by the successful diagnostic `sustain` project alone.
+`validation/reaper/run-piano-lite-qualification-matrix.ps1` captures a newly published state from
+the actual user Piano Lite project, first proves that state reaches `Active` with nonzero processor
+audio, injects it into editor-open and editor-closed REAPER projects, and applies the same 44.1/48
+kHz by 128/256/512-frame host matrix. Its evidence is isolated under
+`validation/reaper/piano-lite-qualification-evidence`.
+
+The compiled-VST3 Debug test and project-owned `default` articulation processor regression pass on
+this workspace. The actual Piano Lite matrix was run on 2026-08-03 with all REAPER sessions closed:
+all 12 editor-state, sample-rate, and block-size combinations produced finite, nonzero audio. The
+signed evidence files are retained under `validation/reaper/piano-lite-qualification-evidence`.
 
 ## Legacy migration
 

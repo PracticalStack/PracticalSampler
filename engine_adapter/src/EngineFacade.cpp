@@ -240,6 +240,65 @@ std::string resolveAuthoredArticulationSelection(const RuntimeProjectModel& proj
     return authoredArticulations.front();
 }
 
+RuntimeInstrumentModel buildProjectPresetValidationInstrument(
+    const RuntimeInstrumentModel& referenceInstrument,
+    const RuntimeProjectModel& project)
+{
+    auto instrument = referenceInstrument;
+    instrument.articulations.clear();
+
+    std::unordered_set<std::string> seenArticulationIds;
+    for (const auto& articulation : project.authoring.articulations)
+    {
+        if (articulation.id.empty() || !seenArticulationIds.insert(articulation.id).second)
+            continue;
+        instrument.articulations.push_back({
+            articulation.id,
+            articulation.displayName.empty() ? articulation.id : articulation.displayName,
+            articulation.isDefault,
+            articulation.activation
+        });
+    }
+
+    // Older authored schemas may express articulation membership only on zones. The project
+    // loader validates and migrates those documents, but retaining this fallback keeps the
+    // hosted-state contract correct for every validated RuntimeProjectModel caller.
+    for (const auto& zone : project.authoring.zones)
+    {
+        if (zone.articulationId.empty()
+            || !seenArticulationIds.insert(zone.articulationId).second)
+        {
+            continue;
+        }
+        instrument.articulations.push_back({
+            zone.articulationId,
+            zone.articulationId,
+            instrument.articulations.empty() || zone.articulationId == "default",
+            std::nullopt
+        });
+    }
+
+    for (const auto& authoredMacro : project.authoring.macros)
+    {
+        const auto existing = std::find_if(
+            instrument.macros.begin(), instrument.macros.end(),
+            [&](const RuntimeMacroDefinition& macro) { return macro.id == authoredMacro.id; });
+        const RuntimeMacroDefinition projected {
+            authoredMacro.id,
+            authoredMacro.name,
+            authoredMacro.defaultValue,
+            authoredMacro.minValue,
+            authoredMacro.maxValue
+        };
+        if (existing == instrument.macros.end())
+            instrument.macros.push_back(projected);
+        else
+            *existing = projected;
+    }
+
+    return instrument;
+}
+
 std::string runtimeMacroIdFromHostParameterId(const std::string& hostParameterId)
 {
     constexpr std::string_view prefix { "macro." };
@@ -2773,6 +2832,91 @@ SfzImportProjectionResult EngineFacade::projectSfzImportDocument(const RuntimePr
 std::string EngineFacade::exportPresetStateJson() const
 {
     return serializeRuntimePresetState(captureRuntimePresetState(currentSessionState));
+}
+
+RuntimePresetStateValidationResult EngineFacade::validateProjectPresetState(
+    const RuntimePresetState& presetState,
+    const RuntimeProjectModel& project) const
+{
+    RuntimePresetStateValidationResult result;
+    result.state = "Project preset state validation failed";
+
+    const auto projectValidation = validateRuntimeProjectModel(project);
+    if (!projectValidation.valid)
+    {
+        result.issues = projectValidation.issues;
+        return result;
+    }
+
+    if (!referenceManifest.loaded)
+    {
+        result.issues.push_back(
+            "Reference instrument manifest is unavailable, so project preset state cannot be validated.");
+        return result;
+    }
+
+    const auto contextualInstrument = buildProjectPresetValidationInstrument(
+        referenceManifest.instrument, project);
+    result = validateRuntimePresetState(presetState, contextualInstrument);
+    result.state = result.valid
+        ? "Project preset state validated"
+        : "Project preset state validation failed";
+    return result;
+}
+
+EnginePresetStateRestoreResult EngineFacade::restoreProjectPresetState(
+    const RuntimePresetState& presetState,
+    const RuntimeProjectModel& project)
+{
+    EnginePresetStateRestoreResult restoreResult;
+    restoreResult.state = "Project preset state restore failed";
+
+    if (!authoringProject.loaded
+        || authoringProject.project.projectId != project.projectId)
+    {
+        restoreResult.issues.push_back(
+            "The project preset state does not match the active authored draft project.");
+    }
+    else
+    {
+        const auto validation = validateProjectPresetState(presetState, project);
+        if (!validation.valid)
+            restoreResult.issues = validation.issues;
+    }
+
+    if (!restoreResult.issues.empty())
+    {
+        currentSessionState.transientMetrics.integrationState = restoreResult.state;
+        currentSessionState.transientMetrics.lastFailure = summarizeIssues(restoreResult.issues);
+        refreshDiagnosticsSnapshot();
+        markStateChanged();
+        return restoreResult;
+    }
+
+    currentSessionState.presetId = presetState.presetId;
+    currentSessionState.targetInstrumentId = presetState.targetInstrumentId;
+    currentSessionState.targetInstrumentSchemaName = presetState.targetInstrumentSchemaName;
+    currentSessionState.targetInstrumentSchemaVersion = presetState.targetInstrumentSchemaVersion;
+    currentSessionState.loadProfileId = presetState.loadProfileId;
+    currentSessionState.selectedArticulationId = presetState.selectedArticulationId;
+    currentSessionState.macroValues = presetState.macroValues;
+    currentSessionState.notes = presetState.notes;
+    currentSessionState.transientMetrics.integrationState = "Project preset state restored";
+    currentSessionState.transientMetrics.lastFailure.clear();
+
+    // The authored draft has already been staged and reopened by the restore transaction.
+    // Do not call initializeDraftPlaybackContract(): that is the legacy reference-preset path
+    // and would replace the project-aware playback context we are restoring.
+    referenceInstrumentActive = true;
+    previewPlaybackSnapshot = {};
+    syncPreviewSnapshotFromDraftPlayback();
+    previewPlaybackSnapshot.articulationId = currentSessionState.selectedArticulationId;
+    refreshDiagnosticsSnapshot();
+    markStateChanged();
+
+    restoreResult.restored = true;
+    restoreResult.state = "Project preset state restored";
+    return restoreResult;
 }
 
 EnginePresetStateRestoreResult EngineFacade::restorePresetStateJson(const std::string& presetStateJson)

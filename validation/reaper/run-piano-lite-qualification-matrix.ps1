@@ -1,4 +1,5 @@
 param(
+    [string] $PianoLiteProjectPath = (Join-Path $env:USERPROFILE 'Documents\DecentRhapsodyStudio\PianoLite\PianoLite.drsproj'),
     [string] $ReaperPath = 'C:\Program Files\REAPER (x64)\reaper.exe',
     [int] $TimeoutSeconds = 90,
     [string[]] $SampleRates = @(44100, 48000),
@@ -11,21 +12,58 @@ $validationRoot = $PSScriptRoot
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $validationRoot '..\..'))
 $templateConfigPath = Join-Path $validationRoot 'reaper.ini'
 $scenarioScriptPath = Join-Path $validationRoot 'validate-scenario.lua'
-$evidenceRoot = Join-Path $validationRoot 'qualification-evidence'
+$baselineProjectPath = Join-Path $validationRoot 'baseline.rpp'
+$captureToolPath = Join-Path $repositoryRoot 'build\vs2022-debug\tests\drs_host_project_recall_tests_artefacts\Debug\drs_host_project_recall_tests.exe'
 $bundlePath = Join-Path $repositoryRoot 'build\vs2022-debug\app\drs_plugin_bundle_artefacts\Debug\VST3'
+$evidenceRoot = Join-Path $validationRoot 'piano-lite-qualification-evidence'
+$capturedStatePath = Join-Path $evidenceRoot 'piano-lite.hoststate.json'
+$scenarioRoot = Join-Path $evidenceRoot 'scenarios'
 
-if (-not (Test-Path -LiteralPath $ReaperPath -PathType Leaf)) {
-    throw "REAPER was not found at '$ReaperPath'."
-}
-if (Get-Process reaper -ErrorAction SilentlyContinue) {
-    throw 'REAPER is already running. Close every REAPER session before the isolated qualification matrix so command-line projects and scripts cannot be forwarded into an existing user session.'
+foreach ($requiredFile in @($PianoLiteProjectPath, $ReaperPath, $templateConfigPath,
+                             $scenarioScriptPath, $baselineProjectPath, $captureToolPath)) {
+    if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
+        throw "Required Piano Lite qualification input was not found at '$requiredFile'."
+    }
 }
 if (-not (Test-Path -LiteralPath $bundlePath -PathType Container)) {
     throw "The compiled Debug VST3 bundle directory was not found at '$bundlePath'."
 }
+if (Get-Process reaper -ErrorAction SilentlyContinue) {
+    throw 'REAPER is already running. Close every REAPER session before the isolated Piano Lite qualification matrix.'
+}
 
-& (Join-Path $validationRoot 'make-scenarios.ps1')
 [IO.Directory]::CreateDirectory($evidenceRoot) | Out-Null
+[IO.Directory]::CreateDirectory($scenarioRoot) | Out-Null
+
+$previousCaptureProject = $env:DRS_HOST_STATE_CAPTURE_PROJECT_PATH
+$previousCapturePath = $env:DRS_HOST_STATE_CAPTURE_PATH
+try {
+    $env:DRS_HOST_STATE_CAPTURE_PROJECT_PATH = [IO.Path]::GetFullPath($PianoLiteProjectPath)
+    $env:DRS_HOST_STATE_CAPTURE_PATH = $capturedStatePath
+    & $captureToolPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "Piano Lite host-state capture failed with exit code $LASTEXITCODE."
+    }
+}
+finally {
+    $env:DRS_HOST_STATE_CAPTURE_PROJECT_PATH = $previousCaptureProject
+    $env:DRS_HOST_STATE_CAPTURE_PATH = $previousCapturePath
+}
+
+$capturedState = Get-Content -LiteralPath $capturedStatePath -Raw | ConvertFrom-Json
+if (($capturedState.schemaName -ne 'drs.hostState') -or
+    ($capturedState.projectBinding.manifestPath -ne ([IO.Path]::GetFullPath($PianoLiteProjectPath))) -or
+    ($capturedState.presetState.selectedArticulationId -ne 'default') -or
+    ($null -eq $capturedState.publishedState)) {
+    throw 'Captured Piano Lite state is not a published project-bound default-articulation host state.'
+}
+
+foreach ($scenarioName in @('piano-lite-editor-open', 'piano-lite-editor-closed')) {
+    & (Join-Path $validationRoot 'inject-host-state.ps1') `
+        -BaselineProject $baselineProjectPath `
+        -HostState $capturedStatePath `
+        -OutputProject (Join-Path $scenarioRoot "$scenarioName.rpp")
+}
 
 function Set-IniValue {
     param([string] $Text, [string] $Key, [string] $Value)
@@ -35,7 +73,7 @@ function Set-IniValue {
 function New-QualificationProject {
     param([string] $ScenarioName, [int] $SampleRate, [int] $BlockSize)
 
-    $sourcePath = Join-Path $validationRoot ($ScenarioName + '.rpp')
+    $sourcePath = Join-Path $scenarioRoot ($ScenarioName + '.rpp')
     $destinationPath = Join-Path $evidenceRoot ("{0}-{1}-{2}.rpp" -f $ScenarioName, $SampleRate, $BlockSize)
     $projectText = Get-Content -LiteralPath $sourcePath -Raw
     $projectText = [regex]::Replace($projectText, '(?m)^  SAMPLERATE .*$', "  SAMPLERATE $SampleRate 0 0")
@@ -59,12 +97,12 @@ function Assert-QualificationEvidence {
         }
     }
     $passed = $values['validation_midi_inserted'] -eq 'true'
-    $passed = $passed -and ([int]($values['nonzero_peak_observations']) -gt 0)
-    $passed = $passed -and ([int]($values['nonfinite_peak_observations']) -eq 0)
+    $passed = $passed -and ([int]$values['nonzero_peak_observations'] -gt 0)
+    $passed = $passed -and ([int]$values['nonfinite_peak_observations'] -eq 0)
     $passed = $passed -and ($values['track.0.fx.0.enabled'] -eq 'true')
     $passed = $passed -and ($values['track.0.fx.0.offline'] -eq 'false')
     if (-not $passed) {
-        throw "REAPER qualification failed for '$EvidencePath': $($values | Out-String)"
+        throw "Piano Lite REAPER qualification failed for '$EvidencePath': $($values | Out-String)"
     }
 }
 
@@ -88,11 +126,14 @@ try {
             $configDirectory = Join-Path $evidenceRoot ("reaper-{0}-{1}" -f $sampleRate, $blockSize)
             [IO.Directory]::CreateDirectory($configDirectory) | Out-Null
             $configPath = Join-Path $configDirectory 'reaper.ini'
-            [IO.File]::WriteAllText($configPath, $configText, [Text.UTF8Encoding]::new($false))
+            [IO.File]::WriteAllText(
+                $configPath,
+                $configText,
+                [Text.UTF8Encoding]::new($false))
             Remove-Item -LiteralPath (Join-Path $configDirectory 'reaper-vstplugins64.ini') `
                 -ErrorAction SilentlyContinue
 
-            foreach ($scenarioName in @('active-editor-open', 'active-editor-closed')) {
+            foreach ($scenarioName in @('piano-lite-editor-open', 'piano-lite-editor-closed')) {
                 $projectPath = New-QualificationProject $scenarioName $sampleRate $blockSize
                 $projectName = [IO.Path]::GetFileNameWithoutExtension($projectPath)
                 $evidencePath = Join-Path $evidenceRoot ($projectName + '.reaper-evidence.txt')
@@ -110,7 +151,7 @@ try {
                         if ($process.HasExited) { break }
                     }
                     if (-not (Test-Path -LiteralPath $evidencePath)) {
-                        throw "Timed out waiting for '$projectName' qualification evidence."
+                        throw "Timed out waiting for '$projectName' Piano Lite qualification evidence."
                     }
                     Assert-QualificationEvidence $evidencePath
                 }

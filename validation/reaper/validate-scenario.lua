@@ -5,7 +5,8 @@ local _, project_path = reaper.EnumProjects(-1, "")
 local project_name = project_path:match("([^/\\]+)%.rpp$") or "unknown"
 local log_path = output_dir .. "\\" .. project_name .. ".reaper-evidence.txt"
 local chunk_path = output_dir .. "\\" .. project_name .. ".restored-track-chunks.txt"
-local started = reaper.time_precise()
+local script_started = reaper.time_precise()
+local playback_started = nil
 local duplicate_prepared = false
 local observed_peak_left = 0.0
 local observed_peak_right = 0.0
@@ -15,6 +16,7 @@ local peak_square_sum = 0.0
 local peak_probe_count = 0
 local nonzero_peak_observations = 0
 local nonfinite_peak_observations = 0
+local validation_midi_note_count = 0
 
 local function observe_peak(value)
   if value ~= value or value == math.huge or value == -math.huge then
@@ -35,7 +37,7 @@ local function insert_validation_midi()
   if track == nil then
     return false
   end
-  local item = reaper.CreateNewMIDIItemInProj(track, 0.25, 4.0, false)
+  local item = reaper.CreateNewMIDIItemInProj(track, 0.25, 14.75, false)
   if item == nil then
     return false
   end
@@ -43,16 +45,41 @@ local function insert_validation_midi()
   if take == nil then
     return false
   end
-  reaper.MIDI_InsertNote(take, false, false, 0, 3840, 0, 60, 100, false)
+  for note_time = 0.5, 14.0, 0.5 do
+    local note_start = reaper.MIDI_GetPPQPosFromProjTime(take, note_time)
+    local note_end = reaper.MIDI_GetPPQPosFromProjTime(take, note_time + 0.25)
+    if reaper.MIDI_InsertNote(take, false, false, note_start, note_end, 0, 60, 100, false) then
+      validation_midi_note_count = validation_midi_note_count + 1
+    end
+  end
   reaper.MIDI_Sort(take)
-  return true
+  return validation_midi_note_count > 0
 end
 
 local midi_inserted = insert_validation_midi()
 
-reaper.GetSet_LoopTimeRange(true, false, 0.0, 60.0, false)
-reaper.GetSetRepeat(1)
-reaper.OnPlayButton()
+local function prepare_editor_state()
+  local track = reaper.GetTrack(0, 0)
+  if track == nil or reaper.TrackFX_GetCount(track) == 0 then
+    return
+  end
+  if project_name:find("editor%-open") then
+    reaper.TrackFX_Show(track, 0, 3)
+  else
+    reaper.TrackFX_Show(track, 0, 2)
+  end
+end
+
+prepare_editor_state()
+
+local function start_validation_playback()
+  reaper.OnStopButton()
+  reaper.SetEditCurPos(0.0, false, false)
+  reaper.GetSet_LoopTimeRange(true, true, 0.0, 14.75, false)
+  reaper.GetSetRepeat(1)
+  reaper.OnPlayButton()
+  playback_started = reaper.time_precise()
+end
 
 local function write_text(path, text)
   local handle = assert(io.open(path, "wb"))
@@ -89,6 +116,8 @@ local function capture()
     "play_state=" .. tostring(reaper.GetPlayState()),
     "track_count=" .. tostring(reaper.CountTracks(0)),
     "validation_midi_inserted=" .. tostring(midi_inserted),
+    "validation_midi_note_count=" .. tostring(validation_midi_note_count),
+    "play_position=" .. tostring(reaper.GetPlayPosition()),
     "track_peak_left=" .. tostring(observed_peak_left),
     "track_peak_right=" .. tostring(observed_peak_right),
     "master_peak_left=" .. tostring(observed_master_peak_left),
@@ -148,6 +177,14 @@ local function capture()
 end
 
 local function wait_for_restore()
+  if playback_started == nil then
+    if reaper.time_precise() - script_started >= 3.0 then
+      start_validation_playback()
+    end
+    reaper.defer(wait_for_restore)
+    return
+  end
+
   local track = reaper.GetTrack(0, 0)
   if track ~= nil then
     observed_peak_left = math.max(observed_peak_left,
@@ -160,9 +197,9 @@ local function wait_for_restore()
     observed_master_peak_right = math.max(observed_master_peak_right,
       observe_peak(reaper.Track_GetPeakInfo(master, 1)))
   end
-  if reaper.time_precise() - started >= 15.0 then
+  if reaper.time_precise() - playback_started >= 15.0 then
     if prepare_duplicate_instance() then
-      started = reaper.time_precise()
+      playback_started = reaper.time_precise()
       reaper.defer(wait_for_restore)
       return
     end

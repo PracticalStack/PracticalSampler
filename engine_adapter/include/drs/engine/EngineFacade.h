@@ -411,6 +411,12 @@ public:
     SfzImportProjectionResult projectSfzImportDocument(const RuntimeProjectModel& baseProject,
                                                        const std::string& sfzPath) const;
     std::string exportPresetStateJson() const;
+    RuntimePresetStateValidationResult validateProjectPresetState(
+        const RuntimePresetState& presetState,
+        const RuntimeProjectModel& project) const;
+    EnginePresetStateRestoreResult restoreProjectPresetState(
+        const RuntimePresetState& presetState,
+        const RuntimeProjectModel& project);
     EnginePresetStateRestoreResult restorePresetStateJson(const std::string& presetStateJson);
     EnginePresetStateRestoreResult restorePresetStateFile(const std::string& presetStatePath);
     EngineContentFailureProbeResult probeContentFailure(EngineContentFailureCategory category);

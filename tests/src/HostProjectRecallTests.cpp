@@ -102,6 +102,63 @@ int main()
     {
         juce::ScopedJuceInitialiser_GUI gui;
 
+        if (const auto* captureProjectPath = std::getenv("DRS_HOST_STATE_CAPTURE_PROJECT_PATH");
+            captureProjectPath != nullptr && *captureProjectPath != '\0')
+        {
+            const auto* capturePath = std::getenv("DRS_HOST_STATE_CAPTURE_PATH");
+            require(capturePath != nullptr && *capturePath != '\0',
+                    "DRS_HOST_STATE_CAPTURE_PATH is required with DRS_HOST_STATE_CAPTURE_PROJECT_PATH.");
+            const auto captureProject = drs::engine::loadRuntimeProjectManifest(captureProjectPath);
+            require(captureProject.loaded, "The requested host-state capture project must load.");
+
+            auto captureProcessor = std::make_unique<drs::plugin::Processor>();
+            captureProcessor->prepareToPlay(44100.0, 256);
+            require(captureProcessor->replaceAuthoringProject(
+                        captureProject.project, juce::File(captureProjectPath)),
+                    "The requested host-state capture project must replace the authored draft.");
+            require(captureProcessor->submitPerformancePublishCommand(),
+                    "The requested host-state capture project must publish.");
+            waitForPublishedPerformance(*captureProcessor, "Requested host-state capture publish");
+
+            float capturePeak = 0.0f;
+            processBlock(*captureProcessor, true, &capturePeak);
+            require(std::isfinite(capturePeak) && capturePeak > 0.0f,
+                    "The requested host-state capture project must render before capture.");
+
+            juce::MemoryBlock captureState;
+            captureProcessor->getStateInformation(captureState);
+            const auto captureText = std::string(
+                static_cast<const char*>(captureState.getData()), captureState.getSize());
+            const auto parsedCapture = drs::engine::parseHostSessionState(captureText);
+            require(parsedCapture.isValidHostState()
+                        && parsedCapture.hostState->projectBinding.projectId
+                            == captureProject.project.projectId
+                        && parsedCapture.hostState->publishedState.has_value(),
+                    "The requested project must produce a published, project-bound host state.");
+
+            auto captureRestored = std::make_unique<drs::plugin::Processor>();
+            captureRestored->prepareToPlay(44100.0, 256);
+            captureRestored->setStateInformation(
+                captureState.getData(), static_cast<int>(captureState.getSize()));
+            const auto captureRestore = waitForRestore(*captureRestored);
+            require(captureRestore->state == drs::engine::ProjectRestoreState::active,
+                    "The requested project host state must restore to Active: "
+                        + captureRestore->message);
+            float restoredCapturePeak = 0.0f;
+            processBlock(*captureRestored, true, &restoredCapturePeak);
+            require(std::isfinite(restoredCapturePeak) && restoredCapturePeak > 0.0f,
+                    "The requested project host state must render after fresh recall.");
+
+            std::ofstream capture(capturePath, std::ios::binary | std::ios::trunc);
+            require(static_cast<bool>(capture), "The requested host-state capture file must open.");
+            capture.write(captureText.data(), static_cast<std::streamsize>(captureText.size()));
+            require(static_cast<bool>(capture), "The requested host-state capture file must be written.");
+            std::cout << "Captured project-bound host state for "
+                      << captureProject.project.projectId << " with sourcePeak=" << capturePeak
+                      << " restoredPeak=" << restoredCapturePeak << std::endl;
+            return 0;
+        }
+
         const auto projectPath = drs::engine::getPhase2ReferenceProjectManifestPath();
         const auto projectLoad = drs::engine::loadRuntimeProjectManifest(projectPath);
         require(projectLoad.loaded,
@@ -240,24 +297,48 @@ int main()
                     && contextualParsed.hostState->presetState.selectedArticulationId == "default",
                 "The contextual-articulation fixture must capture a valid host state with default selected.");
 
+        auto contextualRestored = std::make_unique<drs::plugin::Processor>();
+        contextualRestored->prepareToPlay(44100.0, 64);
+        contextualRestored->setStateInformation(
+            contextualStateBlock.getData(), static_cast<int>(contextualStateBlock.getSize()));
+        const auto contextualRestore = waitForRestore(*contextualRestored);
+        require(contextualRestore->state == drs::engine::ProjectRestoreState::active,
+                "A project-owned default articulation must reach Active: " + contextualRestore->message);
+        require(contextualRestored->getAuthoringSession().getProject().projectId
+                    == "drs.host-state.default-articulation"
+                    && contextualRestored->getEngineFacade().getCurrentSessionState()
+                           .selectedArticulationId == "default",
+                "Project-aware recall must retain the restored project and its default articulation.");
+        float contextualPeak = 0.0f;
+        processBlock(*contextualRestored, true, &contextualPeak);
+        require(std::isfinite(contextualPeak) && contextualPeak > 0.0f,
+                "A restored project-owned default articulation must produce finite, nonzero audio.");
+
+        auto invalidArticulationState = *contextualParsed.hostState;
+        invalidArticulationState.presetState.selectedArticulationId = "sustain";
+        const auto invalidArticulationSerialized = drs::engine::serializeHostSessionState(
+            invalidArticulationState);
+        require(invalidArticulationSerialized.serialized,
+                "The invalid authored-articulation recovery fixture must serialize.");
+
         auto contextualFailure = std::make_unique<drs::plugin::Processor>();
         contextualFailure->prepareToPlay(44100.0, 64);
         contextualFailure->setStateInformation(
-            contextualStateBlock.getData(), static_cast<int>(contextualStateBlock.getSize()));
+            invalidArticulationSerialized.text.data(),
+            static_cast<int>(invalidArticulationSerialized.text.size()));
         const auto contextualFailureRestore = waitForRestore(*contextualFailure);
         require(contextualFailureRestore->state == drs::engine::ProjectRestoreState::failed
                     && contextualFailureRestore->finding
                         == drs::engine::ProjectRestoreFinding::articulationMismatch
-                    && contextualFailureRestore->message.find("default") != std::string::npos
+                    && contextualFailureRestore->message.find("sustain") != std::string::npos
                     && contextualFailureRestore->message.find(
                         "drs.host-state.default-articulation") != std::string::npos
                     && contextualFailureRestore->message.find("default: default") != std::string::npos,
-                "A contextual articulation rejection must name the saved articulation, restored project, "
-                    "and authored default instead of collapsing into CheckpointInvalid.");
+                "An articulation absent from the restored project must fail with contextual diagnostics.");
         float contextualFailurePeak = 0.0f;
         processBlock(*contextualFailure, true, &contextualFailurePeak);
         require(contextualFailurePeak == 0.0f,
-                "A contextual-articulation restore rejected before activation must remain silent.");
+                "An invalid project-articulation restore must remain silent.");
 
         require(contextualFailure->replaceAuthoringProject(
                     defaultArticulationProject.project,
@@ -273,28 +354,6 @@ int main()
         processBlock(*contextualFailure, true, &manualRecoveryPeak);
         require(std::isfinite(manualRecoveryPeak) && manualRecoveryPeak > 0.0f,
                 "The same instance must render finite, nonzero audio after manual recovery and publish.");
-
-        auto referenceKnownDiagnosticState = *contextualParsed.hostState;
-        referenceKnownDiagnosticState.presetState.selectedArticulationId = "sustain";
-        const auto referenceKnownDiagnosticSerialized = drs::engine::serializeHostSessionState(
-            referenceKnownDiagnosticState);
-        require(referenceKnownDiagnosticSerialized.serialized,
-                "The single-field reference-articulation diagnostic fixture must serialize.");
-
-        auto referenceKnownDiagnosticRestore = std::make_unique<drs::plugin::Processor>();
-        referenceKnownDiagnosticRestore->prepareToPlay(44100.0, 64);
-        referenceKnownDiagnosticRestore->setStateInformation(
-            referenceKnownDiagnosticSerialized.text.data(),
-            static_cast<int>(referenceKnownDiagnosticSerialized.text.size()));
-        const auto referenceKnownDiagnosticResult = waitForRestore(*referenceKnownDiagnosticRestore);
-        require(referenceKnownDiagnosticResult->state == drs::engine::ProjectRestoreState::active,
-                "Characterization: changing only default to reference-known sustain must make the old "
-                    "reference-only restore path reach Active.");
-        float referenceKnownDiagnosticPeak = 0.0f;
-        processBlock(*referenceKnownDiagnosticRestore, true, &referenceKnownDiagnosticPeak);
-        require(std::isfinite(referenceKnownDiagnosticPeak) && referenceKnownDiagnosticPeak > 0.0f,
-                "Characterization: the reference-known diagnostic substitution must produce finite, "
-                    "nonzero audio. This is diagnostic evidence, not the desired authored behavior.");
 
         auto dirtySourceOwner = std::make_unique<drs::plugin::Processor>();
         auto& dirtySource = *dirtySourceOwner;
