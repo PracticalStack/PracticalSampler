@@ -35,6 +35,7 @@ ZoneMappingEditor::ZoneMappingEditor()
       roundRobinSection("Round Robin", "authoringRoundRobinInspectorSection", false),
       mixSection("Mix", "authoringMixInspectorSection", false),
       advancedSection("Advanced", "authoringAdvancedInspectorSection", false),
+      performanceSection("Performance", "authoringPerformanceInspectorSection", false),
       rootKeyRow("Root Key", "authoringRootKeyRow", 0, 127, 1),
       keyRangeRow("Key Range", "authoringKeyRangeRow", "Low", "High", 0, 127, 1),
       articulationRow("Articulation", "authoringZoneArticulationRow"),
@@ -50,6 +51,14 @@ ZoneMappingEditor::ZoneMappingEditor()
       panRow("Pan", "authoringPanRow", -1.0, 1.0, 0.01),
       loopToggleRow("Loop", "authoringLoopRow", "Enabled"),
       triggerModeRow("Trigger mode", "authoringTriggerModeRow"),
+      performanceEventRow("Event", "authoringPerformanceEventRow"),
+      sustainConditionRow("Sustain", "authoringSustainConditionRow"),
+      pitchSourceRow("Pitch", "authoringPitchSourceRow"),
+      chokeGroupRow("Choke group", "authoringChokeGroupRow"),
+      chokeTargetRow("Choke target", "authoringChokeTargetRow"),
+      chokeFadeRow("Choke fade", "authoringChokeFadeRow", 0.0, 5.0, 0.01),
+      createChokeGroupRow("Groups", "authoringCreateChokeGroupRow", "New Choke Group"),
+      performanceHintMessage("authoringPerformanceHintMessage", juce::Justification::centredLeft),
       previewZoneRow("Audition", "authoringInspectorPreviewRow", "Preview Zone"),
       restoreRootKeyRow("Reference", "authoringRestoreRootKeyRow", "Restore Root Key"),
       validationMessage("authoringZoneValidationMessage", juce::Justification::centredLeft)
@@ -71,8 +80,25 @@ ZoneMappingEditor::ZoneMappingEditor()
     panRow.getSlider().setComponentID("authoringPanSlider");
     loopToggleRow.getToggle().setComponentID("authoringLoopEnabledToggle");
     triggerModeRow.getComboBox().setComponentID("authoringTriggerModeSelector");
+    performanceEventRow.getComboBox().setComponentID("authoringPerformanceEventSelector");
+    sustainConditionRow.getComboBox().setComponentID("authoringPerformanceSustainSelector");
+    pitchSourceRow.getComboBox().setComponentID("authoringPerformancePitchSelector");
+    chokeGroupRow.getComboBox().setComponentID("authoringChokeGroupSelector");
+    chokeTargetRow.getComboBox().setComponentID("authoringChokeTargetSelector");
+    chokeFadeRow.getSlider().setComponentID("authoringChokeFadeSlider");
+    createChokeGroupRow.getButton().setComponentID("authoringCreateChokeGroupButton");
     triggerModeRow.getComboBox().addItem("Gated", 1);
     triggerModeRow.getComboBox().addItem("One-shot", 2);
+    performanceEventRow.getComboBox().addItem("Note On", 1);
+    performanceEventRow.getComboBox().addItem("Note Off", 2);
+    performanceEventRow.getComboBox().addItem("Release", 3);
+    performanceEventRow.getComboBox().addItem("Pedal Down", 4);
+    performanceEventRow.getComboBox().addItem("Pedal Up", 5);
+    sustainConditionRow.getComboBox().addItem("Any pedal state", 1);
+    sustainConditionRow.getComboBox().addItem("Pedal down", 2);
+    sustainConditionRow.getComboBox().addItem("Pedal up", 3);
+    pitchSourceRow.getComboBox().addItem("Event note", 1);
+    pitchSourceRow.getComboBox().addItem("Fixed root", 2);
     createRoundRobinPoolRow.getButton().setComponentID("authoringCreateRoundRobinPoolButton");
     addCompatibleZonesRow.getButton().setComponentID("authoringAddCompatibleZonesButton");
     normalizeRoundRobinPoolRow.getButton().setComponentID("authoringNormalizeRoundRobinPoolButton");
@@ -100,6 +126,14 @@ ZoneMappingEditor::ZoneMappingEditor()
     triggerModeRow.getComboBox().setExplicitFocusOrder(58);
     previewZoneRow.getButton().setExplicitFocusOrder(59);
     restoreRootKeyRow.getButton().setExplicitFocusOrder(60);
+    performanceSection.getDisclosureButton().setExplicitFocusOrder(61);
+    performanceEventRow.getComboBox().setExplicitFocusOrder(62);
+    sustainConditionRow.getComboBox().setExplicitFocusOrder(63);
+    pitchSourceRow.getComboBox().setExplicitFocusOrder(64);
+    chokeGroupRow.getComboBox().setExplicitFocusOrder(65);
+    chokeTargetRow.getComboBox().setExplicitFocusOrder(66);
+    chokeFadeRow.getSlider().setExplicitFocusOrder(67);
+    createChokeGroupRow.getButton().setExplicitFocusOrder(68);
     triggerModeRow.getComboBox().setHelpText(
         "Gated samples release on note-off. One-shot samples play to their natural end.");
     previewZoneRow.getButton().setHelpText("Auditions the selected zone from the mapping inspector.");
@@ -133,15 +167,27 @@ ZoneMappingEditor::ZoneMappingEditor()
     addOwnedRow(advancedSectionContent, validationMessage, messageRowHeight);
     advancedSectionContent.setSize(0, toggleRowHeight + 6 + comboRowHeight + 6 + actionRowHeight + 6
                                       + actionRowHeight + 6 + messageRowHeight);
+    addOwnedRow(performanceSectionContent, performanceEventRow, comboRowHeight);
+    addOwnedRow(performanceSectionContent, sustainConditionRow, comboRowHeight);
+    addOwnedRow(performanceSectionContent, pitchSourceRow, comboRowHeight);
+    addOwnedRow(performanceSectionContent, chokeGroupRow, comboRowHeight);
+    addOwnedRow(performanceSectionContent, chokeTargetRow, comboRowHeight);
+    addOwnedRow(performanceSectionContent, chokeFadeRow, sliderRowHeight);
+    addOwnedRow(performanceSectionContent, createChokeGroupRow, actionRowHeight);
+    addOwnedRow(performanceSectionContent, performanceHintMessage, messageRowHeight);
+    performanceSectionContent.setSize(0, comboRowHeight * 5 + sliderRowHeight + actionRowHeight
+                                             + messageRowHeight + 7 * 6);
 
     mapSection.setContent(&mapSectionContent);
     sampleSection.setContent(&sampleSectionContent);
     mixSection.setContent(&mixSectionContent);
     advancedSection.setContent(&advancedSectionContent);
+    performanceSection.setContent(&performanceSectionContent);
     mapSection.setOnExpandedChanged([this](bool) { resized(); });
     sampleSection.setOnExpandedChanged([this](bool) { resized(); });
     mixSection.setOnExpandedChanged([this](bool) { resized(); });
     advancedSection.setOnExpandedChanged([this](bool) { resized(); });
+    performanceSection.setOnExpandedChanged([this](bool) { resized(); });
 
     auto bindCommitOnGestureFinished = [this](CompactInspectorCommitSlider& slider, const char* labelText)
     {
@@ -168,6 +214,17 @@ ZoneMappingEditor::ZoneMappingEditor()
     {
         commitCurrentValues("Update zone trigger mode");
     };
+    performanceEventRow.getComboBox().onChange = [this] { commitCurrentValues("Update zone performance event"); };
+    sustainConditionRow.getComboBox().onChange = [this] { commitCurrentValues("Update zone sustain condition"); };
+    pitchSourceRow.getComboBox().onChange = [this] { commitCurrentValues("Update zone pitch source"); };
+    chokeGroupRow.getComboBox().onChange = [this] { commitCurrentValues("Update choke group"); };
+    chokeTargetRow.getComboBox().onChange = [this] { commitCurrentValues("Update choke target"); };
+    bindCommitOnGestureFinished(chokeFadeRow.getSlider(), "Update choke fade");
+    createChokeGroupRow.getButton().onClick = [this]
+    {
+        if (callbacks.onCreateChokeGroupRequested)
+            callbacks.onCreateChokeGroupRequested();
+    };
     articulationRow.getComboBox().onChange = [this]
     {
         if (callbacks.onArticulationCommitRequested && viewModel.hasSelection)
@@ -189,7 +246,8 @@ ZoneMappingEditor::ZoneMappingEditor()
              static_cast<juce::Component*>(&mapSection),
              static_cast<juce::Component*>(&sampleSection),
              static_cast<juce::Component*>(&mixSection),
-             static_cast<juce::Component*>(&advancedSection)
+             static_cast<juce::Component*>(&advancedSection),
+             static_cast<juce::Component*>(&performanceSection)
          })
     {
         addAndMakeVisible(component);
@@ -218,6 +276,11 @@ void ZoneMappingEditor::resized()
     layoutSection(sampleSection, true);
     layoutSection(mixSection, true);
     layoutSection(advancedSection, false);
+    if (!area.isEmpty())
+    {
+        area.removeFromTop(sectionGap);
+        layoutSection(performanceSection, false);
+    }
 
     auto mapArea = mapSectionContent.getLocalBounds();
     rootKeyRow.setBounds(mapArea.removeFromTop(sliderRowHeight));
@@ -244,6 +307,16 @@ void ZoneMappingEditor::resized()
     restoreRootKeyRow.setBounds(advancedArea.removeFromTop(actionRowHeight));
     advancedArea.removeFromTop(6);
     validationMessage.setBounds(advancedArea.removeFromTop(messageRowHeight));
+
+    auto performanceArea = performanceSectionContent.getLocalBounds();
+    performanceEventRow.setBounds(performanceArea.removeFromTop(comboRowHeight)); performanceArea.removeFromTop(6);
+    sustainConditionRow.setBounds(performanceArea.removeFromTop(comboRowHeight)); performanceArea.removeFromTop(6);
+    pitchSourceRow.setBounds(performanceArea.removeFromTop(comboRowHeight)); performanceArea.removeFromTop(6);
+    chokeGroupRow.setBounds(performanceArea.removeFromTop(comboRowHeight)); performanceArea.removeFromTop(6);
+    chokeTargetRow.setBounds(performanceArea.removeFromTop(comboRowHeight)); performanceArea.removeFromTop(6);
+    chokeFadeRow.setBounds(performanceArea.removeFromTop(sliderRowHeight)); performanceArea.removeFromTop(6);
+    createChokeGroupRow.setBounds(performanceArea.removeFromTop(actionRowHeight)); performanceArea.removeFromTop(6);
+    performanceHintMessage.setBounds(performanceArea.removeFromTop(messageRowHeight));
 }
 
 void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
@@ -261,10 +334,12 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
              static_cast<juce::Component*>(&sampleSection),
              static_cast<juce::Component*>(&mixSection),
              static_cast<juce::Component*>(&advancedSection),
+             static_cast<juce::Component*>(&performanceSection),
              static_cast<juce::Component*>(&mapSectionContent),
              static_cast<juce::Component*>(&sampleSectionContent),
              static_cast<juce::Component*>(&mixSectionContent),
              static_cast<juce::Component*>(&advancedSectionContent),
+             static_cast<juce::Component*>(&performanceSectionContent),
              static_cast<juce::Component*>(&rootKeyRow),
              static_cast<juce::Component*>(&keyRangeRow),
              static_cast<juce::Component*>(&articulationRow),
@@ -273,6 +348,14 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
              static_cast<juce::Component*>(&panRow),
              static_cast<juce::Component*>(&loopToggleRow),
              static_cast<juce::Component*>(&triggerModeRow),
+             static_cast<juce::Component*>(&performanceEventRow),
+             static_cast<juce::Component*>(&sustainConditionRow),
+             static_cast<juce::Component*>(&pitchSourceRow),
+             static_cast<juce::Component*>(&chokeGroupRow),
+             static_cast<juce::Component*>(&chokeTargetRow),
+             static_cast<juce::Component*>(&chokeFadeRow),
+             static_cast<juce::Component*>(&createChokeGroupRow),
+             static_cast<juce::Component*>(&performanceHintMessage),
              static_cast<juce::Component*>(&previewZoneRow),
              static_cast<juce::Component*>(&restoreRootKeyRow),
              static_cast<juce::Component*>(&validationMessage),
@@ -286,6 +369,13 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
              static_cast<juce::Component*>(&panRow.getSlider()),
              static_cast<juce::Component*>(&loopToggleRow.getToggle()),
              static_cast<juce::Component*>(&triggerModeRow.getComboBox()),
+             static_cast<juce::Component*>(&performanceEventRow.getComboBox()),
+             static_cast<juce::Component*>(&sustainConditionRow.getComboBox()),
+             static_cast<juce::Component*>(&pitchSourceRow.getComboBox()),
+             static_cast<juce::Component*>(&chokeGroupRow.getComboBox()),
+             static_cast<juce::Component*>(&chokeTargetRow.getComboBox()),
+             static_cast<juce::Component*>(&chokeFadeRow.getSlider()),
+             static_cast<juce::Component*>(&createChokeGroupRow.getButton()),
              static_cast<juce::Component*>(&previewZoneRow.getButton()),
              static_cast<juce::Component*>(&restoreRootKeyRow.getButton())
          })
@@ -327,6 +417,46 @@ ZoneMappingEditor::CommitValues ZoneMappingEditor::collectCurrentValues() const
     values.triggerMode = triggerModeRow.getComboBox().getSelectedId() == 2
         ? drs::engine::ZoneTriggerMode::oneShot
         : drs::engine::ZoneTriggerMode::gated;
+    const auto eventId = performanceEventRow.getComboBox().getSelectedId();
+    values.performanceEvent = eventId == 2 ? drs::engine::PerformanceEventKind::noteOff
+        : eventId == 3 ? drs::engine::PerformanceEventKind::release
+        : eventId == 4 ? drs::engine::PerformanceEventKind::pedalDown
+        : eventId == 5 ? drs::engine::PerformanceEventKind::pedalUp
+                       : drs::engine::PerformanceEventKind::noteOn;
+    const auto sustainId = sustainConditionRow.getComboBox().getSelectedId();
+    values.performanceSustain = sustainId == 2 ? drs::engine::PerformanceSustainCondition::pedalDown
+        : sustainId == 3 ? drs::engine::PerformanceSustainCondition::pedalUp
+                         : drs::engine::PerformanceSustainCondition::any;
+    values.performancePitchSource = pitchSourceRow.getComboBox().getSelectedId() == 2
+        ? drs::engine::PerformancePitchSource::fixedRoot
+        : drs::engine::PerformancePitchSource::eventNote;
+    values.exclusiveGroupId = chokeGroupRow.getComboBox().getSelectedId() > 1
+        ? chokeGroupRow.getComboBox().getText().toStdString() : std::string {};
+    values.exclusiveTargetGroupId = chokeTargetRow.getComboBox().getSelectedId() > 1
+        ? chokeTargetRow.getComboBox().getText().toStdString() : std::string {};
+    values.chokeReleaseSeconds = chokeFadeRow.getSlider().getValue();
+
+    if (values.performanceEvent == drs::engine::PerformanceEventKind::release)
+    {
+        values.performanceSustain = drs::engine::PerformanceSustainCondition::pedalUp;
+        values.triggerMode = drs::engine::ZoneTriggerMode::oneShot;
+    }
+    else if (values.performanceEvent == drs::engine::PerformanceEventKind::pedalDown)
+    {
+        if (values.performanceSustain == drs::engine::PerformanceSustainCondition::pedalUp)
+            values.performanceSustain = drs::engine::PerformanceSustainCondition::pedalDown;
+        values.triggerMode = drs::engine::ZoneTriggerMode::oneShot;
+    }
+    else if (values.performanceEvent == drs::engine::PerformanceEventKind::pedalUp)
+    {
+        if (values.performanceSustain == drs::engine::PerformanceSustainCondition::pedalDown)
+            values.performanceSustain = drs::engine::PerformanceSustainCondition::pedalUp;
+        values.triggerMode = drs::engine::ZoneTriggerMode::oneShot;
+    }
+    if (values.performancePitchSource == drs::engine::PerformancePitchSource::fixedRoot
+        && values.performanceEvent != drs::engine::PerformanceEventKind::pedalDown
+        && values.performanceEvent != drs::engine::PerformanceEventKind::pedalUp)
+        values.performancePitchSource = drs::engine::PerformancePitchSource::eventNote;
 
     const auto normalizedKeyRange = values.keyLow > values.keyHigh;
     const auto normalizedVelocityRange = values.velocityLow > values.velocityHigh;
@@ -386,6 +516,50 @@ void ZoneMappingEditor::applyValuesToControls(const ZoneFieldValuesViewModel& va
     triggerModeRow.getComboBox().setSelectedId(
         values.triggerMode == drs::engine::ZoneTriggerMode::oneShot ? 2 : 1,
         juce::dontSendNotification);
+    const auto eventId = values.performanceEvent == drs::engine::PerformanceEventKind::noteOff ? 2
+        : values.performanceEvent == drs::engine::PerformanceEventKind::release ? 3
+        : values.performanceEvent == drs::engine::PerformanceEventKind::pedalDown ? 4
+        : values.performanceEvent == drs::engine::PerformanceEventKind::pedalUp ? 5 : 1;
+    performanceEventRow.getComboBox().setSelectedId(eventId, juce::dontSendNotification);
+    sustainConditionRow.getComboBox().setSelectedId(
+        values.performanceSustain == drs::engine::PerformanceSustainCondition::pedalDown ? 2
+        : values.performanceSustain == drs::engine::PerformanceSustainCondition::pedalUp ? 3 : 1,
+        juce::dontSendNotification);
+    const auto pedalEvent = values.performanceEvent == drs::engine::PerformanceEventKind::pedalDown
+        || values.performanceEvent == drs::engine::PerformanceEventKind::pedalUp;
+    pitchSourceRow.getComboBox().setSelectedId(
+        values.performancePitchSource == drs::engine::PerformancePitchSource::fixedRoot ? 2 : 1,
+        juce::dontSendNotification);
+    pitchSourceRow.getComboBox().setItemEnabled(2, pedalEvent);
+    chokeGroupRow.getComboBox().clear(juce::dontSendNotification);
+    chokeGroupRow.getComboBox().addItem("(none)", 1);
+    chokeTargetRow.getComboBox().clear(juce::dontSendNotification);
+    chokeTargetRow.getComboBox().addItem("(none)", 1);
+    int groupId = 1;
+    int targetId = 1;
+    for (std::size_t index = 0; index < values.exclusiveGroupIds.size(); ++index)
+    {
+        const auto itemId = static_cast<int>(index) + 2;
+        const auto& group = values.exclusiveGroupIds[index];
+        chokeGroupRow.getComboBox().addItem(juce::String::fromUTF8(group.c_str()), itemId);
+        if (group == values.exclusiveGroupId) groupId = itemId;
+        if (group != values.exclusiveGroupId)
+        {
+            chokeTargetRow.getComboBox().addItem(juce::String::fromUTF8(group.c_str()), itemId);
+            if (group == values.exclusiveTargetGroupId) targetId = itemId;
+        }
+    }
+    chokeGroupRow.getComboBox().setSelectedId(groupId, juce::dontSendNotification);
+    chokeTargetRow.getComboBox().setSelectedId(targetId, juce::dontSendNotification);
+    chokeFadeRow.getSlider().setValue(values.chokeReleaseSeconds, juce::dontSendNotification);
+    const auto eventNeedsOneShot = values.performanceEvent == drs::engine::PerformanceEventKind::release || pedalEvent;
+    triggerModeRow.getComboBox().setItemEnabled(1, !eventNeedsOneShot);
+    sustainConditionRow.getComboBox().setItemEnabled(2, values.performanceEvent != drs::engine::PerformanceEventKind::pedalUp
+                                                          && values.performanceEvent != drs::engine::PerformanceEventKind::release);
+    sustainConditionRow.getComboBox().setItemEnabled(3, values.performanceEvent != drs::engine::PerformanceEventKind::pedalDown);
+    performanceHintMessage.setText(eventNeedsOneShot
+        ? "This event uses one-shot playback; incompatible pedal conditions are unavailable."
+        : "Event note is used for note-on, note-off, and effective-release routes. Fixed root is available for pedal routes.");
 }
 
 void ZoneMappingEditor::refreshValidationMessage(const juce::String& messageText)

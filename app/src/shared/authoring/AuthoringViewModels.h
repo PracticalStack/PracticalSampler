@@ -62,6 +62,13 @@ struct ZoneFieldValuesViewModel
     bool canRemoveZoneFromRoundRobinPool = false;
     bool previewAdvancesRoundRobin = false;
     drs::engine::ZoneTriggerMode triggerMode = drs::engine::ZoneTriggerMode::gated;
+    drs::engine::PerformanceEventKind performanceEvent = drs::engine::PerformanceEventKind::noteOn;
+    drs::engine::PerformanceSustainCondition performanceSustain = drs::engine::PerformanceSustainCondition::any;
+    drs::engine::PerformancePitchSource performancePitchSource = drs::engine::PerformancePitchSource::eventNote;
+    std::string exclusiveGroupId;
+    std::string exclusiveTargetGroupId;
+    std::vector<std::string> exclusiveGroupIds;
+    double chokeReleaseSeconds = 0.0;
     std::string articulationId;
     std::vector<std::string> articulationIds;
     bool hasMultipleZoneSelection = false;
@@ -125,6 +132,7 @@ struct ZoneFieldCallbacks
 {
     std::function<void(const ZoneFieldValuesViewModel&, const std::string&)> onCommitRequested;
     std::function<void(const std::string&)> onArticulationCommitRequested;
+    std::function<void()> onCreateChokeGroupRequested;
     std::function<void()> onRestoreRootKeyRequested;
     std::function<void()> onPreviewRequested;
     std::function<void()> onCreateRoundRobinPoolRequested;

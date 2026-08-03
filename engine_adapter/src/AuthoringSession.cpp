@@ -1487,6 +1487,18 @@ RuntimeProjectDocumentActionResult AuthoringSession::reassignZonesToArticulation
     return documentController.commitSnapshot(project, label, { "authoring.zones" });
 }
 
+RuntimeProjectDocumentActionResult AuthoringSession::updateRoundRobinResetRules(
+    std::vector<RuntimeProjectRoundRobinResetRuleDefinition> rules,
+    const std::string& label)
+{
+    auto project = getProject();
+    project.authoring.roundRobinResetRules = std::move(rules);
+    const auto validation = validateRuntimeProjectModel(project);
+    if (!validation.valid)
+        return makeRejectedResult(getDocumentState(), "Round Robin reset edit rejected", validation.issues.front());
+    return documentController.commitSnapshot(project, label, { "authoring.roundRobinResetRules" });
+}
+
 RuntimeProjectDocumentActionResult AuthoringSession::selectGroup(const std::string& groupId)
 {
     auto project = getProject();

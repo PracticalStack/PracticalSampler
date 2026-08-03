@@ -146,6 +146,9 @@ private:
     std::string ensureSelectedDspScopeRoutingBus();
     void applySelectedRoutingBusEdit(const juce::String& label);
     void applySelectedTriggerSlotEdit(const juce::String& label);
+    void addRoundRobinResetRule();
+    void deleteRoundRobinResetRule();
+    void updateSelectedRoundRobinResetRule();
     void createArticulation();
     void duplicateSelectedArticulation();
     void applySelectedArticulationEdit(const juce::String& label);
@@ -215,6 +218,7 @@ private:
     int selectedPerformanceBankIndex = 0;
     int selectedTriggerSlotIndex = 0;
     int selectedArticulationIndex = 0;
+    int selectedRoundRobinResetIndex = 0;
     bool keySwitchMidiLearnActive = false;
     double keySwitchMidiLearnDeadlineMillis = 0.0;
     authoring::DrawerState drawerState;
@@ -357,6 +361,13 @@ private:
     juce::TextButton phraseImportButton;
     juce::Label performanceSummaryLabel;
     juce::Label phraseSummaryLabel;
+    juce::Label roundRobinResetLabel;
+    juce::ComboBox roundRobinResetSelector;
+    juce::ComboBox roundRobinResetEventSelector;
+    juce::ComboBox roundRobinResetTargetSelector;
+    juce::TextButton roundRobinResetAddButton;
+    juce::TextButton roundRobinResetDeleteButton;
+    juce::Label roundRobinResetSummaryLabel;
 
     juce::Component articulationDrawerContent;
     juce::Viewport articulationDrawerViewport;

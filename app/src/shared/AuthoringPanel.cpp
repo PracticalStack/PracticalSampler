@@ -1267,6 +1267,13 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     chordModeSelector.setComponentID("authoringChordModeSelector");
     performanceSummaryLabel.setComponentID("authoringPerformanceSummaryLabel");
     phraseSummaryLabel.setComponentID("authoringPhraseSummaryLabel");
+    roundRobinResetLabel.setComponentID("authoringRoundRobinResetLabel");
+    roundRobinResetSelector.setComponentID("authoringRoundRobinResetSelector");
+    roundRobinResetEventSelector.setComponentID("authoringRoundRobinResetEventSelector");
+    roundRobinResetTargetSelector.setComponentID("authoringRoundRobinResetTargetSelector");
+    roundRobinResetAddButton.setComponentID("authoringRoundRobinResetAddButton");
+    roundRobinResetDeleteButton.setComponentID("authoringRoundRobinResetDeleteButton");
+    roundRobinResetSummaryLabel.setComponentID("authoringRoundRobinResetSummaryLabel");
     phraseImportPathEditor.setComponentID("authoringPhraseImportPath");
     drawerArticulationsTabButton.setComponentID("authoringDrawerArticulationsTab");
     articulationList.setComponentID("authoringArticulationList");
@@ -1338,6 +1345,29 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
             zoneIds, articulationId, "Assign selected zones to articulation");
         if (result.applied)
             refreshFromSession();
+    };
+    zoneCallbacks.onCreateChokeGroupRequested = [this]
+    {
+        const auto selectedZone = authoringSession.getSelectedZone();
+        if (!selectedZone.has_value())
+            return;
+        auto zone = *selectedZone;
+        const auto& zones = authoringSession.getProject().authoring.zones;
+        int suffix = 1;
+        auto groupId = std::string("choke-group-") + std::to_string(suffix);
+        const auto groupExists = [&](const std::string& candidate)
+        {
+            return std::any_of(zones.begin(), zones.end(), [&](const auto& existing)
+            {
+                return existing.exclusiveGroupId == candidate;
+            });
+        };
+        while (groupExists(groupId))
+            groupId = std::string("choke-group-") + std::to_string(++suffix);
+        zone.exclusiveGroupId = groupId;
+        zone.exclusiveTargetGroupIds.clear();
+        authoringSession.updateSelectedZone(zone, "Create choke group");
+        refreshFromSession();
     };
     zoneCallbacks.onRestoreRootKeyRequested = [this]
     {
@@ -1825,6 +1855,31 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     {
         importPhraseForSelectedBank();
     };
+    roundRobinResetEventSelector.addItem("Program activation", 1);
+    roundRobinResetEventSelector.addItem("Articulation change", 2);
+    roundRobinResetEventSelector.addItem("All notes off", 3);
+    roundRobinResetEventSelector.addItem("Pedal down", 4);
+    roundRobinResetEventSelector.addItem("Pedal up", 5);
+    roundRobinResetAddButton.setButtonText("Add Reset");
+    roundRobinResetAddButton.onClick = [this] { addRoundRobinResetRule(); };
+    roundRobinResetDeleteButton.setButtonText("Remove Reset");
+    roundRobinResetDeleteButton.onClick = [this] { deleteRoundRobinResetRule(); };
+    roundRobinResetSelector.onChange = [this]
+    {
+        if (!isRefreshing)
+        {
+            selectedRoundRobinResetIndex = roundRobinResetSelector.getSelectedId() - 1;
+            refreshFromSession();
+        }
+    };
+    roundRobinResetEventSelector.onChange = [this]
+    {
+        if (!isRefreshing) updateSelectedRoundRobinResetRule();
+    };
+    roundRobinResetTargetSelector.onChange = [this]
+    {
+        if (!isRefreshing) updateSelectedRoundRobinResetRule();
+    };
 
     for (auto* component : {
              static_cast<juce::Component*>(&summaryStrip),
@@ -1955,6 +2010,13 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&phraseImportButton),
              static_cast<juce::Component*>(&performanceSummaryLabel),
              static_cast<juce::Component*>(&phraseSummaryLabel),
+             static_cast<juce::Component*>(&roundRobinResetLabel),
+             static_cast<juce::Component*>(&roundRobinResetSelector),
+             static_cast<juce::Component*>(&roundRobinResetEventSelector),
+             static_cast<juce::Component*>(&roundRobinResetTargetSelector),
+             static_cast<juce::Component*>(&roundRobinResetAddButton),
+             static_cast<juce::Component*>(&roundRobinResetDeleteButton),
+             static_cast<juce::Component*>(&roundRobinResetSummaryLabel),
              static_cast<juce::Component*>(&articulationDrawerViewport)
          })
     {
@@ -3001,12 +3063,26 @@ void AuthoringPanel::resized()
         row.removeFromRight(10);
         layoutLabelAndField(row, phraseImportPathLabel, phraseImportPathEditor, 56);
         phraseImportButton.setBounds(buttonArea);
+        drawerEditorArea.removeFromTop(4);
+        row = drawerEditorArea.removeFromTop(26);
+        roundRobinResetLabel.setBounds(row.removeFromLeft(58));
+        roundRobinResetSelector.setBounds(row.removeFromLeft(std::max(96, row.getWidth() / 4)));
+        row.removeFromLeft(6);
+        roundRobinResetEventSelector.setBounds(row.removeFromLeft(std::max(110, row.getWidth() / 3)));
+        row.removeFromLeft(6);
+        roundRobinResetTargetSelector.setBounds(row.removeFromLeft(std::max(90, row.getWidth() / 3)));
+        row.removeFromLeft(6);
+        roundRobinResetAddButton.setBounds(row.removeFromLeft(std::min(88, row.getWidth())));
+        row.removeFromLeft(4);
+        roundRobinResetDeleteButton.setBounds(row);
         if (expanded)
         {
             drawerEditorArea.removeFromTop(6);
             performanceSummaryLabel.setBounds(drawerEditorArea.removeFromTop(20));
             drawerEditorArea.removeFromTop(4);
             phraseSummaryLabel.setBounds(drawerEditorArea.removeFromTop(24));
+            drawerEditorArea.removeFromTop(2);
+            roundRobinResetSummaryLabel.setBounds(drawerEditorArea.removeFromTop(18));
         }
     }
     else if (drawerState.activeTab == authoring::DrawerTab::articulations)
@@ -3330,6 +3406,21 @@ authoring::ZoneFieldValuesViewModel AuthoringPanel::buildZoneFieldValuesViewMode
         viewModel.pan = zone->pan;
         viewModel.loopEnabled = zone->loopEnabled;
         viewModel.triggerMode = zone->triggerMode;
+        viewModel.performanceEvent = zone->performance.event;
+        viewModel.performanceSustain = zone->performance.sustain;
+        viewModel.performancePitchSource = zone->performance.pitchSource;
+        viewModel.exclusiveGroupId = zone->exclusiveGroupId;
+        viewModel.exclusiveTargetGroupId = zone->exclusiveTargetGroupIds.empty()
+            ? std::string {} : zone->exclusiveTargetGroupIds.front();
+        viewModel.chokeReleaseSeconds = zone->chokeReleaseSeconds.value_or(0.0);
+        for (const auto& candidate : project.authoring.zones)
+        {
+            if (candidate.exclusiveGroupId.empty()
+                || std::find(viewModel.exclusiveGroupIds.begin(), viewModel.exclusiveGroupIds.end(),
+                             candidate.exclusiveGroupId) != viewModel.exclusiveGroupIds.end())
+                continue;
+            viewModel.exclusiveGroupIds.push_back(candidate.exclusiveGroupId);
+        }
         viewModel.articulationId = zone->articulationId;
         viewModel.hasMultipleZoneSelection = zoneMapSelectedZoneIds.size() > 1;
         viewModel.articulationIds.reserve(project.authoring.articulations.size());
@@ -3624,6 +3715,7 @@ void AuthoringPanel::rebuildRoutingBusSelector()
 
 void AuthoringPanel::rebuildPerformanceBankSelector()
 {
+    const auto& project = authoringSession.getProject();
     const auto& performanceBanks = authoringSession.getProject().authoring.performanceBanks;
     performanceBankSelector.clear(juce::dontSendNotification);
 
@@ -3641,6 +3733,45 @@ void AuthoringPanel::rebuildPerformanceBankSelector()
         performanceBankSelector.addItem(juce::String::fromUTF8(performanceBanks[index].displayName.c_str()),
                                         static_cast<int>(index) + 1);
     }
+
+    const auto& resetRules = project.authoring.roundRobinResetRules;
+    selectedRoundRobinResetIndex = resetRules.empty() ? -1
+        : std::clamp(selectedRoundRobinResetIndex, 0, static_cast<int>(resetRules.size()) - 1);
+    roundRobinResetSelector.clear(juce::dontSendNotification);
+    for (std::size_t index = 0; index < resetRules.size(); ++index)
+        roundRobinResetSelector.addItem("Reset " + juce::String(static_cast<int>(index) + 1), static_cast<int>(index) + 1);
+    roundRobinResetSelector.setSelectedId(selectedRoundRobinResetIndex + 1, juce::dontSendNotification);
+    roundRobinResetTargetSelector.clear(juce::dontSendNotification);
+    roundRobinResetTargetSelector.addItem("All pools", 1);
+    std::vector<std::string> rrPoolIds;
+    for (const auto& zone : project.authoring.zones)
+        if (zone.roundRobin.has_value()
+            && std::find(rrPoolIds.begin(), rrPoolIds.end(), zone.roundRobin->poolId) == rrPoolIds.end())
+            rrPoolIds.push_back(zone.roundRobin->poolId);
+    for (std::size_t index = 0; index < rrPoolIds.size(); ++index)
+        roundRobinResetTargetSelector.addItem(juce::String::fromUTF8(rrPoolIds[index].c_str()), static_cast<int>(index) + 2);
+    int resetEventId = 2;
+    int resetTargetId = 1;
+    if (selectedRoundRobinResetIndex >= 0)
+    {
+        const auto& rule = resetRules[static_cast<std::size_t>(selectedRoundRobinResetIndex)];
+        resetEventId = rule.event == drs::engine::RoundRobinResetEvent::programActivation ? 1
+            : rule.event == drs::engine::RoundRobinResetEvent::allNotesOff ? 3
+            : rule.event == drs::engine::RoundRobinResetEvent::pedalDown ? 4
+            : rule.event == drs::engine::RoundRobinResetEvent::pedalUp ? 5 : 2;
+        if (!rule.targetAll)
+            for (std::size_t index = 0; index < rrPoolIds.size(); ++index)
+                if (rrPoolIds[index] == rule.targetPoolId) resetTargetId = static_cast<int>(index) + 2;
+    }
+    roundRobinResetEventSelector.setSelectedId(resetEventId, juce::dontSendNotification);
+    roundRobinResetTargetSelector.setSelectedId(resetTargetId, juce::dontSendNotification);
+    roundRobinResetSelector.setEnabled(!resetRules.empty());
+    roundRobinResetDeleteButton.setEnabled(!resetRules.empty());
+    roundRobinResetTargetSelector.setEnabled(!rrPoolIds.empty() || !resetRules.empty());
+    roundRobinResetSummaryLabel.setText(resetRules.empty()
+        ? "No RR reset rules. Add one for a predictable phrase boundary."
+        : juce::String(static_cast<int>(resetRules.size())) + " RR reset rule(s); all-pools and named-pool targets validate before Publish.",
+        juce::dontSendNotification);
 
     if (const auto selectedPerformanceBank = authoringSession.getSelectedPerformanceBank(); selectedPerformanceBank.has_value())
     {
@@ -3905,6 +4036,13 @@ void AuthoringPanel::refreshDrawerVisibility()
     setVisibleAndAccessible(phraseImportButton, drawerContentVisible && performanceTab);
     setVisibleAndAccessible(performanceSummaryLabel, drawerContentVisible && performanceTab && expanded);
     setVisibleAndAccessible(phraseSummaryLabel, drawerContentVisible && performanceTab && expanded);
+    setVisibleAndAccessible(roundRobinResetLabel, drawerContentVisible && performanceTab);
+    setVisibleAndAccessible(roundRobinResetSelector, drawerContentVisible && performanceTab);
+    setVisibleAndAccessible(roundRobinResetEventSelector, drawerContentVisible && performanceTab);
+    setVisibleAndAccessible(roundRobinResetTargetSelector, drawerContentVisible && performanceTab);
+    setVisibleAndAccessible(roundRobinResetAddButton, drawerContentVisible && performanceTab);
+    setVisibleAndAccessible(roundRobinResetDeleteButton, drawerContentVisible && performanceTab);
+    setVisibleAndAccessible(roundRobinResetSummaryLabel, drawerContentVisible && performanceTab && expanded);
 
     setVisibleAndAccessible(articulationDrawerViewport, drawerContentVisible && articulationsTab);
     setVisibleAndAccessible(articulationList, drawerContentVisible && articulationsTab);
@@ -5428,6 +5566,14 @@ void AuthoringPanel::applySelectedZoneEdit(const authoring::ZoneFieldValuesViewM
     editedZone.pan = values.pan;
     editedZone.loopEnabled = values.loopEnabled;
     editedZone.triggerMode = values.triggerMode;
+    editedZone.performance.event = values.performanceEvent;
+    editedZone.performance.sustain = values.performanceSustain;
+    editedZone.performance.pitchSource = values.performancePitchSource;
+    editedZone.exclusiveGroupId = values.exclusiveGroupId;
+    editedZone.exclusiveTargetGroupIds = values.exclusiveTargetGroupId.empty()
+        ? std::vector<std::string> {} : std::vector<std::string> { values.exclusiveTargetGroupId };
+    editedZone.chokeReleaseSeconds = values.chokeReleaseSeconds > 0.0
+        ? std::optional<double> { values.chokeReleaseSeconds } : std::nullopt;
 
     authoringSession.updateSelectedZone(editedZone, label.toStdString());
     refreshFromSession();
@@ -6371,6 +6517,62 @@ void AuthoringPanel::applySelectedTriggerSlotEdit(const juce::String& label)
     authoringSession.updatePerformanceBank(static_cast<std::size_t>(selectedPerformanceBankIndex),
                                            editedPerformanceBank,
                                            label.toStdString());
+    refreshFromSession();
+}
+
+void AuthoringPanel::addRoundRobinResetRule()
+{
+    auto rules = authoringSession.getProject().authoring.roundRobinResetRules;
+    if (rules.size() >= 128)
+        return;
+    drs::engine::RuntimeProjectRoundRobinResetRuleDefinition rule;
+    const auto eventId = roundRobinResetEventSelector.getSelectedId();
+    rule.event = eventId == 1 ? drs::engine::RoundRobinResetEvent::programActivation
+        : eventId == 3 ? drs::engine::RoundRobinResetEvent::allNotesOff
+        : eventId == 4 ? drs::engine::RoundRobinResetEvent::pedalDown
+        : eventId == 5 ? drs::engine::RoundRobinResetEvent::pedalUp
+                       : drs::engine::RoundRobinResetEvent::articulationChange;
+    const auto targetId = roundRobinResetTargetSelector.getSelectedId();
+    rule.targetAll = targetId <= 1;
+    if (!rule.targetAll)
+        rule.targetPoolId = roundRobinResetTargetSelector.getText().toStdString();
+    rules.push_back(std::move(rule));
+    const auto result = authoringSession.updateRoundRobinResetRules(std::move(rules), "Add Round Robin reset rule");
+    if (result.applied)
+        selectedRoundRobinResetIndex = static_cast<int>(authoringSession.getProject().authoring.roundRobinResetRules.size());
+    refreshFromSession();
+}
+
+void AuthoringPanel::deleteRoundRobinResetRule()
+{
+    auto rules = authoringSession.getProject().authoring.roundRobinResetRules;
+    if (selectedRoundRobinResetIndex < 0
+        || static_cast<std::size_t>(selectedRoundRobinResetIndex) >= rules.size())
+        return;
+    rules.erase(rules.begin() + selectedRoundRobinResetIndex);
+    const auto result = authoringSession.updateRoundRobinResetRules(std::move(rules), "Remove Round Robin reset rule");
+    if (result.applied)
+        selectedRoundRobinResetIndex = std::max(0, selectedRoundRobinResetIndex - 1);
+    refreshFromSession();
+}
+
+void AuthoringPanel::updateSelectedRoundRobinResetRule()
+{
+    auto rules = authoringSession.getProject().authoring.roundRobinResetRules;
+    if (selectedRoundRobinResetIndex < 0
+        || static_cast<std::size_t>(selectedRoundRobinResetIndex) >= rules.size())
+        return;
+    auto& rule = rules[static_cast<std::size_t>(selectedRoundRobinResetIndex)];
+    const auto eventId = roundRobinResetEventSelector.getSelectedId();
+    rule.event = eventId == 1 ? drs::engine::RoundRobinResetEvent::programActivation
+        : eventId == 3 ? drs::engine::RoundRobinResetEvent::allNotesOff
+        : eventId == 4 ? drs::engine::RoundRobinResetEvent::pedalDown
+        : eventId == 5 ? drs::engine::RoundRobinResetEvent::pedalUp
+                       : drs::engine::RoundRobinResetEvent::articulationChange;
+    const auto targetId = roundRobinResetTargetSelector.getSelectedId();
+    rule.targetAll = targetId <= 1;
+    rule.targetPoolId = rule.targetAll ? std::string {} : roundRobinResetTargetSelector.getText().toStdString();
+    authoringSession.updateRoundRobinResetRules(std::move(rules), "Update Round Robin reset rule");
     refreshFromSession();
 }
 

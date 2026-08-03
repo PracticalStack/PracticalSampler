@@ -37,12 +37,14 @@ private:
     CompactInspectorSection roundRobinSection;
     CompactInspectorSection mixSection;
     CompactInspectorSection advancedSection;
+    CompactInspectorSection performanceSection;
 
     juce::Component mapSectionContent;
     juce::Component sampleSectionContent;
     juce::Component roundRobinSectionContent;
     juce::Component mixSectionContent;
     juce::Component advancedSectionContent;
+    juce::Component performanceSectionContent;
 
     CompactInspectorSliderRow rootKeyRow;
     CompactInspectorRangeRow keyRangeRow;
@@ -59,6 +61,14 @@ private:
     CompactInspectorSliderRow panRow;
     CompactInspectorToggleRow loopToggleRow;
     CompactInspectorComboRow triggerModeRow;
+    CompactInspectorComboRow performanceEventRow;
+    CompactInspectorComboRow sustainConditionRow;
+    CompactInspectorComboRow pitchSourceRow;
+    CompactInspectorComboRow chokeGroupRow;
+    CompactInspectorComboRow chokeTargetRow;
+    CompactInspectorSliderRow chokeFadeRow;
+    CompactInspectorActionRow createChokeGroupRow;
+    CompactInspectorMessage performanceHintMessage;
     CompactInspectorActionRow previewZoneRow;
     CompactInspectorActionRow restoreRootKeyRow;
     CompactInspectorMessage validationMessage;

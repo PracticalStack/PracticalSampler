@@ -125,6 +125,9 @@ public:
         const std::vector<std::string>& zoneIds,
         const std::string& articulationId,
         const std::string& label);
+    RuntimeProjectDocumentActionResult updateRoundRobinResetRules(
+        std::vector<RuntimeProjectRoundRobinResetRuleDefinition> rules,
+        const std::string& label);
     RuntimeProjectDocumentActionResult createGroup(const RuntimeProjectGroupDefinition& group,
                                                    const std::string& label);
     RuntimeProjectDocumentActionResult updateGroup(std::size_t groupIndex,
