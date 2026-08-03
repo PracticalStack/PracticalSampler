@@ -50,14 +50,16 @@ int main()
         || !processor.serviceMessageThreadWork()
         || !processor.getEngineFacade().refreshPreviewToCurrentDraft()
         || !processor.getEngineFacade().waitForPreparedPlaybackIdle()
-        || !processor.serviceMessageThreadWork()
         || !processor.getEngineFacade().publishCurrentDraft()
-        || !processor.getEngineFacade().waitForPreparedPlaybackIdle()
-        || !processor.serviceMessageThreadWork())
+        || !processor.getEngineFacade().waitForPreparedPlaybackIdle())
     {
         std::cerr << "Sprint 4 concurrency soak could not prime both playback contexts." << std::endl;
         return 1;
     }
+    // Waiting may have already drained each publication completion. Poll to
+    // install any completion that remains, but do not mistake a no-op poll for
+    // a failed activation; the post-soak snapshot asserts both contexts live.
+    processor.serviceMessageThreadWork();
 
     constexpr int audioBlockCount = 5000;
     constexpr int messageIterationCount = 480;
