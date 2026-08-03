@@ -17,6 +17,7 @@ namespace
 {
 constexpr int statusTimerId = 1;
 constexpr int previewReleaseTimerId = 2;
+constexpr int keySwitchMidiLearnTimerId = 3;
 const auto authoringPanelBackground = juce::Colour::fromRGB(18, 24, 29);
 const auto authoringPanelCard = juce::Colour::fromRGB(250, 247, 240);
 const auto authoringPanelAccent = juce::Colour::fromRGB(181, 96, 21);
@@ -30,6 +31,16 @@ const auto authoringButtonFill = juce::Colour::fromRGB(122, 64, 18);
 const auto authoringButtonFillPressed = juce::Colour::fromRGB(102, 52, 14);
 const auto authoringButtonText = juce::Colours::white;
 const auto authoringToggleTick = juce::Colour::fromRGB(28, 108, 88);
+
+juce::String formatMidiNoteName(const int midiNote)
+{
+    static constexpr std::array<const char*, 12> noteNames {
+        "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
+    };
+    const auto clamped = std::clamp(midiNote, 0, 127);
+    return juce::String(noteNames[static_cast<std::size_t>(clamped % 12)])
+        + juce::String((clamped / 12) - 1) + " · MIDI " + juce::String(clamped);
+}
 
 struct CuratedMacroAssignment
 {
@@ -1068,7 +1079,10 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
                 "authoringGroupListEmptyState"),
       macroList("authoringMacroList",
                 "authoringMacroListBox",
-                "authoringMacroListEmptyState")
+                "authoringMacroListEmptyState"),
+      articulationList("authoringArticulationList",
+                       "authoringArticulationListBox",
+                       "authoringArticulationListEmptyState")
 {
     setLookAndFeel(&authoringLookAndFeel);
     setComponentID("authoringWorkspace");
@@ -1100,6 +1114,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     groupRoundRobinHintLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
     performanceSummaryLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
     phraseSummaryLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
+    articulationSwitchNoteValueLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
+    articulationStatusLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
 
     configureSectionLabel(waveformLabel, "Waveform Detail");
     configureSectionLabel(zoneLabel, "Selected Zone");
@@ -1130,6 +1146,9 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     configureFieldLabel(phraseAssetLabel, "Phrase");
     configureFieldLabel(chordModeLabel, "Chord Rule");
     configureFieldLabel(phraseImportPathLabel, "MIDI Path");
+    configureFieldLabel(articulationNameLabel, "Name");
+    configureFieldLabel(articulationSwitchNoteLabel, "Key Switch");
+    configureFieldLabel(articulationDeleteReassignLabel, "Reassign zones to");
 
     configureEditorSlider(macroDefaultSlider, 0.0, 1.0, 0.01);
     configureEditorSlider(macroMinSlider, 0.0, 1.0, 0.01);
@@ -1249,6 +1268,22 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     performanceSummaryLabel.setComponentID("authoringPerformanceSummaryLabel");
     phraseSummaryLabel.setComponentID("authoringPhraseSummaryLabel");
     phraseImportPathEditor.setComponentID("authoringPhraseImportPath");
+    drawerArticulationsTabButton.setComponentID("authoringDrawerArticulationsTab");
+    articulationList.setComponentID("authoringArticulationList");
+    articulationDrawerViewport.setComponentID("authoringArticulationDrawerViewport");
+    articulationCreateButton.setComponentID("authoringArticulationCreateButton");
+    articulationDuplicateButton.setComponentID("authoringArticulationDuplicateButton");
+    articulationDefaultButton.setComponentID("authoringArticulationDefaultButton");
+    articulationMoveUpButton.setComponentID("authoringArticulationMoveUpButton");
+    articulationMoveDownButton.setComponentID("authoringArticulationMoveDownButton");
+    articulationDeleteButton.setComponentID("authoringArticulationDeleteButton");
+    articulationNameEditor.setComponentID("authoringArticulationNameEditor");
+    articulationSwitchNoteSlider.setComponentID("authoringArticulationKeySwitchPicker");
+    articulationSwitchNoteValueLabel.setComponentID("authoringArticulationKeySwitchValue");
+    articulationClearSwitchButton.setComponentID("authoringArticulationKeySwitchClearButton");
+    articulationMidiLearnButton.setComponentID("authoringArticulationMidiLearnButton");
+    articulationDeleteReassignSelector.setComponentID("authoringArticulationDeleteReassignSelector");
+    articulationStatusLabel.setComponentID("authoringArticulationStatusLabel");
 
     drawerToggleButton.onClick = [this]
     {
@@ -1259,11 +1294,13 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     drawerMacrosTabButton.setButtonText("Macros");
     drawerRoutingTabButton.setButtonText("Routing");
     drawerPerformanceTabButton.setButtonText("Performance");
+    drawerArticulationsTabButton.setButtonText("Articulations");
     drawerWaveformTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::waveform); };
     drawerGroupsTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::groups); };
     drawerMacrosTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::macros); };
     drawerRoutingTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::routing); };
     drawerPerformanceTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::performance); };
+    drawerArticulationsTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::articulations); };
     playbackBannerPrepareButton.setButtonText("Prepare Draft");
     playbackBannerPrepareButton.onClick = [this] { prepareDraftPlaybackPreview(); };
     playbackBannerPublishButton.setButtonText("Publish Draft");
@@ -1288,6 +1325,19 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
                                              const std::string& label)
     {
         applySelectedZoneEdit(values, juce::String::fromUTF8(label.c_str()));
+    };
+    zoneCallbacks.onArticulationCommitRequested = [this](const std::string& articulationId)
+    {
+        auto zoneIds = zoneMapSelectedZoneIds;
+        if (zoneIds.empty())
+        {
+            if (const auto selectedZone = authoringSession.getSelectedZone(); selectedZone.has_value())
+                zoneIds.push_back(selectedZone->id);
+        }
+        const auto result = authoringSession.reassignZonesToArticulation(
+            zoneIds, articulationId, "Assign selected zones to articulation");
+        if (result.applied)
+            refreshFromSession();
     };
     zoneCallbacks.onRestoreRootKeyRequested = [this]
     {
@@ -1721,6 +1771,38 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         applySelectedTriggerSlotEdit("Update trigger articulation");
     };
 
+    articulationList.setOnSelectionChanged([this](int nextIndex)
+    {
+        if (isRefreshing)
+            return;
+        const auto articulations = authoringSession.getArticulations();
+        if (nextIndex < 0 || static_cast<std::size_t>(nextIndex) >= articulations.size())
+            return;
+        selectedArticulationIndex = nextIndex;
+        refreshFromSession();
+    });
+    articulationCreateButton.setButtonText("Create");
+    articulationCreateButton.onClick = [this] { createArticulation(); };
+    articulationDuplicateButton.setButtonText("Duplicate");
+    articulationDuplicateButton.onClick = [this] { duplicateSelectedArticulation(); };
+    articulationDefaultButton.setButtonText("Make Default");
+    articulationDefaultButton.onClick = [this] { setSelectedArticulationDefault(); };
+    articulationMoveUpButton.setButtonText("Move Up");
+    articulationMoveUpButton.onClick = [this] { moveSelectedArticulation(-1); };
+    articulationMoveDownButton.setButtonText("Move Down");
+    articulationMoveDownButton.onClick = [this] { moveSelectedArticulation(1); };
+    articulationDeleteButton.setButtonText("Delete / Reassign");
+    articulationDeleteButton.onClick = [this] { deleteSelectedArticulation(); };
+    articulationNameEditor.setMultiLine(false);
+    articulationNameEditor.setReturnKeyStartsNewLine(false);
+    articulationNameEditor.onReturnKey = [this] { applySelectedArticulationEdit("Rename articulation"); };
+    articulationNameEditor.onFocusLost = [this] { applySelectedArticulationEdit("Rename articulation"); };
+    configureEditorSlider(articulationSwitchNoteSlider, 0.0, 127.0, 1.0);
+    articulationSwitchNoteSlider.onDragEnd = [this] { applySelectedArticulationEdit("Set key switch"); };
+    articulationClearSwitchButton.setButtonText("Clear Switch");
+    articulationClearSwitchButton.onClick = [this] { clearSelectedArticulationKeySwitch(); };
+    articulationMidiLearnButton.onClick = [this] { toggleKeySwitchMidiLearn(); };
+
     phraseAssetSelector.onChange = [this]
     {
         if (isRefreshing)
@@ -1767,6 +1849,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&drawerMacrosTabButton),
              static_cast<juce::Component*>(&drawerRoutingTabButton),
              static_cast<juce::Component*>(&drawerPerformanceTabButton),
+             static_cast<juce::Component*>(&drawerArticulationsTabButton),
              static_cast<juce::Component*>(&zoneLabel),
              static_cast<juce::Component*>(&zoneSelector),
              static_cast<juce::Component*>(&previewEnabledToggle),
@@ -1871,7 +1954,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&phraseImportPathEditor),
              static_cast<juce::Component*>(&phraseImportButton),
              static_cast<juce::Component*>(&performanceSummaryLabel),
-             static_cast<juce::Component*>(&phraseSummaryLabel)
+             static_cast<juce::Component*>(&phraseSummaryLabel),
+             static_cast<juce::Component*>(&articulationDrawerViewport)
          })
     {
         addAndMakeVisible(component);
@@ -1952,6 +2036,49 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         routingDrawerContent.addAndMakeVisible(component);
     }
 
+    articulationDrawerViewport.setViewedComponent(&articulationDrawerContent, false);
+    articulationDrawerViewport.setScrollBarsShown(true, false);
+    articulationDrawerViewport.setScrollBarThickness(12);
+    articulationDrawerViewport.setWantsKeyboardFocus(false);
+    articulationDrawerContent.setSize(1, 1);
+    articulationDrawerContent.setVisible(true);
+    for (auto* component : {
+             static_cast<juce::Component*>(&articulationList),
+             static_cast<juce::Component*>(&articulationCreateButton),
+             static_cast<juce::Component*>(&articulationDuplicateButton),
+             static_cast<juce::Component*>(&articulationDefaultButton),
+             static_cast<juce::Component*>(&articulationMoveUpButton),
+             static_cast<juce::Component*>(&articulationMoveDownButton),
+             static_cast<juce::Component*>(&articulationDeleteButton),
+             static_cast<juce::Component*>(&articulationNameLabel),
+             static_cast<juce::Component*>(&articulationNameEditor),
+             static_cast<juce::Component*>(&articulationSwitchNoteLabel),
+             static_cast<juce::Component*>(&articulationSwitchNoteSlider),
+             static_cast<juce::Component*>(&articulationSwitchNoteValueLabel),
+             static_cast<juce::Component*>(&articulationClearSwitchButton),
+             static_cast<juce::Component*>(&articulationMidiLearnButton),
+             static_cast<juce::Component*>(&articulationDeleteReassignLabel),
+             static_cast<juce::Component*>(&articulationDeleteReassignSelector),
+             static_cast<juce::Component*>(&articulationStatusLabel)
+         })
+    {
+        articulationDrawerContent.addAndMakeVisible(component);
+    }
+    for (int midiNote = 0; midiNote < 36; ++midiNote)
+    {
+        auto key = std::make_unique<juce::TextButton>(formatMidiNoteName(midiNote));
+        key->setComponentID("authoringArticulationKeyboardNote" + juce::String(midiNote));
+        key->setHelpText("Assign " + formatMidiNoteName(midiNote)
+                         + " as the selected articulation key switch.");
+        key->onClick = [this, midiNote]
+        {
+            articulationSwitchNoteSlider.setValue(midiNote, juce::dontSendNotification);
+            applySelectedArticulationEdit("Assign key switch from keyboard");
+        };
+        articulationDrawerContent.addAndMakeVisible(*key);
+        articulationKeyButtons.push_back(std::move(key));
+    }
+
     refreshFromSession();
     if (waveformPreviewProvider || authoringPreviewStatusProvider || importResponsivenessProvider
         || sourceValidationStatusProvider || draftPlaybackStatusProvider)
@@ -1966,6 +2093,7 @@ AuthoringPanel::~AuthoringPanel()
         releaseTimedPreview(source);
     stopTimer(statusTimerId);
     stopTimer(previewReleaseTimerId);
+    stopTimer(keySwitchMidiLearnTimerId);
     setLookAndFeel(nullptr);
 }
 
@@ -2096,11 +2224,16 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "Performance drawer tab",
                                 "Shows bank-scoped performance and trigger detail.",
                                 "Press to switch the drawer to performance detail.");
+    configureAccessibleMetadata(drawerArticulationsTabButton,
+                                "Articulations drawer tab",
+                                "Shows project articulations and key-switch assignment.",
+                                "Press to switch the drawer to articulation management.");
     drawerWaveformTabButton.setExplicitFocusOrder(61);
     drawerGroupsTabButton.setExplicitFocusOrder(62);
     drawerMacrosTabButton.setExplicitFocusOrder(63);
     drawerRoutingTabButton.setExplicitFocusOrder(64);
     drawerPerformanceTabButton.setExplicitFocusOrder(65);
+    drawerArticulationsTabButton.setExplicitFocusOrder(66);
 
     configureAccessibleMetadata(waveformLabel,
                                 "Drawer title",
@@ -2387,6 +2520,34 @@ void AuthoringPanel::configureAccessibilityAndFocus()
     chordModeSelector.setExplicitFocusOrder(95);
     phraseImportPathEditor.setExplicitFocusOrder(96);
     phraseImportButton.setExplicitFocusOrder(97);
+
+    configureAccessibleMetadata(articulationDrawerViewport,
+                                "Articulation editor",
+                                "Creates, reorders, and assigns articulations and their key switches.",
+                                "Use the list to choose an articulation, then edit its name or key switch.");
+    configureAccessibleMetadata(articulationList,
+                                "Articulation list",
+                                "Lists project articulations, their default state, and key switches.");
+    configureAccessibleMetadata(articulationNameEditor, "Articulation name",
+                                "Renames the selected articulation.", "Type a name and press Enter.");
+    configureAccessibleMetadata(articulationSwitchNoteSlider, "Key-switch note picker",
+                                "Chooses a MIDI note for the selected articulation key switch.",
+                                "Use arrow keys or drag to choose a note from MIDI 0 through 127.");
+    configureAccessibleMetadata(articulationMidiLearnButton, "Key-switch MIDI Learn",
+                                "Waits for the next MIDI note to assign as the selected key switch.",
+                                "Press again to cancel MIDI Learn.");
+    articulationList.getListBox().setExplicitFocusOrder(100);
+    articulationCreateButton.setExplicitFocusOrder(101);
+    articulationDuplicateButton.setExplicitFocusOrder(102);
+    articulationDefaultButton.setExplicitFocusOrder(103);
+    articulationMoveUpButton.setExplicitFocusOrder(104);
+    articulationMoveDownButton.setExplicitFocusOrder(105);
+    articulationDeleteButton.setExplicitFocusOrder(106);
+    articulationNameEditor.setExplicitFocusOrder(107);
+    articulationSwitchNoteSlider.setExplicitFocusOrder(108);
+    articulationClearSwitchButton.setExplicitFocusOrder(109);
+    articulationMidiLearnButton.setExplicitFocusOrder(110);
+    articulationDeleteReassignSelector.setExplicitFocusOrder(111);
 }
 
 void AuthoringPanel::paint(juce::Graphics& g)
@@ -2514,7 +2675,8 @@ void AuthoringPanel::resized()
     const auto groupDrawerInShortLayout = shortHeightLayout
         && drawerState.activeTab == authoring::DrawerTab::groups;
     const auto macroDrawerInShortLayout = shortHeightLayout
-        && drawerState.activeTab == authoring::DrawerTab::macros;
+        && (drawerState.activeTab == authoring::DrawerTab::macros
+            || drawerState.activeTab == authoring::DrawerTab::articulations);
     const auto routingDrawerInShortLayout = shortHeightLayout
         && drawerState.activeTab == authoring::DrawerTab::routing;
     const auto inspectorDrawerInShortLayout = groupDrawerInShortLayout || routingDrawerInShortLayout;
@@ -2522,7 +2684,8 @@ void AuthoringPanel::resized()
         ? authoring::shortInspectorDrawerOpenHeight
         : (macroDrawerInShortLayout
                ? std::max(authoring::compactDrawerOpenHeight, 252)
-               : (drawerState.activeTab == authoring::DrawerTab::macros
+               : ((drawerState.activeTab == authoring::DrawerTab::macros
+                    || drawerState.activeTab == authoring::DrawerTab::articulations)
                       ? authoring::macroDrawerOpenHeight
                       : (expanded ? authoring::expandedDrawerOpenHeight
                                   : authoring::compactDrawerOpenHeight)));
@@ -2537,9 +2700,9 @@ void AuthoringPanel::resized()
 
     auto tabArea = drawerTabStrip.getBounds().reduced(0, 4);
     constexpr auto tabGap = 8;
-    const auto tabCount = 5;
+    const auto tabCount = 6;
     const auto desiredTabWidth = expanded ? 104 : 96;
-    const auto tabWidth = juce::jlimit(72,
+    const auto tabWidth = juce::jlimit(54,
                                        desiredTabWidth,
                                        (tabArea.getWidth() - (tabGap * (tabCount - 1)) - 114) / tabCount);
     drawerWaveformTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
@@ -2550,7 +2713,9 @@ void AuthoringPanel::resized()
     tabArea.removeFromLeft(tabGap);
     drawerRoutingTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
     tabArea.removeFromLeft(tabGap);
-    drawerPerformanceTabButton.setBounds(tabArea.removeFromLeft(tabWidth + (expanded ? 8 : 2)));
+    drawerPerformanceTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
+    tabArea.removeFromLeft(tabGap);
+    drawerArticulationsTabButton.setBounds(tabArea.removeFromLeft(tabWidth + (expanded ? 8 : 2)));
 
     auto drawerEditorArea = drawerContentHost.getBounds().reduced(12, inspectorDrawerInShortLayout ? 6 : 10);
     if (drawerState.activeTab == authoring::DrawerTab::groups)
@@ -2844,6 +3009,59 @@ void AuthoringPanel::resized()
             phraseSummaryLabel.setBounds(drawerEditorArea.removeFromTop(24));
         }
     }
+    else if (drawerState.activeTab == authoring::DrawerTab::articulations)
+    {
+        articulationDrawerViewport.setBounds(drawerEditorArea);
+        const auto articulationContentWidth = std::max(420,
+            articulationDrawerViewport.getWidth() - articulationDrawerViewport.getScrollBarThickness());
+        articulationDrawerContent.setSize(articulationContentWidth, expanded ? 308 : 286);
+        auto editorArea = articulationDrawerContent.getLocalBounds();
+        auto actionRow = editorArea.removeFromTop(26);
+        constexpr auto actionGap = 5;
+        const auto actionWidth = std::max(48, (actionRow.getWidth() - actionGap * 5) / 6);
+        articulationCreateButton.setBounds(actionRow.removeFromLeft(actionWidth)); actionRow.removeFromLeft(actionGap);
+        articulationDuplicateButton.setBounds(actionRow.removeFromLeft(actionWidth)); actionRow.removeFromLeft(actionGap);
+        articulationDefaultButton.setBounds(actionRow.removeFromLeft(actionWidth)); actionRow.removeFromLeft(actionGap);
+        articulationMoveUpButton.setBounds(actionRow.removeFromLeft(actionWidth)); actionRow.removeFromLeft(actionGap);
+        articulationMoveDownButton.setBounds(actionRow.removeFromLeft(actionWidth)); actionRow.removeFromLeft(actionGap);
+        articulationDeleteButton.setBounds(actionRow);
+        editorArea.removeFromTop(4);
+        articulationList.setBounds(editorArea.removeFromTop(42));
+        editorArea.removeFromTop(4);
+        auto row = editorArea.removeFromTop(26);
+        layoutLabelAndField(row, articulationNameLabel, articulationNameEditor, 48);
+        editorArea.removeFromTop(4);
+        row = editorArea.removeFromTop(28);
+        auto noteLabelArea = row.removeFromLeft(76);
+        articulationSwitchNoteLabel.setBounds(noteLabelArea.removeFromLeft(70));
+        articulationSwitchNoteSlider.setBounds(row.removeFromLeft(std::max(80, row.getWidth() / 2)));
+        row.removeFromLeft(6);
+        articulationSwitchNoteValueLabel.setBounds(row);
+        editorArea.removeFromTop(4);
+        row = editorArea.removeFromTop(26);
+        articulationClearSwitchButton.setBounds(row.removeFromLeft(std::max(110, row.getWidth() / 3)));
+        row.removeFromLeft(6);
+        articulationMidiLearnButton.setBounds(row.removeFromLeft(std::max(110, row.getWidth() / 3)));
+        row.removeFromLeft(6);
+        articulationStatusLabel.setBounds(row);
+        editorArea.removeFromTop(4);
+        row = editorArea.removeFromTop(26);
+        layoutLabelAndField(row, articulationDeleteReassignLabel, articulationDeleteReassignSelector, 128);
+        editorArea.removeFromTop(4);
+        const auto keyboardColumns = 18;
+        const auto keyGap = 3;
+        const auto keyWidth = std::max(20, (editorArea.getWidth() - (keyboardColumns - 1) * keyGap) / keyboardColumns);
+        for (std::size_t index = 0; index < articulationKeyButtons.size(); ++index)
+        {
+            const auto column = static_cast<int>(index) % keyboardColumns;
+            const auto rowIndex = static_cast<int>(index) / keyboardColumns;
+            auto keyBounds = juce::Rectangle<int>(editorArea.getX() + column * (keyWidth + keyGap),
+                                                  editorArea.getY() + rowIndex * 28,
+                                                  keyWidth,
+                                                  24);
+            articulationKeyButtons[index]->setBounds(keyBounds);
+        }
+    }
 
     area.removeFromTop(inspectorDrawerInShortLayout ? 4 : 8);
     auto shellArea = area;
@@ -3112,6 +3330,11 @@ authoring::ZoneFieldValuesViewModel AuthoringPanel::buildZoneFieldValuesViewMode
         viewModel.pan = zone->pan;
         viewModel.loopEnabled = zone->loopEnabled;
         viewModel.triggerMode = zone->triggerMode;
+        viewModel.articulationId = zone->articulationId;
+        viewModel.hasMultipleZoneSelection = zoneMapSelectedZoneIds.size() > 1;
+        viewModel.articulationIds.reserve(project.authoring.articulations.size());
+        for (const auto& articulation : project.authoring.articulations)
+            viewModel.articulationIds.push_back(articulation.id);
 
         const auto compatibleUnpooledZoneCount = countCompatibleUnpooledRoundRobinZones(project, *zone);
         viewModel.roundRobinEnabled = zone->roundRobin.has_value();
@@ -3242,6 +3465,43 @@ void AuthoringPanel::rebuildMacroList()
     }
 
     macroList.setViewModel(std::move(viewModel));
+}
+
+void AuthoringPanel::rebuildArticulationList()
+{
+    const auto articulations = authoringSession.getArticulations();
+    authoring::RepeatedStructureListViewModel viewModel;
+    viewModel.emptyStateText = "No articulations are available in this project.";
+    if (articulations.empty())
+    {
+        selectedArticulationIndex = -1;
+        articulationList.setViewModel(std::move(viewModel));
+        return;
+    }
+
+    selectedArticulationIndex = std::clamp(selectedArticulationIndex, 0,
+                                            static_cast<int>(articulations.size()) - 1);
+    viewModel.selectedIndex = selectedArticulationIndex;
+    viewModel.rows.reserve(articulations.size());
+    for (const auto& articulation : articulations)
+    {
+        auto row = authoring::RepeatedStructureRowViewModel {};
+        row.key = articulation.id;
+        row.title = articulation.displayName;
+        row.statusText = articulation.isDefault ? "Default" : "";
+        if (articulation.activation.has_value())
+        {
+            if (!row.statusText.empty())
+                row.statusText += " | ";
+            row.statusText += formatMidiNoteName(articulation.activation->midiNote).toStdString();
+        }
+        else if (!row.statusText.empty())
+            row.statusText += " | no switch";
+        else
+            row.statusText = "no switch";
+        viewModel.rows.push_back(std::move(row));
+    }
+    articulationList.setViewModel(std::move(viewModel));
 }
 
 std::string AuthoringPanel::selectedDspScopeInputSource() const
@@ -3448,6 +3708,18 @@ void AuthoringPanel::timerCallback(int timerId)
         refreshNow();
         return;
     }
+    if (timerId == keySwitchMidiLearnTimerId)
+    {
+        if (keySwitchMidiLearnActive
+            && juce::Time::getMillisecondCounterHiRes() >= keySwitchMidiLearnDeadlineMillis)
+        {
+            keySwitchMidiLearnActive = false;
+            keySwitchMidiLearnDeadlineMillis = 0.0;
+            stopTimer(keySwitchMidiLearnTimerId);
+            refreshFromSession();
+        }
+        return;
+    }
     if (timerId != previewReleaseTimerId)
         return;
 
@@ -3471,6 +3743,7 @@ void AuthoringPanel::refreshDrawerVisibility()
     const auto macrosTab = drawerState.activeTab == authoring::DrawerTab::macros;
     const auto routingTab = drawerState.activeTab == authoring::DrawerTab::routing;
     const auto performanceTab = drawerState.activeTab == authoring::DrawerTab::performance;
+    const auto articulationsTab = drawerState.activeTab == authoring::DrawerTab::articulations;
     const auto drawerContentVisible = drawerState.open;
     const auto expanded = isExpandedLayout(layoutMode);
     const auto* focusedComponent = juce::Component::getCurrentlyFocusedComponent();
@@ -3518,6 +3791,11 @@ void AuthoringPanel::refreshDrawerVisibility()
         || isComponentFocusedWithin(focusedComponent, chordModeSelector)
         || isComponentFocusedWithin(focusedComponent, phraseImportPathEditor)
         || isComponentFocusedWithin(focusedComponent, phraseImportButton);
+    const auto focusWithinArticulations = isComponentFocusedWithin(focusedComponent, articulationDrawerViewport)
+        || isComponentFocusedWithin(focusedComponent, articulationList)
+        || isComponentFocusedWithin(focusedComponent, articulationNameEditor)
+        || isComponentFocusedWithin(focusedComponent, articulationSwitchNoteSlider)
+        || isComponentFocusedWithin(focusedComponent, articulationMidiLearnButton);
 
     refreshDrawerContextLabels();
 
@@ -3628,19 +3906,40 @@ void AuthoringPanel::refreshDrawerVisibility()
     setVisibleAndAccessible(performanceSummaryLabel, drawerContentVisible && performanceTab && expanded);
     setVisibleAndAccessible(phraseSummaryLabel, drawerContentVisible && performanceTab && expanded);
 
+    setVisibleAndAccessible(articulationDrawerViewport, drawerContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationList, drawerContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationCreateButton, drawerContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationDuplicateButton, drawerContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationDefaultButton, drawerContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationMoveUpButton, drawerContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationMoveDownButton, drawerContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationDeleteButton, drawerContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationNameLabel, drawerContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationNameEditor, drawerContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationSwitchNoteLabel, drawerContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationSwitchNoteSlider, drawerContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationSwitchNoteValueLabel, drawerContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationClearSwitchButton, drawerContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationMidiLearnButton, drawerContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationDeleteReassignLabel, drawerContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationDeleteReassignSelector, drawerContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationStatusLabel, drawerContentVisible && articulationsTab);
+
     drawerWaveformTabButton.setToggleState(waveformTab, juce::dontSendNotification);
     drawerGroupsTabButton.setToggleState(groupsTab, juce::dontSendNotification);
     drawerMacrosTabButton.setToggleState(macrosTab, juce::dontSendNotification);
     drawerRoutingTabButton.setToggleState(routingTab, juce::dontSendNotification);
     drawerPerformanceTabButton.setToggleState(performanceTab, juce::dontSendNotification);
+    drawerArticulationsTabButton.setToggleState(articulationsTab, juce::dontSendNotification);
 
     const auto focusedDrawerContentBecameHidden = !drawerContentVisible
-        ? (focusWithinWaveform || focusWithinGroups || focusWithinMacros || focusWithinRouting || focusWithinPerformance)
-        : (waveformTab ? (focusWithinGroups || focusWithinMacros || focusWithinRouting || focusWithinPerformance)
-                       : groupsTab ? (focusWithinWaveform || focusWithinMacros || focusWithinRouting || focusWithinPerformance)
-                                   : macrosTab ? (focusWithinWaveform || focusWithinGroups || focusWithinRouting || focusWithinPerformance)
-                                               : routingTab ? (focusWithinWaveform || focusWithinGroups || focusWithinMacros || focusWithinPerformance)
-                                                            : (focusWithinWaveform || focusWithinGroups || focusWithinMacros || focusWithinRouting));
+        ? (focusWithinWaveform || focusWithinGroups || focusWithinMacros || focusWithinRouting || focusWithinPerformance || focusWithinArticulations)
+        : (waveformTab ? (focusWithinGroups || focusWithinMacros || focusWithinRouting || focusWithinPerformance || focusWithinArticulations)
+                       : groupsTab ? (focusWithinWaveform || focusWithinMacros || focusWithinRouting || focusWithinPerformance || focusWithinArticulations)
+                                   : macrosTab ? (focusWithinWaveform || focusWithinGroups || focusWithinRouting || focusWithinPerformance || focusWithinArticulations)
+                                               : routingTab ? (focusWithinWaveform || focusWithinGroups || focusWithinMacros || focusWithinPerformance || focusWithinArticulations)
+                                                            : performanceTab ? (focusWithinWaveform || focusWithinGroups || focusWithinMacros || focusWithinRouting || focusWithinArticulations)
+                                                                             : (focusWithinWaveform || focusWithinGroups || focusWithinMacros || focusWithinRouting || focusWithinPerformance));
 
     if (focusedDrawerContentBecameHidden)
     {
@@ -3654,8 +3953,10 @@ void AuthoringPanel::refreshDrawerVisibility()
             drawerMacrosTabButton.grabKeyboardFocus();
         else if (routingTab)
             drawerRoutingTabButton.grabKeyboardFocus();
-        else
+        else if (performanceTab)
             drawerPerformanceTabButton.grabKeyboardFocus();
+        else
+            drawerArticulationsTabButton.grabKeyboardFocus();
     }
 }
 
@@ -4264,6 +4565,20 @@ void AuthoringPanel::refreshDrawerContextLabels()
             }
             break;
         }
+        case authoring::DrawerTab::articulations:
+        {
+            waveformLabel.setText("Articulation Detail", juce::dontSendNotification);
+            waveformScopeLabel.setText("Project-scoped articulation and key-switch detail",
+                                       juce::dontSendNotification);
+            const auto articulations = authoringSession.getArticulations();
+            const auto name = selectedArticulationIndex >= 0
+                    && static_cast<std::size_t>(selectedArticulationIndex) < articulations.size()
+                ? juce::String::fromUTF8(articulations[static_cast<std::size_t>(selectedArticulationIndex)].displayName.c_str())
+                : juce::String("(none)");
+            drawerBreadcrumbLabel.setText("Project > Articulations > " + name,
+                                          juce::dontSendNotification);
+            break;
+        }
         default:
             break;
     }
@@ -4416,6 +4731,7 @@ void AuthoringPanel::refreshFromSession()
     rebuildRoutingBusSelector();
     rebuildPerformanceBankSelector();
     rebuildTriggerSlotSelector();
+    rebuildArticulationList();
     syncZoneMapSelectionState();
     zoneMap.setZoneSummaries(buildVisibleZoneSummaries());
     zoneMap.setSelectionState({ zoneMapSelectedZoneIds,
@@ -4430,6 +4746,91 @@ void AuthoringPanel::refreshFromSession()
     summaryStrip.setViewModel(selectionSummaryViewModel);
     refreshDraftPlaybackBanner();
     zoneMappingEditor.setViewModel(zoneFieldValuesViewModel);
+
+    const auto articulations = authoringSession.getArticulations();
+    if (selectedArticulationIndex >= 0
+        && static_cast<std::size_t>(selectedArticulationIndex) < articulations.size())
+    {
+        const auto& articulation = articulations[static_cast<std::size_t>(selectedArticulationIndex)];
+        articulationNameEditor.setText(juce::String::fromUTF8(articulation.displayName.c_str()),
+                                       juce::dontSendNotification);
+        articulationSwitchNoteSlider.setValue(articulation.activation.has_value()
+                                                  ? articulation.activation->midiNote : 0,
+                                              juce::dontSendNotification);
+        articulationSwitchNoteValueLabel.setText(articulation.activation.has_value()
+            ? formatMidiNoteName(articulation.activation->midiNote)
+            : "No key switch assigned", juce::dontSendNotification);
+        articulationDeleteReassignSelector.clear(juce::dontSendNotification);
+        int firstReplacementId = 0;
+        for (std::size_t index = 0; index < articulations.size(); ++index)
+        {
+            if (static_cast<int>(index) == selectedArticulationIndex)
+                continue;
+            const auto itemId = static_cast<int>(index) + 1;
+            articulationDeleteReassignSelector.addItem(
+                juce::String::fromUTF8(articulations[index].displayName.c_str()), itemId);
+            if (firstReplacementId == 0)
+                firstReplacementId = itemId;
+        }
+        articulationDeleteReassignSelector.setSelectedId(firstReplacementId, juce::dontSendNotification);
+        articulationCreateButton.setEnabled(articulations.size() < 64);
+        articulationDuplicateButton.setEnabled(articulations.size() < 64);
+        articulationDefaultButton.setEnabled(!articulation.isDefault);
+        articulationMoveUpButton.setEnabled(selectedArticulationIndex > 0);
+        articulationMoveDownButton.setEnabled(selectedArticulationIndex + 1 < static_cast<int>(articulations.size()));
+        articulationDeleteButton.setEnabled(articulations.size() > 1);
+        articulationDeleteReassignSelector.setEnabled(articulations.size() > 1);
+        articulationNameEditor.setEnabled(true);
+        articulationSwitchNoteSlider.setEnabled(true);
+        articulationClearSwitchButton.setEnabled(articulation.activation.has_value());
+        articulationMidiLearnButton.setEnabled(true);
+        articulationMidiLearnButton.setButtonText(keySwitchMidiLearnActive ? "Cancel MIDI Learn" : "MIDI Learn");
+        articulationStatusLabel.setText(keySwitchMidiLearnActive
+            ? "MIDI Learn active — play a MIDI key switch now (10 second timeout)."
+            : (articulation.activation.has_value()
+                  ? "Switch keys are consumed and do not trigger playable zones."
+                  : "Choose a note, use the picker, or start MIDI Learn."), juce::dontSendNotification);
+        for (std::size_t index = 0; index < articulationKeyButtons.size(); ++index)
+        {
+            const auto midiNote = static_cast<int>(index);
+            const auto isSwitchKey = std::any_of(articulations.begin(), articulations.end(),
+                                                 [&](const auto& candidate)
+                                                 {
+                                                     return candidate.activation.has_value()
+                                                         && candidate.activation->midiNote == midiNote;
+                                                 });
+            const auto isPlayableKey = std::any_of(project.authoring.zones.begin(), project.authoring.zones.end(),
+                                                    [&](const auto& zone)
+                                                    {
+                                                        return midiNote >= zone.keyLow && midiNote <= zone.keyHigh;
+                                                    });
+            auto& key = *articulationKeyButtons[index];
+            key.setButtonText(formatMidiNoteName(midiNote));
+            key.setColour(juce::TextButton::buttonColourId,
+                          isSwitchKey ? authoringPanelAccent
+                                      : (isPlayableKey ? authoringToggleTick : authoringControlSurface));
+            key.setColour(juce::TextButton::textColourOffId,
+                          (isSwitchKey || isPlayableKey) ? juce::Colours::white : authoringFocusRing);
+        }
+    }
+    else
+    {
+        articulationNameEditor.setText({}, juce::dontSendNotification);
+        articulationDeleteReassignSelector.clear(juce::dontSendNotification);
+        articulationSwitchNoteValueLabel.setText("No articulation selected", juce::dontSendNotification);
+        articulationStatusLabel.setText("Create an articulation to configure a key switch.", juce::dontSendNotification);
+        articulationCreateButton.setEnabled(true);
+        articulationDuplicateButton.setEnabled(false);
+        articulationDefaultButton.setEnabled(false);
+        articulationMoveUpButton.setEnabled(false);
+        articulationMoveDownButton.setEnabled(false);
+        articulationDeleteButton.setEnabled(false);
+        articulationDeleteReassignSelector.setEnabled(false);
+        articulationNameEditor.setEnabled(false);
+        articulationSwitchNoteSlider.setEnabled(false);
+        articulationClearSwitchButton.setEnabled(false);
+        articulationMidiLearnButton.setEnabled(false);
+    }
 
     if (const auto selectedGroup = authoringSession.getSelectedGroup(); selectedGroup.has_value())
     {
@@ -5971,6 +6372,159 @@ void AuthoringPanel::applySelectedTriggerSlotEdit(const juce::String& label)
                                            editedPerformanceBank,
                                            label.toStdString());
     refreshFromSession();
+}
+
+void AuthoringPanel::createArticulation()
+{
+    const auto articulations = authoringSession.getArticulations();
+    auto baseId = std::string("articulation");
+    auto suffix = static_cast<int>(articulations.size()) + 1;
+    auto id = baseId + "-" + std::to_string(suffix);
+    const auto hasId = [&](const std::string& candidate)
+    {
+        return std::any_of(articulations.begin(), articulations.end(),
+                           [&](const auto& articulation) { return articulation.id == candidate; });
+    };
+    while (hasId(id))
+        id = baseId + "-" + std::to_string(++suffix);
+
+    drs::engine::RuntimeProjectArticulationDefinition articulation;
+    articulation.id = id;
+    articulation.displayName = "Articulation " + std::to_string(suffix);
+    const auto result = authoringSession.createArticulation(articulation, "Create articulation");
+    if (result.applied)
+        selectedArticulationIndex = static_cast<int>(articulations.size());
+    refreshFromSession();
+}
+
+void AuthoringPanel::duplicateSelectedArticulation()
+{
+    const auto articulations = authoringSession.getArticulations();
+    if (selectedArticulationIndex < 0 || static_cast<std::size_t>(selectedArticulationIndex) >= articulations.size())
+        return;
+    auto duplicate = articulations[static_cast<std::size_t>(selectedArticulationIndex)];
+    const auto baseId = duplicate.id + "-copy";
+    auto id = baseId;
+    int suffix = 2;
+    const auto hasId = [&](const std::string& candidate)
+    {
+        return std::any_of(articulations.begin(), articulations.end(),
+                           [&](const auto& articulation) { return articulation.id == candidate; });
+    };
+    while (hasId(id))
+        id = baseId + "-" + std::to_string(suffix++);
+    duplicate.id = id;
+    duplicate.displayName += " Copy";
+    duplicate.isDefault = false;
+    // A duplicate must not silently create a collision with its source key switch.
+    duplicate.activation.reset();
+    const auto result = authoringSession.createArticulation(duplicate, "Duplicate articulation");
+    if (result.applied)
+        selectedArticulationIndex = static_cast<int>(articulations.size());
+    refreshFromSession();
+}
+
+void AuthoringPanel::applySelectedArticulationEdit(const juce::String& label)
+{
+    const auto articulations = authoringSession.getArticulations();
+    if (selectedArticulationIndex < 0 || static_cast<std::size_t>(selectedArticulationIndex) >= articulations.size())
+        return;
+    auto articulation = articulations[static_cast<std::size_t>(selectedArticulationIndex)];
+    const auto name = articulationNameEditor.getText().trim();
+    if (name.isEmpty())
+    {
+        refreshFromSession();
+        return;
+    }
+    articulation.displayName = name.toStdString();
+    if (label != "Rename articulation")
+    {
+        drs::engine::RuntimeProjectArticulationActivationDefinition activation;
+        activation.midiNote = static_cast<int>(articulationSwitchNoteSlider.getValue());
+        articulation.activation = activation;
+    }
+    const auto result = authoringSession.updateArticulation(static_cast<std::size_t>(selectedArticulationIndex),
+                                                            articulation, label.toStdString());
+    if (!result.applied)
+    {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                                "Key Switch Unavailable", buildIssueSummary(result.issues));
+    }
+    refreshFromSession();
+}
+
+void AuthoringPanel::moveSelectedArticulation(const int direction)
+{
+    const auto result = authoringSession.moveArticulation(static_cast<std::size_t>(selectedArticulationIndex), direction,
+                                                           direction < 0 ? "Move articulation up" : "Move articulation down");
+    if (result.applied)
+        selectedArticulationIndex += direction;
+    refreshFromSession();
+}
+
+void AuthoringPanel::deleteSelectedArticulation()
+{
+    const auto articulations = authoringSession.getArticulations();
+    if (selectedArticulationIndex < 0 || static_cast<std::size_t>(selectedArticulationIndex) >= articulations.size())
+        return;
+    const auto replacementIndex = articulationDeleteReassignSelector.getSelectedId() - 1;
+    if (replacementIndex < 0 || static_cast<std::size_t>(replacementIndex) >= articulations.size()
+        || replacementIndex == selectedArticulationIndex)
+        return;
+    const auto result = authoringSession.deleteArticulation(
+        articulations[static_cast<std::size_t>(selectedArticulationIndex)].id,
+        articulations[static_cast<std::size_t>(replacementIndex)].id,
+        "Delete articulation and reassign zones");
+    if (result.applied)
+        selectedArticulationIndex = std::min(selectedArticulationIndex,
+                                              static_cast<int>(articulations.size()) - 2);
+    refreshFromSession();
+}
+
+void AuthoringPanel::setSelectedArticulationDefault()
+{
+    const auto articulations = authoringSession.getArticulations();
+    if (selectedArticulationIndex < 0 || static_cast<std::size_t>(selectedArticulationIndex) >= articulations.size())
+        return;
+    authoringSession.setDefaultArticulation(articulations[static_cast<std::size_t>(selectedArticulationIndex)].id,
+                                            "Set default articulation");
+    refreshFromSession();
+}
+
+void AuthoringPanel::clearSelectedArticulationKeySwitch()
+{
+    const auto articulations = authoringSession.getArticulations();
+    if (selectedArticulationIndex < 0 || static_cast<std::size_t>(selectedArticulationIndex) >= articulations.size())
+        return;
+    auto articulation = articulations[static_cast<std::size_t>(selectedArticulationIndex)];
+    articulation.activation.reset();
+    authoringSession.updateArticulation(static_cast<std::size_t>(selectedArticulationIndex), articulation,
+                                        "Clear key switch");
+    refreshFromSession();
+}
+
+void AuthoringPanel::toggleKeySwitchMidiLearn()
+{
+    keySwitchMidiLearnActive = !keySwitchMidiLearnActive;
+    keySwitchMidiLearnDeadlineMillis = keySwitchMidiLearnActive
+        ? juce::Time::getMillisecondCounterHiRes() + 10000.0 : 0.0;
+    if (keySwitchMidiLearnActive)
+        startTimer(keySwitchMidiLearnTimerId, 100);
+    else
+        stopTimer(keySwitchMidiLearnTimerId);
+    refreshFromSession();
+}
+
+bool AuthoringPanel::applyLearnedKeySwitchMidiNote(const int midiNote)
+{
+    if (!keySwitchMidiLearnActive || midiNote < 0 || midiNote > 127)
+        return false;
+    keySwitchMidiLearnActive = false;
+    keySwitchMidiLearnDeadlineMillis = 0.0;
+    stopTimer(keySwitchMidiLearnTimerId);
+    articulationSwitchNoteSlider.setValue(midiNote, juce::dontSendNotification);
+    applySelectedArticulationEdit("Learn key switch");
+    return true;
 }
 
 void AuthoringPanel::importPhraseForSelectedBank()

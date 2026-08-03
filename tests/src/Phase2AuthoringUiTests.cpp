@@ -837,7 +837,9 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
 
     int commitRequests = 0;
     int restoreRequests = 0;
+    int articulationAssignmentRequests = 0;
     std::string lastCommitLabel;
+    std::string assignedArticulationId;
     drs::app::authoring::ZoneFieldValuesViewModel lastCommittedValues;
 
     drs::app::authoring::ZoneFieldCallbacks callbacks;
@@ -851,6 +853,11 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     callbacks.onRestoreRootKeyRequested = [&restoreRequests]
     {
         ++restoreRequests;
+    };
+    callbacks.onArticulationCommitRequested = [&](const std::string& articulationId)
+    {
+        ++articulationAssignmentRequests;
+        assignedArticulationId = articulationId;
     };
     editor.setCallbacks(std::move(callbacks));
 
@@ -873,6 +880,9 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     populatedViewModel.canNormalizeRoundRobinPool = true;
     populatedViewModel.canRemoveZoneFromRoundRobinPool = true;
     populatedViewModel.previewAdvancesRoundRobin = true;
+    populatedViewModel.articulationId = "sustain";
+    populatedViewModel.articulationIds = { "sustain", "staccato" };
+    populatedViewModel.hasMultipleZoneSelection = true;
     editor.setViewModel(populatedViewModel);
     editor.resized();
 
@@ -895,6 +905,8 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
             "Zone mapping editor should expose one loop toggle after removing old mapping rows.");
     require(countDescendantsById(editor, "authoringTriggerModeSelector") == 1,
             "Zone mapping editor should expose one trigger-mode selector.");
+    require(countDescendantsById(editor, "authoringZoneArticulationSelector") == 1,
+            "Zone mapping editor should expose one zone-articulation selector.");
     require(countDescendantsById(editor, "authoringRestoreRootKeyButton") == 1,
             "Zone mapping editor should expose one restore-root-key action after removing old mapping rows.");
 
@@ -904,6 +916,7 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
              juce::String("authoringRootKeySlider"),
              juce::String("authoringKeyLowSlider"),
              juce::String("authoringKeyHighSlider"),
+             juce::String("authoringZoneArticulationSelector"),
              juce::String("authoringSampleInspectorSection"),
              juce::String("authoringSampleInspectorSectionDisclosure"),
              juce::String("authoringMixInspectorSection"),
@@ -921,6 +934,7 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     requireNonEmptyAccessibilityHelpText(editor, "authoringRootKeySlider");
     requireNonEmptyAccessibilityHelpText(editor, "authoringKeyLowSlider");
     requireNonEmptyAccessibilityHelpText(editor, "authoringKeyHighSlider");
+    requireNonEmptyAccessibilityHelpText(editor, "authoringZoneArticulationSelector");
     requireNonEmptyAccessibilityHelpText(editor, "authoringTriggerModeSelector");
     requireNonEmptyAccessibilityHelpText(editor, "authoringRestoreRootKeyButton");
     requireIncreasingFocusOrder(editor,
@@ -929,6 +943,7 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
                                     "authoringRootKeySlider",
                                     "authoringKeyLowSlider",
                                     "authoringKeyHighSlider",
+                                    "authoringZoneArticulationSelector",
                                     "authoringSampleInspectorSectionDisclosure",
                                     "authoringVelocityLowSlider",
                                     "authoringVelocityHighSlider",
@@ -946,6 +961,7 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     requireAccessibilityHandlerState(editor, "authoringRootKeySlider", true);
     requireAccessibilityHandlerState(editor, "authoringKeyLowSlider", true);
     requireAccessibilityHandlerState(editor, "authoringKeyHighSlider", true);
+    requireAccessibilityHandlerState(editor, "authoringZoneArticulationSelector", true);
     requireAccessibilityHandlerState(editor, "authoringVelocityLowSlider", false);
     requireAccessibilityHandlerState(editor, "authoringVelocityHighSlider", false);
     requireAccessibilityHandlerState(editor, "authoringGainSlider", false);
@@ -971,11 +987,22 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     for (const auto& componentId : {
              juce::String("authoringRootKeySlider"),
              juce::String("authoringKeyLowSlider"),
-             juce::String("authoringKeyHighSlider")
+             juce::String("authoringKeyHighSlider"),
+             juce::String("authoringZoneArticulationSelector")
          })
     {
         requireComponentVisibleWithin(editor, componentId, bounds);
     }
+
+    auto& articulationSelector = requireComboBox(editor, "authoringZoneArticulationSelector");
+    require(articulationSelector.getText() == "sustain",
+            "Zone articulation selector should show the selected zone articulation.");
+    articulationSelector.setSelectedId(2, juce::dontSendNotification);
+    require(static_cast<bool>(articulationSelector.onChange),
+            "Zone articulation selector should expose a bulk-assignment callback.");
+    articulationSelector.onChange();
+    require(articulationAssignmentRequests == 1 && assignedArticulationId == "staccato",
+            "Zone articulation selector should commit through its dedicated assignment callback.");
 
     if (findDescendantById(editor, "authoringVelocityLowSlider")->getBounds().isEmpty())
         requireButton(editor, "authoringSampleInspectorSectionDisclosure").onClick();

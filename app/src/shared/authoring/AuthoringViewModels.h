@@ -14,7 +14,8 @@ enum class DrawerTab
     groups,
     macros,
     routing,
-    performance
+    performance,
+    articulations
 };
 
 struct DrawerState
@@ -61,6 +62,9 @@ struct ZoneFieldValuesViewModel
     bool canRemoveZoneFromRoundRobinPool = false;
     bool previewAdvancesRoundRobin = false;
     drs::engine::ZoneTriggerMode triggerMode = drs::engine::ZoneTriggerMode::gated;
+    std::string articulationId;
+    std::vector<std::string> articulationIds;
+    bool hasMultipleZoneSelection = false;
     std::string emptyStateText;
 };
 
@@ -120,6 +124,7 @@ struct SelectionSummaryCallbacks
 struct ZoneFieldCallbacks
 {
     std::function<void(const ZoneFieldValuesViewModel&, const std::string&)> onCommitRequested;
+    std::function<void(const std::string&)> onArticulationCommitRequested;
     std::function<void()> onRestoreRootKeyRequested;
     std::function<void()> onPreviewRequested;
     std::function<void()> onCreateRoundRobinPoolRequested;

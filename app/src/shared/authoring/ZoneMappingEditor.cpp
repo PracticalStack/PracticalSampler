@@ -37,6 +37,7 @@ ZoneMappingEditor::ZoneMappingEditor()
       advancedSection("Advanced", "authoringAdvancedInspectorSection", false),
       rootKeyRow("Root Key", "authoringRootKeyRow", 0, 127, 1),
       keyRangeRow("Key Range", "authoringKeyRangeRow", "Low", "High", 0, 127, 1),
+      articulationRow("Articulation", "authoringZoneArticulationRow"),
       velocityRangeRow("Velocity Range", "authoringVelocityRangeRow", "Low", "High", 1, 127, 1),
       roundRobinPoolMessage("authoringRoundRobinPoolMessage", juce::Justification::centredLeft),
       roundRobinSlotMessage("authoringRoundRobinSlotMessage", juce::Justification::centredLeft),
@@ -63,6 +64,7 @@ ZoneMappingEditor::ZoneMappingEditor()
     rootKeyRow.getSlider().setComponentID("authoringRootKeySlider");
     keyRangeRow.getLowSlider().setComponentID("authoringKeyLowSlider");
     keyRangeRow.getHighSlider().setComponentID("authoringKeyHighSlider");
+    articulationRow.getComboBox().setComponentID("authoringZoneArticulationSelector");
     velocityRangeRow.getLowSlider().setComponentID("authoringVelocityLowSlider");
     velocityRangeRow.getHighSlider().setComponentID("authoringVelocityHighSlider");
     gainRow.getSlider().setComponentID("authoringGainSlider");
@@ -81,22 +83,23 @@ ZoneMappingEditor::ZoneMappingEditor()
     rootKeyRow.getSlider().setExplicitFocusOrder(41);
     keyRangeRow.getLowSlider().setExplicitFocusOrder(42);
     keyRangeRow.getHighSlider().setExplicitFocusOrder(43);
-    sampleSection.getDisclosureButton().setExplicitFocusOrder(44);
-    velocityRangeRow.getLowSlider().setExplicitFocusOrder(45);
-    velocityRangeRow.getHighSlider().setExplicitFocusOrder(46);
-    roundRobinSection.getDisclosureButton().setExplicitFocusOrder(47);
-    createRoundRobinPoolRow.getButton().setExplicitFocusOrder(48);
-    addCompatibleZonesRow.getButton().setExplicitFocusOrder(49);
-    normalizeRoundRobinPoolRow.getButton().setExplicitFocusOrder(50);
-    removeRoundRobinPoolRow.getButton().setExplicitFocusOrder(51);
-    mixSection.getDisclosureButton().setExplicitFocusOrder(52);
-    gainRow.getSlider().setExplicitFocusOrder(53);
-    panRow.getSlider().setExplicitFocusOrder(54);
-    advancedSection.getDisclosureButton().setExplicitFocusOrder(55);
-    loopToggleRow.getToggle().setExplicitFocusOrder(56);
-    triggerModeRow.getComboBox().setExplicitFocusOrder(57);
-    previewZoneRow.getButton().setExplicitFocusOrder(58);
-    restoreRootKeyRow.getButton().setExplicitFocusOrder(59);
+    articulationRow.getComboBox().setExplicitFocusOrder(44);
+    sampleSection.getDisclosureButton().setExplicitFocusOrder(45);
+    velocityRangeRow.getLowSlider().setExplicitFocusOrder(46);
+    velocityRangeRow.getHighSlider().setExplicitFocusOrder(47);
+    roundRobinSection.getDisclosureButton().setExplicitFocusOrder(48);
+    createRoundRobinPoolRow.getButton().setExplicitFocusOrder(49);
+    addCompatibleZonesRow.getButton().setExplicitFocusOrder(50);
+    normalizeRoundRobinPoolRow.getButton().setExplicitFocusOrder(51);
+    removeRoundRobinPoolRow.getButton().setExplicitFocusOrder(52);
+    mixSection.getDisclosureButton().setExplicitFocusOrder(53);
+    gainRow.getSlider().setExplicitFocusOrder(54);
+    panRow.getSlider().setExplicitFocusOrder(55);
+    advancedSection.getDisclosureButton().setExplicitFocusOrder(56);
+    loopToggleRow.getToggle().setExplicitFocusOrder(57);
+    triggerModeRow.getComboBox().setExplicitFocusOrder(58);
+    previewZoneRow.getButton().setExplicitFocusOrder(59);
+    restoreRootKeyRow.getButton().setExplicitFocusOrder(60);
     triggerModeRow.getComboBox().setHelpText(
         "Gated samples release on note-off. One-shot samples play to their natural end.");
     previewZoneRow.getButton().setHelpText("Auditions the selected zone from the mapping inspector.");
@@ -113,7 +116,8 @@ ZoneMappingEditor::ZoneMappingEditor()
 
     addOwnedRow(mapSectionContent, rootKeyRow, sliderRowHeight);
     addOwnedRow(mapSectionContent, keyRangeRow, rangeRowHeight);
-    mapSectionContent.setSize(0, sliderRowHeight + 6 + rangeRowHeight);
+    addOwnedRow(mapSectionContent, articulationRow, comboRowHeight);
+    mapSectionContent.setSize(0, sliderRowHeight + 6 + rangeRowHeight + 6 + comboRowHeight);
 
     addOwnedRow(sampleSectionContent, velocityRangeRow, rangeRowHeight);
     sampleSectionContent.setSize(0, rangeRowHeight);
@@ -163,6 +167,11 @@ ZoneMappingEditor::ZoneMappingEditor()
     triggerModeRow.getComboBox().onChange = [this]
     {
         commitCurrentValues("Update zone trigger mode");
+    };
+    articulationRow.getComboBox().onChange = [this]
+    {
+        if (callbacks.onArticulationCommitRequested && viewModel.hasSelection)
+            callbacks.onArticulationCommitRequested(articulationRow.getComboBox().getText().toStdString());
     };
 
     restoreRootKeyRow.getButton().onClick = [this]
@@ -214,6 +223,8 @@ void ZoneMappingEditor::resized()
     rootKeyRow.setBounds(mapArea.removeFromTop(sliderRowHeight));
     mapArea.removeFromTop(6);
     keyRangeRow.setBounds(mapArea.removeFromTop(rangeRowHeight));
+    mapArea.removeFromTop(6);
+    articulationRow.setBounds(mapArea.removeFromTop(comboRowHeight));
 
     auto sampleArea = sampleSectionContent.getLocalBounds();
     velocityRangeRow.setBounds(sampleArea.removeFromTop(rangeRowHeight));
@@ -256,6 +267,7 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
              static_cast<juce::Component*>(&advancedSectionContent),
              static_cast<juce::Component*>(&rootKeyRow),
              static_cast<juce::Component*>(&keyRangeRow),
+             static_cast<juce::Component*>(&articulationRow),
              static_cast<juce::Component*>(&velocityRangeRow),
              static_cast<juce::Component*>(&gainRow),
              static_cast<juce::Component*>(&panRow),
@@ -267,6 +279,7 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
              static_cast<juce::Component*>(&rootKeyRow.getSlider()),
              static_cast<juce::Component*>(&keyRangeRow.getLowSlider()),
              static_cast<juce::Component*>(&keyRangeRow.getHighSlider()),
+             static_cast<juce::Component*>(&articulationRow.getComboBox()),
              static_cast<juce::Component*>(&velocityRangeRow.getLowSlider()),
              static_cast<juce::Component*>(&velocityRangeRow.getHighSlider()),
              static_cast<juce::Component*>(&gainRow.getSlider()),
@@ -352,6 +365,21 @@ void ZoneMappingEditor::applyValuesToControls(const ZoneFieldValuesViewModel& va
     keyRangeRow.getHighSlider().setValue(values.keyHigh, juce::dontSendNotification);
     velocityRangeRow.getLowSlider().setValue(values.velocityLow, juce::dontSendNotification);
     velocityRangeRow.getHighSlider().setValue(values.velocityHigh, juce::dontSendNotification);
+    articulationRow.getComboBox().clear(juce::dontSendNotification);
+    int selectedArticulationId = 0;
+    for (std::size_t index = 0; index < values.articulationIds.size(); ++index)
+    {
+        const auto itemId = static_cast<int>(index) + 1;
+        articulationRow.getComboBox().addItem(juce::String::fromUTF8(values.articulationIds[index].c_str()), itemId);
+        if (values.articulationIds[index] == values.articulationId)
+            selectedArticulationId = itemId;
+    }
+    articulationRow.getComboBox().setSelectedId(selectedArticulationId > 0 ? selectedArticulationId : 1,
+                                                 juce::dontSendNotification);
+    articulationRow.getComboBox().setEnabled(values.hasSelection && !values.articulationIds.empty());
+    articulationRow.getComboBox().setHelpText(values.hasMultipleZoneSelection
+        ? "Assigns the selected articulation to every selected zone."
+        : "Assigns the selected zone to an articulation.");
     gainRow.getSlider().setValue(values.gainDb, juce::dontSendNotification);
     panRow.getSlider().setValue(values.pan, juce::dontSendNotification);
     loopToggleRow.getToggle().setToggleState(values.loopEnabled, juce::dontSendNotification);

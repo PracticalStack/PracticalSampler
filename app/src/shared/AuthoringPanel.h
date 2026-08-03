@@ -16,6 +16,7 @@
 
 #include <array>
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -63,6 +64,9 @@ public:
     void resized() override;
     void reloadFromSession();
     void refreshNow();
+    // Shells can forward a learned MIDI note here while the Articulations drawer
+    // is listening. The value is validated through the normal project transaction.
+    bool applyLearnedKeySwitchMidiNote(int midiNote);
 
 private:
     class AuthoringControlLookAndFeel final : public juce::LookAndFeel_V4
@@ -105,6 +109,7 @@ private:
     void rebuildRoutingBusSelector();
     void rebuildPerformanceBankSelector();
     void rebuildTriggerSlotSelector();
+    void rebuildArticulationList();
     void refreshInspectorVisibility();
     void refreshDrawerContextLabels();
     void refreshContextualAccessibility();
@@ -141,6 +146,14 @@ private:
     std::string ensureSelectedDspScopeRoutingBus();
     void applySelectedRoutingBusEdit(const juce::String& label);
     void applySelectedTriggerSlotEdit(const juce::String& label);
+    void createArticulation();
+    void duplicateSelectedArticulation();
+    void applySelectedArticulationEdit(const juce::String& label);
+    void moveSelectedArticulation(int direction);
+    void deleteSelectedArticulation();
+    void setSelectedArticulationDefault();
+    void clearSelectedArticulationKeySwitch();
+    void toggleKeySwitchMidiLearn();
     void importPhraseForSelectedBank();
     void previewSelectedZone(
         drs::engine::AuthoringPreviewAuditionSource source
@@ -201,6 +214,9 @@ private:
     int selectedRoutingBusIndex = 0;
     int selectedPerformanceBankIndex = 0;
     int selectedTriggerSlotIndex = 0;
+    int selectedArticulationIndex = 0;
+    bool keySwitchMidiLearnActive = false;
+    double keySwitchMidiLearnDeadlineMillis = 0.0;
     authoring::DrawerState drawerState;
     authoring::SelectionSummaryViewModel selectionSummaryViewModel;
     authoring::ZoneFieldValuesViewModel zoneFieldValuesViewModel;
@@ -230,6 +246,7 @@ private:
     juce::TextButton drawerMacrosTabButton;
     juce::TextButton drawerRoutingTabButton;
     juce::TextButton drawerPerformanceTabButton;
+    juce::TextButton drawerArticulationsTabButton;
     juce::Label zoneLabel;
     juce::ComboBox zoneSelector;
     juce::ToggleButton previewEnabledToggle;
@@ -340,6 +357,27 @@ private:
     juce::TextButton phraseImportButton;
     juce::Label performanceSummaryLabel;
     juce::Label phraseSummaryLabel;
+
+    juce::Component articulationDrawerContent;
+    juce::Viewport articulationDrawerViewport;
+    authoring::RepeatedStructureList articulationList;
+    juce::TextButton articulationCreateButton;
+    juce::TextButton articulationDuplicateButton;
+    juce::TextButton articulationDefaultButton;
+    juce::TextButton articulationMoveUpButton;
+    juce::TextButton articulationMoveDownButton;
+    juce::TextButton articulationDeleteButton;
+    juce::Label articulationNameLabel;
+    juce::TextEditor articulationNameEditor;
+    juce::Label articulationSwitchNoteLabel;
+    juce::Slider articulationSwitchNoteSlider;
+    juce::Label articulationSwitchNoteValueLabel;
+    juce::TextButton articulationClearSwitchButton;
+    juce::TextButton articulationMidiLearnButton;
+    juce::Label articulationDeleteReassignLabel;
+    juce::ComboBox articulationDeleteReassignSelector;
+    juce::Label articulationStatusLabel;
+    std::vector<std::unique_ptr<juce::TextButton>> articulationKeyButtons;
     std::vector<std::string> routingInputSourceIds;
     std::vector<std::string> groupRoutingBusIds;
     std::vector<std::string> groupAnchorZoneIds;

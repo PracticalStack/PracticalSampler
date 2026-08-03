@@ -46,6 +46,7 @@ private:
 
     CompactInspectorSliderRow rootKeyRow;
     CompactInspectorRangeRow keyRangeRow;
+    CompactInspectorComboRow articulationRow;
     CompactInspectorRangeRow velocityRangeRow;
     CompactInspectorMessage roundRobinPoolMessage;
     CompactInspectorMessage roundRobinSlotMessage;
