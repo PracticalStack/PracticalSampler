@@ -1468,6 +1468,16 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         if (result.applied)
             refreshFromSession();
     });
+    zoneMap.setOnVelocityCrossfadeCommitRequested([this](const std::string& lowerZoneId,
+                                                          const std::string& upperZoneId,
+                                                          const int overlapLow,
+                                                          const int overlapHigh)
+    {
+        const auto result = authoringSession.updateVelocityCrossfadePair(
+            { lowerZoneId, upperZoneId, overlapLow, overlapHigh }, "Drag velocity crossfade overlap");
+        if (result.applied)
+            refreshFromSession();
+    });
     groupList.setOnSelectionChanged([this](int nextIndex)
     {
         if (isRefreshing)

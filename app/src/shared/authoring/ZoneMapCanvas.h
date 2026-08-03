@@ -20,7 +20,9 @@ public:
         keyLow,
         keyHigh,
         velocityHigh,
-        velocityLow
+        velocityLow,
+        crossfadeLow,
+        crossfadeHigh
     };
 
     enum class SelectionMode
@@ -46,6 +48,11 @@ public:
     void setOnZoneRangeCommitRequested(
         std::function<void(const std::vector<drs::engine::AuthoringZoneSummary>& zones,
                            const std::string& label)> nextCallback);
+    void setOnVelocityCrossfadeCommitRequested(
+        std::function<void(const std::string& lowerZoneId,
+                           const std::string& upperZoneId,
+                           int overlapLow,
+                           int overlapHigh)> nextCallback);
     void setOnZoneAuditionRequested(
         std::function<void(const std::string& zoneId, int midiNote, int velocity)> nextCallback);
     void setOnSampleFilesDropped(std::function<void(std::vector<juce::File>)> nextCallback);
@@ -64,6 +71,7 @@ public:
     bool endActiveRangeGesture(juce::Point<float> position);
     bool cancelActiveRangeGesture();
     bool isRangeGestureActive() const { return activeGesture.has_value(); }
+    bool isCrossfadeGestureActive() const { return activeCrossfadeGesture.has_value(); }
     bool requestZoomAt(juce::Point<float> position, float wheelDelta);
     bool requestPanBy(juce::Point<float> pixelDelta);
     void resetViewport();
@@ -104,6 +112,17 @@ private:
         bool dragged = false;
     };
 
+    struct CrossfadeGesture
+    {
+        RangeHandle handle = RangeHandle::none;
+        std::size_t lowerZoneIndex = 0;
+        std::size_t upperZoneIndex = 0;
+        int originalLow = 1;
+        int originalHigh = 2;
+        int previewLow = 1;
+        int previewHigh = 2;
+    };
+
     struct PanGesture
     {
         juce::Point<float> start;
@@ -121,12 +140,20 @@ private:
     std::optional<std::size_t> findSelectedZoneIndex() const;
     std::vector<std::size_t> findSecondarySelectedZoneIndices() const;
     std::vector<std::pair<RangeHandle, juce::Point<float>>> buildHandleCenters(const juce::Rectangle<float>& zoneBounds) const;
+    std::vector<std::pair<RangeHandle, juce::Point<float>>> buildCrossfadeHandleCenters(
+        const drs::engine::AuthoringZoneSummary& zone,
+        const juce::Rectangle<float>& zoneBounds) const;
     RangeHandle findRangeHandleAt(juce::Point<float> position, std::size_t& zoneIndex) const;
+    RangeHandle findCrossfadeHandleAt(juce::Point<float> position,
+                                      std::size_t& lowerZoneIndex,
+                                      std::size_t& upperZoneIndex) const;
+    std::optional<std::pair<std::size_t, std::size_t>> findCrossfadePairForZone(std::size_t zoneIndex) const;
     std::vector<drs::engine::AuthoringZoneSummary> buildRangePreviews(
         const RangeGesture& gesture,
         juce::Point<float> position) const;
     int positionToMidiKey(juce::Point<float> position) const;
     int positionToMidiVelocity(juce::Point<float> position) const;
+    float velocityToCanvasY(int velocity) const;
     SelectionState buildSelectionStateForZoneIndex(std::size_t index, SelectionMode mode) const;
     SelectionState buildSelectionStateForBounds(juce::Rectangle<float> bounds, SelectionMode mode) const;
     bool requestSelectionByIndex(std::size_t index, SelectionMode mode = SelectionMode::replace);
@@ -139,10 +166,16 @@ private:
     std::function<void(const SelectionState& selectionState)> onZoneSelectionStateRequested;
     std::function<void(const std::vector<drs::engine::AuthoringZoneSummary>& zones,
                        const std::string& label)> onZoneRangeCommitRequested;
+    std::function<void(const std::string& lowerZoneId,
+                       const std::string& upperZoneId,
+                       int overlapLow,
+                       int overlapHigh)> onVelocityCrossfadeCommitRequested;
     std::function<void(const std::string& zoneId, int midiNote, int velocity)> onZoneAuditionRequested;
     std::function<void(std::vector<juce::File>)> onSampleFilesDropped;
     std::function<void()> onDeleteSelectedSampleRequested;
     std::optional<RangeGesture> activeGesture;
+    std::optional<CrossfadeGesture> activeCrossfadeGesture;
+    std::optional<CrossfadeGesture> focusedCrossfadeGesture;
     std::optional<MarqueeGesture> activeMarqueeGesture;
     std::optional<PanGesture> activePanGesture;
     float viewportZoom = 1.0f;

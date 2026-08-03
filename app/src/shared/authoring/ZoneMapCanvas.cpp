@@ -20,8 +20,12 @@ const auto zoneMapFocusRing = juce::Colour::fromRGB(24, 29, 33);
 const auto zoneMapFocusHalo = juce::Colour::fromRGBA(255, 255, 255, 232);
 const auto zoneMapMarqueeFill = zoneMapSelected.withAlpha(0.16f);
 const auto zoneMapMarqueeOutline = zoneMapSelected.withAlpha(0.92f);
+const auto crossfadeInColour = juce::Colour::fromRGB(67, 159, 211);
+const auto crossfadeOutColour = juce::Colour::fromRGB(231, 149, 67);
 constexpr float rangeHandleRadius = 6.0f;
 constexpr float rangeHandleHitRadius = 12.0f;
+constexpr float crossfadeHandleRadius = 7.0f;
+constexpr float crossfadeHandleHitRadius = 14.0f;
 constexpr float marqueeDragThreshold = 4.0f;
 constexpr float minimumViewportZoom = 1.0f;
 constexpr float maximumViewportZoom = 8.0f;
@@ -57,6 +61,7 @@ ZoneMapCanvas::ZoneMapCanvas()
 void ZoneMapCanvas::setZoneSummaries(std::vector<drs::engine::AuthoringZoneSummary> summaries)
 {
     zoneSummaries = std::move(summaries);
+    focusedCrossfadeGesture.reset();
     repaint();
 }
 
@@ -87,6 +92,15 @@ void ZoneMapCanvas::setOnZoneRangeCommitRequested(
                        const std::string& label)> nextCallback)
 {
     onZoneRangeCommitRequested = std::move(nextCallback);
+}
+
+void ZoneMapCanvas::setOnVelocityCrossfadeCommitRequested(
+    std::function<void(const std::string& lowerZoneId,
+                       const std::string& upperZoneId,
+                       int overlapLow,
+                       int overlapHigh)> nextCallback)
+{
+    onVelocityCrossfadeCommitRequested = std::move(nextCallback);
 }
 
 void ZoneMapCanvas::setOnZoneAuditionRequested(
@@ -324,7 +338,7 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
 
     for (const auto zoneIndex : paintOrder)
     {
-        const auto& zone = zoneSummaries[zoneIndex];
+        const auto zone = getDisplayZoneSummary(zoneIndex);
         const auto layoutIterator = std::find_if(zoneLayouts.begin(),
                                                  zoneLayouts.end(),
                                                  [&](const ZoneLayout& layout)
@@ -344,6 +358,34 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
                         ? zoneMapSelectedFill
                         : (secondarySelected ? zoneMapSecondarySelectedFill : zoneMapAccentFill));
         g.fillRoundedRectangle(zoneBounds, 8.0f);
+
+        const auto paintCrossfadeBand = [&](int low, int high, const juce::Colour& colour, bool rising)
+        {
+            if (low <= 0 || high <= low)
+                return;
+            const auto top = velocityToCanvasY(high);
+            const auto bottom = velocityToCanvasY(low);
+            const auto band = juce::Rectangle<float>(zoneBounds.getX(), top, zoneBounds.getWidth(), bottom - top)
+                                  .getIntersection(zoneBounds);
+            if (band.isEmpty())
+                return;
+            juce::ColourGradient gradient(rising ? colour.withAlpha(0.78f) : colour.withAlpha(0.12f),
+                                          band.getCentreX(), band.getY(),
+                                          rising ? colour.withAlpha(0.12f) : colour.withAlpha(0.78f),
+                                          band.getCentreX(), band.getBottom(), false);
+            g.setGradientFill(gradient);
+            g.fillRect(band);
+            g.setColour(colour.withAlpha(0.94f));
+            g.drawRect(band, 1.25f);
+        };
+        paintCrossfadeBand(zone.velocityCrossfade.fadeInLowVelocity,
+                           zone.velocityCrossfade.fadeInHighVelocity,
+                           crossfadeInColour,
+                           true);
+        paintCrossfadeBand(zone.velocityCrossfade.fadeOutLowVelocity,
+                           zone.velocityCrossfade.fadeOutHighVelocity,
+                           crossfadeOutColour,
+                           false);
 
         g.setColour(primarySelected
                         ? juce::Colours::white
@@ -387,6 +429,26 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
                               rangeHandleRadius * 2.0f,
                               activeHandle ? 2.0f : 1.0f);
             }
+
+            const auto crossfadeHandles = buildCrossfadeHandleCenters(zone, zoneBounds);
+            for (const auto& [handle, center] : crossfadeHandles)
+            {
+                if (!inner.contains(center))
+                    continue;
+                const auto activeHandle = activeCrossfadeGesture.has_value()
+                    && activeCrossfadeGesture->handle == handle;
+                const auto colour = handle == RangeHandle::crossfadeLow ? crossfadeInColour : crossfadeOutColour;
+                juce::Path diamond;
+                diamond.startNewSubPath(center.x, center.y - crossfadeHandleRadius);
+                diamond.lineTo(center.x + crossfadeHandleRadius, center.y);
+                diamond.lineTo(center.x, center.y + crossfadeHandleRadius);
+                diamond.lineTo(center.x - crossfadeHandleRadius, center.y);
+                diamond.closeSubPath();
+                g.setColour(activeHandle ? juce::Colours::white : colour);
+                g.fillPath(diamond);
+                g.setColour(zoneMapOutline.withAlpha(0.95f));
+                g.strokePath(diamond, juce::PathStrokeType(activeHandle ? 2.0f : 1.2f));
+            }
         }
     }
 
@@ -425,6 +487,25 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
     g.fillRoundedRectangle(zoomBounds.toFloat(), 6.0f);
     g.setColour(juce::Colours::white.withAlpha(0.9f));
     g.drawFittedText(zoomText, zoomBounds.reduced(8, 2), juce::Justification::centredRight, 1);
+
+    const auto hasCrossfades = std::any_of(zoneSummaries.begin(), zoneSummaries.end(), [](const auto& zone)
+    {
+        return drs::engine::hasAnyVelocityCrossfadeValue(zone.velocityCrossfade);
+    });
+    if (hasCrossfades)
+    {
+        auto legendBounds = getLocalBounds().reduced(12).removeFromTop(22).removeFromLeft(190);
+        g.setColour(zoneMapLabelFill);
+        g.fillRoundedRectangle(legendBounds.toFloat(), 6.0f);
+        g.setColour(crossfadeInColour);
+        g.fillEllipse(static_cast<float>(legendBounds.getX() + 8), static_cast<float>(legendBounds.getY() + 7), 8.0f, 8.0f);
+        g.setColour(crossfadeOutColour);
+        g.fillEllipse(static_cast<float>(legendBounds.getX() + 82), static_cast<float>(legendBounds.getY() + 7), 8.0f, 8.0f);
+        g.setColour(juce::Colours::white.withAlpha(0.9f));
+        g.setFont(juce::FontOptions(10.0f, juce::Font::bold));
+        g.drawFittedText("Fade In", legendBounds.withTrimmedLeft(20).withWidth(56), juce::Justification::centredLeft, 1);
+        g.drawFittedText("Fade Out", legendBounds.withTrimmedLeft(94).withWidth(80), juce::Justification::centredLeft, 1);
+    }
 }
 
 void ZoneMapCanvas::mouseDown(const juce::MouseEvent& event)
@@ -491,7 +572,7 @@ void ZoneMapCanvas::showContextMenuAt(juce::Point<int> screenPosition)
 
 void ZoneMapCanvas::mouseDrag(const juce::MouseEvent& event)
 {
-    if (activeGesture.has_value())
+    if (activeGesture.has_value() || activeCrossfadeGesture.has_value())
     {
         updateActiveRangeGesture(event.position);
         return;
@@ -525,7 +606,7 @@ void ZoneMapCanvas::mouseDrag(const juce::MouseEvent& event)
 
 void ZoneMapCanvas::mouseUp(const juce::MouseEvent& event)
 {
-    if (activeGesture.has_value())
+    if (activeGesture.has_value() || activeCrossfadeGesture.has_value())
     {
         endActiveRangeGesture(event.position);
         return;
@@ -575,8 +656,29 @@ void ZoneMapCanvas::mouseWheelMove(const juce::MouseEvent& event,
 
 bool ZoneMapCanvas::keyPressed(const juce::KeyPress& key)
 {
-    if (key == juce::KeyPress::escapeKey && activeGesture.has_value())
+    if (key == juce::KeyPress::escapeKey && (activeGesture.has_value() || activeCrossfadeGesture.has_value()))
         return cancelActiveRangeGesture();
+
+    if (focusedCrossfadeGesture.has_value()
+        && (key == juce::KeyPress::leftKey || key == juce::KeyPress::rightKey
+            || key == juce::KeyPress::upKey || key == juce::KeyPress::downKey))
+    {
+        auto& gesture = *focusedCrossfadeGesture;
+        const auto direction = (key == juce::KeyPress::leftKey || key == juce::KeyPress::downKey) ? -1 : 1;
+        const auto step = key.getModifiers().isShiftDown() ? 8 : 1;
+        if (gesture.handle == RangeHandle::crossfadeLow)
+            gesture.previewLow = juce::jlimit(1, gesture.previewHigh - 1, gesture.previewLow + direction * step);
+        else
+            gesture.previewHigh = juce::jlimit(gesture.previewLow + 1, 127, gesture.previewHigh + direction * step);
+
+        if (onVelocityCrossfadeCommitRequested)
+            onVelocityCrossfadeCommitRequested(zoneSummaries[gesture.lowerZoneIndex].id,
+                                               zoneSummaries[gesture.upperZoneIndex].id,
+                                               gesture.previewLow,
+                                               gesture.previewHigh);
+        repaint();
+        return true;
+    }
 
     if (key == juce::KeyPress::leftKey || key == juce::KeyPress::upKey)
         return moveSelection(-1);
@@ -639,6 +741,25 @@ drs::engine::AuthoringZoneSummary ZoneMapCanvas::getDisplayZoneSummary(std::size
                 std::distance(activeGesture->zoneIndices.begin(), iterator));
             return activeGesture->previewZones[previewIndex];
         }
+    }
+
+    if (activeCrossfadeGesture.has_value())
+    {
+        auto preview = zoneSummaries[index];
+        const auto& gesture = *activeCrossfadeGesture;
+        if (index == gesture.lowerZoneIndex)
+        {
+            preview.velocityHigh = gesture.previewHigh;
+            preview.velocityCrossfade.fadeOutLowVelocity = gesture.previewLow;
+            preview.velocityCrossfade.fadeOutHighVelocity = gesture.previewHigh;
+        }
+        else if (index == gesture.upperZoneIndex)
+        {
+            preview.velocityLow = gesture.previewLow;
+            preview.velocityCrossfade.fadeInLowVelocity = gesture.previewLow;
+            preview.velocityCrossfade.fadeInHighVelocity = gesture.previewHigh;
+        }
+        return preview;
     }
 
     return zoneSummaries[index];
@@ -792,6 +913,103 @@ ZoneMapCanvas::buildHandleCenters(const juce::Rectangle<float>& zoneBounds) cons
     };
 }
 
+std::vector<std::pair<ZoneMapCanvas::RangeHandle, juce::Point<float>>>
+ZoneMapCanvas::buildCrossfadeHandleCenters(const drs::engine::AuthoringZoneSummary& zone,
+                                           const juce::Rectangle<float>& zoneBounds) const
+{
+    const auto& crossfade = zone.velocityCrossfade;
+    if (!drs::engine::hasCompleteFadeIn(crossfade) && !drs::engine::hasCompleteFadeOut(crossfade))
+        return {};
+
+    const auto low = drs::engine::hasCompleteFadeIn(crossfade)
+        ? crossfade.fadeInLowVelocity : crossfade.fadeOutLowVelocity;
+    const auto high = drs::engine::hasCompleteFadeIn(crossfade)
+        ? crossfade.fadeInHighVelocity : crossfade.fadeOutHighVelocity;
+    const auto x = zoneBounds.getRight() - crossfadeHandleRadius - 2.0f;
+    return {
+        {RangeHandle::crossfadeLow, {x, velocityToCanvasY(low)}},
+        {RangeHandle::crossfadeHigh, {x, velocityToCanvasY(high)}}
+    };
+}
+
+std::optional<std::pair<std::size_t, std::size_t>> ZoneMapCanvas::findCrossfadePairForZone(
+    const std::size_t zoneIndex) const
+{
+    if (zoneIndex >= zoneSummaries.size())
+        return std::nullopt;
+
+    const auto sameIdentity = [](const auto& left, const auto& right)
+    {
+        const auto leftKey = drs::engine::computeVelocityCrossfadePairingKey(
+            left.articulationId, left.rootKey, left.keyLow, left.keyHigh, static_cast<int>(left.triggerMode));
+        const auto rightKey = drs::engine::computeVelocityCrossfadePairingKey(
+            right.articulationId, right.rootKey, right.keyLow, right.keyHigh, static_cast<int>(right.triggerMode));
+        const auto leftUsesRoundRobin = left.roundRobinLength > 0 && left.roundRobinPosition > 0;
+        const auto rightUsesRoundRobin = right.roundRobinLength > 0 && right.roundRobinPosition > 0;
+        const auto leftPool = left.roundRobin.has_value() ? left.roundRobin->poolId : std::string {};
+        const auto rightPool = right.roundRobin.has_value() ? right.roundRobin->poolId : std::string {};
+        return leftKey == rightKey && leftUsesRoundRobin == rightUsesRoundRobin
+            && (!leftUsesRoundRobin || (leftPool == rightPool
+                                        && left.roundRobinLength == right.roundRobinLength
+                                        && left.roundRobinPosition == right.roundRobinPosition));
+    };
+
+    for (std::size_t lowerIndex = 0; lowerIndex < zoneSummaries.size(); ++lowerIndex)
+    {
+        for (std::size_t upperIndex = 0; upperIndex < zoneSummaries.size(); ++upperIndex)
+        {
+            if (lowerIndex == upperIndex || (zoneIndex != lowerIndex && zoneIndex != upperIndex))
+                continue;
+            const auto& lower = zoneSummaries[lowerIndex];
+            const auto& upper = zoneSummaries[upperIndex];
+            const drs::engine::VelocityCrossfadeZoneDefinition lowerDefinition {
+                lower.velocityLow, lower.velocityHigh, lower.velocityCrossfade
+            };
+            const drs::engine::VelocityCrossfadeZoneDefinition upperDefinition {
+                upper.velocityLow, upper.velocityHigh, upper.velocityCrossfade
+            };
+            if (sameIdentity(lower, upper)
+                && drs::engine::validateFirstPassVelocityCrossfadePair(lowerDefinition, upperDefinition)
+                    == drs::engine::VelocityCrossfadePairIssue::none)
+            {
+                return std::make_pair(lowerIndex, upperIndex);
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+ZoneMapCanvas::RangeHandle ZoneMapCanvas::findCrossfadeHandleAt(juce::Point<float> position,
+                                                                std::size_t& lowerZoneIndex,
+                                                                std::size_t& upperZoneIndex) const
+{
+    const auto selectedIndex = findSelectedZoneIndex();
+    if (!selectedIndex.has_value())
+        return RangeHandle::none;
+    const auto pair = findCrossfadePairForZone(*selectedIndex);
+    if (!pair.has_value())
+        return RangeHandle::none;
+
+    const auto zoneBounds = computeZoneBounds(getDisplayZoneSummary(*selectedIndex));
+    auto nearestHandle = RangeHandle::none;
+    auto nearestDistance = crossfadeHandleHitRadius;
+    for (const auto& [handle, center] : buildCrossfadeHandleCenters(getDisplayZoneSummary(*selectedIndex), zoneBounds))
+    {
+        const auto distance = center.getDistanceFrom(position);
+        if (distance <= nearestDistance)
+        {
+            nearestHandle = handle;
+            nearestDistance = distance;
+        }
+    }
+    if (nearestHandle != RangeHandle::none)
+    {
+        lowerZoneIndex = pair->first;
+        upperZoneIndex = pair->second;
+    }
+    return nearestHandle;
+}
+
 ZoneMapCanvas::RangeHandle ZoneMapCanvas::findRangeHandleAt(juce::Point<float> position, std::size_t& zoneIndex) const
 {
     const auto selectedIndex = findSelectedZoneIndex();
@@ -905,6 +1123,8 @@ std::vector<drs::engine::AuthoringZoneSummary> ZoneMapCanvas::buildRangePreviews
             break;
         case RangeHandle::keyLow:
         case RangeHandle::keyHigh:
+        case RangeHandle::crossfadeLow:
+        case RangeHandle::crossfadeHigh:
         case RangeHandle::none:
             break;
     }
@@ -927,6 +1147,8 @@ std::vector<drs::engine::AuthoringZoneSummary> ZoneMapCanvas::buildRangePreviews
                 break;
             case RangeHandle::keyLow:
             case RangeHandle::keyHigh:
+            case RangeHandle::crossfadeLow:
+            case RangeHandle::crossfadeHigh:
             case RangeHandle::none:
                 break;
         }
@@ -951,6 +1173,12 @@ int ZoneMapCanvas::positionToMidiVelocity(juce::Point<float> position) const
         0.0f, 1.0f, (position.y - inner.getY()) / inner.getHeight());
     const auto contentProportion = viewportOrigin.y + viewportProportion / viewportZoom;
     return juce::jlimit(1, 127, static_cast<int>(std::lround((1.0f - contentProportion) * 127.0f)));
+}
+
+float ZoneMapCanvas::velocityToCanvasY(const int velocity) const
+{
+    return normalizedContentToCanvas({ 0.0f,
+                                       1.0f - static_cast<float>(juce::jlimit(1, 127, velocity)) / 127.0f }).y;
 }
 
 ZoneMapCanvas::SelectionState ZoneMapCanvas::buildSelectionStateForZoneIndex(std::size_t index,
@@ -1070,7 +1298,7 @@ ZoneMapCanvas::SelectionState ZoneMapCanvas::buildSelectionStateForBounds(juce::
 
 bool ZoneMapCanvas::requestSelectionByIndex(std::size_t index, SelectionMode mode)
 {
-    if (activeGesture.has_value() || activePanGesture.has_value())
+    if (activeGesture.has_value() || activeCrossfadeGesture.has_value() || activePanGesture.has_value())
         return false;
 
     if (index >= zoneSummaries.size())
@@ -1101,8 +1329,28 @@ bool ZoneMapCanvas::requestSelectionState(const SelectionState& nextSelectionSta
 
 bool ZoneMapCanvas::beginRangeGestureAt(juce::Point<float> position)
 {
-    if (activeGesture.has_value())
+    if (activeGesture.has_value() || activeCrossfadeGesture.has_value())
         return false;
+
+    std::size_t lowerZoneIndex = 0;
+    std::size_t upperZoneIndex = 0;
+    const auto crossfadeHandle = findCrossfadeHandleAt(position, lowerZoneIndex, upperZoneIndex);
+    if (crossfadeHandle != RangeHandle::none)
+    {
+        const auto& lower = zoneSummaries[lowerZoneIndex];
+        CrossfadeGesture gesture;
+        gesture.handle = crossfadeHandle;
+        gesture.lowerZoneIndex = lowerZoneIndex;
+        gesture.upperZoneIndex = upperZoneIndex;
+        gesture.originalLow = lower.velocityCrossfade.fadeOutLowVelocity;
+        gesture.originalHigh = lower.velocityCrossfade.fadeOutHighVelocity;
+        gesture.previewLow = gesture.originalLow;
+        gesture.previewHigh = gesture.originalHigh;
+        activeCrossfadeGesture = gesture;
+        focusedCrossfadeGesture = gesture;
+        repaint();
+        return true;
+    }
 
     std::size_t zoneIndex = 0;
     const auto handle = findRangeHandleAt(position, zoneIndex);
@@ -1129,6 +1377,29 @@ bool ZoneMapCanvas::beginRangeGestureAt(juce::Point<float> position)
 
 bool ZoneMapCanvas::updateActiveRangeGesture(juce::Point<float> position)
 {
+    if (activeCrossfadeGesture.has_value())
+    {
+        auto& gesture = *activeCrossfadeGesture;
+        const auto targetVelocity = positionToMidiVelocity(position);
+        const auto& lower = zoneSummaries[gesture.lowerZoneIndex];
+        const auto& upper = zoneSummaries[gesture.upperZoneIndex];
+        if (gesture.handle == RangeHandle::crossfadeLow)
+        {
+            const auto minimumLow = drs::engine::hasCompleteFadeIn(lower.velocityCrossfade)
+                ? lower.velocityCrossfade.fadeInHighVelocity + 1 : 1;
+            gesture.previewLow = juce::jlimit(minimumLow, gesture.previewHigh - 1, targetVelocity);
+        }
+        else if (gesture.handle == RangeHandle::crossfadeHigh)
+        {
+            const auto maximumHigh = drs::engine::hasCompleteFadeOut(upper.velocityCrossfade)
+                ? upper.velocityCrossfade.fadeOutLowVelocity - 1 : 127;
+            gesture.previewHigh = juce::jlimit(gesture.previewLow + 1, maximumHigh, targetVelocity);
+        }
+        else
+            return false;
+        repaint();
+        return true;
+    }
     if (!activeGesture.has_value())
         return false;
 
@@ -1139,6 +1410,23 @@ bool ZoneMapCanvas::updateActiveRangeGesture(juce::Point<float> position)
 
 bool ZoneMapCanvas::endActiveRangeGesture(juce::Point<float> position)
 {
+    if (activeCrossfadeGesture.has_value())
+    {
+        updateActiveRangeGesture(position);
+        const auto gesture = *activeCrossfadeGesture;
+        activeCrossfadeGesture.reset();
+        focusedCrossfadeGesture = gesture;
+        repaint();
+        if ((gesture.previewLow != gesture.originalLow || gesture.previewHigh != gesture.originalHigh)
+            && onVelocityCrossfadeCommitRequested)
+        {
+            onVelocityCrossfadeCommitRequested(zoneSummaries[gesture.lowerZoneIndex].id,
+                                               zoneSummaries[gesture.upperZoneIndex].id,
+                                               gesture.previewLow,
+                                               gesture.previewHigh);
+        }
+        return true;
+    }
     if (!activeGesture.has_value())
         return false;
 
@@ -1169,6 +1457,12 @@ bool ZoneMapCanvas::endActiveRangeGesture(juce::Point<float> position)
 
 bool ZoneMapCanvas::cancelActiveRangeGesture()
 {
+    if (activeCrossfadeGesture.has_value())
+    {
+        activeCrossfadeGesture.reset();
+        repaint();
+        return true;
+    }
     if (!activeGesture.has_value())
         return false;
 

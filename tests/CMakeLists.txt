@@ -1956,6 +1956,23 @@ add_test(
     COMMAND drs_velocity_crossfade_inspector_ui_tests
 )
 
+add_executable(drs_velocity_crossfade_zone_map_tests
+    src/VelocityCrossfadeZoneMapTests.cpp
+)
+
+target_link_libraries(drs_velocity_crossfade_zone_map_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+)
+
+target_compile_features(drs_velocity_crossfade_zone_map_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.velocity_crossfade.zone_map
+    COMMAND drs_velocity_crossfade_zone_map_tests
+)
+
 add_executable(drs_phase3_crossfade_fixture_characterization_tests
     src/Phase3CrossfadeFixtureCharacterizationTests.cpp
 )
