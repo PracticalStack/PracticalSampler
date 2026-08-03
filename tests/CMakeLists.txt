@@ -1939,6 +1939,22 @@ add_test(
     COMMAND drs_velocity_crossfade_authoring_tests
 )
 
+add_executable(drs_velocity_crossfade_stack_authoring_tests
+    src/VelocityCrossfadeStackAuthoringTests.cpp
+)
+
+target_link_libraries(drs_velocity_crossfade_stack_authoring_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_features(drs_velocity_crossfade_stack_authoring_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.velocity_crossfade.stack_authoring
+    COMMAND drs_velocity_crossfade_stack_authoring_tests
+)
+
 add_executable(drs_velocity_crossfade_inspector_ui_tests
     src/VelocityCrossfadeInspectorUiTests.cpp
 )

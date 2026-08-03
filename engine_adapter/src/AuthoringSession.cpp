@@ -1524,6 +1524,46 @@ RuntimeProjectDocumentActionResult AuthoringSession::removeVelocityCrossfadePair
     return documentController.commitSnapshot(plan.proposedProject, label, changedPaths);
 }
 
+RuntimeProjectDocumentActionResult AuthoringSession::createVelocityCrossfadeStack(
+    const VelocityCrossfadeStackRequest& request,
+    const std::string& label)
+{
+    const auto plan = planVelocityCrossfadeStack(getProject(), request);
+    if (!plan.valid() || !plan.changesProject())
+        return makeRejectedResult(getDocumentState(), "Velocity crossfade stack creation rejected",
+                                  plan.blockingIssues.empty()
+                                      ? "The selected velocity stack has no changes to create."
+                                      : plan.blockingIssues.front());
+    std::vector<std::string> changedPaths;
+    for (const auto& zoneId : plan.affectedZoneIds)
+    {
+        const auto index = findZoneIndexById(plan.proposedProject, zoneId);
+        if (index.has_value())
+            changedPaths.push_back("authoring.zones[" + std::to_string(*index) + "]");
+    }
+    return documentController.commitSnapshot(plan.proposedProject, label, changedPaths);
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::removeVelocityCrossfadeStack(
+    const std::vector<std::string>& zoneIds,
+    const std::string& label)
+{
+    const auto plan = planVelocityCrossfadeStackRemoval(getProject(), zoneIds);
+    if (!plan.valid() || !plan.changesProject())
+        return makeRejectedResult(getDocumentState(), "Velocity crossfade stack removal rejected",
+                                  plan.blockingIssues.empty()
+                                      ? "The selected velocity stack has no removable crossfades."
+                                      : plan.blockingIssues.front());
+    std::vector<std::string> changedPaths;
+    for (const auto& zoneId : plan.affectedZoneIds)
+    {
+        const auto index = findZoneIndexById(plan.proposedProject, zoneId);
+        if (index.has_value())
+            changedPaths.push_back("authoring.zones[" + std::to_string(*index) + "]");
+    }
+    return documentController.commitSnapshot(plan.proposedProject, label, changedPaths);
+}
+
 RuntimeProjectDocumentActionResult AuthoringSession::createArticulation(
     const RuntimeProjectArticulationDefinition& articulation,
     const std::string& label)

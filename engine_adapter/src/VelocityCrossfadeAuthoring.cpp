@@ -3,7 +3,9 @@
 #include "drs/engine/RuntimeLoader.h"
 
 #include <algorithm>
+#include <map>
 #include <sstream>
+#include <unordered_set>
 
 namespace drs::engine
 {
@@ -53,6 +55,20 @@ bool sameCrossfadeIdentity(const RuntimeProjectZoneDefinition& left,
             == computeVelocityCrossfadePairingKey(right.articulationId, right.rootKey, right.keyLow,
                                                    right.keyHigh, static_cast<int>(right.triggerMode))
         && sameRoundRobinIdentity(left, right);
+}
+
+bool sameCrossfadeBaseIdentity(const RuntimeProjectZoneDefinition& left,
+                               const RuntimeProjectZoneDefinition& right)
+{
+    return computeVelocityCrossfadePairingKey(left.articulationId, left.rootKey, left.keyLow,
+                                              left.keyHigh, static_cast<int>(left.triggerMode))
+        == computeVelocityCrossfadePairingKey(right.articulationId, right.rootKey, right.keyLow,
+                                              right.keyHigh, static_cast<int>(right.triggerMode));
+}
+
+bool usesRoundRobin(const RuntimeProjectZoneDefinition& zone) noexcept
+{
+    return zone.roundRobinLength > 0 || zone.roundRobinPosition > 0 || zone.roundRobin.has_value();
 }
 
 VelocityCrossfadeZoneDefinition validationZone(const RuntimeProjectZoneDefinition& zone)
@@ -139,6 +155,8 @@ std::string stateIssue(const VelocityCrossfadeAuthoringState state)
             return "The Round Robin pool uses mixed slot counts.";
         case VelocityCrossfadeAuthoringState::duplicateRoundRobinSlot:
             return "The Round Robin pool contains a duplicate slot for this layer.";
+        case VelocityCrossfadeAuthoringState::incompleteLayerStack:
+            return "Select every layer in the velocity stack before changing its crossfades.";
         default:
             return "The selected zones cannot form a valid velocity crossfade.";
     }
@@ -334,6 +352,254 @@ VelocityCrossfadeAuthoringPlan planVelocityCrossfadeRemoval(
     plan.state = VelocityCrossfadeAuthoringState::eligible;
     plan.proposedProject = std::move(proposed);
     plan.affectedZoneIds = { lowerZoneId, upperZoneId };
+    return plan;
+}
+
+VelocityCrossfadeAuthoringPlan planVelocityCrossfadeStack(
+    const RuntimeProjectModel& project,
+    const VelocityCrossfadeStackRequest& request)
+{
+    if (request.requestedOverlapWidth < 1 || request.requestedOverlapWidth > 126)
+        return rejectedPlan(project, VelocityCrossfadeAuthoringState::invalidOverlap,
+                            "Stack overlap width must be between 1 and 126 MIDI velocity steps.");
+
+    std::vector<std::size_t> selectedIndices;
+    std::unordered_set<std::string> selectedIds;
+    for (const auto& id : request.zoneIds)
+    {
+        if (!selectedIds.insert(id).second)
+            return rejectedPlan(project, VelocityCrossfadeAuthoringState::incompleteLayerStack,
+                                "Each selected velocity layer must appear only once.");
+        const auto index = findZoneIndex(project, id);
+        if (!index.has_value())
+            return rejectedPlan(project, VelocityCrossfadeAuthoringState::missingPartner,
+                                "One of the selected velocity layers no longer exists.");
+        selectedIndices.push_back(*index);
+    }
+    if (selectedIndices.size() < 2)
+        return rejectedPlan(project, VelocityCrossfadeAuthoringState::incompleteLayerStack,
+                            "Select at least two compatible velocity layers to create a stack.");
+
+    const auto& anchor = project.authoring.zones[selectedIndices.front()];
+    const auto hasRoundRobin = usesRoundRobin(anchor);
+    for (const auto index : selectedIndices)
+    {
+        const auto& zone = project.authoring.zones[index];
+        if (!sameCrossfadeBaseIdentity(anchor, zone) || usesRoundRobin(zone) != hasRoundRobin)
+            return rejectedPlan(project, VelocityCrossfadeAuthoringState::incompatibleMapping,
+                                "Every layer in a crossfade stack must share its playback mapping and Round Robin mode.");
+    }
+
+    std::vector<std::vector<std::size_t>> layers;
+    if (!hasRoundRobin)
+    {
+        std::sort(selectedIndices.begin(), selectedIndices.end(), [&](const auto left, const auto right)
+        {
+            const auto& leftZone = project.authoring.zones[left];
+            const auto& rightZone = project.authoring.zones[right];
+            return leftZone.velocityLow != rightZone.velocityLow
+                ? leftZone.velocityLow < rightZone.velocityLow : leftZone.id < rightZone.id;
+        });
+        for (std::size_t index = 1; index < selectedIndices.size(); ++index)
+            if (project.authoring.zones[selectedIndices[index - 1]].velocityLow
+                    == project.authoring.zones[selectedIndices[index]].velocityLow)
+                return rejectedPlan(project, VelocityCrossfadeAuthoringState::ambiguousPartner,
+                                    "Two selected layers start at the same velocity, so their order is ambiguous.");
+        for (const auto index : selectedIndices)
+            layers.push_back({ index });
+    }
+    else
+    {
+        const auto topologyState = roundRobinTopologyState(project, anchor);
+        if (topologyState != VelocityCrossfadeAuthoringState::eligible)
+            return rejectedPlan(project, topologyState, stateIssue(topologyState));
+        const auto poolId = anchor.roundRobin.has_value() ? anchor.roundRobin->poolId : std::string {};
+        for (const auto& candidate : project.authoring.zones)
+        {
+            const auto candidatePoolId = candidate.roundRobin.has_value() ? candidate.roundRobin->poolId : std::string {};
+            if (sameCrossfadeBaseIdentity(anchor, candidate) && candidatePoolId == poolId
+                && usesRoundRobin(candidate) && !selectedIds.count(candidate.id))
+                return rejectedPlan(project, VelocityCrossfadeAuthoringState::incompleteRoundRobinPool,
+                                    "Select every Round Robin slot in every velocity layer before creating a stack.");
+        }
+
+        std::map<int, std::vector<std::size_t>> layersByLow;
+        for (const auto index : selectedIndices)
+            layersByLow[project.authoring.zones[index].velocityLow].push_back(index);
+        for (auto& [velocityLow, layer] : layersByLow)
+        {
+            (void) velocityLow;
+            std::sort(layer.begin(), layer.end(), [&](const auto left, const auto right)
+            {
+                return project.authoring.zones[left].roundRobinPosition
+                    < project.authoring.zones[right].roundRobinPosition;
+            });
+            if (static_cast<int>(layer.size()) != anchor.roundRobinLength)
+                return rejectedPlan(project, VelocityCrossfadeAuthoringState::incompleteRoundRobinPool,
+                                    "Each Round Robin velocity layer must contain every pool slot exactly once.");
+            const auto expectedHigh = project.authoring.zones[layer.front()].velocityHigh;
+            const auto expectedCrossfade = project.authoring.zones[layer.front()].velocityCrossfade;
+            for (int slot = 1; slot <= anchor.roundRobinLength; ++slot)
+            {
+                const auto& zone = project.authoring.zones[layer[static_cast<std::size_t>(slot - 1)]];
+                if (zone.roundRobinPosition != slot)
+                    return rejectedPlan(project, VelocityCrossfadeAuthoringState::duplicateRoundRobinSlot,
+                                        "A Round Robin layer must contain one ordered copy of every slot.");
+                if (zone.velocityHigh != expectedHigh
+                    || zone.velocityCrossfade.fadeInLowVelocity != expectedCrossfade.fadeInLowVelocity
+                    || zone.velocityCrossfade.fadeInHighVelocity != expectedCrossfade.fadeInHighVelocity
+                    || zone.velocityCrossfade.fadeOutLowVelocity != expectedCrossfade.fadeOutLowVelocity
+                    || zone.velocityCrossfade.fadeOutHighVelocity != expectedCrossfade.fadeOutHighVelocity)
+                    return rejectedPlan(project, VelocityCrossfadeAuthoringState::invalidExistingCrossfade,
+                                        "Every Round Robin slot must have the same velocity-layer shape.");
+            }
+            layers.push_back(std::move(layer));
+        }
+    }
+
+    if (layers.size() < 2)
+        return rejectedPlan(project, VelocityCrossfadeAuthoringState::incompleteLayerStack,
+                            "The selected zones resolve to fewer than two velocity layers.");
+
+    std::vector<int> overlapLows(layers.size() - 1);
+    std::vector<int> overlapHighs(layers.size() - 1);
+    for (std::size_t index = 0; index + 1 < layers.size(); ++index)
+    {
+        const auto& lower = project.authoring.zones[layers[index].front()];
+        const auto& upper = project.authoring.zones[layers[index + 1].front()];
+        const auto seam = (lower.velocityHigh + upper.velocityLow) / 2;
+        overlapLows[index] = std::clamp(seam - request.requestedOverlapWidth / 2, 1, 126);
+        overlapHighs[index] = std::min(127, overlapLows[index] + request.requestedOverlapWidth);
+        if (index > 0)
+        {
+            overlapLows[index] = std::max(overlapLows[index], overlapHighs[index - 1] + 1);
+            overlapHighs[index] = std::max(overlapHighs[index], overlapLows[index] + 1);
+        }
+        if (overlapHighs[index] > 127)
+            return rejectedPlan(project, VelocityCrossfadeAuthoringState::invalidOverlap,
+                                "The selected layers leave no room for the requested crossfade widths.");
+    }
+    for (std::size_t index = overlapHighs.size(); index-- > 1;)
+    {
+        overlapHighs[index - 1] = std::min(overlapHighs[index - 1], overlapLows[index] - 1);
+        if (overlapHighs[index - 1] <= overlapLows[index - 1])
+            return rejectedPlan(project, VelocityCrossfadeAuthoringState::invalidOverlap,
+                                "The selected layers leave no room for disjoint adjacent crossfade windows.");
+    }
+
+    auto proposed = project;
+    VelocityCrossfadeAuthoringPlan plan;
+    plan.proposedProject = project;
+    for (std::size_t layerIndex = 0; layerIndex < layers.size(); ++layerIndex)
+    {
+        auto& orderedIds = plan.orderedLayerZoneIds.emplace_back();
+        for (const auto zoneIndex : layers[layerIndex])
+        {
+            auto& zone = proposed.authoring.zones[zoneIndex];
+            orderedIds.push_back(zone.id);
+            plan.affectedZoneIds.push_back(zone.id);
+            if (layerIndex > 0)
+                zone.velocityLow = overlapLows[layerIndex - 1];
+            if (layerIndex + 1 < layers.size())
+                zone.velocityHigh = overlapHighs[layerIndex];
+            zone.velocityCrossfade = {};
+            if (layerIndex > 0)
+            {
+                zone.velocityCrossfade.fadeInLowVelocity = overlapLows[layerIndex - 1];
+                zone.velocityCrossfade.fadeInHighVelocity = overlapHighs[layerIndex - 1];
+            }
+            if (layerIndex + 1 < layers.size())
+            {
+                zone.velocityCrossfade.fadeOutLowVelocity = overlapLows[layerIndex];
+                zone.velocityCrossfade.fadeOutHighVelocity = overlapHighs[layerIndex];
+            }
+            if (layerIndex > 0 || layerIndex + 1 < layers.size())
+                zone.velocityCrossfade.curve = VelocityCrossfadeCurve::linear;
+        }
+    }
+    for (std::size_t index = 0; index < overlapLows.size(); ++index)
+    {
+        VelocityCrossfadeStackOverlap overlap;
+        overlap.lowVelocity = overlapLows[index];
+        overlap.highVelocity = overlapHighs[index];
+        overlap.widthClamped = overlap.highVelocity - overlap.lowVelocity != request.requestedOverlapWidth;
+        for (const auto zoneIndex : layers[index]) overlap.lowerZoneIds.push_back(project.authoring.zones[zoneIndex].id);
+        for (const auto zoneIndex : layers[index + 1]) overlap.upperZoneIds.push_back(project.authoring.zones[zoneIndex].id);
+        if (overlap.widthClamped)
+            plan.warnings.push_back("A stack overlap was clamped to keep adjacent fade windows disjoint.");
+        plan.stackOverlaps.push_back(std::move(overlap));
+    }
+
+    const auto validation = validateRuntimeProjectModel(proposed);
+    if (!validation.valid)
+        return rejectedPlan(project, VelocityCrossfadeAuthoringState::invalidTopology,
+                            validation.issues.empty() ? "The proposed crossfade stack is invalid."
+                                                      : validation.issues.front());
+
+    bool changed = false;
+    for (const auto zoneIndex : selectedIndices)
+    {
+        const auto& before = project.authoring.zones[zoneIndex];
+        const auto& after = proposed.authoring.zones[zoneIndex];
+        changed = changed || before.velocityLow != after.velocityLow || before.velocityHigh != after.velocityHigh
+            || before.velocityCrossfade.fadeInLowVelocity != after.velocityCrossfade.fadeInLowVelocity
+            || before.velocityCrossfade.fadeInHighVelocity != after.velocityCrossfade.fadeInHighVelocity
+            || before.velocityCrossfade.fadeOutLowVelocity != after.velocityCrossfade.fadeOutLowVelocity
+            || before.velocityCrossfade.fadeOutHighVelocity != after.velocityCrossfade.fadeOutHighVelocity;
+    }
+    plan.proposedProject = std::move(proposed);
+    plan.state = changed ? VelocityCrossfadeAuthoringState::eligible : VelocityCrossfadeAuthoringState::noChanges;
+    return plan;
+}
+
+VelocityCrossfadeAuthoringPlan planVelocityCrossfadeStackRemoval(
+    const RuntimeProjectModel& project,
+    const std::vector<std::string>& zoneIds)
+{
+    const auto topology = planVelocityCrossfadeStack(project, { zoneIds, 16 });
+    if (!topology.valid())
+        return topology;
+
+    auto proposed = project;
+    bool changed = false;
+    for (std::size_t layer = 0; layer + 1 < topology.orderedLayerZoneIds.size(); ++layer)
+    {
+        const auto& lowerIds = topology.orderedLayerZoneIds[layer];
+        const auto& upperIds = topology.orderedLayerZoneIds[layer + 1];
+        if (lowerIds.size() != upperIds.size())
+            return rejectedPlan(project, VelocityCrossfadeAuthoringState::invalidExistingCrossfade,
+                                "The selected stack does not have matching Round Robin slots.");
+        for (std::size_t slot = 0; slot < lowerIds.size(); ++slot)
+        {
+            const auto lowerIndex = findZoneIndex(project, lowerIds[slot]);
+            const auto upperIndex = findZoneIndex(project, upperIds[slot]);
+            if (!lowerIndex.has_value() || !upperIndex.has_value()
+                || validateFirstPassVelocityCrossfadePair(validationZone(project.authoring.zones[*lowerIndex]),
+                                                           validationZone(project.authoring.zones[*upperIndex]))
+                    != VelocityCrossfadePairIssue::none)
+                return rejectedPlan(project, VelocityCrossfadeAuthoringState::invalidExistingCrossfade,
+                                    "Every adjacent layer must own a valid shared crossfade before stack removal.");
+            auto& lower = proposed.authoring.zones[*lowerIndex];
+            auto& upper = proposed.authoring.zones[*upperIndex];
+            changed = changed || hasAnyVelocityCrossfadeValue(lower.velocityCrossfade)
+                || hasAnyVelocityCrossfadeValue(upper.velocityCrossfade);
+            lower.velocityCrossfade.fadeOutLowVelocity = 0;
+            lower.velocityCrossfade.fadeOutHighVelocity = 0;
+            upper.velocityCrossfade.fadeInLowVelocity = 0;
+            upper.velocityCrossfade.fadeInHighVelocity = 0;
+        }
+    }
+    if (!changed)
+        return rejectedPlan(project, VelocityCrossfadeAuthoringState::noChanges,
+                            "The selected stack has no crossfade relationships to remove.");
+    const auto validation = validateRuntimeProjectModel(proposed);
+    if (!validation.valid)
+        return rejectedPlan(project, VelocityCrossfadeAuthoringState::invalidTopology,
+                            validation.issues.empty() ? "The proposed stack removal is invalid."
+                                                      : validation.issues.front());
+    auto plan = topology;
+    plan.proposedProject = std::move(proposed);
+    plan.state = VelocityCrossfadeAuthoringState::eligible;
     return plan;
 }
 } // namespace drs::engine

@@ -52,6 +52,10 @@ int main()
         int createCount = 0;
         int updateCount = 0;
         int removeCount = 0;
+        int stackCreateCount = 0;
+        int stackRemoveCount = 0;
+        int requestedStackWidth = 0;
+        std::vector<std::string> requestedStackIds;
         drs::app::authoring::ZoneFieldCallbacks callbacks;
         callbacks.onCreateVelocityCrossfadeRequested = [&](const std::string& lower,
                                                             const std::string& upper,
@@ -80,6 +84,17 @@ int main()
             ++removeCount;
             requestedLower = lower;
             requestedUpper = upper;
+        };
+        callbacks.onCreateVelocityCrossfadeStackRequested = [&](const std::vector<std::string>& ids, const int width)
+        {
+            ++stackCreateCount;
+            requestedStackIds = ids;
+            requestedStackWidth = width;
+        };
+        callbacks.onRemoveVelocityCrossfadeStackRequested = [&](const std::vector<std::string>& ids)
+        {
+            ++stackRemoveCount;
+            requestedStackIds = ids;
         };
         editor.setCallbacks(std::move(callbacks));
 
@@ -131,6 +146,27 @@ int main()
         requireButton(editor, "authoringRemoveCrossfadeButton").onClick();
         require(removeCount == 1 && requestedLower == "lower" && requestedUpper == "upper",
                 "Remove Crossfade should target the complete relationship rather than one descriptor side.");
+
+        values.crossfadeCanEdit = false;
+        values.crossfadeCanRemove = false;
+        values.crossfadeCanCreateStack = true;
+        values.crossfadeCanRemoveStack = true;
+        values.crossfadeStackZoneIds = { "layer-1", "layer-2", "layer-3" };
+        values.crossfadeOverlapLow = 48;
+        values.crossfadeOverlapHigh = 64;
+        values.crossfadeGuidanceText = "Preview: 3 layers, 2 adjacent overlaps: 48-64, 80-96.";
+        editor.setViewModel(values);
+        editor.resized();
+        require(requireButton(editor, "authoringCreateCrossfadeStackButton").isEnabled(),
+                "A valid layer stack should expose Create Stack Crossfades.");
+        require(requireButton(editor, "authoringRemoveCrossfadeStackButton").isEnabled(),
+                "A valid layer stack should expose Remove Stack Crossfades.");
+        requireButton(editor, "authoringCreateCrossfadeStackButton").onClick();
+        require(stackCreateCount == 1 && requestedStackIds.size() == 3 && requestedStackWidth == 16,
+                "Create Stack Crossfades should forward every selected layer and the requested width.");
+        requireButton(editor, "authoringRemoveCrossfadeStackButton").onClick();
+        require(stackRemoveCount == 1 && requestedStackIds.size() == 3,
+                "Remove Stack Crossfades should target the complete selected stack.");
 
         std::cout << "Velocity crossfade inspector UI tests passed.\n";
         return 0;

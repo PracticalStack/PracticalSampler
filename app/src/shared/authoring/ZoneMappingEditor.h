@@ -29,6 +29,7 @@ private:
     void refreshValidationMessage(const juce::String& messageText);
     void updateSampleSectionContentHeight();
     void invokeCrossfadeAction(bool create);
+    void invokeCrossfadeStackAction(bool create);
 
     ZoneFieldValuesViewModel viewModel;
     ZoneFieldCallbacks callbacks;
@@ -60,6 +61,8 @@ private:
     CompactInspectorActionRow createCrossfadeRow;
     CompactInspectorActionRow updateCrossfadeRow;
     CompactInspectorActionRow removeCrossfadeRow;
+    CompactInspectorActionRow createCrossfadeStackRow;
+    CompactInspectorActionRow removeCrossfadeStackRow;
     CompactInspectorMessage crossfadeGuidanceMessage;
     CompactInspectorMessage roundRobinPoolMessage;
     CompactInspectorMessage roundRobinSlotMessage;

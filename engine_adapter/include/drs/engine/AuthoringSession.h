@@ -120,6 +120,12 @@ public:
         const std::string& lowerZoneId,
         const std::string& upperZoneId,
         const std::string& label);
+    RuntimeProjectDocumentActionResult createVelocityCrossfadeStack(
+        const VelocityCrossfadeStackRequest& request,
+        const std::string& label);
+    RuntimeProjectDocumentActionResult removeVelocityCrossfadeStack(
+        const std::vector<std::string>& zoneIds,
+        const std::string& label);
     RuntimeProjectDocumentActionResult createArticulation(
         const RuntimeProjectArticulationDefinition& articulation,
         const std::string& label);

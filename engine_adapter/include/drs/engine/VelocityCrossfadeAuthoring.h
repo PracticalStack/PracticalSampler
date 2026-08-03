@@ -26,6 +26,7 @@ enum class VelocityCrossfadeAuthoringState : std::uint8_t
     incompleteRoundRobinPool,
     mixedRoundRobinSlotCount,
     duplicateRoundRobinSlot,
+    incompleteLayerStack,
     invalidOverlap,
     invalidExistingCrossfade,
     invalidTopology
@@ -50,6 +51,24 @@ struct VelocityCrossfadePairRequest
     int overlapHighVelocity = 0;
 };
 
+// A stack is planned as one topology operation.  This deliberately avoids
+// composing pair operations: once three or more compatible layers exist, a
+// pair-wise partner lookup is intentionally ambiguous.
+struct VelocityCrossfadeStackRequest
+{
+    std::vector<std::string> zoneIds;
+    int requestedOverlapWidth = 16;
+};
+
+struct VelocityCrossfadeStackOverlap
+{
+    std::vector<std::string> lowerZoneIds;
+    std::vector<std::string> upperZoneIds;
+    int lowVelocity = 0;
+    int highVelocity = 0;
+    bool widthClamped = false;
+};
+
 struct VelocityCrossfadeAuthoringPlan
 {
     VelocityCrossfadeAuthoringState state = VelocityCrossfadeAuthoringState::invalidTopology;
@@ -57,6 +76,10 @@ struct VelocityCrossfadeAuthoringPlan
     std::vector<std::string> affectedZoneIds;
     std::vector<std::string> warnings;
     std::vector<std::string> blockingIssues;
+    // Ordered low-to-high.  A Round Robin layer contains every slot in its
+    // pool; ordinary layers contain exactly one zone.
+    std::vector<std::vector<std::string>> orderedLayerZoneIds;
+    std::vector<VelocityCrossfadeStackOverlap> stackOverlaps;
 
     bool valid() const noexcept
     {
@@ -80,4 +103,12 @@ VelocityCrossfadeAuthoringPlan planVelocityCrossfadeRemoval(
     const RuntimeProjectModel& project,
     const std::string& lowerZoneId,
     const std::string& upperZoneId);
+
+VelocityCrossfadeAuthoringPlan planVelocityCrossfadeStack(
+    const RuntimeProjectModel& project,
+    const VelocityCrossfadeStackRequest& request);
+
+VelocityCrossfadeAuthoringPlan planVelocityCrossfadeStackRemoval(
+    const RuntimeProjectModel& project,
+    const std::vector<std::string>& zoneIds);
 } // namespace drs::engine

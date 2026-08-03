@@ -1392,6 +1392,33 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
                                                "Crossfade Removal Unavailable",
                                                buildIssueSummary(result.issues));
     };
+    zoneCallbacks.onCreateVelocityCrossfadeStackRequested = [this](const std::vector<std::string>& zoneIds,
+                                                                    const int overlapWidth)
+    {
+        const auto result = authoringSession.createVelocityCrossfadeStack(
+            { zoneIds, overlapWidth }, "Create velocity crossfade stack");
+        if (result.applied)
+        {
+            refreshFromSession();
+            return;
+        }
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Crossfade Stack Unavailable",
+                                               buildIssueSummary(result.issues));
+    };
+    zoneCallbacks.onRemoveVelocityCrossfadeStackRequested = [this](const std::vector<std::string>& zoneIds)
+    {
+        const auto result = authoringSession.removeVelocityCrossfadeStack(
+            zoneIds, "Remove velocity crossfade stack");
+        if (result.applied)
+        {
+            refreshFromSession();
+            return;
+        }
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Crossfade Stack Removal Unavailable",
+                                               buildIssueSummary(result.issues));
+    };
     zoneCallbacks.onCreateChokeGroupRequested = [this]
     {
         const auto selectedZone = authoringSession.getSelectedZone();
@@ -3636,6 +3663,40 @@ authoring::ZoneFieldValuesViewModel AuthoringPanel::buildZoneFieldValuesViewMode
                         + "-" + std::to_string(overlapHigh) + " overlap for the two selected layers.";
                 else if (!plan.blockingIssues.empty())
                     viewModel.crossfadeGuidanceText = plan.blockingIssues.front();
+            }
+        }
+        else if (selectedZoneIds.size() >= 3)
+        {
+            const drs::engine::VelocityCrossfadeStackRequest request { selectedZoneIds, 16 };
+            const auto plan = drs::engine::planVelocityCrossfadeStack(project, request);
+            viewModel.crossfadeStackZoneIds = selectedZoneIds;
+            viewModel.crossfadeCanCreateStack = plan.changesProject();
+            if (!plan.stackOverlaps.empty())
+            {
+                viewModel.crossfadeOverlapLow = plan.stackOverlaps.front().lowVelocity;
+                viewModel.crossfadeOverlapHigh = plan.stackOverlaps.front().highVelocity;
+            }
+            if (plan.valid())
+            {
+                std::string preview = std::to_string(plan.orderedLayerZoneIds.size()) + " layers, ";
+                preview += std::to_string(plan.stackOverlaps.size()) + " adjacent overlaps: ";
+                for (std::size_t index = 0; index < plan.stackOverlaps.size(); ++index)
+                {
+                    if (index > 0) preview += ", ";
+                    preview += std::to_string(plan.stackOverlaps[index].lowVelocity) + "-"
+                        + std::to_string(plan.stackOverlaps[index].highVelocity);
+                    if (plan.stackOverlaps[index].widthClamped) preview += " (clamped)";
+                }
+                viewModel.crossfadeStackPreviewText = preview;
+                viewModel.crossfadeGuidanceText = "Preview: " + preview
+                    + ". Create applies every relationship in one undo step.";
+
+                const auto removal = drs::engine::planVelocityCrossfadeStackRemoval(project, selectedZoneIds);
+                viewModel.crossfadeCanRemoveStack = removal.changesProject();
+            }
+            else if (!plan.blockingIssues.empty())
+            {
+                viewModel.crossfadeGuidanceText = plan.blockingIssues.front();
             }
         }
     }
