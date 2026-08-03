@@ -74,13 +74,11 @@ std::uint64_t computeFnv1a64(std::string_view text) noexcept
 
 std::uint64_t buildCrossfadePairingKey(const RuntimeCompileZoneDefinition& zone)
 {
-    std::ostringstream stream;
-    stream << zone.articulationId
-           << "|" << zone.rootKey
-           << "|" << zone.keyLow
-           << "|" << zone.keyHigh
-           << "|" << static_cast<int>(zone.triggerMode);
-    return computeFnv1a64(stream.str());
+    return computeVelocityCrossfadePairingKey(zone.articulationId,
+                                              zone.rootKey,
+                                              zone.keyLow,
+                                              zone.keyHigh,
+                                              static_cast<int>(zone.triggerMode));
 }
 
 std::optional<RoundRobinDescriptor> materializeRoundRobinDescriptor(const RuntimeCompileZoneDefinition& zone)

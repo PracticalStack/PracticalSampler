@@ -1358,6 +1358,51 @@ RuntimeProjectDocumentActionResult AuthoringSession::updateZoneRanges(
         zoneIndices.push_back(*zoneIndex);
     }
 
+    // A regular range edit is allowed to move a crossfade's outer endpoints,
+    // but never one half of the relationship.  Capture valid existing pairs
+    // before applying the requested ranges, then materialize each affected
+    // pair again from the edited lower-high / upper-low endpoints below.
+    std::vector<std::pair<std::size_t, std::size_t>> crossfadePairs;
+    std::vector<bool> hasFadeInPartner(project.authoring.zones.size(), false);
+    std::vector<bool> hasFadeOutPartner(project.authoring.zones.size(), false);
+    for (std::size_t lowerIndex = 0; lowerIndex < project.authoring.zones.size(); ++lowerIndex)
+    {
+        const auto lowerValidationZone = VelocityCrossfadeZoneDefinition {
+            project.authoring.zones[lowerIndex].velocityLow,
+            project.authoring.zones[lowerIndex].velocityHigh,
+            project.authoring.zones[lowerIndex].velocityCrossfade
+        };
+        for (std::size_t upperIndex = 0; upperIndex < project.authoring.zones.size(); ++upperIndex)
+        {
+            if (lowerIndex == upperIndex)
+                continue;
+            const auto upperValidationZone = VelocityCrossfadeZoneDefinition {
+                project.authoring.zones[upperIndex].velocityLow,
+                project.authoring.zones[upperIndex].velocityHigh,
+                project.authoring.zones[upperIndex].velocityCrossfade
+            };
+            if (validateFirstPassVelocityCrossfadePair(lowerValidationZone, upperValidationZone)
+                    == VelocityCrossfadePairIssue::none)
+            {
+                crossfadePairs.emplace_back(lowerIndex, upperIndex);
+                hasFadeOutPartner[lowerIndex] = true;
+                hasFadeInPartner[upperIndex] = true;
+            }
+        }
+    }
+
+    for (const auto zoneIndex : zoneIndices)
+    {
+        const auto& crossfade = project.authoring.zones[zoneIndex].velocityCrossfade;
+        if ((hasCompleteFadeIn(crossfade) && !hasFadeInPartner[zoneIndex])
+            || (hasCompleteFadeOut(crossfade) && !hasFadeOutPartner[zoneIndex]))
+        {
+            return makeRejectedResult(getDocumentState(),
+                                      "Zone range edit rejected",
+                                      "A crossfaded zone can only move through a complete valid crossfade relationship.");
+        }
+    }
+
     std::vector<std::pair<std::string, RoundRobinMode>> enabledGroups;
     for (const auto zoneIndex : zoneIndices)
     {
@@ -1376,7 +1421,13 @@ RuntimeProjectDocumentActionResult AuthoringSession::updateZoneRanges(
     }
 
     std::vector<std::string> changedPaths;
-    changedPaths.reserve(zoneIndices.size());
+    changedPaths.reserve(zoneIndices.size() + crossfadePairs.size() * 2u);
+    const auto addChangedPath = [&](const std::size_t zoneIndex)
+    {
+        const auto path = "authoring.zones[" + std::to_string(zoneIndex) + "]";
+        if (std::find(changedPaths.begin(), changedPaths.end(), path) == changedPaths.end())
+            changedPaths.push_back(path);
+    };
     for (std::size_t editIndex = 0; editIndex < zones.size(); ++editIndex)
     {
         auto& destination = project.authoring.zones[zoneIndices[editIndex]];
@@ -1385,13 +1436,92 @@ RuntimeProjectDocumentActionResult AuthoringSession::updateZoneRanges(
         destination.keyHigh = source.keyHigh;
         destination.velocityLow = source.velocityLow;
         destination.velocityHigh = source.velocityHigh;
-        changedPaths.push_back("authoring.zones[" + std::to_string(zoneIndices[editIndex]) + "]");
+        addChangedPath(zoneIndices[editIndex]);
+    }
+
+    for (const auto& [lowerIndex, upperIndex] : crossfadePairs)
+    {
+        const auto pairWasEdited = std::find(zoneIndices.begin(), zoneIndices.end(), lowerIndex) != zoneIndices.end()
+            || std::find(zoneIndices.begin(), zoneIndices.end(), upperIndex) != zoneIndices.end();
+        if (!pairWasEdited)
+            continue;
+
+        auto& lower = project.authoring.zones[lowerIndex];
+        auto& upper = project.authoring.zones[upperIndex];
+        lower.velocityCrossfade.fadeOutLowVelocity = upper.velocityLow;
+        lower.velocityCrossfade.fadeOutHighVelocity = lower.velocityHigh;
+        upper.velocityCrossfade.fadeInLowVelocity = upper.velocityLow;
+        upper.velocityCrossfade.fadeInHighVelocity = lower.velocityHigh;
+        addChangedPath(lowerIndex);
+        addChangedPath(upperIndex);
     }
 
     for (const auto& [groupId, mode] : enabledGroups)
         reconcilePreviouslyEnabledGroup(project, groupId, mode);
 
     return documentController.commitSnapshot(project, label, changedPaths);
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::createVelocityCrossfadePair(
+    const VelocityCrossfadePairRequest& request,
+    const std::string& label)
+{
+    const auto plan = planVelocityCrossfadePair(getProject(), request);
+    if (!plan.valid())
+    {
+        return makeRejectedResult(getDocumentState(), "Velocity crossfade creation rejected",
+                                  plan.blockingIssues.empty()
+                                      ? "The requested velocity crossfade is invalid."
+                                      : plan.blockingIssues.front());
+    }
+    if (!plan.changesProject())
+    {
+        return makeRejectedResult(getDocumentState(), "Velocity crossfade unchanged",
+                                  "The requested velocity crossfade already has those endpoints.");
+    }
+
+    std::vector<std::string> changedPaths;
+    for (const auto& zoneId : plan.affectedZoneIds)
+    {
+        const auto index = findZoneIndexById(plan.proposedProject, zoneId);
+        if (index.has_value())
+            changedPaths.push_back("authoring.zones[" + std::to_string(*index) + "]");
+    }
+    return documentController.commitSnapshot(plan.proposedProject, label, changedPaths);
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::updateVelocityCrossfadePair(
+    const VelocityCrossfadePairRequest& request,
+    const std::string& label)
+{
+    auto result = createVelocityCrossfadePair(request, label);
+    if (!result.applied && result.state == "Velocity crossfade creation rejected")
+        result.state = "Velocity crossfade update rejected";
+    return result;
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::removeVelocityCrossfadePair(
+    const std::string& lowerZoneId,
+    const std::string& upperZoneId,
+    const std::string& label)
+{
+    const auto plan = planVelocityCrossfadeRemoval(getProject(), lowerZoneId, upperZoneId);
+    if (!plan.valid() || !plan.changesProject())
+    {
+        return makeRejectedResult(getDocumentState(), "Velocity crossfade removal rejected",
+                                  plan.blockingIssues.empty()
+                                      ? "The selected crossfade relationship has no removable changes."
+                                      : plan.blockingIssues.front());
+    }
+
+    std::vector<std::string> changedPaths;
+    for (const auto& zoneId : plan.affectedZoneIds)
+    {
+        const auto index = findZoneIndexById(plan.proposedProject, zoneId);
+        if (index.has_value())
+            changedPaths.push_back("authoring.zones[" + std::to_string(*index) + "]");
+    }
+    return documentController.commitSnapshot(plan.proposedProject, label, changedPaths);
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::createArticulation(

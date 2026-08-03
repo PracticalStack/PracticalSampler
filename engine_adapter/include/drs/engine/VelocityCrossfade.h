@@ -22,6 +22,14 @@ struct VelocityCrossfadeDescriptor
     VelocityCrossfadeCurve curve = VelocityCrossfadeCurve::linear;
 };
 
+// Kept in the crossfade core so runtime compilation, snapshot building, and
+// authoring all agree on which zones can form a velocity relationship.
+std::uint64_t computeVelocityCrossfadePairingKey(const std::string& articulationId,
+                                                 int rootKey,
+                                                 int keyLow,
+                                                 int keyHigh,
+                                                 int triggerMode);
+
 struct VelocityCrossfadeZoneDefinition
 {
     int velocityLow = 1;

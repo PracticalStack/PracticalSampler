@@ -720,13 +720,11 @@ std::string buildVelocityCrossfadeTopologyIssue(const std::string& context,
 template <typename TZone>
 std::uint64_t buildVelocityCrossfadePairingKey(const TZone& zone)
 {
-    std::ostringstream stream;
-    stream << zone.articulationId
-           << "|" << zone.rootKey
-           << "|" << zone.keyLow
-           << "|" << zone.keyHigh
-           << "|" << static_cast<int>(zone.triggerMode);
-    return computeFnv1a64(stream.str());
+    return computeVelocityCrossfadePairingKey(zone.articulationId,
+                                              zone.rootKey,
+                                              zone.keyLow,
+                                              zone.keyHigh,
+                                              static_cast<int>(zone.triggerMode));
 }
 
 template <typename TZone>

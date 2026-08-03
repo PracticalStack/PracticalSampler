@@ -1,6 +1,7 @@
 #pragma once
 
 #include "drs/engine/ProjectDocument.h"
+#include "drs/engine/VelocityCrossfadeAuthoring.h"
 
 #include <functional>
 #include <optional>
@@ -108,6 +109,16 @@ public:
                                                           const std::string& label);
     RuntimeProjectDocumentActionResult updateZoneRanges(
         const std::vector<AuthoringZoneSummary>& zones,
+        const std::string& label);
+    RuntimeProjectDocumentActionResult createVelocityCrossfadePair(
+        const VelocityCrossfadePairRequest& request,
+        const std::string& label);
+    RuntimeProjectDocumentActionResult updateVelocityCrossfadePair(
+        const VelocityCrossfadePairRequest& request,
+        const std::string& label);
+    RuntimeProjectDocumentActionResult removeVelocityCrossfadePair(
+        const std::string& lowerZoneId,
+        const std::string& upperZoneId,
         const std::string& label);
     RuntimeProjectDocumentActionResult createArticulation(
         const RuntimeProjectArticulationDefinition& articulation,

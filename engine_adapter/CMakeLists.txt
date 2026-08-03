@@ -212,11 +212,13 @@ add_library(drs_engine_adapter STATIC
     src/RuntimeStreamingService.cpp
     src/RuntimeStream.cpp
     src/RuntimeVoice.cpp
+    src/VelocityCrossfadeAuthoring.cpp
     include/drs/engine/AuthoringPreviewCommandAdapter.h
     include/drs/engine/AuthoringPreviewContract.h
     include/drs/engine/AuthoringPreviewController.h
     include/drs/engine/AuthoringPreviewRecovery.h
     include/drs/engine/AuthoringSession.h
+    include/drs/engine/VelocityCrossfadeAuthoring.h
     include/drs/engine/ControlLaw.h
     include/drs/engine/CuratedDspCatalog.h
     include/drs/engine/DraftPlaybackContract.h
