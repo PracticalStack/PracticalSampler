@@ -44,8 +44,7 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
     const auto pitchRatio = std::pow(2.0,
                                      static_cast<double>(request.effectiveMidiNote - selectedRoute.rootKey) / 12.0);
     const auto increment = pitchRatio * (selectedSample.sampleRate / request.outputSampleRate);
-    const auto gain = 0.25
-        * (static_cast<double>(request.effectiveVelocity) / 127.0)
+    const auto gain = (static_cast<double>(request.effectiveVelocity) / 127.0)
         * request.routeGainMultiplier
         * std::pow(10.0, selectedRoute.gainDb / 20.0);
     if (!std::isfinite(increment) || increment <= 0.0 || !std::isfinite(gain))

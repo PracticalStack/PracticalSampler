@@ -191,7 +191,7 @@ void runLoopBoundaryMatrix()
     require(result.mixedFrameCount == 10 && !result.voiceFinished && voice.isActive(),
             "Enabled loop must remain active after repeated wraps.");
     requireVector(output.left,
-                  { 0.0f, 0.25f, 0.5f, 0.75f, 1.0f, 0.5f, 0.75f, 1.0f, 0.5f, 0.75f },
+                  { 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 2.0f, 3.0f, 4.0f, 2.0f, 3.0f },
                   "Unity loop sequence changed");
 
     loop.sampleStartFrame = 4;
@@ -202,7 +202,7 @@ void runLoopBoundaryMatrix()
     StereoOutput fractionalOutput(6);
     fractional.render(fractionalOutput.view(), 0, 6);
     requireVector(fractionalOutput.left,
-                  { 1.0f, 0.75f, 0.5f, 0.625f, 0.75f, 0.875f },
+                  { 4.0f, 3.0f, 2.0f, 2.5f, 3.0f, 3.5f },
                   "Fractional loop-boundary interpolation changed");
 
     ModelOptions multipleWraps;
@@ -215,7 +215,7 @@ void runLoopBoundaryMatrix()
     require(multiple.start(*multipleModel, startRequest(84)), "Multiple-wrap voice should start.");
     StereoOutput multipleOutput(4);
     multiple.render(multipleOutput.view(), 0, 4);
-    requireVector(multipleOutput.left, { 0.25f, 0.25f, 0.25f, 0.25f },
+    requireVector(multipleOutput.left, { 1.0f, 1.0f, 1.0f, 1.0f },
                   "Multiple wraps in one increment changed");
 
     ModelOptions shortLoop;
@@ -228,7 +228,7 @@ void runLoopBoundaryMatrix()
     require(shortVoice.start(*shortModel, startRequest()), "One-frame loop should start.");
     StereoOutput shortOutput(4);
     shortVoice.render(shortOutput.view(), 0, 4);
-    requireVector(shortOutput.left, { 0.5f, 0.5f, 0.5f, 0.5f },
+    requireVector(shortOutput.left, { 2.0f, 2.0f, 2.0f, 2.0f },
                   "One-frame loop traversal changed");
 
     ModelOptions afterLoop;
@@ -243,7 +243,7 @@ void runLoopBoundaryMatrix()
     const auto afterResult = afterVoice.render(afterOutput.view(), 0, 4);
     require(afterResult.mixedFrameCount == 3 && afterResult.voiceFinished,
             "A start at/after loop end must play the natural tail without wrapping.");
-    requireVector(afterOutput.left, { 1.25f, 1.5f, 1.75f, 0.0f },
+    requireVector(afterOutput.left, { 5.0f, 6.0f, 7.0f, 0.0f },
                   "Post-loop natural tail changed");
 }
 
@@ -267,10 +267,10 @@ void runReleaseLawMatrix()
     require(result.mixedFrameCount == 2048 && result.voiceFinished
                 && voice.getReleaseSamplesRemaining() == 0,
             "Release must finish after exactly 2,048 rendered samples.");
-    requireNear(output.left.front(), 0.25f, "First release sample must remain unity.");
-    requireNear(output.left[1], 0.25f * 2047.0f / 2048.0f,
+    requireNear(output.left.front(), 1.0f, "First release sample must remain unity.");
+    requireNear(output.left[1], 2047.0f / 2048.0f,
                 "Second release sample changed.");
-    requireNear(output.left.back(), 0.25f / 2048.0f,
+    requireNear(output.left.back(), 1.0f / 2048.0f,
                 "Final release sample changed.");
 
     drs::engine::SamplerVoice idempotent;
@@ -331,9 +331,9 @@ void runPoolLifecycleMatrix()
     require(result.render.releasedVoiceCount == 1 && result.releasingVoiceCount == 1,
             "Note-off must enter release at its exact event boundary.");
     requireVector(output.left,
-                  { 0.0f, 0.25f, 0.25f, 0.25f,
-                    0.25f * 2047.0f / 2048.0f,
-                    0.25f * 2046.0f / 2048.0f },
+                  { 0.0f, 1.0f, 1.0f, 1.0f,
+                    2047.0f / 2048.0f,
+                    2046.0f / 2048.0f },
                   "Pool release boundary changed");
 
     events.clear();
@@ -352,7 +352,7 @@ void runPoolLifecycleMatrix()
     result = naturalPool.renderBlock(naturalOutput.view(), events.view());
     require(result.render.completedVoiceCount == 1 && result.finishedVoiceCount == 1,
             "Natural sample end must produce one completed finished slot.");
-    requireVector(naturalOutput.left, { 0.25f, 0.25f, 0.25f, 0.0f },
+    requireVector(naturalOutput.left, { 1.0f, 1.0f, 1.0f, 0.0f },
                   "Natural sample completion changed");
 }
 

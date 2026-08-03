@@ -323,9 +323,9 @@ void runIndependentContextMatrix()
     require(previewResult.accepted && performanceResult.accepted
                 && previewResult.activationApplied && performanceResult.activationApplied,
             "Both contexts should apply and render their activations at their block boundary.");
-    requireNear(previewOutput.left.front(), 0.25f,
+    requireNear(previewOutput.left.front(), 1.0f,
                 "Preview must render only Preview PCM and gain state.");
-    requireNear(performanceOutput.left.front(), 0.5f,
+    requireNear(performanceOutput.left.front(), 2.0f,
                 "Performance must render only Performance PCM and gain state.");
 
     preview.resetAtBlockBoundary();
@@ -336,7 +336,7 @@ void runIndependentContextMatrix()
             "Both contexts should remain renderable after Preview reset.");
     requireNear(previewAfterReset.left.front(), 0.0f,
                 "Preview reset must silence only Preview voices.");
-    requireNear(performanceAfterReset.left.front(), 0.5f,
+    requireNear(performanceAfterReset.left.front(), 2.0f,
                 "Preview reset must not alter Performance note ownership.");
 
     const auto previewSnapshot = preview.getSnapshot();
@@ -386,7 +386,7 @@ void runDspGenerationActivationMatrix()
     require(context.renderBlock(output.view(), eventView(gainNotes)).activationApplied
                 && context.getActiveDspGeneration() == generation.get(),
             "The audio block boundary must exchange only the prepared slot's generation pointer.");
-    requireNear(output.left.front(), 0.9976312f,
+    requireNear(output.left.front(), 3.9905248f,
                 "Overlapping voices must traverse zone, group, and master Gain once at each aggregation point.");
     require(!context.publishDspControl(generation->getControlGenerationIdentity() + 1, 6, 0.0)
                 && context.publishDspControl(generation->getControlGenerationIdentity(), 6, 0.0),
@@ -395,7 +395,7 @@ void runDspGenerationActivationMatrix()
     StereoOutput updatedOutput(4);
     require(context.renderBlock(updatedOutput.view(), eventView(gainNotes)).accepted,
             "A live Gain control update must render without rebuilding the active graph.");
-    require(updatedOutput.left[1] < 0.9976312f && updatedOutput.left[1] > 0.5f,
+    require(updatedOutput.left[1] < 3.9905248f && updatedOutput.left[1] > 2.0f,
             "A linear Gain control update must begin a click-free ramp on the next callback block.");
     for (std::size_t block = 1; block < 120; ++block)
     {
@@ -403,7 +403,7 @@ void runDspGenerationActivationMatrix()
         require(context.renderBlock(smoothingOutput.view(), noEvents()).accepted,
                 "A smoothing ramp must remain renderable across callback partitions.");
         if (block == 119)
-            requireNear(smoothingOutput.left.back(), 0.5f,
+            requireNear(smoothingOutput.left.back(), 2.0f,
                         "A numeric master Gain control update must reach its target after 10 ms.");
     }
     require(!context.publishDspNodeBypass(generation->getControlGenerationIdentity() + 1, 1, true)
@@ -411,7 +411,7 @@ void runDspGenerationActivationMatrix()
             "A stale generation must not bypass a node, while the active node may crossfade to bypass.");
     StereoOutput bypassTransition(4);
     require(context.renderBlock(bypassTransition.view(), noEvents()).accepted
-                && bypassTransition.left[1] > 0.5f && bypassTransition.left[1] < 0.9976312f,
+                && bypassTransition.left[1] > 2.0f && bypassTransition.left[1] < 3.9905248f,
             "A node bypass must start as a click-free wet/dry transition rather than a hard switch.");
     for (std::size_t block = 1; block < 60; ++block)
     {
@@ -419,7 +419,7 @@ void runDspGenerationActivationMatrix()
         require(context.renderBlock(bypassOutput.view(), noEvents()).accepted,
                 "A bypass transition must remain renderable across callback partitions.");
         if (block == 59)
-            requireNear(bypassOutput.left.back(), 0.9976312f,
+            requireNear(bypassOutput.left.back(), 3.9905248f,
                         "A bypassed group Gain must become transparent after its 5 ms crossfade.");
     }
     const auto snapshot = context.getSnapshot();
@@ -441,7 +441,7 @@ void runDspGenerationActivationMatrix()
     StereoOutput performanceOutput(4);
     require(performance.renderBlock(performanceOutput.view(), eventView(gainNotes)).accepted,
             "Performance must render the same instrument Gain core.");
-    requireNear(performanceOutput.left.front(), 0.9976312f,
+    requireNear(performanceOutput.left.front(), 3.9905248f,
                 "Preview and Performance must produce the same Gain result with separate state.");
     require(performance.getActiveDspGeneration() != generation.get(),
             "Preview and Performance must never share mutable Gain-generation state.");
@@ -529,9 +529,9 @@ void runConcurrentRenderMatrix()
             "Preview and Performance should render concurrently through the shared core.");
     for (std::size_t frame = 0; frame < previewOutput.left.size(); ++frame)
     {
-        requireNear(previewOutput.left[frame], 0.25f,
+        requireNear(previewOutput.left[frame], 1.0f,
                     "Concurrent Preview output leaked Performance state.");
-        requireNear(performanceOutput.left[frame], 0.5f,
+        requireNear(performanceOutput.left[frame], 2.0f,
                     "Concurrent Performance output leaked Preview state.");
     }
 }
@@ -566,7 +566,7 @@ void runBlockBoundaryAndLifetimeMatrix()
     require(replacement.accepted && replacement.activationApplied
                 && context.getSnapshot().activeRevision == 21,
             "Replacement must become visible exactly at the following block boundary.");
-    requireNear(replacementBlock.left.front(), 0.75f,
+    requireNear(replacementBlock.left.front(), 3.0f,
                 "Old and new activation voices must render together without model aliasing.");
 
     oldLifetime.model.reset();
@@ -634,11 +634,11 @@ void runRoundRobinLaneAndGenerationMatrix()
                 && performance.stageActivation(performanceModel.model),
             "RR activations should stage for both lanes.");
 
-    requireNear(renderSingleFrameNote(preview, 60), 0.25f,
+    requireNear(renderSingleFrameNote(preview, 60), 1.0f,
                 "Preview RR should start on slot 1.");
-    requireNear(renderSingleFrameNote(preview, 60), 0.5f,
+    requireNear(renderSingleFrameNote(preview, 60), 2.0f,
                 "Preview RR should advance to slot 2.");
-    requireNear(renderSingleFrameNote(performance, 60), 0.25f,
+    requireNear(renderSingleFrameNote(performance, 60), 1.0f,
                 "Performance RR must keep its own slot counter.");
     auto previewSnapshot = preview.getSnapshot();
     auto performanceSnapshot = performance.getSnapshot();
@@ -651,7 +651,7 @@ void runRoundRobinLaneAndGenerationMatrix()
     auto replacementModel = buildRoundRobinModel(drs::engine::PlaybackActivationLane::preview, 42, 1.0f, 2.0f);
     require(preview.stageActivation(replacementModel.model),
             "Replacement preview RR activation should stage.");
-    requireNear(renderSingleFrameNote(preview, 60), 0.25f,
+    requireNear(renderSingleFrameNote(preview, 60), 1.0f,
                 "A new activation generation should reset the RR slot sequence.");
     previewSnapshot = preview.getSnapshot();
     require(previewSnapshot.counters.roundRobinPoolHitCount == 3

@@ -245,48 +245,48 @@ std::vector<drs::tests::OfflineRenderArtifact> runGoldenBehaviorMatrix()
     auto timing = render("sample-accurate-timing", constant, 12, { noteOn(3) });
     require(timing.summary.firstNonZeroFrame == 3, "Note-on should begin at its exact global frame.");
     requireFrame(timing, 0, 2, 0.0, "Timing pre-roll");
-    requireFrame(timing, 0, 3, 0.25, "Timing onset");
+    requireFrame(timing, 0, 3, 1.0, "Timing onset");
     artifacts.push_back(std::move(timing));
 
     auto mono = render("mono-root-unity", ramp, 7, { noteOn(0) });
-    requireFrame(mono, 0, 1, 0.0625, "Mono unity-pitch left");
-    requireFrame(mono, 1, 1, 0.0625, "Mono duplication right");
+    requireFrame(mono, 0, 1, 0.25, "Mono unity-pitch left");
+    requireFrame(mono, 1, 1, 0.25, "Mono duplication right");
     artifacts.push_back(std::move(mono));
 
     ModelSpec stereo { { { 0.2f, 0.4f, 0.6f }, { -0.1f, -0.3f, -0.5f } } };
     auto stereoArtifact = render("stereo-channels", stereo, 5, { noteOn(0) });
-    requireFrame(stereoArtifact, 0, 1, 0.1, "Stereo left channel");
-    requireFrame(stereoArtifact, 1, 1, -0.075, "Stereo right channel");
+    requireFrame(stereoArtifact, 0, 1, 0.4, "Stereo left channel");
+    requireFrame(stereoArtifact, 1, 1, -0.3, "Stereo right channel");
     artifacts.push_back(std::move(stereoArtifact));
 
     ModelSpec startOffset = ramp;
     startOffset.sampleStartFrame = 2;
     auto offset = render("sample-start-offset", startOffset, 5, { noteOn(0) });
-    requireFrame(offset, 0, 0, 0.125, "Authored sample start offset");
-    requireFrame(offset, 0, 2, 0.25, "Authored sample start progression");
+    requireFrame(offset, 0, 0, 0.5, "Authored sample start offset");
+    requireFrame(offset, 0, 2, 1.0, "Authored sample start progression");
     artifacts.push_back(std::move(offset));
 
     ModelSpec octave { { { 0.0f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f } } };
     auto octaveArtifact = render("octave-pitch", octave, 5, { noteOn(0, 72) });
-    requireFrame(octaveArtifact, 0, 1, 0.05, "Octave pitch increment");
-    requireFrame(octaveArtifact, 0, 3, 0.15, "Octave final-frame traversal");
+    requireFrame(octaveArtifact, 0, 1, 0.2, "Octave pitch increment");
+    requireFrame(octaveArtifact, 0, 3, 0.6, "Octave final-frame traversal");
     artifacts.push_back(std::move(octaveArtifact));
 
     auto velocity = render("velocity-scaling", constant, 4, { noteOn(0, 60, 64) });
-    requireFrame(velocity, 0, 0, 0.25 * 64.0 / 127.0, "Velocity scaling");
+    requireFrame(velocity, 0, 0, 64.0 / 127.0, "Velocity scaling");
     artifacts.push_back(std::move(velocity));
 
     ModelSpec gain = constant;
     gain.gainDb = -6.0;
     auto gainArtifact = render("gain-scaling", gain, 4, { noteOn(0) });
-    requireFrame(gainArtifact, 0, 0, 0.25 * std::pow(10.0, -6.0 / 20.0), "Gain scaling");
+    requireFrame(gainArtifact, 0, 0, std::pow(10.0, -6.0 / 20.0), "Gain scaling");
     artifacts.push_back(std::move(gainArtifact));
 
     ModelSpec pan = constant;
     pan.pan = 0.5;
     auto panArtifact = render("pan-balance", pan, 4, { noteOn(0) });
-    requireFrame(panArtifact, 0, 0, 0.125, "Positive pan left attenuation");
-    requireFrame(panArtifact, 1, 0, 0.25, "Positive pan right preservation");
+    requireFrame(panArtifact, 0, 0, 0.5, "Positive pan left attenuation");
+    requireFrame(panArtifact, 1, 0, 1.0, "Positive pan right preservation");
     artifacts.push_back(std::move(panArtifact));
 
     const auto grouped = drs::tests::renderOffline(
@@ -301,15 +301,15 @@ std::vector<drs::tests::OfflineRenderArtifact> runGoldenBehaviorMatrix()
           4,
           64,
           { noteOn(0) } });
-    requireFrame(grouped, 0, 0, 0.25 + 2.0 * 0.25 * std::pow(10.0, -6.0 / 20.0) * 0.5,
+    requireFrame(grouped, 0, 0, 1.0 + 2.0 * std::pow(10.0, -6.0 / 20.0) * 0.5,
                  "Group gain/pan left mix");
-    requireFrame(grouped, 1, 0, 0.25 + 2.0 * 0.25 * std::pow(10.0, -6.0 / 20.0),
+    requireFrame(grouped, 1, 0, 1.0 + 2.0 * std::pow(10.0, -6.0 / 20.0),
                  "Group gain/pan right mix");
     artifacts.push_back(std::move(grouped));
 
     ModelSpec shortSample { { { 1.0f, 0.5f, 0.25f } } };
     auto completion = render("sample-completion", shortSample, 7, { noteOn(0) });
-    requireFrame(completion, 0, 2, 0.0625, "Final sample frame");
+    requireFrame(completion, 0, 2, 0.25, "Final sample frame");
     requireFrame(completion, 0, 3, 0.0, "Post-completion silence");
     require(completion.summary.counters.completedVoiceCount == 1
                 && completion.summary.finishedVoiceCount == 1,
@@ -318,7 +318,7 @@ std::vector<drs::tests::OfflineRenderArtifact> runGoldenBehaviorMatrix()
 
     auto accumulation = render("mixed-accumulation", constant, 4,
                                { noteOn(0), noteOn(0) });
-    requireFrame(accumulation, 0, 0, 0.5, "Two-voice mixed accumulation");
+    requireFrame(accumulation, 0, 0, 2.0, "Two-voice mixed accumulation");
     require(accumulation.summary.counters.startedVoiceCount == 2,
             "Mixed accumulation should start two voices.");
     artifacts.push_back(std::move(accumulation));
@@ -329,8 +329,8 @@ std::vector<drs::tests::OfflineRenderArtifact> runGoldenBehaviorMatrix()
     loopConstant.loopEndFrame = 32;
     auto release = render("note-off-release", loopConstant, 2060,
                           { noteOn(0), noteOff(4) }, 127);
-    requireFrame(release, 0, 4, 0.25, "Release first sample");
-    requireFrame(release, 0, 5, 0.25 * 2047.0 / 2048.0, "Release envelope progression");
+    requireFrame(release, 0, 4, 1.0, "Release first sample");
+    requireFrame(release, 0, 5, 2047.0 / 2048.0, "Release envelope progression");
     requireFrame(release, 0, 2052, 0.0, "Release completion silence");
     require(release.summary.counters.releasedVoiceCount == 1
                 && release.summary.counters.completedVoiceCount == 1,
@@ -342,20 +342,20 @@ std::vector<drs::tests::OfflineRenderArtifact> runGoldenBehaviorMatrix()
     loop.loopStartFrame = 1;
     loop.loopEndFrame = 4;
     auto loopBoundary = render("loop-boundary", loop, 8, { noteOn(0) });
-    const std::array<double, 8> loopExpected { 0.0, 0.05, 0.1, 0.15, 0.05, 0.1, 0.15, 0.05 };
+    const std::array<double, 8> loopExpected { 0.0, 0.2, 0.4, 0.6, 0.2, 0.4, 0.6, 0.2 };
     for (std::size_t frame = 0; frame < loopExpected.size(); ++frame)
         requireFrame(loopBoundary, 0, frame, loopExpected[frame], "Forward loop boundary");
     artifacts.push_back(std::move(loopBoundary));
 
     auto multipleWraps = render("multiple-loop-wraps", loop, 8, { noteOn(0, 72) });
-    const std::array<double, 8> wrapExpected { 0.0, 0.1, 0.05, 0.15, 0.1, 0.05, 0.15, 0.1 };
+    const std::array<double, 8> wrapExpected { 0.0, 0.4, 0.2, 0.6, 0.4, 0.2, 0.6, 0.4 };
     for (std::size_t frame = 0; frame < wrapExpected.size(); ++frame)
         requireFrame(multipleWraps, 0, frame, wrapExpected[frame], "Multiple loop wraps");
     artifacts.push_back(std::move(multipleWraps));
 
     auto polyphony = render("polyphony", loopConstant, 8,
                             { noteOn(0, 60), noteOn(0, 61), noteOn(0, 62) });
-    requireFrame(polyphony, 0, 0, 0.75, "Three-voice polyphony");
+    requireFrame(polyphony, 0, 0, 3.0, "Three-voice polyphony");
     require(polyphony.summary.activeVoiceCount == 3,
             "Polyphony scenario should retain three active voices.");
     artifacts.push_back(std::move(polyphony));
@@ -364,7 +364,7 @@ std::vector<drs::tests::OfflineRenderArtifact> runGoldenBehaviorMatrix()
     for (int index = 0; index < 25; ++index)
         stealEvents.push_back(noteOn(0, 48 + index));
     auto stealing = render("voice-stealing", loopConstant, 4, std::move(stealEvents));
-    requireFrame(stealing, 0, 0, 6.0, "Fixed-pool post-steal mix");
+    requireFrame(stealing, 0, 0, 24.0, "Fixed-pool post-steal mix");
     require(stealing.summary.counters.startedVoiceCount == 25
                 && stealing.summary.counters.stolenVoiceCount == 1
                 && stealing.summary.activeVoiceCount == 24,
@@ -390,7 +390,7 @@ std::vector<drs::tests::OfflineRenderArtifact> runGoldenBehaviorMatrix()
     auto reset = render("emergency-reset", loopConstant, 8,
                         { noteOn(0), noteOn(0, 61),
                           command(3, drs::engine::SamplerRenderEventType::reset) });
-    requireFrame(reset, 0, 2, 0.5, "Reset precondition mix");
+    requireFrame(reset, 0, 2, 2.0, "Reset precondition mix");
     requireFrame(reset, 0, 3, 0.0, "Emergency reset boundary");
     require(reset.summary.counters.resetVoiceCount == 2
                 && reset.summary.activeVoiceCount == 0

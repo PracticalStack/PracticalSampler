@@ -401,7 +401,7 @@ drs::engine::SamplerVoicePoolRenderResult renderSingleFrameNoteOn(drs::engine::S
 
 void runEventBlockContract()
 {
-    static_assert(drs::engine::SamplerEventBlock::capacity == 128,
+    static_assert(drs::engine::SamplerEventBlock::capacity == 512,
                   "Sprint 4 event capacity changed.");
     static_assert(drs::engine::SamplerVoicePool::capacity == 24,
                   "Sprint 4 per-context voice capacity changed.");
@@ -425,9 +425,11 @@ void runEventBlockContract()
     block.clear();
     for (std::size_t index = 0; index < drs::engine::SamplerEventBlock::capacity; ++index)
         require(block.push(noteOff(static_cast<std::uint32_t>(index % 32))),
-                "Event block should accept exactly 128 events.");
-    require(!block.push(noteOff(0)) && block.size() == 128 && block.droppedEventCount() == 1,
-            "The 129th event must be rejected with a deterministic drop count.");
+                "Event block should accept exactly its bounded event capacity.");
+    require(!block.push(noteOff(0))
+                && block.size() == drs::engine::SamplerEventBlock::capacity
+                && block.droppedEventCount() == 1,
+            "The first event beyond the bounded capacity must be rejected with a deterministic drop count.");
     block.clear();
     require(block.size() == 0 && block.droppedEventCount() == 0,
             "Event-block clear must restore bounded scratch state.");
@@ -448,7 +450,7 @@ void runSampleAccurateTimingMatrix()
                 && result.render.startedVoiceCount == 1
                 && result.activeVoiceCount == 1,
             "Sample-accurate note-on should start one active voice.");
-    requireVector(output.left, { 0.0f, 0.0f, 0.0f, 0.25f, 0.25f, 0.25f, 0.25f, 0.25f },
+    requireVector(output.left, { 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },
                   "Note-on sample offset changed");
     requireVector(output.right, output.left, "Mono scheduled voice should duplicate to stereo");
 
@@ -501,8 +503,8 @@ void runNoteOwnershipAndCommandMatrix()
                 && result.releasingVoiceCount == 2,
             "Repeated-note ownership must release every matching active voice.");
     requireVector(repeatedOutput.left,
-                  { 0.25f, 0.25f, 0.5f, 0.5f, 0.5f,
-                    0.5f * 2047.0f / 2048.0f },
+                  { 1.0f, 1.0f, 2.0f, 2.0f, 2.0f,
+                    2.0f * 2047.0f / 2048.0f },
                   "Repeated-note scheduling changed");
 
     pool.resetVoices();
@@ -525,7 +527,7 @@ void runNoteOwnershipAndCommandMatrix()
                 && result.activeVoiceCount == 0
                 && result.releasingVoiceCount == 0,
             "Emergency reset must immediately return all slots to free.");
-    requireVector(resetOutput.left, { 0.25f, 0.25f, 0.25f, 0.25f, 0.0f, 0.0f, 0.0f, 0.0f },
+    requireVector(resetOutput.left, { 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f },
                   "Emergency reset sample boundary changed");
 }
 
@@ -541,7 +543,7 @@ void runOverlappingLayerMatrix()
     auto result = pool.renderBlock(output.view(), events.view());
     require(result.render.startedVoiceCount == 2 && result.activeVoiceCount == 2,
             "One note must start every sample whose key and velocity ranges overlap the trigger.");
-    requireVector(output.left, { 0.5f, 0.5f, 0.5f, 0.5f },
+    requireVector(output.left, { 2.0f, 2.0f, 2.0f, 2.0f },
                   "Overlapping sample layers should be mixed together");
 
     events.clear();
@@ -568,7 +570,7 @@ void runTriggerModeMatrix()
                 && result.activeVoiceCount == 1
                 && result.releasingVoiceCount == 0,
             "One-shot voices must ignore matching note-off events.");
-    requireVector(firstOutput.left, { 0.25f, 0.25f, 0.25f, 0.25f },
+    requireVector(firstOutput.left, { 1.0f, 1.0f, 1.0f, 1.0f },
                   "One-shot playback should continue after note-off");
 
     events.clear();
@@ -598,20 +600,20 @@ void runRoundRobinRoutingMatrix()
             "Sequential RR pool should prepare.");
     float mixedSample = 0.0f;
     auto renderResult = renderSingleFrameNoteOn(sequentialPool, 60, mixedSample);
-    requireNear(mixedSample, 0.25f,
+    requireNear(mixedSample, 1.0f,
                 "First RR trigger should select slot 1.");
     require(renderResult.render.roundRobinPoolHitCount == 1
                 && renderResult.render.roundRobinPoolMissCount == 0
                 && renderResult.render.roundRobinFallbackCount == 0,
             "Valid RR routing should record one pool hit and no RR fallbacks.");
     renderResult = renderSingleFrameNoteOn(sequentialPool, 60, mixedSample);
-    requireNear(mixedSample, 0.5f,
+    requireNear(mixedSample, 2.0f,
                 "Second RR trigger should select slot 2.");
     renderResult = renderSingleFrameNoteOn(sequentialPool, 60, mixedSample);
-    requireNear(mixedSample, 0.75f,
+    requireNear(mixedSample, 3.0f,
                 "Third RR trigger should select slot 3.");
     renderResult = renderSingleFrameNoteOn(sequentialPool, 60, mixedSample);
-    requireNear(mixedSample, 0.25f,
+    requireNear(mixedSample, 1.0f,
                 "Fourth RR trigger should wrap back to slot 1.");
 
     const auto multiPoolModel = buildRoundRobinModel({
@@ -624,19 +626,19 @@ void runRoundRobinRoutingMatrix()
     require(multiPool.prepare(*multiPoolModel, 48000.0),
             "Multi-pool RR model should prepare.");
     renderResult = renderSingleFrameNoteOn(multiPool, 60, mixedSample);
-    requireNear(mixedSample, 2.75f,
+    requireNear(mixedSample, 11.0f,
                 "First shared RR trigger should start slot 1 in both pools.");
     require(renderResult.render.roundRobinPoolHitCount == 2
                 && renderResult.render.roundRobinPoolMissCount == 0
                 && renderResult.render.roundRobinFallbackCount == 0,
             "Shared-note RR routing should record one hit per participating pool.");
     renderResult = renderSingleFrameNoteOn(multiPool, 61, mixedSample);
-    requireNear(mixedSample, 0.5f,
+    requireNear(mixedSample, 2.0f,
                 "A trigger that only hits pool A should advance only pool A.");
     require(renderResult.render.roundRobinPoolHitCount == 1,
             "A note that reaches only one RR family should hit only that pool.");
     renderResult = renderSingleFrameNoteOn(multiPool, 60, mixedSample);
-    requireNear(mixedSample, 5.25f,
+    requireNear(mixedSample, 21.0f,
                 "Pool B must not phase-lock to pool A when it misses an intervening note.");
 
     const auto randomModel = buildRoundRobinModel({
@@ -652,7 +654,7 @@ void runRoundRobinRoutingMatrix()
     for (auto trigger = 0; trigger < 12; ++trigger)
     {
         renderResult = renderSingleFrameNoteOn(randomPool, 60, mixedSample);
-        randomSlots.push_back(static_cast<int>(std::lround(mixedSample * 4.0f)));
+        randomSlots.push_back(static_cast<int>(std::lround(mixedSample)));
     }
     const std::vector<int> sequentialSlots { 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4 };
     require(randomSlots != sequentialSlots
@@ -734,7 +736,7 @@ void runOverflowDropAndRealtimeMatrix()
     allocation_probe::enabled = false;
     require(!overflowAccepted && events.droppedEventCount() == 1
                 && allocation_probe::allocations == 0 && allocation_probe::deallocations == 0,
-            "Bounded event admission must not allocate, release, or grow at 128/129 pressure.");
+            "Bounded event admission must not allocate, release, or grow at capacity pressure.");
 
     StereoOutput output(64);
     allocation_probe::reset();
@@ -742,7 +744,7 @@ void runOverflowDropAndRealtimeMatrix()
     const auto result = pool.renderBlock(output.view(), events.view());
     allocation_probe::enabled = false;
     require(result.accepted
-                && result.render.consumedEventCount == 128
+                && result.render.consumedEventCount == drs::engine::SamplerEventBlock::capacity
                 && result.activeVoiceCount == 24
                 && allocation_probe::allocations == 0
                 && allocation_probe::deallocations == 0,

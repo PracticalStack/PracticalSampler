@@ -209,7 +209,7 @@ drs::engine::SamplerRenderEventView eventView(
 
 float expectedOutput(int velocity, float sampleValue = 1.0f, float gainMultiplier = 1.0f)
 {
-    return 0.25f * static_cast<float>(velocity) / 127.0f * sampleValue * gainMultiplier;
+    return static_cast<float>(velocity) / 127.0f * sampleValue * gainMultiplier;
 }
 
 std::vector<RouteSpec> makeCrossfadePair(bool includeUpperRuntime = true)

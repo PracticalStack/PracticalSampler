@@ -182,8 +182,8 @@ void runStartAndFormulaContract()
             "Voice identity must be stable primitive state.");
     requireNear(voice.getIncrementFrames(), 1.0, 1.0e-12,
                 "Octave-up at half source/output rate should produce unity increment.");
-    requireNear(voice.getBaseGain(), 0.25 * 64.0 / 127.0, 1.0e-7,
-                "Velocity/gain compatibility formula changed.");
+    requireNear(voice.getBaseGain(), 64.0 / 127.0, 1.0e-7,
+                "Velocity/gain formula changed.");
     requireNear(voice.getPositionFrames(), 0.0, 0.0, "Voice should start at the route offset.");
     requireNear(voice.getPanGains().left, 1.0, 0.0, "Center left balance changed.");
     requireNear(voice.getPanGains().right, 1.0, 0.0, "Center right balance changed.");
@@ -219,14 +219,14 @@ void runLegacyCenterReferenceVectors()
     const auto result = voice.render(output.view(), 0, 5);
     require(result.accepted && result.mixedFrameCount == 5 && result.voiceFinished,
             "Legacy vector should render through the final frame exactly once.");
-    requireVector(output.left, { 0.0f, 0.25f, 0.5f, 0.75f, 1.0f },
+    requireVector(output.left, { 0.0f, 1.0f, 2.0f, 3.0f, 4.0f },
                   "Legacy center left vector changed");
-    requireVector(output.right, { 1.0f, 0.75f, 0.5f, 0.25f, 0.0f },
+    requireVector(output.right, { 4.0f, 3.0f, 2.0f, 1.0f, 0.0f },
                   "Legacy center right vector changed");
 
     require(voice.render(output.view(), 0, 5).voiceFinished,
             "A completed voice should remain deterministically finished.");
-    requireVector(output.left, { 0.0f, 0.25f, 0.5f, 0.75f, 1.0f },
+    requireVector(output.left, { 0.0f, 1.0f, 2.0f, 3.0f, 4.0f },
                   "Finished voice must not render twice");
 }
 
@@ -248,7 +248,7 @@ void runSilenceAndImpulseMatrix()
     require(impulseVoice.start(*impulseModel, makeStart()), "Impulse voice should start.");
     StereoOutput impulseOutput(4);
     impulseVoice.render(impulseOutput.view(), 0, 4);
-    requireVector(impulseOutput.left, { 0.25f, 0.0f, 0.0f, 0.0f },
+    requireVector(impulseOutput.left, { 1.0f, 0.0f, 0.0f, 0.0f },
                   "Impulse response vector changed");
     requireVector(impulseOutput.right, impulseOutput.left, "Impulse mono duplication changed");
 }
@@ -263,7 +263,7 @@ void runPitchAndInterpolationMatrix()
     StereoOutput upOutput(5);
     require(up.render(upOutput.view(), 0, 5).voiceFinished,
             "Octave-up voice should reach sample end.");
-    requireVector(upOutput.left, { 0.0f, 0.5f, 1.0f, 1.5f, 2.0f },
+    requireVector(upOutput.left, { 0.0f, 2.0f, 4.0f, 6.0f, 8.0f },
                   "Octave-up interpolation vector changed");
     requireVector(upOutput.right, upOutput.left, "Mono octave-up should duplicate to stereo");
 
@@ -273,7 +273,7 @@ void runPitchAndInterpolationMatrix()
     const auto downResult = down.render(downOutput.view(), 0, 6);
     require(downResult.accepted && !downResult.voiceFinished,
             "Octave-down voice should retain remaining sample frames.");
-    requireVector(downOutput.left, { 0.0f, 0.125f, 0.25f, 0.375f, 0.5f, 0.625f },
+    requireVector(downOutput.left, { 0.0f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f },
                   "Octave-down fractional interpolation vector changed");
 
     ModelOptions halfRate;
@@ -285,7 +285,7 @@ void runPitchAndInterpolationMatrix()
                 "Source/output sample-rate ratio changed.");
     StereoOutput resampledOutput(4);
     resampled.render(resampledOutput.view(), 0, 4);
-    requireVector(resampledOutput.left, { 0.0f, 0.125f, 0.25f, 0.375f },
+    requireVector(resampledOutput.left, { 0.0f, 0.5f, 1.0f, 1.5f },
                   "Sample-rate interpolation vector changed");
 }
 
@@ -298,7 +298,7 @@ void runGainVelocityAndPanMatrix()
     require(minimumVelocity.start(*centerModel, makeStart(60, 1)), "Minimum velocity should start.");
     StereoOutput minimumOutput(1);
     minimumVelocity.render(minimumOutput.view(), 0, 1);
-    requireNear(minimumOutput.left[0], 0.25 / 127.0, renderTolerance,
+    requireNear(minimumOutput.left[0], 1.0 / 127.0, renderTolerance,
                 "Minimum velocity scale changed.");
 
     ModelOptions minusSix;
@@ -308,7 +308,7 @@ void runGainVelocityAndPanMatrix()
     require(quiet.start(*quietModel, makeStart()), "-6.02 dB voice should start.");
     StereoOutput quietOutput(1);
     quiet.render(quietOutput.view(), 0, 1);
-    requireNear(quietOutput.left[0], 0.125, renderTolerance,
+    requireNear(quietOutput.left[0], 0.5, renderTolerance,
                 "Zone dB conversion changed.");
 
     ModelOptions hardLeft;
@@ -318,7 +318,7 @@ void runGainVelocityAndPanMatrix()
     require(leftVoice.start(*leftModel, makeStart()), "Hard-left voice should start.");
     StereoOutput leftOutput(1);
     leftVoice.render(leftOutput.view(), 0, 1);
-    requireNear(leftOutput.left[0], 0.25, renderTolerance, "Hard-left signal changed.");
+    requireNear(leftOutput.left[0], 1.0, renderTolerance, "Hard-left signal changed.");
     requireNear(leftOutput.right[0], 0.0, renderTolerance, "Hard-left opposite channel must mute.");
 
     ModelOptions hardRight;
@@ -329,7 +329,7 @@ void runGainVelocityAndPanMatrix()
     StereoOutput rightOutput(1);
     rightVoice.render(rightOutput.view(), 0, 1);
     requireNear(rightOutput.left[0], 0.0, renderTolerance, "Hard-right opposite channel must mute.");
-    requireNear(rightOutput.right[0], 0.25, renderTolerance, "Hard-right signal changed.");
+    requireNear(rightOutput.right[0], 1.0, renderTolerance, "Hard-right signal changed.");
 
     ModelOptions halfRight;
     halfRight.pan = 0.5;
@@ -338,8 +338,8 @@ void runGainVelocityAndPanMatrix()
     require(halfRightVoice.start(*halfRightModel, makeStart()), "Half-right voice should start.");
     StereoOutput halfRightOutput(1);
     halfRightVoice.render(halfRightOutput.view(), 0, 1);
-    requireNear(halfRightOutput.left[0], 0.125, renderTolerance, "Linear left balance changed.");
-    requireNear(halfRightOutput.right[0], 0.25, renderTolerance, "Linear right balance changed.");
+    requireNear(halfRightOutput.left[0], 0.5, renderTolerance, "Linear left balance changed.");
+    requireNear(halfRightOutput.right[0], 1.0, renderTolerance, "Linear right balance changed.");
 }
 
 void runOffsetAccumulationAndFinalFrameMatrix()
@@ -353,7 +353,7 @@ void runOffsetAccumulationAndFinalFrameMatrix()
     const auto result = offsetVoice.render(output.view(), 2, 3);
     require(result.mixedFrameCount == 3 && result.voiceFinished,
             "Offset render should consume frames 2 through 4.");
-    requireVector(output.left, { 0.5f, 0.5f, 1.0f, 1.25f, 1.5f, 0.5f },
+    requireVector(output.left, { 0.5f, 0.5f, 2.5f, 3.5f, 4.5f, 0.5f },
                   "Start-offset/additive output changed");
     requireVector(output.right, output.left, "Mono start-offset output should duplicate");
 
@@ -364,7 +364,7 @@ void runOffsetAccumulationAndFinalFrameMatrix()
     const auto oneFrameResult = oneFrameVoice.render(oneFrameOutput.view(), 0, 2);
     require(oneFrameResult.mixedFrameCount == 1 && oneFrameResult.voiceFinished,
             "One-frame source must render its final frame once.");
-    requireVector(oneFrameOutput.left, { 0.2f, 0.0f }, "One-frame final sample changed");
+    requireVector(oneFrameOutput.left, { 0.8f, 0.0f }, "One-frame final sample changed");
 
     drs::engine::SamplerVoice invalidRange;
     require(invalidRange.start(*oneFrameModel, makeStart()), "Invalid-range voice should start.");
