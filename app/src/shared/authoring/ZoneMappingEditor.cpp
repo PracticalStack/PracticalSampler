@@ -49,6 +49,8 @@ ZoneMappingEditor::ZoneMappingEditor()
       removeCrossfadeRow("Relationship", "authoringRemoveCrossfadeRow", "Remove Crossfade"),
       createCrossfadeStackRow("Layer Stack", "authoringCreateCrossfadeStackRow", "Create Stack Crossfades"),
       removeCrossfadeStackRow("Layer Stack", "authoringRemoveCrossfadeStackRow", "Remove Stack Crossfades"),
+      auditionCrossfadeRow("Audition", "authoringCrossfadeAuditionRow", "Audition 5 Steps"),
+      crossfadeAuditionMessage("authoringCrossfadeAuditionStatus", juce::Justification::centredLeft),
       crossfadeGuidanceMessage("authoringCrossfadeGuidance", juce::Justification::centredLeft),
       roundRobinPoolMessage("authoringRoundRobinPoolMessage", juce::Justification::centredLeft),
       roundRobinSlotMessage("authoringRoundRobinSlotMessage", juce::Justification::centredLeft),
@@ -93,6 +95,7 @@ ZoneMappingEditor::ZoneMappingEditor()
     removeCrossfadeRow.getButton().setComponentID("authoringRemoveCrossfadeButton");
     createCrossfadeStackRow.getButton().setComponentID("authoringCreateCrossfadeStackButton");
     removeCrossfadeStackRow.getButton().setComponentID("authoringRemoveCrossfadeStackButton");
+    auditionCrossfadeRow.getButton().setComponentID("authoringAuditionCrossfadeButton");
     gainRow.getSlider().setComponentID("authoringGainSlider");
     panRow.getSlider().setComponentID("authoringPanSlider");
     loopToggleRow.getToggle().setComponentID("authoringLoopEnabledToggle");
@@ -184,6 +187,8 @@ ZoneMappingEditor::ZoneMappingEditor()
         "Creates all adjacent crossfades for the selected compatible velocity-layer stack in one undo step.");
     removeCrossfadeStackRow.getButton().setHelpText(
         "Removes crossfade descriptors across the selected stack without restoring or changing velocity ranges.");
+    auditionCrossfadeRow.getButton().setHelpText(
+        "Auditions below, at both edges, at the midpoint, and above the selected crossfade using draft playback.");
 
     addOwnedRow(mapSectionContent, rootKeyRow, sliderRowHeight);
     addOwnedRow(mapSectionContent, keyRangeRow, rangeRowHeight);
@@ -199,8 +204,10 @@ ZoneMappingEditor::ZoneMappingEditor()
     addOwnedRow(crossfadeSectionContent, removeCrossfadeRow, actionRowHeight);
     addOwnedRow(crossfadeSectionContent, createCrossfadeStackRow, actionRowHeight);
     addOwnedRow(crossfadeSectionContent, removeCrossfadeStackRow, actionRowHeight);
+    addOwnedRow(crossfadeSectionContent, auditionCrossfadeRow, actionRowHeight);
+    addOwnedRow(crossfadeSectionContent, crossfadeAuditionMessage, messageRowHeight);
     addOwnedRow(crossfadeSectionContent, crossfadeGuidanceMessage, messageRowHeight);
-    crossfadeSectionContent.setSize(0, messageRowHeight * 3 + rangeRowHeight + actionRowHeight * 5 + 8 * 6);
+    crossfadeSectionContent.setSize(0, messageRowHeight * 4 + rangeRowHeight + actionRowHeight * 6 + 10 * 6);
     crossfadeSection.setContent(&crossfadeSectionContent);
     sampleSectionContent.addAndMakeVisible(crossfadeSection);
     updateSampleSectionContentHeight();
@@ -293,6 +300,11 @@ ZoneMappingEditor::ZoneMappingEditor()
     };
     createCrossfadeStackRow.getButton().onClick = [this] { invokeCrossfadeStackAction(true); };
     removeCrossfadeStackRow.getButton().onClick = [this] { invokeCrossfadeStackAction(false); };
+    auditionCrossfadeRow.getButton().onClick = [this]
+    {
+        if (viewModel.crossfadeCanAudition && callbacks.onAuditionVelocityCrossfadeRequested)
+            callbacks.onAuditionVelocityCrossfadeRequested(viewModel.crossfadeAuditionVelocities);
+    };
 
     restoreRootKeyRow.getButton().onClick = [this]
     {
@@ -366,6 +378,8 @@ void ZoneMappingEditor::resized()
     removeCrossfadeRow.setBounds(crossfadeArea.removeFromTop(actionRowHeight)); crossfadeArea.removeFromTop(6);
     createCrossfadeStackRow.setBounds(crossfadeArea.removeFromTop(actionRowHeight)); crossfadeArea.removeFromTop(6);
     removeCrossfadeStackRow.setBounds(crossfadeArea.removeFromTop(actionRowHeight)); crossfadeArea.removeFromTop(6);
+    auditionCrossfadeRow.setBounds(crossfadeArea.removeFromTop(actionRowHeight)); crossfadeArea.removeFromTop(6);
+    crossfadeAuditionMessage.setBounds(crossfadeArea.removeFromTop(messageRowHeight)); crossfadeArea.removeFromTop(6);
     crossfadeGuidanceMessage.setBounds(crossfadeArea.removeFromTop(messageRowHeight));
 
     auto mixArea = mixSectionContent.getLocalBounds();
@@ -430,6 +444,8 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
              static_cast<juce::Component*>(&removeCrossfadeRow),
              static_cast<juce::Component*>(&createCrossfadeStackRow),
              static_cast<juce::Component*>(&removeCrossfadeStackRow),
+             static_cast<juce::Component*>(&auditionCrossfadeRow),
+             static_cast<juce::Component*>(&crossfadeAuditionMessage),
              static_cast<juce::Component*>(&crossfadeGuidanceMessage),
              static_cast<juce::Component*>(&gainRow),
              static_cast<juce::Component*>(&panRow),
@@ -459,6 +475,7 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
              static_cast<juce::Component*>(&removeCrossfadeRow.getButton()),
              static_cast<juce::Component*>(&createCrossfadeStackRow.getButton()),
              static_cast<juce::Component*>(&removeCrossfadeStackRow.getButton()),
+             static_cast<juce::Component*>(&auditionCrossfadeRow.getButton()),
              static_cast<juce::Component*>(&gainRow.getSlider()),
              static_cast<juce::Component*>(&panRow.getSlider()),
              static_cast<juce::Component*>(&loopToggleRow.getToggle()),
@@ -615,16 +632,19 @@ void ZoneMappingEditor::applyValuesToControls(const ZoneFieldValuesViewModel& va
     crossfadeOverlapRow.getLowSlider().setValue(values.crossfadeOverlapLow, juce::dontSendNotification);
     crossfadeOverlapRow.getHighSlider().setValue(values.crossfadeOverlapHigh, juce::dontSendNotification);
     crossfadeGuidanceMessage.setText(juce::String::fromUTF8(values.crossfadeGuidanceText.c_str()));
+    crossfadeAuditionMessage.setText(juce::String::fromUTF8(values.crossfadeAuditionText.c_str()));
     createCrossfadeRow.getButton().setEnabled(values.crossfadeCanCreate);
     updateCrossfadeRow.getButton().setEnabled(values.crossfadeCanEdit);
     removeCrossfadeRow.getButton().setEnabled(values.crossfadeCanRemove);
     createCrossfadeStackRow.getButton().setEnabled(values.crossfadeCanCreateStack);
     removeCrossfadeStackRow.getButton().setEnabled(values.crossfadeCanRemoveStack);
+    auditionCrossfadeRow.getButton().setEnabled(values.crossfadeCanAudition);
     createCrossfadeRow.getButton().setButtonText("Create Crossfade");
     updateCrossfadeRow.getButton().setButtonText("Apply Overlap");
     removeCrossfadeRow.getButton().setButtonText("Remove Crossfade");
     createCrossfadeStackRow.getButton().setButtonText("Create Stack Crossfades");
     removeCrossfadeStackRow.getButton().setButtonText("Remove Stack Crossfades");
+    auditionCrossfadeRow.getButton().setButtonText("Audition 5 Steps");
     gainRow.getSlider().setValue(values.gainDb, juce::dontSendNotification);
     panRow.getSlider().setValue(values.pan, juce::dontSendNotification);
     loopToggleRow.getToggle().setToggleState(values.loopEnabled, juce::dontSendNotification);

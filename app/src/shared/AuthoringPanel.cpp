@@ -1451,6 +1451,10 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     {
         previewSelectedZone(drs::engine::AuthoringPreviewAuditionSource::inspector);
     };
+    zoneCallbacks.onAuditionVelocityCrossfadeRequested = [this](const std::vector<int>& velocities)
+    {
+        auditionVelocityCrossfade(velocities);
+    };
     zoneMappingEditor.setCallbacks(std::move(zoneCallbacks));
     zoneMap.setOnZoneSelectionStateRequested([this](const authoring::ZoneMapCanvas::SelectionState& selectionState)
     {
@@ -1632,6 +1636,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
 
     previewEnabledToggle.onClick = [this]
     {
+        if (!previewEnabledToggle.getToggleState())
+            crossfadeAuditionSequence.active = false;
         if (!previewEnabledToggle.getToggleState() && previewCommandCallback)
         {
             drs::engine::AuthoringPreviewCommand command;
@@ -1643,6 +1649,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     };
     previewStopButton.onClick = [this]
     {
+        crossfadeAuditionSequence.active = false;
         for (auto& timedNote : timedPreviewNotes)
             timedNote = {};
         stopTimer(previewReleaseTimerId);
@@ -2226,6 +2233,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
 
 AuthoringPanel::~AuthoringPanel()
 {
+    crossfadeAuditionSequence.active = false;
     for (std::size_t source = 0; source < timedPreviewNotes.size(); ++source)
         releaseTimedPreview(source);
     stopTimer(statusTimerId);
@@ -3627,6 +3635,26 @@ authoring::ZoneFieldValuesViewModel AuthoringPanel::buildZoneFieldValuesViewMode
             viewModel.crossfadeGuidanceText = "Edit or remove the complete Fade Out relationship with its upper layer.";
         }
 
+        if (!viewModel.crossfadeLowerZoneId.empty() && !viewModel.crossfadeUpperZoneId.empty())
+        {
+            const auto audition = drs::engine::planVelocityCrossfadeAudition(
+                project, viewModel.crossfadeLowerZoneId, viewModel.crossfadeUpperZoneId);
+            if (audition.valid())
+            {
+                viewModel.crossfadeCanAudition = true;
+                std::string text;
+                for (const auto& step : audition.steps)
+                {
+                    viewModel.crossfadeAuditionVelocities.push_back(step.velocity);
+                    if (!text.empty()) text += " | ";
+                    text += step.label + " " + std::to_string(step.velocity) + ": L "
+                        + juce::String(step.lowerGain, 2).toStdString() + ", U "
+                        + juce::String(step.upperGain, 2).toStdString();
+                }
+                viewModel.crossfadeAuditionText = text;
+            }
+        }
+
         auto selectedZoneIds = zoneMapSelectedZoneIds;
         if (selectedZoneIds.empty())
             selectedZoneIds.push_back(zone->id);
@@ -4103,6 +4131,9 @@ void AuthoringPanel::timerCallback(int timerId)
             releaseTimedPreview(source);
         anyPending = anyPending || timedPreviewNotes[source].active;
     }
+    if (crossfadeAuditionSequence.active && now >= crossfadeAuditionSequence.nextAtMillis)
+        dispatchNextCrossfadeAuditionStep();
+    anyPending = anyPending || crossfadeAuditionSequence.active;
     if (!anyPending)
         stopTimer(previewReleaseTimerId);
 }
@@ -6068,6 +6099,53 @@ void AuthoringPanel::previewSelectedZone(
 
     timedPreviewNotes[sourceIndex] = { true, midiNote,
                                        juce::Time::getMillisecondCounterHiRes() + 180.0 };
+    startTimer(previewReleaseTimerId, 10);
+}
+
+void AuthoringPanel::auditionVelocityCrossfade(const std::vector<int>& velocities)
+{
+    if (!previewEnabledToggle.getToggleState() || !previewCommandCallback || velocities.empty())
+        return;
+    const auto request = authoringSession.buildSelectedZonePreviewRequest();
+    if (!request.available)
+        return;
+
+    crossfadeAuditionSequence.active = true;
+    crossfadeAuditionSequence.midiNote = request.midiNote;
+    crossfadeAuditionSequence.velocities = velocities;
+    crossfadeAuditionSequence.nextIndex = 0;
+    crossfadeAuditionSequence.nextAtMillis = juce::Time::getMillisecondCounterHiRes();
+    dispatchNextCrossfadeAuditionStep();
+}
+
+void AuthoringPanel::dispatchNextCrossfadeAuditionStep()
+{
+    if (!crossfadeAuditionSequence.active || !previewCommandCallback)
+    {
+        crossfadeAuditionSequence.active = false;
+        return;
+    }
+    if (crossfadeAuditionSequence.nextIndex >= crossfadeAuditionSequence.velocities.size())
+    {
+        crossfadeAuditionSequence.active = false;
+        return;
+    }
+
+    constexpr auto source = drs::engine::AuthoringPreviewAuditionSource::inspector;
+    const auto sourceIndex = static_cast<std::size_t>(source);
+    releaseTimedPreview(sourceIndex);
+    const auto velocity = std::clamp(crossfadeAuditionSequence.velocities[crossfadeAuditionSequence.nextIndex], 1, 127);
+    drs::engine::AuthoringPreviewCommand command;
+    command.type = drs::engine::AuthoringPreviewCommandType::auditionCurrentDraft;
+    command.source = source;
+    command.midiNote = crossfadeAuditionSequence.midiNote;
+    command.velocity = static_cast<float>(velocity) / 127.0f;
+    previewCommandCallback(command);
+
+    timedPreviewNotes[sourceIndex] = { true, crossfadeAuditionSequence.midiNote,
+                                       juce::Time::getMillisecondCounterHiRes() + 140.0 };
+    ++crossfadeAuditionSequence.nextIndex;
+    crossfadeAuditionSequence.nextAtMillis = juce::Time::getMillisecondCounterHiRes() + 240.0;
     startTimer(previewReleaseTimerId, 10);
 }
 

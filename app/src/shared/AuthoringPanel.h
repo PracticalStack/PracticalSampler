@@ -164,6 +164,8 @@ private:
         int explicitMidiNote = -1,
         int explicitVelocity = 0,
         std::string explicitZoneId = {});
+    void auditionVelocityCrossfade(const std::vector<int>& velocities);
+    void dispatchNextCrossfadeAuditionStep();
     void releaseTimedPreview(std::size_t sourceIndex);
     void prepareDraftPlaybackPreview();
     void publishDraftPlayback();
@@ -205,6 +207,15 @@ private:
         double releaseAtMillis = 0.0;
     };
     std::array<TimedPreviewNote, 4> timedPreviewNotes {};
+    struct CrossfadeAuditionSequence
+    {
+        bool active = false;
+        int midiNote = 60;
+        std::vector<int> velocities;
+        std::size_t nextIndex = 0;
+        double nextAtMillis = 0.0;
+    };
+    CrossfadeAuditionSequence crossfadeAuditionSequence;
     bool isRefreshing = false;
     int selectedGroupIndex = 0;
     int selectedMacroIndex = 0;

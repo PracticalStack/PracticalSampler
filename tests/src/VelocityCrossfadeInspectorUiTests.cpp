@@ -56,6 +56,8 @@ int main()
         int stackRemoveCount = 0;
         int requestedStackWidth = 0;
         std::vector<std::string> requestedStackIds;
+        int auditionCount = 0;
+        std::vector<int> auditionVelocities;
         drs::app::authoring::ZoneFieldCallbacks callbacks;
         callbacks.onCreateVelocityCrossfadeRequested = [&](const std::string& lower,
                                                             const std::string& upper,
@@ -95,6 +97,11 @@ int main()
         {
             ++stackRemoveCount;
             requestedStackIds = ids;
+        };
+        callbacks.onAuditionVelocityCrossfadeRequested = [&](const std::vector<int>& velocities)
+        {
+            ++auditionCount;
+            auditionVelocities = velocities;
         };
         editor.setCallbacks(std::move(callbacks));
 
@@ -146,6 +153,17 @@ int main()
         requireButton(editor, "authoringRemoveCrossfadeButton").onClick();
         require(removeCount == 1 && requestedLower == "lower" && requestedUpper == "upper",
                 "Remove Crossfade should target the complete relationship rather than one descriptor side.");
+
+        values.crossfadeCanAudition = true;
+        values.crossfadeAuditionVelocities = { 54, 55, 63, 72, 73 };
+        values.crossfadeAuditionText = "Below 54: L 1.00, U 0.00 | Midpoint 63: L 0.50, U 0.50";
+        editor.setViewModel(values);
+        editor.resized();
+        require(requireButton(editor, "authoringAuditionCrossfadeButton").isEnabled(),
+                "A valid relationship should expose the five-step audition action.");
+        requireButton(editor, "authoringAuditionCrossfadeButton").onClick();
+        require(auditionCount == 1 && auditionVelocities == values.crossfadeAuditionVelocities,
+                "Crossfade audition should forward the runtime-derived five-step velocity sequence.");
 
         values.crossfadeCanEdit = false;
         values.crossfadeCanRemove = false;

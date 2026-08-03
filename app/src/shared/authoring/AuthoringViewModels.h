@@ -79,6 +79,7 @@ struct ZoneFieldValuesViewModel
     bool crossfadeCanRemove = false;
     bool crossfadeCanCreateStack = false;
     bool crossfadeCanRemoveStack = false;
+    bool crossfadeCanAudition = false;
     int crossfadeOverlapLow = 1;
     int crossfadeOverlapHigh = 2;
     std::string crossfadeLowerZoneId;
@@ -92,6 +93,8 @@ struct ZoneFieldValuesViewModel
     std::string crossfadeGuidanceText;
     std::vector<std::string> crossfadeStackZoneIds;
     std::string crossfadeStackPreviewText;
+    std::vector<int> crossfadeAuditionVelocities;
+    std::string crossfadeAuditionText;
     std::string emptyStateText;
 };
 
@@ -157,6 +160,7 @@ struct ZoneFieldCallbacks
     std::function<void(const std::string&, const std::string&)> onRemoveVelocityCrossfadeRequested;
     std::function<void(const std::vector<std::string>&, int)> onCreateVelocityCrossfadeStackRequested;
     std::function<void(const std::vector<std::string>&)> onRemoveVelocityCrossfadeStackRequested;
+    std::function<void(const std::vector<int>&)> onAuditionVelocityCrossfadeRequested;
     std::function<void()> onCreateChokeGroupRequested;
     std::function<void()> onRestoreRootKeyRequested;
     std::function<void()> onPreviewRequested;

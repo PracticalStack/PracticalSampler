@@ -3,6 +3,7 @@
 #include "drs/engine/RuntimeLoader.h"
 
 #include <algorithm>
+#include <array>
 #include <map>
 #include <sstream>
 #include <unordered_set>
@@ -352,6 +353,56 @@ VelocityCrossfadeAuthoringPlan planVelocityCrossfadeRemoval(
     plan.state = VelocityCrossfadeAuthoringState::eligible;
     plan.proposedProject = std::move(proposed);
     plan.affectedZoneIds = { lowerZoneId, upperZoneId };
+    return plan;
+}
+
+VelocityCrossfadeAuditionPlan planVelocityCrossfadeAudition(
+    const RuntimeProjectModel& project,
+    const std::string& lowerZoneId,
+    const std::string& upperZoneId)
+{
+    VelocityCrossfadeAuditionPlan plan;
+    plan.lowerZoneId = lowerZoneId;
+    plan.upperZoneId = upperZoneId;
+    const auto lowerIndex = findZoneIndex(project, lowerZoneId);
+    const auto upperIndex = findZoneIndex(project, upperZoneId);
+    if (!lowerIndex.has_value() || !upperIndex.has_value() || *lowerIndex == *upperIndex)
+    {
+        plan.state = VelocityCrossfadeAuthoringState::missingPartner;
+        plan.blockingIssues.push_back("Choose the two existing zones that own the crossfade relationship.");
+        return plan;
+    }
+
+    const auto& lower = project.authoring.zones[*lowerIndex];
+    const auto& upper = project.authoring.zones[*upperIndex];
+    if (!sameCrossfadeIdentity(lower, upper)
+        || validateFirstPassVelocityCrossfadePair(validationZone(lower), validationZone(upper))
+            != VelocityCrossfadePairIssue::none)
+    {
+        plan.state = VelocityCrossfadeAuthoringState::invalidExistingCrossfade;
+        plan.blockingIssues.push_back("The selected zones do not own one valid shared velocity crossfade.");
+        return plan;
+    }
+
+    const auto overlapLow = lower.velocityCrossfade.fadeOutLowVelocity;
+    const auto overlapHigh = lower.velocityCrossfade.fadeOutHighVelocity;
+    const std::array<std::pair<const char*, int>, 5> points {{
+        { "Below", std::max(1, overlapLow - 1) },
+        { "Low edge", overlapLow },
+        { "Midpoint", (overlapLow + overlapHigh) / 2 },
+        { "High edge", overlapHigh },
+        { "Above", std::min(127, overlapHigh + 1) }
+    }};
+    for (const auto& [label, velocity] : points)
+    {
+        VelocityCrossfadeAuditionStep step;
+        step.label = label;
+        step.velocity = velocity;
+        step.lowerGain = computeFirstPassVelocityCrossfadeGain(validationZone(lower), velocity);
+        step.upperGain = computeFirstPassVelocityCrossfadeGain(validationZone(upper), velocity);
+        plan.steps.push_back(std::move(step));
+    }
+    plan.state = VelocityCrossfadeAuthoringState::eligible;
     return plan;
 }
 

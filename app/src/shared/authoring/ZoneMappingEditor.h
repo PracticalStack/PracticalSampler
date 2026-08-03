@@ -63,6 +63,8 @@ private:
     CompactInspectorActionRow removeCrossfadeRow;
     CompactInspectorActionRow createCrossfadeStackRow;
     CompactInspectorActionRow removeCrossfadeStackRow;
+    CompactInspectorActionRow auditionCrossfadeRow;
+    CompactInspectorMessage crossfadeAuditionMessage;
     CompactInspectorMessage crossfadeGuidanceMessage;
     CompactInspectorMessage roundRobinPoolMessage;
     CompactInspectorMessage roundRobinSlotMessage;

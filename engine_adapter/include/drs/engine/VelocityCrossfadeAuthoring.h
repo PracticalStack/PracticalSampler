@@ -69,6 +69,25 @@ struct VelocityCrossfadeStackOverlap
     bool widthClamped = false;
 };
 
+struct VelocityCrossfadeAuditionStep
+{
+    std::string label;
+    int velocity = 1;
+    double lowerGain = 0.0;
+    double upperGain = 0.0;
+};
+
+struct VelocityCrossfadeAuditionPlan
+{
+    VelocityCrossfadeAuthoringState state = VelocityCrossfadeAuthoringState::invalidTopology;
+    std::string lowerZoneId;
+    std::string upperZoneId;
+    std::vector<VelocityCrossfadeAuditionStep> steps;
+    std::vector<std::string> blockingIssues;
+
+    bool valid() const noexcept { return state == VelocityCrossfadeAuthoringState::eligible; }
+};
+
 struct VelocityCrossfadeAuthoringPlan
 {
     VelocityCrossfadeAuthoringState state = VelocityCrossfadeAuthoringState::invalidTopology;
@@ -111,4 +130,11 @@ VelocityCrossfadeAuthoringPlan planVelocityCrossfadeStack(
 VelocityCrossfadeAuthoringPlan planVelocityCrossfadeStackRemoval(
     const RuntimeProjectModel& project,
     const std::vector<std::string>& zoneIds);
+
+// Builds the author-facing five-point audition sequence from the same gain
+// function used by playback.  No UI-specific crossfade math is permitted.
+VelocityCrossfadeAuditionPlan planVelocityCrossfadeAudition(
+    const RuntimeProjectModel& project,
+    const std::string& lowerZoneId,
+    const std::string& upperZoneId);
 } // namespace drs::engine

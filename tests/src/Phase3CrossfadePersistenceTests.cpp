@@ -174,6 +174,61 @@ int main()
                                0,
                                "Round-tripped upper instrument zone crossfade metadata");
 
+        // Exercise the actual authoring transactions, including the bulk-stack path,
+        // through the transactional project + companion-instrument save boundary.
+        auto authoredStackProject = crossfadeProject;
+        auto thirdLayer = authoredStackProject.authoring.zones.at(1);
+        thirdLayer.id += "-stack-third";
+        thirdLayer.displayName += " stack third";
+        thirdLayer.velocityLow = 85;
+        thirdLayer.velocityHigh = 127;
+        thirdLayer.velocityCrossfade = {};
+        authoredStackProject.authoring.zones.at(0).velocityLow = 1;
+        authoredStackProject.authoring.zones.at(0).velocityHigh = 42;
+        authoredStackProject.authoring.zones.at(0).velocityCrossfade = {};
+        authoredStackProject.authoring.zones.at(0).roundRobin.reset();
+        authoredStackProject.authoring.zones.at(0).roundRobinLength = 0;
+        authoredStackProject.authoring.zones.at(0).roundRobinPosition = 0;
+        authoredStackProject.authoring.zones.at(1).velocityLow = 43;
+        authoredStackProject.authoring.zones.at(1).velocityHigh = 84;
+        authoredStackProject.authoring.zones.at(1).velocityCrossfade = {};
+        authoredStackProject.authoring.zones.at(1).roundRobin.reset();
+        authoredStackProject.authoring.zones.at(1).roundRobinLength = 0;
+        authoredStackProject.authoring.zones.at(1).roundRobinPosition = 0;
+        thirdLayer.roundRobin.reset();
+        thirdLayer.roundRobinLength = 0;
+        thirdLayer.roundRobinPosition = 0;
+        for (std::size_t index = 2; index < authoredStackProject.authoring.zones.size(); ++index)
+            authoredStackProject.authoring.zones[index].rootKey += 12;
+        authoredStackProject.authoring.zones.push_back(thirdLayer);
+
+        AuthoringSession stackSession(authoredStackProject);
+        const auto stackResult = stackSession.createVelocityCrossfadeStack(
+            { { lowerZone.id, upperZone.id, thirdLayer.id }, 12 }, "Create persisted crossfade stack");
+        require(stackResult.applied,
+                "UI-equivalent stack authoring must commit before the persistence boundary: "
+                    + (stackResult.issues.empty() ? std::string("no issue") : stackResult.issues.front()));
+        const auto authoredProjectFile = juce::File((tempDirectory / "authored-stack.drsproj").generic_string());
+        require(drs::app::saveProjectFiles(stackSession.getProject(), authoredProjectFile).saved,
+                "A UI-authored crossfade stack must save its project and companion instrument together.");
+        writeTextFile(tempDirectory / "authored-stack.drstrm", "authored stack stream placeholder");
+        const auto savedStackProject = loadRuntimeProjectManifest(authoredProjectFile.getFullPathName().toStdString());
+        const auto savedStackInstrument = loadRuntimeInstrumentManifest(
+            authoredProjectFile.withFileExtension(".drinst").getFullPathName().toStdString());
+        require(savedStackProject.loaded && savedStackInstrument.loaded,
+                "A UI-authored crossfade stack must reload through both manifests: project="
+                    + (savedStackProject.issues.empty() ? std::string("ok") : savedStackProject.issues.front())
+                    + "; instrument="
+                    + (savedStackInstrument.issues.empty() ? std::string("ok") : savedStackInstrument.issues.front()));
+        require(hasCompleteFadeOut(savedStackProject.project.authoring.zones.at(0).velocityCrossfade)
+                    && hasCompleteFadeIn(savedStackProject.project.authoring.zones.at(1).velocityCrossfade)
+                    && hasCompleteFadeOut(savedStackProject.project.authoring.zones.at(1).velocityCrossfade)
+                    && hasCompleteFadeIn(savedStackProject.project.authoring.zones.back().velocityCrossfade),
+                "Reloaded project must retain every adjacent UI-authored stack relationship.");
+        require(hasAnyVelocityCrossfadeValue(savedStackInstrument.instrument.zones.at(0).velocityCrossfade)
+                    && hasAnyVelocityCrossfadeValue(savedStackInstrument.instrument.zones.at(1).velocityCrossfade),
+                "Companion instrument generation must retain UI-authored crossfade metadata.");
+
         auto invalidProject = crossfadeProject;
         invalidProject.authoring.zones.front().velocityCrossfade.fadeOutLowVelocity =
             invalidProject.authoring.zones.front().velocityCrossfade.fadeOutHighVelocity;

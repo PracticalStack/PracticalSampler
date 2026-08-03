@@ -89,6 +89,17 @@ int main()
                     && createdUpper.velocityCrossfade.fadeInHighVelocity == 70,
                 "Pair creation must materialize mirrored descriptors and owned outer endpoints atomically.");
 
+        const auto audition = planVelocityCrossfadeAudition(session.getProject(), lowerId, upperId);
+        require(audition.valid() && audition.steps.size() == 5
+                    && audition.steps[0].velocity == 59 && audition.steps[1].velocity == 60
+                    && audition.steps[2].velocity == 65 && audition.steps[3].velocity == 70
+                    && audition.steps[4].velocity == 71,
+                "Crossfade audition must provide below, edge, midpoint, edge, and above velocities.");
+        require(audition.steps[0].lowerGain == 1.0 && audition.steps[0].upperGain == 0.0
+                    && audition.steps[2].lowerGain == 0.5 && audition.steps[2].upperGain == 0.5
+                    && audition.steps[4].lowerGain == 0.0 && audition.steps[4].upperGain == 1.0,
+                "Crossfade audition gains must use the runtime contribution law.");
+
         const VelocityCrossfadePairRequest resize { lowerId, upperId, 56, 76 };
         require(session.updateVelocityCrossfadePair(resize, "Resize velocity crossfade").applied,
                 "A valid pair resize should commit through the authoring session.");
