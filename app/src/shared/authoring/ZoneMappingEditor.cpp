@@ -510,6 +510,12 @@ void ZoneMappingEditor::applyValuesToControls(const ZoneFieldValuesViewModel& va
     articulationRow.getComboBox().setHelpText(values.hasMultipleZoneSelection
         ? "Assigns the selected articulation to every selected zone."
         : "Assigns the selected zone to an articulation.");
+    velocityRangeRow.getLowSlider().setHelpText(values.hasMultipleZoneSelection
+        ? "Sets the low velocity for every selected zone."
+        : "Sets the selected zone's low velocity.");
+    velocityRangeRow.getHighSlider().setHelpText(values.hasMultipleZoneSelection
+        ? "Sets the high velocity for every selected zone."
+        : "Sets the selected zone's high velocity.");
     gainRow.getSlider().setValue(values.gainDb, juce::dontSendNotification);
     panRow.getSlider().setValue(values.pan, juce::dontSendNotification);
     loopToggleRow.getToggle().setToggleState(values.loopEnabled, juce::dontSendNotification);

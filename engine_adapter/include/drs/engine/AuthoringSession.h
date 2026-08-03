@@ -106,6 +106,9 @@ public:
     RuntimeProjectDocumentActionResult selectDspSlot(const std::string& fxSlotId);
     RuntimeProjectDocumentActionResult updateSelectedZone(const RuntimeProjectZoneDefinition& zone,
                                                           const std::string& label);
+    RuntimeProjectDocumentActionResult updateZoneRanges(
+        const std::vector<AuthoringZoneSummary>& zones,
+        const std::string& label);
     RuntimeProjectDocumentActionResult createArticulation(
         const RuntimeProjectArticulationDefinition& articulation,
         const std::string& label);

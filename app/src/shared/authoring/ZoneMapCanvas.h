@@ -44,7 +44,8 @@ public:
     void setOnZoneSelectionRequested(std::function<void(const std::string& zoneId)> nextCallback);
     void setOnZoneSelectionStateRequested(std::function<void(const SelectionState& selectionState)> nextCallback);
     void setOnZoneRangeCommitRequested(
-        std::function<void(const drs::engine::AuthoringZoneSummary& zone, const std::string& label)> nextCallback);
+        std::function<void(const std::vector<drs::engine::AuthoringZoneSummary>& zones,
+                           const std::string& label)> nextCallback);
     void setOnZoneAuditionRequested(
         std::function<void(const std::string& zoneId, int midiNote, int velocity)> nextCallback);
     void setOnSampleFilesDropped(std::function<void(std::vector<juce::File>)> nextCallback);
@@ -90,8 +91,9 @@ private:
     {
         RangeHandle handle = RangeHandle::none;
         std::size_t zoneIndex = 0;
-        drs::engine::AuthoringZoneSummary originalZone;
-        drs::engine::AuthoringZoneSummary previewZone;
+        std::vector<std::size_t> zoneIndices;
+        std::vector<drs::engine::AuthoringZoneSummary> originalZones;
+        std::vector<drs::engine::AuthoringZoneSummary> previewZones;
     };
 
     struct MarqueeGesture
@@ -120,7 +122,9 @@ private:
     std::vector<std::size_t> findSecondarySelectedZoneIndices() const;
     std::vector<std::pair<RangeHandle, juce::Point<float>>> buildHandleCenters(const juce::Rectangle<float>& zoneBounds) const;
     RangeHandle findRangeHandleAt(juce::Point<float> position, std::size_t& zoneIndex) const;
-    drs::engine::AuthoringZoneSummary buildRangePreview(const RangeGesture& gesture, juce::Point<float> position) const;
+    std::vector<drs::engine::AuthoringZoneSummary> buildRangePreviews(
+        const RangeGesture& gesture,
+        juce::Point<float> position) const;
     int positionToMidiKey(juce::Point<float> position) const;
     int positionToMidiVelocity(juce::Point<float> position) const;
     SelectionState buildSelectionStateForZoneIndex(std::size_t index, SelectionMode mode) const;
@@ -133,7 +137,8 @@ private:
     SelectionState selectionState;
     std::function<void(const std::string& zoneId)> onZoneSelectionRequested;
     std::function<void(const SelectionState& selectionState)> onZoneSelectionStateRequested;
-    std::function<void(const drs::engine::AuthoringZoneSummary& zone, const std::string& label)> onZoneRangeCommitRequested;
+    std::function<void(const std::vector<drs::engine::AuthoringZoneSummary>& zones,
+                       const std::string& label)> onZoneRangeCommitRequested;
     std::function<void(const std::string& zoneId, int midiNote, int velocity)> onZoneAuditionRequested;
     std::function<void(std::vector<juce::File>)> onSampleFilesDropped;
     std::function<void()> onDeleteSelectedSampleRequested;

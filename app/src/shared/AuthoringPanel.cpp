@@ -1414,21 +1414,13 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         if (result.applied)
             refreshFromSession();
     });
-    zoneMap.setOnZoneRangeCommitRequested([this](const drs::engine::AuthoringZoneSummary& zone,
-                                                 const std::string& label)
+    zoneMap.setOnZoneRangeCommitRequested([this](
+        const std::vector<drs::engine::AuthoringZoneSummary>& zones,
+        const std::string& label)
     {
-        authoring::ZoneFieldValuesViewModel values;
-        values.hasSelection = true;
-        values.rootKey = zone.rootKey;
-        values.keyLow = zone.keyLow;
-        values.keyHigh = zone.keyHigh;
-        values.velocityLow = zone.velocityLow;
-        values.velocityHigh = zone.velocityHigh;
-        values.gainDb = zone.gainDb;
-        values.pan = zone.pan;
-        values.loopEnabled = zone.loopEnabled;
-        values.triggerMode = zone.triggerMode;
-        applySelectedZoneEdit(values, juce::String::fromUTF8(label.c_str()));
+        const auto result = authoringSession.updateZoneRanges(zones, label);
+        if (result.applied)
+            refreshFromSession();
     });
     groupList.setOnSelectionChanged([this](int nextIndex)
     {
@@ -5555,6 +5547,42 @@ void AuthoringPanel::applySelectedZoneEdit(const authoring::ZoneFieldValuesViewM
     const auto currentZone = authoringSession.getSelectedZone();
     if (!currentZone.has_value())
         return;
+
+    if (zoneMapSelectedZoneIds.size() > 1 && label == "Update zone velocity range")
+    {
+        const auto lowVelocityChanged = values.velocityLow != currentZone->velocityLow;
+        const auto highVelocityChanged = values.velocityHigh != currentZone->velocityHigh;
+        auto zoneSummaries = authoringSession.getZoneSummaries();
+        std::vector<drs::engine::AuthoringZoneSummary> editedZones;
+        editedZones.reserve(zoneMapSelectedZoneIds.size());
+        for (const auto& zoneId : zoneMapSelectedZoneIds)
+        {
+            const auto zoneIterator = std::find_if(zoneSummaries.begin(), zoneSummaries.end(),
+                                                   [&](const auto& zone)
+                                                   {
+                                                       return zone.id == zoneId;
+                                                   });
+            if (zoneIterator == zoneSummaries.end())
+                continue;
+
+            auto editedZone = *zoneIterator;
+            if (lowVelocityChanged && highVelocityChanged)
+            {
+                editedZone.velocityLow = values.velocityLow;
+                editedZone.velocityHigh = values.velocityHigh;
+            }
+            else if (lowVelocityChanged)
+                editedZone.velocityLow = std::min(values.velocityLow, editedZone.velocityHigh);
+            else if (highVelocityChanged)
+                editedZone.velocityHigh = std::max(values.velocityHigh, editedZone.velocityLow);
+            editedZones.push_back(std::move(editedZone));
+        }
+
+        const auto result = authoringSession.updateZoneRanges(editedZones, label.toStdString());
+        if (result.applied)
+            refreshFromSession();
+        return;
+    }
 
     auto editedZone = *currentZone;
     editedZone.rootKey = values.rootKey;

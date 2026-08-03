@@ -1329,6 +1329,71 @@ RuntimeProjectDocumentActionResult AuthoringSession::updateSelectedZone(const Ru
     return documentController.commitSnapshot(project, label, changedPaths);
 }
 
+RuntimeProjectDocumentActionResult AuthoringSession::updateZoneRanges(
+    const std::vector<AuthoringZoneSummary>& zones,
+    const std::string& label)
+{
+    if (zones.empty())
+        return makeRejectedResult(getDocumentState(),
+                                  "Zone range edit rejected",
+                                  "At least one zone must be provided for a range edit.");
+
+    auto project = getProject();
+    std::unordered_set<std::string> requestedZoneIds;
+    std::vector<std::size_t> zoneIndices;
+    zoneIndices.reserve(zones.size());
+
+    for (const auto& editedZone : zones)
+    {
+        if (!requestedZoneIds.insert(editedZone.id).second)
+            return makeRejectedResult(getDocumentState(),
+                                      "Zone range edit rejected",
+                                      "Zone '" + editedZone.id + "' was provided more than once.");
+
+        const auto zoneIndex = findZoneIndexById(project, editedZone.id);
+        if (!zoneIndex.has_value())
+            return makeRejectedResult(getDocumentState(),
+                                      "Zone range edit rejected",
+                                      "Zone '" + editedZone.id + "' does not exist in the current authoring project.");
+        zoneIndices.push_back(*zoneIndex);
+    }
+
+    std::vector<std::pair<std::string, RoundRobinMode>> enabledGroups;
+    for (const auto zoneIndex : zoneIndices)
+    {
+        const auto& groupId = project.authoring.zones[zoneIndex].groupId;
+        const auto alreadyTracked = std::any_of(enabledGroups.begin(), enabledGroups.end(),
+                                                [&](const auto& entry)
+                                                {
+                                                    return entry.first == groupId;
+                                                });
+        if (alreadyTracked)
+            continue;
+
+        const auto groupStatus = assessGroupRoundRobin(project, groupId);
+        if (groupStatus.enabled)
+            enabledGroups.emplace_back(groupId, groupStatus.mode);
+    }
+
+    std::vector<std::string> changedPaths;
+    changedPaths.reserve(zoneIndices.size());
+    for (std::size_t editIndex = 0; editIndex < zones.size(); ++editIndex)
+    {
+        auto& destination = project.authoring.zones[zoneIndices[editIndex]];
+        const auto& source = zones[editIndex];
+        destination.keyLow = source.keyLow;
+        destination.keyHigh = source.keyHigh;
+        destination.velocityLow = source.velocityLow;
+        destination.velocityHigh = source.velocityHigh;
+        changedPaths.push_back("authoring.zones[" + std::to_string(zoneIndices[editIndex]) + "]");
+    }
+
+    for (const auto& [groupId, mode] : enabledGroups)
+        reconcilePreviouslyEnabledGroup(project, groupId, mode);
+
+    return documentController.commitSnapshot(project, label, changedPaths);
+}
+
 RuntimeProjectDocumentActionResult AuthoringSession::createArticulation(
     const RuntimeProjectArticulationDefinition& articulation,
     const std::string& label)

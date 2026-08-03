@@ -83,7 +83,8 @@ void ZoneMapCanvas::setOnZoneSelectionStateRequested(
 }
 
 void ZoneMapCanvas::setOnZoneRangeCommitRequested(
-    std::function<void(const drs::engine::AuthoringZoneSummary& zone, const std::string& label)> nextCallback)
+    std::function<void(const std::vector<drs::engine::AuthoringZoneSummary>& zones,
+                       const std::string& label)> nextCallback)
 {
     onZoneRangeCommitRequested = std::move(nextCallback);
 }
@@ -627,8 +628,18 @@ juce::Point<float> ZoneMapCanvas::normalizedContentToCanvas(juce::Point<float> p
 
 drs::engine::AuthoringZoneSummary ZoneMapCanvas::getDisplayZoneSummary(std::size_t index) const
 {
-    if (activeGesture.has_value() && activeGesture->zoneIndex == index)
-        return activeGesture->previewZone;
+    if (activeGesture.has_value())
+    {
+        const auto iterator = std::find(activeGesture->zoneIndices.begin(),
+                                        activeGesture->zoneIndices.end(),
+                                        index);
+        if (iterator != activeGesture->zoneIndices.end())
+        {
+            const auto previewIndex = static_cast<std::size_t>(
+                std::distance(activeGesture->zoneIndices.begin(), iterator));
+            return activeGesture->previewZones[previewIndex];
+        }
+    }
 
     return zoneSummaries[index];
 }
@@ -811,30 +822,66 @@ ZoneMapCanvas::RangeHandle ZoneMapCanvas::findRangeHandleAt(juce::Point<float> p
     return nearestHandle;
 }
 
-drs::engine::AuthoringZoneSummary ZoneMapCanvas::buildRangePreview(const RangeGesture& gesture,
-                                                                   juce::Point<float> position) const
+std::vector<drs::engine::AuthoringZoneSummary> ZoneMapCanvas::buildRangePreviews(
+    const RangeGesture& gesture,
+    juce::Point<float> position) const
 {
-    auto preview = gesture.previewZone;
+    if (gesture.originalZones.empty())
+        return {};
+
+    auto previews = gesture.originalZones;
+    auto primaryPreview = gesture.originalZones.front();
 
     switch (gesture.handle)
     {
         case RangeHandle::keyLow:
-            preview.keyLow = juce::jlimit(0, preview.keyHigh, positionToMidiKey(position));
+            primaryPreview.keyLow = juce::jlimit(0, primaryPreview.keyHigh, positionToMidiKey(position));
             break;
         case RangeHandle::keyHigh:
-            preview.keyHigh = juce::jlimit(preview.keyLow, 127, positionToMidiKey(position));
+            primaryPreview.keyHigh = juce::jlimit(primaryPreview.keyLow, 127, positionToMidiKey(position));
             break;
         case RangeHandle::velocityHigh:
-            preview.velocityHigh = juce::jlimit(preview.velocityLow, 127, positionToMidiVelocity(position));
+            primaryPreview.velocityHigh = juce::jlimit(primaryPreview.velocityLow, 127,
+                                                       positionToMidiVelocity(position));
             break;
         case RangeHandle::velocityLow:
-            preview.velocityLow = juce::jlimit(1, preview.velocityHigh, positionToMidiVelocity(position));
+            primaryPreview.velocityLow = juce::jlimit(1, primaryPreview.velocityHigh,
+                                                      positionToMidiVelocity(position));
             break;
         case RangeHandle::none:
             break;
     }
 
-    return preview;
+    const auto& primaryOriginal = gesture.originalZones.front();
+    const auto keyLowDelta = primaryPreview.keyLow - primaryOriginal.keyLow;
+    const auto keyHighDelta = primaryPreview.keyHigh - primaryOriginal.keyHigh;
+    const auto velocityLowDelta = primaryPreview.velocityLow - primaryOriginal.velocityLow;
+    const auto velocityHighDelta = primaryPreview.velocityHigh - primaryOriginal.velocityHigh;
+
+    for (auto& preview : previews)
+    {
+        switch (gesture.handle)
+        {
+            case RangeHandle::keyLow:
+                preview.keyLow = juce::jlimit(0, preview.keyHigh, preview.keyLow + keyLowDelta);
+                break;
+            case RangeHandle::keyHigh:
+                preview.keyHigh = juce::jlimit(preview.keyLow, 127, preview.keyHigh + keyHighDelta);
+                break;
+            case RangeHandle::velocityHigh:
+                preview.velocityHigh = juce::jlimit(preview.velocityLow, 127,
+                                                    preview.velocityHigh + velocityHighDelta);
+                break;
+            case RangeHandle::velocityLow:
+                preview.velocityLow = juce::jlimit(1, preview.velocityHigh,
+                                                   preview.velocityLow + velocityLowDelta);
+                break;
+            case RangeHandle::none:
+                break;
+        }
+    }
+
+    return previews;
 }
 
 int ZoneMapCanvas::positionToMidiKey(juce::Point<float> position) const
@@ -1014,8 +1061,16 @@ bool ZoneMapCanvas::beginRangeGestureAt(juce::Point<float> position)
     RangeGesture gesture;
     gesture.handle = handle;
     gesture.zoneIndex = zoneIndex;
-    gesture.originalZone = getDisplayZoneSummary(zoneIndex);
-    gesture.previewZone = gesture.originalZone;
+    gesture.zoneIndices.push_back(zoneIndex);
+    for (const auto secondaryIndex : findSecondarySelectedZoneIndices())
+    {
+        if (secondaryIndex != zoneIndex)
+            gesture.zoneIndices.push_back(secondaryIndex);
+    }
+    gesture.originalZones.reserve(gesture.zoneIndices.size());
+    for (const auto selectedZoneIndex : gesture.zoneIndices)
+        gesture.originalZones.push_back(zoneSummaries[selectedZoneIndex]);
+    gesture.previewZones = gesture.originalZones;
     activeGesture = gesture;
     repaint();
     return true;
@@ -1026,7 +1081,7 @@ bool ZoneMapCanvas::updateActiveRangeGesture(juce::Point<float> position)
     if (!activeGesture.has_value())
         return false;
 
-    activeGesture->previewZone = buildRangePreview(*activeGesture, position);
+    activeGesture->previewZones = buildRangePreviews(*activeGesture, position);
     repaint();
     return true;
 }
@@ -1036,13 +1091,19 @@ bool ZoneMapCanvas::endActiveRangeGesture(juce::Point<float> position)
     if (!activeGesture.has_value())
         return false;
 
-    activeGesture->previewZone = buildRangePreview(*activeGesture, position);
-    const auto changed = activeGesture->previewZone.keyLow != activeGesture->originalZone.keyLow
-        || activeGesture->previewZone.keyHigh != activeGesture->originalZone.keyHigh
-        || activeGesture->previewZone.velocityLow != activeGesture->originalZone.velocityLow
-        || activeGesture->previewZone.velocityHigh != activeGesture->originalZone.velocityHigh;
+    activeGesture->previewZones = buildRangePreviews(*activeGesture, position);
+    const auto changed = !std::equal(activeGesture->previewZones.begin(),
+                                     activeGesture->previewZones.end(),
+                                     activeGesture->originalZones.begin(),
+                                     [](const auto& preview, const auto& original)
+                                     {
+                                         return preview.keyLow == original.keyLow
+                                             && preview.keyHigh == original.keyHigh
+                                             && preview.velocityLow == original.velocityLow
+                                             && preview.velocityHigh == original.velocityHigh;
+                                     });
 
-    auto committedZone = activeGesture->previewZone;
+    auto committedZones = activeGesture->previewZones;
     const auto label = (activeGesture->handle == RangeHandle::keyLow || activeGesture->handle == RangeHandle::keyHigh)
         ? std::string("Update zone key range")
         : std::string("Update zone velocity range");
@@ -1050,7 +1111,7 @@ bool ZoneMapCanvas::endActiveRangeGesture(juce::Point<float> position)
     repaint();
 
     if (changed && onZoneRangeCommitRequested)
-        onZoneRangeCommitRequested(committedZone, label);
+        onZoneRangeCommitRequested(committedZones, label);
 
     return true;
 }
