@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>Decent Rhapsody Studio - Playable Instrument Package Implementation Plan</title>
+  <style>
+    :root {
+      --paper: #f2eee6;
+      --surface: #fffdf8;
+      --surface-alt: #f8f3eb;
+      --ink: #222b30;
+      --muted: #687278;
+      --line: #d8d0c3;
+      --charcoal: #253238;
+      --charcoal-2: #34464d;
+      --brown: #8a4615;
+      --brown-soft: #f2dfcd;
+      --blue: #286c83;
+      --blue-soft: #deedf1;
+      --green: #24715e;
+      --green-soft: #dfeee8;
+      --amber: #946315;
+      --amber-soft: #f5e8ce;
+      --red: #9a3f38;
+      --red-soft: #f4dfdc;
+      --violet: #69509a;
+      --violet-soft: #ebe4f5;
+      --shadow: 0 18px 42px rgba(53, 43, 32, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 7% 0%, rgba(138, 70, 21, 0.11), transparent 31rem),
+        radial-gradient(circle at 95% 8%, rgba(40, 108, 131, 0.11), transparent 29rem),
+        var(--paper);
+      font-family: Inter, "Segoe UI Variable Text", "Segoe UI", sans-serif;
+      line-height: 1.58;
+    }
+
+    a { color: var(--blue); }
+    h1, h2, h3, h4, p { margin-top: 0; }
+    h1, h2, h3 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-weight: 500;
+      letter-spacing: -0.025em;
+    }
+    h1 { max-width: 1080px; margin-bottom: 18px; font-size: clamp(2.4rem, 5vw, 4.7rem); line-height: 0.98; }
+    h2 { margin-bottom: 14px; font-size: clamp(1.7rem, 3vw, 2.55rem); line-height: 1.08; }
+    h3 { margin-bottom: 9px; font-size: 1.35rem; }
+    h4 { margin-bottom: 7px; font-size: 0.97rem; letter-spacing: 0.02em; }
+    p { margin-bottom: 14px; }
+    ul, ol { margin: 10px 0 0; padding-left: 1.3rem; }
+    li + li { margin-top: 6px; }
+    code {
+      padding: 0.12em 0.35em;
+      border-radius: 5px;
+      color: #26343c;
+      background: #e9edeb;
+      font: 0.9em "Cascadia Code", Consolas, monospace;
+    }
+    .page { width: min(1340px, calc(100% - 36px)); margin: 0 auto; padding: 30px 0 76px; }
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 48px;
+      border-radius: 27px;
+      color: #fffaf3;
+      background: linear-gradient(135deg, var(--charcoal), var(--charcoal-2));
+      box-shadow: var(--shadow);
+    }
+    .hero::after {
+      content: "PACKAGE";
+      position: absolute;
+      right: 22px;
+      bottom: -32px;
+      color: rgba(255, 255, 255, 0.045);
+      font: 700 7.9rem/1 Georgia, serif;
+      pointer-events: none;
+    }
+    .eyebrow, .section-label {
+      display: inline-block;
+      margin-bottom: 10px;
+      color: #efc39f;
+      font-size: 0.75rem;
+      font-weight: 850;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    .section-label { color: var(--brown); }
+    .lede { position: relative; z-index: 1; max-width: 980px; color: #dce3df; font-size: 1.08rem; }
+    .meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 9px; margin-top: 24px; }
+    .chip { padding: 8px 12px; border: 1px solid rgba(255,255,255,0.14); border-radius: 999px; background: rgba(255,255,255,0.08); font-size: 0.83rem; }
+
+    .summary-grid, .grid-2, .grid-3, .grid-4, .gate-grid { display: grid; gap: 15px; }
+    .summary-grid { position: relative; z-index: 1; grid-template-columns: repeat(4, 1fr); margin-top: 28px; }
+    .summary-card { padding: 17px; border: 1px solid rgba(255,255,255,0.13); border-radius: 15px; background: rgba(255,255,255,0.07); }
+    .summary-card strong { display: block; margin-bottom: 3px; color: #fff; font: 600 1.7rem Georgia, serif; }
+    .summary-card span { color: #d7dedb; font-size: 0.84rem; }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+    .gate-grid { grid-template-columns: 1.15fr 0.85fr; }
+
+    .toc, .section, .sprint, .callout {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .toc { margin-top: 20px; padding: 21px 25px; }
+    .toc ol { columns: 3; column-gap: 34px; }
+    .toc li { break-inside: avoid; }
+    .section, .sprint { margin-top: 24px; padding: 30px; }
+    .heading { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; margin-bottom: 18px; }
+    .heading h2 { margin: 0; }
+    .heading::after { content: ""; height: 1px; background: var(--line); }
+
+    .card { padding: 21px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-alt); }
+    .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+    .card.accent { border-top: 4px solid var(--blue); }
+    .card.good { border-top: 4px solid var(--green); }
+    .card.warn { border-top: 4px solid var(--amber); }
+    .card.violet { border-top: 4px solid var(--violet); }
+
+    .callout { margin-top: 18px; padding: 18px 21px; border-left: 6px solid var(--blue); }
+    .callout.problem { border-left-color: var(--red); background: #fff8f6; }
+    .callout.decision { border-left-color: var(--green); background: #f7fcfa; }
+    .callout.warning { border-left-color: var(--amber); background: #fffaf0; }
+    .callout p:last-child { margin-bottom: 0; }
+
+    .flow { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 18px; }
+    .flow-step { position: relative; min-height: 156px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-alt); }
+    .flow-step:not(:last-child)::after { content: "\2192"; position: absolute; z-index: 2; top: 50%; right: -14px; width: 20px; color: var(--brown); background: var(--paper); font-weight: 900; text-align: center; }
+    .flow-step strong { display: block; margin-bottom: 7px; color: var(--blue); }
+    .flow-step span { color: var(--muted); font-size: 0.84rem; }
+
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 16px; }
+    table { width: 100%; min-width: 980px; border-collapse: collapse; background: var(--surface); }
+    th, td { padding: 13px 15px; border-bottom: 1px solid var(--line); vertical-align: top; text-align: left; }
+    th { color: #fffaf3; background: var(--charcoal); font-size: 0.73rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    tbody tr:nth-child(even) td { background: rgba(242, 238, 230, 0.45); }
+    tbody tr:last-child td { border-bottom: 0; }
+    .id { color: var(--blue); font-weight: 850; white-space: nowrap; }
+    .priority { display: inline-block; min-width: 34px; padding: 3px 8px; border-radius: 999px; color: var(--brown); background: var(--brown-soft); font-size: 0.74rem; font-weight: 850; text-align: center; }
+    .status { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 850; text-transform: uppercase; }
+    .status.must { color: var(--red); background: var(--red-soft); }
+    .status.should { color: var(--amber); background: var(--amber-soft); }
+    .status.later { color: var(--violet); background: var(--violet-soft); }
+
+    .sprint { overflow: hidden; padding: 0; }
+    .sprint-head { display: grid; grid-template-columns: auto 1fr auto; gap: 15px; align-items: center; padding: 22px 25px; color: #fffaf3; background: var(--charcoal); }
+    .sprint-number { display: grid; width: 48px; height: 48px; place-items: center; border-radius: 50%; color: var(--charcoal); background: #fffaf3; font: 700 1.18rem Georgia, serif; }
+    .sprint-head h2 { margin: 0; font-size: 1.65rem; }
+    .sprint-focus { color: #ccd6d3; font-size: 0.82rem; font-weight: 700; text-align: right; }
+    .sprint-intent { margin: 0; padding: 18px 25px; color: var(--muted); border-bottom: 1px solid var(--line); }
+    .sprint-body { padding: 23px 25px 26px; }
+    .task-list { margin: 0; padding: 0; list-style: none; }
+    .task-list li { position: relative; padding: 11px 12px 11px 42px; border-bottom: 1px solid var(--line); }
+    .task-list li:last-child { border-bottom: 0; }
+    .task-list li::before { content: "[ ]"; position: absolute; left: 10px; color: var(--green); font: 700 0.9rem "Cascadia Code", Consolas, monospace; }
+    .task-id { color: var(--blue); font-family: "Cascadia Code", Consolas, monospace; font-weight: 800; }
+    .exit { padding: 18px; border-left: 5px solid var(--green); border-radius: 0 13px 13px 0; background: var(--green-soft); }
+    .exit h3 { color: var(--green); }
+    .files { margin-top: 15px; color: var(--muted); font-size: 0.88rem; }
+
+    .timeline { display: grid; grid-template-columns: repeat(8, minmax(80px, 1fr)); gap: 6px; margin-top: 16px; overflow-x: auto; }
+    .timeline div { min-width: 88px; padding: 12px 7px; border-radius: 10px; color: #fff; background: var(--blue); font-size: 0.75rem; font-weight: 800; text-align: center; }
+    .timeline div:nth-child(-n+2) { background: var(--brown); }
+    .timeline div:nth-child(n+3):nth-child(-n+5) { background: var(--green); }
+    .timeline div:nth-child(n+6) { background: var(--violet); }
+
+    footer { margin-top: 30px; padding: 20px 3px 0; color: var(--muted); border-top: 1px solid var(--line); font-size: 0.84rem; }
+
+    @media (max-width: 1100px) {
+      .summary-grid, .grid-4 { grid-template-columns: repeat(2, 1fr); }
+      .grid-3 { grid-template-columns: repeat(2, 1fr); }
+      .grid-2, .gate-grid { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: repeat(3, 1fr); }
+      .flow-step:nth-child(3)::after { display: none; }
+      .toc ol { columns: 2; }
+    }
+    @media (max-width: 700px) {
+      .page { width: calc(100% - 22px); padding-top: 18px; }
+      .hero, .section { padding: 25px 22px; }
+      .summary-grid, .grid-3, .grid-4, .flow { grid-template-columns: 1fr; }
+      .flow-step:not(:last-child)::after { content: "\2193"; top: auto; right: 50%; bottom: -17px; }
+      .flow-step:nth-child(3)::after { display: block; }
+      .toc ol { columns: 1; }
+      .sprint-head { grid-template-columns: auto 1fr; }
+      .sprint-focus { grid-column: 2; text-align: left; }
+      .sprint-body { padding: 20px; }
+      .hero::after { display: none; }
+    }
+    @media print {
+      body { background: #fff; }
+      .page { width: 100%; padding: 0; }
+      .hero, .toc, .section, .sprint { box-shadow: none; }
+      .sprint, .card, .callout, table { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <span class="eyebrow">Implementation Plan | August 3, 2026</span>
+      <h1>Playable Instrument Package Plan</h1>
+      <p class="lede">
+        This plan defines a second DRS output artifact: a sealed, playable instrument package that opens
+        inside DRS in a Performance-only workspace. The package excludes the authored <code>.drsproj</code>,
+        carries only runtime-facing content, and encrypts its internal assets so extraction and authoring-side
+        mutation become intentionally inconvenient without claiming strong copy protection.
+      </p>
+      <div class="meta">
+        <span class="chip">New artifact: <code>.drpkg</code></span>
+        <span class="chip">Workspace mode: Performance only</span>
+        <span class="chip">Authoring model excluded</span>
+        <span class="chip">Authenticated encryption at rest</span>
+        <span class="chip">Compiler and loader work required</span>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-card">
+          <strong>8</strong>
+          <span>Implementation sprints</span>
+        </div>
+        <div class="summary-card">
+          <strong>3</strong>
+          <span>Primary seams: compile, package, open</span>
+        </div>
+        <div class="summary-card">
+          <strong>0</strong>
+          <span><code>.drsproj</code> bytes included in package</span>
+        </div>
+        <div class="summary-card">
+          <strong>1</strong>
+          <span>Single reader mode for customer playback</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="toc">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#goal">Goal and Product Frame</a></li>
+        <li><a href="#baseline">Current Codebase Baseline</a></li>
+        <li><a href="#artifact">Target Artifact Model</a></li>
+        <li><a href="#format">Package Format and Crypto</a></li>
+        <li><a href="#flows">Open and Export Flows</a></li>
+        <li><a href="#workstreams">Workstreams and Ownership</a></li>
+        <li><a href="#sprints">Sprint Plan</a></li>
+        <li><a href="#gates">Validation and Release Gates</a></li>
+      </ol>
+    </section>
+
+    <section class="section" id="goal">
+      <div class="heading"><h2>Goal and Product Frame</h2></div>
+      <div class="grid-3">
+        <article class="card accent">
+          <h3>What We Are Building</h3>
+          <p>A DRS-native package that opens as a playable instrument, not as an authored project. It uses the existing runtime engine and performance surface, but hides the authoring surface entirely.</p>
+        </article>
+        <article class="card good">
+          <h3>What It Protects Against</h3>
+          <p>Casual browsing of raw sample files, trivial manifest editing, and accidental re-entry into the authoring workflow.</p>
+        </article>
+        <article class="card warn">
+          <h3>What It Does Not Promise</h3>
+          <p>It is not DRM and does not claim to stop a determined reverse engineer who can instrument a running copy of DRS.</p>
+        </article>
+      </div>
+      <div class="callout decision">
+        <strong>Core product decision:</strong>
+        the playable package is a distinct document type, not a disguised <code>drs.project</code>. The runtime instrument becomes authoritative, and authoring content is absent from the package.
+      </div>
+      <div class="callout warning">
+        <strong>Naming decision:</strong>
+        this plan uses <code>.drpkg</code> as the package extension and <code>drs.performancePackage</code> as the top-level schema name. If branding wants a different extension later, keep the schema split intact.
+      </div>
+    </section>
+
+    <section class="section" id="baseline">
+      <div class="heading"><h2>Current Codebase Baseline</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>Current State</th>
+              <th>Implication</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="id">Runtime models</td>
+              <td><code>RuntimeProjectModel</code> and <code>RuntimeInstrumentModel</code> are already separated in <code>engine_adapter/include/drs/engine/RuntimeModel.h</code>.</td>
+              <td>Good foundation for removing authoring data from the playable package.</td>
+            </tr>
+            <tr>
+              <td class="id">Compiler seam</td>
+              <td><code>compileRuntimeInstrument(...)</code> exists in <code>engine_adapter/src/RuntimeCompiler.cpp</code>.</td>
+              <td>We can build from an authored project into runtime artifacts, but the app does not yet expose a complete package writer.</td>
+            </tr>
+            <tr>
+              <td class="id">Project save flow</td>
+              <td><code>saveProjectFiles(...)</code> writes plain <code>.drsproj</code> and <code>.drinst</code> files in <code>app/src/shared/ProjectStorage.cpp</code>.</td>
+              <td>Current save logic is not suitable for sealed distribution output.</td>
+            </tr>
+            <tr>
+              <td class="id">Workspace shell</td>
+              <td>Standalone and plugin editors always add both <code>Perform</code> and <code>Map</code> tabs.</td>
+              <td>We need a document/workspace mode that can suppress the authoring tab entirely.</td>
+            </tr>
+            <tr>
+              <td class="id">Fixture packaging</td>
+              <td>The repo already generates a reference <code>drs.referencePackage</code> manifest for fixtures.</td>
+              <td>There is a useful packaging vocabulary, but not yet a customer-facing sealed container.</td>
+            </tr>
+            <tr>
+              <td class="id">Crypto baseline</td>
+              <td>JUCE crypto modules are vendored, but the obvious HISE BlowFish utilities are obfuscation-oriented and not the right long-term package primitive.</td>
+              <td>We should define a product-owned AEAD provider abstraction and avoid tying this feature to weak legacy helpers.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="artifact">
+      <div class="heading"><h2>Target Artifact Model</h2></div>
+      <div class="grid-2">
+        <article class="card accent">
+          <h3>Authoring Output</h3>
+          <ul>
+            <li><code>.drsproj</code> remains the editable source of truth.</li>
+            <li><code>.drinst</code> remains a plain runtime manifest for internal development, tests, and fixture review.</li>
+            <li>Authoring workflows continue to target the current workspace shell.</li>
+          </ul>
+        </article>
+        <article class="card good">
+          <h3>Distribution Output</h3>
+          <ul>
+            <li><code>.drpkg</code> becomes the customer-facing playable instrument package.</li>
+            <li>The package contains runtime-only content: package manifest, instrument manifest, compiled stream index/data, presets, artwork, and package metadata.</li>
+            <li>The package does not contain <code>.drsproj</code> or any authoring-state graph.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="callout decision">
+        <strong>Authority rule:</strong>
+        when a <code>.drpkg</code> file is opened, all runtime behavior must be driven from package payloads alone. No hidden fallback to a nearby <code>.drsproj</code>, sibling sample folder, or project-derived editable model is allowed.
+      </div>
+
+      <div class="flow">
+        <div class="flow-step">
+          <strong>1. Authored Project</strong>
+          <span>Editable source model with full authoring graph and sample references.</span>
+        </div>
+        <div class="flow-step">
+          <strong>2. Runtime Compile</strong>
+          <span>Compile project data into a runtime instrument plus stream mapping and payload plan.</span>
+        </div>
+        <div class="flow-step">
+          <strong>3. Stream Build</strong>
+          <span>Produce the package-owned sample payload and index with deterministic offsets and checksums.</span>
+        </div>
+        <div class="flow-step">
+          <strong>4. Package Manifest</strong>
+          <span>Assemble metadata, compatibility bounds, payload map, and visible document summary.</span>
+        </div>
+        <div class="flow-step">
+          <strong>5. Encrypt and Seal</strong>
+          <span>Compress, encrypt, authenticate, and write the final <code>.drpkg</code> container.</span>
+        </div>
+        <div class="flow-step">
+          <strong>6. Performance Open</strong>
+          <span>Load through a package reader and enter Performance-only workspace mode.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="format">
+      <div class="heading"><h2>Package Format and Crypto</h2></div>
+      <div class="grid-2">
+        <article class="card violet">
+          <h3>Recommended Container Shape</h3>
+          <ul>
+            <li>Cleartext fixed header with magic, version, package id, display name, payload table offset, flags, and minimum compatible app version.</li>
+            <li>Encrypted table-of-contents describing each logical payload.</li>
+            <li>Encrypted payload blobs for instrument manifest, compiled stream index, compiled sample pages, presets, artwork, and optional notes.</li>
+            <li>Per-payload checksums and sizes recorded inside the authenticated metadata.</li>
+          </ul>
+        </article>
+        <article class="card warn">
+          <h3>Crypto Recommendation</h3>
+          <ul>
+            <li>Use authenticated encryption, not plain symmetric obfuscation.</li>
+            <li>Prefer a product-owned AEAD abstraction whose first concrete provider is a vendored modern primitive such as <code>XChaCha20-Poly1305</code> or <code>AES-256-GCM</code>.</li>
+            <li>Avoid relying on legacy HISE BlowFish helpers for this format.</li>
+            <li>Compress first, then encrypt, so repetitive sample metadata is not leaked.</li>
+          </ul>
+        </article>
+      </div>
+
+      <pre><code>cleartext header
+  magic = "DRSPKG01"
+  packageSchema = 1
+  minReaderVersion
+  packageId
+  displayName
+  tocOffset
+  tocSize
+  headerFlags
+  visibleThumbnailOffset? / visibleThumbnailSize?
+
+encrypted TOC
+  packageManifest.json
+  instrumentManifest.json
+  compiledStream.index
+  compiledStream.pages
+  defaultPreset.json
+  artwork/*
+  diagnostics/build-info.json</code></pre>
+
+      <div class="callout problem">
+        <strong>Important technical gap:</strong>
+        the current compiler emits stream metadata and manifest serialization, but not yet a final sealed package with a production binary sample payload format. The stream writer must become a first-class product seam, not a test-only descriptor.
+      </div>
+    </section>
+
+    <section class="section" id="flows">
+      <div class="heading"><h2>Open and Export Flows</h2></div>
+      <div class="grid-2">
+        <article class="card accent">
+          <h3>Export Flow</h3>
+          <ol>
+            <li>User selects <em>Export Playable Instrument</em> from a project.</li>
+            <li>DRS validates the project for distribution eligibility.</li>
+            <li>Compiler builds runtime instrument and stream payload.</li>
+            <li>Packager assembles, encrypts, and writes <code>.drpkg</code>.</li>
+            <li>Validation pass reopens the written package and confirms performance playback readiness.</li>
+          </ol>
+        </article>
+        <article class="card good">
+          <h3>Open Flow</h3>
+          <ol>
+            <li>User opens a <code>.drpkg</code> file.</li>
+            <li>Reader validates header, version, and authentication tag.</li>
+            <li>Package loader hydrates runtime instrument and stream services from package payloads.</li>
+            <li>Workspace enters <code>performanceOnly</code> mode.</li>
+            <li>Only the Perform surface is shown; authoring actions are absent.</li>
+          </ol>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="workstreams">
+      <div class="heading"><h2>Workstreams and Ownership</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Workstream</th>
+              <th>Primary Scope</th>
+              <th>Likely Files</th>
+              <th>Priority</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="id">WS1</td>
+              <td>Document type, package schema, compatibility rules</td>
+              <td><code>engine_adapter/include/drs/engine/*</code>, <code>docs/*</code></td>
+              <td><span class="priority">P1</span></td>
+            </tr>
+            <tr>
+              <td class="id">WS2</td>
+              <td>Runtime compile finalization and binary stream writer</td>
+              <td><code>RuntimeCompiler.*</code>, new package writer files, tests</td>
+              <td><span class="priority">P1</span></td>
+            </tr>
+            <tr>
+              <td class="id">WS3</td>
+              <td>Package encryption and authenticated read/write</td>
+              <td>new <code>PackageCrypto*</code>, <code>PackageReader*</code>, <code>PackageWriter*</code></td>
+              <td><span class="priority">P1</span></td>
+            </tr>
+            <tr>
+              <td class="id">WS4</td>
+              <td>Loader integration and performance-only session open</td>
+              <td><code>RuntimeLoader.*</code>, <code>EngineFacade.*</code>, plugin processor/editor, standalone shell</td>
+              <td><span class="priority">P1</span></td>
+            </tr>
+            <tr>
+              <td class="id">WS5</td>
+              <td>UI and UX gating</td>
+              <td><code>MainComponent.cpp</code>, <code>PluginEditor.cpp</code>, menu actions, project status labels</td>
+              <td><span class="priority">P2</span></td>
+            </tr>
+            <tr>
+              <td class="id">WS6</td>
+              <td>Validation, negative fixtures, corruption handling, docs</td>
+              <td><code>tests/src/*</code>, <code>validation/*</code>, <code>docs/*</code></td>
+              <td><span class="priority">P1</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="sprints">
+      <div class="heading"><h2>Sprint Plan</h2></div>
+      <p>These sprints are deliberately narrow and testable. Each sprint should end with concrete fixtures and targeted automated coverage rather than a partially wired vertical slice.</p>
+      <div class="timeline">
+        <div>S1 Contracts</div>
+        <div>S2 Compile</div>
+        <div>S3 Crypto</div>
+        <div>S4 Read/Open</div>
+        <div>S5 UX Mode</div>
+        <div>S6 Export</div>
+        <div>S7 Hardening</div>
+        <div>S8 Release Gate</div>
+      </div>
+    </section>
+
+    <section class="sprint">
+      <div class="sprint-head">
+        <div class="sprint-number">1</div>
+        <div>
+          <h2>Package Contract and Workspace Mode</h2>
+        </div>
+        <div class="sprint-focus">Focus: schemas, document identity, shell mode</div>
+      </div>
+      <p class="sprint-intent">Define the contract before touching encryption or export UI so every later sprint has a stable vocabulary.</p>
+      <div class="sprint-body">
+        <ul class="task-list">
+          <li><span class="task-id">PKG-S1-T1</span> Create an ADR and code contract for <code>drs.performancePackage</code>, <code>.drpkg</code>, compatibility versioning, and package non-goals.</li>
+          <li><span class="task-id">PKG-S1-T2</span> Introduce a document-kind/workspace-mode enum that differentiates editable projects from performance packages.</li>
+          <li><span class="task-id">PKG-S1-T3</span> Add shell plumbing so standalone and plugin editors can suppress the Map tab when opening a performance package.</li>
+          <li><span class="task-id">PKG-S1-T4</span> Define package manifest structs and serialization contracts in <code>engine_adapter/include/drs/engine</code>.</li>
+          <li><span class="task-id">PKG-S1-T5</span> Add contract tests that assert authoring components are unavailable in <code>performanceOnly</code> mode.</li>
+        </ul>
+        <div class="files">Likely files: <code>MainComponent.cpp</code>, <code>PluginEditor.cpp</code>, new <code>PackageModel.h</code>, new docs contract.</div>
+        <div class="exit">
+          <h3>Exit Criteria</h3>
+          <p>The codebase can represent a performance package as a first-class document type and can render a shell that exposes only the Perform view.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="sprint">
+      <div class="sprint-head">
+        <div class="sprint-number">2</div>
+        <div>
+          <h2>Compiler Finalization and Stream Writer</h2>
+        </div>
+        <div class="sprint-focus">Focus: deterministic runtime payload generation</div>
+      </div>
+      <p class="sprint-intent">Turn the current compile seam into a real packageable runtime output instead of a mostly manifest-oriented fixture path.</p>
+      <div class="sprint-body">
+        <ul class="task-list">
+          <li><span class="task-id">PKG-S2-T1</span> Split compile output into explicit logical artifacts: instrument manifest, stream index, binary sample payload pages, optional preset bundle.</li>
+          <li><span class="task-id">PKG-S2-T2</span> Replace or extend the prototype stream container serializer with a production binary writer plus deterministic index format.</li>
+          <li><span class="task-id">PKG-S2-T3</span> Add checksums, page accounting, and payload-size metrics that are stable across repeated compiles.</li>
+          <li><span class="task-id">PKG-S2-T4</span> Add reference fixture tests for binary stream output determinism and round-trip loader readability.</li>
+          <li><span class="task-id">PKG-S2-T5</span> Add negative tests for missing samples, duplicate source ids, unsupported sample metadata, and invalid payload offsets.</li>
+        </ul>
+        <div class="files">Likely files: <code>RuntimeCompiler.cpp</code>, new <code>CompiledStreamWriter.*</code>, compile-path tests, fixture tooling.</div>
+        <div class="exit">
+          <h3>Exit Criteria</h3>
+          <p>A project can be compiled into complete runtime-owned payloads without depending on the plain project save flow.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="sprint">
+      <div class="sprint-head">
+        <div class="sprint-number">3</div>
+        <div>
+          <h2>Package Crypto and Sealed Writer</h2>
+        </div>
+        <div class="sprint-focus">Focus: authenticated package format</div>
+      </div>
+      <p class="sprint-intent">Build the encryption boundary as a product-owned seam instead of sprinkling ad hoc crypto into the exporter.</p>
+      <div class="sprint-body">
+        <ul class="task-list">
+          <li><span class="task-id">PKG-S3-T1</span> Introduce a <code>PackageCryptoProvider</code> abstraction with test vectors and deterministic harness coverage.</li>
+          <li><span class="task-id">PKG-S3-T2</span> Implement the package header, encrypted TOC, payload records, nonce handling, and authentication-tag validation rules.</li>
+          <li><span class="task-id">PKG-S3-T3</span> Define the cleartext-vs-encrypted metadata boundary, including visible display name and optional thumbnail policy.</li>
+          <li><span class="task-id">PKG-S3-T4</span> Write a <code>PackageWriter</code> that consumes compiled runtime artifacts and emits a single <code>.drpkg</code> file.</li>
+          <li><span class="task-id">PKG-S3-T5</span> Add corruption tests for truncated files, bad tags, duplicate payload ids, TOC mismatch, and version skew.</li>
+        </ul>
+        <div class="files">Likely files: new <code>PackageCrypto*</code>, <code>PackageWriter*</code>, new package-format tests.</div>
+        <div class="exit">
+          <h3>Exit Criteria</h3>
+          <p>The repo can write a sealed, authenticated package from compiled runtime artifacts and reliably reject tampered packages.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="sprint">
+      <div class="sprint-head">
+        <div class="sprint-number">4</div>
+        <div>
+          <h2>Package Reader and Runtime Loader</h2>
+        </div>
+        <div class="sprint-focus">Focus: loading <code>.drpkg</code> without authoring fallback</div>
+      </div>
+      <p class="sprint-intent">Make the sealed package loadable through a dedicated reader path that hydrates runtime state directly.</p>
+      <div class="sprint-body">
+        <ul class="task-list">
+          <li><span class="task-id">PKG-S4-T1</span> Add a <code>PackageReader</code> that validates the cleartext header, decrypts the TOC, and streams payloads on demand.</li>
+          <li><span class="task-id">PKG-S4-T2</span> Add <code>loadPerformancePackage(...)</code> entry points beside the existing project and instrument loaders.</li>
+          <li><span class="task-id">PKG-S4-T3</span> Teach the runtime loader to hydrate instrument and stream services from package-owned payloads instead of file-neighbor assumptions.</li>
+          <li><span class="task-id">PKG-S4-T4</span> Ensure no package-open path constructs a <code>RuntimeProjectModel</code> or editable authoring session.</li>
+          <li><span class="task-id">PKG-S4-T5</span> Add unit tests for successful open, checksum mismatch, unsupported version, missing required payload, and wrong package schema.</li>
+        </ul>
+        <div class="files">Likely files: <code>RuntimeLoader.*</code>, new <code>PackageReader*</code>, new package-load tests.</div>
+        <div class="exit">
+          <h3>Exit Criteria</h3>
+          <p>A <code>.drpkg</code> file can be opened into a playable runtime session without requiring a project manifest or a raw sample directory.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="sprint">
+      <div class="sprint-head">
+        <div class="sprint-number">5</div>
+        <div>
+          <h2>Performance-Only UX and Session Semantics</h2>
+        </div>
+        <div class="sprint-focus">Focus: visible product behavior</div>
+      </div>
+      <p class="sprint-intent">Make the new document type feel intentional in the UI rather than like a crippled project window.</p>
+      <div class="sprint-body">
+        <ul class="task-list">
+          <li><span class="task-id">PKG-S5-T1</span> Add open commands for <code>.drpkg</code> in plugin and standalone shells.</li>
+          <li><span class="task-id">PKG-S5-T2</span> Show package display name, package status, and compatible-engine messaging in the shell header.</li>
+          <li><span class="task-id">PKG-S5-T3</span> Remove or disable authoring-oriented menu items, save prompts, and dirty-project affordances in package sessions.</li>
+          <li><span class="task-id">PKG-S5-T4</span> Add explicit read-only language so the session does not look broken when authoring actions are absent.</li>
+          <li><span class="task-id">PKG-S5-T5</span> Add UI tests for tab visibility, open flow, and package-specific status messaging.</li>
+        </ul>
+        <div class="files">Likely files: <code>MainComponent.cpp</code>, <code>PluginEditor.cpp</code>, menu wiring, status labels, shell tests.</div>
+        <div class="exit">
+          <h3>Exit Criteria</h3>
+          <p>Users can open a playable package and clearly understand that they are in a performance session, not an editable project session.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="sprint">
+      <div class="sprint-head">
+        <div class="sprint-number">6</div>
+        <div>
+          <h2>Export Command and Authoring Integration</h2>
+        </div>
+        <div class="sprint-focus">Focus: package creation from real projects</div>
+      </div>
+      <p class="sprint-intent">Expose the new output through a dedicated export path rather than piggybacking on ordinary Save.</p>
+      <div class="sprint-body">
+        <ul class="task-list">
+          <li><span class="task-id">PKG-S6-T1</span> Add an <em>Export Playable Instrument</em> command to plugin and standalone shells.</li>
+          <li><span class="task-id">PKG-S6-T2</span> Create a distribution validation pass that blocks export when required runtime artifacts are incomplete.</li>
+          <li><span class="task-id">PKG-S6-T3</span> Add an export coordinator/service that compiles, packages, verifies, and reports progress and failures.</li>
+          <li><span class="task-id">PKG-S6-T4</span> Add destination picking, overwrite confirmation, and export summary reporting.</li>
+          <li><span class="task-id">PKG-S6-T5</span> Add integration tests that export a real fixture project and reopen the result in performance-only mode.</li>
+        </ul>
+        <div class="files">Likely files: export command plumbing, new service/coordinator classes, shell integration tests.</div>
+        <div class="exit">
+          <h3>Exit Criteria</h3>
+          <p>Users can export a <code>.drpkg</code> from an authored project and immediately reopen it as a playable instrument.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="sprint">
+      <div class="sprint-head">
+        <div class="sprint-number">7</div>
+        <div>
+          <h2>Hardening, Negative Fixtures, and Host Validation</h2>
+        </div>
+        <div class="sprint-focus">Focus: resilience and supportability</div>
+      </div>
+      <p class="sprint-intent">Treat packaging as a long-lived product surface with bad-input handling, diagnostics, and reproducible fixtures.</p>
+      <div class="sprint-body">
+        <ul class="task-list">
+          <li><span class="task-id">PKG-S7-T1</span> Add checked-in positive and negative package fixtures: valid, truncated, tampered, wrong-version, missing-payload, and checksum-mismatch.</li>
+          <li><span class="task-id">PKG-S7-T2</span> Add runtime diagnostics that distinguish package-format failure, decryption failure, payload corruption, and playback-compatibility failure.</li>
+          <li><span class="task-id">PKG-S7-T3</span> Extend REAPER or host validation scenarios so a sealed package can be opened and played in plugin and standalone paths.</li>
+          <li><span class="task-id">PKG-S7-T4</span> Add performance and memory profiling around package open, stream paging, and initial playback latency.</li>
+          <li><span class="task-id">PKG-S7-T5</span> Add docs for contributor fixture refresh, package verification, and debug triage.</li>
+        </ul>
+        <div class="files">Likely files: <code>validation/reaper/*</code>, <code>tests/src/*</code>, package docs, fixture tool extensions.</div>
+        <div class="exit">
+          <h3>Exit Criteria</h3>
+          <p>The package system is supportable under corruption, version skew, and host-level playback validation.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="sprint">
+      <div class="sprint-head">
+        <div class="sprint-number">8</div>
+        <div>
+          <h2>Release Gate and Cutover</h2>
+        </div>
+        <div class="sprint-focus">Focus: production readiness</div>
+      </div>
+      <p class="sprint-intent">Ship only after packaging is deterministic, debuggable, and clearly separated from the editable project flow.</p>
+      <div class="sprint-body">
+        <ul class="task-list">
+          <li><span class="task-id">PKG-S8-T1</span> Freeze the package schema and compatibility policy, including reader behavior for future minor and major versions.</li>
+          <li><span class="task-id">PKG-S8-T2</span> Add go/no-go evidence for package determinism, reopen validation, performance-only UX, and failure reporting.</li>
+          <li><span class="task-id">PKG-S8-T3</span> Audit menus, commands, and docs to ensure Save Project and Export Playable Instrument remain clearly distinct.</li>
+          <li><span class="task-id">PKG-S8-T4</span> Add release checklist items for customer package corpus smoke tests and package-format regression tests.</li>
+          <li><span class="task-id">PKG-S8-T5</span> Publish operator docs for support and internal QA.</li>
+        </ul>
+        <div class="files">Likely files: release docs, test presets, gate reports, operator notes.</div>
+        <div class="exit">
+          <h3>Exit Criteria</h3>
+          <p>The playable package feature is ready to ship as a distinct output with clear user expectations and stable reader/writer behavior.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="gates">
+      <div class="heading"><h2>Validation and Release Gates</h2></div>
+      <div class="gate-grid">
+        <article class="card good">
+          <h3>Must-Have Gates</h3>
+          <ul>
+            <li>Deterministic package generation from identical inputs.</li>
+            <li>Successful reopen of exported package in standalone and plugin shells.</li>
+            <li>No authoring tab, authoring save prompts, or editable project state in package sessions.</li>
+            <li>Negative fixture coverage for corruption and version mismatch.</li>
+            <li>Host validation proving package-backed playback through the runtime engine.</li>
+          </ul>
+        </article>
+        <article class="card warn">
+          <h3>Should-Have Gates</h3>
+          <ul>
+            <li>Package open-time and first-note latency budgets.</li>
+            <li>Contributor tooling to rebuild and verify package fixtures.</li>
+            <li>Human-readable diagnostics for common field failures.</li>
+            <li>Compatibility tests across at least one previous reader format revision once the schema evolves.</li>
+          </ul>
+        </article>
+      </div>
+      <div class="callout warning">
+        <strong>Release blocker:</strong>
+        do not ship the format if the runtime can still silently fall back to nearby raw sample files or project manifests. That would undercut both the packaging goal and the support model.
+      </div>
+    </section>
+
+    <footer>
+      Prepared for the playable-instrument packaging initiative. This plan intentionally excludes embedding the authored
+      <code>.drsproj</code> and assumes the distribution artifact is runtime-only.
+    </footer>
+  </main>
+</body>
+</html>

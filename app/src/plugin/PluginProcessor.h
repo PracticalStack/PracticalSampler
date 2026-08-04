@@ -5,6 +5,7 @@
 #include "drs/engine/AuthoringPreviewController.h"
 #include "drs/engine/EngineFacade.h"
 #include "drs/engine/HostSessionState.h"
+#include "drs/engine/PerformancePackage.h"
 #include "drs/engine/PerformancePublishCommandAdapter.h"
 #include "drs/engine/ProjectRestoreCoordinator.h"
 #include "drs/engine/SampleImport.h"
@@ -191,6 +192,13 @@ public:
     bool bindAuthoringProjectFile(const juce::File& resolvedProjectFile);
     void clearAuthoringProjectFileBinding();
     juce::File getAuthoringProjectFile() const;
+    const drs::engine::WorkspaceDocumentState& getWorkspaceDocumentState() const noexcept
+    {
+        return workspaceDocumentState;
+    }
+    bool activatePerformancePackageWorkspace(
+        const drs::engine::PerformancePackageManifest& package,
+        juce::File resolvedPackageFile = {});
     const drs::engine::HostProjectBinding& getAuthoringProjectBinding() const
     {
         return authoringProjectBinding;
@@ -319,6 +327,7 @@ private:
     std::optional<drs::engine::HostProjectBinding> buildValidatedAuthoringProjectBinding(
         const juce::File& resolvedProjectFile,
         const drs::engine::RuntimeProjectModel& project) const;
+    void refreshWorkspaceDocumentStateFromAuthoringProject();
     struct ProjectRestoreApplicationOutcome
     {
         bool applied = false;
@@ -474,6 +483,7 @@ private:
     drs::app::AuthoringImportResponsivenessSnapshot authoringImportResponsivenessSnapshot;
     drs::app::AuthoringSourceValidationSnapshot authoringSourceValidationSnapshot;
     drs::engine::HostProjectBinding authoringProjectBinding;
+    drs::engine::WorkspaceDocumentState workspaceDocumentState;
     drs::engine::ProjectRestoreCoordinator projectRestoreCoordinator;
     drs::app::SfzImportReviewService sfzImportReviewService;
     drs::app::WavImportService wavImportService;

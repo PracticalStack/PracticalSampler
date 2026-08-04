@@ -79,11 +79,13 @@ private:
     bool loadProjectFromFile(const juce::File& file);
     void confirmSafeToDiscardChanges(const juce::String& nextAction, std::function<void(bool)> completion);
     void refreshProjectViews();
+    void synchronizeWorkspacePresentation();
     void updateWindowTitle();
     void pollWavImportService();
     void pollSfzImportReviewService();
     drs::engine::RuntimeProjectModel buildUnloadedProjectState() const;
     drs::engine::RuntimeProjectModel buildEmptyProjectTemplate() const;
+    juce::String buildWorkspaceDisplayName() const;
     juce::String buildWindowTitle() const;
     juce::String buildProjectIssueSummary(const std::vector<std::string>& issues) const;
     juce::String buildImportSummaryMessage(std::size_t importedCount,

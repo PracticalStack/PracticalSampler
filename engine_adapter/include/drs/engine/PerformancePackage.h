@@ -1,0 +1,72 @@
+#pragma once
+
+#include <string>
+#include <vector>
+
+namespace drs::engine
+{
+inline constexpr const char* performancePackageSchemaName = "drs.performancePackage";
+inline constexpr int performancePackageSchemaVersion = 1;
+inline constexpr const char* performancePackageFileExtension = ".drpkg";
+
+enum class WorkspaceDocumentKind
+{
+    authoringProject,
+    performancePackage
+};
+
+enum class WorkspaceMode
+{
+    authoring,
+    performanceOnly
+};
+
+struct PerformancePackageManifest
+{
+    std::string schemaName = performancePackageSchemaName;
+    int schemaVersion = performancePackageSchemaVersion;
+    std::string packageId;
+    std::string displayName;
+    std::string instrumentId;
+    std::string defaultLoadProfile;
+    int minimumReaderSchemaVersion = performancePackageSchemaVersion;
+    std::vector<std::string> notes;
+};
+
+struct WorkspaceDocumentState
+{
+    WorkspaceDocumentKind kind = WorkspaceDocumentKind::authoringProject;
+    WorkspaceMode workspaceMode = WorkspaceMode::authoring;
+    std::string displayName;
+    std::string sourcePath;
+    std::string documentId;
+    bool authoringAvailable = true;
+    bool dirty = false;
+};
+
+inline const char* toString(const WorkspaceDocumentKind kind) noexcept
+{
+    switch (kind)
+    {
+        case WorkspaceDocumentKind::authoringProject:
+            return "authoringProject";
+        case WorkspaceDocumentKind::performancePackage:
+            return "performancePackage";
+    }
+
+    return "unknown";
+}
+
+inline const char* toString(const WorkspaceMode mode) noexcept
+{
+    switch (mode)
+    {
+        case WorkspaceMode::authoring:
+            return "authoring";
+        case WorkspaceMode::performanceOnly:
+            return "performanceOnly";
+    }
+
+    return "unknown";
+}
+} // namespace drs::engine

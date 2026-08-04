@@ -18,6 +18,8 @@ namespace drs::plugin
 namespace
 {
 namespace fs = std::filesystem;
+const auto performTabColour = juce::Colour::fromRGB(28, 126, 214);
+const auto mapTabColour = juce::Colour::fromRGB(181, 96, 21);
 
 constexpr int saveButtonResult = 1;
 constexpr int discardButtonResult = 2;
@@ -530,8 +532,6 @@ Editor::Editor(Processor& owner)
     workspaceShell.addAndMakeVisible(projectStatusLabel);
 
     workspaceTabs.setComponentID("workspaceTabs");
-    workspaceTabs.addTab("Perform", juce::Colour::fromRGB(28, 126, 214), &performancePanel, false);
-    workspaceTabs.addTab("Map", juce::Colour::fromRGB(181, 96, 21), &authoringPanel, false);
     workspaceShell.addAndMakeVisible(workspaceTabs);
     workspaceShell.addAndMakeVisible(restoreBanner);
     wavImportProgress.setCancelCallback([this]
@@ -548,6 +548,7 @@ Editor::Editor(Processor& owner)
     sfzImportProgress.setVisible(false);
     workspaceShell.addAndMakeVisible(sfzImportProgress);
     restoreBanner.update(processor.getProjectRestoreSnapshot());
+    synchronizeWorkspacePresentation();
 
     setSize(drs::app::authoring::compactShellWidth, drs::app::authoring::compactShellHeight);
     refreshProjectViews();
@@ -567,6 +568,7 @@ Editor::~Editor()
 
 void Editor::resized()
 {
+    synchronizeWorkspacePresentation();
     workspaceShell.setBounds(getLocalBounds());
 
     auto area = workspaceShell.getLocalBounds();
@@ -599,14 +601,18 @@ void Editor::resized()
 void Editor::showFileMenu()
 {
     juce::PopupMenu menu;
+    const auto authoringAvailable = processor.getWorkspaceDocumentState().authoringAvailable;
     menu.addItem(newProjectCommandId, "New Project");
     menu.addItem(openProjectCommandId, "Open Project...");
     menu.addItem(closeProjectCommandId, "Close");
-    menu.addSeparator();
-    menu.addItem(saveProjectCommandId, "Save");
-    menu.addItem(saveProjectAsCommandId, "Save As...");
-    menu.addItem(importWavCommandId, "Import WAV...");
-    menu.addItem(importSfzCommandId, "Import SFZ...");
+    if (authoringAvailable)
+    {
+        menu.addSeparator();
+        menu.addItem(saveProjectCommandId, "Save");
+        menu.addItem(saveProjectAsCommandId, "Save As...");
+        menu.addItem(importWavCommandId, "Import WAV...");
+        menu.addItem(importSfzCommandId, "Import SFZ...");
+    }
 
     auto safeThis = juce::Component::SafePointer<Editor>(this);
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&fileMenuButton),
@@ -670,6 +676,9 @@ void Editor::handleMenuCommand(int menuItemId)
 
 void Editor::createNewProject()
 {
+    if (!processor.getWorkspaceDocumentState().authoringAvailable)
+        return;
+
     auto safeThis = juce::Component::SafePointer<Editor>(this);
     confirmSafeToDiscardChanges("creating a new project",
                                 [safeThis](bool shouldProceed)
@@ -726,6 +735,13 @@ void Editor::closeProject()
 
 void Editor::saveProject(std::function<void(bool)> completion)
 {
+    if (!processor.getWorkspaceDocumentState().authoringAvailable)
+    {
+        if (completion)
+            completion(false);
+        return;
+    }
+
     if (processor.getAuthoringProjectFile() == juce::File())
     {
         saveProjectAs(std::move(completion));
@@ -739,6 +755,13 @@ void Editor::saveProject(std::function<void(bool)> completion)
 
 void Editor::saveProjectAs(std::function<void(bool)> completion)
 {
+    if (!processor.getWorkspaceDocumentState().authoringAvailable)
+    {
+        if (completion)
+            completion(false);
+        return;
+    }
+
     auto safeThis = juce::Component::SafePointer<Editor>(this);
     launchSaveProjectChooser(
         [safeThis, completion = std::move(completion)](juce::File selectedFile) mutable
@@ -764,6 +787,9 @@ void Editor::saveProjectAs(std::function<void(bool)> completion)
 
 void Editor::importWavFiles()
 {
+    if (!processor.getWorkspaceDocumentState().authoringAvailable)
+        return;
+
     auto safeThis = juce::Component::SafePointer<Editor>(this);
     launchImportWavChooser([safeThis](std::vector<juce::File> selectedFiles)
     {
@@ -774,6 +800,9 @@ void Editor::importWavFiles()
 
 void Editor::importSfzFile()
 {
+    if (!processor.getWorkspaceDocumentState().authoringAvailable)
+        return;
+
     auto safeThis = juce::Component::SafePointer<Editor>(this);
     launchImportSfzChooser([safeThis](juce::File selectedFile)
     {
@@ -1160,7 +1189,7 @@ bool Editor::loadProjectFromFile(const juce::File& file)
 void Editor::confirmSafeToDiscardChanges(const juce::String& nextAction,
                                          std::function<void(bool)> completion)
 {
-    if (!processor.getAuthoringSession().getDocumentState().dirty)
+    if (!processor.getWorkspaceDocumentState().dirty)
     {
         if (completion)
             completion(true);
@@ -1198,7 +1227,8 @@ void Editor::timerCallback()
     if (restoreBanner.update(processor.getProjectRestoreSnapshot()))
         resized();
     performancePanel.refreshNow();
-    authoringPanel.refreshNow();
+    if (processor.getWorkspaceDocumentState().authoringAvailable)
+        authoringPanel.refreshNow();
     updateProjectStatusLabel();
     pollWavImportService();
     pollSfzImportReviewService();
@@ -1392,24 +1422,45 @@ void Editor::locateProjectForRestore()
 
 void Editor::refreshProjectViews()
 {
-    authoringPanel.reloadFromSession();
+    if (processor.getWorkspaceDocumentState().authoringAvailable)
+        authoringPanel.reloadFromSession();
+    synchronizeWorkspacePresentation();
     updateProjectStatusLabel();
+}
+
+void Editor::synchronizeWorkspacePresentation()
+{
+    const auto performanceOnly
+        = processor.getWorkspaceDocumentState().workspaceMode == drs::engine::WorkspaceMode::performanceOnly;
+    const auto expectedTabCount = performanceOnly ? 1 : 2;
+    if (workspaceTabs.getNumTabs() == expectedTabCount)
+        return;
+
+    const auto previousIndex = workspaceTabs.getCurrentTabIndex();
+    workspaceTabs.clearTabs();
+    workspaceTabs.addTab("Perform", performTabColour, &performancePanel, false);
+    if (!performanceOnly)
+        workspaceTabs.addTab("Map", mapTabColour, &authoringPanel, false);
+
+    workspaceTabs.setCurrentTabIndex(std::clamp(previousIndex, 0, workspaceTabs.getNumTabs() - 1));
 }
 
 void Editor::updateProjectStatusLabel()
 {
-    juce::String statusText;
-    if (processor.getAuthoringProjectFile() != juce::File())
-        statusText = processor.getAuthoringProjectFile().getFileNameWithoutExtension();
-    else if (!processor.getAuthoringSession().getProject().displayName.empty())
-        statusText = juce::String::fromUTF8(processor.getAuthoringSession().getProject().displayName.c_str());
-    else
-        statusText = "No Project Loaded";
-
-    if (processor.getAuthoringSession().getDocumentState().dirty)
+    auto statusText = buildWorkspaceDisplayName();
+    if (processor.getWorkspaceDocumentState().dirty)
         statusText += " *";
 
     projectStatusLabel.setText(statusText, juce::dontSendNotification);
+}
+
+juce::String Editor::buildWorkspaceDisplayName() const
+{
+    const auto& document = processor.getWorkspaceDocumentState();
+    if (!document.displayName.empty())
+        return juce::String::fromUTF8(document.displayName.c_str());
+
+    return "No Project Loaded";
 }
 
 drs::engine::RuntimeProjectModel Editor::buildUnloadedProjectState() const

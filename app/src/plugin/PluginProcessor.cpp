@@ -182,6 +182,54 @@ std::string describeAuthoredArticulations(const drs::engine::RuntimeProjectModel
     return description.str();
 }
 
+drs::engine::WorkspaceDocumentState buildAuthoringWorkspaceDocumentState(
+    const drs::engine::AuthoringSession& authoringSession,
+    const drs::engine::HostProjectBinding& binding)
+{
+    drs::engine::WorkspaceDocumentState state;
+    state.kind = drs::engine::WorkspaceDocumentKind::authoringProject;
+    state.workspaceMode = drs::engine::WorkspaceMode::authoring;
+    state.authoringAvailable = true;
+    state.dirty = authoringSession.getDocumentState().dirty;
+    state.documentId = authoringSession.getProject().projectId;
+    state.sourcePath = binding.manifestPath;
+
+    if (!binding.manifestFileName.empty())
+        state.displayName = fs::path(binding.manifestFileName).stem().generic_string();
+    else if (!authoringSession.getProject().displayName.empty())
+        state.displayName = authoringSession.getProject().displayName;
+    else
+        state.displayName = "No Project Loaded";
+
+    return state;
+}
+
+drs::engine::WorkspaceDocumentState buildPerformancePackageWorkspaceDocumentState(
+    const drs::engine::PerformancePackageManifest& package,
+    const juce::File& resolvedPackageFile)
+{
+    drs::engine::WorkspaceDocumentState state;
+    state.kind = drs::engine::WorkspaceDocumentKind::performancePackage;
+    state.workspaceMode = drs::engine::WorkspaceMode::performanceOnly;
+    state.authoringAvailable = false;
+    state.dirty = false;
+    state.documentId = package.packageId;
+    state.sourcePath = resolvedPackageFile == juce::File()
+        ? std::string {}
+        : resolvedPackageFile.getFullPathName().toStdString();
+
+    if (!package.displayName.empty())
+        state.displayName = package.displayName;
+    else if (resolvedPackageFile != juce::File())
+        state.displayName = resolvedPackageFile.getFileNameWithoutExtension().toStdString();
+    else if (!package.packageId.empty())
+        state.displayName = package.packageId;
+    else
+        state.displayName = "Playable Instrument";
+
+    return state;
+}
+
 bool isWavImportItemTerminal(const drs::app::WavImportItemStage stage) noexcept
 {
     using Stage = drs::app::WavImportItemStage;
@@ -722,6 +770,7 @@ Processor::Processor(drs::app::WaveformPreviewServiceOptions waveformPreviewServ
     primeRealtimeSafetyState(512);
     initializeAuthoringImportMetrics();
     initializeAuthoringSourceValidationSnapshot();
+    refreshWorkspaceDocumentStateFromAuthoringProject();
     authoringSession.setDspParameterGesturePreviewListener(
         [this](const std::string& slotId, const std::string& parameterId, const double value)
         {
@@ -1680,6 +1729,7 @@ bool Processor::bindAuthoringProjectFile(const juce::File& resolvedProjectFile)
         return false;
 
     authoringProjectBinding = *binding;
+    refreshWorkspaceDocumentStateFromAuthoringProject();
     refreshSerializedHostStatePublication(true);
     return true;
 }
@@ -1687,7 +1737,23 @@ bool Processor::bindAuthoringProjectFile(const juce::File& resolvedProjectFile)
 void Processor::clearAuthoringProjectFileBinding()
 {
     authoringProjectBinding = {};
+    refreshWorkspaceDocumentStateFromAuthoringProject();
     refreshSerializedHostStatePublication(true);
+}
+
+bool Processor::activatePerformancePackageWorkspace(
+    const drs::engine::PerformancePackageManifest& package,
+    juce::File resolvedPackageFile)
+{
+    if (package.schemaName != drs::engine::performancePackageSchemaName
+        || package.schemaVersion != drs::engine::performancePackageSchemaVersion
+        || package.packageId.empty())
+    {
+        return false;
+    }
+
+    workspaceDocumentState = buildPerformancePackageWorkspaceDocumentState(package, resolvedPackageFile);
+    return true;
 }
 
 bool Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project,
@@ -1740,6 +1806,7 @@ bool Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
     observedDraftPlaybackProjectRevision = authoringSession.getDocumentState().revision;
     initializeAuthoringImportMetrics();
     initializeAuthoringSourceValidationSnapshot();
+    refreshWorkspaceDocumentStateFromAuthoringProject();
     serviceMessageThreadWork();
     updateRealtimeSafetyState();
     refreshSerializedHostStatePublication(true);
@@ -1763,6 +1830,7 @@ bool Processor::applyAuthoringProjectMigration(drs::engine::RuntimeProjectModel 
     resetAuthoringPreviewPreparationAuthorization();
     resetAuthoringWaveformPreviewAuthorization();
     initializeAuthoringSourceValidationSnapshot();
+    refreshWorkspaceDocumentStateFromAuthoringProject();
     serviceMessageThreadWork();
     refreshSerializedHostStatePublication(true);
     return true;
@@ -1790,9 +1858,15 @@ void Processor::closeAuthoringProject(drs::engine::RuntimeProjectModel unloadedP
     observedDraftPlaybackProjectRevision = authoringSession.getDocumentState().revision;
     initializeAuthoringImportMetrics();
     initializeAuthoringSourceValidationSnapshot();
+    refreshWorkspaceDocumentStateFromAuthoringProject();
     updateRealtimeSafetyState();
     publishAuthoringPreviewStatus();
     refreshSerializedHostStatePublication(true);
+}
+
+void Processor::refreshWorkspaceDocumentStateFromAuthoringProject()
+{
+    workspaceDocumentState = buildAuthoringWorkspaceDocumentState(authoringSession, authoringProjectBinding);
 }
 
 void Processor::queuePerformanceSurfaceNoteOn(int midiNoteNumber, float velocity)

@@ -321,6 +321,19 @@ int main()
         standaloneTabs->setCurrentTabIndex(1);
         require(findDescendantById(mainComponent, "authoringZoneSelector") != nullptr,
                 "Standalone shell should expose the Sprint 3 mapping workspace zone selector.");
+        require(mainComponent.getProcessor().getWorkspaceDocumentState().authoringAvailable,
+                "Standalone shell should start in authoring workspace mode.");
+        drs::engine::PerformancePackageManifest standalonePackage;
+        standalonePackage.packageId = "drs.phase0.smoke.package";
+        standalonePackage.displayName = "Smoke Package";
+        standalonePackage.instrumentId = "drs.phase0.instrument";
+        require(mainComponent.getProcessor().activatePerformancePackageWorkspace(standalonePackage),
+                "Standalone shell should accept a valid performance package workspace contract.");
+        mainComponent.resized();
+        require(standaloneTabs->getNumTabs() == 1,
+                "Standalone shell should hide the Map tab in performance-only workspace mode.");
+        require(findDescendantById(mainComponent, "authoringZoneSelector") == nullptr,
+                "Standalone shell should remove authoring descendants in performance-only workspace mode.");
         require(!mainComponent.isAudioOutputEnabled(),
                 "Headless standalone smoke validation should keep the real audio device disabled.");
         mainComponent.getProcessor().prepareToPlay(44100.0, 512);
@@ -372,6 +385,19 @@ int main()
         pluginTabs->setCurrentTabIndex(1);
         require(findDescendantById(*editor, "authoringZoneSelector") != nullptr,
                 "Plugin editor should expose the Sprint 3 mapping workspace zone selector.");
+        require(processor.getWorkspaceDocumentState().authoringAvailable,
+                "Plugin editor should start in authoring workspace mode.");
+        drs::engine::PerformancePackageManifest pluginPackage;
+        pluginPackage.packageId = "drs.phase0.plugin.package";
+        pluginPackage.displayName = "Plugin Smoke Package";
+        pluginPackage.instrumentId = "drs.phase0.plugin.instrument";
+        require(processor.activatePerformancePackageWorkspace(pluginPackage),
+                "Plugin editor should accept a valid performance package workspace contract.");
+        editor->resized();
+        require(pluginTabs->getNumTabs() == 1,
+                "Plugin editor should hide the Map tab in performance-only workspace mode.");
+        require(findDescendantById(*editor, "authoringZoneSelector") == nullptr,
+                "Plugin editor should remove authoring descendants in performance-only workspace mode.");
 
         processor.prepareToPlay(44100.0, 512);
         processor.getEngineFacade().resetSessionStateToDefault();
