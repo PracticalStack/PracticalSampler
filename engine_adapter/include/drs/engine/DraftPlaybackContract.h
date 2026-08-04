@@ -166,4 +166,10 @@ private:
     DraftPlaybackStatus status;
     std::uint64_t nextRequestId = 1;
 };
+
+PlaybackActivationPayloadPtr buildPlaybackActivationPayload(
+    PlaybackActivationLane lane,
+    std::size_t requestedRevision,
+    const PlaybackSnapshotBuildResult* snapshotResult,
+    const PreparedPlaybackBuildResult* preparedResult);
 } // namespace drs::engine

@@ -193,6 +193,7 @@ drs::engine::WorkspaceDocumentState buildAuthoringWorkspaceDocumentState(
     state.dirty = authoringSession.getDocumentState().dirty;
     state.documentId = authoringSession.getProject().projectId;
     state.sourcePath = binding.manifestPath;
+    state.schemaVersion = authoringSession.getProject().schemaVersion;
 
     if (!binding.manifestFileName.empty())
         state.displayName = fs::path(binding.manifestFileName).stem().generic_string();
@@ -214,6 +215,8 @@ drs::engine::WorkspaceDocumentState buildPerformancePackageWorkspaceDocumentStat
     state.authoringAvailable = false;
     state.dirty = false;
     state.documentId = package.packageId;
+    state.schemaVersion = package.schemaVersion;
+    state.minimumReaderSchemaVersion = package.minimumReaderSchemaVersion;
     state.sourcePath = resolvedPackageFile == juce::File()
         ? std::string {}
         : resolvedPackageFile.getFullPathName().toStdString();
@@ -228,6 +231,26 @@ drs::engine::WorkspaceDocumentState buildPerformancePackageWorkspaceDocumentStat
         state.displayName = "Playable Instrument";
 
     return state;
+}
+
+drs::engine::RuntimeProjectModel buildSuppressedAuthoringProjectState()
+{
+    drs::engine::RuntimeProjectModel project;
+    project.schemaName = "drs.project";
+    project.schemaVersion = 6;
+    project.displayName = "Playable Instrument Session";
+    project.authoring.schemaName = "drs.authoring";
+    project.authoring.schemaVersion = 5;
+    project.authoring.articulations = { { "default", "Default", true, 0, std::nullopt } };
+    project.authoring.notes = {
+        "A playable package is open.",
+        "Authoring is intentionally unavailable in this read-only session."
+    };
+    project.notes = {
+        "This workspace is backed by a sealed performance package.",
+        "Open a project to return to the authoring workflow."
+    };
+    return project;
 }
 
 bool isWavImportItemTerminal(const drs::app::WavImportItemStage stage) noexcept
@@ -1756,6 +1779,103 @@ bool Processor::activatePerformancePackageWorkspace(
     return true;
 }
 
+PerformancePackageWorkspaceLoadResult Processor::loadPerformancePackageWorkspace(
+    const juce::File& resolvedPackageFile)
+{
+    PerformancePackageWorkspaceLoadResult result;
+    result.state = "Performance package open failed";
+
+    if (resolvedPackageFile == juce::File()
+        || !resolvedPackageFile.existsAsFile()
+        || !resolvedPackageFile.getFileExtension().equalsIgnoreCase(
+            juce::String::fromUTF8(drs::engine::performancePackageFileExtension)))
+    {
+        result.issues.push_back("Select a valid .drpkg file.");
+        return result;
+    }
+
+    const auto packageLoad = drs::engine::loadPerformancePackage(
+        resolvedPackageFile.getFullPathName().toStdString(),
+        drs::engine::getDeterministicPackageCryptoProvider(),
+        drs::engine::performancePackageSchemaVersion);
+    if (!packageLoad.loaded)
+    {
+        result.state = packageLoad.state;
+        result.issues = packageLoad.issues;
+        if (result.issues.empty())
+            result.issues.push_back("The playable package could not be loaded.");
+        return result;
+    }
+
+    const auto activation = engineFacade.activatePerformancePackageSession(packageLoad);
+    if (!activation.activated)
+    {
+        result.state = activation.state;
+        result.issues = activation.issues;
+        if (result.issues.empty())
+            result.issues.push_back("The playable package could not be activated.");
+        return result;
+    }
+
+    projectSourceValidationService.cancel("Performance package opened");
+    engineFacade.cancelPreviewPreparation("Performance package opened");
+    performancePlaybackContext.cancelPendingActivation();
+    pendingPerformanceActivation.reset();
+    authoringSession.replaceProject(buildSuppressedAuthoringProjectState());
+    authoringProjectBinding = {};
+    clearAuthoringWaveformPreviewCache();
+    resetAuthoringPreviewPreparationAuthorization();
+    resetAuthoringWaveformPreviewAuthorization();
+    authoringPreviewController.reset();
+    authoringPreviewCommandAdapter.clearOwnership();
+    authoringPreviewCloseRequested.store(true, std::memory_order_release);
+    authoringPreviewDirectAuditionRequested = false;
+    authoringPreviewRequestedScope = drs::engine::AuthoringPreviewScope::selectedZone;
+    pendingAuthoringPreviewZoneId.clear();
+    pendingAuthoringPreviewGroupId.clear();
+    observedDraftPlaybackProjectRevision = authoringSession.getDocumentState().revision;
+    initializeAuthoringImportMetrics();
+    initializeAuthoringSourceValidationSnapshot();
+    workspaceDocumentState = buildPerformancePackageWorkspaceDocumentState(packageLoad.manifest,
+                                                                          resolvedPackageFile);
+    serviceMessageThreadWork();
+    updateRealtimeSafetyState();
+    publishAuthoringPreviewStatus();
+    refreshSerializedHostStatePublication(true);
+
+    result.loaded = true;
+    result.state = "Performance package opened";
+    return result;
+}
+
+void Processor::closePerformancePackageWorkspace(drs::engine::RuntimeProjectModel unloadedProject)
+{
+    projectSourceValidationService.cancel("Performance package closed");
+    engineFacade.restoreBundledReferenceRuntimeSession();
+    engineFacade.closeDraftPlaybackProject();
+    performancePlaybackContext.cancelPendingActivation();
+    pendingPerformanceActivation.reset();
+    authoringSession.replaceProject(std::move(unloadedProject));
+    authoringProjectBinding = {};
+    clearAuthoringWaveformPreviewCache();
+    resetAuthoringPreviewPreparationAuthorization();
+    resetAuthoringWaveformPreviewAuthorization();
+    authoringPreviewController.reset();
+    authoringPreviewCommandAdapter.clearOwnership();
+    authoringPreviewCloseRequested.store(true, std::memory_order_release);
+    authoringPreviewDirectAuditionRequested = false;
+    authoringPreviewRequestedScope = drs::engine::AuthoringPreviewScope::selectedZone;
+    pendingAuthoringPreviewZoneId.clear();
+    pendingAuthoringPreviewGroupId.clear();
+    observedDraftPlaybackProjectRevision = authoringSession.getDocumentState().revision;
+    initializeAuthoringImportMetrics();
+    initializeAuthoringSourceValidationSnapshot();
+    refreshWorkspaceDocumentStateFromAuthoringProject();
+    updateRealtimeSafetyState();
+    publishAuthoringPreviewStatus();
+    refreshSerializedHostStatePublication(true);
+}
+
 bool Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project,
                                         juce::File resolvedProjectFile)
 {
@@ -1766,6 +1886,9 @@ bool Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
         if (!replacementBinding.has_value())
             return false;
     }
+
+    if (workspaceDocumentState.kind == drs::engine::WorkspaceDocumentKind::performancePackage)
+        engineFacade.restoreBundledReferenceRuntimeSession();
 
     // A deliberate project replacement supersedes a queued or failed host recall before
     // the new project is permitted to publish.
@@ -3030,18 +3153,35 @@ bool Processor::synchronizePerformanceActivation(bool installImmediately)
         return false;
 
     const auto performanceSnapshot = performancePlaybackContext.getSnapshot();
+    const auto packageSession
+        = workspaceDocumentState.kind == drs::engine::WorkspaceDocumentKind::performancePackage;
     auto authorized = engineFacade.authorizePerformanceActivation(monotonicMicros());
     auto payload = authorized != nullptr
         ? authorized->playbackPayload
-        : drs::engine::PlaybackActivationPayloadPtr {};
+        : (packageSession
+               ? engineFacade.getPerformancePackageActivationPayload()
+               : drs::engine::PlaybackActivationPayloadPtr {});
     const auto bootstrap = !performanceSnapshot.hasActiveActivation
         && (authorized == nullptr
             || authorized->requestIdentity.origin
                 == drs::engine::PerformancePublishRequestOrigin::bootstrap);
     if (bootstrap && authorized == nullptr)
-        payload = engineFacade.getBootstrapPerformanceActivationPayload();
+    {
+        payload = packageSession
+            ? engineFacade.getPerformancePackageActivationPayload()
+            : engineFacade.getBootstrapPerformanceActivationPayload();
+    }
     if (payload == nullptr)
         return false;
+
+    if (packageSession
+        && performanceSnapshot.hasActiveActivation
+        && !performanceSnapshot.hasPendingActivation
+        && performanceSnapshot.activeRevision == payload->revision
+        && performanceSnapshot.activePreparedBuildId == payload->preparedBuildId)
+    {
+        return false;
+    }
 
     const auto& sessionState = engineFacade.getCurrentSessionState();
 
@@ -3179,7 +3319,7 @@ bool Processor::synchronizePerformanceActivation(bool installImmediately)
 
     pendingPerformanceActivation = authorized;
 
-    if (installImmediately && bootstrap
+    if (installImmediately && (bootstrap || packageSession)
         && performancePlaybackContext.activatePendingForPreparation())
     {
         diagnosticsPerformanceActivationCount.fetch_add(1, std::memory_order_relaxed);

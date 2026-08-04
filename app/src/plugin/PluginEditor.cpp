@@ -581,6 +581,7 @@ void Editor::resized()
                                      .withTrimmedBottom(menuButtonYInset));
     menuRow.removeFromLeft(menuButtonSpacing);
     projectStatusLabel.setBounds(menuRow);
+    updateProjectStatusLabel();
     if (wavImportProgress.isVisible())
         wavImportProgress.setBounds(area.removeFromTop(58).reduced(8, 2));
     else
@@ -602,9 +603,12 @@ void Editor::showFileMenu()
 {
     juce::PopupMenu menu;
     const auto authoringAvailable = processor.getWorkspaceDocumentState().authoringAvailable;
+    const auto packageSession
+        = processor.getWorkspaceDocumentState().kind == drs::engine::WorkspaceDocumentKind::performancePackage;
     menu.addItem(newProjectCommandId, "New Project");
     menu.addItem(openProjectCommandId, "Open Project...");
-    menu.addItem(closeProjectCommandId, "Close");
+    menu.addItem(openPerformancePackageCommandId, "Open Playable Package...");
+    menu.addItem(closeProjectCommandId, packageSession ? "Close Package" : "Close");
     if (authoringAvailable)
     {
         menu.addSeparator();
@@ -650,6 +654,9 @@ void Editor::handleMenuCommand(int menuItemId)
             break;
         case openProjectCommandId:
             openProject();
+            break;
+        case openPerformancePackageCommandId:
+            openPerformancePackage();
             break;
         case closeProjectCommandId:
             closeProject();
@@ -719,16 +726,50 @@ void Editor::openProject()
                                 });
 }
 
-void Editor::closeProject()
+void Editor::openPerformancePackage()
 {
     auto safeThis = juce::Component::SafePointer<Editor>(this);
-    confirmSafeToDiscardChanges("closing the current project",
+    confirmSafeToDiscardChanges("opening a playable package",
                                 [safeThis](bool shouldProceed)
                                 {
                                     if (!shouldProceed || safeThis == nullptr)
                                         return;
 
-                                    safeThis->processor.closeAuthoringProject(safeThis->buildUnloadedProjectState());
+                                    safeThis->launchOpenPerformancePackageChooser(
+                                        [safeThis](juce::File selectedFile)
+                                        {
+                                            if (safeThis == nullptr || selectedFile == juce::File())
+                                                return;
+
+                                            safeThis->loadPerformancePackageFromFile(selectedFile);
+                                        });
+                                });
+}
+
+void Editor::closeProject()
+{
+    auto safeThis = juce::Component::SafePointer<Editor>(this);
+    const auto nextAction
+        = processor.getWorkspaceDocumentState().kind == drs::engine::WorkspaceDocumentKind::performancePackage
+        ? juce::String("closing the current package")
+        : juce::String("closing the current project");
+    confirmSafeToDiscardChanges(nextAction,
+                                [safeThis](bool shouldProceed)
+                                {
+                                    if (!shouldProceed || safeThis == nullptr)
+                                        return;
+
+                                    if (safeThis->processor.getWorkspaceDocumentState().kind
+                                        == drs::engine::WorkspaceDocumentKind::performancePackage)
+                                    {
+                                        safeThis->processor.closePerformancePackageWorkspace(
+                                            safeThis->buildUnloadedProjectState());
+                                    }
+                                    else
+                                    {
+                                        safeThis->processor.closeAuthoringProject(
+                                            safeThis->buildUnloadedProjectState());
+                                    }
                                     safeThis->refreshProjectViews();
                                 });
 }
@@ -1186,6 +1227,21 @@ bool Editor::loadProjectFromFile(const juce::File& file)
     return true;
 }
 
+bool Editor::loadPerformancePackageFromFile(const juce::File& file)
+{
+    const auto loadResult = processor.loadPerformancePackageWorkspace(file);
+    if (!loadResult.loaded)
+    {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Open Playable Package Failed",
+                                               buildProjectIssueSummary(loadResult.issues));
+        return false;
+    }
+
+    refreshProjectViews();
+    return true;
+}
+
 void Editor::confirmSafeToDiscardChanges(const juce::String& nextAction,
                                          std::function<void(bool)> completion)
 {
@@ -1447,11 +1503,12 @@ void Editor::synchronizeWorkspacePresentation()
 
 void Editor::updateProjectStatusLabel()
 {
-    auto statusText = buildWorkspaceDisplayName();
+    auto statusText = buildWorkspaceStatusText();
     if (processor.getWorkspaceDocumentState().dirty)
         statusText += " *";
 
     projectStatusLabel.setText(statusText, juce::dontSendNotification);
+    projectStatusLabel.setTooltip(buildWorkspaceStatusTooltip());
 }
 
 juce::String Editor::buildWorkspaceDisplayName() const
@@ -1461,6 +1518,33 @@ juce::String Editor::buildWorkspaceDisplayName() const
         return juce::String::fromUTF8(document.displayName.c_str());
 
     return "No Project Loaded";
+}
+
+juce::String Editor::buildWorkspaceStatusText() const
+{
+    const auto& document = processor.getWorkspaceDocumentState();
+    auto text = buildWorkspaceDisplayName();
+
+    if (document.kind == drs::engine::WorkspaceDocumentKind::performancePackage)
+    {
+        text += " | Playable package | Read-only | Reader v";
+        text += juce::String(document.minimumReaderSchemaVersion);
+    }
+
+    return text;
+}
+
+juce::String Editor::buildWorkspaceStatusTooltip() const
+{
+    const auto& document = processor.getWorkspaceDocumentState();
+    if (document.kind != drs::engine::WorkspaceDocumentKind::performancePackage)
+        return "Editable authoring workspace.";
+
+    auto tooltip = juce::String("Read-only playable package session.");
+    if (!document.sourcePath.empty())
+        tooltip += "\nSource: " + juce::String::fromUTF8(document.sourcePath.c_str());
+    tooltip += "\nCompatible reader schema: v" + juce::String(document.minimumReaderSchemaVersion);
+    return tooltip;
 }
 
 drs::engine::RuntimeProjectModel Editor::buildUnloadedProjectState() const
@@ -1626,6 +1710,29 @@ void Editor::launchOpenProjectChooser(std::function<void(juce::File)> completion
     activeFileChooser = std::make_unique<juce::FileChooser>("Open Decent Rhapsody project",
                                                             buildChooserBaseDirectory(),
                                                             "*.drsproj",
+                                                            true,
+                                                            false,
+                                                            this);
+    auto safeThis = juce::Component::SafePointer<Editor>(this);
+    activeFileChooser->launchAsync(juce::FileBrowserComponent::openMode
+                                       | juce::FileBrowserComponent::canSelectFiles,
+                                   [safeThis, completion = std::move(completion)](const juce::FileChooser& chooser) mutable
+                                   {
+                                       if (safeThis == nullptr)
+                                           return;
+
+                                       const auto selectedFile = chooser.getResult();
+                                       safeThis->activeFileChooser.reset();
+                                       if (completion)
+                                           completion(selectedFile);
+                                   });
+}
+
+void Editor::launchOpenPerformancePackageChooser(std::function<void(juce::File)> completion)
+{
+    activeFileChooser = std::make_unique<juce::FileChooser>("Open Decent Rhapsody playable package",
+                                                            buildChooserBaseDirectory(),
+                                                            "*.drpkg",
                                                             true,
                                                             false,
                                                             this);

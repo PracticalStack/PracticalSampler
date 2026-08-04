@@ -1,6 +1,7 @@
 #pragma once
 
 #include "drs/engine/DraftPlaybackContract.h"
+#include "drs/engine/PackageReader.h"
 #include "drs/engine/PlaybackSnapshot.h"
 #include "drs/engine/PerformancePublishController.h"
 #include "drs/engine/PerformancePublishPresentation.h"
@@ -317,6 +318,13 @@ struct EnginePresetStateRestoreResult
     std::vector<std::string> issues;
 };
 
+struct EnginePerformancePackageActivationResult
+{
+    bool activated = false;
+    std::string state;
+    std::vector<std::string> issues;
+};
+
 enum class EngineContentFailureCategory
 {
     missingContent,
@@ -345,6 +353,9 @@ public:
     EngineStatusSnapshot getStatusSnapshot() const;
     RuntimeManifestLoadResult loadPhase1ReferenceInstrument() const;
     RuntimeStreamLoadResult loadPhase1ReferenceStream() const;
+    EnginePerformancePackageActivationResult activatePerformancePackageSession(
+        const PerformancePackageLoadResult& packageLoad);
+    void restoreBundledReferenceRuntimeSession();
     EngineDiagnosticsSnapshot getDiagnosticsSnapshot() const;
     EnginePerformanceSnapshot getPerformanceSnapshot() const;
     const DraftPlaybackStatus& getDraftPlaybackStatus() const { return draftPlaybackContract.getStatus(); }
@@ -357,6 +368,10 @@ public:
         return draftPlaybackContract.getStatus().performance.activationPayload;
     }
     PlaybackActivationPayloadPtr getBootstrapPerformanceActivationPayload() const;
+    PlaybackActivationPayloadPtr getPerformancePackageActivationPayload() const
+    {
+        return packagePerformanceActivationPayload;
+    }
     PerformancePublishActivationPayloadPtr authorizePerformanceActivation(
         std::uint64_t nowMicros = 0);
     bool rejectPerformanceActivationStaging(
@@ -449,10 +464,13 @@ private:
                                          bool bootstrapPreparedPlayback = true);
     void refreshDiagnosticsSnapshot();
 
+    RuntimeManifestLoadResult bundledReferenceManifest;
+    RuntimeStreamLoadResult bundledReferenceStream;
     RuntimeManifestLoadResult referenceManifest;
     RuntimeStreamLoadResult referenceStream;
     RuntimeProjectLoadResult authoringProject;
     bool referenceInstrumentActive = false;
+    PlaybackActivationPayloadPtr packagePerformanceActivationPayload;
     RuntimeSessionStateSnapshot currentSessionState;
     EngineDiagnosticsSnapshot diagnosticsSnapshot;
     EnginePreviewPlaybackSnapshot previewPlaybackSnapshot;

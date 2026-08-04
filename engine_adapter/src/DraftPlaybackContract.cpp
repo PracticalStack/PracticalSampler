@@ -53,7 +53,9 @@ PlayableRangeSummary summarizePlayableRange(const PlaybackSnapshotBuildResult* s
     return summary;
 }
 
-PlaybackActivationPayloadPtr buildActivationPayload(
+} // namespace
+
+PlaybackActivationPayloadPtr buildPlaybackActivationPayload(
     PlaybackActivationLane lane,
     std::size_t requestedRevision,
     const PlaybackSnapshotBuildResult* snapshotResult,
@@ -91,7 +93,6 @@ PlaybackActivationPayloadPtr buildActivationPayload(
     payload->prepared = std::make_shared<const ImmutablePreparedPlayback>(preparedResult->prepared);
     return payload;
 }
-} // namespace
 
 DraftPlaybackContract::DraftPlaybackContract(std::size_t initialDraftRevision)
 {
@@ -324,10 +325,10 @@ bool DraftPlaybackContract::completeBuild(DraftPlaybackPendingRequest& pending,
     const auto snapshotFailed = buildResult != nullptr && (!buildResult->built || !buildResult->activationEligible);
     const auto preparedFailed = preparedBuildResult != nullptr
         && (!preparedBuildResult->built || !preparedBuildResult->activationEligible);
-    const auto activationPayload = buildActivationPayload(lane,
-                                                          pending.requestedRevision,
-                                                          buildResult,
-                                                          preparedBuildResult);
+    const auto activationPayload = buildPlaybackActivationPayload(lane,
+                                                                  pending.requestedRevision,
+                                                                  buildResult,
+                                                                  preparedBuildResult);
     const auto payloadRequired = buildResult != nullptr && preparedBuildResult != nullptr;
     const auto payloadInvalid = payloadRequired && activationPayload == nullptr && !snapshotFailed && !preparedFailed;
     if (snapshotFailed || preparedFailed || payloadInvalid)

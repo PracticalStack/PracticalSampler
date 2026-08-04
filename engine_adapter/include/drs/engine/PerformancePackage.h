@@ -40,6 +40,8 @@ struct WorkspaceDocumentState
     std::string displayName;
     std::string sourcePath;
     std::string documentId;
+    int schemaVersion = 0;
+    int minimumReaderSchemaVersion = 0;
     bool authoringAvailable = true;
     bool dirty = false;
 };

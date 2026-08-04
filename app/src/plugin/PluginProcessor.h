@@ -33,6 +33,13 @@
 
 namespace drs::plugin
 {
+struct PerformancePackageWorkspaceLoadResult
+{
+    bool loaded = false;
+    std::string state;
+    std::vector<std::string> issues;
+};
+
 struct ProcessorRealtimeSafetySnapshot
 {
     bool available = false;
@@ -199,6 +206,9 @@ public:
     bool activatePerformancePackageWorkspace(
         const drs::engine::PerformancePackageManifest& package,
         juce::File resolvedPackageFile = {});
+    PerformancePackageWorkspaceLoadResult loadPerformancePackageWorkspace(
+        const juce::File& resolvedPackageFile);
+    void closePerformancePackageWorkspace(drs::engine::RuntimeProjectModel unloadedProject);
     const drs::engine::HostProjectBinding& getAuthoringProjectBinding() const
     {
         return authoringProjectBinding;

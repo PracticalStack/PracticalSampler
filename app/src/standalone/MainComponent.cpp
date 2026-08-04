@@ -505,6 +505,10 @@ MainComponent::MainComponent(bool enableAudioOutput)
     menuBar.setComponentID("mainMenuBar");
     addAndMakeVisible(menuBar);
 
+    sessionStatusLabel.setComponentID("standaloneWorkspaceStatusLabel");
+    sessionStatusLabel.setJustificationType(juce::Justification::centredRight);
+    addAndMakeVisible(sessionStatusLabel);
+
     workspaceTabs.setComponentID("workspaceTabs");
     addAndMakeVisible(workspaceTabs);
     addAndMakeVisible(restoreBanner);
@@ -551,6 +555,8 @@ void MainComponent::resized()
     synchronizeWorkspacePresentation();
     auto area = getLocalBounds();
     menuBar.setBounds(area.removeFromTop(28));
+    sessionStatusLabel.setBounds(area.removeFromTop(24).reduced(8, 0));
+    updateWorkspaceStatusLabel();
     if (restoreBanner.isVisible())
         restoreBanner.setBounds(area.removeFromTop(42));
     else
@@ -620,9 +626,12 @@ juce::PopupMenu MainComponent::getMenuForIndex(int topLevelMenuIndex, const juce
     const auto authoringAvailable = processor.getWorkspaceDocumentState().authoringAvailable;
     if (topLevelMenuIndex == 0)
     {
+        const auto packageSession
+            = processor.getWorkspaceDocumentState().kind == drs::engine::WorkspaceDocumentKind::performancePackage;
         menu.addItem(newProjectCommandId, "New Project");
         menu.addItem(openProjectCommandId, "Open Project...");
-        menu.addItem(closeProjectCommandId, "Close");
+        menu.addItem(openPerformancePackageCommandId, "Open Playable Package...");
+        menu.addItem(closeProjectCommandId, packageSession ? "Close Package" : "Close");
         if (authoringAvailable)
         {
             menu.addSeparator();
@@ -653,6 +662,9 @@ void MainComponent::menuItemSelected(int menuItemID, int)
             break;
         case openProjectCommandId:
             openProject();
+            break;
+        case openPerformancePackageCommandId:
+            openPerformancePackage();
             break;
         case closeProjectCommandId:
             closeProject();
@@ -810,17 +822,52 @@ void MainComponent::openProject()
                                 });
 }
 
+void MainComponent::openPerformancePackage()
+{
+    auto safeThis = juce::Component::SafePointer<MainComponent>(this);
+    confirmSafeToDiscardChanges("opening a playable package",
+                                [safeThis](bool shouldProceed)
+                                {
+                                    if (!shouldProceed || safeThis == nullptr)
+                                        return;
+
+                                    safeThis->launchOpenPerformancePackageChooser(
+                                        [safeThis](juce::File selectedFile)
+                                        {
+                                            if (safeThis == nullptr || selectedFile == juce::File())
+                                                return;
+
+                                            safeThis->loadPerformancePackageFromFile(selectedFile);
+                                        });
+                                });
+}
+
 void MainComponent::closeProject()
 {
-    handleCloseRequest([safeThis = juce::Component::SafePointer<MainComponent>(this)](bool shouldClose)
-    {
-        if (!shouldClose || safeThis == nullptr)
-            return;
+    const auto nextAction
+        = processor.getWorkspaceDocumentState().kind == drs::engine::WorkspaceDocumentKind::performancePackage
+        ? juce::String("closing the current package")
+        : juce::String("closing the current project");
+    confirmSafeToDiscardChanges(nextAction,
+                                [safeThis = juce::Component::SafePointer<MainComponent>(this)](bool shouldClose)
+                                {
+                                    if (!shouldClose || safeThis == nullptr)
+                                        return;
 
-        safeThis->currentProjectFile = {};
-        safeThis->processor.closeAuthoringProject(safeThis->buildUnloadedProjectState());
-        safeThis->refreshProjectViews();
-    });
+                                    safeThis->currentProjectFile = {};
+                                    if (safeThis->processor.getWorkspaceDocumentState().kind
+                                        == drs::engine::WorkspaceDocumentKind::performancePackage)
+                                    {
+                                        safeThis->processor.closePerformancePackageWorkspace(
+                                            safeThis->buildUnloadedProjectState());
+                                    }
+                                    else
+                                    {
+                                        safeThis->processor.closeAuthoringProject(
+                                            safeThis->buildUnloadedProjectState());
+                                    }
+                                    safeThis->refreshProjectViews();
+                                });
 }
 
 void MainComponent::saveProject(std::function<void(bool)> completion)
@@ -1491,6 +1538,23 @@ bool MainComponent::loadProjectFromFile(const juce::File& file)
     return true;
 }
 
+bool MainComponent::loadPerformancePackageFromFile(const juce::File& file)
+{
+    const auto loadResult = processor.loadPerformancePackageWorkspace(file);
+    if (!loadResult.loaded)
+    {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Open Playable Package Failed",
+                                               buildProjectIssueSummary(loadResult.issues));
+        return false;
+    }
+
+    currentProjectFile = {};
+    setRecentProjectDirectory(file.getParentDirectory());
+    refreshProjectViews();
+    return true;
+}
+
 void MainComponent::confirmSafeToDiscardChanges(const juce::String& nextAction,
                                                 std::function<void(bool)> completion)
 {
@@ -1531,6 +1595,7 @@ void MainComponent::refreshProjectViews()
     if (processor.getWorkspaceDocumentState().authoringAvailable)
         authoringPanel.reloadFromSession();
     synchronizeWorkspacePresentation();
+    updateWorkspaceStatusLabel();
     updateWindowTitle();
 }
 
@@ -1555,6 +1620,16 @@ void MainComponent::updateWindowTitle()
 {
     if (auto* window = findParentComponentOfClass<juce::TopLevelWindow>())
         window->setName(buildWindowTitle());
+}
+
+void MainComponent::updateWorkspaceStatusLabel()
+{
+    auto statusText = buildWorkspaceStatusText();
+    if (processor.getWorkspaceDocumentState().dirty)
+        statusText += " *";
+
+    sessionStatusLabel.setText(statusText, juce::dontSendNotification);
+    sessionStatusLabel.setTooltip(buildWorkspaceStatusTooltip());
 }
 
 drs::engine::RuntimeProjectModel MainComponent::buildUnloadedProjectState() const
@@ -1604,6 +1679,8 @@ juce::String MainComponent::buildWindowTitle() const
     title += " - ";
 
     title += buildWorkspaceDisplayName();
+    if (processor.getWorkspaceDocumentState().kind == drs::engine::WorkspaceDocumentKind::performancePackage)
+        title += " [Playable Package]";
 
     if (processor.getWorkspaceDocumentState().dirty)
         title += " *";
@@ -1618,6 +1695,33 @@ juce::String MainComponent::buildWorkspaceDisplayName() const
         return juce::String::fromUTF8(document.displayName.c_str());
 
     return "No Project Loaded";
+}
+
+juce::String MainComponent::buildWorkspaceStatusText() const
+{
+    const auto& document = processor.getWorkspaceDocumentState();
+    auto text = buildWorkspaceDisplayName();
+
+    if (document.kind == drs::engine::WorkspaceDocumentKind::performancePackage)
+    {
+        text += " | Playable package | Read-only | Reader v";
+        text += juce::String(document.minimumReaderSchemaVersion);
+    }
+
+    return text;
+}
+
+juce::String MainComponent::buildWorkspaceStatusTooltip() const
+{
+    const auto& document = processor.getWorkspaceDocumentState();
+    if (document.kind != drs::engine::WorkspaceDocumentKind::performancePackage)
+        return "Editable authoring workspace.";
+
+    auto tooltip = juce::String("Read-only playable package session.");
+    if (!document.sourcePath.empty())
+        tooltip += "\nSource: " + juce::String::fromUTF8(document.sourcePath.c_str());
+    tooltip += "\nCompatible reader schema: v" + juce::String(document.minimumReaderSchemaVersion);
+    return tooltip;
 }
 
 juce::String MainComponent::buildProjectIssueSummary(const std::vector<std::string>& issues) const
@@ -1771,6 +1875,29 @@ void MainComponent::launchOpenProjectChooser(std::function<void(juce::File)> com
     activeFileChooser = std::make_unique<juce::FileChooser>("Open Decent Rhapsody project",
                                                             buildChooserBaseDirectory(),
                                                             "*.drsproj",
+                                                            true,
+                                                            false,
+                                                            this);
+    auto safeThis = juce::Component::SafePointer<MainComponent>(this);
+    activeFileChooser->launchAsync(juce::FileBrowserComponent::openMode
+                                       | juce::FileBrowserComponent::canSelectFiles,
+                                   [safeThis, completion = std::move(completion)](const juce::FileChooser& chooser) mutable
+                                   {
+                                       if (safeThis == nullptr)
+                                           return;
+
+                                       const auto selectedFile = chooser.getResult();
+                                       safeThis->activeFileChooser.reset();
+                                       if (completion)
+                                           completion(selectedFile);
+                                   });
+}
+
+void MainComponent::launchOpenPerformancePackageChooser(std::function<void(juce::File)> completion)
+{
+    activeFileChooser = std::make_unique<juce::FileChooser>("Open Decent Rhapsody playable package",
+                                                            buildChooserBaseDirectory(),
+                                                            "*.drpkg",
                                                             true,
                                                             false,
                                                             this);

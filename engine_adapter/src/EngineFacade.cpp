@@ -73,6 +73,15 @@ std::string summarizeDigest(const std::string& digest)
     return digest.substr(0, prefixLength) + "...";
 }
 
+void addSnapshotFinding(PlaybackSnapshotBuildResult& result,
+                        PlaybackSnapshotFindingSeverity severity,
+                        const std::string& code,
+                        const std::string& path,
+                        const std::string& message)
+{
+    result.findings.push_back({ severity, code, path, message });
+}
+
 std::uint64_t monotonicMicros() noexcept
 {
     return static_cast<std::uint64_t>(
@@ -1127,17 +1136,246 @@ fs::path buildChecksumMismatchFixture()
     writeTextFile(outputPath, checksumCorruptJson.dump(2) + "\n");
     return outputPath;
 }
+
+PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
+    const PerformancePackageLoadResult& packageLoad)
+{
+    PlaybackSnapshotBuildResult result;
+    result.built = false;
+    result.activationEligible = false;
+    result.buildId = 1;
+    result.cancellationId = 1;
+    result.requestedDraftRevision = 0;
+    result.activationRequested = true;
+    result.lifecycleState = PlaybackSnapshotLifecycleState::failed;
+    result.state = "Performance package snapshot failed";
+
+    if (!packageLoad.loaded)
+    {
+        addSnapshotFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           "package-not-loaded",
+                           "package",
+                           "The performance package must load before activation can be prepared.");
+        return result;
+    }
+
+    const auto& manifest = packageLoad.manifest;
+    const auto& instrument = packageLoad.instrument.instrument;
+    const auto& stream = packageLoad.stream.container;
+
+    result.snapshot.schemaName = "drs.playbackSnapshot";
+    result.snapshot.schemaVersion = 1;
+    result.snapshot.projectId = manifest.packageId;
+    result.snapshot.displayName = !manifest.displayName.empty()
+        ? manifest.displayName
+        : instrument.displayName;
+    result.snapshot.sourceProjectSchemaName = manifest.schemaName;
+    result.snapshot.sourceProjectSchemaVersion = manifest.schemaVersion;
+    result.snapshot.sourceAuthoringSchemaName = manifest.schemaName;
+    result.snapshot.sourceAuthoringSchemaVersion = manifest.schemaVersion;
+    result.snapshot.draftRevision = 0;
+    result.snapshot.notes = manifest.notes;
+    result.snapshot.notes.insert(result.snapshot.notes.end(),
+                                 instrument.validationNotes.begin(),
+                                 instrument.validationNotes.end());
+    result.snapshot.notes.insert(result.snapshot.notes.end(),
+                                 stream.notes.begin(),
+                                 stream.notes.end());
+
+    std::unordered_map<std::string, std::string> sampleIdByPath;
+    sampleIdByPath.reserve(stream.samples.size());
+    result.snapshot.sampleIdentities.reserve(stream.samples.size());
+    for (const auto& sample : stream.samples)
+    {
+        PlaybackSnapshotSampleIdentity identity;
+        identity.sampleSourceId = sample.sampleId;
+        identity.sourcePath = sample.sourcePath;
+        identity.role = sample.role;
+        result.snapshot.sampleIdentities.push_back(std::move(identity));
+        sampleIdByPath.emplace(sample.sourcePath, sample.sampleId);
+    }
+
+    result.snapshot.macroDefaults.reserve(instrument.macros.size());
+    for (const auto& macro : instrument.macros)
+    {
+        PlaybackSnapshotMacroDefault snapshotMacro;
+        snapshotMacro.id = macro.id;
+        snapshotMacro.name = macro.name;
+        snapshotMacro.defaultValue = macro.defaultValue;
+        snapshotMacro.minValue = macro.minValue;
+        snapshotMacro.maxValue = macro.maxValue;
+        snapshotMacro.exposedInPerformance = true;
+        result.snapshot.macroDefaults.push_back(std::move(snapshotMacro));
+    }
+
+    result.snapshot.articulationDefinitions.reserve(instrument.articulations.size());
+    for (const auto& articulation : instrument.articulations)
+    {
+        result.snapshot.articulationDefinitions.push_back({
+            articulation.id,
+            articulation.name,
+            articulation.isDefault,
+            0,
+            articulation.activation
+        });
+    }
+
+    std::unordered_map<std::string, std::size_t> groupRouteIndices;
+    result.snapshot.groupRoutes.reserve(instrument.groups.size());
+    for (const auto& group : instrument.groups)
+    {
+        PlaybackSnapshotGroupRoute route;
+        route.groupId = group.id;
+        route.displayName = group.name;
+        route.articulationIds = group.articulationIds;
+        route.routingSourceId = "master";
+        route.workspaceVisible = true;
+        route.routingBusId = "master";
+        groupRouteIndices.emplace(group.id, result.snapshot.groupRoutes.size());
+        result.snapshot.groupRoutes.push_back(std::move(route));
+    }
+
+    if (result.snapshot.groupRoutes.empty())
+    {
+        std::unordered_set<std::string> implicitGroupIds;
+        for (const auto& zone : instrument.zones)
+        {
+            if (zone.groupId.empty() || !implicitGroupIds.insert(zone.groupId).second)
+                continue;
+
+            PlaybackSnapshotGroupRoute route;
+            route.groupId = zone.groupId;
+            route.displayName = zone.groupId;
+            route.routingSourceId = "master";
+            route.workspaceVisible = true;
+            route.routingBusId = "master";
+            groupRouteIndices.emplace(route.groupId, result.snapshot.groupRoutes.size());
+            result.snapshot.groupRoutes.push_back(std::move(route));
+        }
+    }
+
+    std::unordered_map<std::string, std::size_t> articulationRouteIndices;
+    result.snapshot.zones.reserve(instrument.zones.size());
+    for (const auto& zone : instrument.zones)
+    {
+        const auto sampleIdIterator = sampleIdByPath.find(zone.samplePath);
+        if (sampleIdIterator == sampleIdByPath.end())
+        {
+            addSnapshotFinding(result,
+                               PlaybackSnapshotFindingSeverity::error,
+                               "package-zone-sample-missing",
+                               "instrument.zones",
+                               "Zone '" + zone.id + "' references sample path '" + zone.samplePath
+                                   + "' that is not present in the compiled package stream.");
+            continue;
+        }
+
+        PlaybackSnapshotZone snapshotZone;
+        snapshotZone.id = zone.id;
+        snapshotZone.sampleSourceId = sampleIdIterator->second;
+        snapshotZone.displayName = zone.id;
+        snapshotZone.groupId = zone.groupId;
+        snapshotZone.articulationId = zone.articulationId;
+        snapshotZone.rootKey = zone.rootKey;
+        snapshotZone.keyLow = zone.keyLow;
+        snapshotZone.keyHigh = zone.keyHigh;
+        snapshotZone.velocityLow = zone.velocityLow;
+        snapshotZone.velocityHigh = zone.velocityHigh;
+        snapshotZone.velocityCrossfade = zone.velocityCrossfade;
+        snapshotZone.velocityCrossfadeRuntime = zone.velocityCrossfadeRuntime;
+        snapshotZone.gainDb = 0.0;
+        snapshotZone.pan = 0.0;
+        snapshotZone.releaseSeconds = zone.releaseSeconds;
+        snapshotZone.roundRobin = zone.roundRobin;
+        snapshotZone.roundRobinLength = zone.roundRobinLength;
+        snapshotZone.roundRobinPosition = zone.roundRobinPosition;
+        snapshotZone.triggerMode = zone.triggerMode;
+        snapshotZone.performance = zone.performance;
+        snapshotZone.exclusiveGroupId = zone.exclusiveGroupId;
+        snapshotZone.exclusiveTargetGroupIds = zone.exclusiveTargetGroupIds;
+        snapshotZone.chokeReleaseSeconds = zone.chokeReleaseSeconds;
+        result.snapshot.zones.push_back(std::move(snapshotZone));
+
+        if (!zone.articulationId.empty())
+        {
+            auto [iterator, inserted] = articulationRouteIndices.emplace(
+                zone.articulationId, result.snapshot.articulationRoutes.size());
+            if (inserted)
+                result.snapshot.articulationRoutes.push_back({ zone.articulationId, {} });
+            result.snapshot.articulationRoutes[iterator->second].zoneIds.push_back(zone.id);
+        }
+
+        if (const auto groupIterator = groupRouteIndices.find(zone.groupId);
+            groupIterator != groupRouteIndices.end())
+        {
+            auto& route = result.snapshot.groupRoutes[groupIterator->second];
+            route.zoneIds.push_back(zone.id);
+            if (route.auditionAnchorZoneId.empty())
+                route.auditionAnchorZoneId = zone.id;
+            if (!zone.articulationId.empty()
+                && std::find(route.articulationIds.begin(),
+                             route.articulationIds.end(),
+                             zone.articulationId) == route.articulationIds.end())
+            {
+                route.articulationIds.push_back(zone.articulationId);
+            }
+        }
+    }
+
+    result.snapshot.roundRobinResetRules = instrument.roundRobinResetRules;
+
+    if (result.snapshot.sampleIdentities.empty())
+    {
+        addSnapshotFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           "no-sample-identities",
+                           "stream.samples",
+                           "A playable package requires at least one compiled stream sample.");
+    }
+
+    if (result.snapshot.zones.empty())
+    {
+        addSnapshotFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           "no-playable-zones",
+                           "instrument.zones",
+                           "A playable package requires at least one runtime zone.");
+    }
+
+    const auto hasErrors = std::any_of(result.findings.begin(),
+                                       result.findings.end(),
+                                       [](const auto& finding)
+                                       {
+                                           return finding.severity
+                                               == PlaybackSnapshotFindingSeverity::error;
+                                       });
+    if (!hasErrors)
+    {
+        result.snapshot.dspGraphDigest = computePlaybackSnapshotDspGraphDigest(result.snapshot);
+        result.snapshot.contentDigest = "fnv1a64:"
+            + computeFnv1a64Digest(serializeImmutablePlaybackSnapshot(result.snapshot));
+        result.built = true;
+        result.activationEligible = true;
+        result.lifecycleState = PlaybackSnapshotLifecycleState::ready;
+        result.state = "Performance package snapshot ready";
+    }
+
+    return result;
+}
 } // namespace
 
 EngineFacade::EngineFacade()
-    : referenceManifest(loadPhase1ReferenceInstrumentManifest()),
+    : bundledReferenceManifest(loadPhase1ReferenceInstrumentManifest()),
+      referenceManifest(bundledReferenceManifest),
       preparedPlaybackService("phase1-prepared-playback-v2", 2, true)
 {
     if (referenceManifest.loaded)
     {
         currentSessionState = buildDefaultRuntimeSessionState(referenceManifest);
         currentSessionState.transientMetrics.integrationState = "Default preset state loaded";
-        referenceStream = loadPhase1ReferenceStreamContainer();
+        bundledReferenceStream = loadPhase1ReferenceStreamContainer();
+        referenceStream = bundledReferenceStream;
         preparedPlaybackService.setBackgroundWorkerStream(referenceStream);
         referenceInstrumentActive = referenceStream.loaded;
     }
@@ -1149,6 +1387,127 @@ EngineFacade::EngineFacade()
     }
 
     initializeDraftPlaybackContract(false);
+    refreshDiagnosticsSnapshot();
+    markStateChanged();
+}
+
+EnginePerformancePackageActivationResult EngineFacade::activatePerformancePackageSession(
+    const PerformancePackageLoadResult& packageLoad)
+{
+    EnginePerformancePackageActivationResult result;
+    result.state = "Performance package activation failed";
+
+    if (!packageLoad.loaded)
+    {
+        result.issues = packageLoad.issues;
+        if (result.issues.empty())
+            result.issues.push_back("The performance package did not load.");
+        return result;
+    }
+
+    const auto snapshotResult = buildPerformancePackagePlaybackSnapshot(packageLoad);
+    if (!snapshotResult.built || !snapshotResult.activationEligible)
+    {
+        result.state = snapshotResult.state;
+        for (const auto& finding : snapshotResult.findings)
+        {
+            if (finding.severity == PlaybackSnapshotFindingSeverity::error)
+                result.issues.push_back(finding.message);
+        }
+        if (result.issues.empty())
+            result.issues.push_back("The performance package snapshot could not be activated.");
+        return result;
+    }
+
+    const auto preparedRequest = preparedPlaybackService.requestBuild(snapshotResult, packageLoad.stream);
+    if (!preparedRequest.accepted)
+    {
+        result.state = preparedRequest.state;
+        result.issues.push_back(preparedRequest.state);
+        return result;
+    }
+
+    const auto preparedResult = preparedPlaybackService.prepare(preparedRequest,
+                                                                snapshotResult,
+                                                                packageLoad.stream);
+    if (!preparedResult.built || !preparedResult.activationEligible)
+    {
+        result.state = preparedResult.state;
+        for (const auto& finding : preparedResult.findings)
+        {
+            if (finding.severity == PlaybackSnapshotFindingSeverity::error)
+                result.issues.push_back(finding.message);
+        }
+        if (result.issues.empty())
+            result.issues.push_back("Prepared playback could not be built from the performance package.");
+        return result;
+    }
+
+    packagePerformanceActivationPayload = buildPlaybackActivationPayload(
+        PlaybackActivationLane::performance,
+        snapshotResult.requestedDraftRevision,
+        &snapshotResult,
+        &preparedResult);
+    if (packagePerformanceActivationPayload == nullptr)
+    {
+        result.issues.push_back("The performance package activation payload could not be constructed.");
+        return result;
+    }
+
+    clearPendingPreparedCompletions();
+    ++performancePublishProjectGeneration;
+    performancePublishController.reset(true, true);
+    draftPlaybackContract.closeProject();
+    authoringProject = {};
+    referenceManifest = packageLoad.instrument;
+    referenceStream = packageLoad.stream;
+    preparedPlaybackService.setBackgroundWorkerStream(referenceStream);
+    referenceInstrumentActive = true;
+    currentSessionState = buildDefaultRuntimeSessionState(referenceManifest);
+    if (!packageLoad.manifest.defaultLoadProfile.empty())
+        currentSessionState.loadProfileId = packageLoad.manifest.defaultLoadProfile;
+    currentSessionState.transientMetrics.integrationState = "Performance package loaded";
+    currentSessionState.transientMetrics.lastFailure.clear();
+    previewPlaybackSnapshot = {};
+    syncPreviewSnapshotFromDraftPlayback();
+    refreshDiagnosticsSnapshot();
+    markStateChanged();
+
+    result.activated = true;
+    result.state = "Performance package activated";
+    return result;
+}
+
+void EngineFacade::restoreBundledReferenceRuntimeSession()
+{
+    bundledReferenceManifest = loadPhase1ReferenceInstrumentManifest();
+    if (bundledReferenceManifest.loaded)
+        bundledReferenceStream = loadPhase1ReferenceStreamContainer();
+    else
+        bundledReferenceStream = {};
+
+    referenceManifest = bundledReferenceManifest;
+    referenceStream = bundledReferenceStream;
+    packagePerformanceActivationPayload.reset();
+    preparedPlaybackService.setBackgroundWorkerStream(referenceStream);
+
+    if (referenceManifest.loaded)
+    {
+        currentSessionState = buildDefaultRuntimeSessionState(referenceManifest);
+        currentSessionState.transientMetrics.integrationState = "Default preset state loaded";
+        currentSessionState.transientMetrics.lastFailure.clear();
+        referenceInstrumentActive = referenceStream.loaded;
+    }
+    else
+    {
+        currentSessionState = {};
+        currentSessionState.transientMetrics.integrationState = "Reference manifest unavailable";
+        currentSessionState.transientMetrics.lastFailure = referenceManifest.state;
+        referenceInstrumentActive = false;
+    }
+
+    previewPlaybackSnapshot = {};
+    syncPreviewSnapshotFromDraftPlayback();
     refreshDiagnosticsSnapshot();
     markStateChanged();
 }
@@ -3028,6 +3387,11 @@ void EngineFacade::clearContentFailureProbe()
 
 void EngineFacade::resetSessionStateToDefault()
 {
+    referenceManifest = bundledReferenceManifest;
+    referenceStream = bundledReferenceStream;
+    packagePerformanceActivationPayload.reset();
+    preparedPlaybackService.setBackgroundWorkerStream(referenceStream);
+
     if (!referenceManifest.loaded)
     {
         referenceInstrumentActive = false;

@@ -28,6 +28,7 @@ private:
     {
         newProjectCommandId = 1,
         openProjectCommandId,
+        openPerformancePackageCommandId,
         closeProjectCommandId,
         saveProjectCommandId,
         saveProjectAsCommandId,
@@ -42,6 +43,7 @@ private:
     void handleMenuCommand(int menuItemId);
     void createNewProject();
     void openProject();
+    void openPerformancePackage();
     void closeProject();
     void saveProject(std::function<void(bool)> completion = {});
     void saveProjectAs(std::function<void(bool)> completion = {});
@@ -54,6 +56,7 @@ private:
     void restoreSelectedZoneRootKey();
     bool saveProjectToFile(const juce::File& file);
     bool loadProjectFromFile(const juce::File& file);
+    bool loadPerformancePackageFromFile(const juce::File& file);
     void confirmSafeToDiscardChanges(const juce::String& nextAction, std::function<void(bool)> completion);
     void refreshProjectViews();
     void synchronizeWorkspacePresentation();
@@ -63,6 +66,8 @@ private:
     drs::engine::RuntimeProjectModel buildUnloadedProjectState() const;
     drs::engine::RuntimeProjectModel buildEmptyProjectTemplate() const;
     juce::String buildWorkspaceDisplayName() const;
+    juce::String buildWorkspaceStatusText() const;
+    juce::String buildWorkspaceStatusTooltip() const;
     juce::String buildProjectIssueSummary(const std::vector<std::string>& issues) const;
     juce::String buildImportSummaryMessage(std::size_t importedCount,
                                            std::size_t warningCount,
@@ -77,6 +82,7 @@ private:
     juce::File buildChooserBaseDirectory() const;
     juce::File buildDefaultSaveTarget() const;
     void launchOpenProjectChooser(std::function<void(juce::File)> completion);
+    void launchOpenPerformancePackageChooser(std::function<void(juce::File)> completion);
     void launchNewProjectChooser(std::function<void(juce::File)> completion);
     void launchSaveProjectChooser(std::function<void(juce::File)> completion);
     void launchImportWavChooser(std::function<void(std::vector<juce::File>)> completion);

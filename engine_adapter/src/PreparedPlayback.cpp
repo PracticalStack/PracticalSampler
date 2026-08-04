@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstring>
 #include <filesystem>
 #include <memory>
 #include <numeric>
@@ -334,6 +335,86 @@ std::string buildPreparedDecodePolicyFingerprint(const RuntimeStreamSampleDefini
 std::string buildAuthoredDecodePolicyFingerprint()
 {
     return "format=auto|normalization=float32-normalized-v1|payloadEncoding=decoded-float32|topology=decoded-memory";
+}
+
+struct EmbeddedPreparedSampleDataResult
+{
+    bool decoded = false;
+    std::string state;
+    std::vector<std::string> issues;
+    std::shared_ptr<PreparedPlaybackDecodedSampleData> sampleData;
+};
+
+EmbeddedPreparedSampleDataResult decodeEmbeddedPreparedSampleData(
+    const RuntimeStreamContainerModel& container,
+    const RuntimeStreamSampleDefinition& streamSample)
+{
+    EmbeddedPreparedSampleDataResult result;
+    result.state = "Embedded prepared sample decode failed";
+
+    if (!container.payloadEmbedded)
+    {
+        result.issues.push_back("Embedded payload bytes are unavailable.");
+        return result;
+    }
+
+    if (container.payloadEncoding != "f32-interleaved-little-endian")
+    {
+        result.issues.push_back("Unsupported embedded payload encoding '" + container.payloadEncoding + "'.");
+        return result;
+    }
+
+    if (streamSample.channelCount == 0 || streamSample.frameCount == 0)
+    {
+        result.issues.push_back("Embedded stream sample metadata must declare frames and channels.");
+        return result;
+    }
+
+    const auto expectedPayloadBytes = streamSample.frameCount
+        * static_cast<std::uint64_t>(streamSample.channelCount)
+        * static_cast<std::uint64_t>(sizeof(float));
+    if (expectedPayloadBytes != streamSample.payloadSizeBytes)
+    {
+        result.issues.push_back("Embedded stream sample payloadSizeBytes does not match its frame and channel counts.");
+        return result;
+    }
+
+    if (streamSample.payloadOffsetBytes > container.embeddedPayloadBytes.size()
+        || streamSample.payloadSizeBytes > container.embeddedPayloadBytes.size() - streamSample.payloadOffsetBytes)
+    {
+        result.issues.push_back("Embedded stream sample payload range exceeds the packaged payload bytes.");
+        return result;
+    }
+
+    auto sampleData = std::make_shared<PreparedPlaybackDecodedSampleData>();
+    sampleData->normalizedChannels.resize(streamSample.channelCount);
+    for (auto& channel : sampleData->normalizedChannels)
+        channel.resize(static_cast<std::size_t>(streamSample.frameCount));
+
+    const auto* payloadBytes = container.embeddedPayloadBytes.data() + streamSample.payloadOffsetBytes;
+    for (std::uint64_t frameIndex = 0; frameIndex < streamSample.frameCount; ++frameIndex)
+    {
+        for (std::uint32_t channelIndex = 0; channelIndex < streamSample.channelCount; ++channelIndex)
+        {
+            const auto sampleByteOffset = (frameIndex * static_cast<std::uint64_t>(streamSample.channelCount)
+                                           + static_cast<std::uint64_t>(channelIndex))
+                * static_cast<std::uint64_t>(sizeof(float));
+            const auto* sampleBytes = payloadBytes + sampleByteOffset;
+            const auto bits = static_cast<std::uint32_t>(sampleBytes[0])
+                | (static_cast<std::uint32_t>(sampleBytes[1]) << 8u)
+                | (static_cast<std::uint32_t>(sampleBytes[2]) << 16u)
+                | (static_cast<std::uint32_t>(sampleBytes[3]) << 24u);
+            float sampleValue = 0.0f;
+            std::memcpy(&sampleValue, &bits, sizeof(sampleValue));
+            sampleData->normalizedChannels[static_cast<std::size_t>(channelIndex)]
+                                        [static_cast<std::size_t>(frameIndex)] = sampleValue;
+        }
+    }
+
+    result.decoded = true;
+    result.state = "Embedded prepared sample decoded";
+    result.sampleData = std::move(sampleData);
+    return result;
 }
 
 std::string buildRetirementToken(std::uint64_t retirementOrdinal,
@@ -805,41 +886,72 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
         const auto* candidateStreamSample = !streamResult.loaded || sampleResolution.selectedStreamSampleId.empty()
             ? nullptr
             : findStreamSampleById(streamResult.container, sampleResolution.selectedStreamSampleId);
+        const auto packageEmbeddedSample = streamResult.loaded
+                && streamResult.container.payloadEmbedded
+                && candidateStreamSample != nullptr
+            ? candidateStreamSample
+            : nullptr;
 
-        const auto fingerprint = fingerprintSampleSourceFile(sampleResolution.normalizedSourcePath);
-        if (isCancellationRequested(request))
-            return finishCanceled();
-        if (!fingerprint.fingerprinted)
+        if (streamResult.loaded
+            && streamResult.container.payloadEmbedded
+            && packageEmbeddedSample == nullptr)
         {
-            SampleImportResult fingerprintFailure;
-            fingerprintFailure.fileFound = fingerprint.fileFound;
-            fingerprintFailure.sourcePath = fingerprint.sourcePath;
-            fingerprintFailure.state = fingerprint.state;
-            fingerprintFailure.issues = fingerprint.issues;
-            const auto failure = classifyPreparedSampleImportFailure(fingerprintFailure);
             addFinding(result,
                        PlaybackSnapshotFindingSeverity::error,
-                       failure.code,
-                       path + ".sourcePath",
-                       failure.summary + " '" + sampleResolution.normalizedSourcePath + "': "
-                           + describePreparedSampleImportFailure(fingerprintFailure));
+                       "prepared-package-sample-unresolved",
+                       path + ".sampleSourceId",
+                       "Prepared playback could not resolve packaged sample '" + sampleResolution.sampleSourceId
+                           + "' to an embedded compiled-stream sample.");
             continue;
+        }
+
+        SampleSourceFingerprintResult fingerprint;
+        auto sourceFingerprintHex = std::string {};
+        if (packageEmbeddedSample != nullptr)
+        {
+            sourceFingerprintHex = packageEmbeddedSample->sourceChecksumHex;
+        }
+        else
+        {
+            fingerprint = fingerprintSampleSourceFile(sampleResolution.normalizedSourcePath);
+            if (isCancellationRequested(request))
+                return finishCanceled();
+            if (!fingerprint.fingerprinted)
+            {
+                SampleImportResult fingerprintFailure;
+                fingerprintFailure.fileFound = fingerprint.fileFound;
+                fingerprintFailure.sourcePath = fingerprint.sourcePath;
+                fingerprintFailure.state = fingerprint.state;
+                fingerprintFailure.issues = fingerprint.issues;
+                const auto failure = classifyPreparedSampleImportFailure(fingerprintFailure);
+                addFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           failure.code,
+                           path + ".sourcePath",
+                           failure.summary + " '" + sampleResolution.normalizedSourcePath + "': "
+                               + describePreparedSampleImportFailure(fingerprintFailure));
+                continue;
+            }
+
+            sourceFingerprintHex = fingerprint.fingerprintHex;
         }
 
         // A compiled stream sample is optional. Reuse it only when it describes the bytes that
         // were actually fingerprinted by this worker; stale or absent topology falls back to a
         // decoded-memory handle without making the authored source ineligible.
-        const auto* streamSample = candidateStreamSample != nullptr
-                && candidateStreamSample->sourceChecksumHex == fingerprint.fingerprintHex
-            ? candidateStreamSample
-            : nullptr;
+        const auto* streamSample = packageEmbeddedSample != nullptr
+                ? packageEmbeddedSample
+                : (candidateStreamSample != nullptr
+                       && candidateStreamSample->sourceChecksumHex == sourceFingerprintHex
+                   ? candidateStreamSample
+                   : nullptr);
         const auto decodePolicyFingerprint = streamSample != nullptr
             ? buildPreparedDecodePolicyFingerprint(*streamSample, streamResult.container)
             : buildAuthoredDecodePolicyFingerprint();
 
         const auto cacheKey = buildCacheKey(compilerVersion,
                                             sampleResolution,
-                                            fingerprint.fingerprintHex,
+                                            sourceFingerprintHex,
                                             decodePolicyFingerprint);
         const auto cacheIterator = std::find_if(cacheEntries.begin(),
                                                 cacheEntries.end(),
@@ -860,93 +972,161 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
         }
         else
         {
-            const auto decodedSample = importSampleFile(sampleResolution.normalizedSourcePath,
-                                                        fingerprint.fingerprintHex);
-            if (isCancellationRequested(request))
-                return finishCanceled();
-            if (!decodedSample.imported)
-            {
-                const auto failure = classifyPreparedSampleImportFailure(decodedSample);
-                addFinding(result,
-                           PlaybackSnapshotFindingSeverity::error,
-                           failure.code,
-                           path + ".sourcePath",
-                           failure.summary + " '" + sampleResolution.normalizedSourcePath + "': "
-                               + describePreparedSampleImportFailure(decodedSample));
-                continue;
-            }
+            const auto& snapshotRole
+                = snapshotResult.snapshot.sampleIdentities[sampleResolution.snapshotSampleIndex].role;
 
-            const auto decodeMismatches = streamSample != nullptr
-                ? collectDecodeMismatches(decodedSample.sample.metadata, *streamSample)
-                : std::vector<std::string> {};
-            if (!decodeMismatches.empty())
+            if (packageEmbeddedSample != nullptr)
             {
-                addFinding(result,
-                           PlaybackSnapshotFindingSeverity::error,
-                           "prepared-sample-stream-mismatch",
-                           path + ".sourcePath",
-                           "Prepared playback decoded source sample '" + sampleResolution.normalizedSourcePath
-                               + "', but the compiled stream metadata no longer matches: "
-                               + summarizeIssues(decodeMismatches));
-                continue;
-            }
+                const auto embeddedSample
+                    = decodeEmbeddedPreparedSampleData(streamResult.container, *packageEmbeddedSample);
+                if (!embeddedSample.decoded || embeddedSample.sampleData == nullptr)
+                {
+                    addFinding(result,
+                               PlaybackSnapshotFindingSeverity::error,
+                               "prepared-package-sample-decode-failed",
+                               path + ".sourcePath",
+                               "Prepared playback could not decode packaged sample '"
+                                   + sampleResolution.normalizedSourcePath + "': "
+                                   + (embeddedSample.issues.empty() ? embeddedSample.state
+                                                                    : summarizeIssues(embeddedSample.issues)));
+                    continue;
+                }
 
-            sampleHandle.sampleSourceId = sampleResolution.sampleSourceId;
-            sampleHandle.streamSampleId = streamSample != nullptr
-                ? streamSample->sampleId
-                : sampleResolution.sampleSourceId;
-            sampleHandle.sourcePath = sampleResolution.normalizedSourcePath;
-            sampleHandle.canonicalSourcePath = sampleResolution.normalizedSourcePath;
-            sampleHandle.canonicalSourceIdentity = buildCanonicalSourceIdentity(sampleResolution.sampleSourceId,
-                                                                                sampleResolution.normalizedSourcePath);
-            sampleHandle.sourceFingerprintHex = decodedSample.sample.metadata.sourceChecksumHex;
-            sampleHandle.formatName = decodedSample.sample.metadata.formatName;
-            const auto& snapshotRole = snapshotResult.snapshot.sampleIdentities[sampleResolution.snapshotSampleIndex].role;
-            sampleHandle.role = snapshotRole.empty() && streamSample != nullptr ? streamSample->role : snapshotRole;
-            sampleHandle.channelLayout = streamSample != nullptr
-                ? streamSample->channelLayout
-                : decodedSample.sample.metadata.channelLayout;
-            sampleHandle.sampleRate = decodedSample.sample.metadata.sampleRate;
-            sampleHandle.frameCount = decodedSample.sample.metadata.frameCount;
-            sampleHandle.channelCount = decodedSample.sample.metadata.channelCount;
-            sampleHandle.rootMidiNotePresent = decodedSample.sample.metadata.rootMidiNotePresent;
-            sampleHandle.rootMidiNote = decodedSample.sample.metadata.rootMidiNote;
-            sampleHandle.loopRangePresent = decodedSample.sample.metadata.loopRangePresent;
-            sampleHandle.loopStartFrame = decodedSample.sample.metadata.loopStartFrame;
-            sampleHandle.loopEndFrame = decodedSample.sample.metadata.loopEndFrame;
-            auto decodedSampleData = std::make_shared<PreparedPlaybackDecodedSampleData>();
-            decodedSampleData->normalizedChannels = decodedSample.sample.normalizedChannels;
-            sampleHandle.decodedSampleData = std::move(decodedSampleData);
-            sampleHandle.ownershipToken = "cache:" + cacheKey;
-            sampleHandle.cacheKey = cacheKey;
+                sampleHandle.sampleSourceId = sampleResolution.sampleSourceId;
+                sampleHandle.streamSampleId = packageEmbeddedSample->sampleId;
+                sampleHandle.sourcePath = sampleResolution.normalizedSourcePath;
+                sampleHandle.canonicalSourcePath = sampleResolution.normalizedSourcePath;
+                sampleHandle.canonicalSourceIdentity = buildCanonicalSourceIdentity(sampleResolution.sampleSourceId,
+                                                                                    sampleResolution.normalizedSourcePath);
+                sampleHandle.sourceFingerprintHex = packageEmbeddedSample->sourceChecksumHex;
+                sampleHandle.formatName = packageEmbeddedSample->formatName;
+                sampleHandle.role = snapshotRole.empty() ? packageEmbeddedSample->role : snapshotRole;
+                sampleHandle.channelLayout = packageEmbeddedSample->channelLayout;
+                sampleHandle.sampleRate = packageEmbeddedSample->sampleRate;
+                sampleHandle.frameCount = packageEmbeddedSample->frameCount;
+                sampleHandle.channelCount = packageEmbeddedSample->channelCount;
+                sampleHandle.rootMidiNotePresent = packageEmbeddedSample->rootMidiNotePresent;
+                sampleHandle.rootMidiNote = packageEmbeddedSample->rootMidiNote;
+                sampleHandle.loopRangePresent = packageEmbeddedSample->loopRangePresent;
+                sampleHandle.loopStartFrame = packageEmbeddedSample->loopStartFrame;
+                sampleHandle.loopEndFrame = packageEmbeddedSample->loopEndFrame;
+                sampleHandle.decodedSampleData = embeddedSample.sampleData;
+                sampleHandle.ownershipToken = "cache:" + cacheKey;
+                sampleHandle.cacheKey = cacheKey;
 
-            streamHandle.sampleSourceId = sampleResolution.sampleSourceId;
-            streamHandle.streamSampleId = sampleHandle.streamSampleId;
-            streamHandle.compiledStreamTopologyAvailable = streamSample != nullptr;
-            if (streamSample != nullptr)
-            {
+                streamHandle.sampleSourceId = sampleResolution.sampleSourceId;
+                streamHandle.streamSampleId = sampleHandle.streamSampleId;
+                streamHandle.compiledStreamTopologyAvailable = true;
                 streamHandle.containerId = streamResult.container.containerId;
                 streamHandle.containerPath = streamResult.containerPath;
                 streamHandle.payloadEncoding = streamResult.container.payloadEncoding;
                 streamHandle.pageSizeBytes = streamResult.container.pageSizeBytes;
-                streamHandle.payloadOffsetBytes = streamSample->payloadOffsetBytes;
-                streamHandle.payloadSizeBytes = streamSample->payloadSizeBytes;
-                streamHandle.prefetchBytes = streamSample->prefetchBytes;
-                populateStreamTopologyMetadata(streamHandle, *streamSample, streamResult.container.pageSizeBytes);
+                streamHandle.payloadOffsetBytes = packageEmbeddedSample->payloadOffsetBytes;
+                streamHandle.payloadSizeBytes = packageEmbeddedSample->payloadSizeBytes;
+                streamHandle.prefetchBytes = packageEmbeddedSample->prefetchBytes;
+                populateStreamTopologyMetadata(streamHandle,
+                                               *packageEmbeddedSample,
+                                               streamResult.container.pageSizeBytes);
+                streamHandle.ownershipToken = "cache:" + cacheKey;
+                streamHandle.cacheKey = cacheKey;
+                streamHandle.pages.reserve(packageEmbeddedSample->pages.size());
+                for (const auto& page : packageEmbeddedSample->pages)
+                    streamHandle.pages.push_back({ page.pageIndex, page.offsetBytes, page.sizeBytes });
             }
             else
             {
-                streamHandle.payloadEncoding = "decoded-float32";
-                streamHandle.topologyKind = "decoded-memory";
+                const auto decodedSample = importSampleFile(sampleResolution.normalizedSourcePath,
+                                                            sourceFingerprintHex);
+                if (isCancellationRequested(request))
+                    return finishCanceled();
+                if (!decodedSample.imported)
+                {
+                    const auto failure = classifyPreparedSampleImportFailure(decodedSample);
+                    addFinding(result,
+                               PlaybackSnapshotFindingSeverity::error,
+                               failure.code,
+                               path + ".sourcePath",
+                               failure.summary + " '" + sampleResolution.normalizedSourcePath + "': "
+                                   + describePreparedSampleImportFailure(decodedSample));
+                    continue;
+                }
+
+                const auto decodeMismatches = streamSample != nullptr
+                    ? collectDecodeMismatches(decodedSample.sample.metadata, *streamSample)
+                    : std::vector<std::string> {};
+                if (!decodeMismatches.empty())
+                {
+                    addFinding(result,
+                               PlaybackSnapshotFindingSeverity::error,
+                               "prepared-sample-stream-mismatch",
+                               path + ".sourcePath",
+                               "Prepared playback decoded source sample '" + sampleResolution.normalizedSourcePath
+                                   + "', but the compiled stream metadata no longer matches: "
+                                   + summarizeIssues(decodeMismatches));
+                    continue;
+                }
+
+                sampleHandle.sampleSourceId = sampleResolution.sampleSourceId;
+                sampleHandle.streamSampleId = streamSample != nullptr
+                    ? streamSample->sampleId
+                    : sampleResolution.sampleSourceId;
+                sampleHandle.sourcePath = sampleResolution.normalizedSourcePath;
+                sampleHandle.canonicalSourcePath = sampleResolution.normalizedSourcePath;
+                sampleHandle.canonicalSourceIdentity = buildCanonicalSourceIdentity(sampleResolution.sampleSourceId,
+                                                                                    sampleResolution.normalizedSourcePath);
+                sampleHandle.sourceFingerprintHex = decodedSample.sample.metadata.sourceChecksumHex;
+                sampleHandle.formatName = decodedSample.sample.metadata.formatName;
+                sampleHandle.role = snapshotRole.empty() && streamSample != nullptr ? streamSample->role : snapshotRole;
+                sampleHandle.channelLayout = streamSample != nullptr
+                    ? streamSample->channelLayout
+                    : decodedSample.sample.metadata.channelLayout;
+                sampleHandle.sampleRate = decodedSample.sample.metadata.sampleRate;
+                sampleHandle.frameCount = decodedSample.sample.metadata.frameCount;
+                sampleHandle.channelCount = decodedSample.sample.metadata.channelCount;
+                sampleHandle.rootMidiNotePresent = decodedSample.sample.metadata.rootMidiNotePresent;
+                sampleHandle.rootMidiNote = decodedSample.sample.metadata.rootMidiNote;
+                sampleHandle.loopRangePresent = decodedSample.sample.metadata.loopRangePresent;
+                sampleHandle.loopStartFrame = decodedSample.sample.metadata.loopStartFrame;
+                sampleHandle.loopEndFrame = decodedSample.sample.metadata.loopEndFrame;
+                auto decodedSampleData = std::make_shared<PreparedPlaybackDecodedSampleData>();
+                decodedSampleData->normalizedChannels = decodedSample.sample.normalizedChannels;
+                sampleHandle.decodedSampleData = std::move(decodedSampleData);
+                sampleHandle.ownershipToken = "cache:" + cacheKey;
+                sampleHandle.cacheKey = cacheKey;
+
+                streamHandle.sampleSourceId = sampleResolution.sampleSourceId;
+                streamHandle.streamSampleId = sampleHandle.streamSampleId;
+                streamHandle.compiledStreamTopologyAvailable = streamSample != nullptr;
+                if (streamSample != nullptr)
+                {
+                    streamHandle.containerId = streamResult.container.containerId;
+                    streamHandle.containerPath = streamResult.containerPath;
+                    streamHandle.payloadEncoding = streamResult.container.payloadEncoding;
+                    streamHandle.pageSizeBytes = streamResult.container.pageSizeBytes;
+                    streamHandle.payloadOffsetBytes = streamSample->payloadOffsetBytes;
+                    streamHandle.payloadSizeBytes = streamSample->payloadSizeBytes;
+                    streamHandle.prefetchBytes = streamSample->prefetchBytes;
+                    populateStreamTopologyMetadata(streamHandle, *streamSample, streamResult.container.pageSizeBytes);
+                }
+                else
+                {
+                    streamHandle.payloadEncoding = "decoded-float32";
+                    streamHandle.topologyKind = "decoded-memory";
+                }
+                streamHandle.ownershipToken = "cache:" + cacheKey;
+                streamHandle.cacheKey = cacheKey;
+                if (streamSample != nullptr)
+                {
+                    streamHandle.pages.reserve(streamSample->pages.size());
+                    for (const auto& page : streamSample->pages)
+                        streamHandle.pages.push_back({ page.pageIndex, page.offsetBytes, page.sizeBytes });
+                }
+
+                result.metrics.decodedBytes += computeDecodedSampleBytes(decodedSample.sample);
             }
-            streamHandle.ownershipToken = "cache:" + cacheKey;
-            streamHandle.cacheKey = cacheKey;
-            if (streamSample != nullptr)
-            {
-                streamHandle.pages.reserve(streamSample->pages.size());
-                for (const auto& page : streamSample->pages)
-                    streamHandle.pages.push_back({ page.pageIndex, page.offsetBytes, page.sizeBytes });
-            }
+
+            if (isCancellationRequested(request))
+                return finishCanceled();
 
             retireSupersededCacheEntries(sampleResolution.sampleSourceId, cacheKey, request.buildId);
 
@@ -964,7 +1144,6 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             entry.retainedBytes = retainedSampleBytes;
             cacheEntries.push_back({ cacheKey, std::move(entry) });
             ++result.metrics.cacheMissCount;
-            result.metrics.decodedBytes += computeDecodedSampleBytes(decodedSample.sample);
         }
 
         const auto ownershipRecordIndex = result.prepared.ownershipRecords.size();
