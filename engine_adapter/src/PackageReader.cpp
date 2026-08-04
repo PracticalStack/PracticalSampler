@@ -296,6 +296,102 @@ std::string buildLoadFailureState(const PerformancePackageFailureCategory catego
     return "Performance package load failed";
 }
 
+void finalizePayloadFailure(PerformancePackagePayloadLoadResult& result,
+                            const PerformancePackageFailureCategory defaultCategory);
+
+PerformancePackagePayloadLoadResult openPerformancePackagePayloadFromBytes(
+    const PerformancePackageReaderResult& package,
+    const std::string& payloadId,
+    const PackageCryptoProvider& cryptoProvider,
+    const std::vector<std::uint8_t>& fileBytes)
+{
+    PerformancePackagePayloadLoadResult result;
+    result.state = "Performance package payload open not attempted";
+
+    if (!package.valid)
+    {
+        addIssue(result, "Cannot open a payload from an invalid package-reader result.");
+        setFailureCategory(result, package.failureCategory == PerformancePackageFailureCategory::none
+                                       ? PerformancePackageFailureCategory::packageFormatFailure
+                                       : package.failureCategory);
+        finalizePayloadFailure(result, PerformancePackageFailureCategory::packageFormatFailure);
+        return result;
+    }
+
+    const auto payload = findPayload(package, payloadId);
+    if (!payload.has_value())
+    {
+        result.state = "Performance package payload missing";
+        return result;
+    }
+
+    result.found = true;
+    result.payload = *payload;
+
+    std::string issue;
+    const auto absoluteOffsetBytes = package.header.payloadRegionOffsetBytes + result.payload.payloadOffsetBytes;
+    std::vector<std::uint8_t> sealedPayloadBytes;
+    if (!extractFileRange(fileBytes,
+                          absoluteOffsetBytes,
+                          result.payload.sealedSizeBytes,
+                          sealedPayloadBytes,
+                          issue))
+    {
+        addIssue(result, "Payload '" + payloadId + "' exceeded the package file bounds.");
+        setFailureCategory(result, PerformancePackageFailureCategory::payloadCorruption);
+        finalizePayloadFailure(result, PerformancePackageFailureCategory::payloadCorruption);
+        return result;
+    }
+
+    PackageSealedBlob sealedPayload;
+    if (!parseSealedBlob(sealedPayloadBytes, cryptoProvider, sealedPayload, issue))
+    {
+        addIssue(result, "Payload '" + payloadId + "' sealed blob could not be parsed: " + issue);
+        setFailureCategory(result, PerformancePackageFailureCategory::payloadCorruption);
+        finalizePayloadFailure(result, PerformancePackageFailureCategory::payloadCorruption);
+        return result;
+    }
+
+    PackageOpenRequest payloadOpenRequest;
+    payloadOpenRequest.packageId = package.cleartextManifest.packageId;
+    payloadOpenRequest.recordId = result.payload.payloadId;
+    payloadOpenRequest.additionalAuthenticatedData = makePackagePayloadAad(package.cleartextManifest,
+                                                                          result.payload.payloadId,
+                                                                          result.payload.payloadKind,
+                                                                          result.payload.logicalPath,
+                                                                          result.payload.mediaType,
+                                                                          result.payload.plaintextSizeBytes);
+    payloadOpenRequest.sealed = std::move(sealedPayload);
+
+    if (!cryptoProvider.open(payloadOpenRequest, result.payload.plaintextBytes, issue))
+    {
+        addIssue(result, "Payload '" + payloadId + "' authentication failed: " + issue);
+        setFailureCategory(result, PerformancePackageFailureCategory::decryptionFailure);
+        finalizePayloadFailure(result, PerformancePackageFailureCategory::decryptionFailure);
+        return result;
+    }
+
+    if (result.payload.plaintextBytes.size() != result.payload.plaintextSizeBytes)
+    {
+        addIssue(result, "Payload '" + payloadId + "' plaintext size did not match the decrypted TOC.");
+        setFailureCategory(result, PerformancePackageFailureCategory::payloadCorruption);
+        finalizePayloadFailure(result, PerformancePackageFailureCategory::payloadCorruption);
+        return result;
+    }
+
+    if (computeFnv1a64Hex(result.payload.plaintextBytes) != result.payload.plaintextChecksumHex)
+    {
+        addIssue(result, "Payload '" + payloadId + "' plaintext checksum mismatch.");
+        setFailureCategory(result, PerformancePackageFailureCategory::payloadCorruption);
+        finalizePayloadFailure(result, PerformancePackageFailureCategory::payloadCorruption);
+        return result;
+    }
+
+    result.loaded = true;
+    result.state = "Performance package payload opened";
+    return result;
+}
+
 void finalizeReaderFailure(PerformancePackageReaderResult& result,
                            const PerformancePackageFailureCategory defaultCategory
                                = PerformancePackageFailureCategory::packageFormatFailure)
@@ -556,100 +652,17 @@ PerformancePackagePayloadLoadResult openPerformancePackagePayload(const Performa
                                                                  const std::string& payloadId,
                                                                  const PackageCryptoProvider& cryptoProvider)
 {
-    PerformancePackagePayloadLoadResult result;
-    result.state = "Performance package payload open not attempted";
-
-    if (!package.valid)
-    {
-        addIssue(result, "Cannot open a payload from an invalid package-reader result.");
-        setFailureCategory(result, package.failureCategory == PerformancePackageFailureCategory::none
-                                       ? PerformancePackageFailureCategory::packageFormatFailure
-                                       : package.failureCategory);
-        finalizePayloadFailure(result, PerformancePackageFailureCategory::packageFormatFailure);
-        return result;
-    }
-
-    const auto payload = findPayload(package, payloadId);
-    if (!payload.has_value())
-    {
-        result.state = "Performance package payload missing";
-        return result;
-    }
-
-    result.found = true;
-    result.payload = *payload;
-
     std::string issue;
     const auto fileBytes = readBinaryFile(fs::path(package.packagePath), issue);
     if (!issue.empty())
     {
+        PerformancePackagePayloadLoadResult result;
         addIssue(result, issue);
         setFailureCategory(result, PerformancePackageFailureCategory::packageFormatFailure);
         finalizePayloadFailure(result, PerformancePackageFailureCategory::packageFormatFailure);
         return result;
     }
-
-    const auto absoluteOffsetBytes = package.header.payloadRegionOffsetBytes + result.payload.payloadOffsetBytes;
-    std::vector<std::uint8_t> sealedPayloadBytes;
-    if (!extractFileRange(fileBytes,
-                          absoluteOffsetBytes,
-                          result.payload.sealedSizeBytes,
-                          sealedPayloadBytes,
-                          issue))
-    {
-        addIssue(result, "Payload '" + payloadId + "' exceeded the package file bounds.");
-        setFailureCategory(result, PerformancePackageFailureCategory::payloadCorruption);
-        finalizePayloadFailure(result);
-        return result;
-    }
-
-    PackageSealedBlob sealedPayload;
-    if (!parseSealedBlob(sealedPayloadBytes, cryptoProvider, sealedPayload, issue))
-    {
-        addIssue(result, "Payload '" + payloadId + "' sealed blob could not be parsed: " + issue);
-        setFailureCategory(result, PerformancePackageFailureCategory::payloadCorruption);
-        finalizePayloadFailure(result);
-        return result;
-    }
-
-    PackageOpenRequest payloadOpenRequest;
-    payloadOpenRequest.packageId = package.cleartextManifest.packageId;
-    payloadOpenRequest.recordId = result.payload.payloadId;
-    payloadOpenRequest.additionalAuthenticatedData = makePackagePayloadAad(package.cleartextManifest,
-                                                                          result.payload.payloadId,
-                                                                          result.payload.payloadKind,
-                                                                          result.payload.logicalPath,
-                                                                          result.payload.mediaType,
-                                                                          result.payload.plaintextSizeBytes);
-    payloadOpenRequest.sealed = std::move(sealedPayload);
-
-    if (!cryptoProvider.open(payloadOpenRequest, result.payload.plaintextBytes, issue))
-    {
-        addIssue(result, "Payload '" + payloadId + "' authentication failed: " + issue);
-        setFailureCategory(result, PerformancePackageFailureCategory::decryptionFailure);
-        finalizePayloadFailure(result, PerformancePackageFailureCategory::decryptionFailure);
-        return result;
-    }
-
-    if (result.payload.plaintextBytes.size() != result.payload.plaintextSizeBytes)
-    {
-        addIssue(result, "Payload '" + payloadId + "' plaintext size did not match the decrypted TOC.");
-        setFailureCategory(result, PerformancePackageFailureCategory::payloadCorruption);
-        finalizePayloadFailure(result);
-        return result;
-    }
-
-    if (computeFnv1a64Hex(result.payload.plaintextBytes) != result.payload.plaintextChecksumHex)
-    {
-        addIssue(result, "Payload '" + payloadId + "' plaintext checksum mismatch.");
-        setFailureCategory(result, PerformancePackageFailureCategory::payloadCorruption);
-        finalizePayloadFailure(result);
-        return result;
-    }
-
-    result.loaded = true;
-    result.state = "Performance package payload opened";
-    return result;
+    return openPerformancePackagePayloadFromBytes(package, payloadId, cryptoProvider, fileBytes);
 }
 
 PerformancePackageLoadResult loadPerformancePackage(const std::string& packagePath,
@@ -672,6 +685,15 @@ PerformancePackageLoadResult loadPerformancePackage(const std::string& packagePa
     }
 
     result.manifest = result.package.cleartextManifest;
+    std::string fileIssue;
+    const auto fileBytes = readBinaryFile(fs::path(packagePath), fileIssue);
+    if (!fileIssue.empty())
+    {
+        addIssue(result, fileIssue);
+        setFailureCategory(result, PerformancePackageFailureCategory::packageFormatFailure);
+        finalizeLoadFailure(result, PerformancePackageFailureCategory::packageFormatFailure);
+        return result;
+    }
 
     const auto packageManifestPayload = findPayloadByKind(result.package, "packageManifest");
     const auto instrumentPayload = findPayloadByKind(result.package, "runtimeInstrument");
@@ -694,9 +716,10 @@ PerformancePackageLoadResult loadPerformancePackage(const std::string& packagePa
         return result;
     }
 
-    const auto packageManifestOpen = openPerformancePackagePayload(result.package,
-                                                                   packageManifestPayload->payloadId,
-                                                                   cryptoProvider);
+    const auto packageManifestOpen = openPerformancePackagePayloadFromBytes(result.package,
+                                                                            packageManifestPayload->payloadId,
+                                                                            cryptoProvider,
+                                                                            fileBytes);
     appendIssues(result.issues, packageManifestOpen.issues);
     if (!packageManifestOpen.loaded)
     {
@@ -725,9 +748,10 @@ PerformancePackageLoadResult loadPerformancePackage(const std::string& packagePa
         addIssue(result, "Package manifest payload schemaName must be 'drs.performancePackage'.");
     }
 
-    const auto instrumentOpen = openPerformancePackagePayload(result.package,
-                                                              instrumentPayload->payloadId,
-                                                              cryptoProvider);
+    const auto instrumentOpen = openPerformancePackagePayloadFromBytes(result.package,
+                                                                       instrumentPayload->payloadId,
+                                                                       cryptoProvider,
+                                                                       fileBytes);
     appendIssues(result.issues, instrumentOpen.issues);
     if (!instrumentOpen.loaded)
     {
@@ -742,9 +766,10 @@ PerformancePackageLoadResult loadPerformancePackage(const std::string& packagePa
                                                        false);
     appendIssues(result.issues, result.instrument.issues);
 
-    const auto streamPayloadOpen = openPerformancePackagePayload(result.package,
-                                                                 streamPayload->payloadId,
-                                                                 cryptoProvider);
+    const auto streamPayloadOpen = openPerformancePackagePayloadFromBytes(result.package,
+                                                                          streamPayload->payloadId,
+                                                                          cryptoProvider,
+                                                                          fileBytes);
     appendIssues(result.issues, streamPayloadOpen.issues);
     if (!streamPayloadOpen.loaded)
     {
@@ -754,9 +779,10 @@ PerformancePackageLoadResult loadPerformancePackage(const std::string& packagePa
         return result;
     }
 
-    const auto streamIndexOpen = openPerformancePackagePayload(result.package,
-                                                               streamIndexPayload->payloadId,
-                                                               cryptoProvider);
+    const auto streamIndexOpen = openPerformancePackagePayloadFromBytes(result.package,
+                                                                        streamIndexPayload->payloadId,
+                                                                        cryptoProvider,
+                                                                        fileBytes);
     appendIssues(result.issues, streamIndexOpen.issues);
     if (!streamIndexOpen.loaded)
     {

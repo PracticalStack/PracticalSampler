@@ -35,6 +35,20 @@ std::string summarizeIssues(const std::vector<std::string>& issues)
     return summary;
 }
 
+std::optional<double> findMacroValue(const drs::engine::RuntimeSessionStateSnapshot& sessionState,
+                                     const std::string& macroId)
+{
+    const auto iterator = std::find_if(sessionState.macroValues.begin(),
+                                       sessionState.macroValues.end(),
+                                       [&](const drs::engine::RuntimePresetMacroValue& macroValue)
+                                       {
+                                           return macroValue.id == macroId;
+                                       });
+    return iterator != sessionState.macroValues.end()
+        ? std::optional<double>(iterator->value)
+        : std::nullopt;
+}
+
 juce::Component* findDescendantById(juce::Component& root, const juce::String& componentId)
 {
     if (root.getComponentID() == componentId)
@@ -177,6 +191,9 @@ int main()
                 "Standalone package sessions should not expose authoring descendants.");
         require(standalone.exportStateJson().find("\"projectBinding\"") == std::string::npos,
                 "Standalone package sessions should export preset-only host state without project bindings.");
+        const auto& standaloneSessionState = standalone.getProcessor().getEngineFacade().getCurrentSessionState();
+        require(!findMacroValue(standaloneSessionState, "motion").has_value(),
+                "Standalone package sessions should not reintroduce Motion when the exported package omitted macros.");
         standalone.getProcessor().prepareToPlay(44100.0, 512);
         standalone.getProcessor().serviceMessageThreadWork();
         require(renderQueuedPerformanceSurfaceMagnitude(standalone.getProcessor(), 69, 0.8f) > 0.0001f,
@@ -216,6 +233,9 @@ int main()
         const std::string serializedState(static_cast<const char*>(pluginState.getData()), pluginState.getSize());
         require(serializedState.find("\"projectBinding\"") == std::string::npos,
                 "Plugin package sessions should export preset-only host state without project bindings.");
+        const auto& pluginSessionState = processor.getEngineFacade().getCurrentSessionState();
+        require(!findMacroValue(pluginSessionState, "motion").has_value(),
+                "Plugin package sessions should not reintroduce Motion when the exported package omitted macros.");
         processor.prepareToPlay(44100.0, 512);
         processor.serviceMessageThreadWork();
         require(renderQueuedPerformanceSurfaceMagnitude(processor, 69, 0.8f) > 0.0001f,

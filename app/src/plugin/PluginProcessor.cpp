@@ -983,7 +983,7 @@ int computeToneRenderVelocity(const drs::engine::RuntimeSessionStateSnapshot& se
 
 int computeMotionRenderNote(const drs::engine::RuntimeSessionStateSnapshot& sessionState, int playedNote)
 {
-    const auto motionValue = findMacroValue(sessionState, "motion").value_or(0.15);
+    const auto motionValue = findMacroValue(sessionState, "motion").value_or(0.5);
     const auto semitoneOffset = static_cast<int>(std::lround((motionValue - 0.5) * 24.0));
     return clampMidiValue(playedNote + semitoneOffset);
 }

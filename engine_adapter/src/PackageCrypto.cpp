@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <string_view>
 
 namespace drs::engine
@@ -12,32 +13,9 @@ constexpr std::string_view kAlgorithmId = "drs.sha256.stream-seal.v1";
 constexpr std::string_view kDeterministicSeed = "DecentRhapsodyStudio.PackageCrypto.Sprint3.InternalSeed";
 constexpr std::size_t kNonceSizeBytes = 24;
 constexpr std::size_t kTagSizeBytes = 16;
-
-std::vector<std::uint8_t> toBytes(std::string_view text)
-{
-    return std::vector<std::uint8_t>(text.begin(), text.end());
-}
-
-void appendBytes(std::vector<std::uint8_t>& target, const std::vector<std::uint8_t>& bytes)
-{
-    target.insert(target.end(), bytes.begin(), bytes.end());
-}
-
-void appendBytes(std::vector<std::uint8_t>& target, std::string_view text)
-{
-    target.insert(target.end(), text.begin(), text.end());
-}
-
-void appendSeparator(std::vector<std::uint8_t>& target)
-{
-    target.push_back(0xffu);
-}
-
-void appendUint64LittleEndian(std::vector<std::uint8_t>& target, const std::uint64_t value)
-{
-    for (std::size_t index = 0; index < sizeof(value); ++index)
-        target.push_back(static_cast<std::uint8_t>((value >> (index * 8u)) & 0xffu));
-}
+constexpr std::uint64_t kFnv1aOffsetBasis = 14695981039346656037ull;
+constexpr std::uint64_t kFnv1aPrime = 1099511628211ull;
+constexpr std::uint8_t kSeparatorByte = 0xffu;
 
 std::uint64_t mix64(std::uint64_t value) noexcept
 {
@@ -47,27 +25,58 @@ std::uint64_t mix64(std::uint64_t value) noexcept
     return value ^ (value >> 31u);
 }
 
-std::uint64_t computeFnv1a64(const std::vector<std::uint8_t>& bytes) noexcept
+struct Fnv1a64State
 {
-    constexpr std::uint64_t offsetBasis = 14695981039346656037ull;
-    constexpr std::uint64_t prime = 1099511628211ull;
+    std::uint64_t hash = kFnv1aOffsetBasis;
+    std::uint64_t sizeBytes = 0;
+};
 
-    std::uint64_t hash = offsetBasis;
-    for (const auto byte : bytes)
+void appendHashBytes(Fnv1a64State& state, const std::uint8_t* bytes, const std::size_t byteCount) noexcept
+{
+    for (std::size_t index = 0; index < byteCount; ++index)
     {
-        hash ^= byte;
-        hash *= prime;
+        state.hash ^= bytes[index];
+        state.hash *= kFnv1aPrime;
     }
-
-    return hash;
+    state.sizeBytes += static_cast<std::uint64_t>(byteCount);
 }
 
-std::vector<std::uint8_t> expandDigestWords(const std::vector<std::uint8_t>& bytes, const std::size_t outputSizeBytes)
+void appendHashBytes(Fnv1a64State& state, const std::vector<std::uint8_t>& bytes) noexcept
+{
+    if (!bytes.empty())
+        appendHashBytes(state, bytes.data(), bytes.size());
+}
+
+void appendHashBytes(Fnv1a64State& state, std::string_view text) noexcept
+{
+    if (!text.empty())
+    {
+        appendHashBytes(state,
+                        reinterpret_cast<const std::uint8_t*>(text.data()),
+                        text.size());
+    }
+}
+
+void appendSeparator(Fnv1a64State& state) noexcept
+{
+    appendHashBytes(state, &kSeparatorByte, 1);
+}
+
+void appendUint64LittleEndian(Fnv1a64State& state, const std::uint64_t value) noexcept
+{
+    std::uint8_t bytes[sizeof(value)] {};
+    for (std::size_t index = 0; index < sizeof(value); ++index)
+        bytes[index] = static_cast<std::uint8_t>((value >> (index * 8u)) & 0xffu);
+    appendHashBytes(state, bytes, sizeof(bytes));
+}
+
+std::vector<std::uint8_t> expandDigestWords(const Fnv1a64State& inputState,
+                                            const std::size_t outputSizeBytes)
 {
     std::vector<std::uint8_t> output;
     output.reserve(outputSizeBytes);
 
-    auto state = computeFnv1a64(bytes) ^ mix64(static_cast<std::uint64_t>(bytes.size()));
+    auto state = inputState.hash ^ mix64(inputState.sizeBytes);
     while (output.size() < outputSizeBytes)
     {
         state = mix64(state ^ 0xa0761d6478bd642full ^ static_cast<std::uint64_t>(output.size()));
@@ -78,47 +87,51 @@ std::vector<std::uint8_t> expandDigestWords(const std::vector<std::uint8_t>& byt
     return output;
 }
 
-std::vector<std::uint8_t> buildDomainBytes(std::string_view packageId,
-                                           std::string_view recordId,
-                                           std::string_view additionalAuthenticatedData)
+Fnv1a64State buildDomainState(std::string_view packageId,
+                              std::string_view recordId,
+                              std::string_view additionalAuthenticatedData) noexcept
 {
-    std::vector<std::uint8_t> bytes;
-    appendBytes(bytes, kDeterministicSeed);
-    appendSeparator(bytes);
-    appendBytes(bytes, kAlgorithmId);
-    appendSeparator(bytes);
-    appendBytes(bytes, packageId);
-    appendSeparator(bytes);
-    appendBytes(bytes, recordId);
-    appendSeparator(bytes);
-    appendBytes(bytes, additionalAuthenticatedData);
-    return bytes;
+    Fnv1a64State state;
+    appendHashBytes(state, kDeterministicSeed);
+    appendSeparator(state);
+    appendHashBytes(state, kAlgorithmId);
+    appendSeparator(state);
+    appendHashBytes(state, packageId);
+    appendSeparator(state);
+    appendHashBytes(state, recordId);
+    appendSeparator(state);
+    appendHashBytes(state, additionalAuthenticatedData);
+    return state;
 }
 
 std::vector<std::uint8_t> deriveNonceBytes(std::string_view packageId,
                                            std::string_view recordId,
                                            std::string_view additionalAuthenticatedData)
 {
-    auto domain = buildDomainBytes(packageId, recordId, additionalAuthenticatedData);
+    auto domain = buildDomainState(packageId, recordId, additionalAuthenticatedData);
     appendSeparator(domain);
-    appendBytes(domain, "nonce");
+    appendHashBytes(domain, "nonce");
     return expandDigestWords(domain, kNonceSizeBytes);
 }
 
-std::vector<std::uint8_t> computeKeystreamBlock(const std::vector<std::uint8_t>& nonce,
-                                                std::string_view packageId,
-                                                std::string_view recordId,
-                                                std::string_view additionalAuthenticatedData,
-                                                const std::uint64_t blockIndex)
+void xorWithExpandedDigest(std::vector<std::uint8_t>& output,
+                           const std::vector<std::uint8_t>& input,
+                           const std::size_t outputOffset,
+                           const Fnv1a64State& seedState)
 {
-    auto bytes = buildDomainBytes(packageId, recordId, additionalAuthenticatedData);
-    appendSeparator(bytes);
-    appendBytes(bytes, "stream");
-    appendSeparator(bytes);
-    appendBytes(bytes, nonce);
-    appendSeparator(bytes);
-    appendUint64LittleEndian(bytes, blockIndex);
-    return expandDigestWords(bytes, 32);
+    auto state = seedState.hash ^ mix64(seedState.sizeBytes);
+    auto generatedBytes = std::size_t { 0 };
+    const auto chunkSize = std::min<std::size_t>(32, input.size() - outputOffset);
+    while (generatedBytes < chunkSize)
+    {
+        state = mix64(state ^ 0xa0761d6478bd642full ^ static_cast<std::uint64_t>(generatedBytes));
+        for (std::size_t index = 0; index < sizeof(state) && generatedBytes < chunkSize; ++index, ++generatedBytes)
+        {
+            output[outputOffset + generatedBytes]
+                = input[outputOffset + generatedBytes]
+                ^ static_cast<std::uint8_t>((state >> (index * 8u)) & 0xffu);
+        }
+    }
 }
 
 std::vector<std::uint8_t> xorWithDeterministicKeystream(const std::vector<std::uint8_t>& input,
@@ -128,21 +141,18 @@ std::vector<std::uint8_t> xorWithDeterministicKeystream(const std::vector<std::u
                                                         std::string_view additionalAuthenticatedData)
 {
     std::vector<std::uint8_t> output(input.size(), 0);
-    std::size_t inputOffset = 0;
-    std::uint64_t blockIndex = 0;
+    auto keystreamPrefixState = buildDomainState(packageId, recordId, additionalAuthenticatedData);
+    appendSeparator(keystreamPrefixState);
+    appendHashBytes(keystreamPrefixState, "stream");
+    appendSeparator(keystreamPrefixState);
+    appendHashBytes(keystreamPrefixState, nonce);
+    appendSeparator(keystreamPrefixState);
 
-    while (inputOffset < input.size())
+    for (std::size_t inputOffset = 0, blockIndex = 0; inputOffset < input.size(); inputOffset += 32, ++blockIndex)
     {
-        const auto keystreamBlock = computeKeystreamBlock(nonce,
-                                                          packageId,
-                                                          recordId,
-                                                          additionalAuthenticatedData,
-                                                          blockIndex++);
-        const auto chunkSize = std::min<std::size_t>(keystreamBlock.size(), input.size() - inputOffset);
-        for (std::size_t index = 0; index < chunkSize; ++index)
-            output[inputOffset + index] = input[inputOffset + index] ^ keystreamBlock[index];
-
-        inputOffset += chunkSize;
+        auto blockState = keystreamPrefixState;
+        appendUint64LittleEndian(blockState, static_cast<std::uint64_t>(blockIndex));
+        xorWithExpandedDigest(output, input, inputOffset, blockState);
     }
 
     return output;
@@ -150,18 +160,18 @@ std::vector<std::uint8_t> xorWithDeterministicKeystream(const std::vector<std::u
 
 std::vector<std::uint8_t> computeAuthenticationTag(const std::vector<std::uint8_t>& nonce,
                                                    const std::vector<std::uint8_t>& ciphertext,
-                                                   std::string_view packageId,
-                                                   std::string_view recordId,
-                                                   std::string_view additionalAuthenticatedData)
+                                                    std::string_view packageId,
+                                                    std::string_view recordId,
+                                                    std::string_view additionalAuthenticatedData)
 {
-    auto bytes = buildDomainBytes(packageId, recordId, additionalAuthenticatedData);
-    appendSeparator(bytes);
-    appendBytes(bytes, "tag");
-    appendSeparator(bytes);
-    appendBytes(bytes, nonce);
-    appendSeparator(bytes);
-    appendBytes(bytes, ciphertext);
-    return expandDigestWords(bytes, kTagSizeBytes);
+    auto tagState = buildDomainState(packageId, recordId, additionalAuthenticatedData);
+    appendSeparator(tagState);
+    appendHashBytes(tagState, "tag");
+    appendSeparator(tagState);
+    appendHashBytes(tagState, nonce);
+    appendSeparator(tagState);
+    appendHashBytes(tagState, ciphertext);
+    return expandDigestWords(tagState, kTagSizeBytes);
 }
 
 bool constantTimeEquals(const std::vector<std::uint8_t>& left, const std::vector<std::uint8_t>& right) noexcept

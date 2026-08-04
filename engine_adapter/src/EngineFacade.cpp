@@ -188,7 +188,7 @@ int computeTonePreviewVelocity(const RuntimeSessionStateSnapshot& sessionState, 
 
 int computeMotionPreviewNote(const RuntimeSessionStateSnapshot& sessionState, int playedNote)
 {
-    const auto motionValue = findMacroValue(sessionState, "motion").value_or(0.15);
+    const auto motionValue = findMacroValue(sessionState, "motion").value_or(0.5);
     const auto semitoneOffset = static_cast<int>(std::lround((motionValue - 0.5) * 24.0));
     return clampMidiValue(playedNote + semitoneOffset);
 }
@@ -205,7 +205,7 @@ std::string buildToneCurrentEffect(const RuntimeSessionStateSnapshot& sessionSta
 
 std::string buildMotionCurrentEffect(const RuntimeSessionStateSnapshot& sessionState)
 {
-    const auto motionValue = findMacroValue(sessionState, "motion").value_or(0.15);
+    const auto motionValue = findMacroValue(sessionState, "motion").value_or(0.5);
     const auto semitoneOffset = static_cast<int>(std::lround((motionValue - 0.5) * 24.0));
     if (semitoneOffset == 0)
         return "Centered pitch";

@@ -70,7 +70,7 @@ std::optional<double> findMacroValue(const drs::engine::RuntimeSessionStateSnaps
 
 int computeMotionSemitoneOffset(const drs::engine::RuntimeSessionStateSnapshot& sessionState)
 {
-    const auto motionValue = findMacroValue(sessionState, "motion").value_or(0.15);
+    const auto motionValue = findMacroValue(sessionState, "motion").value_or(0.5);
     return static_cast<int>(std::lround((motionValue - 0.5) * 24.0));
 }
 
