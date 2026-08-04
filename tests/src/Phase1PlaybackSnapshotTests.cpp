@@ -2,6 +2,7 @@
 #include "drs/engine/PlaybackSnapshot.h"
 #include "drs/engine/RuntimeLoader.h"
 
+#include <cmath>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -90,8 +91,9 @@ int main()
                     && firstSerialized.find("\"routingSourceId\"") != std::string::npos
                     && firstSerialized.find("\"workspaceVisible\"") != std::string::npos,
                 "Sprint 3 playback snapshots must serialize explicit group selection and route metadata.");
-        require(firstSerialized.find("roundRobin") == std::string::npos,
-                "Sprint 2 playback snapshots must not invent Round Robin entities early.");
+        require(firstSerialized.find("\"roundRobinLength\"") == std::string::npos
+                    && firstSerialized.find("\"roundRobinPosition\"") == std::string::npos,
+                "Playback snapshots must not regress to legacy Round Robin scalar serialization.");
         require(firstSerialized.find("micPosition") == std::string::npos,
                 "Sprint 2 playback snapshots must not invent mic-position entities early.");
         require(firstSerialized.find("sfz") == std::string::npos,
@@ -104,6 +106,8 @@ int main()
                 "Identical draft revisions should produce the same playback snapshot digest.");
         require(drs::engine::serializeImmutablePlaybackSnapshot(secondResult.snapshot) == firstSerialized,
                 "Identical draft revisions should produce byte-equivalent playback snapshots.");
+        require(std::abs(firstResult.snapshot.masterGainDb - phase2Project.project.authoring.masterGainDb) < 1.0e-9,
+                "Playback snapshot should preserve the authored master gain.");
 
         auto visibilityOnlyProject = phase2Project.project;
         visibilityOnlyProject.authoring.groups[0].workspaceVisible = !visibilityOnlyProject.authoring.groups[0].workspaceVisible;
@@ -117,10 +121,10 @@ int main()
 
         drs::engine::RuntimeProjectDocumentController controller(phase2Project.project);
         auto editedProject = controller.getProject();
-        editedProject.authoring.zones[0].gainDb += 1.0;
+        editedProject.authoring.masterGainDb -= 1.5;
         const auto commitResult = controller.commitSnapshot(editedProject,
-                                                            "Adjust the first zone gain for snapshot coverage",
-                                                            {"authoring.zones[0].gainDb"});
+                                                            "Adjust project master gain for snapshot coverage",
+                                                            {"authoring.masterGainDb"});
         require(commitResult.applied, "Edited project revision should commit before snapshot rebuild.");
 
         const auto editedRequest = builder.requestBuild(commitResult.documentState.revision, true);
@@ -128,8 +132,8 @@ int main()
         require(editedResult.built, "Edited draft revision should still build a playback snapshot.");
         require(editedResult.snapshot.contentDigest != firstResult.snapshot.contentDigest,
                 "Snapshot digest should change predictably when the authored draft changes.");
-        require(editedResult.snapshot.zones[0].gainDb == controller.getProject().authoring.zones[0].gainDb,
-                "Playback snapshot should carry the edited zone normalization values.");
+        require(std::abs(editedResult.snapshot.masterGainDb - controller.getProject().authoring.masterGainDb) < 1.0e-9,
+                "Playback snapshot should carry the edited master gain.");
 
         auto unknownGroupProject = phase2Project.project;
         unknownGroupProject.authoring.zones[0].groupId = "ghost-group";
@@ -202,6 +206,8 @@ int main()
                 "Migrated Phase 1 snapshot must report the migrated authoring schema version.");
         require(migratedResult.snapshot.sampleIdentities.size() == migratedProject.project.sampleSources.size(),
                 "Migrated Phase 1 snapshot must preserve the migrated sample-source inventory.");
+        require(std::abs(migratedResult.snapshot.masterGainDb) < 1.0e-9,
+                "Legacy migrated projects must default master gain to unity.");
         require(migratedResult.snapshot.macroDefaults.empty(),
                 "Migrated Phase 1 snapshot must not invent macro defaults before authoring data exists.");
         require(migratedResult.snapshot.fxSlots.empty(),
@@ -225,8 +231,9 @@ int main()
                                  "sampleSources"),
                 "Migrated Phase 1 project should preserve sample identities even while zones are still missing.");
         const auto migratedSerialized = drs::engine::serializeImmutablePlaybackSnapshot(migratedResult.snapshot);
-        require(migratedSerialized.find("roundRobin") == std::string::npos,
-                "Migrated Phase 1 snapshot coverage must not invent Round Robin entities early.");
+        require(migratedSerialized.find("\"roundRobinLength\"") == std::string::npos
+                    && migratedSerialized.find("\"roundRobinPosition\"") == std::string::npos,
+                "Migrated Phase 1 snapshot coverage must not regress to legacy Round Robin scalar serialization.");
         require(migratedSerialized.find("micPosition") == std::string::npos,
                 "Migrated Phase 1 snapshot coverage must not invent mic-position entities early.");
         require(migratedSerialized.find("sfz") == std::string::npos,

@@ -154,6 +154,7 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
     root["compilerVersion"] = prepared.compilerVersion;
     root["draftRevision"] = prepared.draftRevision;
     root["selectedGroupId"] = prepared.selectedGroupId;
+    root["masterGainDb"] = prepared.masterGainDb;
     root["containerId"] = prepared.containerId;
     root["containerPath"] = prepared.containerPath;
     root["payloadEncoding"] = prepared.payloadEncoding;
@@ -864,6 +865,7 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     result.prepared.compilerVersion = compilerVersion;
     result.prepared.draftRevision = snapshotResult.snapshot.draftRevision;
     result.prepared.selectedGroupId = snapshotResult.snapshot.selectedGroupId;
+    result.prepared.masterGainDb = snapshotResult.snapshot.masterGainDb;
     result.prepared.containerId = streamResult.container.containerId;
     result.prepared.containerPath = streamResult.containerPath;
     result.prepared.payloadEncoding = streamResult.container.payloadEncoding;
@@ -2202,6 +2204,7 @@ bool operator==(const ImmutablePreparedPlayback& left, const ImmutablePreparedPl
         && left.compilerVersion == right.compilerVersion
         && left.draftRevision == right.draftRevision
         && left.selectedGroupId == right.selectedGroupId
+        && left.masterGainDb == right.masterGainDb
         && left.containerId == right.containerId
         && left.containerPath == right.containerPath
         && left.payloadEncoding == right.payloadEncoding

@@ -148,6 +148,8 @@ public:
     RuntimeProjectDocumentActionResult updateRoundRobinResetRules(
         std::vector<RuntimeProjectRoundRobinResetRuleDefinition> rules,
         const std::string& label);
+    RuntimeProjectDocumentActionResult updateMasterGain(double masterGainDb,
+                                                        const std::string& label);
     RuntimeProjectDocumentActionResult createGroup(const RuntimeProjectGroupDefinition& group,
                                                    const std::string& label);
     RuntimeProjectDocumentActionResult updateGroup(std::size_t groupIndex,

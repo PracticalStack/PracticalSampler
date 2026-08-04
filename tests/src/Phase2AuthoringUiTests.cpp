@@ -2020,6 +2020,7 @@ void exerciseGroupUi(drs::app::AuthoringPanel& panel,
     requireAccessibilityDescriptionContains(panel, "authoringDrawerScopeLabel", "Group-scoped");
     requireAccessibilityDescriptionContains(panel, "authoringDrawerBreadcrumbLabel", "Project > Groups >");
     requireComponentVisibleWithin(panel, "authoringGroupNameEditor", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringMasterGainSlider", panelBounds);
     requireComponentVisibleWithin(panel, "authoringGroupVisibilityToggle", panelBounds);
     requireComponentVisibleWithin(panel, "authoringGroupGainSlider", panelBounds);
     requireComponentVisibleWithin(panel, "authoringGroupPanSlider", panelBounds);
@@ -2039,6 +2040,8 @@ void exerciseGroupUi(drs::app::AuthoringPanel& panel,
              juce::String("authoringDrawerBreadcrumbLabel"),
              juce::String("authoringGroupNameLabel"),
              juce::String("authoringGroupNameEditor"),
+             juce::String("authoringMasterGainLabel"),
+             juce::String("authoringMasterGainSlider"),
              juce::String("authoringGroupVisibilityLabel"),
              juce::String("authoringGroupVisibilityToggle"),
              juce::String("authoringGroupGainLabel"),
@@ -2061,6 +2064,7 @@ void exerciseGroupUi(drs::app::AuthoringPanel& panel,
 
     for (const auto& componentId : {
              juce::String("authoringGroupNameEditor"),
+             juce::String("authoringMasterGainSlider"),
              juce::String("authoringGroupVisibilityToggle"),
              juce::String("authoringGroupGainSlider"),
              juce::String("authoringGroupPanSlider"),
@@ -2098,6 +2102,15 @@ void exerciseGroupUi(drs::app::AuthoringPanel& panel,
     require(session.getSelectedGroup()->displayName == "Lead Core UI",
             "Group inspector rename edits should persist through the authoring session.");
 
+    auto& masterGainSlider = requireSlider(panel, "authoringMasterGainSlider");
+    const auto nextMasterGain = juce::jlimit(masterGainSlider.getMinimum(),
+                                             masterGainSlider.getMaximum(),
+                                             masterGainSlider.getValue() + 0.5);
+    masterGainSlider.setValue(nextMasterGain, juce::dontSendNotification);
+    masterGainSlider.onDragEnd();
+    require(std::abs(session.getProject().authoring.masterGainDb - nextMasterGain) < 0.001,
+            "Group inspector master-gain edits should persist through the authoring session.");
+
     auto& groupGainSlider = requireSlider(panel, "authoringGroupGainSlider");
     const auto nextGroupGain = juce::jlimit(groupGainSlider.getMinimum(),
                                             groupGainSlider.getMaximum(),
@@ -2122,6 +2135,7 @@ void exerciseGroupUi(drs::app::AuthoringPanel& panel,
     inventory << shellName << " / groups\n";
     inventory << "  " << describeBounds(panel, "authoringGroupList") << "\n";
     inventory << "  " << describeBounds(panel, "authoringGroupNameEditor") << "\n";
+    inventory << "  " << describeBounds(panel, "authoringMasterGainSlider") << "\n";
     inventory << "  " << describeBounds(panel, "authoringGroupGainSlider") << "\n\n";
     saveComponentPng(panel, outputDirectory / (shellName + "-groups.png"));
 }
@@ -2165,6 +2179,7 @@ void exerciseShortHeightGroupLayout(drs::app::AuthoringPanel& panel,
              juce::String("authoringDrawerScopeLabel"),
              juce::String("authoringDrawerBreadcrumbLabel"),
              juce::String("authoringGroupNameEditor"),
+             juce::String("authoringMasterGainSlider"),
              juce::String("authoringGroupVisibilityToggle"),
              juce::String("authoringGroupGainSlider"),
              juce::String("authoringGroupPanSlider"),
@@ -2182,6 +2197,7 @@ void exerciseShortHeightGroupLayout(drs::app::AuthoringPanel& panel,
 
     for (const auto& componentId : {
              juce::String("authoringGroupNameEditor"),
+             juce::String("authoringMasterGainSlider"),
              juce::String("authoringGroupVisibilityToggle"),
              juce::String("authoringGroupGainSlider"),
              juce::String("authoringGroupPanSlider"),

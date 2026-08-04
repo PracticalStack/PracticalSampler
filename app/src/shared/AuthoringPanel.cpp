@@ -1133,6 +1133,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     configureFieldLabel(macroMaxLabel, "Max");
     configureFieldLabel(fxTypeLabel, "Type");
     configureFieldLabel(fxScopeLabel, "Scope");
+    configureFieldLabel(masterGainLabel, "Master Gain");
     configureFieldLabel(groupVisibilityLabel, "Visibility");
     configureFieldLabel(groupGainLabel, "Gain");
     configureFieldLabel(groupPanLabel, "Pan");
@@ -1244,6 +1245,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     routingInsertTwoSelector.setComponentID("authoringRoutingInsertTwoSelector");
     routingSummaryLabel.setComponentID("authoringRoutingSummaryLabel");
     groupSummaryLabel.setComponentID("authoringGroupSummaryLabel");
+    masterGainLabel.setComponentID("authoringMasterGainLabel");
+    masterGainSlider.setComponentID("authoringMasterGainSlider");
     groupVisibilityLabel.setComponentID("authoringGroupVisibilityLabel");
     groupVisibilityToggle.setComponentID("authoringGroupVisibilityToggle");
     groupGainLabel.setComponentID("authoringGroupGainLabel");
@@ -1544,8 +1547,10 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     groupNameEditor.onReturnKey = [this] { applySelectedGroupNameEdit(); };
     groupNameEditor.onFocusLost = [this] { applySelectedGroupNameEdit(); };
 
+    configureEditorSlider(masterGainSlider, -24.0, 24.0, 0.1);
     configureEditorSlider(groupGainSlider, -24.0, 24.0, 0.1);
     configureEditorSlider(groupPanSlider, -1.0, 1.0, 0.01);
+    masterGainSlider.onDragEnd = [this] { applyProjectMasterGainEdit("Update master gain"); };
     groupGainSlider.onDragEnd = [this] { applySelectedGroupMixEdit("Update group gain"); };
     groupPanSlider.onDragEnd = [this] { applySelectedGroupMixEdit("Update group pan"); };
     groupVisibilityToggle.setButtonText("Visible In Workspace");
@@ -2062,6 +2067,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&routingInsertTwoSelector),
              static_cast<juce::Component*>(&routingSummaryLabel),
              static_cast<juce::Component*>(&groupSummaryLabel),
+             static_cast<juce::Component*>(&masterGainLabel),
+             static_cast<juce::Component*>(&masterGainSlider),
              static_cast<juce::Component*>(&groupVisibilityLabel),
              static_cast<juce::Component*>(&groupVisibilityToggle),
              static_cast<juce::Component*>(&groupGainLabel),
@@ -2564,6 +2571,10 @@ void AuthoringPanel::configureAccessibilityAndFocus()
     routingInputSelector.setExplicitFocusOrder(97);
     routingInsertOneSelector.setExplicitFocusOrder(98);
     routingInsertTwoSelector.setExplicitFocusOrder(99);
+    configureAccessibleMetadata(masterGainSlider,
+                                "Project master gain",
+                                "Adjusts the project's top-level gain before group and zone gain are combined.",
+                                "Drag the slider or enter a numeric master-gain value.");
     configureAccessibleMetadata(groupVisibilityToggle,
                                 "Group workspace visibility",
                                 "Toggles whether the selected group is visible on the workspace map.",
@@ -2609,15 +2620,16 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "Group round robin mode",
                                 "Chooses cycle or random selection for the selected group's Round Robin pools.",
                                 "Enable Round Robin before changing its mode.");
-    groupVisibilityToggle.setExplicitFocusOrder(71);
-    groupGainSlider.setExplicitFocusOrder(72);
-    groupPanSlider.setExplicitFocusOrder(73);
-    groupRoutingSelector.setExplicitFocusOrder(74);
-    groupAnchorSelector.setExplicitFocusOrder(75);
-    groupDeleteButton.setExplicitFocusOrder(76);
-    groupAssignZonesButton.setExplicitFocusOrder(77);
-    groupRoundRobinToggle.setExplicitFocusOrder(78);
-    groupRoundRobinModeSelector.setExplicitFocusOrder(79);
+    masterGainSlider.setExplicitFocusOrder(71);
+    groupVisibilityToggle.setExplicitFocusOrder(72);
+    groupGainSlider.setExplicitFocusOrder(73);
+    groupPanSlider.setExplicitFocusOrder(74);
+    groupRoutingSelector.setExplicitFocusOrder(75);
+    groupAnchorSelector.setExplicitFocusOrder(76);
+    groupDeleteButton.setExplicitFocusOrder(77);
+    groupAssignZonesButton.setExplicitFocusOrder(78);
+    groupRoundRobinToggle.setExplicitFocusOrder(79);
+    groupRoundRobinModeSelector.setExplicitFocusOrder(80);
 
     configureAccessibleMetadata(performanceBankSelector,
                                 "Performance bank selector",
@@ -2915,7 +2927,13 @@ void AuthoringPanel::resized()
         drawerEditorArea.removeFromTop(2);
 
         row = drawerEditorArea.removeFromTop(fieldRowHeight);
-        layoutLabelAndField(row, groupVisibilityLabel, groupVisibilityToggle, 74);
+        layoutDualLabelAndFieldRow(row,
+                                   masterGainLabel,
+                                   masterGainSlider,
+                                   92,
+                                   groupVisibilityLabel,
+                                   groupVisibilityToggle,
+                                   74);
         drawerEditorArea.removeFromTop(2);
 
         row = drawerEditorArea.removeFromTop(fieldRowHeight);
@@ -4217,6 +4235,8 @@ void AuthoringPanel::refreshDrawerVisibility()
 
     setVisibleAndAccessible(groupNameLabel, drawerContentVisible && groupsTab);
     setVisibleAndAccessible(groupNameEditor, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(masterGainLabel, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(masterGainSlider, drawerContentVisible && groupsTab);
     setVisibleAndAccessible(groupVisibilityLabel, drawerContentVisible && groupsTab);
     setVisibleAndAccessible(groupVisibilityToggle, drawerContentVisible && groupsTab);
     setVisibleAndAccessible(groupGainLabel, drawerContentVisible && groupsTab);
@@ -4458,6 +4478,10 @@ void AuthoringPanel::refreshContextualAccessibility()
                                            hasSelectedGroup
                                                ? "Press to toggle visibility for " + groupName + "."
                                                : "Select a group before changing workspace visibility.");
+    updateAccessibleDescriptionAndHelpText(masterGainSlider,
+                                           "Adjusts the top-level gain for "
+                                               + juce::String::fromUTF8(project.displayName.c_str()) + ".",
+                                           "Drag the slider or enter a master-gain value for the whole project.");
     updateAccessibleDescriptionAndHelpText(groupGainSlider,
                                            hasSelectedGroup
                                                ? "Adjusts gain for " + groupName + "."
@@ -5149,6 +5173,7 @@ void AuthoringPanel::refreshFromSession()
                                     : std::string {} });
 
     const auto& project = authoringSession.getProject();
+    masterGainSlider.setValue(project.authoring.masterGainDb, juce::dontSendNotification);
     selectionSummaryViewModel = buildSelectionSummaryViewModel();
     zoneFieldValuesViewModel = buildZoneFieldValuesViewModel();
 
@@ -5311,7 +5336,8 @@ void AuthoringPanel::refreshFromSession()
                                                                          return !group.workspaceVisible;
                                                                      }));
         groupSummaryLabel.setText(
-            juce::String::fromUTF8(selectedGroup->displayName.c_str())
+            "Master " + juce::String(project.authoring.masterGainDb, 1) + " dB"
+                + " | " + juce::String::fromUTF8(selectedGroup->displayName.c_str())
                 + " | " + juce::String(memberCount) + " zones"
                 + " | routing " + (selectedGroup->routingBusId.empty()
                                        ? juce::String("direct")
@@ -5354,7 +5380,9 @@ void AuthoringPanel::refreshFromSession()
         groupPanSlider.setValue(0.0, juce::dontSendNotification);
         groupRoutingSelector.clear(juce::dontSendNotification);
         groupAnchorSelector.clear(juce::dontSendNotification);
-        groupSummaryLabel.setText("No group is selected.", juce::dontSendNotification);
+        groupSummaryLabel.setText("Master " + juce::String(project.authoring.masterGainDb, 1)
+                                      + " dB | No group is selected.",
+                                  juce::dontSendNotification);
         groupRoundRobinLabel.setText("Round Robin unavailable until a group is selected.", juce::dontSendNotification);
         groupRoundRobinHintLabel.setText("Create or select a group to inspect its visibility, routing, and RR entry points.",
                                          juce::dontSendNotification);
@@ -5904,6 +5932,15 @@ void AuthoringPanel::applySelectedGroupNameEdit()
     authoringSession.updateGroup(static_cast<std::size_t>(selectedGroupIndex),
                                  editedGroup,
                                  "Rename group");
+    refreshFromSession();
+}
+
+void AuthoringPanel::applyProjectMasterGainEdit(const juce::String& label)
+{
+    if (isRefreshing)
+        return;
+
+    authoringSession.updateMasterGain(masterGainSlider.getValue(), label.toStdString());
     refreshFromSession();
 }
 

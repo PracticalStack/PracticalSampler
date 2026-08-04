@@ -62,9 +62,9 @@ bool containsZoneId(const std::vector<std::string>& zoneIds, const std::string& 
     return std::find(zoneIds.begin(), zoneIds.end(), zoneId) != zoneIds.end();
 }
 
-double combineGroupGainDb(double zoneGainDb, double groupGainDb) noexcept
+double combineRouteGainDb(double zoneGainDb, double groupGainDb, double masterGainDb) noexcept
 {
-    return zoneGainDb + groupGainDb;
+    return zoneGainDb + groupGainDb + masterGainDb;
 }
 
 double combineGroupPan(double zonePan, double groupPan) noexcept
@@ -440,6 +440,16 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
         }
     }
 
+    if (!std::isfinite(snapshot.masterGainDb))
+        addError(result, "render-model-master-gain-invalid", "payload.snapshot.masterGainDb",
+                 "Snapshot master gain must be finite.");
+    if (!std::isfinite(prepared.masterGainDb))
+        addError(result, "render-model-prepared-master-gain-invalid", "payload.prepared.masterGainDb",
+                 "Prepared master gain must be finite.");
+    if (snapshot.masterGainDb != prepared.masterGainDb)
+        addError(result, "render-model-master-gain-mismatch", "payload.prepared.masterGainDb",
+                 "Prepared content must retain the immutable snapshot master gain.");
+
     std::vector<VelocityCrossfadeTopologyZoneDefinition> crossfadeTopologyZones;
     crossfadeTopologyZones.reserve(prepared.zones.size());
     for (const auto& zone : prepared.zones)
@@ -526,9 +536,9 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
         const auto* snapshotGroupRoute = snapshotZone == nullptr
             ? nullptr
             : findSnapshotGroupRoute(snapshot, snapshotZone->groupId);
-        const auto gainDb = snapshotGroupRoute == nullptr
-            ? zone.gainDb
-            : combineGroupGainDb(zone.gainDb, snapshotGroupRoute->gainDb);
+        const auto gainDb = combineRouteGainDb(zone.gainDb,
+                                               snapshotGroupRoute == nullptr ? 0.0 : snapshotGroupRoute->gainDb,
+                                               snapshot.masterGainDb);
         const auto pan = snapshotGroupRoute == nullptr
             ? zone.pan
             : combineGroupPan(zone.pan, snapshotGroupRoute->pan);

@@ -273,6 +273,7 @@ struct RuntimeProjectAuthoringState
     std::string selectedZoneId;
     std::string selectedGroupId;
     std::string selectedPerformanceBankId;
+    double masterGainDb = 0.0;
     std::vector<RuntimeProjectArticulationDefinition> articulations;
     std::vector<RuntimeProjectRoundRobinResetRuleDefinition> roundRobinResetRules;
     std::vector<RuntimeProjectZoneDefinition> zones;

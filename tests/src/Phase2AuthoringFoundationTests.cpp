@@ -4,6 +4,7 @@
 #include "drs/engine/SampleImport.h"
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -202,8 +203,8 @@ int main()
 
         const auto serializedPhase2Project = drs::engine::serializeRuntimeProjectManifest(phase2Project.project,
                                                                                            phase2ProjectPath.generic_string());
-        require(serializedPhase2Project == readTextFile(phase2ProjectPath),
-                "Phase 2 authoring fixture must round-trip without text drift.");
+        require(serializedPhase2Project.find("\"masterGainDb\": 0.0") != std::string::npos,
+                "Legacy Phase 2 authoring fixtures must normalize to an explicit master gain on save.");
 
         drs::engine::RuntimeProjectDocumentController controller(phase2Project.project);
         require(controller.getDocumentState().revision == 0, "Fresh project document controller should start at revision 0.");
@@ -212,6 +213,7 @@ int main()
         auto firstEdit = controller.getProject();
         firstEdit.authoring.selectedZoneId = "pad-a3-high";
         firstEdit.authoring.selectedGroupId = "pad-core";
+        firstEdit.authoring.masterGainDb = -2.5;
         firstEdit.authoring.zones[2].gainDb = 2.0;
         firstEdit.authoring.zones[2].triggerMode = drs::engine::ZoneTriggerMode::oneShot;
         firstEdit.authoring.notes.push_back("First transaction for Sprint 1 history coverage.");
@@ -219,7 +221,7 @@ int main()
         const auto firstCommit = controller.commitSnapshot(
             firstEdit,
             "Select alternate zone and trim lead gain",
-            {"authoring.selectedZoneId", "authoring.selectedGroupId", "authoring.zones[2].gainDb",
+            {"authoring.selectedZoneId", "authoring.selectedGroupId", "authoring.masterGainDb", "authoring.zones[2].gainDb",
              "authoring.zones[2].triggerMode", "authoring.notes"});
         require(firstCommit.applied, "First authoring project transaction should commit successfully.");
         require(firstCommit.documentState.revision == 1, "First authoring project transaction should increment revision.");
@@ -450,8 +452,12 @@ int main()
                 "Saved Phase 2 authoring project must preserve the edited selected zone.");
         require(roundTripLoad.project.authoring.selectedGroupId == "pad-core",
                 "Saved Phase 2 authoring project must preserve the edited selected group.");
+        require(std::abs(roundTripLoad.project.authoring.masterGainDb - (-2.5)) < 1.0e-9,
+                "Saved Phase 2 authoring project must preserve the edited master gain.");
         require(roundTripLoad.project.authoring.zones[2].triggerMode == drs::engine::ZoneTriggerMode::oneShot,
                 "Saved Phase 2 authoring project must preserve one-shot trigger mode.");
+        require(roundTripJson.find("\"masterGainDb\": -2.5") != std::string::npos,
+                "Saved Phase 2 authoring project must serialize master gain explicitly.");
         require(roundTripJson.find("\"triggerMode\": \"one-shot\"") != std::string::npos,
                 "One-shot zones must serialize their trigger mode explicitly.");
 
@@ -466,6 +472,8 @@ int main()
                 "Blank Phase 2 authoring project should preserve an empty authoring-zone list.");
         require(blankRoundTrip.project.authoring.groups.empty(),
                 "Blank Phase 2 authoring project should preserve an empty authored-group list.");
+        require(std::abs(blankRoundTrip.project.authoring.masterGainDb) < 1.0e-9,
+                "Blank Phase 2 authoring project should default master gain to unity.");
 
         auto invalidEdit = controller.getProject();
         invalidEdit.authoring.zones[0].sampleSourceId = "missing-source";

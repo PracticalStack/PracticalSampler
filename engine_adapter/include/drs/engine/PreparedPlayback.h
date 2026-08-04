@@ -147,6 +147,7 @@ struct ImmutablePreparedPlayback
     std::string compilerVersion;
     std::size_t draftRevision = 0;
     std::string selectedGroupId;
+    double masterGainDb = 0.0;
     std::string containerId;
     std::string containerPath;
     std::string payloadEncoding;

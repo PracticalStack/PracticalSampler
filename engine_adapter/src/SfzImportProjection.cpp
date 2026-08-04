@@ -219,6 +219,19 @@ std::string buildDisplayName(const fs::path& samplePath)
     return stem.empty() ? samplePath.filename().generic_string() : stem;
 }
 
+std::string buildArticulationDisplayName(const std::string& articulationId)
+{
+    auto displayName = articulationId;
+    if (displayName.empty())
+        return "Articulation";
+
+    std::replace(displayName.begin(), displayName.end(), '-', ' ');
+    std::replace(displayName.begin(), displayName.end(), '_', ' ');
+    displayName.front() = static_cast<char>(
+        std::toupper(static_cast<unsigned char>(displayName.front())));
+    return displayName;
+}
+
 std::string buildArticulationId(const SfzNormalizedSection& section)
 {
     if (const auto* trigger = findEffectiveOpcode(section, "trigger"))
@@ -452,6 +465,61 @@ RuntimeProjectModel buildProvisionalProject(const RuntimeProjectModel& baseProje
                                    projection.authoringNotes.end());
     if (!projection.zones.empty())
         project.authoring.selectedZoneId = projection.zones.front().id;
+
+    if (project.schemaVersion >= 6 && project.authoring.schemaVersion >= 5)
+    {
+        auto nextDisplayOrder = static_cast<int>(project.authoring.articulations.size());
+        bool hasDefaultArticulation = std::any_of(
+            project.authoring.articulations.begin(),
+            project.authoring.articulations.end(),
+            [](const RuntimeProjectArticulationDefinition& articulation)
+            {
+                return articulation.isDefault;
+            });
+        std::set<std::string> articulationIds;
+        for (const auto& articulation : project.authoring.articulations)
+        {
+            if (articulation.id.empty())
+                continue;
+            articulationIds.insert(articulation.id);
+            nextDisplayOrder = std::max(nextDisplayOrder, articulation.displayOrder + 1);
+        }
+
+        for (const auto& zone : project.authoring.zones)
+        {
+            if (zone.articulationId.empty()
+                || !articulationIds.insert(zone.articulationId).second)
+            {
+                continue;
+            }
+
+            RuntimeProjectArticulationDefinition articulation;
+            articulation.id = zone.articulationId;
+            articulation.displayName = buildArticulationDisplayName(zone.articulationId);
+            articulation.displayOrder = nextDisplayOrder++;
+            articulation.isDefault = !hasDefaultArticulation;
+            hasDefaultArticulation = hasDefaultArticulation || articulation.isDefault;
+            project.authoring.articulations.push_back(std::move(articulation));
+        }
+
+        std::stable_sort(project.authoring.articulations.begin(),
+                         project.authoring.articulations.end(),
+                         [](const RuntimeProjectArticulationDefinition& left,
+                            const RuntimeProjectArticulationDefinition& right)
+                         {
+                             if (left.displayOrder != right.displayOrder)
+                                 return left.displayOrder < right.displayOrder;
+                             return left.id < right.id;
+                         });
+
+        for (std::size_t index = 0; index < project.authoring.articulations.size(); ++index)
+        {
+            auto& articulation = project.authoring.articulations[index];
+            articulation.displayOrder = static_cast<int>(index);
+            if (articulation.displayName.empty())
+                articulation.displayName = buildArticulationDisplayName(articulation.id);
+        }
+    }
 
     if (project.schemaVersion >= 4 && project.authoring.schemaVersion >= 3)
     {

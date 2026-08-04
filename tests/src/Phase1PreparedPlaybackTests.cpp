@@ -8,6 +8,7 @@
 #include <juce_audio_formats/juce_audio_formats.h>
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -329,6 +330,8 @@ int main()
                     && firstPrepared.prepared.groupRoutes[0].gainDb == firstSnapshot.snapshot.groupRoutes[0].gainDb
                     && firstPrepared.prepared.groupRoutes[0].pan == firstSnapshot.snapshot.groupRoutes[0].pan,
                 "Prepared playback should preserve immutable group route mix metadata.");
+        require(std::abs(firstPrepared.prepared.masterGainDb - firstSnapshot.snapshot.masterGainDb) < 1.0e-9,
+                "Prepared playback should preserve immutable master gain metadata.");
         require(firstPrepared.prepared.samples[0].canonicalSourcePath
                     == normalizePath(firstPrepared.prepared.samples[0].sourcePath),
                 "Prepared sample handles should expose a normalized canonical source path.");
@@ -561,6 +564,43 @@ int main()
                 "Serialized prepared playback should still expose visibility-only group state changes.");
 
         const auto firstPreparedCacheKeys = collectPreparedCacheKeys(firstPrepared.prepared);
+
+        drs::engine::RuntimeProjectDocumentController masterOnlyController(phase2Project.project);
+        auto masterOnlyProject = masterOnlyController.getProject();
+        masterOnlyProject.authoring.masterGainDb += 1.75;
+        const auto masterOnlyCommit = masterOnlyController.commitSnapshot(masterOnlyProject,
+                                                                          "Adjust project master gain",
+                                                                          {"authoring.masterGainDb"});
+        require(masterOnlyCommit.applied, "Master-gain prepared playback coverage should commit successfully.");
+        const auto masterOnlySnapshotRequest = snapshotBuilder.requestBuild(masterOnlyCommit.documentState.revision, true);
+        const auto masterOnlySnapshot = snapshotBuilder.buildSnapshot(masterOnlySnapshotRequest, masterOnlyController.getProject());
+        require(masterOnlySnapshot.built, "Master-gain prepared playback coverage should still build an immutable snapshot.");
+        require(masterOnlySnapshot.snapshot.contentDigest != firstSnapshot.snapshot.contentDigest,
+                "Master-gain edits should change the immutable snapshot digest.");
+        const auto masterOnlyPreparedRequest = preparedService.requestBuild(masterOnlySnapshot, referenceStream);
+        require(masterOnlyPreparedRequest.accepted,
+                "Prepared playback should accept master-gain-only authored edits.");
+        const auto masterOnlyPrepared = preparedService.prepare(masterOnlyPreparedRequest, masterOnlySnapshot, referenceStream);
+        require(masterOnlyPrepared.built && masterOnlyPrepared.activationEligible,
+                "Master-gain-only authored edits should still prepare successfully.");
+        require(masterOnlyPrepared.prepared.preparedContentDigest != firstPrepared.prepared.preparedContentDigest,
+                "Master-gain edits should change the prepared digest because route content changed.");
+        require(masterOnlyPrepared.metrics.cacheHitCount == phase2Project.project.sampleSources.size()
+                    && masterOnlyPrepared.metrics.cacheMissCount == 0
+                    && masterOnlyPrepared.metrics.decodedBytes == 0,
+                "Master-gain-only authored edits should fully reuse warm prepared sample assets.");
+        require(collectPreparedCacheKeys(masterOnlyPrepared.prepared) == firstPreparedCacheKeys,
+                "Master-gain-only authored edits should preserve prepared cache-key identity.");
+        require(masterOnlyPrepared.prepared.samples == firstPrepared.prepared.samples,
+                "Master-gain-only authored edits should preserve prepared sample handles.");
+        require(masterOnlyPrepared.prepared.streams == firstPrepared.prepared.streams,
+                "Master-gain-only authored edits should preserve prepared stream handles.");
+        require(masterOnlyPrepared.prepared.ownershipRecords == firstPrepared.prepared.ownershipRecords,
+                "Master-gain-only authored edits should preserve ownership records.");
+        require(masterOnlyPrepared.prepared.zones == firstPrepared.prepared.zones,
+                "Master-gain-only authored edits should preserve prepared zone handles.");
+        require(std::abs(masterOnlyPrepared.prepared.masterGainDb - masterOnlyProject.authoring.masterGainDb) < 1.0e-9,
+                "Prepared playback should preserve the edited master gain.");
 
         drs::engine::RuntimeProjectDocumentController zoneOnlyController(phase2Project.project);
         auto zoneOnlyProject = zoneOnlyController.getProject();

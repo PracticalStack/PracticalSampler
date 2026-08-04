@@ -172,6 +172,7 @@ struct ImmutablePlaybackSnapshot
     std::string selectedZoneId;
     std::string selectedGroupId;
     std::string selectedPerformanceBankId;
+    double masterGainDb = 0.0;
     std::string contentDigest;
     std::string dspGraphDigest;
     std::vector<PlaybackSnapshotSampleIdentity> sampleIdentities;

@@ -1227,6 +1227,8 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
 
             if (const auto selectedPerformanceBankId = readOptional<RuntimeProjectLoadResult, std::string>(*authoringIterator, result, "selectedPerformanceBankId", "Project authoring"))
                 authoring.selectedPerformanceBankId = *selectedPerformanceBankId;
+            if (const auto masterGainDb = readOptional<RuntimeProjectLoadResult, double>(*authoringIterator, result, "masterGainDb", "Project authoring"))
+                authoring.masterGainDb = *masterGainDb;
 
             if (project.schemaVersion >= 6 && authoring.schemaVersion >= 5)
             {
@@ -1896,6 +1898,9 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
             addIssue(result, "Project authoring schemaVersion must be 4 for schemaVersion 5 projects.");
         if (project.schemaVersion == 6 && authoring.schemaVersion != 5)
             addIssue(result, "Project authoring schemaVersion must be 5 for schemaVersion 6 projects.");
+
+        if (!std::isfinite(authoring.masterGainDb))
+            addIssue(result, "Project authoring masterGainDb must be finite.");
 
         if (hasDuplicateIds(authoring.zones))
             addIssue(result, "Project authoring zone ids must be unique.");
@@ -3149,6 +3154,7 @@ std::string serializeRuntimeProjectManifest(const RuntimeProjectModel& project, 
         if (project.schemaVersion >= 4)
             authoring["selectedGroupId"] = project.authoring.selectedGroupId;
         authoring["selectedPerformanceBankId"] = project.authoring.selectedPerformanceBankId;
+        authoring["masterGainDb"] = project.authoring.masterGainDb;
         if (project.schemaVersion >= 6)
         {
             authoring["articulations"] = serializeProjectArticulations(project.authoring.articulations);

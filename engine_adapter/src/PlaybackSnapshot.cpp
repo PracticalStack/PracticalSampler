@@ -306,6 +306,7 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
     root["selectedZoneId"] = snapshot.selectedZoneId;
     root["selectedGroupId"] = snapshot.selectedGroupId;
     root["selectedPerformanceBankId"] = snapshot.selectedPerformanceBankId;
+    root["masterGainDb"] = snapshot.masterGainDb;
 
     if (includeDigest)
         root["contentDigest"] = snapshot.contentDigest;
@@ -563,6 +564,7 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
     result.snapshot.selectedZoneId = project.authoring.selectedZoneId;
     result.snapshot.selectedGroupId = project.authoring.selectedGroupId;
     result.snapshot.selectedPerformanceBankId = project.authoring.selectedPerformanceBankId;
+    result.snapshot.masterGainDb = project.authoring.masterGainDb;
     result.snapshot.notes = project.notes;
     result.snapshot.notes.insert(result.snapshot.notes.end(),
                                  project.authoring.notes.begin(),

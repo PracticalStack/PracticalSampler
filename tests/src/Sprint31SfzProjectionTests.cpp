@@ -110,6 +110,20 @@ drs::engine::RuntimeProjectModel makeBlankPhase5Project(const fs::path& fixtureP
     return project;
 }
 
+drs::engine::RuntimeProjectModel makeBlankPhase6Project(const fs::path& fixturePath)
+{
+    drs::engine::RuntimeProjectModel project;
+    project.schemaName = "drs.project";
+    project.schemaVersion = 6;
+    project.projectId = "sprint31.sfz-projection-schema6";
+    project.displayName = "Sprint 3.1.4 Projection Schema 6";
+    project.contentRootPath = fixturePath.parent_path().generic_string();
+    project.defaultInstrumentManifestPath = (fixturePath.parent_path() / "projection-test-schema6.drstrm").generic_string();
+    project.authoring.schemaName = "drs.authoring";
+    project.authoring.schemaVersion = 5;
+    return project;
+}
+
 void writeTextFile(const fs::path& path, const std::string& text)
 {
     fs::create_directories(path.parent_path());
@@ -173,9 +187,11 @@ int main()
         const auto fixturePath = resolveFirstFixturePath();
         const auto blankProject = makeBlankPhase2Project(fixturePath);
         const auto blankPhase5Project = makeBlankPhase5Project(fixturePath);
+        const auto blankPhase6Project = makeBlankPhase6Project(fixturePath);
         const auto analysis = analyzeSfzImportDocument(fixturePath.generic_string());
         const auto projection = projectSfzImportAnalysis(blankProject, analysis);
         const auto phase5Projection = projectSfzImportAnalysis(blankPhase5Project, analysis);
+        const auto phase6Projection = projectSfzImportAnalysis(blankPhase6Project, analysis);
 
         require(projection.projected, "Sprint 3.1.4 should project the first SFZ fixture into native content.");
         require(projection.playable, "Sprint 3.1.4 should keep the first SFZ fixture playable after projection.");
@@ -197,6 +213,14 @@ int main()
                 "Schema 5 SFZ projection should produce the same zone and sample counts as the legacy authoring baseline.");
         require(phase5Projection.issues.empty(),
                 "Schema 5 SFZ projection should not report legacy round-robin migration failures.");
+        require(phase6Projection.projected && phase6Projection.playable,
+                "Sprint 3.1.4 should also project the first SFZ fixture into a fresh schema 6 project. Issues: "
+                    + joinIssues(phase6Projection.issues));
+        require(phase6Projection.zones.size() == projection.zones.size()
+                    && phase6Projection.sampleSources.size() == projection.sampleSources.size(),
+                "Schema 6 SFZ projection should produce the same zone and sample counts as the legacy authoring baseline.");
+        require(phase6Projection.issues.empty(),
+                "Schema 6 SFZ projection should synthesize any required articulation metadata.");
 
         const auto& firstZone = projection.zones.at(0);
         const auto& secondZone = projection.zones.at(1);
@@ -257,6 +281,22 @@ int main()
         require(phase5Session.getProject().authoring.selectedGroupId
                     == phase5Session.getProject().authoring.zones.front().groupId,
                 "Applying SFZ content into a schema 5 project should align selectedGroupId with the imported selection.");
+
+        AuthoringSession phase6Session(blankPhase6Project);
+        const auto phase6ApplyResult = applySfzImportProjection(
+            phase6Session,
+            phase6Projection,
+            "Import Sprint 3.1.4 SFZ fixture into schema 6 project");
+        require(phase6ApplyResult.applied,
+                "Sprint 3.1.4 should apply projected SFZ content into a fresh schema 6 project.");
+        require(phase6Session.getProject().schemaVersion == 6
+                    && phase6Session.getProject().authoring.schemaVersion == 5,
+                "Applying SFZ content into a schema 6 project should preserve the current project schema versions.");
+        require(phase6Session.getProject().authoring.articulations.size() == 1,
+                "Applying SFZ content into a schema 6 project should synthesize one explicit articulation for this sustain-only fixture.");
+        require(phase6Session.getProject().authoring.articulations.front().id == "sustain"
+                    && phase6Session.getProject().authoring.articulations.front().isDefault,
+                "Schema 6 SFZ projection should synthesize a default sustain articulation for the imported zones.");
 
         AuthoringSession session(blankProject);
         const auto applyResult = applySfzImportProjection(session, projection, "Import Sprint 3.1.4 SFZ fixture");

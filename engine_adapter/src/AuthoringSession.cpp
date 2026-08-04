@@ -70,6 +70,19 @@ bool usesExplicitArticulationSchema(const RuntimeProjectModel& project) noexcept
     return project.schemaVersion >= 6 && project.authoring.schemaVersion >= 5;
 }
 
+std::string buildArticulationDisplayName(const std::string& articulationId)
+{
+    auto displayName = articulationId;
+    if (displayName.empty())
+        return "Articulation";
+
+    std::replace(displayName.begin(), displayName.end(), '-', ' ');
+    std::replace(displayName.begin(), displayName.end(), '_', ' ');
+    displayName.front() = static_cast<char>(
+        std::toupper(static_cast<unsigned char>(displayName.front())));
+    return displayName;
+}
+
 std::optional<std::size_t> findArticulationIndexById(const RuntimeProjectModel& project,
                                                      const std::string& articulationId)
 {
@@ -89,6 +102,54 @@ void normalizeArticulationDisplayOrder(RuntimeProjectModel& project)
 {
     for (std::size_t index = 0; index < project.authoring.articulations.size(); ++index)
         project.authoring.articulations[index].displayOrder = static_cast<int>(index);
+}
+
+bool synthesizeMissingArticulations(RuntimeProjectModel& project)
+{
+    if (!usesExplicitArticulationSchema(project))
+        return false;
+
+    bool changed = false;
+    std::unordered_set<std::string> articulationIds;
+    bool hasDefaultArticulation = false;
+    for (const auto& articulation : project.authoring.articulations)
+    {
+        if (!articulation.id.empty())
+            articulationIds.insert(articulation.id);
+        hasDefaultArticulation = hasDefaultArticulation || articulation.isDefault;
+    }
+
+    for (const auto& zone : project.authoring.zones)
+    {
+        if (zone.articulationId.empty()
+            || !articulationIds.insert(zone.articulationId).second)
+        {
+            continue;
+        }
+
+        RuntimeProjectArticulationDefinition articulation;
+        articulation.id = zone.articulationId;
+        articulation.displayName = buildArticulationDisplayName(zone.articulationId);
+        articulation.displayOrder = static_cast<int>(project.authoring.articulations.size());
+        articulation.isDefault = !hasDefaultArticulation;
+        hasDefaultArticulation = hasDefaultArticulation || articulation.isDefault;
+        project.authoring.articulations.push_back(std::move(articulation));
+        changed = true;
+    }
+
+    for (auto& articulation : project.authoring.articulations)
+    {
+        if (articulation.displayName.empty())
+        {
+            articulation.displayName = buildArticulationDisplayName(articulation.id);
+            changed = true;
+        }
+    }
+
+    if (changed)
+        normalizeArticulationDisplayOrder(project);
+
+    return changed;
 }
 
 std::optional<std::size_t> findGroupIndexById(const RuntimeProjectModel& project,
@@ -1734,6 +1795,19 @@ RuntimeProjectDocumentActionResult AuthoringSession::updateRoundRobinResetRules(
     return documentController.commitSnapshot(project, label, { "authoring.roundRobinResetRules" });
 }
 
+RuntimeProjectDocumentActionResult AuthoringSession::updateMasterGain(double masterGainDb,
+                                                                      const std::string& label)
+{
+    if (!std::isfinite(masterGainDb))
+        return makeRejectedResult(getDocumentState(),
+                                  "Master gain edit rejected",
+                                  "Master gain must be finite.");
+
+    auto project = getProject();
+    project.authoring.masterGainDb = masterGainDb;
+    return documentController.commitSnapshot(project, label, { "authoring.masterGainDb" });
+}
+
 RuntimeProjectDocumentActionResult AuthoringSession::selectGroup(const std::string& groupId)
 {
     auto project = getProject();
@@ -2497,6 +2571,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
                                    std::make_move_iterator(zones.end()));
     if (reconcileInferredRoundRobin)
         reconcileBatchInferredRoundRobinDescriptors(project.authoring.zones);
+    const auto synthesizedArticulations = synthesizeMissingArticulations(project);
     project.notes.insert(project.notes.end(),
                          std::make_move_iterator(projectNotes.begin()),
                          std::make_move_iterator(projectNotes.end()));
@@ -2538,6 +2613,8 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
         changedPaths.push_back("authoring.selectedGroupId");
         changedPaths.push_back("authoring.groups");
     }
+    if (synthesizedArticulations)
+        changedPaths.push_back("authoring.articulations");
     if (!projectNotes.empty())
         changedPaths.push_back("notes");
     if (!authoringNotes.empty())

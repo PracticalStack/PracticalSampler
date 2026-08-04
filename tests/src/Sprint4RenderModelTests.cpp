@@ -36,6 +36,7 @@ struct RenderModelFixture
     {
         snapshot.draftRevision = revision;
         snapshot.contentDigest = snapshotDigest;
+        snapshot.masterGainDb = -1.5;
         drs::engine::PlaybackSnapshotGroupRoute snapshotGroup;
         snapshotGroup.groupId = "group-a";
         snapshotGroup.articulationIds = { "sustain" };
@@ -83,6 +84,7 @@ struct RenderModelFixture
         prepared.snapshotContentDigest = snapshotDigest;
         prepared.draftRevision = revision;
         prepared.preparedContentDigest = preparedDigest;
+        prepared.masterGainDb = snapshot.masterGainDb;
         drs::engine::PreparedPlaybackGroupRoute preparedGroup;
         preparedGroup.groupId = "group-a";
         preparedGroup.articulationIds = { "sustain" };
@@ -177,15 +179,15 @@ void runImmutableModelContract()
                 && result.model->getSamples().front().channelCount == 2
                 && result.model->getSamples().front().frameCount == 8,
             "Render model must retain prepared PCM without copying decoded channels.");
-    require(result.model->getRoutes().size() == 1
+        require(result.model->getRoutes().size() == 1
                 && result.model->getRoutes().front().zoneId == "zone-a"
                 && result.model->getRoutes().front().preparedSampleIndex == 0
-                && std::abs(result.model->getRoutes().front().gainDb - (-9.0)) < 1.0e-9
+                && std::abs(result.model->getRoutes().front().gainDb - (-10.5)) < 1.0e-9
                 && std::abs(result.model->getRoutes().front().pan - 0.15) < 1.0e-9
                 && result.model->getRoutes().front().loopEnabled
                 && result.model->getRoutes().front().loopStartFrame == 2
                 && result.model->getRoutes().front().loopEndFrame == 6,
-            "Render model must expose normalized, prevalidated renderer topology with group mix folded into route gain and pan.");
+            "Render model must expose normalized, prevalidated renderer topology with master, group, and zone gain folded into route gain exactly once.");
 
     payload.reset();
     require(!weakPayload.expired()
@@ -365,6 +367,10 @@ void runRouteTopologyFailures()
     expectRejected("render-model-prepared-group-route-missing", [](RenderModelFixture& value)
     {
         value.prepared.groupRoutes.clear();
+    });
+    expectRejected("render-model-master-gain-mismatch", [](RenderModelFixture& value)
+    {
+        value.prepared.masterGainDb += 0.25;
     });
     expectRejected("render-model-zone-id-duplicate", [](RenderModelFixture& value)
     {

@@ -119,6 +119,7 @@ private:
     void refreshDraftPlaybackBanner();
     void refreshFromSession();
     void applySelectedZoneEdit(const authoring::ZoneFieldValuesViewModel& values, const juce::String& label);
+    void applyProjectMasterGainEdit(const juce::String& label);
     void applySelectedGroupNameEdit();
     void applySelectedGroupMixEdit(const juce::String& label);
     void createGroup();
@@ -341,6 +342,8 @@ private:
     juce::ComboBox routingInsertTwoSelector;
     juce::Label routingSummaryLabel;
     juce::Label groupSummaryLabel;
+    juce::Label masterGainLabel;
+    juce::Slider masterGainSlider;
     juce::Label groupVisibilityLabel;
     juce::ToggleButton groupVisibilityToggle;
     juce::Label groupGainLabel;
