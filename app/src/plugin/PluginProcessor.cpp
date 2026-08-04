@@ -4,7 +4,10 @@
 #include "drs/engine/AuthoringPreviewPreparation.h"
 #include "drs/engine/CuratedDspCatalog.h"
 #include "drs/engine/DspGraphPlan.h"
+#include "drs/engine/PackageReader.h"
+#include "drs/engine/PackageWriter.h"
 #include "drs/engine/DspRenderGeneration.h"
+#include "drs/engine/RuntimeCompiler.h"
 #include "drs/engine/RuntimeLoader.h"
 #include "shared/ProjectStorage.h"
 
@@ -251,6 +254,365 @@ drs::engine::RuntimeProjectModel buildSuppressedAuthoringProjectState()
         "Open a project to return to the authoring workflow."
     };
     return project;
+}
+
+std::string sanitizeExportStableId(std::string_view source, std::string_view fallback)
+{
+    std::string result;
+    result.reserve(source.size());
+
+    auto separatorPending = false;
+    for (const auto character : source)
+    {
+        const auto unsignedCharacter = static_cast<unsigned char>(character);
+        if (std::isalnum(unsignedCharacter))
+        {
+            if (separatorPending && !result.empty())
+                result.push_back('-');
+            result.push_back(static_cast<char>(std::tolower(unsignedCharacter)));
+            separatorPending = false;
+        }
+        else
+        {
+            separatorPending = !result.empty();
+        }
+    }
+
+    if (result.empty())
+        result = std::string(fallback);
+
+    return result;
+}
+
+std::string summarizeIssues(const std::vector<std::string>& issues)
+{
+    if (issues.empty())
+        return {};
+
+    if (issues.size() == 1)
+        return issues.front();
+
+    return issues.front() + " (+" + std::to_string(issues.size() - 1) + " more)";
+}
+
+std::string resolveProjectSampleSourcePath(const drs::engine::RuntimeProjectModel& project,
+                                          const drs::engine::RuntimeProjectSampleSource& sampleSource)
+{
+    const fs::path sourcePath(sampleSource.path);
+    if (sourcePath.is_absolute() || project.contentRootPath.empty())
+        return sourcePath.lexically_normal().generic_string();
+
+    return (fs::path(project.contentRootPath) / sourcePath).lexically_normal().generic_string();
+}
+
+void collectPerformancePackageExportCompatibilityIssues(
+    const drs::engine::RuntimeProjectModel& project,
+    std::vector<std::string>& issues)
+{
+    for (const auto& macro : project.authoring.macros)
+    {
+        if (!macro.targets.empty())
+        {
+            issues.push_back("Macro '" + macro.id
+                             + "' carries target mappings that playable package export does not yet preserve.");
+        }
+    }
+
+    if (!project.authoring.fxSlots.empty())
+    {
+        issues.push_back("Playable package export does not yet support authored FX slots.");
+    }
+
+    if (!project.authoring.routingBuses.empty())
+    {
+        issues.push_back("Playable package export does not yet support authored routing buses.");
+    }
+
+    if (!project.authoring.performanceBanks.empty())
+    {
+        issues.push_back("Playable package export does not yet support authored performance banks.");
+    }
+
+    for (const auto& group : project.authoring.groups)
+    {
+        if (std::abs(group.gainDb) > 0.000001)
+        {
+            issues.push_back("Group '" + group.id
+                             + "' uses non-default gain, which playable package export does not yet preserve.");
+        }
+
+        if (std::abs(group.pan) > 0.000001)
+        {
+            issues.push_back("Group '" + group.id
+                             + "' uses non-default pan, which playable package export does not yet preserve.");
+        }
+
+        if (!group.routingBusId.empty() && group.routingBusId != "master")
+        {
+            issues.push_back("Group '" + group.id
+                             + "' routes to '" + group.routingBusId
+                             + "', which playable package export does not yet preserve.");
+        }
+    }
+
+    for (const auto& zone : project.authoring.zones)
+    {
+        if (std::abs(zone.gainDb) > 0.000001)
+        {
+            issues.push_back("Zone '" + zone.id
+                             + "' uses non-default gain, which playable package export does not yet preserve.");
+        }
+
+        if (std::abs(zone.pan) > 0.000001)
+        {
+            issues.push_back("Zone '" + zone.id
+                             + "' uses non-default pan, which playable package export does not yet preserve.");
+        }
+
+        if (zone.sampleStartFrame != 0)
+        {
+            issues.push_back("Zone '" + zone.id
+                             + "' uses a non-zero sample start offset, which playable package export does not yet preserve.");
+        }
+
+        if (zone.loopEnabled || zone.loopStartFrame != 0 || zone.loopEndFrame != 0)
+        {
+            issues.push_back("Zone '" + zone.id
+                             + "' uses loop settings, which playable package export does not yet preserve.");
+        }
+    }
+}
+
+struct PerformancePackageExportPreparationResult
+{
+    bool ready = false;
+    std::string state;
+    std::vector<std::string> issues;
+    drs::engine::RuntimeCompilePlan compilePlan;
+    drs::engine::PerformancePackageManifest manifest;
+};
+
+PerformancePackageExportPreparationResult preparePerformancePackageExport(
+    const drs::engine::RuntimeProjectModel& project,
+    const drs::engine::RuntimeSessionStateSnapshot& sessionState,
+    const juce::File& targetPackageFile,
+    const juce::File& stagingDirectory)
+{
+    PerformancePackageExportPreparationResult result;
+    result.state = "Playable package export validation failed";
+
+    if (targetPackageFile == juce::File())
+    {
+        result.issues.push_back("Select a valid .drpkg export destination.");
+        return result;
+    }
+
+    if (project.sampleSources.empty())
+        result.issues.push_back("The current project has no sample sources to export.");
+    if (project.authoring.zones.empty())
+        result.issues.push_back("The current project has no playable zones to export.");
+
+    collectPerformancePackageExportCompatibilityIssues(project, result.issues);
+
+    const auto baseId = sanitizeExportStableId(
+        !project.projectId.empty() ? std::string_view(project.projectId)
+                                   : std::string_view(targetPackageFile.getFileNameWithoutExtension().toStdString()),
+        "playable-package");
+    const auto displayName = !project.displayName.empty() && project.displayName != "No Project Loaded"
+        ? project.displayName
+        : targetPackageFile.getFileNameWithoutExtension().toStdString();
+
+    auto& plan = result.compilePlan;
+    plan.outputProjectPath = stagingDirectory.getChildFile("export-runtime-project.drsproj").getFullPathName().toStdString();
+    plan.outputInstrumentPath = stagingDirectory.getChildFile("export-runtime-instrument.drinst").getFullPathName().toStdString();
+    plan.outputStreamPath = stagingDirectory.getChildFile("export-runtime-stream.drstrm").getFullPathName().toStdString();
+    plan.projectId = !project.projectId.empty() ? project.projectId : baseId;
+    plan.projectDisplayName = displayName;
+    plan.contentRootPath = project.contentRootPath;
+    plan.instrumentId = plan.projectId + ".instrument";
+    plan.instrumentDisplayName = displayName;
+    plan.defaultLoadProfile = sessionState.loadProfileId.empty() ? "balanced" : sessionState.loadProfileId;
+    plan.pageSizeBytes = 65536;
+    plan.projectNotes = project.notes;
+    plan.instrumentValidationNotes = {
+        "Exported from the current Decent Rhapsody Studio authoring project."
+    };
+    plan.streamNotes = {
+        "Generated for sealed playable package export."
+    };
+
+    for (const auto& projectMacro : project.authoring.macros)
+    {
+        drs::engine::RuntimeMacroDefinition macro;
+        macro.id = projectMacro.id;
+        macro.name = projectMacro.name;
+        macro.defaultValue = projectMacro.defaultValue;
+        macro.minValue = projectMacro.minValue;
+        macro.maxValue = projectMacro.maxValue;
+        plan.macros.push_back(std::move(macro));
+    }
+
+    std::unordered_map<std::string, const drs::engine::RuntimeProjectSampleSource*> sampleSourcesById;
+    sampleSourcesById.reserve(project.sampleSources.size());
+    for (const auto& sampleSource : project.sampleSources)
+    {
+        if (sampleSource.id.empty())
+        {
+            result.issues.push_back("Every sample source must have a stable id before export.");
+            continue;
+        }
+
+        if (sampleSource.path.empty())
+        {
+            result.issues.push_back("Sample source '" + sampleSource.id + "' does not point to a source file.");
+            continue;
+        }
+
+        if (!sampleSourcesById.emplace(sampleSource.id, &sampleSource).second)
+        {
+            result.issues.push_back("Sample source id '" + sampleSource.id + "' is duplicated.");
+            continue;
+        }
+
+        const auto resolvedPath = resolveProjectSampleSourcePath(project, sampleSource);
+        const auto inspection = drs::engine::inspectSampleFile(resolvedPath);
+        if (!inspection.accepted)
+        {
+            auto issue = "Sample source '" + sampleSource.id + "' could not be prepared for export from '"
+                + resolvedPath + "'.";
+            if (!inspection.state.empty())
+                issue += " " + inspection.state + ".";
+            if (!inspection.issues.empty())
+                issue += " " + summarizeIssues(inspection.issues);
+            result.issues.push_back(std::move(issue));
+            continue;
+        }
+
+        drs::engine::RuntimeCompileSourceDefinition compileSource;
+        compileSource.id = sampleSource.id;
+        compileSource.sourcePath = resolvedPath;
+        compileSource.role = sampleSource.role;
+        compileSource.metadata = inspection.metadata;
+        plan.sampleSources.push_back(std::move(compileSource));
+    }
+
+    std::unordered_map<std::string, std::size_t> articulationIndexes;
+    std::unordered_map<std::string, std::size_t> groupIndexes;
+
+    plan.groups.reserve(project.authoring.groups.size());
+    for (const auto& projectGroup : project.authoring.groups)
+    {
+        if (projectGroup.id.empty() || groupIndexes.count(projectGroup.id) != 0)
+            continue;
+
+        drs::engine::RuntimeGroupDefinition group;
+        group.id = projectGroup.id;
+        group.name = projectGroup.displayName.empty() ? projectGroup.id : projectGroup.displayName;
+        groupIndexes.emplace(group.id, plan.groups.size());
+        plan.groups.push_back(std::move(group));
+    }
+
+    plan.articulations.reserve(project.authoring.articulations.size());
+    for (const auto& projectArticulation : project.authoring.articulations)
+    {
+        if (projectArticulation.id.empty() || articulationIndexes.count(projectArticulation.id) != 0)
+            continue;
+
+        drs::engine::RuntimeArticulationDefinition articulation;
+        articulation.id = projectArticulation.id;
+        articulation.name = projectArticulation.displayName.empty()
+            ? projectArticulation.id
+            : projectArticulation.displayName;
+        articulation.isDefault = projectArticulation.isDefault;
+        articulation.activation = projectArticulation.activation;
+        articulationIndexes.emplace(articulation.id, plan.articulations.size());
+        plan.articulations.push_back(std::move(articulation));
+    }
+
+    for (const auto& projectZone : project.authoring.zones)
+    {
+        if (projectZone.id.empty())
+        {
+            result.issues.push_back("Every exported zone must have a stable id.");
+            continue;
+        }
+
+        if (sampleSourcesById.count(projectZone.sampleSourceId) == 0)
+        {
+            result.issues.push_back("Zone '" + projectZone.id + "' references missing sample source '"
+                                    + projectZone.sampleSourceId + "'.");
+            continue;
+        }
+
+        if (!projectZone.groupId.empty() && groupIndexes.count(projectZone.groupId) == 0)
+        {
+            drs::engine::RuntimeGroupDefinition group;
+            group.id = projectZone.groupId;
+            group.name = projectZone.groupId;
+            groupIndexes.emplace(group.id, plan.groups.size());
+            plan.groups.push_back(std::move(group));
+        }
+
+        if (!projectZone.articulationId.empty() && articulationIndexes.count(projectZone.articulationId) == 0)
+        {
+            drs::engine::RuntimeArticulationDefinition articulation;
+            articulation.id = projectZone.articulationId;
+            articulation.name = projectZone.articulationId;
+            articulation.isDefault = plan.articulations.empty();
+            articulationIndexes.emplace(articulation.id, plan.articulations.size());
+            plan.articulations.push_back(std::move(articulation));
+        }
+
+        if (!projectZone.groupId.empty() && !projectZone.articulationId.empty())
+        {
+            auto& articulationIds = plan.groups[groupIndexes.at(projectZone.groupId)].articulationIds;
+            if (std::find(articulationIds.begin(), articulationIds.end(), projectZone.articulationId)
+                == articulationIds.end())
+            {
+                articulationIds.push_back(projectZone.articulationId);
+            }
+        }
+
+        drs::engine::RuntimeCompileZoneDefinition zone;
+        zone.id = projectZone.id;
+        zone.sourceId = projectZone.sampleSourceId;
+        zone.groupId = projectZone.groupId;
+        zone.articulationId = projectZone.articulationId;
+        zone.rootKey = projectZone.rootKey;
+        zone.keyLow = projectZone.keyLow;
+        zone.keyHigh = projectZone.keyHigh;
+        zone.velocityLow = projectZone.velocityLow;
+        zone.velocityHigh = projectZone.velocityHigh;
+        zone.velocityCrossfade = projectZone.velocityCrossfade;
+        zone.roundRobin = projectZone.roundRobin;
+        zone.roundRobinLength = projectZone.roundRobinLength;
+        zone.roundRobinPosition = projectZone.roundRobinPosition;
+        zone.triggerMode = projectZone.triggerMode;
+        zone.performance = projectZone.performance;
+        zone.exclusiveGroupId = projectZone.exclusiveGroupId;
+        zone.exclusiveTargetGroupIds = projectZone.exclusiveTargetGroupIds;
+        zone.chokeReleaseSeconds = projectZone.chokeReleaseSeconds;
+        zone.prefetchBytes = 16384;
+        plan.zones.push_back(std::move(zone));
+    }
+
+    plan.roundRobinResetRules = project.authoring.roundRobinResetRules;
+
+    result.manifest.packageId = baseId;
+    result.manifest.displayName = displayName;
+    result.manifest.instrumentId = plan.instrumentId;
+    result.manifest.defaultLoadProfile = plan.defaultLoadProfile;
+    result.manifest.minimumReaderSchemaVersion = drs::engine::performancePackageSchemaVersion;
+    result.manifest.notes = {
+        "Exported from the current Decent Rhapsody Studio authoring project."
+    };
+
+    if (!result.issues.empty())
+        return result;
+
+    result.ready = true;
+    result.state = "Playable package export ready";
+    return result;
 }
 
 bool isWavImportItemTerminal(const drs::app::WavImportItemStage stage) noexcept
@@ -1845,6 +2207,133 @@ PerformancePackageWorkspaceLoadResult Processor::loadPerformancePackageWorkspace
 
     result.loaded = true;
     result.state = "Performance package opened";
+    return result;
+}
+
+PerformancePackageExportResult Processor::exportPerformancePackage(
+    const juce::File& resolvedPackageFile)
+{
+    PerformancePackageExportResult result;
+    result.state = "Playable package export failed";
+
+    if (workspaceDocumentState.kind != drs::engine::WorkspaceDocumentKind::authoringProject
+        || !workspaceDocumentState.authoringAvailable)
+    {
+        result.issues.push_back("Open an editable authoring project before exporting a playable package.");
+        return result;
+    }
+
+    const auto targetPackageFile = resolvedPackageFile == juce::File()
+        ? juce::File {}
+        : resolvedPackageFile.withFileExtension(
+              juce::String::fromUTF8(drs::engine::performancePackageFileExtension));
+    if (targetPackageFile == juce::File())
+    {
+        result.issues.push_back("Select a valid .drpkg export destination.");
+        return result;
+    }
+
+    const auto targetDirectory = targetPackageFile.getParentDirectory();
+    if ((!targetDirectory.exists() && !targetDirectory.createDirectory()) || !targetDirectory.isDirectory())
+    {
+        result.issues.push_back("The playable package destination folder could not be created.");
+        return result;
+    }
+
+    const auto stagingDirectory = juce::File::getSpecialLocation(juce::File::tempDirectory)
+        .getChildFile("drs-package-export-" + juce::Uuid().toDashedString());
+    const auto cleanupStagingDirectory = [&]()
+    {
+        std::error_code cleanupError;
+        fs::remove_all(fs::path(stagingDirectory.getFullPathName().toStdString()), cleanupError);
+    };
+    if ((!stagingDirectory.exists() && !stagingDirectory.createDirectory()) || !stagingDirectory.isDirectory())
+    {
+        result.issues.push_back("A temporary export staging directory could not be created.");
+        return result;
+    }
+
+    const auto preparation = preparePerformancePackageExport(authoringSession.getProject(),
+                                                             engineFacade.getCurrentSessionState(),
+                                                             targetPackageFile,
+                                                             stagingDirectory);
+    if (!preparation.ready)
+    {
+        cleanupStagingDirectory();
+        result.state = preparation.state;
+        result.issues = preparation.issues;
+        if (result.issues.empty())
+            result.issues.push_back("The playable package export validation did not succeed.");
+        return result;
+    }
+
+    auto compileResult = drs::engine::compileRuntimeInstrument(preparation.compilePlan);
+    if (!compileResult.compiled)
+    {
+        cleanupStagingDirectory();
+        result.state = compileResult.state;
+        result.issues = compileResult.issues;
+        if (result.issues.empty())
+            result.issues.push_back("The project could not be compiled for playable package export.");
+        return result;
+    }
+
+    const auto streamWrite = drs::engine::writeCompiledStreamAssets(compileResult);
+    if (!streamWrite.written)
+    {
+        cleanupStagingDirectory();
+        result.state = streamWrite.state;
+        result.issues = streamWrite.issues;
+        if (result.issues.empty())
+        {
+            result.issues.push_back("The compiled runtime stream could not be materialized for playable package export.");
+        }
+        return result;
+    }
+
+    drs::engine::PerformancePackageCompileWritePlan packagePlan;
+    packagePlan.manifest = preparation.manifest;
+    packagePlan.compiledRuntime = std::move(compileResult);
+    packagePlan.outputPackagePath = targetPackageFile.getFullPathName().toStdString();
+    packagePlan.minimumCompatibleAppVersion = "0.5.0-internal";
+
+    const auto packageWrite = drs::engine::writePerformancePackage(
+        packagePlan,
+        drs::engine::getDeterministicPackageCryptoProvider());
+    if (!packageWrite.written)
+    {
+        cleanupStagingDirectory();
+        result.state = packageWrite.state;
+        result.issues = packageWrite.issues;
+        if (result.issues.empty())
+            result.issues.push_back("The playable package file could not be written.");
+        return result;
+    }
+
+    const auto verification = drs::engine::loadPerformancePackage(
+        packagePlan.outputPackagePath,
+        drs::engine::getDeterministicPackageCryptoProvider(),
+        drs::engine::performancePackageSchemaVersion);
+    cleanupStagingDirectory();
+    if (!verification.loaded)
+    {
+        result.state = verification.state.empty()
+            ? std::string("Playable package export verification failed")
+            : verification.state;
+        result.issues = verification.issues;
+        if (result.issues.empty())
+        {
+            result.issues.push_back(
+                "The exported playable package was written, but the current reader could not reopen it.");
+        }
+        return result;
+    }
+
+    result.exported = true;
+    result.state = "Playable package exported";
+    result.packagePath = packageWrite.packagePath;
+    result.packageBytes = packageWrite.packageBytes;
+    result.payloadCount = packageWrite.payloadCount;
     return result;
 }
 

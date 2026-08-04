@@ -40,6 +40,16 @@ struct PerformancePackageWorkspaceLoadResult
     std::vector<std::string> issues;
 };
 
+struct PerformancePackageExportResult
+{
+    bool exported = false;
+    std::string state;
+    std::vector<std::string> issues;
+    std::string packagePath;
+    std::uint64_t packageBytes = 0;
+    std::uint32_t payloadCount = 0;
+};
+
 struct ProcessorRealtimeSafetySnapshot
 {
     bool available = false;
@@ -207,6 +217,8 @@ public:
         const drs::engine::PerformancePackageManifest& package,
         juce::File resolvedPackageFile = {});
     PerformancePackageWorkspaceLoadResult loadPerformancePackageWorkspace(
+        const juce::File& resolvedPackageFile);
+    PerformancePackageExportResult exportPerformancePackage(
         const juce::File& resolvedPackageFile);
     void closePerformancePackageWorkspace(drs::engine::RuntimeProjectModel unloadedProject);
     const drs::engine::HostProjectBinding& getAuthoringProjectBinding() const

@@ -1,6 +1,3 @@
-#include "drs/engine/PackageWriter.h"
-#include "drs/engine/RuntimeCompiler.h"
-#include "drs/engine/SampleImport.h"
 #include "plugin/PluginEditor.h"
 #include "plugin/PluginProcessor.h"
 #include "standalone/MainComponent.h"
@@ -73,75 +70,39 @@ float renderQueuedPerformanceSurfaceMagnitude(drs::plugin::Processor& processor,
     return maxMagnitude;
 }
 
-drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path& outputDirectory)
+fs::path buildReferenceContentRoot()
 {
-    const auto projectPath = outputDirectory / "tiny-open-instrument.drsproj";
-    const auto instrumentPath = outputDirectory / "tiny-open-instrument.drinst";
-    const auto streamPath = outputDirectory / "tiny-open-instrument.drstrm";
-    const auto contentRoot = fs::path(drs::engine::getPhase1ReferenceProjectManifestPath()).parent_path()
+    return fs::path(drs::engine::getPhase1ReferenceProjectManifestPath()).parent_path()
         / ".." / ".." / ".." / ".." / "hise_project";
+}
 
-    const auto sinePath = (contentRoot / "Samples" / "DRS_Sine_A3.wav").lexically_normal();
-    const auto trianglePath = (contentRoot / "Samples" / "DRS_TriangleLead_A4.wav").lexically_normal();
+drs::engine::RuntimeProjectModel buildAuthoringProjectFixture()
+{
+    const auto contentRoot = buildReferenceContentRoot().lexically_normal().generic_string();
 
-    const auto sineImport = drs::engine::inspectSampleFile(sinePath.generic_string());
-    require(sineImport.accepted, "Reference sine sample must inspect successfully before package-session tests run.");
+    drs::engine::RuntimeProjectModel project;
+    project.schemaName = "drs.project";
+    project.schemaVersion = 6;
+    project.projectId = "drs.phase1.package-export-project";
+    project.displayName = "Package Export Fixture";
+    project.contentRootPath = contentRoot;
+    project.defaultInstrumentManifestPath = (buildReferenceContentRoot() / "PackageExportFixture.drinst").generic_string();
+    project.notes = { "Sprint 6 playable package export fixture." };
 
-    const auto triangleImport = drs::engine::inspectSampleFile(trianglePath.generic_string());
-    require(triangleImport.accepted, "Reference triangle sample must inspect successfully before package-session tests run.");
+    project.sampleSources.push_back({ "sine-a3", "Samples/DRS_Sine_A3.wav", "core-sustain" });
+    project.sampleSources.push_back({ "triangle-a4", "Samples/DRS_TriangleLead_A4.wav", "core-lead" });
 
-    drs::engine::RuntimeCompilePlan plan;
-    plan.outputProjectPath = projectPath.generic_string();
-    plan.outputInstrumentPath = instrumentPath.generic_string();
-    plan.outputStreamPath = streamPath.generic_string();
-    plan.projectId = "drs.phase1.tiny-open-project";
-    plan.projectDisplayName = "DRS Tiny Open Project";
-    plan.contentRootPath = contentRoot.lexically_normal().generic_string();
-    plan.instrumentId = "drs.phase1.tiny-open-instrument";
-    plan.instrumentDisplayName = "DRS Tiny Open Instrument";
-    plan.defaultLoadProfile = "balanced";
-    plan.pageSizeBytes = 65536;
+    project.authoring.schemaName = "drs.authoring";
+    project.authoring.schemaVersion = 5;
+    project.authoring.articulations.push_back({ "sustain", "Sustain", true, 0, std::nullopt });
+    project.authoring.articulations.push_back({ "lead", "Lead", false, 1, std::nullopt });
+    project.authoring.groups.push_back({ "pad-core", "Pad Core", 0, true, 0.0, 0.0, {}, {} });
+    project.authoring.groups.push_back({ "lead-core", "Lead Core", 1, true, 0.0, 0.0, {}, {} });
 
-    drs::engine::RuntimeCompileSourceDefinition sineSource;
-    sineSource.id = "sine-a3";
-    sineSource.sourcePath = sinePath.generic_string();
-    sineSource.role = "core-sustain";
-    sineSource.metadata = sineImport.metadata;
-    plan.sampleSources.push_back(std::move(sineSource));
-
-    drs::engine::RuntimeCompileSourceDefinition triangleSource;
-    triangleSource.id = "triangle-a4";
-    triangleSource.sourcePath = trianglePath.generic_string();
-    triangleSource.role = "core-lead";
-    triangleSource.metadata = triangleImport.metadata;
-    plan.sampleSources.push_back(std::move(triangleSource));
-
-    drs::engine::RuntimeArticulationDefinition sustain;
-    sustain.id = "sustain";
-    sustain.name = "Sustain";
-    sustain.isDefault = true;
-    plan.articulations.push_back(std::move(sustain));
-
-    drs::engine::RuntimeArticulationDefinition lead;
-    lead.id = "lead";
-    lead.name = "Lead";
-    plan.articulations.push_back(std::move(lead));
-
-    drs::engine::RuntimeGroupDefinition padCore;
-    padCore.id = "pad-core";
-    padCore.name = "Pad Core";
-    padCore.articulationIds = { "sustain" };
-    plan.groups.push_back(std::move(padCore));
-
-    drs::engine::RuntimeGroupDefinition leadCore;
-    leadCore.id = "lead-core";
-    leadCore.name = "Lead Core";
-    leadCore.articulationIds = { "lead" };
-    plan.groups.push_back(std::move(leadCore));
-
-    drs::engine::RuntimeCompileZoneDefinition padZone;
+    drs::engine::RuntimeProjectZoneDefinition padZone;
     padZone.id = "pad-a3";
-    padZone.sourceId = "sine-a3";
+    padZone.sampleSourceId = "sine-a3";
+    padZone.displayName = "Pad A3";
     padZone.groupId = "pad-core";
     padZone.articulationId = "sustain";
     padZone.rootKey = 57;
@@ -149,12 +110,12 @@ drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path& output
     padZone.keyHigh = 76;
     padZone.velocityLow = 1;
     padZone.velocityHigh = 95;
-    padZone.prefetchBytes = 16384;
-    plan.zones.push_back(std::move(padZone));
+    project.authoring.zones.push_back(std::move(padZone));
 
-    drs::engine::RuntimeCompileZoneDefinition leadZone;
+    drs::engine::RuntimeProjectZoneDefinition leadZone;
     leadZone.id = "lead-a4";
-    leadZone.sourceId = "triangle-a4";
+    leadZone.sampleSourceId = "triangle-a4";
+    leadZone.displayName = "Lead A4";
     leadZone.groupId = "lead-core";
     leadZone.articulationId = "lead";
     leadZone.rootKey = 69;
@@ -162,40 +123,9 @@ drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path& output
     leadZone.keyHigh = 96;
     leadZone.velocityLow = 1;
     leadZone.velocityHigh = 127;
-    leadZone.prefetchBytes = 16384;
-    plan.zones.push_back(std::move(leadZone));
+    project.authoring.zones.push_back(std::move(leadZone));
 
-    return plan;
-}
-
-std::string buildPackageFixture(const fs::path& scratchDirectory)
-{
-    auto compilePlan = buildReferenceCompilePlan(scratchDirectory / "compiled-runtime");
-    auto compileResult = drs::engine::compileRuntimeInstrument(compilePlan);
-    require(compileResult.compiled, "Reference compile plan should compile successfully for package-session tests.");
-
-    const auto writeResult = drs::engine::writeCompiledStreamAssets(compileResult);
-    require(writeResult.written, "Compiled stream assets should write successfully for package-session tests.");
-
-    drs::engine::PerformancePackageManifest manifest;
-    manifest.packageId = "drs.phase1.package-session";
-    manifest.displayName = "Package Session Fixture";
-    manifest.instrumentId = compilePlan.instrumentId;
-    manifest.defaultLoadProfile = compilePlan.defaultLoadProfile;
-    manifest.minimumReaderSchemaVersion = drs::engine::performancePackageSchemaVersion;
-    manifest.notes = { "Sprint 5 package session fixture." };
-
-    drs::engine::PerformancePackageCompileWritePlan packagePlan;
-    packagePlan.manifest = std::move(manifest);
-    packagePlan.compiledRuntime = std::move(compileResult);
-    packagePlan.outputPackagePath = (scratchDirectory / "package-session-fixture.drpkg").generic_string();
-    packagePlan.minimumCompatibleAppVersion = "0.5.0-internal";
-
-    const auto packageWrite = drs::engine::writePerformancePackage(
-        packagePlan,
-        drs::engine::getDeterministicPackageCryptoProvider());
-    require(packageWrite.written, "Package-session fixture should write successfully.");
-    return packagePlan.outputPackagePath;
+    return project;
 }
 } // namespace
 
@@ -207,13 +137,20 @@ int main()
         std::error_code errorCode;
         fs::remove_all(scratchDirectory, errorCode);
         fs::create_directories(scratchDirectory);
-        const auto packagePath = buildPackageFixture(scratchDirectory);
 
         juce::ScopedJuceInitialiser_GUI gui;
 
         drs::standalone::MainComponent standalone(false);
         standalone.addToDesktop(0);
         standalone.setVisible(true);
+        require(standalone.getProcessor().replaceAuthoringProject(buildAuthoringProjectFixture()),
+                "Standalone shell should accept the export-fixture authoring project.");
+        const auto packagePath = (scratchDirectory / "exported-session-fixture.drpkg").generic_string();
+        const auto standaloneExport = standalone.getProcessor().exportPerformancePackage(
+            juce::File(juce::String::fromUTF8(packagePath.c_str())));
+        require(standaloneExport.exported,
+                "Standalone shell should export a valid playable package from the authoring fixture. state="
+                    + standaloneExport.state + " issues=" + summarizeIssues(standaloneExport.issues));
         const auto standaloneLoad = standalone.getProcessor().loadPerformancePackageWorkspace(
             juce::File(juce::String::fromUTF8(packagePath.c_str())));
         require(standaloneLoad.loaded,

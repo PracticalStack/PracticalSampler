@@ -32,6 +32,7 @@ private:
         closeProjectCommandId,
         saveProjectCommandId,
         saveProjectAsCommandId,
+        exportPerformancePackageCommandId,
         importWavCommandId,
         importSfzCommandId,
         preferencesCommandId
@@ -47,6 +48,7 @@ private:
     void closeProject();
     void saveProject(std::function<void(bool)> completion = {});
     void saveProjectAs(std::function<void(bool)> completion = {});
+    void exportPerformancePackage();
     void importWavFiles();
     void importSfzFile();
     void importSampleFiles(std::vector<juce::File> selectedFiles);
@@ -81,10 +83,12 @@ private:
     void setRecentProjectDirectory(const juce::File& folder);
     juce::File buildChooserBaseDirectory() const;
     juce::File buildDefaultSaveTarget() const;
+    juce::File buildDefaultPackageExportTarget() const;
     void launchOpenProjectChooser(std::function<void(juce::File)> completion);
     void launchOpenPerformancePackageChooser(std::function<void(juce::File)> completion);
     void launchNewProjectChooser(std::function<void(juce::File)> completion);
     void launchSaveProjectChooser(std::function<void(juce::File)> completion);
+    void launchExportPerformancePackageChooser(std::function<void(juce::File)> completion);
     void launchImportWavChooser(std::function<void(std::vector<juce::File>)> completion);
     void launchImportSfzChooser(std::function<void(juce::File)> completion);
     void promptForRootKeySelection(const juce::String& title,

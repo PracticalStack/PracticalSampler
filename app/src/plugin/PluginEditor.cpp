@@ -614,6 +614,7 @@ void Editor::showFileMenu()
         menu.addSeparator();
         menu.addItem(saveProjectCommandId, "Save");
         menu.addItem(saveProjectAsCommandId, "Save As...");
+        menu.addItem(exportPerformancePackageCommandId, "Export Playable Instrument...");
         menu.addItem(importWavCommandId, "Import WAV...");
         menu.addItem(importSfzCommandId, "Import SFZ...");
     }
@@ -666,6 +667,9 @@ void Editor::handleMenuCommand(int menuItemId)
             break;
         case saveProjectAsCommandId:
             saveProjectAs({});
+            break;
+        case exportPerformancePackageCommandId:
+            exportPerformancePackage();
             break;
         case importWavCommandId:
             importWavFiles();
@@ -824,6 +828,38 @@ void Editor::saveProjectAs(std::function<void(bool)> completion)
             if (completion)
                 completion(saved);
         });
+}
+
+void Editor::exportPerformancePackage()
+{
+    if (!processor.getWorkspaceDocumentState().authoringAvailable)
+        return;
+
+    auto safeThis = juce::Component::SafePointer<Editor>(this);
+    launchExportPerformancePackageChooser([safeThis](juce::File selectedFile)
+    {
+        if (safeThis == nullptr || selectedFile == juce::File())
+            return;
+
+        const auto exportResult = safeThis->processor.exportPerformancePackage(selectedFile);
+        if (!exportResult.exported)
+        {
+            juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                                   "Export Playable Instrument Failed",
+                                                   safeThis->buildProjectIssueSummary(exportResult.issues));
+            return;
+        }
+
+        safeThis->setRecentProjectDirectory(selectedFile.getParentDirectory());
+        juce::AlertWindow::showMessageBoxAsync(
+            juce::AlertWindow::InfoIcon,
+            "Playable Instrument Exported",
+            "Exported playable package:\n"
+                + juce::String::fromUTF8(exportResult.packagePath.c_str())
+                + "\n\nPackage size: "
+                + juce::File::descriptionOfSizeInBytes(static_cast<int64_t>(exportResult.packageBytes))
+                + "\nPayload count: " + juce::String(static_cast<int>(exportResult.payloadCount)));
+    });
 }
 
 void Editor::importWavFiles()
@@ -1705,6 +1741,22 @@ juce::File Editor::buildDefaultSaveTarget() const
     return buildChooserBaseDirectory().getChildFile("Untitled Project.drsproj");
 }
 
+juce::File Editor::buildDefaultPackageExportTarget() const
+{
+    if (processor.getAuthoringProjectFile() != juce::File())
+        return processor.getAuthoringProjectFile().withFileExtension(".drpkg");
+
+    auto baseDirectory = buildChooserBaseDirectory();
+    if (baseDirectory == juce::File() || !baseDirectory.isDirectory())
+        baseDirectory = getProjectDirectory();
+
+    auto baseName = juce::File::createLegalFileName(buildWorkspaceDisplayName());
+    if (baseName.trim().isEmpty() || baseName == "No Project Loaded")
+        baseName = "Playable Instrument";
+
+    return baseDirectory.getChildFile(baseName).withFileExtension(".drpkg");
+}
+
 void Editor::launchOpenProjectChooser(std::function<void(juce::File)> completion)
 {
     activeFileChooser = std::make_unique<juce::FileChooser>("Open Decent Rhapsody project",
@@ -1795,6 +1847,30 @@ void Editor::launchSaveProjectChooser(std::function<void(juce::File)> completion
                                            return;
 
                                        const auto selectedFile = drs::app::ensureProjectFileExtension(chooser.getResult());
+                                       safeThis->activeFileChooser.reset();
+                                       if (completion)
+                                           completion(selectedFile);
+                                   });
+}
+
+void Editor::launchExportPerformancePackageChooser(std::function<void(juce::File)> completion)
+{
+    activeFileChooser = std::make_unique<juce::FileChooser>("Export Decent Rhapsody playable instrument",
+                                                            buildDefaultPackageExportTarget(),
+                                                            "*.drpkg",
+                                                            true,
+                                                            false,
+                                                            this);
+    auto safeThis = juce::Component::SafePointer<Editor>(this);
+    activeFileChooser->launchAsync(juce::FileBrowserComponent::saveMode
+                                       | juce::FileBrowserComponent::canSelectFiles
+                                       | juce::FileBrowserComponent::warnAboutOverwriting,
+                                   [safeThis, completion = std::move(completion)](const juce::FileChooser& chooser) mutable
+                                   {
+                                       if (safeThis == nullptr)
+                                           return;
+
+                                       const auto selectedFile = chooser.getResult().withFileExtension(".drpkg");
                                        safeThis->activeFileChooser.reset();
                                        if (completion)
                                            completion(selectedFile);
