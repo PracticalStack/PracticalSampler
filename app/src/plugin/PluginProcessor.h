@@ -36,6 +36,8 @@ namespace drs::plugin
 struct PerformancePackageWorkspaceLoadResult
 {
     bool loaded = false;
+    drs::engine::PerformancePackageFailureCategory failureCategory
+        = drs::engine::PerformancePackageFailureCategory::none;
     std::string state;
     std::vector<std::string> issues;
 };

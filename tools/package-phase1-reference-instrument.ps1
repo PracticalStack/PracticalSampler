@@ -52,7 +52,7 @@ try {
         throw "Could not locate the built Phase 1 runtime fixture tool executable."
     }
 
-    & $tool --write-reference-package
+    & $tool --write-reference-package --write-reference-package-corpus
     if ($LASTEXITCODE -ne 0) {
         throw "Phase 1 runtime fixture tool refresh failed with exit code $LASTEXITCODE."
     }

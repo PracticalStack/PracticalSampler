@@ -234,6 +234,94 @@ void appendIssues(std::vector<std::string>& destination, const std::vector<std::
 {
     destination.insert(destination.end(), issues.begin(), issues.end());
 }
+
+template <typename TResult>
+void setFailureCategory(TResult& result, const PerformancePackageFailureCategory category)
+{
+    if (result.failureCategory == PerformancePackageFailureCategory::none)
+        result.failureCategory = category;
+}
+
+std::string buildReaderFailureState(const PerformancePackageFailureCategory category)
+{
+    switch (category)
+    {
+        case PerformancePackageFailureCategory::none:
+        case PerformancePackageFailureCategory::packageFormatFailure:
+            return "Performance package format validation failed";
+        case PerformancePackageFailureCategory::decryptionFailure:
+            return "Performance package decryption failed";
+        case PerformancePackageFailureCategory::payloadCorruption:
+            return "Performance package payload corruption detected";
+        case PerformancePackageFailureCategory::playbackCompatibilityFailure:
+            return "Performance package playback compatibility failed";
+    }
+
+    return "Performance package read failed";
+}
+
+std::string buildPayloadFailureState(const PerformancePackageFailureCategory category)
+{
+    switch (category)
+    {
+        case PerformancePackageFailureCategory::none:
+        case PerformancePackageFailureCategory::packageFormatFailure:
+            return "Performance package payload open failed";
+        case PerformancePackageFailureCategory::decryptionFailure:
+            return "Performance package payload decryption failed";
+        case PerformancePackageFailureCategory::payloadCorruption:
+            return "Performance package payload corruption detected";
+        case PerformancePackageFailureCategory::playbackCompatibilityFailure:
+            return "Performance package payload playback compatibility failed";
+    }
+
+    return "Performance package payload open failed";
+}
+
+std::string buildLoadFailureState(const PerformancePackageFailureCategory category)
+{
+    switch (category)
+    {
+        case PerformancePackageFailureCategory::none:
+        case PerformancePackageFailureCategory::packageFormatFailure:
+            return "Performance package load failed";
+        case PerformancePackageFailureCategory::decryptionFailure:
+            return "Performance package decryption failed";
+        case PerformancePackageFailureCategory::payloadCorruption:
+            return "Performance package payload corruption detected";
+        case PerformancePackageFailureCategory::playbackCompatibilityFailure:
+            return "Performance package playback compatibility failed";
+    }
+
+    return "Performance package load failed";
+}
+
+void finalizeReaderFailure(PerformancePackageReaderResult& result,
+                           const PerformancePackageFailureCategory defaultCategory
+                               = PerformancePackageFailureCategory::packageFormatFailure)
+{
+    if (result.failureCategory == PerformancePackageFailureCategory::none)
+        result.failureCategory = defaultCategory;
+    result.state = buildReaderFailureState(result.failureCategory);
+}
+
+void finalizePayloadFailure(PerformancePackagePayloadLoadResult& result,
+                            const PerformancePackageFailureCategory defaultCategory
+                                = PerformancePackageFailureCategory::payloadCorruption)
+{
+    if (result.failureCategory == PerformancePackageFailureCategory::none)
+        result.failureCategory = defaultCategory;
+    result.state = buildPayloadFailureState(result.failureCategory);
+}
+
+void finalizeLoadFailure(PerformancePackageLoadResult& result,
+                         const PerformancePackageFailureCategory defaultCategory
+                             = PerformancePackageFailureCategory::packageFormatFailure)
+{
+    if (result.failureCategory == PerformancePackageFailureCategory::none)
+        result.failureCategory = defaultCategory;
+    result.state = buildLoadFailureState(result.failureCategory);
+}
 } // namespace
 
 PerformancePackageReaderResult readPerformancePackage(const std::string& packagePath,
@@ -249,7 +337,8 @@ PerformancePackageReaderResult readPerformancePackage(const std::string& package
     if (!issue.empty())
     {
         addIssue(result, issue);
-        result.state = "Performance package read failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::packageFormatFailure);
+        finalizeReaderFailure(result);
         return result;
     }
 
@@ -259,14 +348,16 @@ PerformancePackageReaderResult readPerformancePackage(const std::string& package
     if (!readHeader(fileBytes, header))
     {
         addIssue(result, "Performance package was truncated before its fixed header could be read.");
-        result.state = "Performance package read failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::packageFormatFailure);
+        finalizeReaderFailure(result);
         return result;
     }
 
     if (!std::equal(kMagic.begin(), kMagic.end(), header.magic))
     {
         addIssue(result, "Performance package magic did not match the expected DRS package signature.");
-        result.state = "Performance package read failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::packageFormatFailure);
+        finalizeReaderFailure(result);
         return result;
     }
 
@@ -286,7 +377,8 @@ PerformancePackageReaderResult readPerformancePackage(const std::string& package
     {
         addIssue(result, "Performance package formatVersion " + std::to_string(header.formatVersion)
                              + " is not supported by this reader.");
-        result.state = "Performance package read failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::packageFormatFailure);
+        finalizeReaderFailure(result);
         return result;
     }
 
@@ -298,7 +390,8 @@ PerformancePackageReaderResult readPerformancePackage(const std::string& package
                           issue))
     {
         addIssue(result, "Cleartext metadata range was invalid: " + issue);
-        result.state = "Performance package read failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::packageFormatFailure);
+        finalizeReaderFailure(result);
         return result;
     }
 
@@ -312,20 +405,23 @@ PerformancePackageReaderResult readPerformancePackage(const std::string& package
     catch (const std::exception& exception)
     {
         addIssue(result, std::string("Could not parse package cleartext metadata JSON: ") + exception.what());
-        result.state = "Performance package read failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::packageFormatFailure);
+        finalizeReaderFailure(result);
         return result;
     }
 
     if (!parseCleartextManifest(metadataRoot, result))
     {
-        result.state = "Performance package read failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::packageFormatFailure);
+        finalizeReaderFailure(result);
         return result;
     }
 
     if (result.cleartextManifest.schemaName != performancePackageSchemaName)
     {
         addIssue(result, "Package cleartext metadata schemaName must be 'drs.performancePackage'.");
-        result.state = "Performance package read failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::packageFormatFailure);
+        finalizeReaderFailure(result);
         return result;
     }
 
@@ -336,7 +432,8 @@ PerformancePackageReaderResult readPerformancePackage(const std::string& package
                      + std::to_string(result.cleartextManifest.minimumReaderSchemaVersion)
                      + " but the current reader only supports "
                      + std::to_string(supportedReaderSchemaVersion) + ".");
-        result.state = "Performance package read failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::packageFormatFailure);
+        finalizeReaderFailure(result);
         return result;
     }
 
@@ -348,7 +445,8 @@ PerformancePackageReaderResult readPerformancePackage(const std::string& package
                           issue))
     {
         addIssue(result, "Encrypted TOC range was invalid: " + issue);
-        result.state = "Performance package read failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::packageFormatFailure);
+        finalizeReaderFailure(result);
         return result;
     }
 
@@ -356,7 +454,8 @@ PerformancePackageReaderResult readPerformancePackage(const std::string& package
     if (!parseSealedBlob(sealedTocBytes, cryptoProvider, sealedToc, issue))
     {
         addIssue(result, "Encrypted TOC blob could not be parsed: " + issue);
-        result.state = "Performance package read failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::packageFormatFailure);
+        finalizeReaderFailure(result);
         return result;
     }
 
@@ -374,7 +473,8 @@ PerformancePackageReaderResult readPerformancePackage(const std::string& package
         addIssue(result,
                  "Encrypted TOC authentication failed; the cleartext header and sealed TOC no longer agree: "
                      + issue);
-        result.state = "Performance package read failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::decryptionFailure);
+        finalizeReaderFailure(result);
         return result;
     }
 
@@ -388,7 +488,8 @@ PerformancePackageReaderResult readPerformancePackage(const std::string& package
     catch (const std::exception& exception)
     {
         addIssue(result, std::string("Could not parse decrypted TOC JSON: ") + exception.what());
-        result.state = "Performance package read failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::packageFormatFailure);
+        finalizeReaderFailure(result);
         return result;
     }
 
@@ -401,7 +502,8 @@ PerformancePackageReaderResult readPerformancePackage(const std::string& package
     if (!tocRoot.contains("payloads") || !tocRoot.at("payloads").is_array())
     {
         addIssue(result, "Decrypted TOC must provide a payloads array.");
-        result.state = "Performance package read failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::packageFormatFailure);
+        finalizeReaderFailure(result);
         return result;
     }
 
@@ -440,7 +542,8 @@ PerformancePackageReaderResult readPerformancePackage(const std::string& package
 
     if (!result.issues.empty())
     {
-        result.state = "Performance package validation failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::packageFormatFailure);
+        finalizeReaderFailure(result);
         return result;
     }
 
@@ -459,7 +562,10 @@ PerformancePackagePayloadLoadResult openPerformancePackagePayload(const Performa
     if (!package.valid)
     {
         addIssue(result, "Cannot open a payload from an invalid package-reader result.");
-        result.state = "Performance package payload open failed";
+        setFailureCategory(result, package.failureCategory == PerformancePackageFailureCategory::none
+                                       ? PerformancePackageFailureCategory::packageFormatFailure
+                                       : package.failureCategory);
+        finalizePayloadFailure(result, PerformancePackageFailureCategory::packageFormatFailure);
         return result;
     }
 
@@ -478,7 +584,8 @@ PerformancePackagePayloadLoadResult openPerformancePackagePayload(const Performa
     if (!issue.empty())
     {
         addIssue(result, issue);
-        result.state = "Performance package payload open failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::packageFormatFailure);
+        finalizePayloadFailure(result, PerformancePackageFailureCategory::packageFormatFailure);
         return result;
     }
 
@@ -491,7 +598,8 @@ PerformancePackagePayloadLoadResult openPerformancePackagePayload(const Performa
                           issue))
     {
         addIssue(result, "Payload '" + payloadId + "' exceeded the package file bounds.");
-        result.state = "Performance package payload open failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::payloadCorruption);
+        finalizePayloadFailure(result);
         return result;
     }
 
@@ -499,7 +607,8 @@ PerformancePackagePayloadLoadResult openPerformancePackagePayload(const Performa
     if (!parseSealedBlob(sealedPayloadBytes, cryptoProvider, sealedPayload, issue))
     {
         addIssue(result, "Payload '" + payloadId + "' sealed blob could not be parsed: " + issue);
-        result.state = "Performance package payload open failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::payloadCorruption);
+        finalizePayloadFailure(result);
         return result;
     }
 
@@ -517,21 +626,24 @@ PerformancePackagePayloadLoadResult openPerformancePackagePayload(const Performa
     if (!cryptoProvider.open(payloadOpenRequest, result.payload.plaintextBytes, issue))
     {
         addIssue(result, "Payload '" + payloadId + "' authentication failed: " + issue);
-        result.state = "Performance package payload open failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::decryptionFailure);
+        finalizePayloadFailure(result, PerformancePackageFailureCategory::decryptionFailure);
         return result;
     }
 
     if (result.payload.plaintextBytes.size() != result.payload.plaintextSizeBytes)
     {
         addIssue(result, "Payload '" + payloadId + "' plaintext size did not match the decrypted TOC.");
-        result.state = "Performance package payload open failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::payloadCorruption);
+        finalizePayloadFailure(result);
         return result;
     }
 
     if (computeFnv1a64Hex(result.payload.plaintextBytes) != result.payload.plaintextChecksumHex)
     {
         addIssue(result, "Payload '" + payloadId + "' plaintext checksum mismatch.");
-        result.state = "Performance package payload open failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::payloadCorruption);
+        finalizePayloadFailure(result);
         return result;
     }
 
@@ -551,10 +663,11 @@ PerformancePackageLoadResult loadPerformancePackage(const std::string& packagePa
     result.package = readPerformancePackage(packagePath, cryptoProvider, supportedReaderSchemaVersion);
     result.packageFound = result.package.packageFound;
     appendIssues(result.issues, result.package.issues);
+    result.failureCategory = result.package.failureCategory;
 
     if (!result.package.valid)
     {
-        result.state = "Performance package load failed";
+        finalizeLoadFailure(result);
         return result;
     }
 
@@ -576,7 +689,8 @@ PerformancePackageLoadResult loadPerformancePackage(const std::string& packagePa
 
     if (!result.issues.empty())
     {
-        result.state = "Performance package load failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::payloadCorruption);
+        finalizeLoadFailure(result, PerformancePackageFailureCategory::payloadCorruption);
         return result;
     }
 
@@ -587,7 +701,8 @@ PerformancePackageLoadResult loadPerformancePackage(const std::string& packagePa
     if (!packageManifestOpen.loaded)
     {
         addIssue(result, "Required packageManifest payload could not be opened.");
-        result.state = "Performance package load failed";
+        setFailureCategory(result, packageManifestOpen.failureCategory);
+        finalizeLoadFailure(result, PerformancePackageFailureCategory::payloadCorruption);
         return result;
     }
 
@@ -599,12 +714,16 @@ PerformancePackageLoadResult loadPerformancePackage(const std::string& packagePa
     catch (const std::exception& exception)
     {
         addIssue(result, std::string("Package manifest payload JSON parse failed: ") + exception.what());
-        result.state = "Performance package load failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::payloadCorruption);
+        finalizeLoadFailure(result, PerformancePackageFailureCategory::payloadCorruption);
         return result;
     }
 
     if (manifestRoot.value("schemaName", std::string {}) != performancePackageSchemaName)
+    {
+        setFailureCategory(result, PerformancePackageFailureCategory::payloadCorruption);
         addIssue(result, "Package manifest payload schemaName must be 'drs.performancePackage'.");
+    }
 
     const auto instrumentOpen = openPerformancePackagePayload(result.package,
                                                               instrumentPayload->payloadId,
@@ -613,7 +732,8 @@ PerformancePackageLoadResult loadPerformancePackage(const std::string& packagePa
     if (!instrumentOpen.loaded)
     {
         addIssue(result, "Required runtimeInstrument payload could not be opened.");
-        result.state = "Performance package load failed";
+        setFailureCategory(result, instrumentOpen.failureCategory);
+        finalizeLoadFailure(result, PerformancePackageFailureCategory::payloadCorruption);
         return result;
     }
 
@@ -629,7 +749,8 @@ PerformancePackageLoadResult loadPerformancePackage(const std::string& packagePa
     if (!streamPayloadOpen.loaded)
     {
         addIssue(result, "Required runtimeStreamPayload payload could not be opened.");
-        result.state = "Performance package load failed";
+        setFailureCategory(result, streamPayloadOpen.failureCategory);
+        finalizeLoadFailure(result, PerformancePackageFailureCategory::payloadCorruption);
         return result;
     }
 
@@ -640,7 +761,8 @@ PerformancePackageLoadResult loadPerformancePackage(const std::string& packagePa
     if (!streamIndexOpen.loaded)
     {
         addIssue(result, "Required runtimeStreamIndex payload could not be opened.");
-        result.state = "Performance package load failed";
+        setFailureCategory(result, streamIndexOpen.failureCategory);
+        finalizeLoadFailure(result, PerformancePackageFailureCategory::payloadCorruption);
         return result;
     }
 
@@ -650,15 +772,23 @@ PerformancePackageLoadResult loadPerformancePackage(const std::string& packagePa
                                                 &streamPayloadOpen.payload.plaintextBytes);
     appendIssues(result.issues, result.stream.issues);
 
+    if (!result.instrument.loaded || !result.stream.loaded)
+    {
+        setFailureCategory(result, PerformancePackageFailureCategory::payloadCorruption);
+        finalizeLoadFailure(result, PerformancePackageFailureCategory::payloadCorruption);
+        return result;
+    }
+
     if (result.stream.container.containerId != result.instrument.instrument.instrumentId)
         addIssue(result, "Package stream containerId did not match the runtime instrumentId.");
 
     if (result.manifest.instrumentId != result.instrument.instrument.instrumentId)
         addIssue(result, "Package manifest instrumentId did not match the runtime instrument payload.");
 
-    if (!result.issues.empty() || !result.instrument.loaded || !result.stream.loaded)
+    if (!result.issues.empty())
     {
-        result.state = "Performance package load failed";
+        setFailureCategory(result, PerformancePackageFailureCategory::playbackCompatibilityFailure);
+        finalizeLoadFailure(result, PerformancePackageFailureCategory::playbackCompatibilityFailure);
         return result;
     }
 

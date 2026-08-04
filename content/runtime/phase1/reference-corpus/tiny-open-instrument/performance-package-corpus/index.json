@@ -1,0 +1,67 @@
+{
+  "schemaName": "drs.performancePackageCorpus",
+  "schemaVersion": 1,
+  "packageId": "drs.phase1.tiny-open-instrument.package",
+  "generatedFrom": {
+    "referenceProjectPath": "tiny-open-instrument.drsproj",
+    "referenceInstrumentPath": "tiny-open-instrument.drinst",
+    "referenceStreamPath": "tiny-open-instrument.drstrm",
+    "wrapperScriptPath": "../../../tools/package-phase1-reference-instrument.ps1"
+  },
+  "fixtures": [
+    {
+      "id": "valid",
+      "path": "valid.drpkg",
+      "sizeBytes": 795141,
+      "checksumHex": "0032086e125147ef",
+      "expectedState": "loaded",
+      "expectedFailureCategory": "none",
+      "expectedIssueSubstring": ""
+    },
+    {
+      "id": "truncated",
+      "path": "truncated.drpkg",
+      "sizeBytes": 795109,
+      "checksumHex": "406978b042e90889",
+      "expectedState": "read-failed",
+      "expectedFailureCategory": "package-format-failure",
+      "expectedIssueSubstring": "truncated"
+    },
+    {
+      "id": "tampered",
+      "path": "tampered.drpkg",
+      "sizeBytes": 795141,
+      "checksumHex": "01bea7caa0822949",
+      "expectedState": "read-failed",
+      "expectedFailureCategory": "decryption-failure",
+      "expectedIssueSubstring": "authentication failed"
+    },
+    {
+      "id": "wrong-version",
+      "path": "wrong-version.drpkg",
+      "sizeBytes": 795141,
+      "checksumHex": "4e32853f052cea57",
+      "expectedState": "read-failed",
+      "expectedFailureCategory": "package-format-failure",
+      "expectedIssueSubstring": "requires reader schema version"
+    },
+    {
+      "id": "missing-payload",
+      "path": "missing-payload.drpkg",
+      "sizeBytes": 791835,
+      "checksumHex": "f1adbf79331e5835",
+      "expectedState": "load-failed",
+      "expectedFailureCategory": "payload-corruption",
+      "expectedIssueSubstring": "runtimeStreamIndex payload"
+    },
+    {
+      "id": "checksum-mismatch",
+      "path": "checksum-mismatch.drpkg",
+      "sizeBytes": 795141,
+      "checksumHex": "614077765d8cc584",
+      "expectedState": "load-failed",
+      "expectedFailureCategory": "payload-corruption",
+      "expectedIssueSubstring": "payload checksum mismatch"
+    }
+  ]
+}

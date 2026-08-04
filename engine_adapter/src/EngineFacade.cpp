@@ -1395,10 +1395,12 @@ EnginePerformancePackageActivationResult EngineFacade::activatePerformancePackag
     const PerformancePackageLoadResult& packageLoad)
 {
     EnginePerformancePackageActivationResult result;
+    result.failureCategory = PerformancePackageFailureCategory::playbackCompatibilityFailure;
     result.state = "Performance package activation failed";
 
     if (!packageLoad.loaded)
     {
+        result.failureCategory = packageLoad.failureCategory;
         result.issues = packageLoad.issues;
         if (result.issues.empty())
             result.issues.push_back("The performance package did not load.");
@@ -1408,6 +1410,7 @@ EnginePerformancePackageActivationResult EngineFacade::activatePerformancePackag
     const auto snapshotResult = buildPerformancePackagePlaybackSnapshot(packageLoad);
     if (!snapshotResult.built || !snapshotResult.activationEligible)
     {
+        result.failureCategory = PerformancePackageFailureCategory::playbackCompatibilityFailure;
         result.state = snapshotResult.state;
         for (const auto& finding : snapshotResult.findings)
         {
@@ -1422,6 +1425,7 @@ EnginePerformancePackageActivationResult EngineFacade::activatePerformancePackag
     const auto preparedRequest = preparedPlaybackService.requestBuild(snapshotResult, packageLoad.stream);
     if (!preparedRequest.accepted)
     {
+        result.failureCategory = PerformancePackageFailureCategory::playbackCompatibilityFailure;
         result.state = preparedRequest.state;
         result.issues.push_back(preparedRequest.state);
         return result;
@@ -1432,6 +1436,7 @@ EnginePerformancePackageActivationResult EngineFacade::activatePerformancePackag
                                                                 packageLoad.stream);
     if (!preparedResult.built || !preparedResult.activationEligible)
     {
+        result.failureCategory = PerformancePackageFailureCategory::playbackCompatibilityFailure;
         result.state = preparedResult.state;
         for (const auto& finding : preparedResult.findings)
         {
@@ -1450,6 +1455,7 @@ EnginePerformancePackageActivationResult EngineFacade::activatePerformancePackag
         &preparedResult);
     if (packagePerformanceActivationPayload == nullptr)
     {
+        result.failureCategory = PerformancePackageFailureCategory::playbackCompatibilityFailure;
         result.issues.push_back("The performance package activation payload could not be constructed.");
         return result;
     }
@@ -1474,6 +1480,7 @@ EnginePerformancePackageActivationResult EngineFacade::activatePerformancePackag
     markStateChanged();
 
     result.activated = true;
+    result.failureCategory = PerformancePackageFailureCategory::none;
     result.state = "Performance package activated";
     return result;
 }

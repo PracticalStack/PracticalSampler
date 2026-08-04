@@ -9,6 +9,15 @@ inline constexpr const char* performancePackageSchemaName = "drs.performancePack
 inline constexpr int performancePackageSchemaVersion = 1;
 inline constexpr const char* performancePackageFileExtension = ".drpkg";
 
+enum class PerformancePackageFailureCategory
+{
+    none,
+    packageFormatFailure,
+    decryptionFailure,
+    payloadCorruption,
+    playbackCompatibilityFailure
+};
+
 enum class WorkspaceDocumentKind
 {
     authoringProject,
@@ -54,6 +63,25 @@ inline const char* toString(const WorkspaceDocumentKind kind) noexcept
             return "authoringProject";
         case WorkspaceDocumentKind::performancePackage:
             return "performancePackage";
+    }
+
+    return "unknown";
+}
+
+inline const char* toString(const PerformancePackageFailureCategory category) noexcept
+{
+    switch (category)
+    {
+        case PerformancePackageFailureCategory::none:
+            return "none";
+        case PerformancePackageFailureCategory::packageFormatFailure:
+            return "package-format-failure";
+        case PerformancePackageFailureCategory::decryptionFailure:
+            return "decryption-failure";
+        case PerformancePackageFailureCategory::payloadCorruption:
+            return "payload-corruption";
+        case PerformancePackageFailureCategory::playbackCompatibilityFailure:
+            return "playback-compatibility-failure";
     }
 
     return "unknown";

@@ -2162,6 +2162,7 @@ PerformancePackageWorkspaceLoadResult Processor::loadPerformancePackageWorkspace
         drs::engine::performancePackageSchemaVersion);
     if (!packageLoad.loaded)
     {
+        result.failureCategory = packageLoad.failureCategory;
         result.state = packageLoad.state;
         result.issues = packageLoad.issues;
         if (result.issues.empty())
@@ -2172,6 +2173,7 @@ PerformancePackageWorkspaceLoadResult Processor::loadPerformancePackageWorkspace
     const auto activation = engineFacade.activatePerformancePackageSession(packageLoad);
     if (!activation.activated)
     {
+        result.failureCategory = activation.failureCategory;
         result.state = activation.state;
         result.issues = activation.issues;
         if (result.issues.empty())
@@ -2206,6 +2208,7 @@ PerformancePackageWorkspaceLoadResult Processor::loadPerformancePackageWorkspace
     refreshSerializedHostStatePublication(true);
 
     result.loaded = true;
+    result.failureCategory = drs::engine::PerformancePackageFailureCategory::none;
     result.state = "Performance package opened";
     return result;
 }

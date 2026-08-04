@@ -321,6 +321,7 @@ struct EnginePresetStateRestoreResult
 struct EnginePerformancePackageActivationResult
 {
     bool activated = false;
+    PerformancePackageFailureCategory failureCategory = PerformancePackageFailureCategory::none;
     std::string state;
     std::vector<std::string> issues;
 };

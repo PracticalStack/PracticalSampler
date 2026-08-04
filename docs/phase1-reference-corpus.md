@@ -31,6 +31,17 @@ Sprint 5 now also checks in a package manifest for this fixture so contributors 
 - the compiled stream descriptor
 - the expected runtime shape needed for repeatable validation
 
+Sprint 7 now also checks in a sealed package corpus for this fixture at:
+
+- `content/runtime/phase1/reference-corpus/tiny-open-instrument/performance-package-corpus/index.json`
+
+That corpus includes:
+
+- one valid `.drpkg`
+- truncated and tampered corruption cases
+- wrong-version skew coverage
+- missing-payload and checksum-mismatch loader failures
+
 ### 2. Medium internal streaming case
 
 Status: planned
@@ -122,9 +133,11 @@ If the reference package changes intentionally, refresh the checked-in package m
 
 - `powershell -ExecutionPolicy Bypass -File .\tools\package-phase1-reference-instrument.ps1 -Mode Refresh`
 
+That same refresh now also rewrites the checked-in sealed package corpus under `performance-package-corpus/`.
+
 Refreshes should be followed by a targeted validation pass:
 
-- `ctest --preset test-debug -R "drs.phase1.fixture_tool_verify|drs.phase1.runtime_contract|drs.phase1.macro_bridge|drs.phase0.smoke" --output-on-failure`
+- `ctest --preset test-debug -R "drs.phase1.fixture_tool_verify|drs.phase1.performance_package|drs.phase1.performance_package_loader|drs.phase1.performance_package_host_validation|drs.phase1.runtime_contract|drs.phase1.macro_bridge|drs.phase0.smoke" --output-on-failure`
 - open the standalone app and confirm `Load Default` and `Load Lead Demo` both produce the expected playable state from the Sprint 5 performance surface
 
 ## Sprint 1 outcome

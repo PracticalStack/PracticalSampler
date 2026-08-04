@@ -1,11 +1,15 @@
 #include "drs/engine/Phase1Baseline.h"
+#include "drs/engine/PackageCrypto.h"
+#include "drs/engine/PackageWriter.h"
 #include "drs/engine/RuntimeLoader.h"
 #include "drs/engine/RuntimeStream.h"
+#include "Phase1PerformancePackageSupport.h"
 
 #include <json/json.hpp>
 
 #include <chrono>
 #include <ctime>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -26,6 +30,7 @@ struct Options
     bool verify = true;
     bool writeReferenceFixtures = false;
     bool writeReferencePackage = false;
+    bool writeReferencePackageCorpus = false;
     bool writeBaseline = false;
     std::string capturedOnIsoDate;
 };
@@ -68,6 +73,23 @@ std::string computeFnv1aChecksumHex(const fs::path& path)
             hash ^= static_cast<unsigned char>(buffer[index]);
             hash *= prime;
         }
+    }
+
+    std::ostringstream stream;
+    stream << std::hex << std::setfill('0') << std::setw(16) << hash;
+    return stream.str();
+}
+
+std::string computeFnv1aChecksumHex(const std::vector<std::uint8_t>& bytes)
+{
+    constexpr std::uint64_t offsetBasis = 14695981039346656037ull;
+    constexpr std::uint64_t prime = 1099511628211ull;
+
+    std::uint64_t hash = offsetBasis;
+    for (const auto byte : bytes)
+    {
+        hash ^= byte;
+        hash *= prime;
     }
 
     std::ostringstream stream;
@@ -131,11 +153,17 @@ Options parseOptions(int argc, char* argv[])
             options.verify = false;
             options.writeReferencePackage = true;
         }
+        else if (argument == "--write-reference-package-corpus")
+        {
+            options.verify = false;
+            options.writeReferencePackageCorpus = true;
+        }
         else if (argument == "--write-all")
         {
             options.verify = false;
             options.writeReferenceFixtures = true;
             options.writeReferencePackage = true;
+            options.writeReferencePackageCorpus = true;
             options.writeBaseline = true;
         }
         else if (argument == "--captured-on")
@@ -350,6 +378,168 @@ void rewriteReferencePackageManifest(const drs::engine::RuntimeProjectLoadResult
     writeTextFile(packageManifestPath, packageManifestText);
 }
 
+void generateReferencePackageCorpus(const fs::path& outputRoot)
+{
+    namespace package_support = drs::tests::performance_package;
+
+    fs::create_directories(outputRoot);
+    const auto& cryptoProvider = drs::engine::getDeterministicPackageCryptoProvider();
+    const auto corpusPaths = package_support::CheckedInCorpusPaths {
+        outputRoot,
+        outputRoot / "index.json",
+        outputRoot / "valid.drpkg",
+        outputRoot / "truncated.drpkg",
+        outputRoot / "tampered.drpkg",
+        outputRoot / "wrong-version.drpkg",
+        outputRoot / "missing-payload.drpkg",
+        outputRoot / "checksum-mismatch.drpkg",
+    };
+
+    const auto validPlan = package_support::buildPackagePlan(outputRoot / "staging-valid",
+                                                             corpusPaths.valid);
+    const auto validWrite = drs::engine::writePerformancePackage(validPlan, cryptoProvider);
+    require(validWrite.written, "Valid performance package fixture should write successfully.");
+
+    const auto validBytes = package_support::readBinaryFile(corpusPaths.valid);
+    require(validBytes.size() > 64, "Valid performance package fixture should be large enough for corruption mutations.");
+
+    auto truncatedBytes = validBytes;
+    truncatedBytes.resize(truncatedBytes.size() - 32);
+    package_support::writeBinaryFile(corpusPaths.truncated, truncatedBytes);
+
+    const auto validInspection = drs::engine::inspectPerformancePackage(corpusPaths.valid.generic_string(),
+                                                                        cryptoProvider,
+                                                                        drs::engine::performancePackageSchemaVersion);
+    require(validInspection.valid, "Generated valid package fixture should inspect successfully.");
+
+    auto tamperedBytes = validBytes;
+    const auto tocTagOffset = validInspection.header.tocOffsetBytes + cryptoProvider.nonceSizeBytes();
+    require(tocTagOffset < tamperedBytes.size(), "Generated valid package TOC tag offset should remain in bounds.");
+    tamperedBytes[static_cast<std::size_t>(tocTagOffset)] ^= 0x5au;
+    package_support::writeBinaryFile(corpusPaths.tampered, tamperedBytes);
+
+    const auto wrongVersionPlan = package_support::buildPackagePlan(outputRoot / "staging-wrong-version",
+                                                                    corpusPaths.wrongVersion,
+                                                                    drs::engine::performancePackageSchemaVersion + 1);
+    const auto wrongVersionWrite = drs::engine::writePerformancePackage(wrongVersionPlan, cryptoProvider);
+    require(wrongVersionWrite.written, "Wrong-version performance package fixture should write successfully.");
+
+    auto missingPayloadPlan = drs::engine::buildPerformancePackageWritePlan(
+        package_support::buildPackagePlan(outputRoot / "staging-missing-payload",
+                                          corpusPaths.missingPayload));
+    missingPayloadPlan.payloads.erase(
+        std::remove_if(missingPayloadPlan.payloads.begin(),
+                       missingPayloadPlan.payloads.end(),
+                       [](const drs::engine::PerformancePackagePayloadSource& payload)
+                       {
+                           return payload.kind == drs::engine::PerformancePackagePayloadKind::runtimeStreamIndex;
+                       }),
+        missingPayloadPlan.payloads.end());
+    const auto missingPayloadWrite = drs::engine::writePerformancePackage(missingPayloadPlan, cryptoProvider);
+    require(missingPayloadWrite.written, "Missing-payload performance package fixture should write successfully.");
+
+    auto checksumMismatchPlan = drs::engine::buildPerformancePackageWritePlan(
+        package_support::buildPackagePlan(outputRoot / "staging-checksum-mismatch",
+                                          corpusPaths.checksumMismatch));
+    auto payloadIterator = std::find_if(
+        checksumMismatchPlan.payloads.begin(),
+        checksumMismatchPlan.payloads.end(),
+        [](const drs::engine::PerformancePackagePayloadSource& payload)
+        {
+            return payload.kind == drs::engine::PerformancePackagePayloadKind::runtimeStreamPayload;
+        });
+    require(payloadIterator != checksumMismatchPlan.payloads.end(),
+            "Checksum-mismatch performance package fixture should include the runtime stream payload.");
+    require(!payloadIterator->plaintextBytes.empty(),
+            "Checksum-mismatch runtime stream payload should include bytes to corrupt.");
+    payloadIterator->plaintextBytes[0] ^= 0x7fu;
+    const auto checksumMismatchWrite = drs::engine::writePerformancePackage(checksumMismatchPlan, cryptoProvider);
+    require(checksumMismatchWrite.written, "Checksum-mismatch performance package fixture should write successfully.");
+
+    ordered_json indexRoot;
+    indexRoot["schemaName"] = "drs.performancePackageCorpus";
+    indexRoot["schemaVersion"] = 1;
+    indexRoot["packageId"] = "drs.phase1.tiny-open-instrument.package";
+    indexRoot["generatedFrom"] = {
+        { "referenceProjectPath", "tiny-open-instrument.drsproj" },
+        { "referenceInstrumentPath", "tiny-open-instrument.drinst" },
+        { "referenceStreamPath", "tiny-open-instrument.drstrm" },
+        { "wrapperScriptPath", "../../../tools/package-phase1-reference-instrument.ps1" }
+    };
+
+    const auto appendFixture = [&](const std::string& id,
+                                   const fs::path& path,
+                                   const std::string& expectedState,
+                                   const std::string& expectedFailureCategory,
+                                   const std::string& expectedIssueSubstring)
+    {
+        ordered_json fixture;
+        fixture["id"] = id;
+        fixture["path"] = path.filename().generic_string();
+        fixture["sizeBytes"] = fs::file_size(path);
+        fixture["checksumHex"] = computeFnv1aChecksumHex(path);
+        fixture["expectedState"] = expectedState;
+        fixture["expectedFailureCategory"] = expectedFailureCategory;
+        fixture["expectedIssueSubstring"] = expectedIssueSubstring;
+        return fixture;
+    };
+
+    indexRoot["fixtures"] = ordered_json::array({
+        appendFixture("valid", corpusPaths.valid, "loaded", "none", ""),
+        appendFixture("truncated", corpusPaths.truncated, "read-failed", "package-format-failure", "truncated"),
+        appendFixture("tampered", corpusPaths.tampered, "read-failed", "decryption-failure", "authentication failed"),
+        appendFixture("wrong-version", corpusPaths.wrongVersion, "read-failed", "package-format-failure", "requires reader schema version"),
+        appendFixture("missing-payload", corpusPaths.missingPayload, "load-failed", "payload-corruption", "runtimeStreamIndex payload"),
+        appendFixture("checksum-mismatch", corpusPaths.checksumMismatch, "load-failed", "payload-corruption", "payload checksum mismatch"),
+    });
+
+    package_support::writeTextFile(corpusPaths.index, indexRoot.dump(2) + "\n");
+
+    std::error_code cleanupError;
+    fs::remove_all(outputRoot / "staging-valid", cleanupError);
+    fs::remove_all(outputRoot / "staging-wrong-version", cleanupError);
+    fs::remove_all(outputRoot / "staging-missing-payload", cleanupError);
+    fs::remove_all(outputRoot / "staging-checksum-mismatch", cleanupError);
+}
+
+void verifyReferencePackageCorpus()
+{
+    namespace package_support = drs::tests::performance_package;
+
+    const auto checkedInCorpus = package_support::getCheckedInCorpusPaths();
+    require(fs::exists(checkedInCorpus.index), "Checked-in performance package corpus index must exist.");
+
+    const auto generatedRoot = fs::temp_directory_path() / "drs-phase1-reference-package-corpus-verify";
+    std::error_code cleanupError;
+    fs::remove_all(generatedRoot, cleanupError);
+    generateReferencePackageCorpus(generatedRoot);
+
+    const auto compareTextFile = [&](const fs::path& checkedInPath, const fs::path& generatedPath, const std::string& label)
+    {
+        require(package_support::readTextFile(checkedInPath) == package_support::readTextFile(generatedPath),
+                label + " is out of sync with the deterministic fixture generator.");
+    };
+
+    const auto compareBinaryFile = [&](const fs::path& checkedInPath, const fs::path& generatedPath, const std::string& label)
+    {
+        require(package_support::readBinaryFile(checkedInPath) == package_support::readBinaryFile(generatedPath),
+                label + " is out of sync with the deterministic fixture generator.");
+    };
+
+    compareTextFile(checkedInCorpus.index, generatedRoot / "index.json", "Performance package corpus index");
+    compareBinaryFile(checkedInCorpus.valid, generatedRoot / "valid.drpkg", "Valid performance package fixture");
+    compareBinaryFile(checkedInCorpus.truncated, generatedRoot / "truncated.drpkg", "Truncated performance package fixture");
+    compareBinaryFile(checkedInCorpus.tampered, generatedRoot / "tampered.drpkg", "Tampered performance package fixture");
+    compareBinaryFile(checkedInCorpus.wrongVersion, generatedRoot / "wrong-version.drpkg", "Wrong-version performance package fixture");
+    compareBinaryFile(checkedInCorpus.missingPayload, generatedRoot / "missing-payload.drpkg", "Missing-payload performance package fixture");
+    compareBinaryFile(checkedInCorpus.checksumMismatch, generatedRoot / "checksum-mismatch.drpkg", "Checksum-mismatch performance package fixture");
+}
+
+void rewriteReferencePackageCorpus()
+{
+    generateReferencePackageCorpus(drs::tests::performance_package::getCheckedInCorpusPaths().root);
+}
+
 void rewriteBaselineSnapshot(const drs::engine::RuntimeManifestLoadResult& coldResult,
                              const drs::engine::RuntimeManifestLoadResult& warmResult,
                              const std::string& capturedOnIsoDate)
@@ -384,6 +574,7 @@ int main(int argc, char* argv[])
         {
             verifyReferenceFixtures(referenceProject, coldResult);
             verifyReferencePackageManifest(referenceProject, coldResult, referenceStream);
+            verifyReferencePackageCorpus();
             verifyCheckedInBaseline(coldResult);
             std::cout << "Phase 1 runtime fixture tool verify passed." << std::endl;
             return 0;
@@ -394,6 +585,9 @@ int main(int argc, char* argv[])
 
         if (options.writeReferencePackage)
             rewriteReferencePackageManifest(referenceProject, coldResult, referenceStream);
+
+        if (options.writeReferencePackageCorpus)
+            rewriteReferencePackageCorpus();
 
         if (options.writeBaseline)
         {

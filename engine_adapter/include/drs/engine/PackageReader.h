@@ -9,12 +9,16 @@
 
 namespace drs::engine
 {
-using PerformancePackageReaderResult = PerformancePackageInspectionResult;
+struct PerformancePackageReaderResult : PerformancePackageInspectionResult
+{
+    PerformancePackageFailureCategory failureCategory = PerformancePackageFailureCategory::none;
+};
 
 struct PerformancePackagePayloadLoadResult
 {
     bool found = false;
     bool loaded = false;
+    PerformancePackageFailureCategory failureCategory = PerformancePackageFailureCategory::none;
     std::string state;
     std::vector<std::string> issues;
     PerformancePackagePayloadView payload;
@@ -25,6 +29,7 @@ struct PerformancePackageLoadResult
     bool packageFound = false;
     bool loaded = false;
     std::string packagePath;
+    PerformancePackageFailureCategory failureCategory = PerformancePackageFailureCategory::none;
     std::string state;
     std::vector<std::string> issues;
     PerformancePackageReaderResult package;

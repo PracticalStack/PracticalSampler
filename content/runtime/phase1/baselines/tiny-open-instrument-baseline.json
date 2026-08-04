@@ -5,7 +5,7 @@
   "referenceManifestPath": "content/runtime/phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drinst",
   "timingUnits": "microseconds",
   "staticExpectations": {
-    "manifestBytes": 3343,
+    "manifestBytes": 3353,
     "sourceProjectResolved": true,
     "compiledStreamAssetResolved": true,
     "macroCount": 2,
@@ -16,13 +16,13 @@
     "totalPrefetchBytes": 65536
   },
   "latestObserved": {
-    "capturedOn": "2026-07-19",
-    "coldLoadMicros": 8082,
-    "warmLoadMicros": 1193
+    "capturedOn": "2026-08-04",
+    "coldLoadMicros": 1983,
+    "warmLoadMicros": 1627
   },
   "driftPolicy": {
     "allowedPositiveDriftMicros": 5000,
-    "allowedNegativeDriftMicros": 10000
+    "allowedNegativeDriftMicros": 5000
   },
   "notes": [
     "This file is the checked-in Sprint 1 baseline snapshot for the tiny open instrument.",

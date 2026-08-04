@@ -10,9 +10,11 @@
       "projectPath": "tiny-open-instrument/tiny-open-instrument.drsproj",
       "instrumentManifestPath": "tiny-open-instrument/tiny-open-instrument.drinst",
       "streamAssetPath": "tiny-open-instrument/tiny-open-instrument.drstrm",
+      "packageCorpusIndexPath": "tiny-open-instrument/performance-package-corpus/index.json",
       "notes": [
         "This is the canonical Sprint 1 loader fixture.",
-        "It reuses the existing open HISE sample assets until the native compiler lands in Sprint 2."
+        "It reuses the existing open HISE sample assets until the native compiler lands in Sprint 2.",
+        "Sprint 7 adds a checked-in sealed package corpus beside this fixture for package hardening and loader diagnostics."
       ]
     },
     {
