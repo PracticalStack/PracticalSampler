@@ -190,6 +190,8 @@ std::string buildReferencePackageManifest(const drs::engine::RuntimeProjectLoadR
     appendPackageFile("projectManifest", referenceProject.manifestPath);
     appendPackageFile("instrumentManifest", referenceInstrument.manifestPath);
     appendPackageFile("streamContainer", referenceStream.containerPath);
+    if (!referenceStream.container.payloadAssetPath.empty())
+        appendPackageFile("streamPayload", referenceStream.container.payloadAssetPath);
     packageManifest["packageFiles"] = std::move(packageFiles);
 
     ordered_json sourceSamples = ordered_json::array();
@@ -228,6 +230,7 @@ std::string buildReferencePackageManifest(const drs::engine::RuntimeProjectLoadR
     compiledRuntime["streamSampleCount"] = referenceStream.metrics.sampleCount;
     compiledRuntime["streamPageCount"] = referenceStream.metrics.pageCount;
     compiledRuntime["totalPayloadBytes"] = referenceStream.container.totalPayloadBytes;
+    compiledRuntime["payloadFileBytes"] = referenceStream.container.payloadFileBytes;
     packageManifest["compiledRuntime"] = std::move(compiledRuntime);
 
     ordered_json validation = ordered_json::array();

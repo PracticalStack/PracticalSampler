@@ -123,6 +123,6 @@
   "validationNotes": [
     "Uses the existing open HISE sample assets as stand-in sample sources for Sprint 1.",
     "Exercises two articulations, two groups, velocity-layer routing, and explicit prefetch metadata.",
-    "Acts as the canonical loader fixture until the import compiler lands in Sprint 2."
+    "Acts as the canonical loader fixture for the deterministic stream index and payload writer."
   ]
 }

@@ -5,6 +5,7 @@
 #include <json/json.hpp>
 
 #include <algorithm>
+#include <array>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -138,6 +139,47 @@ std::string computeFnv1aChecksumHex(const fs::path& path)
     return stream.str();
 }
 
+std::string computeFnv1aChecksumHexForRange(const fs::path& path,
+                                            const std::uint64_t offsetBytes,
+                                            const std::uint64_t sizeBytes)
+{
+    constexpr std::uint64_t offsetBasis = 14695981039346656037ull;
+    constexpr std::uint64_t prime = 1099511628211ull;
+
+    std::ifstream input(path, std::ios::binary);
+    if (!input.good())
+        return {};
+
+    input.seekg(static_cast<std::streamoff>(offsetBytes), std::ios::beg);
+    if (!input.good())
+        return {};
+
+    std::uint64_t hash = offsetBasis;
+    std::array<char, 4096> buffer {};
+    auto remainingBytes = sizeBytes;
+
+    while (remainingBytes > 0)
+    {
+        const auto chunkBytes = static_cast<std::streamsize>(
+            std::min<std::uint64_t>(remainingBytes, static_cast<std::uint64_t>(buffer.size())));
+        input.read(buffer.data(), chunkBytes);
+        if (!input.good() && input.gcount() != chunkBytes)
+            return {};
+
+        for (std::streamsize index = 0; index < chunkBytes; ++index)
+        {
+            hash ^= static_cast<unsigned char>(buffer[static_cast<std::size_t>(index)]);
+            hash *= prime;
+        }
+
+        remainingBytes -= static_cast<std::uint64_t>(chunkBytes);
+    }
+
+    std::ostringstream stream;
+    stream << std::hex << std::setfill('0') << std::setw(16) << hash;
+    return stream.str();
+}
+
 std::string inferChannelLayout(std::uint32_t channelCount)
 {
     switch (channelCount)
@@ -233,6 +275,43 @@ RuntimeStreamLoadResult loadRuntimeStreamContainer(const std::string& containerP
     if (const auto totalPayloadBytes = readRequired<std::uint64_t>(root, result, "totalPayloadBytes", "StreamContainer"))
         container.totalPayloadBytes = *totalPayloadBytes;
 
+    if (const auto payloadAssetIterator = root.find("payloadAssetPath"); payloadAssetIterator != root.end())
+    {
+        if (!payloadAssetIterator->is_string())
+        {
+            addIssue(result, "StreamContainer field 'payloadAssetPath' must be a string when present.");
+        }
+        else
+        {
+            container.payloadAssetPath = toDisplayPath(resolveRelativePath(containerFsPath,
+                                                                           payloadAssetIterator->get<std::string>()));
+        }
+    }
+
+    if (const auto payloadFileBytesIterator = root.find("payloadFileBytes"); payloadFileBytesIterator != root.end())
+    {
+        if (!payloadFileBytesIterator->is_number_unsigned())
+        {
+            addIssue(result, "StreamContainer field 'payloadFileBytes' must be an unsigned integer when present.");
+        }
+        else
+        {
+            container.payloadFileBytes = payloadFileBytesIterator->get<std::uint64_t>();
+        }
+    }
+
+    if (const auto payloadFileChecksumIterator = root.find("payloadFileChecksumHex"); payloadFileChecksumIterator != root.end())
+    {
+        if (!payloadFileChecksumIterator->is_string())
+        {
+            addIssue(result, "StreamContainer field 'payloadFileChecksumHex' must be a string when present.");
+        }
+        else
+        {
+            container.payloadFileChecksumHex = payloadFileChecksumIterator->get<std::string>();
+        }
+    }
+
     const auto declaredSampleCount = readRequired<std::size_t>(root, result, "sampleCount", "StreamContainer");
 
     const auto samplesIterator = root.find("samples");
@@ -291,6 +370,19 @@ RuntimeStreamLoadResult loadRuntimeStreamContainer(const std::string& containerP
 
             if (const auto formatName = readRequired<std::string>(sampleObject, result, "formatName", context.c_str()))
                 sample.formatName = *formatName;
+
+            if (const auto payloadChecksumIterator = sampleObject.find("payloadChecksumHex");
+                payloadChecksumIterator != sampleObject.end())
+            {
+                if (!payloadChecksumIterator->is_string())
+                {
+                    addIssue(result, context + " field 'payloadChecksumHex' must be a string when present.");
+                }
+                else
+                {
+                    sample.payloadChecksumHex = payloadChecksumIterator->get<std::string>();
+                }
+            }
 
             if (const auto role = readRequired<std::string>(sampleObject, result, "role", context.c_str()))
                 sample.role = *role;
@@ -451,6 +543,92 @@ RuntimeStreamLoadResult loadRuntimeStreamContainer(const std::string& containerP
         {
             addIssue(result,
                      "Stream-container totalPayloadBytes did not match the sum of sample payload sizes.");
+        }
+
+        if (!container.payloadAssetPath.empty())
+        {
+            const fs::path payloadFsPath(container.payloadAssetPath);
+            if (!fs::exists(payloadFsPath, errorCode))
+            {
+                addIssue(result, "Stream payload asset does not exist: " + container.payloadAssetPath);
+            }
+            else
+            {
+                result.metrics.payloadAssetResolved = true;
+
+                const auto payloadFileBytes = fs::file_size(payloadFsPath, errorCode);
+                if (errorCode)
+                {
+                    addIssue(result, "Could not stat stream payload asset: " + container.payloadAssetPath);
+                }
+                else if (container.payloadFileBytes != 0 && payloadFileBytes != container.payloadFileBytes)
+                {
+                    addIssue(result, "Stream payload asset size did not match payloadFileBytes.");
+                }
+                else
+                {
+                    container.payloadFileBytes = payloadFileBytes;
+                }
+
+                if (!container.payloadFileChecksumHex.empty())
+                {
+                    const auto actualPayloadChecksum = computeFnv1aChecksumHex(payloadFsPath);
+                    if (actualPayloadChecksum.empty())
+                    {
+                        addIssue(result, "Could not compute checksum for stream payload asset: " + container.payloadAssetPath);
+                    }
+                    else if (actualPayloadChecksum != container.payloadFileChecksumHex)
+                    {
+                        addIssue(result,
+                                 "Stream payload asset checksum mismatch: expected " + container.payloadFileChecksumHex
+                                     + ", actual " + actualPayloadChecksum + ".");
+                    }
+                    else
+                    {
+                        ++result.metrics.payloadChecksumValidatedCount;
+                    }
+                }
+
+                for (std::size_t sampleIndex = 0; sampleIndex < container.samples.size(); ++sampleIndex)
+                {
+                    const auto& sample = container.samples[sampleIndex];
+                    const auto context = "StreamSample[" + std::to_string(sampleIndex) + "]";
+
+                    if (!sample.payloadChecksumHex.empty())
+                    {
+                        const auto payloadEndBytes = sample.payloadOffsetBytes + sample.payloadSizeBytes;
+                        if (payloadEndBytes > container.payloadFileBytes)
+                        {
+                            addIssue(result,
+                                     context + " payload bytes extend past the declared stream payload asset.");
+                            continue;
+                        }
+
+                        const auto actualSampleChecksum = computeFnv1aChecksumHexForRange(payloadFsPath,
+                                                                                          sample.payloadOffsetBytes,
+                                                                                          sample.payloadSizeBytes);
+                        if (actualSampleChecksum.empty())
+                        {
+                            addIssue(result,
+                                     context + " could not compute payload checksum from the stream payload asset.");
+                        }
+                        else if (actualSampleChecksum != sample.payloadChecksumHex)
+                        {
+                            addIssue(result,
+                                     context + " payload checksum mismatch: expected " + sample.payloadChecksumHex
+                                         + ", actual " + actualSampleChecksum + ".");
+                        }
+                        else
+                        {
+                            ++result.metrics.payloadChecksumValidatedCount;
+                        }
+                    }
+                    else
+                    {
+                        addIssue(result, context + " must provide payloadChecksumHex when payloadAssetPath is present.");
+                    }
+                }
+            }
         }
     }
 

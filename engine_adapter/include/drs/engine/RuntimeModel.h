@@ -377,6 +377,7 @@ struct RuntimeStreamSampleDefinition
     std::string sampleId;
     std::string sourcePath;
     std::string sourceChecksumHex;
+    std::string payloadChecksumHex;
     std::string formatName;
     std::string role;
     std::string channelLayout;
@@ -402,6 +403,9 @@ struct RuntimeStreamContainerModel
     std::uint64_t pageSizeBytes = 0;
     std::string payloadEncoding;
     std::uint64_t totalPayloadBytes = 0;
+    std::string payloadAssetPath;
+    std::uint64_t payloadFileBytes = 0;
+    std::string payloadFileChecksumHex;
     std::vector<RuntimeStreamSampleDefinition> samples;
     std::vector<std::string> notes;
 };
@@ -426,6 +430,8 @@ struct RuntimeStreamLoadMetrics
     std::size_t sampleCount = 0;
     std::size_t pageCount = 0;
     std::size_t checksumValidatedCount = 0;
+    std::size_t payloadChecksumValidatedCount = 0;
+    bool payloadAssetResolved = false;
     bool payloadLayoutValidated = false;
     bool pageTableValidated = false;
 };

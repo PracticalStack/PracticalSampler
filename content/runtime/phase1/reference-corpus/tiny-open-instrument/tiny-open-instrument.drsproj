@@ -19,6 +19,6 @@
   ],
   "notes": [
     "Sprint 1 project fixture used to validate the product-owned runtime model and loader seam.",
-    "The native importer and compiled stream writer are intentionally deferred to Sprint 2."
+    "Sprint 2 finalizes the compiled stream path with a deterministic binary payload writer."
   ]
 }

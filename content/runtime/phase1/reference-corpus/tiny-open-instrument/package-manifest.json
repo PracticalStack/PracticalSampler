@@ -15,20 +15,26 @@
     {
       "role": "projectManifest",
       "path": "tiny-open-instrument.drsproj",
-      "sizeBytes": 757,
-      "checksumHex": "25d1c5a427cbb63d"
+      "sizeBytes": 758,
+      "checksumHex": "b1d52e563d5ecd4b"
     },
     {
       "role": "instrumentManifest",
       "path": "tiny-open-instrument.drinst",
-      "sizeBytes": 3343,
-      "checksumHex": "20d0d633b8978fc0"
+      "sizeBytes": 3353,
+      "checksumHex": "95e7e568b3e65b30"
     },
     {
       "role": "streamContainer",
       "path": "tiny-open-instrument.drstrm",
-      "sizeBytes": 2703,
-      "checksumHex": "cd134c0007a86a94"
+      "sizeBytes": 2962,
+      "checksumHex": "ebc4e8381af1b1c1"
+    },
+    {
+      "role": "streamPayload",
+      "path": "tiny-open-instrument.drstrm.bin",
+      "sizeBytes": 786432,
+      "checksumHex": "02b6538956a714fe"
     }
   ],
   "sourceSamples": [
@@ -68,7 +74,8 @@
     "streamPageSizeBytes": 65536,
     "streamSampleCount": 2,
     "streamPageCount": 12,
-    "totalPayloadBytes": 705600
+    "totalPayloadBytes": 705600,
+    "payloadFileBytes": 786432
   },
   "validation": [
     "Build and run drs_phase1_runtime_fixture_tool --verify to confirm the checked-in manifests and package metadata still match the canonical runtime serializers.",

@@ -1,5 +1,6 @@
 #include "drs/engine/RuntimeCompiler.h"
 #include "drs/engine/RuntimeLoader.h"
+#include "drs/engine/RuntimeStream.h"
 #include "drs/engine/SampleImport.h"
 
 #include <json/json.hpp>
@@ -10,6 +11,7 @@
 #include <stdexcept>
 #include <string>
 #include <algorithm>
+#include <vector>
 
 namespace
 {
@@ -26,6 +28,12 @@ std::string readTextFile(const fs::path& path)
 {
     std::ifstream input(path, std::ios::binary);
     return std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+}
+
+std::vector<char> readBinaryFile(const fs::path& path)
+{
+    std::ifstream input(path, std::ios::binary);
+    return std::vector<char>(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
 }
 
 void writeTextFile(const fs::path& path, const std::string& text)
@@ -83,12 +91,12 @@ drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path& output
     plan.pageSizeBytes = 65536;
     plan.projectNotes = {
         "Sprint 1 project fixture used to validate the product-owned runtime model and loader seam.",
-        "The native importer and compiled stream writer are intentionally deferred to Sprint 2."
+        "Sprint 2 finalizes the compiled stream path with a deterministic binary payload writer."
     };
     plan.instrumentValidationNotes = {
         "Uses the existing open HISE sample assets as stand-in sample sources for Sprint 1.",
         "Exercises two articulations, two groups, velocity-layer routing, and explicit prefetch metadata.",
-        "Acts as the canonical loader fixture until the import compiler lands in Sprint 2."
+        "Acts as the canonical loader fixture for the deterministic stream index and payload writer."
     };
 
     drs::engine::RuntimeCompileSourceDefinition sineSource;
@@ -210,18 +218,30 @@ int main()
         const auto referenceCompilePlan = buildReferenceCompilePlan(referenceDirectory);
         const auto tempCompilePlan = buildReferenceCompilePlan(compileOutputDirectory);
 
-        const auto firstCompile = drs::engine::compileRuntimeInstrument(referenceCompilePlan);
+        auto firstCompile = drs::engine::compileRuntimeInstrument(referenceCompilePlan);
         require(firstCompile.compiled, "Reference compile plan should compile successfully.");
+        auto firstWriteCompile = firstCompile;
+        firstWriteCompile.payloadFilePath = (compileOutputDirectory / "reference-pass-1" / "tiny-open-instrument.drstrm.bin").generic_string();
+        const auto firstWrite = drs::engine::writeCompiledStreamAssets(firstWriteCompile);
+        require(firstWrite.written, "Reference compile plan should write compiled stream assets successfully.");
+        firstCompile = firstWriteCompile;
+        firstCompile.payloadFilePath = drs::engine::buildCompiledStreamPayloadPath(referenceCompilePlan.outputStreamPath);
 
-        const auto secondCompile = drs::engine::compileRuntimeInstrument(referenceCompilePlan);
+        auto secondCompile = drs::engine::compileRuntimeInstrument(referenceCompilePlan);
         require(secondCompile.compiled, "Reference compile plan should compile successfully on the second pass.");
+        auto secondWriteCompile = secondCompile;
+        secondWriteCompile.payloadFilePath = (compileOutputDirectory / "reference-pass-2" / "tiny-open-instrument.drstrm.bin").generic_string();
+        const auto secondWrite = drs::engine::writeCompiledStreamAssets(secondWriteCompile);
+        require(secondWrite.written, "Reference compile plan should write compiled stream assets successfully on the second pass.");
+        secondCompile = secondWriteCompile;
+        secondCompile.payloadFilePath = drs::engine::buildCompiledStreamPayloadPath(referenceCompilePlan.outputStreamPath);
 
         const auto generatedProjectJson = drs::engine::serializeRuntimeProjectManifest(firstCompile.project,
                                                                                        referenceCompilePlan.outputProjectPath);
         const auto generatedInstrumentJson = drs::engine::serializeRuntimeInstrumentManifest(firstCompile.instrument,
                                                                                             referenceCompilePlan.outputInstrumentPath);
-        const auto generatedStreamJson = drs::engine::serializePrototypeStreamContainer(firstCompile,
-                                                                                         referenceCompilePlan.outputStreamPath);
+        const auto generatedStreamJson = drs::engine::serializeCompiledStreamIndex(firstCompile,
+                                                                                   referenceCompilePlan.outputStreamPath);
 
         require(generatedProjectJson == drs::engine::serializeRuntimeProjectManifest(secondCompile.project,
                                                                                      referenceCompilePlan.outputProjectPath),
@@ -229,19 +249,23 @@ int main()
         require(generatedInstrumentJson == drs::engine::serializeRuntimeInstrumentManifest(secondCompile.instrument,
                                                                                            referenceCompilePlan.outputInstrumentPath),
                 "Instrument manifest generation must be deterministic.");
-        require(generatedStreamJson == drs::engine::serializePrototypeStreamContainer(secondCompile,
-                                                                                      referenceCompilePlan.outputStreamPath),
-                "Stream container generation must be deterministic.");
+        require(generatedStreamJson == drs::engine::serializeCompiledStreamIndex(secondCompile,
+                                                                                 referenceCompilePlan.outputStreamPath),
+                "Stream index generation must be deterministic.");
+        require(firstWrite.payloadFileChecksumHex == secondWrite.payloadFileChecksumHex,
+                "Compiled stream payload generation must be deterministic.");
 
-        const auto tempCompile = drs::engine::compileRuntimeInstrument(tempCompilePlan);
+        auto tempCompile = drs::engine::compileRuntimeInstrument(tempCompilePlan);
         require(tempCompile.compiled, "Temp compile plan should compile successfully.");
+        const auto tempWrite = drs::engine::writeCompiledStreamAssets(tempCompile);
+        require(tempWrite.written, "Temp compile plan should write compiled stream assets successfully.");
 
         const auto tempProjectJson = drs::engine::serializeRuntimeProjectManifest(tempCompile.project,
                                                                                   tempCompilePlan.outputProjectPath);
         const auto tempInstrumentJson = drs::engine::serializeRuntimeInstrumentManifest(tempCompile.instrument,
                                                                                        tempCompilePlan.outputInstrumentPath);
-        const auto tempStreamJson = drs::engine::serializePrototypeStreamContainer(tempCompile,
-                                                                                   tempCompilePlan.outputStreamPath);
+        const auto tempStreamJson = drs::engine::serializeCompiledStreamIndex(tempCompile,
+                                                                              tempCompilePlan.outputStreamPath);
 
         writeTextFile(fs::path(tempCompilePlan.outputProjectPath), tempProjectJson);
         writeTextFile(fs::path(tempCompilePlan.outputInstrumentPath), tempInstrumentJson);
@@ -250,12 +274,15 @@ int main()
         const auto checkedInProjectPath = referenceDirectory / "tiny-open-instrument.drsproj";
         const auto checkedInInstrumentPath = referenceDirectory / "tiny-open-instrument.drinst";
         const auto checkedInStreamPath = referenceDirectory / "tiny-open-instrument.drstrm";
+        const auto checkedInPayloadPath = fs::path(drs::engine::buildCompiledStreamPayloadPath(referenceCompilePlan.outputStreamPath));
         require(generatedProjectJson == readTextFile(checkedInProjectPath),
                 "Compiler-generated project manifest no longer matches the checked-in reference artifact.");
         require(generatedInstrumentJson == readTextFile(checkedInInstrumentPath),
                 "Compiler-generated instrument manifest no longer matches the checked-in reference artifact.");
         require(generatedStreamJson == readTextFile(checkedInStreamPath),
-                "Compiler-generated stream descriptor no longer matches the checked-in reference artifact.");
+                "Compiler-generated stream index no longer matches the checked-in reference artifact.");
+        require(readBinaryFile(firstWrite.payloadPath) == readBinaryFile(checkedInPayloadPath),
+                "Compiler-generated stream payload no longer matches the checked-in reference artifact.");
 
         const auto generatedProjectLoad = drs::engine::loadRuntimeProjectManifest(tempCompilePlan.outputProjectPath);
         require(generatedProjectLoad.loaded, "Loader must open the compiler-generated project manifest.");
@@ -267,17 +294,27 @@ int main()
         require(generatedInstrumentLoad.metrics.zoneCount == 4, "Compiler-generated manifest zone count changed unexpectedly.");
         require(generatedInstrumentLoad.metrics.totalPrefetchBytes == 65536,
                 "Compiler-generated manifest total prefetch bytes changed unexpectedly.");
+        const auto generatedStreamLoad = drs::engine::loadRuntimeStreamContainer(tempCompilePlan.outputStreamPath);
+        require(generatedStreamLoad.loaded, "Loader must open the compiler-generated stream index and payload.");
+        require(generatedStreamLoad.metrics.payloadAssetResolved,
+                "Compiler-generated stream payload asset should resolve successfully.");
+        require(generatedStreamLoad.metrics.payloadChecksumValidatedCount == 3,
+                "Compiler-generated stream payload checksum validation count changed unexpectedly.");
 
         const auto streamJson = json::parse(generatedStreamJson);
         require(streamJson.at("schemaName").get<std::string>() == "drs.streamContainer",
-                "Compiler-generated stream descriptor schema name changed unexpectedly.");
+                "Compiler-generated stream index schema name changed unexpectedly.");
         require(streamJson.at("sampleCount").get<int>() == 2,
-                "Compiler-generated stream descriptor sample count changed unexpectedly.");
+                "Compiler-generated stream index sample count changed unexpectedly.");
         require(streamJson.at("pageSizeBytes").get<std::uint64_t>() == 65536,
-                "Compiler-generated stream descriptor page size changed unexpectedly.");
+                "Compiler-generated stream index page size changed unexpectedly.");
+        require(streamJson.at("payloadAssetPath").get<std::string>() == "tiny-open-instrument.drstrm.bin",
+                "Compiler-generated stream index payload asset path changed unexpectedly.");
+        require(streamJson.at("payloadFileChecksumHex").get<std::string>() == firstWrite.payloadFileChecksumHex,
+                "Compiler-generated stream index payload checksum changed unexpectedly.");
 
         const auto& samples = streamJson.at("samples");
-        require(samples.is_array() && samples.size() == 2, "Compiler-generated stream descriptor must list two samples.");
+        require(samples.is_array() && samples.size() == 2, "Compiler-generated stream index must list two samples.");
         require(samples.at(0).at("sampleId").get<std::string>() == "sine-a3",
                 "First compiled stream sample id changed unexpectedly.");
         require(samples.at(1).at("sampleId").get<std::string>() == "triangle-a4",
@@ -286,6 +323,8 @@ int main()
                 "First compiled stream prefetch size changed unexpectedly.");
         require(samples.at(1).at("prefetchBytes").get<std::uint64_t>() == 16384,
                 "Second compiled stream prefetch size changed unexpectedly.");
+        require(!samples.at(0).at("payloadChecksumHex").get<std::string>().empty(),
+                "Compiled stream samples should include payload checksums.");
         require(samples.at(1).at("payloadOffsetBytes").get<std::uint64_t>()
                     > samples.at(0).at("payloadOffsetBytes").get<std::uint64_t>(),
                 "Compiled stream payload offsets must advance monotonically.");
@@ -309,6 +348,15 @@ int main()
                            "content root",
                            "Compile policy rejection should explain the content-root layout rule.");
 
+        auto duplicateSourcePlan = tempCompilePlan;
+        duplicateSourcePlan.sampleSources.push_back(duplicateSourcePlan.sampleSources.front());
+        const auto duplicateSourceCompile = drs::engine::compileRuntimeInstrument(duplicateSourcePlan);
+        require(!duplicateSourceCompile.compiled,
+                "Compile plan with duplicate source ids should be rejected.");
+        requireAnyContains(duplicateSourceCompile.issues,
+                           "duplicate id",
+                           "Compile rejection should explain duplicate source ids.");
+
         auto awkwardNamingPlan = tempCompilePlan;
         awkwardNamingPlan.sampleSources.front().sourcePath = (fs::path(awkwardNamingPlan.contentRootPath) / "Samples" / "Bad Name!.wav").generic_string();
         awkwardNamingPlan.sampleSources.front().metadata.sourcePath = awkwardNamingPlan.sampleSources.front().sourcePath;
@@ -320,6 +368,15 @@ int main()
         requireAnyContains(awkwardNamingCompile.warnings,
                            "portable sample names",
                            "Compile warnings should preserve the naming-policy guidance.");
+
+        auto missingPayloadCompile = tempCompile;
+        missingPayloadCompile.streamSamples.front().sourcePath = (compileOutputDirectory / "missing-source.wav").generic_string();
+        const auto missingPayloadWrite = drs::engine::writeCompiledStreamAssets(missingPayloadCompile);
+        require(!missingPayloadWrite.written,
+                "Compiled stream writer should reject missing source samples.");
+        requireAnyContains(missingPayloadWrite.issues,
+                           "could not decode source sample",
+                           "Compiled stream writer rejection should explain missing source samples.");
 
         std::cout << "Phase 1 compile path tests passed." << std::endl;
         return 0;

@@ -3,7 +3,11 @@
 #include <json/json.hpp>
 
 #include <algorithm>
+#include <array>
+#include <cstring>
 #include <filesystem>
+#include <fstream>
+#include <iomanip>
 #include <optional>
 #include <sstream>
 #include <string_view>
@@ -15,6 +19,8 @@ namespace
 {
 namespace fs = std::filesystem;
 using ordered_json = nlohmann::ordered_json;
+constexpr std::uint64_t kFnv1aOffsetBasis = 14695981039346656037ull;
+constexpr std::uint64_t kFnv1aPrime = 1099511628211ull;
 
 void addIssue(RuntimeCompileResult& result, const std::string& issue)
 {
@@ -24,6 +30,11 @@ void addIssue(RuntimeCompileResult& result, const std::string& issue)
 void addWarning(RuntimeCompileResult& result, const std::string& warning)
 {
     result.warnings.push_back(warning);
+}
+
+void addIssue(RuntimeStreamWriteResult& result, const std::string& issue)
+{
+    result.issues.push_back(issue);
 }
 
 std::uint64_t alignUp(std::uint64_t value, std::uint64_t alignment)
@@ -62,14 +73,116 @@ std::string toContainerRelativePath(const fs::path& containerPath, const std::st
 
 std::uint64_t computeFnv1a64(std::string_view text) noexcept
 {
-    std::uint64_t hash = 14695981039346656037ull;
+    std::uint64_t hash = kFnv1aOffsetBasis;
     for (const auto character : text)
     {
         hash ^= static_cast<unsigned char>(character);
-        hash *= 1099511628211ull;
+        hash *= kFnv1aPrime;
     }
 
     return hash;
+}
+
+std::uint64_t updateFnv1a64(std::uint64_t hash, const void* data, const std::size_t byteCount) noexcept
+{
+    const auto* bytes = static_cast<const unsigned char*>(data);
+    for (std::size_t index = 0; index < byteCount; ++index)
+    {
+        hash ^= bytes[index];
+        hash *= kFnv1aPrime;
+    }
+
+    return hash;
+}
+
+std::string formatFnv1a64Hex(const std::uint64_t hash)
+{
+    std::ostringstream stream;
+    stream << std::hex << std::setfill('0') << std::setw(16) << hash;
+    return stream.str();
+}
+
+bool writeRepeatedByte(std::ofstream& output,
+                       std::uint8_t value,
+                       std::uint64_t byteCount,
+                       std::uint64_t& hash)
+{
+    if (byteCount == 0)
+        return true;
+
+    std::array<std::uint8_t, 4096> buffer {};
+    buffer.fill(value);
+
+    auto remaining = byteCount;
+    while (remaining > 0)
+    {
+        const auto chunkBytes = static_cast<std::size_t>(std::min<std::uint64_t>(remaining, buffer.size()));
+        output.write(reinterpret_cast<const char*>(buffer.data()), static_cast<std::streamsize>(chunkBytes));
+        if (!output.good())
+            return false;
+
+        hash = updateFnv1a64(hash, buffer.data(), chunkBytes);
+        remaining -= chunkBytes;
+    }
+
+    return true;
+}
+
+bool writeFloat32LittleEndian(std::ofstream& output,
+                              float value,
+                              std::uint64_t& hash,
+                              std::uint64_t* secondaryHash = nullptr)
+{
+    std::uint32_t bits = 0;
+    static_assert(sizeof(bits) == sizeof(value), "Float32 writer expects 32-bit floats.");
+    std::memcpy(&bits, &value, sizeof(bits));
+
+    const std::uint8_t bytes[] = {
+        static_cast<std::uint8_t>(bits & 0xffu),
+        static_cast<std::uint8_t>((bits >> 8u) & 0xffu),
+        static_cast<std::uint8_t>((bits >> 16u) & 0xffu),
+        static_cast<std::uint8_t>((bits >> 24u) & 0xffu)
+    };
+
+    output.write(reinterpret_cast<const char*>(bytes), static_cast<std::streamsize>(sizeof(bytes)));
+    if (!output.good())
+        return false;
+
+    hash = updateFnv1a64(hash, bytes, sizeof(bytes));
+    if (secondaryHash != nullptr)
+        *secondaryHash = updateFnv1a64(*secondaryHash, bytes, sizeof(bytes));
+    return true;
+}
+
+bool metadataMatchesCompiledSample(const ImportedSampleMetadata& metadata,
+                                   const CompiledStreamSampleDefinition& sample,
+                                   std::string& mismatch)
+{
+    if (metadata.sourceChecksumHex != sample.sourceChecksumHex)
+    {
+        mismatch = "checksum";
+        return false;
+    }
+
+    if (metadata.sampleRate != sample.sampleRate)
+    {
+        mismatch = "sampleRate";
+        return false;
+    }
+
+    if (metadata.frameCount != sample.frameCount)
+    {
+        mismatch = "frameCount";
+        return false;
+    }
+
+    if (metadata.channelCount != sample.channelCount)
+    {
+        mismatch = "channelCount";
+        return false;
+    }
+
+    return true;
 }
 
 std::uint64_t buildCrossfadePairingKey(const RuntimeCompileZoneDefinition& zone)
@@ -198,6 +311,9 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
     if (plan.pageSizeBytes == 0)
         addIssue(result, "Compile plan pageSizeBytes must be greater than zero.");
 
+    if (plan.outputStreamPath.empty())
+        addIssue(result, "Compile plan outputStreamPath must be non-empty.");
+
     if (plan.sampleSources.empty())
         addIssue(result, "Compile plan must provide at least one sample source.");
 
@@ -247,7 +363,13 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
             continue;
         }
 
-        sourceById.emplace(sampleSource.id, sampleSource);
+        const auto [sourceIterator, inserted] = sourceById.emplace(sampleSource.id, sampleSource);
+        if (!inserted)
+        {
+            static_cast<void>(sourceIterator);
+            addIssue(result, "Compile source ids must be unique; duplicate id '" + sampleSource.id + "' was provided.");
+            continue;
+        }
 
         const auto policyReport = evaluatePhase1SamplePolicy(sampleSource.metadata, plan.contentRootPath);
         for (const auto& warning : policyReport.warnings)
@@ -305,6 +427,7 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
     result.instrument.groups = plan.groups;
     result.instrument.roundRobinResetRules = plan.roundRobinResetRules;
     result.instrument.validationNotes = plan.instrumentValidationNotes;
+    result.payloadFilePath = buildCompiledStreamPayloadPath(plan.outputStreamPath);
 
     std::unordered_map<std::string, bool> articulationIds;
     for (const auto& articulation : plan.articulations)
@@ -444,6 +567,7 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
             page.offsetBytes = nextOffsetBytes + streamedOffsetBytes;
             page.sizeBytes = std::min(plan.pageSizeBytes, payloadSizeBytes - streamedOffsetBytes);
             streamSample.pages.push_back(std::move(page));
+            ++result.totalPageCount;
             streamedOffsetBytes += plan.pageSizeBytes;
         }
 
@@ -452,6 +576,8 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         result.streamSamples.push_back(std::move(streamSample));
         nextOffsetBytes += alignUp(payloadSizeBytes, plan.pageSizeBytes);
     }
+
+    result.alignedPayloadBytes = nextOffsetBytes;
 
     for (const auto& zonePlan : plan.zones)
     {
@@ -494,7 +620,171 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
     return result;
 }
 
-std::string serializePrototypeStreamContainer(const RuntimeCompileResult& result, const std::string& containerPath)
+std::string buildCompiledStreamPayloadPath(const std::string& containerPath)
+{
+    return containerPath + ".bin";
+}
+
+RuntimeStreamWriteResult writeCompiledStreamAssets(RuntimeCompileResult& result)
+{
+    RuntimeStreamWriteResult writeResult;
+    writeResult.containerPath = result.instrument.compiledStreamAssetPath;
+    writeResult.payloadPath = result.payloadFilePath.empty()
+        ? buildCompiledStreamPayloadPath(result.instrument.compiledStreamAssetPath)
+        : result.payloadFilePath;
+    writeResult.totalPayloadBytes = result.totalPayloadBytes;
+    writeResult.alignedPayloadBytes = result.alignedPayloadBytes;
+    writeResult.totalPageCount = result.totalPageCount;
+    writeResult.state = "Compiled stream payload write not attempted";
+
+    if (!result.compiled)
+    {
+        addIssue(writeResult, "Cannot write compiled stream assets for a compile result that did not succeed.");
+        writeResult.state = "Compiled stream payload write rejected";
+        return writeResult;
+    }
+
+    if (writeResult.payloadPath.empty())
+    {
+        addIssue(writeResult, "Compiled stream payload path was empty.");
+        writeResult.state = "Compiled stream payload write rejected";
+        return writeResult;
+    }
+
+    const fs::path payloadFsPath(writeResult.payloadPath);
+    std::error_code errorCode;
+    fs::create_directories(payloadFsPath.parent_path(), errorCode);
+
+    std::ofstream output(payloadFsPath, std::ios::binary | std::ios::trunc);
+    if (!output.good())
+    {
+        addIssue(writeResult, "Could not open compiled stream payload for writing: " + payloadFsPath.generic_string());
+        writeResult.state = "Compiled stream payload write failed";
+        return writeResult;
+    }
+
+    std::uint64_t fileHash = kFnv1aOffsetBasis;
+    std::uint64_t currentOffsetBytes = 0;
+
+    for (auto& sample : result.streamSamples)
+    {
+        if (sample.payloadOffsetBytes < currentOffsetBytes)
+        {
+            addIssue(writeResult,
+                     "Compiled stream sample '" + sample.sampleId + "' regressed payload offsets while writing.");
+            writeResult.state = "Compiled stream payload write failed";
+            return writeResult;
+        }
+
+        if (!writeRepeatedByte(output, 0, sample.payloadOffsetBytes - currentOffsetBytes, fileHash))
+        {
+            addIssue(writeResult, "Could not write alignment padding into compiled stream payload.");
+            writeResult.state = "Compiled stream payload write failed";
+            return writeResult;
+        }
+
+        currentOffsetBytes = sample.payloadOffsetBytes;
+
+        const auto importedSample = importSampleFile(sample.sourcePath, sample.sourceChecksumHex);
+        if (!importedSample.imported)
+        {
+            addIssue(writeResult,
+                     "Compiled stream writer could not decode source sample '" + sample.sourcePath
+                         + "' for sampleId '" + sample.sampleId + "'.");
+            for (const auto& issue : importedSample.issues)
+                addIssue(writeResult, "Source '" + sample.sampleId + "': " + issue);
+            writeResult.state = "Compiled stream payload write failed";
+            return writeResult;
+        }
+
+        std::string mismatch;
+        if (!metadataMatchesCompiledSample(importedSample.sample.metadata, sample, mismatch))
+        {
+            addIssue(writeResult,
+                     "Compiled stream writer metadata drifted for sample '" + sample.sampleId
+                         + "' while validating '" + mismatch + "'.");
+            writeResult.state = "Compiled stream payload write failed";
+            return writeResult;
+        }
+
+        const auto expectedPayloadBytes = sample.frameCount
+            * static_cast<std::uint64_t>(sample.channelCount)
+            * sizeof(float);
+        if (expectedPayloadBytes != sample.payloadSizeBytes)
+        {
+            addIssue(writeResult,
+                     "Compiled stream sample '" + sample.sampleId
+                         + "' declared payloadSizeBytes that did not match decoded frame and channel counts.");
+            writeResult.state = "Compiled stream payload write failed";
+            return writeResult;
+        }
+
+        if (importedSample.sample.normalizedChannels.size() != sample.channelCount)
+        {
+            addIssue(writeResult,
+                     "Compiled stream writer decoded an unexpected channel count for sample '" + sample.sampleId + "'.");
+            writeResult.state = "Compiled stream payload write failed";
+            return writeResult;
+        }
+
+        std::uint64_t sampleHash = kFnv1aOffsetBasis;
+        for (std::uint64_t frameIndex = 0; frameIndex < sample.frameCount; ++frameIndex)
+        {
+            for (std::uint32_t channelIndex = 0; channelIndex < sample.channelCount; ++channelIndex)
+            {
+                const auto& channel = importedSample.sample.normalizedChannels[static_cast<std::size_t>(channelIndex)];
+                if (frameIndex >= channel.size())
+                {
+                    addIssue(writeResult,
+                             "Compiled stream writer decoded fewer frames than expected for sample '"
+                                 + sample.sampleId + "'.");
+                    writeResult.state = "Compiled stream payload write failed";
+                    return writeResult;
+                }
+
+                const auto value = channel[static_cast<std::size_t>(frameIndex)];
+                if (!writeFloat32LittleEndian(output, value, sampleHash, &fileHash))
+                {
+                    addIssue(writeResult,
+                             "Could not write interleaved sample payload bytes for sample '" + sample.sampleId + "'.");
+                    writeResult.state = "Compiled stream payload write failed";
+                    return writeResult;
+                }
+            }
+        }
+
+        sample.payloadChecksumHex = formatFnv1a64Hex(sampleHash);
+        currentOffsetBytes += sample.payloadSizeBytes;
+        const auto alignedEndBytes = alignUp(sample.payloadOffsetBytes + sample.payloadSizeBytes, result.pageSizeBytes);
+        if (!writeRepeatedByte(output, 0, alignedEndBytes - currentOffsetBytes, fileHash))
+        {
+            addIssue(writeResult, "Could not write trailing alignment padding into compiled stream payload.");
+            writeResult.state = "Compiled stream payload write failed";
+            return writeResult;
+        }
+
+        currentOffsetBytes = alignedEndBytes;
+    }
+
+    output.flush();
+    if (!output.good())
+    {
+        addIssue(writeResult, "Could not finish writing compiled stream payload: " + payloadFsPath.generic_string());
+        writeResult.state = "Compiled stream payload write failed";
+        return writeResult;
+    }
+
+    result.payloadFilePath = writeResult.payloadPath;
+    result.alignedPayloadBytes = currentOffsetBytes;
+    result.payloadFileChecksumHex = formatFnv1a64Hex(fileHash);
+    writeResult.alignedPayloadBytes = result.alignedPayloadBytes;
+    writeResult.payloadFileChecksumHex = result.payloadFileChecksumHex;
+    writeResult.written = true;
+    writeResult.state = "Compiled stream payload written";
+    return writeResult;
+}
+
+std::string serializeCompiledStreamIndex(const RuntimeCompileResult& result, const std::string& containerPath)
 {
     const fs::path containerFsPath(containerPath);
     ordered_json root;
@@ -505,6 +795,9 @@ std::string serializePrototypeStreamContainer(const RuntimeCompileResult& result
     root["sampleCount"] = result.streamSamples.size();
     root["payloadEncoding"] = "f32-interleaved-little-endian";
     root["totalPayloadBytes"] = result.totalPayloadBytes;
+    root["payloadAssetPath"] = toContainerRelativePath(containerFsPath, result.payloadFilePath);
+    root["payloadFileBytes"] = result.alignedPayloadBytes;
+    root["payloadFileChecksumHex"] = result.payloadFileChecksumHex;
 
     ordered_json samples = ordered_json::array();
     for (const auto& sample : result.streamSamples)
@@ -513,6 +806,7 @@ std::string serializePrototypeStreamContainer(const RuntimeCompileResult& result
         sampleObject["sampleId"] = sample.sampleId;
         sampleObject["sourcePath"] = toContainerRelativePath(containerFsPath, sample.sourcePath);
         sampleObject["sourceChecksumHex"] = sample.sourceChecksumHex;
+        sampleObject["payloadChecksumHex"] = sample.payloadChecksumHex;
         sampleObject["formatName"] = sample.formatName;
         sampleObject["role"] = sample.role;
         sampleObject["channelLayout"] = sample.channelLayout;
@@ -548,8 +842,8 @@ std::string serializePrototypeStreamContainer(const RuntimeCompileResult& result
 
     root["samples"] = std::move(samples);
     root["notes"] = serializeStringArray({
-        "Sprint 2 compiler-emitted prototype stream-container descriptor.",
-        "Carries deterministic payload offsets, prefetch heads, and page-table placeholders for the reference instrument."
+        "Sprint 2 compiler-emitted stream index with a sibling binary payload asset.",
+        "Carries deterministic payload offsets, per-sample checksums, prefetch heads, and page-table layout for the runtime stream writer."
     });
 
     return root.dump(2) + "\n";

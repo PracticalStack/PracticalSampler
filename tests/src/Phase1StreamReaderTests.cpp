@@ -60,6 +60,10 @@ int main()
         require(streamResult.metrics.pageCount == 12, "Reference stream-container page count changed unexpectedly.");
         require(streamResult.metrics.checksumValidatedCount == 2,
                 "Reference stream-container checksum-validation count changed unexpectedly.");
+        require(streamResult.metrics.payloadAssetResolved,
+                "Reference stream payload asset should resolve successfully.");
+        require(streamResult.metrics.payloadChecksumValidatedCount == 3,
+                "Reference stream payload checksum-validation count changed unexpectedly.");
 
         const auto instrumentResult = drs::engine::loadPhase1ReferenceInstrumentManifest();
         require(instrumentResult.loaded, "Reference instrument manifest must load before stream tests run.");
@@ -118,17 +122,19 @@ int main()
         const auto offsetCorruptPath = scratchDirectory / "offset-corrupt.drstrm";
 
         auto checksumCorruptJson = json::parse(readTextFile(fs::path(drs::engine::getPhase1ReferenceStreamContainerPath())));
+        checksumCorruptJson["payloadAssetPath"] = streamResult.container.payloadAssetPath;
         checksumCorruptJson["samples"][0]["sourcePath"] = streamResult.container.samples[0].sourcePath;
         checksumCorruptJson["samples"][1]["sourcePath"] = streamResult.container.samples[1].sourcePath;
-        checksumCorruptJson["samples"][0]["sourceChecksumHex"] = "deadbeefdeadbeef";
+        checksumCorruptJson["samples"][0]["payloadChecksumHex"] = "deadbeefdeadbeef";
         writeTextFile(checksumCorruptPath, checksumCorruptJson.dump(2) + "\n");
 
         const auto checksumCorruptResult = drs::engine::loadRuntimeStreamContainer(checksumCorruptPath.generic_string());
         require(!checksumCorruptResult.loaded, "Checksum-corrupt stream-container should fail validation.");
-        require(containsIssue(checksumCorruptResult, "checksum mismatch"),
-                "Checksum-corrupt stream-container must report checksum mismatch.");
+        require(containsIssue(checksumCorruptResult, "payload checksum mismatch"),
+                "Checksum-corrupt stream-container must report payload checksum mismatch.");
 
         auto offsetCorruptJson = json::parse(readTextFile(fs::path(drs::engine::getPhase1ReferenceStreamContainerPath())));
+        offsetCorruptJson["payloadAssetPath"] = streamResult.container.payloadAssetPath;
         offsetCorruptJson["samples"][0]["sourcePath"] = streamResult.container.samples[0].sourcePath;
         offsetCorruptJson["samples"][1]["sourcePath"] = streamResult.container.samples[1].sourcePath;
         offsetCorruptJson["samples"][0]["pages"][0]["offsetBytes"] = 16385;

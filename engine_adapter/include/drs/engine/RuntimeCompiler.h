@@ -75,6 +75,7 @@ struct CompiledStreamSampleDefinition
     std::string sampleId;
     std::string sourcePath;
     std::string sourceChecksumHex;
+    std::string payloadChecksumHex;
     std::string formatName;
     std::string role;
     std::string channelLayout;
@@ -103,9 +104,28 @@ struct RuntimeCompileResult
     std::string containerId;
     std::uint64_t pageSizeBytes = 65536;
     std::uint64_t totalPayloadBytes = 0;
+    std::uint64_t alignedPayloadBytes = 0;
+    std::uint64_t totalPageCount = 0;
+    std::string payloadFilePath;
+    std::string payloadFileChecksumHex;
     std::vector<CompiledStreamSampleDefinition> streamSamples;
 };
 
+struct RuntimeStreamWriteResult
+{
+    bool written = false;
+    std::string state;
+    std::vector<std::string> issues;
+    std::string containerPath;
+    std::string payloadPath;
+    std::uint64_t totalPayloadBytes = 0;
+    std::uint64_t alignedPayloadBytes = 0;
+    std::uint64_t totalPageCount = 0;
+    std::string payloadFileChecksumHex;
+};
+
 RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan);
-std::string serializePrototypeStreamContainer(const RuntimeCompileResult& result, const std::string& containerPath);
+std::string buildCompiledStreamPayloadPath(const std::string& containerPath);
+RuntimeStreamWriteResult writeCompiledStreamAssets(RuntimeCompileResult& result);
+std::string serializeCompiledStreamIndex(const RuntimeCompileResult& result, const std::string& containerPath);
 } // namespace drs::engine

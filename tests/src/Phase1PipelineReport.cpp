@@ -60,6 +60,12 @@ std::string readTextFile(const fs::path& path)
     return std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
 }
 
+std::vector<char> readBinaryFile(const fs::path& path)
+{
+    std::ifstream input(path, std::ios::binary);
+    return std::vector<char>(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+}
+
 void writeTextFile(const fs::path& path, const std::string& text)
 {
     fs::create_directories(path.parent_path());
@@ -188,12 +194,12 @@ drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path& output
     plan.pageSizeBytes = 65536;
     plan.projectNotes = {
         "Sprint 1 project fixture used to validate the product-owned runtime model and loader seam.",
-        "The native importer and compiled stream writer are intentionally deferred to Sprint 2."
+        "Sprint 2 finalizes the compiled stream path with a deterministic binary payload writer."
     };
     plan.instrumentValidationNotes = {
         "Uses the existing open HISE sample assets as stand-in sample sources for Sprint 1.",
         "Exercises two articulations, two groups, velocity-layer routing, and explicit prefetch metadata.",
-        "Acts as the canonical loader fixture until the import compiler lands in Sprint 2."
+        "Acts as the canonical loader fixture for the deterministic stream index and payload writer."
     };
 
     drs::engine::RuntimeCompileSourceDefinition sineSource;
@@ -338,6 +344,8 @@ ordered_json buildCompileEntry(const drs::engine::RuntimeCompileResult& result)
     entry["issues"] = result.issues;
     entry["streamSampleCount"] = result.streamSamples.size();
     entry["totalPayloadBytes"] = result.totalPayloadBytes;
+    entry["alignedPayloadBytes"] = result.alignedPayloadBytes;
+    entry["streamPageCount"] = result.totalPageCount;
     return entry;
 }
 
@@ -400,9 +408,13 @@ int main(int argc, char* argv[])
         streamReaderSection["sampleCount"] = referenceStream.metrics.sampleCount;
         streamReaderSection["pageCount"] = referenceStream.metrics.pageCount;
         streamReaderSection["checksumValidatedCount"] = referenceStream.metrics.checksumValidatedCount;
+        streamReaderSection["payloadChecksumValidatedCount"] = referenceStream.metrics.payloadChecksumValidatedCount;
+        streamReaderSection["payloadAssetResolved"] = referenceStream.metrics.payloadAssetResolved;
         const bool streamReaderPassed = referenceStream.loaded
             && referenceStream.metrics.sampleCount == 2
-            && referenceStream.metrics.checksumValidatedCount == 2;
+            && referenceStream.metrics.checksumValidatedCount == 2
+            && referenceStream.metrics.payloadAssetResolved
+            && referenceStream.metrics.payloadChecksumValidatedCount == 3;
         streamReaderSection["passed"] = streamReaderPassed;
         report["streamReader"] = std::move(streamReaderSection);
 
@@ -942,16 +954,27 @@ int main(int argc, char* argv[])
         importerSection["passed"] = importerPassed;
         report["importer"] = std::move(importerSection);
 
-        const auto referenceCompile = drs::engine::compileRuntimeInstrument(referencePlan);
-        const auto secondReferenceCompile = drs::engine::compileRuntimeInstrument(referencePlan);
-        const auto tempCompile = drs::engine::compileRuntimeInstrument(tempPlan);
+        auto referenceCompile = drs::engine::compileRuntimeInstrument(referencePlan);
+        auto secondReferenceCompile = drs::engine::compileRuntimeInstrument(referencePlan);
+        auto tempCompile = drs::engine::compileRuntimeInstrument(tempPlan);
+        auto referenceWriteCompile = referenceCompile;
+        referenceWriteCompile.payloadFilePath = (tempDirectory / "reference-pass-1" / "tiny-open-instrument.drstrm.bin").generic_string();
+        const auto referenceWrite = drs::engine::writeCompiledStreamAssets(referenceWriteCompile);
+        referenceCompile = referenceWriteCompile;
+        referenceCompile.payloadFilePath = drs::engine::buildCompiledStreamPayloadPath(referencePlan.outputStreamPath);
+        auto secondReferenceWriteCompile = secondReferenceCompile;
+        secondReferenceWriteCompile.payloadFilePath = (tempDirectory / "reference-pass-2" / "tiny-open-instrument.drstrm.bin").generic_string();
+        const auto secondReferenceWrite = drs::engine::writeCompiledStreamAssets(secondReferenceWriteCompile);
+        secondReferenceCompile = secondReferenceWriteCompile;
+        secondReferenceCompile.payloadFilePath = drs::engine::buildCompiledStreamPayloadPath(referencePlan.outputStreamPath);
+        const auto tempWrite = drs::engine::writeCompiledStreamAssets(tempCompile);
 
         const auto referenceProjectJson = drs::engine::serializeRuntimeProjectManifest(referenceCompile.project,
                                                                                        referencePlan.outputProjectPath);
         const auto referenceInstrumentJson = drs::engine::serializeRuntimeInstrumentManifest(referenceCompile.instrument,
                                                                                             referencePlan.outputInstrumentPath);
-        const auto referenceStreamJson = drs::engine::serializePrototypeStreamContainer(referenceCompile,
-                                                                                         referencePlan.outputStreamPath);
+        const auto referenceStreamJson = drs::engine::serializeCompiledStreamIndex(referenceCompile,
+                                                                                   referencePlan.outputStreamPath);
 
         const auto deterministicProject = referenceProjectJson
             == drs::engine::serializeRuntimeProjectManifest(secondReferenceCompile.project,
@@ -960,23 +983,26 @@ int main(int argc, char* argv[])
             == drs::engine::serializeRuntimeInstrumentManifest(secondReferenceCompile.instrument,
                                                                referencePlan.outputInstrumentPath);
         const auto deterministicStream = referenceStreamJson
-            == drs::engine::serializePrototypeStreamContainer(secondReferenceCompile,
-                                                              referencePlan.outputStreamPath);
+            == drs::engine::serializeCompiledStreamIndex(secondReferenceCompile,
+                                                         referencePlan.outputStreamPath);
+        const auto deterministicPayload = referenceWrite.payloadFileChecksumHex == secondReferenceWrite.payloadFileChecksumHex;
 
         const auto checkedInProjectPath = getReferenceDirectory() / "tiny-open-instrument.drsproj";
         const auto checkedInInstrumentPath = getReferenceDirectory() / "tiny-open-instrument.drinst";
         const auto checkedInStreamPath = getReferenceDirectory() / "tiny-open-instrument.drstrm";
+        const auto checkedInPayloadPath = fs::path(drs::engine::buildCompiledStreamPayloadPath(referencePlan.outputStreamPath));
 
         const bool goldenProjectMatch = referenceProjectJson == readTextFile(checkedInProjectPath);
         const bool goldenInstrumentMatch = referenceInstrumentJson == readTextFile(checkedInInstrumentPath);
         const bool goldenStreamMatch = referenceStreamJson == readTextFile(checkedInStreamPath);
+        const bool goldenPayloadMatch = readBinaryFile(referenceWrite.payloadPath) == readBinaryFile(checkedInPayloadPath);
 
         const auto tempProjectJson = drs::engine::serializeRuntimeProjectManifest(tempCompile.project,
                                                                                   tempPlan.outputProjectPath);
         const auto tempInstrumentJson = drs::engine::serializeRuntimeInstrumentManifest(tempCompile.instrument,
                                                                                        tempPlan.outputInstrumentPath);
-        const auto tempStreamJson = drs::engine::serializePrototypeStreamContainer(tempCompile,
-                                                                                   tempPlan.outputStreamPath);
+        const auto tempStreamJson = drs::engine::serializeCompiledStreamIndex(tempCompile,
+                                                                              tempPlan.outputStreamPath);
 
         writeTextFile(fs::path(tempPlan.outputProjectPath), tempProjectJson);
         writeTextFile(fs::path(tempPlan.outputInstrumentPath), tempInstrumentJson);
@@ -984,27 +1010,37 @@ int main(int argc, char* argv[])
 
         const auto tempLoadedProject = drs::engine::loadRuntimeProjectManifest(tempPlan.outputProjectPath);
         const auto tempLoadedInstrument = drs::engine::loadRuntimeInstrumentManifest(tempPlan.outputInstrumentPath);
+        const auto tempLoadedStream = drs::engine::loadRuntimeStreamContainer(tempPlan.outputStreamPath);
 
         ordered_json compileSection = buildCompileEntry(referenceCompile);
         compileSection["deterministicProject"] = deterministicProject;
         compileSection["deterministicInstrument"] = deterministicInstrument;
         compileSection["deterministicStream"] = deterministicStream;
+        compileSection["deterministicPayload"] = deterministicPayload;
         compileSection["goldenProjectMatch"] = goldenProjectMatch;
         compileSection["goldenInstrumentMatch"] = goldenInstrumentMatch;
         compileSection["goldenStreamMatch"] = goldenStreamMatch;
+        compileSection["goldenPayloadMatch"] = goldenPayloadMatch;
         compileSection["tempProjectLoaded"] = tempLoadedProject.loaded;
         compileSection["tempInstrumentLoaded"] = tempLoadedInstrument.loaded;
+        compileSection["tempStreamLoaded"] = tempLoadedStream.loaded;
         const bool compilePassed = referenceCompile.compiled
+            && referenceWrite.written
             && secondReferenceCompile.compiled
+            && secondReferenceWrite.written
             && tempCompile.compiled
+            && tempWrite.written
             && deterministicProject
             && deterministicInstrument
             && deterministicStream
+            && deterministicPayload
             && goldenProjectMatch
             && goldenInstrumentMatch
             && goldenStreamMatch
+            && goldenPayloadMatch
             && tempLoadedProject.loaded
-            && tempLoadedInstrument.loaded;
+            && tempLoadedInstrument.loaded
+            && tempLoadedStream.loaded;
         compileSection["passed"] = compilePassed;
         report["compilePath"] = std::move(compileSection);
 

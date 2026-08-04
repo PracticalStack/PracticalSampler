@@ -6,11 +6,15 @@
   "sampleCount": 2,
   "payloadEncoding": "f32-interleaved-little-endian",
   "totalPayloadBytes": 705600,
+  "payloadAssetPath": "tiny-open-instrument.drstrm.bin",
+  "payloadFileBytes": 786432,
+  "payloadFileChecksumHex": "02b6538956a714fe",
   "samples": [
     {
       "sampleId": "sine-a3",
       "sourcePath": "../../../../hise_project/Samples/DRS_Sine_A3.wav",
       "sourceChecksumHex": "bc13c2d71c12fce6",
+      "payloadChecksumHex": "986d785edc3e631e",
       "formatName": "WAV file",
       "role": "core-sustain",
       "channelLayout": "Mono",
@@ -57,6 +61,7 @@
       "sampleId": "triangle-a4",
       "sourcePath": "../../../../hise_project/Samples/DRS_TriangleLead_A4.wav",
       "sourceChecksumHex": "0481fa2ca766debe",
+      "payloadChecksumHex": "a0dce2a9b4ee5ea5",
       "formatName": "WAV file",
       "role": "core-lead",
       "channelLayout": "Stereo",
@@ -101,7 +106,7 @@
     }
   ],
   "notes": [
-    "Sprint 2 compiler-emitted prototype stream-container descriptor.",
-    "Carries deterministic payload offsets, prefetch heads, and page-table placeholders for the reference instrument."
+    "Sprint 2 compiler-emitted stream index with a sibling binary payload asset.",
+    "Carries deterministic payload offsets, per-sample checksums, prefetch heads, and page-table layout for the runtime stream writer."
   ]
 }

@@ -356,9 +356,12 @@ int main()
 
         const auto tempDirectory = fs::temp_directory_path() / "drs-phase3-crossfade-prepared-playback-tests";
         const auto compilePlan = buildCrossfadeCompilePlan(tempDirectory);
-        const auto compileResult = compileRuntimeInstrument(compilePlan);
+        auto compileResult = compileRuntimeInstrument(compilePlan);
         require(compileResult.compiled,
                 "Compile plan with valid crossfade topology should compile successfully.");
+        const auto streamWrite = writeCompiledStreamAssets(compileResult);
+        require(streamWrite.written,
+                "Compile plan with valid crossfade topology should write compiled stream assets successfully.");
         require(compileResult.instrument.zones.size() == 2,
                 "Crossfade compile plan should preserve both compiled zones.");
 
@@ -405,7 +408,7 @@ int main()
         writeTextFile(compilePlan.outputProjectPath,
                       serializeRuntimeProjectManifest(compileResult.project, compilePlan.outputProjectPath));
         writeTextFile(compilePlan.outputStreamPath,
-                      serializePrototypeStreamContainer(compileResult, compilePlan.outputStreamPath));
+                      serializeCompiledStreamIndex(compileResult, compilePlan.outputStreamPath));
         writeTextFile(compilePlan.outputInstrumentPath, serializedInstrument);
         const auto roundTripInstrument = loadRuntimeInstrumentManifest(compilePlan.outputInstrumentPath);
         require(roundTripInstrument.loaded,
