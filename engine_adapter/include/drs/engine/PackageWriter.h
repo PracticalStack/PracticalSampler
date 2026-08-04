@@ -89,6 +89,7 @@ struct PerformancePackageInspectionResult
 {
     bool packageFound = false;
     bool valid = false;
+    std::string packagePath;
     std::string state;
     std::vector<std::string> issues;
     PerformancePackageHeaderView header;

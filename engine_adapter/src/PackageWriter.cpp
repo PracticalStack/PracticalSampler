@@ -668,6 +668,7 @@ PerformancePackageInspectionResult inspectPerformancePackage(const std::string& 
                                                              const int supportedReaderSchemaVersion)
 {
     PerformancePackageInspectionResult result;
+    result.packagePath = packagePath;
     result.state = "Performance package inspection not attempted";
 
     std::string issue;

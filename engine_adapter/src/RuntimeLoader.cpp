@@ -2613,38 +2613,23 @@ RuntimeProjectMigrationResult migrateRuntimeProjectToPerformanceArticulationSche
     return result;
 }
 
-RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manifestPath)
+RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawText,
+                                                         const std::string& manifestPath,
+                                                         const bool validateReferencedPaths)
 {
-    const auto startTime = std::chrono::steady_clock::now();
     RuntimeManifestLoadResult result;
     result.manifestPath = manifestPath;
-    result.state = "Manifest load not attempted";
+    result.state = "Manifest parse not attempted";
+    result.manifestFound = true;
+    result.metrics.manifestSizeBytes = static_cast<std::uint64_t>(rawText.size());
 
     const fs::path manifestFsPath(manifestPath);
-    std::error_code errorCode;
-
-    if (!fs::exists(manifestFsPath, errorCode))
-    {
-        result.state = "Manifest missing";
-        addIssue(result, "Manifest file was not found at " + manifestPath + ".");
-        result.metrics.loadDurationMicros = static_cast<std::uint64_t>(
-            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - startTime).count());
-        return result;
-    }
-
-    result.manifestFound = true;
-
-    const auto rawText = readTextFile(manifestFsPath);
     if (rawText.empty())
     {
         result.state = "Manifest unreadable";
-        addIssue(result, "Manifest file was empty or unreadable.");
-        result.metrics.loadDurationMicros = static_cast<std::uint64_t>(
-            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - startTime).count());
+        addIssue(result, "Manifest JSON text was empty.");
         return result;
     }
-
-    result.metrics.manifestSizeBytes = static_cast<std::uint64_t>(rawText.size());
 
     json root;
     try
@@ -2655,8 +2640,6 @@ RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manif
     {
         result.state = "Manifest parse failed";
         addIssue(result, "Manifest JSON parse failed: " + std::string(exception.what()));
-        result.metrics.loadDurationMicros = static_cast<std::uint64_t>(
-            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - startTime).count());
         return result;
     }
 
@@ -2664,8 +2647,6 @@ RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manif
     {
         result.state = "Manifest root invalid";
         addIssue(result, "Manifest root must be a JSON object.");
-        result.metrics.loadDurationMicros = static_cast<std::uint64_t>(
-            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - startTime).count());
         return result;
     }
 
@@ -2685,17 +2666,33 @@ RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manif
 
     if (const auto sourceProjectPath = readRequired<RuntimeManifestLoadResult, std::string>(root, result, "sourceProject", "Manifest"))
     {
-        const auto resolved = validateRequiredFile(result, manifestFsPath, *sourceProjectPath, "Source project");
-        instrument.sourceProjectPath = resolved ? toDisplayPath(*resolved) : *sourceProjectPath;
-        result.metrics.sourceProjectResolved = resolved.has_value();
+        if (validateReferencedPaths)
+        {
+            const auto resolved = validateRequiredFile(result, manifestFsPath, *sourceProjectPath, "Source project");
+            instrument.sourceProjectPath = resolved ? toDisplayPath(*resolved) : *sourceProjectPath;
+            result.metrics.sourceProjectResolved = resolved.has_value();
+        }
+        else
+        {
+            instrument.sourceProjectPath = *sourceProjectPath;
+        }
     }
 
     if (const auto compiledStreamAsset = readRequired<RuntimeManifestLoadResult, std::string>(root, result, "compiledStreamAsset", "Manifest"))
     {
-        const auto resolved = validateRequiredFile(result, manifestFsPath, *compiledStreamAsset, "Compiled stream asset");
-        instrument.compiledStreamAssetPath = resolved ? toDisplayPath(*resolved) : *compiledStreamAsset;
-        result.metrics.usesStreaming = resolved.has_value();
-        result.metrics.compiledStreamAssetResolved = resolved.has_value();
+        if (validateReferencedPaths)
+        {
+            const auto resolved = validateRequiredFile(result, manifestFsPath, *compiledStreamAsset, "Compiled stream asset");
+            instrument.compiledStreamAssetPath = resolved ? toDisplayPath(*resolved) : *compiledStreamAsset;
+            result.metrics.usesStreaming = resolved.has_value();
+            result.metrics.compiledStreamAssetResolved = resolved.has_value();
+        }
+        else
+        {
+            instrument.compiledStreamAssetPath = *compiledStreamAsset;
+            result.metrics.usesStreaming = !instrument.compiledStreamAssetPath.empty();
+            result.metrics.compiledStreamAssetResolved = result.metrics.usesStreaming;
+        }
     }
 
     if (const auto loadProfile = readRequired<RuntimeManifestLoadResult, std::string>(root, result, "defaultLoadProfile", "Manifest"))
@@ -2859,14 +2856,28 @@ RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manif
 
             if (const auto samplePath = readRequired<RuntimeManifestLoadResult, std::string>(zoneObject, result, "samplePath", context.c_str()))
             {
-                const auto resolvedSamplePath = validateRequiredFile(result, manifestFsPath, *samplePath, "Zone sample");
-                zone.samplePath = resolvedSamplePath ? toDisplayPath(*resolvedSamplePath) : *samplePath;
+                if (validateReferencedPaths)
+                {
+                    const auto resolvedSamplePath = validateRequiredFile(result, manifestFsPath, *samplePath, "Zone sample");
+                    zone.samplePath = resolvedSamplePath ? toDisplayPath(*resolvedSamplePath) : *samplePath;
+                }
+                else
+                {
+                    zone.samplePath = *samplePath;
+                }
             }
 
             if (const auto streamAssetPath = readRequired<RuntimeManifestLoadResult, std::string>(zoneObject, result, "streamAssetPath", context.c_str()))
             {
-                const auto resolvedStreamPath = validateRequiredFile(result, manifestFsPath, *streamAssetPath, "Zone stream asset");
-                zone.streamAssetPath = resolvedStreamPath ? toDisplayPath(*resolvedStreamPath) : *streamAssetPath;
+                if (validateReferencedPaths)
+                {
+                    const auto resolvedStreamPath = validateRequiredFile(result, manifestFsPath, *streamAssetPath, "Zone stream asset");
+                    zone.streamAssetPath = resolvedStreamPath ? toDisplayPath(*resolvedStreamPath) : *streamAssetPath;
+                }
+                else
+                {
+                    zone.streamAssetPath = *streamAssetPath;
+                }
             }
 
             if (const auto rootKey = readRequired<RuntimeManifestLoadResult, int>(zoneObject, result, "rootKey", context.c_str()))
@@ -3062,6 +3073,40 @@ RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manif
 
     result.loaded = result.issues.empty();
     result.state = result.loaded ? "Reference manifest loaded" : "Reference manifest invalid";
+    return result;
+}
+
+RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manifestPath)
+{
+    const auto startTime = std::chrono::steady_clock::now();
+    RuntimeManifestLoadResult result;
+    result.manifestPath = manifestPath;
+    result.state = "Manifest load not attempted";
+
+    const fs::path manifestFsPath(manifestPath);
+    std::error_code errorCode;
+
+    if (!fs::exists(manifestFsPath, errorCode))
+    {
+        result.state = "Manifest missing";
+        addIssue(result, "Manifest file was not found at " + manifestPath + ".");
+        result.metrics.loadDurationMicros = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - startTime).count());
+        return result;
+    }
+
+    const auto rawText = readTextFile(manifestFsPath);
+    if (rawText.empty())
+    {
+        result.manifestFound = true;
+        result.state = "Manifest unreadable";
+        addIssue(result, "Manifest file was empty or unreadable.");
+        result.metrics.loadDurationMicros = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - startTime).count());
+        return result;
+    }
+
+    result = parseRuntimeInstrumentManifest(rawText, manifestPath, true);
     result.metrics.loadDurationMicros = static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - startTime).count());
     return result;

@@ -10,6 +10,10 @@ namespace drs::engine
 std::string getPhase1ReferenceStreamContainerPath();
 
 RuntimeStreamLoadResult loadRuntimeStreamContainer(const std::string& containerPath);
+RuntimeStreamLoadResult parseRuntimeStreamContainer(const std::string& text,
+                                                    const std::string& containerPath,
+                                                    bool validateReferencedPaths = true,
+                                                    const std::vector<std::uint8_t>* embeddedPayloadBytes = nullptr);
 RuntimeStreamLoadResult loadPhase1ReferenceStreamContainer();
 RuntimeStreamLoadResult loadRuntimeStreamContainerForInstrument(const RuntimeManifestLoadResult& instrumentResult);
 

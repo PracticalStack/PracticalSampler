@@ -23,6 +23,9 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& text,
 RuntimeProjectLoadResult loadPhase1ReferenceProjectManifest();
 RuntimeProjectLoadResult loadPhase2ReferenceProjectManifest();
 RuntimeManifestLoadResult loadRuntimeInstrumentManifest(const std::string& manifestPath);
+RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& text,
+                                                         const std::string& manifestPath,
+                                                         bool validateReferencedPaths = true);
 RuntimeManifestLoadResult loadPhase1ReferenceInstrumentManifest();
 RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectModel& project);
 RuntimeProjectMigrationResult migrateRuntimeProjectToPhase2Authoring(const RuntimeProjectModel& project);

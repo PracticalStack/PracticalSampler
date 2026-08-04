@@ -3419,6 +3419,39 @@ add_test(
     COMMAND drs_phase1_performance_package_tests
 )
 
+juce_add_console_app(drs_phase1_performance_package_loader_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Performance Package Loader Tests"
+)
+
+target_sources(drs_phase1_performance_package_loader_tests
+    PRIVATE
+        src/Phase1PerformancePackageLoaderTests.cpp
+)
+
+target_link_libraries(drs_phase1_performance_package_loader_tests
+    PRIVATE
+        drs_engine_adapter
+        drs_sample_import
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase1_performance_package_loader_tests PRIVATE cxx_std_17)
+
+target_include_directories(drs_phase1_performance_package_loader_tests
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/third_party/juce/modules
+        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
+)
+
+add_test(
+    NAME drs.phase1.performance_package_loader
+    COMMAND drs_phase1_performance_package_loader_tests
+)
+
 juce_add_console_app(drs_phase1_pipeline_report
     PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Pipeline Report"
 )

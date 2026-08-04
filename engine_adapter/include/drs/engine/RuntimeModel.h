@@ -406,6 +406,8 @@ struct RuntimeStreamContainerModel
     std::string payloadAssetPath;
     std::uint64_t payloadFileBytes = 0;
     std::string payloadFileChecksumHex;
+    bool payloadEmbedded = false;
+    std::vector<std::uint8_t> embeddedPayloadBytes;
     std::vector<RuntimeStreamSampleDefinition> samples;
     std::vector<std::string> notes;
 };

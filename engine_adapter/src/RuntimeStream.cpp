@@ -180,6 +180,28 @@ std::string computeFnv1aChecksumHexForRange(const fs::path& path,
     return stream.str();
 }
 
+std::string computeFnv1aChecksumHexForRange(const std::vector<std::uint8_t>& bytes,
+                                            const std::uint64_t offsetBytes,
+                                            const std::uint64_t sizeBytes)
+{
+    constexpr std::uint64_t offsetBasis = 14695981039346656037ull;
+    constexpr std::uint64_t prime = 1099511628211ull;
+
+    if (offsetBytes > bytes.size() || sizeBytes > bytes.size() - offsetBytes)
+        return {};
+
+    std::uint64_t hash = offsetBasis;
+    for (std::uint64_t index = 0; index < sizeBytes; ++index)
+    {
+        hash ^= bytes[static_cast<std::size_t>(offsetBytes + index)];
+        hash *= prime;
+    }
+
+    std::ostringstream stream;
+    stream << std::hex << std::setfill('0') << std::setw(16) << hash;
+    return stream.str();
+}
+
 std::string inferChannelLayout(std::uint32_t channelCount)
 {
     switch (channelCount)
@@ -210,29 +232,21 @@ std::string getPhase1ReferenceStreamContainerPath()
     return generated::workspacePhase1ReferenceStream;
 }
 
-RuntimeStreamLoadResult loadRuntimeStreamContainer(const std::string& containerPath)
+RuntimeStreamLoadResult parseRuntimeStreamContainer(const std::string& rawText,
+                                                    const std::string& containerPath,
+                                                    const bool validateReferencedPaths,
+                                                    const std::vector<std::uint8_t>* embeddedPayloadBytes)
 {
     RuntimeStreamLoadResult result;
     result.containerPath = containerPath;
-    result.state = "Stream-container load not attempted";
-
-    const fs::path containerFsPath(containerPath);
-    std::error_code errorCode;
-
-    if (!fs::exists(containerFsPath, errorCode))
-    {
-        result.state = "Stream-container missing";
-        addIssue(result, "Stream-container file was not found at " + containerPath + ".");
-        return result;
-    }
-
+    result.state = "Stream-container parse not attempted";
     result.containerFound = true;
 
-    const auto rawText = readTextFile(containerFsPath);
+    const fs::path containerFsPath(containerPath);
     if (rawText.empty())
     {
         result.state = "Stream-container unreadable";
-        addIssue(result, "Stream-container file was empty or unreadable.");
+        addIssue(result, "Stream-container JSON text was empty.");
         return result;
     }
 
@@ -283,8 +297,10 @@ RuntimeStreamLoadResult loadRuntimeStreamContainer(const std::string& containerP
         }
         else
         {
-            container.payloadAssetPath = toDisplayPath(resolveRelativePath(containerFsPath,
-                                                                           payloadAssetIterator->get<std::string>()));
+            container.payloadAssetPath = validateReferencedPaths
+                ? toDisplayPath(resolveRelativePath(containerFsPath,
+                                                    payloadAssetIterator->get<std::string>()))
+                : payloadAssetIterator->get<std::string>();
         }
     }
 
@@ -334,22 +350,24 @@ RuntimeStreamLoadResult loadRuntimeStreamContainer(const std::string& containerP
             if (const auto sampleId = readRequired<std::string>(sampleObject, result, "sampleId", context.c_str()))
                 sample.sampleId = *sampleId;
 
+            if (const auto sourceChecksumHex = readRequired<std::string>(sampleObject, result, "sourceChecksumHex", context.c_str()))
+                sample.sourceChecksumHex = *sourceChecksumHex;
+
             if (const auto sourcePath = readRequired<std::string>(sampleObject, result, "sourcePath", context.c_str()))
             {
-                const auto resolvedSourcePath = resolveRelativePath(containerFsPath, *sourcePath);
-                sample.sourcePath = toDisplayPath(resolvedSourcePath);
+                if (validateReferencedPaths)
+                {
+                    std::error_code errorCode;
+                    const auto resolvedSourcePath = resolveRelativePath(containerFsPath, *sourcePath);
+                    sample.sourcePath = toDisplayPath(resolvedSourcePath);
 
-                if (!fs::exists(resolvedSourcePath, errorCode))
-                {
-                    addIssue(result, context + " source sample does not exist: " + sample.sourcePath);
-                }
-                else
-                {
-                    const auto actualChecksum = computeFnv1aChecksumHex(resolvedSourcePath);
-                    if (const auto sourceChecksumHex = readRequired<std::string>(sampleObject, result, "sourceChecksumHex", context.c_str()))
+                    if (!fs::exists(resolvedSourcePath, errorCode))
                     {
-                        sample.sourceChecksumHex = *sourceChecksumHex;
-
+                        addIssue(result, context + " source sample does not exist: " + sample.sourcePath);
+                    }
+                    else
+                    {
+                        const auto actualChecksum = computeFnv1aChecksumHex(resolvedSourcePath);
                         if (actualChecksum.empty())
                         {
                             addIssue(result, context + " could not compute source checksum for " + sample.sourcePath + ".");
@@ -365,6 +383,10 @@ RuntimeStreamLoadResult loadRuntimeStreamContainer(const std::string& containerP
                             ++result.metrics.checksumValidatedCount;
                         }
                     }
+                }
+                else
+                {
+                    sample.sourcePath = *sourcePath;
                 }
             }
 
@@ -545,8 +567,82 @@ RuntimeStreamLoadResult loadRuntimeStreamContainer(const std::string& containerP
                      "Stream-container totalPayloadBytes did not match the sum of sample payload sizes.");
         }
 
-        if (!container.payloadAssetPath.empty())
+        if (embeddedPayloadBytes != nullptr)
         {
+            result.metrics.payloadAssetResolved = true;
+            container.payloadEmbedded = true;
+            container.embeddedPayloadBytes = *embeddedPayloadBytes;
+
+            if (container.payloadFileBytes != 0
+                && container.embeddedPayloadBytes.size() != container.payloadFileBytes)
+            {
+                addIssue(result, "Embedded stream payload size did not match payloadFileBytes.");
+            }
+            else
+            {
+                container.payloadFileBytes = container.embeddedPayloadBytes.size();
+            }
+
+            if (!container.payloadFileChecksumHex.empty())
+            {
+                const auto actualPayloadChecksum = computeFnv1aChecksumHexForRange(container.embeddedPayloadBytes,
+                                                                                   0,
+                                                                                   container.embeddedPayloadBytes.size());
+                if (actualPayloadChecksum != container.payloadFileChecksumHex)
+                {
+                    addIssue(result,
+                             "Stream payload asset checksum mismatch: expected " + container.payloadFileChecksumHex
+                                 + ", actual " + actualPayloadChecksum + ".");
+                }
+                else
+                {
+                    ++result.metrics.payloadChecksumValidatedCount;
+                }
+            }
+
+            for (std::size_t sampleIndex = 0; sampleIndex < container.samples.size(); ++sampleIndex)
+            {
+                const auto& sample = container.samples[sampleIndex];
+                const auto context = "StreamSample[" + std::to_string(sampleIndex) + "]";
+
+                if (!sample.payloadChecksumHex.empty())
+                {
+                    const auto payloadEndBytes = sample.payloadOffsetBytes + sample.payloadSizeBytes;
+                    if (payloadEndBytes > container.payloadFileBytes)
+                    {
+                        addIssue(result,
+                                 context + " payload bytes extend past the declared embedded stream payload.");
+                        continue;
+                    }
+
+                    const auto actualSampleChecksum = computeFnv1aChecksumHexForRange(container.embeddedPayloadBytes,
+                                                                                      sample.payloadOffsetBytes,
+                                                                                      sample.payloadSizeBytes);
+                    if (actualSampleChecksum.empty())
+                    {
+                        addIssue(result,
+                                 context + " could not compute payload checksum from the embedded stream payload.");
+                    }
+                    else if (actualSampleChecksum != sample.payloadChecksumHex)
+                    {
+                        addIssue(result,
+                                 context + " payload checksum mismatch: expected " + sample.payloadChecksumHex
+                                     + ", actual " + actualSampleChecksum + ".");
+                    }
+                    else
+                    {
+                        ++result.metrics.payloadChecksumValidatedCount;
+                    }
+                }
+                else
+                {
+                    addIssue(result, context + " must provide payloadChecksumHex when stream payload bytes are present.");
+                }
+            }
+        }
+        else if (!container.payloadAssetPath.empty())
+        {
+            std::error_code errorCode;
             const fs::path payloadFsPath(container.payloadAssetPath);
             if (!fs::exists(payloadFsPath, errorCode))
             {
@@ -653,6 +749,34 @@ RuntimeStreamLoadResult loadRuntimeStreamContainer(const std::string& containerP
     result.loaded = result.issues.empty();
     result.state = result.loaded ? "Stream-container loaded" : "Stream-container invalid";
     return result;
+}
+
+RuntimeStreamLoadResult loadRuntimeStreamContainer(const std::string& containerPath)
+{
+    RuntimeStreamLoadResult result;
+    result.containerPath = containerPath;
+    result.state = "Stream-container load not attempted";
+
+    const fs::path containerFsPath(containerPath);
+    std::error_code errorCode;
+
+    if (!fs::exists(containerFsPath, errorCode))
+    {
+        result.state = "Stream-container missing";
+        addIssue(result, "Stream-container file was not found at " + containerPath + ".");
+        return result;
+    }
+
+    const auto rawText = readTextFile(containerFsPath);
+    if (rawText.empty())
+    {
+        result.containerFound = true;
+        result.state = "Stream-container unreadable";
+        addIssue(result, "Stream-container file was empty or unreadable.");
+        return result;
+    }
+
+    return parseRuntimeStreamContainer(rawText, containerPath, true, nullptr);
 }
 
 RuntimeStreamLoadResult loadPhase1ReferenceStreamContainer()
