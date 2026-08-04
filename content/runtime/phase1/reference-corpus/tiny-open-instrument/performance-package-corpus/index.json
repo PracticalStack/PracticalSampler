@@ -23,9 +23,9 @@
       "path": "truncated.drpkg",
       "sizeBytes": 795109,
       "checksumHex": "406978b042e90889",
-      "expectedState": "read-failed",
-      "expectedFailureCategory": "package-format-failure",
-      "expectedIssueSubstring": "truncated"
+      "expectedState": "load-failed",
+      "expectedFailureCategory": "payload-corruption",
+      "expectedIssueSubstring": "exceeded the package file bounds"
     },
     {
       "id": "tampered",

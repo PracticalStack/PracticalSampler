@@ -4,6 +4,7 @@
 #include "drs/engine/RuntimeLoader.h"
 #include "shared/ProjectStorage.h"
 #include "shared/SfzImportWorkflow.h"
+#include "shared/WorkspaceMenuPolicy.h"
 #include "shared/WavImportWorkflow.h"
 #include "shared/authoring/AuthoringWorkspaceLayout.h"
 
@@ -152,7 +153,7 @@ public:
                                  juce::dontSendNotification);
         libraryHelpLabel.setJustificationType(juce::Justification::centredLeft);
 
-        projectHelpLabel.setText("Open/Save Project uses the most recent project folder first, then this default folder.",
+        projectHelpLabel.setText(drs::app::projectDirectoryHelpText,
                                  juce::dontSendNotification);
         projectHelpLabel.setJustificationType(juce::Justification::centredLeft);
 
@@ -628,18 +629,19 @@ juce::PopupMenu MainComponent::getMenuForIndex(int topLevelMenuIndex, const juce
     {
         const auto packageSession
             = processor.getWorkspaceDocumentState().kind == drs::engine::WorkspaceDocumentKind::performancePackage;
-        menu.addItem(newProjectCommandId, "New Project");
-        menu.addItem(openProjectCommandId, "Open Project...");
-        menu.addItem(openPerformancePackageCommandId, "Open Playable Package...");
-        menu.addItem(closeProjectCommandId, packageSession ? "Close Package" : "Close");
+        menu.addItem(newProjectCommandId, drs::app::newProjectMenuLabel);
+        menu.addItem(openProjectCommandId, drs::app::openProjectMenuLabel);
+        menu.addItem(openPerformancePackageCommandId, drs::app::openPerformancePackageMenuLabel);
+        menu.addItem(closeProjectCommandId, packageSession ? drs::app::closePackageMenuLabel
+                                                           : drs::app::closeWorkspaceMenuLabel);
         if (authoringAvailable)
         {
             menu.addSeparator();
-            menu.addItem(saveProjectCommandId, "Save");
-            menu.addItem(saveProjectAsCommandId, "Save As...");
-            menu.addItem(exportPerformancePackageCommandId, "Export Playable Instrument...");
-            menu.addItem(importWavCommandId, "Import WAV...");
-            menu.addItem(importSfzCommandId, "Import SFZ...");
+            menu.addItem(saveProjectCommandId, drs::app::saveProjectMenuLabel);
+            menu.addItem(saveProjectAsCommandId, drs::app::saveProjectAsMenuLabel);
+            menu.addItem(exportPerformancePackageCommandId, drs::app::exportPerformancePackageMenuLabel);
+            menu.addItem(importWavCommandId, drs::app::importWavMenuLabel);
+            menu.addItem(importSfzCommandId, drs::app::importSfzMenuLabel);
         }
         menu.addSeparator();
         menu.addItem(exitApplicationCommandId, "Exit");

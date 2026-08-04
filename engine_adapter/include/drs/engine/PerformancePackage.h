@@ -7,7 +7,14 @@ namespace drs::engine
 {
 inline constexpr const char* performancePackageSchemaName = "drs.performancePackage";
 inline constexpr int performancePackageSchemaVersion = 1;
+inline constexpr int performancePackageSchemaMajorVersion = 1;
+inline constexpr int performancePackageSchemaMinorVersion = 0;
 inline constexpr const char* performancePackageFileExtension = ".drpkg";
+inline constexpr const char* performancePackageCompatibilityPolicyId = "drs.performancePackage.policy.v1.0";
+inline constexpr const char* performancePackageFutureMinorPolicy
+    = "Future minor changes must remain additive, keep schemaName and formatVersion stable, and require no higher minimumReaderSchemaVersion than the current reader.";
+inline constexpr const char* performancePackageFutureMajorPolicy
+    = "Future major changes require a new incompatible reader contract; current readers reject packages that require a higher minimumReaderSchemaVersion or unsupported formatVersion.";
 
 enum class PerformancePackageFailureCategory
 {

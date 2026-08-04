@@ -263,4 +263,57 @@ inline drs::engine::PerformancePackageCompileWritePlan buildPackagePlan(
     packagePlan.minimumCompatibleAppVersion = "0.5.0-internal";
     return packagePlan;
 }
+
+inline drs::engine::RuntimeProjectModel buildAuthoringProjectFixture()
+{
+    const auto contentRoot = getReferenceContentRoot().lexically_normal().generic_string();
+
+    drs::engine::RuntimeProjectModel project;
+    project.schemaName = "drs.project";
+    project.schemaVersion = 6;
+    project.projectId = "drs.phase1.package-export-project";
+    project.displayName = "Package Export Fixture";
+    project.contentRootPath = contentRoot;
+    project.defaultInstrumentManifestPath
+        = (getReferenceContentRoot() / "PackageExportFixture.drinst").generic_string();
+    project.notes = { "Sprint 6 playable package export fixture." };
+
+    project.sampleSources.push_back({ "sine-a3", "Samples/DRS_Sine_A3.wav", "core-sustain" });
+    project.sampleSources.push_back({ "triangle-a4", "Samples/DRS_TriangleLead_A4.wav", "core-lead" });
+
+    project.authoring.schemaName = "drs.authoring";
+    project.authoring.schemaVersion = 5;
+    project.authoring.articulations.push_back({ "sustain", "Sustain", true, 0, std::nullopt });
+    project.authoring.articulations.push_back({ "lead", "Lead", false, 1, std::nullopt });
+    project.authoring.groups.push_back({ "pad-core", "Pad Core", 0, true, 0.0, 0.0, {}, {} });
+    project.authoring.groups.push_back({ "lead-core", "Lead Core", 1, true, 0.0, 0.0, {}, {} });
+
+    drs::engine::RuntimeProjectZoneDefinition padZone;
+    padZone.id = "pad-a3";
+    padZone.sampleSourceId = "sine-a3";
+    padZone.displayName = "Pad A3";
+    padZone.groupId = "pad-core";
+    padZone.articulationId = "sustain";
+    padZone.rootKey = 57;
+    padZone.keyLow = 36;
+    padZone.keyHigh = 76;
+    padZone.velocityLow = 1;
+    padZone.velocityHigh = 95;
+    project.authoring.zones.push_back(std::move(padZone));
+
+    drs::engine::RuntimeProjectZoneDefinition leadZone;
+    leadZone.id = "lead-a4";
+    leadZone.sampleSourceId = "triangle-a4";
+    leadZone.displayName = "Lead A4";
+    leadZone.groupId = "lead-core";
+    leadZone.articulationId = "lead";
+    leadZone.rootKey = 69;
+    leadZone.keyLow = 60;
+    leadZone.keyHigh = 96;
+    leadZone.velocityLow = 1;
+    leadZone.velocityHigh = 127;
+    project.authoring.zones.push_back(std::move(leadZone));
+
+    return project;
+}
 } // namespace drs::tests::performance_package

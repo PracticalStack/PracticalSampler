@@ -47,7 +47,13 @@ That refresh updates both:
 
 After a refresh, run:
 
-- `ctest --preset test-debug -R "drs.phase1.fixture_tool_verify|drs.phase1.performance_package|drs.phase1.performance_package_loader|drs.phase1.performance_package_session|drs.phase1.performance_package_host_validation" --output-on-failure`
+- `ctest --preset test-debug -R "drs.phase1.fixture_tool_verify|drs.phase1.performance_package|drs.phase1.performance_package_loader|drs.phase1.performance_package_session|drs.phase1.performance_package_host_validation|drs.phase1.performance_package_release_gate" --output-on-failure`
+
+The release-gate test writes:
+
+- `phase1-performance-package-release-gate.json`
+
+That artifact is the primary Sprint 8 go/no-go snapshot for package determinism, exported-package reopen, performance-only UX, and failure reporting.
 
 ## Triage
 
@@ -63,3 +69,9 @@ If `drs.phase1.fixture_tool_verify` fails:
 - compare the changed fixture checksums in `performance-package-corpus/index.json`
 - rerun the focused package tests to see whether the drift is writer-side, reader-side, or activation-side
 - refresh the corpus only after confirming the format change is intentional
+
+If `drs.phase1.performance_package_release_gate` fails:
+
+- inspect the failing section in `phase1-performance-package-release-gate.json`
+- treat `compatibilityPolicy` failures as contract blockers
+- treat `determinism`, `reopenAndPerformanceOnlyUx`, or `failureReporting` failures as release blockers

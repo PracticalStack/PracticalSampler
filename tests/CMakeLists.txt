@@ -3524,6 +3524,43 @@ add_test(
     COMMAND drs_phase1_performance_package_host_validation_tests
 )
 
+juce_add_console_app(drs_phase1_performance_package_release_gate
+    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Performance Package Release Gate"
+)
+
+target_sources(drs_phase1_performance_package_release_gate
+    PRIVATE
+        src/Phase1PerformancePackageReleaseGate.cpp
+)
+
+target_link_libraries(drs_phase1_performance_package_release_gate
+    PRIVATE
+        drs_plugin_shell
+        drs_standalone_shell
+        drs_engine_adapter
+        drs_sample_import
+        juce::juce_audio_formats
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_phase1_performance_package_release_gate PRIVATE cxx_std_17)
+
+target_include_directories(drs_phase1_performance_package_release_gate
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/third_party/juce/modules
+        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
+)
+
+add_test(
+    NAME drs.phase1.performance_package_release_gate
+    COMMAND drs_phase1_performance_package_release_gate
+        "${CMAKE_CURRENT_BINARY_DIR}/phase1-performance-package-release-gate.json"
+)
+
 juce_add_console_app(drs_phase1_pipeline_report
     PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Pipeline Report"
 )
@@ -3978,6 +4015,11 @@ add_dependencies(drs_all_tests
     drs_phase1_runtime_counters_tests
     drs_phase1_runtime_baseline_guard
     drs_phase1_runtime_fixture_tool
+    drs_phase1_performance_package_tests
+    drs_phase1_performance_package_loader_tests
+    drs_phase1_performance_package_session_tests
+    drs_phase1_performance_package_host_validation_tests
+    drs_phase1_performance_package_release_gate
 )
 
 set_target_properties(drs_all_tests PROPERTIES
