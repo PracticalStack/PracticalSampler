@@ -110,6 +110,7 @@ struct EnginePerformanceSnapshot
     std::uint64_t previewPreparedBuildId = 0;
     std::uint64_t publishedPreparedBuildId = 0;
     std::string instrumentDisplayName;
+    std::string contentRootPath;
     std::string presetId;
     std::string loadProfileId;
     std::string selectedArticulationId;

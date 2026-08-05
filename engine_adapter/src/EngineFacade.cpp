@@ -1972,6 +1972,9 @@ EnginePerformanceSnapshot EngineFacade::getPerformanceSnapshot() const
     snapshot.instrumentDisplayName = (referenceInstrumentActive && referenceManifest.loaded)
         ? referenceManifest.instrument.displayName
         : "No instrument loaded";
+    snapshot.contentRootPath = authoringProject.loaded
+        ? authoringProject.project.contentRootPath
+        : std::string {};
     snapshot.presetId = referenceInstrumentActive ? currentSessionState.presetId : "none";
     snapshot.loadProfileId = referenceInstrumentActive ? currentSessionState.loadProfileId : "none";
     snapshot.selectedArticulationId = referenceInstrumentActive ? currentSessionState.selectedArticulationId : std::string {};
@@ -2015,7 +2018,7 @@ EnginePerformanceSnapshot EngineFacade::getPerformanceSnapshot() const
     snapshot.draftPlaybackEvent = draftStatus.lastEvent;
     snapshot.loadIndicator = referenceInstrumentActive
         ? buildLoadIndicator(referenceManifest, referenceStream, currentSessionState)
-        : "Click Load Default or Load Lead Demo";
+        : "No instrument loaded";
     const auto workerStatus = preparedPlaybackService.getWorkerStatus();
     snapshot.preparedScheduler = workerStatus;
     snapshot.preparedWorkerPendingCount = workerStatus.pendingWorkCount;
@@ -3084,7 +3087,7 @@ EnginePreviewPlaybackSnapshot EngineFacade::auditionPreviewNote(int midiNote, in
     if (!referenceInstrumentActive)
     {
         previewPlaybackSnapshot.state = "Preview unavailable";
-        previewPlaybackSnapshot.errorMessage = "No instrument is loaded. Use Load Default or Load Lead Demo first.";
+        previewPlaybackSnapshot.errorMessage = "No instrument is loaded.";
         return previewPlaybackSnapshot;
     }
 

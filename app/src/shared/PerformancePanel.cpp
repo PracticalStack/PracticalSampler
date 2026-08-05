@@ -1,11 +1,7 @@
 #include "shared/PerformancePanel.h"
 
-#include "drs/engine/RuntimeLoader.h"
-
 #include <algorithm>
 #include <cmath>
-#include <filesystem>
-#include <optional>
 
 namespace drs::app
 {
@@ -17,62 +13,6 @@ const auto performancePanelAccent = juce::Colour::fromRGB(28, 126, 214);
 const auto performancePanelSuccess = juce::Colour::fromRGB(27, 128, 84);
 const auto performancePanelWarning = juce::Colour::fromRGB(176, 91, 22);
 const auto performancePanelDanger = juce::Colour::fromRGB(172, 41, 41);
-
-juce::String summarizeDigest(const std::string& digest)
-{
-    if (digest.empty())
-        return "none";
-
-    constexpr std::size_t prefixLength = 18;
-    if (digest.size() <= prefixLength)
-        return juce::String::fromUTF8(digest.c_str());
-
-    return juce::String::fromUTF8((digest.substr(0, prefixLength) + "...").c_str());
-}
-
-juce::String summarizeFindings(const std::vector<drs::engine::PlaybackSnapshotFinding>& findings)
-{
-    if (findings.empty())
-        return "none";
-
-    juce::String summary = juce::String::fromUTF8(findings.front().message.c_str());
-    if (findings.size() > 1)
-        summary << " (+" << juce::String(static_cast<int>(findings.size() - 1)) << " more)";
-
-    return summary;
-}
-
-juce::String formatArticulationLabel(const std::string& articulationName, const std::string& articulationId)
-{
-    if (!articulationName.empty())
-        return juce::String::fromUTF8(articulationName.c_str());
-
-    if (!articulationId.empty())
-        return juce::String::fromUTF8(articulationId.c_str());
-
-    return "Unassigned";
-}
-
-std::optional<double> findMacroValue(const drs::engine::RuntimeSessionStateSnapshot& sessionState,
-                                     const std::string& macroId)
-{
-    const auto iterator = std::find_if(sessionState.macroValues.begin(),
-                                       sessionState.macroValues.end(),
-                                       [&](const auto& macroValue)
-                                       {
-                                           return macroValue.id == macroId;
-                                       });
-    if (iterator == sessionState.macroValues.end())
-        return std::nullopt;
-
-    return iterator->value;
-}
-
-int computeMotionSemitoneOffset(const drs::engine::RuntimeSessionStateSnapshot& sessionState)
-{
-    const auto motionValue = findMacroValue(sessionState, "motion").value_or(0.5);
-    return static_cast<int>(std::lround((motionValue - 0.5) * 24.0));
-}
 
 struct PerformanceMacroSurfaceModel
 {
@@ -161,12 +101,12 @@ std::vector<PerformanceMixerControlView> buildPublishedMixerControls(
 juce::String buildMacroStripTitle(const PerformanceMacroSurfaceModel& model)
 {
     if (!model.showingPublishedMixer)
-        return model.displayedMacros.empty() ? "Performance Macros" : "Performance Macros | Preview Controls";
+        return "Instrument Controls";
 
     if (model.displayedMacros.empty())
-        return "Published Controls | None Exposed";
+        return "Instrument Controls | None Exposed";
 
-    return "Performance Mixer | " + juce::String(static_cast<int>(model.displayedMacros.size()))
+    return "Instrument Controls | " + juce::String(static_cast<int>(model.displayedMacros.size()))
         + " Exposed";
 }
 
@@ -197,6 +137,36 @@ juce::String buildMixerEmptyStateText(const std::size_t hiddenPublishedMacroCoun
 }
 } // namespace
 
+void PerformancePanel::ArtworkPanel::setArtwork(juce::Image nextArtwork, juce::String nextDescription)
+{
+    artwork = std::move(nextArtwork);
+    description = std::move(nextDescription);
+    setTitle("Performance artwork");
+    setDescription(description);
+    repaint();
+}
+
+void PerformancePanel::ArtworkPanel::paint(juce::Graphics& g)
+{
+    auto bounds = getLocalBounds().toFloat();
+    g.setColour(juce::Colour::fromRGB(46, 48, 51));
+    g.fillRoundedRectangle(bounds, 18.0f);
+
+    if (artwork.isValid())
+    {
+        g.reduceClipRegion(getLocalBounds());
+        g.drawImageWithin(artwork,
+                          getLocalBounds().getX(),
+                          getLocalBounds().getY(),
+                          getLocalBounds().getWidth(),
+                          getLocalBounds().getHeight(),
+                          juce::RectanglePlacement::fillDestination);
+    }
+
+    g.setColour(performancePanelAccent.withAlpha(0.22f));
+    g.drawRoundedRectangle(bounds.reduced(1.0f), 18.0f, 1.5f);
+}
+
 PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
                                    MacroValueChangedCallback macroValueChanged,
                                    PerformanceNoteOnCallback performanceNoteOn,
@@ -221,43 +191,18 @@ PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
       diagnosticsPanel(facade, onMacroValueChanged, std::move(publishCommand),
                        publishPresentationProvider)
 {
-    titleLabel.setText("Performance Mixer", juce::dontSendNotification);
-    titleLabel.setFont(juce::FontOptions(26.0f, juce::Font::bold));
-    titleLabel.setColour(juce::Label::textColourId, juce::Colours::white);
-
-    instrumentLabel.setFont(juce::FontOptions(24.0f, juce::Font::bold));
-    instrumentLabel.setComponentID("performanceInstrumentLabel");
-    patchStatusLabel.setFont(juce::FontOptions(15.0f));
-    patchStatusLabel.setComponentID("performancePatchStatusLabel");
-    previewStatusLabel.setFont(juce::FontOptions(15.0f));
-    previewStatusLabel.setComponentID("performancePreviewStatusLabel");
     macroStripLabel.setFont(juce::FontOptions(16.0f, juce::Font::bold));
     macroStripLabel.setComponentID("performanceMacroStripLabel");
     mixerEmptyStateLabel.setFont(juce::FontOptions(15.0f));
     mixerEmptyStateLabel.setComponentID("performanceMixerEmptyStateLabel");
     mixerEmptyStateLabel.setJustificationType(juce::Justification::centredLeft);
-    articulationLabel.setFont(juce::FontOptions(16.0f, juce::Font::bold));
-    articulationLabel.setComponentID("performanceArticulationLabel");
-    keyboardHintLabel.setFont(juce::FontOptions(15.0f));
-    keyboardHintLabel.setComponentID("performanceKeyboardHintLabel");
     loadIndicatorLabel.setFont(juce::FontOptions(15.0f, juce::Font::bold));
     loadIndicatorLabel.setComponentID("performanceLoadIndicatorLabel");
+    artworkPanel.setComponentID("performanceArtworkPanel");
 
-    instrumentLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(14, 20, 27));
-    patchStatusLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(52, 64, 84));
-    previewStatusLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(52, 64, 84));
     macroStripLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(14, 20, 27));
     mixerEmptyStateLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(52, 64, 84));
-    articulationLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(14, 20, 27));
-    keyboardHintLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(52, 64, 84));
-    loadIndicatorLabel.setJustificationType(juce::Justification::centred);
-
-    loadDefaultButton.setButtonText("Load Default");
-    loadDefaultButton.setComponentID("performanceLoadDefaultButton");
-    loadLeadButton.setButtonText("Load Lead Demo");
-    loadLeadButton.setComponentID("performanceLoadLeadButton");
-    diagnosticsToggle.setButtonText("Show Diagnostics");
-    diagnosticsToggle.setComponentID("performanceDiagnosticsToggle");
+    loadIndicatorLabel.setJustificationType(juce::Justification::centredRight);
 
     keyboardComponent.setComponentID("performanceKeyboard");
     keyboardComponent.setKeyWidth(34.0f);
@@ -269,47 +214,14 @@ PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
     diagnosticsPanel.setComponentID("performanceDiagnosticsPanel");
     diagnosticsPanel.setVisible(false);
 
-    loadDefaultButton.onClick = [this]
-    {
-        engineFacade.resetSessionStateToDefault();
-        refreshSurface();
-    };
-
-    loadLeadButton.onClick = [this]
-    {
-        namespace fs = std::filesystem;
-        const auto presetPath = fs::path(drs::engine::getPhase1RuntimeRootPath())
-            / "preset-state"
-            / "reference"
-            / "lead-performance-state.drpreset.json";
-        engineFacade.restorePresetStateFile(presetPath.generic_string());
-        refreshSurface();
-    };
-
-    diagnosticsToggle.onClick = [this]
-    {
-        diagnosticsPanel.setVisible(diagnosticsToggle.getToggleState());
-        diagnosticsToggle.setButtonText(diagnosticsToggle.getToggleState() ? "Hide Diagnostics" : "Show Diagnostics");
-        resized();
-    };
-
-    addAndMakeVisible(titleLabel);
-    addAndMakeVisible(instrumentLabel);
-    addAndMakeVisible(patchStatusLabel);
-    addAndMakeVisible(previewStatusLabel);
+    addAndMakeVisible(artworkPanel);
     addAndMakeVisible(macroStripLabel);
     addAndMakeVisible(mixerEmptyStateLabel);
-    addAndMakeVisible(articulationLabel);
-    addAndMakeVisible(keyboardHintLabel);
     addAndMakeVisible(loadIndicatorLabel);
-    addAndMakeVisible(loadDefaultButton);
-    addAndMakeVisible(loadLeadButton);
-    addAndMakeVisible(diagnosticsToggle);
     addAndMakeVisible(keyboardComponent);
     addChildComponent(publishedMixer);
     addChildComponent(diagnosticsPanel);
 
-    rebuildArticulationButtons();
     rebuildMacroControls(engineFacade.getMacroDescriptors(), false);
     refreshSurface();
     startTimerHz(2);
@@ -330,51 +242,20 @@ void PerformancePanel::paint(juce::Graphics& g)
 
     g.setColour(performancePanelCard);
     g.fillRoundedRectangle(bounds.reduced(4.0f), 18.0f);
-
-    auto heroBounds = bounds.reduced(16.0f).removeFromTop(92.0f);
-    juce::ColourGradient heroGradient(performancePanelAccent,
-                                      heroBounds.getTopLeft(),
-                                      juce::Colour::fromRGB(15, 78, 160),
-                                      heroBounds.getBottomRight(),
-                                      false);
-    g.setGradientFill(heroGradient);
-    g.fillRoundedRectangle(heroBounds, 16.0f);
 }
 
 void PerformancePanel::resized()
 {
     auto area = getLocalBounds().reduced(30);
 
-    auto heroArea = area.removeFromTop(88);
-    auto heroLeft = heroArea.removeFromLeft(460);
-    titleLabel.setBounds(heroLeft.removeFromTop(30));
-    heroLeft.removeFromTop(8);
-    instrumentLabel.setBounds(heroLeft.removeFromTop(28));
-    heroLeft.removeFromTop(6);
-    patchStatusLabel.setBounds(heroLeft.removeFromTop(20));
-
-    auto heroRight = heroArea;
-    loadIndicatorLabel.setBounds(heroRight.removeFromTop(30).removeFromRight(200));
-    heroRight.removeFromTop(10);
-    auto heroButtons = heroRight.removeFromTop(28);
-    loadDefaultButton.setBounds(heroButtons.removeFromLeft(140));
-    heroButtons.removeFromLeft(10);
-    loadLeadButton.setBounds(heroButtons.removeFromLeft(150));
-    heroButtons.removeFromLeft(10);
-    diagnosticsToggle.setBounds(heroButtons.removeFromLeft(150));
-
-    area.removeFromTop(18);
-    articulationLabel.setBounds(area.removeFromTop(24));
-    area.removeFromTop(8);
-
-    auto articulationRow = area.removeFromTop(28);
-    for (auto& button : articulationButtons)
-    {
-        button->setBounds(articulationRow.removeFromLeft(140));
-        articulationRow.removeFromLeft(10);
-    }
+    auto statusRow = area.removeFromTop(28);
+    loadIndicatorLabel.setBounds(statusRow.removeFromRight(260));
 
     area.removeFromTop(14);
+    const auto artworkHeight = std::clamp(area.getHeight() / 3, 180, 320);
+    artworkPanel.setBounds(area.removeFromTop(artworkHeight));
+
+    area.removeFromTop(18);
     macroStripLabel.setBounds(area.removeFromTop(24));
     area.removeFromTop(8);
 
@@ -409,10 +290,7 @@ void PerformancePanel::resized()
         }
     }
 
-    area.removeFromTop(12);
-    previewStatusLabel.setBounds(area.removeFromTop(22));
-    keyboardHintLabel.setBounds(area.removeFromTop(22));
-    area.removeFromTop(8);
+    area.removeFromTop(16);
     keyboardComponent.setBounds(area.removeFromTop(92));
 
     if (diagnosticsPanel.isVisible())
@@ -510,40 +388,45 @@ void PerformancePanel::rebuildMacroControls(
     }
 }
 
-void PerformancePanel::rebuildArticulationButtons()
+void PerformancePanel::refreshArtwork()
 {
-    articulationButtons.clear();
+    if (loadedArtworkContentRoot == performanceSnapshot.contentRootPath)
+        return;
 
-    for (const auto& articulation : engineFacade.getArticulationDescriptors())
+    loadedArtworkContentRoot = performanceSnapshot.contentRootPath;
+    auto artwork = juce::Image();
+    auto description = juce::String("Performance artwork unavailable. Using fallback background.");
+
+    if (!loadedArtworkContentRoot.empty())
     {
-        auto button = std::make_unique<juce::TextButton>(juce::String::fromUTF8(articulation.name.c_str()));
-        button->setClickingTogglesState(false);
-        button->onClick = [this, articulationId = articulation.id]
+        const auto artworkFile = juce::File(
+            juce::String::fromUTF8(loadedArtworkContentRoot.c_str()))
+            .getChildFile("Images")
+            .getChildFile("background.jpg");
+        if (artworkFile.existsAsFile())
         {
-            engineFacade.setSelectedArticulation(articulationId);
-            refreshSurface();
-        };
-        addAndMakeVisible(*button);
-        articulationButtons.push_back(std::move(button));
+            artwork = juce::ImageFileFormat::loadFrom(artworkFile);
+            if (artwork.isValid())
+            {
+                description = "Performance artwork loaded from "
+                    + artworkFile.getFullPathName();
+            }
+        }
     }
+
+    artworkPanel.setArtwork(std::move(artwork), description);
 }
 
 void PerformancePanel::refreshSurface()
 {
     performanceSnapshot = engineFacade.getPerformanceSnapshot();
     lastObservedStateRevision = engineFacade.getStateRevision();
-    const auto articulations = engineFacade.getArticulationDescriptors();
     const auto allMacros = engineFacade.getMacroDescriptors();
     const auto macroSurface = buildPerformanceMacroSurfaceModel(allMacros);
     const auto publishPresentation = publishPresentationProvider
         ? publishPresentationProvider()
         : engineFacade.getPerformancePublishPresentationSnapshot();
-
-    if (articulations.size() != articulationButtons.size())
-    {
-        rebuildArticulationButtons();
-        resized();
-    }
+    refreshArtwork();
 
     hiddenPublishedMacroCount = macroSurface.hiddenPublishedMacroCount;
     if (!sameMacroLayout(visibleMacroIds,
@@ -557,37 +440,6 @@ void PerformancePanel::refreshSurface()
     else if (macroSurface.showingPublishedMixer)
     {
         publishedMixer.setControls(buildPublishedMixerControls(macroSurface.displayedMacros));
-    }
-
-    instrumentLabel.setText(juce::String::fromUTF8(performanceSnapshot.instrumentDisplayName.c_str()),
-                            juce::dontSendNotification);
-    if (!performanceSnapshot.loaded && performanceSnapshot.instrumentDisplayName == "No instrument loaded")
-    {
-        patchStatusLabel.setText("No performance instrument loaded yet. Surface "
-                                     + juce::String::fromUTF8(performanceSnapshot.surfaceStateSource.c_str())
-                                     + " | renderer "
-                                     + juce::String::fromUTF8(performanceSnapshot.rendererMode.c_str())
-                                     + ". Use Load Default or Load Lead Demo.",
-                                 juce::dontSendNotification);
-    }
-    else
-    {
-        patchStatusLabel.setText(
-            "Preset " + juce::String::fromUTF8(performanceSnapshot.presetId.c_str())
-                + " | Load " + juce::String::fromUTF8(performanceSnapshot.loadProfileId.c_str())
-                + " | Articulation " + formatArticulationLabel(performanceSnapshot.selectedArticulationName,
-                                                               performanceSnapshot.selectedArticulationId)
-                + " | Draft r" + juce::String(static_cast<juce::int64>(performanceSnapshot.draftRevision))
-                + " | Preview r" + juce::String(static_cast<juce::int64>(performanceSnapshot.previewRevision))
-                + " (" + juce::String::fromUTF8(performanceSnapshot.previewRevisionState.c_str()) + ")"
-                + " | Published r" + juce::String(static_cast<juce::int64>(performanceSnapshot.publishedRevision))
-                + " (" + juce::String::fromUTF8(drs::engine::toString(
-                    performanceSnapshot.publishedPresentationState)) + ")"
-                + " | Preview build #" + juce::String(static_cast<juce::int64>(performanceSnapshot.previewBuildId))
-                + " | Publish build #" + juce::String(static_cast<juce::int64>(performanceSnapshot.publishedBuildId))
-                + " | Surface " + juce::String::fromUTF8(performanceSnapshot.surfaceStateSource.c_str())
-                + " | Renderer " + juce::String::fromUTF8(performanceSnapshot.rendererMode.c_str()),
-            juce::dontSendNotification);
     }
 
     juce::String loadIndicatorText = juce::String::fromUTF8(performanceSnapshot.loadIndicator.c_str());
@@ -626,35 +478,6 @@ void PerformancePanel::refreshSurface()
                                                    : performancePanelDanger)));
     loadIndicatorLabel.setColour(juce::Label::textColourId, juce::Colours::white);
 
-    juce::String previewText = "Preview: draft r"
-        + juce::String(static_cast<juce::int64>(performanceSnapshot.previewPlayback.draftRevision))
-        + " -> prepared r"
-        + juce::String(static_cast<juce::int64>(performanceSnapshot.previewPlayback.preparedRevision))
-        + " | "
-        + juce::String::fromUTF8(performanceSnapshot.previewPlayback.revisionState.c_str());
-    if (performanceSnapshot.previewPlayback.attempted)
-    {
-        previewText << " | played " << performanceSnapshot.previewPlayback.midiNote
-                    << " -> effective " << performanceSnapshot.previewPlayback.effectiveMidiNote
-                    << " | velocity " << performanceSnapshot.previewPlayback.effectiveVelocity
-                    << " | zone " << juce::String::fromUTF8(performanceSnapshot.previewPlayback.zoneId.c_str());
-    }
-    if (performanceSnapshot.previewPlayback.pendingBuild)
-    {
-        previewText << " | preparing";
-    }
-    previewText << " | digest " << summarizeDigest(performanceSnapshot.previewContentDigest);
-    if (!performanceSnapshot.previewFindings.empty())
-        previewText << " | findings " << summarizeFindings(performanceSnapshot.previewFindings);
-    previewText << " | " << juce::String::fromUTF8(performanceSnapshot.previewPlayback.appliedMacroSummary.c_str());
-    if (!performanceSnapshot.previewPlayback.errorMessage.empty())
-    {
-        previewText << " | " << juce::String::fromUTF8(performanceSnapshot.previewPlayback.errorMessage.c_str());
-    }
-    previewStatusLabel.setText(previewText, juce::dontSendNotification);
-    previewStatusLabel.setColour(juce::Label::textColourId,
-                                 hasPreviewError ? performancePanelDanger : juce::Colour::fromRGB(52, 64, 84));
-
     const auto macroStripDescription = buildMacroStripDescription(macroSurface);
     macroStripLabel.setText(buildMacroStripTitle(macroSurface), juce::dontSendNotification);
     macroStripLabel.setTooltip(macroStripDescription);
@@ -665,19 +488,7 @@ void PerformancePanel::refreshSurface()
     mixerEmptyStateLabel.setText(mixerEmptyText, juce::dontSendNotification);
     mixerEmptyStateLabel.setTooltip(mixerEmptyText);
     mixerEmptyStateLabel.setDescription(mixerEmptyText);
-    articulationLabel.setText("Articulations", juce::dontSendNotification);
     syncKeyboardPlayableRange();
-
-    for (std::size_t index = 0; index < std::min(articulations.size(), articulationButtons.size()); ++index)
-    {
-        const auto& articulation = articulations[index];
-        auto& button = articulationButtons[index];
-        button->setButtonText(juce::String::fromUTF8(articulation.name.c_str()));
-        button->setColour(juce::TextButton::buttonColourId,
-                          articulation.selected ? performancePanelAccent : juce::Colour::fromRGB(220, 228, 237));
-        button->setColour(juce::TextButton::textColourOffId,
-                          articulation.selected ? juce::Colours::white : juce::Colour::fromRGB(14, 20, 27));
-    }
 
     for (std::size_t index = 0;
          index < std::min(macroSurface.displayedMacros.size(), macroControls.size());
@@ -702,8 +513,7 @@ void PerformancePanel::refreshSurface()
         control->valueLabel.setTooltip(controlDescription);
     }
 
-    if (diagnosticsPanel.isVisible())
-        diagnosticsPanel.repaint();
+    diagnosticsPanel.repaint();
 }
 
 void PerformancePanel::syncKeyboardPlayableRange()
@@ -765,11 +575,6 @@ void PerformancePanel::syncKeyboardPlayableRange()
             + " - "
             + juce::MidiMessage::getMidiNoteName(highestPlayableNote, true, true, 3)
             + " follows the current playable zone window.";
-    keyboardHintLabel.setText(
-        keyboardHint,
-        juce::dontSendNotification);
-    keyboardHintLabel.setTooltip(keyboardHint);
-    keyboardHintLabel.setDescription(keyboardHint);
     keyboardComponent.setTitle("Performance keyboard");
     keyboardComponent.setDescription(keyboardHint);
 }

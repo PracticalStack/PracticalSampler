@@ -145,29 +145,46 @@ int main()
         DesktopHostedComponent host(panel);
         refreshPanel(panel);
 
-        requireButton(panel, "performanceDiagnosticsToggle").triggerClick();
-        refreshPanel(panel);
-
+        requireComponentPresent(panel,
+                                "performanceArtworkPanel",
+                                true,
+                                "Performance panel should expose an artwork surface above the controls.");
+        requireComponentPresent(panel,
+                                "performanceLoadDefaultButton",
+                                false,
+                                "Performance panel should no longer expose the Load Default demo button.");
+        requireComponentPresent(panel,
+                                "performanceLoadLeadButton",
+                                false,
+                                "Performance panel should no longer expose the Load Lead demo button.");
+        requireComponentPresent(panel,
+                                "performanceArticulationLabel",
+                                false,
+                                "Performance panel should no longer expose the demo articulation strip.");
+        requireComponentPresent(panel,
+                                "performancePatchStatusLabel",
+                                false,
+                                "Performance panel should remove the old internal patch-status block.");
+        requireComponentPresent(panel,
+                                "performancePreviewStatusLabel",
+                                false,
+                                "Performance panel should remove the old preview-status block.");
+        requireComponentPresent(panel,
+                                "performanceKeyboardHintLabel",
+                                false,
+                                "Performance panel should remove the old keyboard hint label.");
+        requireComponentPresent(panel,
+                                "performanceDiagnosticsToggle",
+                                false,
+                                "Performance panel should remove the old diagnostics toggle from the player surface.");
         requireLabelContains(panel,
-                             "performancePatchStatusLabel",
-                             "Draft r0 | Preview r0 (Ready) | Published r0 (Active)",
-                             "Performance panel should expose the seeded default draft-playback state.");
+                             "performanceLoadIndicatorLabel",
+                             "Publish Active r0",
+                             "Performance panel should keep the compact publish indicator visible.");
         requireLabelContains(panel,
-                             "statusSessionLabel",
-                             "draft=0 | preview=0 (Ready) | published=0 (Active)",
-                             "Diagnostics panel should expose the seeded default draft-playback state.");
-        requireLabelContains(panel,
-                             "performancePatchStatusLabel",
-                             "Surface published draft | Renderer reference-backed",
-                             "Performance panel should expose explicit draft-surface provenance for the seeded runtime.");
-        requireLabelContains(panel,
-                             "statusSessionLabel",
-                             "surface=published draft | renderer=reference-backed",
-                             "Diagnostics panel should expose explicit draft-surface provenance for the seeded runtime.");
-        requireLabelContains(panel,
-                             "statusFailureLabel",
-                             "previewFindings=0 (none) | publishFindings=0 (none)",
-                             "Diagnostics panel should begin without draft-playback findings.");
+                             "performanceMacroStripLabel",
+                             "Instrument Controls",
+                             "Performance panel should label the control area as instrument controls.");
 
         const auto phase1Project = drs::engine::loadPhase1ReferenceProjectManifest();
         require(phase1Project.loaded, "Phase 1 reference project must load before performance UI migration coverage runs.");
@@ -188,55 +205,15 @@ int main()
         refreshPanel(panel);
 
         requireLabelContains(panel,
-                             "performancePatchStatusLabel",
-                             "Preview r0 (Prepared playback build rejected because the immutable snapshot is unavailable)",
-                             "Performance panel should surface the rejected migrated preview state.");
-        requireLabelContains(panel,
-                             "performancePatchStatusLabel",
-                             "Published r0 (Failed)",
-                             "Performance panel should surface the rejected migrated publish state.");
-        requireLabelContains(panel,
                              "performanceLoadIndicatorLabel",
                              "Publish Failed",
                              "The compact Performance status chip should keep a failed Publish fully visible.");
         require(requireLabel(panel, "performanceLoadIndicatorLabel").findColour(
                     juce::Label::backgroundColourId) == juce::Colour::fromRGB(172, 41, 41),
                 "A failed Publish must use the danger colour even when a fallback instrument remains loaded.");
-        requireLabelContains(panel,
-                             "performanceKeyboardHintLabel",
-                             "Publish failed: Snapshot requires at least one playable zone",
-                             "The full actionable Publish failure must remain visible beside the disabled keyboard.");
         require(requireLabel(panel, "performanceLoadIndicatorLabel").getDescription().contains(
                     "no-playable-zones"),
                 "The compact failed Publish chip must retain the structured finding in its accessible description.");
-        requireLabelContains(panel,
-                             "performancePreviewStatusLabel",
-                             "findings Snapshot requires at least one playable zone before it can become activation-eligible.",
-                             "Performance panel should surface the migrated preview finding summary.");
-        requireLabelContains(panel,
-                             "statusSessionLabel",
-                             "draft=0 | preview=0 (Prepared playback build rejected because the immutable snapshot is unavailable) | published=0 (Failed)",
-                             "Diagnostics panel should surface the rejected migrated draft-playback states.");
-        requireLabelContains(panel,
-                             "performancePatchStatusLabel",
-                             "Surface default fallback | Renderer reference-backed",
-                             "Performance panel should expose the default fallback surface provenance when no prepared draft state exists.");
-        requireLabelContains(panel,
-                             "statusSessionLabel",
-                             "surface=default fallback | renderer=reference-backed",
-                             "Diagnostics panel should expose the default fallback surface provenance when no prepared draft state exists.");
-        requireLabelContains(panel,
-                             "statusFailureLabel",
-                             "Publish failure [no-playable-zones]",
-                             "Diagnostics must retain the actionable published failure code after the compact mixer keeps the healthy path small.");
-        requireLabelContains(panel,
-                             "statusFailureLabel",
-                             "Snapshot requires at least one playable zone",
-                             "Diagnostics must retain actionable repair guidance for a failed publication.");
-        requireLabelContains(panel,
-                             "performanceKeyboardHintLabel",
-                             "Range C1 - C6",
-                             "Performance panel should fall back to the default keyboard range when no prepared draft-playback range exists.");
 
         drs::engine::RuntimeProjectSampleSource importedSampleSource;
         importedSampleSource.id = "performance-ui-migrated-sine-a3";
@@ -278,36 +255,9 @@ int main()
         refreshPanel(panel);
 
         requireLabelContains(panel,
-                             "performancePatchStatusLabel",
-                             "Draft r1 | Preview r1 (Ready)",
-                             "Performance panel should surface the recovered migrated preview/publish state.");
-        requireLabelContains(panel,
-                             "performancePatchStatusLabel",
-                             "Published r1 (Ready)",
-                             "Performance panel should surface the recovered migrated publish state.");
-        requireLabelContains(panel,
-                             "statusSessionLabel",
-                             "draft=1 | preview=1 (Ready) | published=1 (Ready)",
-                             "Diagnostics panel should surface the recovered migrated preview/publish state.");
-        requireLabelContains(panel,
-                             "performancePatchStatusLabel",
-                             "Surface published draft | Renderer reference-backed",
-                             "Performance panel should expose published draft provenance once a migrated draft is published.");
-        requireLabelContains(panel,
                              "performanceLoadIndicatorLabel",
                              "Publish Ready r1",
                              "The compact Performance status chip should expose the recovered published revision without clipping.");
-        requireLabelContains(panel,
-                             "statusFailureLabel",
-                             "previewFindings=0 (none) | publishFindings=0 (none)",
-                             "Diagnostics panel should clear migrated findings once preview/publish recover.");
-        requireLabelContains(panel,
-                             "performanceKeyboardHintLabel",
-                             std::string("Range ")
-                                 + juce::MidiMessage::getMidiNoteName(57, true, true, 3).toStdString()
-                                 + " - "
-                                 + juce::MidiMessage::getMidiNoteName(57, true, true, 3).toStdString(),
-                             "Performance panel should derive the keyboard range from the published authored draft instead of the reference manifest.");
 
         auto editedZone = *migratedSession.getSelectedZone();
         editedZone.gainDb = 2.5;
@@ -320,23 +270,6 @@ int main()
         require(engineFacade.stageDraftRevision(editResult.documentState.revision),
                 "Engine facade should stage the edited migrated draft revision.");
         refreshPanel(panel);
-
-        requireLabelContains(panel,
-                             "performancePatchStatusLabel",
-                             "Draft r2 | Preview r1 (Stale)",
-                             "Performance panel should surface the stale-preview edited-draft state.");
-        requireLabelContains(panel,
-                             "performancePatchStatusLabel",
-                             "Published r1 (Ready)",
-                             "Performance panel should keep the last published revision visible while the draft is stale.");
-        requireLabelContains(panel,
-                             "statusSessionLabel",
-                             "draft=2 | preview=1 (Stale) | published=1 (Ready)",
-                             "Diagnostics panel should surface the stale-preview edited-draft state.");
-        requireLabelContains(panel,
-                             "performancePatchStatusLabel",
-                             "Surface published draft | Renderer reference-backed",
-                             "Performance panel should keep the published draft provenance while a newer edit is still stale.");
 
         require(engineFacade.refreshPreviewToCurrentDraft(),
                 "Edited migrated draft should prepare preview successfully.");
@@ -353,28 +286,9 @@ int main()
         refreshPanel(panel);
 
         requireLabelContains(panel,
-                             "performancePatchStatusLabel",
-                             "Draft r2 | Preview r2 (Ready)",
-                             "Performance panel should surface the republished edited-draft state.");
-        requireLabelContains(panel,
-                             "performancePatchStatusLabel",
-                             "Published r2 (Ready)",
-                             "Performance panel should surface the republished publish revision.");
-        requireLabelContains(panel,
-                             "statusSessionLabel",
-                             "draft=2 | preview=2 (Ready) | published=2 (Ready)",
-                             "Diagnostics panel should surface the republished edited-draft state.");
-        requireLabelContains(panel,
-                             "performancePatchStatusLabel",
-                             "Surface published draft | Renderer reference-backed",
-                             "Performance panel should preserve published draft provenance after republishing an edited draft.");
-        requireLabelContains(panel,
-                             "performanceKeyboardHintLabel",
-                             std::string("Range ")
-                                 + juce::MidiMessage::getMidiNoteName(57, true, true, 3).toStdString()
-                                 + " - "
-                                 + juce::MidiMessage::getMidiNoteName(57, true, true, 3).toStdString(),
-                             "Performance panel should preserve the authored playable range after republishing an edited draft.");
+                             "performanceLoadIndicatorLabel",
+                             "Publish Ready r2",
+                             "Performance panel should advance the compact publish indicator when the edited draft is republished.");
 
         const auto phase2ProjectLoad = drs::engine::loadPhase2ReferenceProjectManifest();
         require(phase2ProjectLoad.loaded,
@@ -411,7 +325,7 @@ int main()
 
         requireLabelContains(panel,
                              "performanceMacroStripLabel",
-                             "Performance Mixer | 1 Exposed",
+                             "Instrument Controls | 1 Exposed",
                              "Performance panel should switch into mixer mode when published exposed controls are active.");
         requireLabelContains(panel,
                              "performanceMixerNameLabel.layer-blend",
@@ -459,7 +373,7 @@ int main()
 
         requireLabelContains(panel,
                              "performanceMacroStripLabel",
-                             "Published Controls | None Exposed",
+                             "Instrument Controls | None Exposed",
                              "Performance panel should call out when a published instrument exposes no player-facing controls.");
         requireLabelContains(panel,
                              "performanceMixerEmptyStateLabel",
@@ -483,10 +397,6 @@ int main()
                              "statusMacroNameLabel.motion",
                              "Release Helper",
                              "Diagnostics should continue to expose the second hidden helper binding.");
-        requireLabelContains(panel,
-                             "performanceKeyboardHintLabel",
-                             "publishes no exposed performance controls",
-                             "Performance keyboard guidance should explain why the active publication has no visible mixer controls.");
 
         std::cout << "Phase 2 performance UI tests passed." << std::endl;
         return 0;

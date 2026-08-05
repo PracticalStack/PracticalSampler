@@ -39,6 +39,17 @@ public:
     juce::MidiKeyboardState& getKeyboardState() noexcept { return keyboardState; }
 
 private:
+    class ArtworkPanel final : public juce::Component
+    {
+    public:
+        void setArtwork(juce::Image nextArtwork, juce::String nextDescription);
+        void paint(juce::Graphics& g) override;
+
+    private:
+        juce::Image artwork;
+        juce::String description;
+    };
+
     struct MacroControl
     {
         std::string id;
@@ -53,7 +64,7 @@ private:
     void handleNoteOff(juce::MidiKeyboardState* source, int midiChannel, int midiNoteNumber, float velocity) override;
     void rebuildMacroControls(const std::vector<drs::engine::EngineMacroDescriptor>& macros,
                               bool mixerControl);
-    void rebuildArticulationButtons();
+    void refreshArtwork();
     void refreshSurface();
     void syncKeyboardPlayableRange();
 
@@ -74,22 +85,14 @@ private:
     std::vector<std::string> visibleMacroIds;
     std::vector<std::unique_ptr<MacroControl>> macroControls;
     PerformanceMixer publishedMixer;
-    std::vector<std::unique_ptr<juce::TextButton>> articulationButtons;
     juce::MidiKeyboardState keyboardState;
     juce::MidiKeyboardComponent keyboardComponent;
     StatusPanel diagnosticsPanel;
+    ArtworkPanel artworkPanel;
+    std::string loadedArtworkContentRoot;
 
-    juce::Label titleLabel;
-    juce::Label instrumentLabel;
-    juce::Label patchStatusLabel;
-    juce::Label previewStatusLabel;
     juce::Label macroStripLabel;
     juce::Label mixerEmptyStateLabel;
-    juce::Label articulationLabel;
-    juce::Label keyboardHintLabel;
     juce::Label loadIndicatorLabel;
-    juce::TextButton loadDefaultButton;
-    juce::TextButton loadLeadButton;
-    juce::ToggleButton diagnosticsToggle;
 };
 } // namespace drs::app

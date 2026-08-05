@@ -314,8 +314,8 @@ int main()
                 "Standalone shell should expose the workspace tab container.");
         require(findDescendantById(mainComponent, "performanceKeyboard") != nullptr,
                 "Standalone shell should expose the Sprint 5 keyboard surface.");
-        require(findDescendantById(mainComponent, "performanceDiagnosticsToggle") != nullptr,
-                "Standalone shell should expose a diagnostics entry point.");
+        require(findDescendantById(mainComponent, "performanceArtworkPanel") != nullptr,
+                "Standalone shell should expose the performance artwork panel.");
         auto* standaloneTabs = dynamic_cast<juce::TabbedComponent*>(findDescendantById(mainComponent, "workspaceTabs"));
         require(standaloneTabs != nullptr, "Standalone shell workspace tab container should be a tabbed component.");
         standaloneTabs->setCurrentTabIndex(1);
@@ -378,8 +378,8 @@ int main()
                 "Plugin editor should expose the Settings menu entry point.");
         require(findDescendantById(*editor, "performanceKeyboard") != nullptr,
                 "Plugin editor should expose the Sprint 5 keyboard surface.");
-        require(findDescendantById(*editor, "performanceDiagnosticsToggle") != nullptr,
-                "Plugin editor should expose a diagnostics entry point.");
+        require(findDescendantById(*editor, "performanceArtworkPanel") != nullptr,
+                "Plugin editor should expose the performance artwork panel.");
         auto* pluginTabs = dynamic_cast<juce::TabbedComponent*>(findDescendantById(*editor, "workspaceTabs"));
         require(pluginTabs != nullptr, "Plugin editor workspace tab container should be a tabbed component.");
         pluginTabs->setCurrentTabIndex(1);

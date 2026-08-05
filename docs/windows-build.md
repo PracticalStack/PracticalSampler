@@ -59,6 +59,16 @@ To install the built VST3 bundle into the standard Windows VST3 location after a
 powershell -ExecutionPolicy Bypass -File .\tools\install-vst3-windows.ps1
 ```
 
+To create a simple tester-facing `setup.exe` from the current build outputs:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\build-tester-installer.ps1 -Configuration Release
+```
+
+This helper expects Inno Setup 6 to be installed and packages the built VST3 bundle into the
+standard VST3 location. If the standalone app artefacts are present, it also includes the
+standalone executable in the installer.
+
 To configure only:
 
 ```powershell
