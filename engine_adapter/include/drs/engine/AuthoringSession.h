@@ -192,6 +192,14 @@ public:
                                                             std::vector<std::string> authoringNotes,
                                                             const std::string& label,
                                                             bool reconcileInferredRoundRobin = true);
+    RuntimeProjectDocumentActionResult appendImportedContent(std::vector<RuntimeProjectSampleSource> sampleSources,
+                                                            std::vector<RuntimeProjectZoneDefinition> zones,
+                                                            double importedMasterGainDb,
+                                                            std::vector<RuntimeProjectGroupDefinition> groups,
+                                                            std::vector<std::string> projectNotes,
+                                                            std::vector<std::string> authoringNotes,
+                                                            const std::string& label,
+                                                            bool reconcileInferredRoundRobin = true);
     RuntimeProjectDocumentActionResult createMacro(const RuntimeProjectMacroDefinition& macro,
                                                    const std::string& label);
     RuntimeProjectDocumentActionResult duplicateMacro(const std::string& macroId,

@@ -1093,6 +1093,8 @@ RuntimeProjectDocumentActionResult applySfzImportProjection(AuthoringSession& au
 
     return authoringSession.appendImportedContent(std::move(projection.sampleSources),
                                                   std::move(projection.zones),
+                                                  projection.masterGainDb,
+                                                  std::move(projection.groups),
                                                   std::move(projection.projectNotes),
                                                   std::move(projection.authoringNotes),
                                                   label,

@@ -2535,12 +2535,32 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
     std::vector<RuntimeProjectZoneDefinition> zones,
     const std::string& label)
 {
-    return appendImportedContent(std::move(sampleSources), std::move(zones), {}, {}, label);
+    return appendImportedContent(std::move(sampleSources), std::move(zones), 0.0, {}, {}, {}, label);
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
     std::vector<RuntimeProjectSampleSource> sampleSources,
     std::vector<RuntimeProjectZoneDefinition> zones,
+    std::vector<std::string> projectNotes,
+    std::vector<std::string> authoringNotes,
+    const std::string& label,
+    const bool reconcileInferredRoundRobin)
+{
+    return appendImportedContent(std::move(sampleSources),
+                                 std::move(zones),
+                                 0.0,
+                                 {},
+                                 std::move(projectNotes),
+                                 std::move(authoringNotes),
+                                 label,
+                                 reconcileInferredRoundRobin);
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
+    std::vector<RuntimeProjectSampleSource> sampleSources,
+    std::vector<RuntimeProjectZoneDefinition> zones,
+    const double importedMasterGainDb,
+    std::vector<RuntimeProjectGroupDefinition> groups,
     std::vector<std::string> projectNotes,
     std::vector<std::string> authoringNotes,
     const std::string& label,
@@ -2558,22 +2578,46 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
         const auto status = assessGroupRoundRobin(project, group.id);
         if (status.enabled)
             enabledGroups.push_back({ group.id, status.mode });
-    }
+      }
 
-    const auto originalSampleSourceCount = project.sampleSources.size();
-    const auto originalZoneCount = project.authoring.zones.size();
+      const auto originalSampleSourceCount = project.sampleSources.size();
+      const auto originalZoneCount = project.authoring.zones.size();
+      const auto originalGroupCount = project.authoring.groups.size();
+      const auto originalMasterGainDb = project.authoring.masterGainDb;
 
-    project.sampleSources.insert(project.sampleSources.end(),
-                                 std::make_move_iterator(sampleSources.begin()),
-                                 std::make_move_iterator(sampleSources.end()));
-    project.authoring.zones.insert(project.authoring.zones.end(),
-                                   std::make_move_iterator(zones.begin()),
-                                   std::make_move_iterator(zones.end()));
-    if (reconcileInferredRoundRobin)
-        reconcileBatchInferredRoundRobinDescriptors(project.authoring.zones);
-    const auto synthesizedArticulations = synthesizeMissingArticulations(project);
-    project.notes.insert(project.notes.end(),
-                         std::make_move_iterator(projectNotes.begin()),
+      project.sampleSources.insert(project.sampleSources.end(),
+                                   std::make_move_iterator(sampleSources.begin()),
+                                   std::make_move_iterator(sampleSources.end()));
+      project.authoring.zones.insert(project.authoring.zones.end(),
+                                     std::make_move_iterator(zones.begin()),
+                                     std::make_move_iterator(zones.end()));
+      project.authoring.masterGainDb += importedMasterGainDb;
+      if (usesExplicitZoneGroupsSchema(project))
+      {
+          auto nextDisplayOrder = static_cast<int>(project.authoring.groups.size());
+          for (const auto& group : project.authoring.groups)
+              nextDisplayOrder = std::max(nextDisplayOrder, group.displayOrder + 1);
+
+          for (auto& importedGroup : groups)
+          {
+              if (importedGroup.id.empty()
+                  || findGroupIndexById(project, importedGroup.id).has_value())
+              {
+                  continue;
+              }
+
+              importedGroup.displayOrder = nextDisplayOrder++;
+              if (importedGroup.displayName.empty())
+                  importedGroup.displayName = importedGroup.id;
+
+              project.authoring.groups.push_back(std::move(importedGroup));
+          }
+      }
+      if (reconcileInferredRoundRobin)
+          reconcileBatchInferredRoundRobinDescriptors(project.authoring.zones);
+      const auto synthesizedArticulations = synthesizeMissingArticulations(project);
+      project.notes.insert(project.notes.end(),
+                           std::make_move_iterator(projectNotes.begin()),
                          std::make_move_iterator(projectNotes.end()));
     project.authoring.notes.insert(project.authoring.notes.end(),
                                    std::make_move_iterator(authoringNotes.begin()),
@@ -2603,20 +2647,23 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
     for (const auto& [enabledGroupId, mode] : enabledGroups)
         reconcilePreviouslyEnabledGroup(project, enabledGroupId, mode);
 
-    std::vector<std::string> changedPaths {
-        "sampleSources[" + std::to_string(originalSampleSourceCount) + "]",
-        "authoring.zones[" + std::to_string(originalZoneCount) + "]",
-        "authoring.selectedZoneId"
-    };
-    if (usesExplicitZoneGroupsSchema(project))
-    {
-        changedPaths.push_back("authoring.selectedGroupId");
-        changedPaths.push_back("authoring.groups");
-    }
-    if (synthesizedArticulations)
-        changedPaths.push_back("authoring.articulations");
-    if (!projectNotes.empty())
-        changedPaths.push_back("notes");
+      std::vector<std::string> changedPaths {
+          "sampleSources[" + std::to_string(originalSampleSourceCount) + "]",
+          "authoring.zones[" + std::to_string(originalZoneCount) + "]",
+          "authoring.selectedZoneId"
+      };
+      if (project.authoring.masterGainDb != originalMasterGainDb)
+          changedPaths.push_back("authoring.masterGainDb");
+      if (usesExplicitZoneGroupsSchema(project))
+      {
+          changedPaths.push_back("authoring.selectedGroupId");
+          if (project.authoring.groups.size() != originalGroupCount)
+              changedPaths.push_back("authoring.groups");
+      }
+      if (synthesizedArticulations)
+          changedPaths.push_back("authoring.articulations");
+      if (!projectNotes.empty())
+          changedPaths.push_back("notes");
     if (!authoringNotes.empty())
         changedPaths.push_back("authoring.notes");
 

@@ -5,6 +5,7 @@
 #include "shared/ProjectStorage.h"
 
 #include <array>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -342,14 +343,22 @@ int main()
         require(phase5Session.getProject().schemaVersion == 5
                     && phase5Session.getProject().authoring.schemaVersion == 4,
                 "Applying SFZ content into a schema 5 project should preserve the current project schema versions.");
+        require(std::abs(phase5Session.getProject().authoring.masterGainDb - phase5Projection.masterGainDb) < 1.0e-9,
+                "Applying SFZ content into a schema 5 project should commit imported master gain.");
         require(phase5Session.getProject().authoring.zones.size() == phase5Projection.zones.size(),
                 "Applying SFZ content into a schema 5 project should append every projected zone.");
         require(phase5Session.getProject().authoring.groups.size()
-                    == countDistinctGroupIds(phase5Session.getProject().authoring.zones),
-                "Applying SFZ content into a schema 5 project should synthesize one explicit group per distinct imported groupId.");
+                    == phase5Projection.groups.size(),
+                "Applying SFZ content into a schema 5 project should commit projected authored groups atomically.");
         require(phase5Session.getProject().authoring.selectedGroupId
                     == phase5Session.getProject().authoring.zones.front().groupId,
                 "Applying SFZ content into a schema 5 project should align selectedGroupId with the imported selection.");
+        const auto* phase5FirstAppliedGroup =
+            findGroupById(phase5Session.getProject().authoring.groups, phase5Projection.groups.front().id);
+        require(phase5FirstAppliedGroup != nullptr
+                    && phase5FirstAppliedGroup->gainDb == phase5Projection.groups.front().gainDb
+                    && phase5FirstAppliedGroup->displayName == phase5Projection.groups.front().displayName,
+                "Applying SFZ content into a schema 5 project should preserve projected group gain and naming.");
 
         AuthoringSession phase6Session(blankPhase6Project);
         const auto phase6ApplyResult = applySfzImportProjection(
@@ -361,11 +370,59 @@ int main()
         require(phase6Session.getProject().schemaVersion == 6
                     && phase6Session.getProject().authoring.schemaVersion == 5,
                 "Applying SFZ content into a schema 6 project should preserve the current project schema versions.");
+        require(std::abs(phase6Session.getProject().authoring.masterGainDb - phase6Projection.masterGainDb) < 1.0e-9,
+                "Applying SFZ content into a schema 6 project should commit imported master gain.");
+        require(phase6Session.getProject().authoring.groups.size() == phase6Projection.groups.size(),
+                "Applying SFZ content into a schema 6 project should commit projected authored groups atomically.");
         require(phase6Session.getProject().authoring.articulations.size() == 1,
                 "Applying SFZ content into a schema 6 project should synthesize one explicit articulation for this sustain-only fixture.");
         require(phase6Session.getProject().authoring.articulations.front().id == "sustain"
                     && phase6Session.getProject().authoring.articulations.front().isDefault,
                 "Schema 6 SFZ projection should synthesize a default sustain articulation for the imported zones.");
+
+        AuthoringSession scopedVolumeSession(blankPhase6Project);
+        const auto scopedVolumeApplyResult = applySfzImportProjection(
+            scopedVolumeSession,
+            scopedVolumeProjection,
+            "Import scoped-volume Stage 3 fixture into schema 6 project");
+        require(scopedVolumeApplyResult.applied,
+                "Stage 3 should apply the scoped-volume fixture through the authoring session.");
+        require(std::abs(scopedVolumeSession.getProject().authoring.masterGainDb - 2.0) < 1.0e-9,
+                "Stage 3 should commit the imported master gain in the authoring project.");
+        require(scopedVolumeSession.getProject().authoring.groups.size() == scopedVolumeProjection.groups.size()
+                    && scopedVolumeSession.getProject().authoring.zones.size() == scopedVolumeProjection.zones.size(),
+                "Stage 3 should commit imported groups and zones atomically.");
+        const auto* appliedLowVelocityGroup =
+            findGroupById(scopedVolumeSession.getProject().authoring.groups, scopedVolumeProjection.groups[0].id);
+        const auto* appliedHighVelocityGroup =
+            findGroupById(scopedVolumeSession.getProject().authoring.groups, scopedVolumeProjection.groups[1].id);
+        require(appliedLowVelocityGroup != nullptr
+                    && appliedHighVelocityGroup != nullptr
+                    && appliedLowVelocityGroup->gainDb == -3.0
+                    && appliedHighVelocityGroup->gainDb == -6.0,
+                "Stage 3 should preserve imported group-local gain through apply.");
+        require(scopedVolumeSession.getProject().authoring.zones[0].gainDb == 1.0
+                    && scopedVolumeSession.getProject().authoring.zones[1].gainDb == 4.0,
+                "Stage 3 should preserve imported region-local gain through apply.");
+        require(scopedVolumeSession.getProject().authoring.selectedZoneId
+                    == scopedVolumeSession.getProject().authoring.zones.front().id
+                    && scopedVolumeSession.getProject().authoring.selectedGroupId
+                        == scopedVolumeSession.getProject().authoring.zones.front().groupId,
+                "Stage 3 should settle selected zone and group coherently after import.");
+        const auto scopedUndoResult = scopedVolumeSession.undo();
+        require(scopedUndoResult.applied,
+                "Stage 3 scoped-volume import should be undoable.");
+        require(std::abs(scopedVolumeSession.getProject().authoring.masterGainDb) < 1.0e-9
+                    && scopedVolumeSession.getProject().authoring.groups.empty()
+                    && scopedVolumeSession.getProject().authoring.zones.empty(),
+                "Undo should roll back imported master gain, groups, and zones together.");
+        const auto scopedRedoResult = scopedVolumeSession.redo();
+        require(scopedRedoResult.applied,
+                "Stage 3 scoped-volume import should be redoable.");
+        require(std::abs(scopedVolumeSession.getProject().authoring.masterGainDb - 2.0) < 1.0e-9
+                    && scopedVolumeSession.getProject().authoring.groups.size() == 2
+                    && scopedVolumeSession.getProject().authoring.zones.size() == 2,
+                "Redo should restore imported master gain, groups, and zones together.");
 
         AuthoringSession session(blankProject);
         const auto applyResult = applySfzImportProjection(session, projection, "Import Sprint 3.1.4 SFZ fixture");
@@ -374,6 +431,8 @@ int main()
                 "Applying the first SFZ fixture should append the projected sample sources.");
         require(session.getProject().authoring.zones.size() == 225,
                 "Applying the first SFZ fixture should append the projected zones.");
+        require(std::abs(session.getProject().authoring.masterGainDb - projection.masterGainDb) < 1.0e-9,
+                "Applying the first SFZ fixture should commit imported master gain even on legacy schema projects.");
         require(!session.getProject().notes.empty() && !session.getProject().authoring.notes.empty(),
                 "Applying the first SFZ fixture should persist both project and authoring SFZ notes.");
         require(session.getDocumentState().revision == 1 && session.getDocumentState().undoDepth == 1,
@@ -383,6 +442,7 @@ int main()
         require(undoResult.applied, "The projected SFZ import should be undoable.");
         require(session.getProject().sampleSources.empty()
                     && session.getProject().authoring.zones.empty()
+                    && std::abs(session.getProject().authoring.masterGainDb) < 1.0e-9
                     && session.getProject().notes.empty()
                     && session.getProject().authoring.notes.empty(),
                 "Undo should fully remove the projected SFZ content and saved notes.");
@@ -390,8 +450,9 @@ int main()
         const auto redoResult = session.redo();
         require(redoResult.applied, "The projected SFZ import should be redoable.");
         require(session.getProject().sampleSources.size() == 195
-                    && session.getProject().authoring.zones.size() == 225,
-                "Redo should fully restore the projected SFZ content.");
+                    && session.getProject().authoring.zones.size() == 225
+                    && std::abs(session.getProject().authoring.masterGainDb - projection.masterGainDb) < 1.0e-9,
+                "Redo should fully restore the projected SFZ content and imported master gain.");
 
         const auto tempDirectory = fs::temp_directory_path() / "drs-sprint31-sfz-projection-tests";
         const auto projectPath = tempDirectory / "sfz-projection-roundtrip.drsproj";
