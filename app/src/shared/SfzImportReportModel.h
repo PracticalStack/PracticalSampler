@@ -37,6 +37,23 @@ inline bool reportHasRoundRobinWithDisposition(const drs::engine::SfzImportRepor
                        });
 }
 
+inline bool reportHasScopedGainWithDisposition(
+    const drs::engine::SfzImportReport& report,
+    drs::engine::SfzImportSupportDisposition disposition)
+{
+    return std::any_of(report.opcodeSupport.begin(),
+                       report.opcodeSupport.end(),
+                       [disposition](const drs::engine::SfzImportOpcodeSupportSummary& summary)
+                       {
+                           return summary.opcodeName == "volume"
+                               && summary.disposition == disposition
+                               && (summary.scope == drs::engine::SfzOpcodeScope::master
+                                   || summary.scope == drs::engine::SfzOpcodeScope::group
+                                   || summary.scope == drs::engine::SfzOpcodeScope::region
+                                   || summary.scope == drs::engine::SfzOpcodeScope::global);
+                       });
+}
+
 struct SfzImportReportModel
 {
     bool available = false;
@@ -101,21 +118,37 @@ inline SfzImportReportModel makeSfzImportReportModel(
             const auto preservesRoundRobin = reportHasRoundRobinWithDisposition(
                 report,
                 drs::engine::SfzImportSupportDisposition::converted);
+            const auto preservesScopedGain = reportHasScopedGainWithDisposition(
+                report,
+                drs::engine::SfzImportSupportDisposition::converted);
+            const auto approximatesScopedGain = reportHasScopedGainWithDisposition(
+                report,
+                drs::engine::SfzImportSupportDisposition::approximated);
 
-            if (preservesCrossfades && preservesRoundRobin)
+            if (approximatesScopedGain)
             {
                 model.guidance =
-                    "Supported linear velocity crossfades will be preserved, and supported sequential round robins will be grouped into native Round Robin pools. Review-only findings still need acknowledgement before final import.";
+                    "Supported master, group, and region-local SFZ gain scopes will be preserved, but at least one source gain scope still needs review. Confirm the findings before final import.";
             }
-            else if (preservesCrossfades)
+            else if (preservesCrossfades && preservesRoundRobin && preservesScopedGain)
             {
                 model.guidance =
-                    "Supported linear velocity crossfades will be preserved and play back natively. Review-only findings still need acknowledgement before final import.";
+                    "Supported linear velocity crossfades will be preserved, supported sequential round robins will be grouped into native Round Robin pools, and supported SFZ gain scopes will stay separated across authored master, group, and zone gains. Review-only findings still need acknowledgement before final import.";
             }
-            else if (preservesRoundRobin)
+            else if (preservesCrossfades && preservesScopedGain)
             {
                 model.guidance =
-                    "Supported sequential round robins will be preserved and grouped into native Round Robin pools. Review-only findings still need acknowledgement before final import.";
+                    "Supported linear velocity crossfades will be preserved, and supported SFZ gain scopes will stay separated across authored master, group, and zone gains. Review-only findings still need acknowledgement before final import.";
+            }
+            else if (preservesRoundRobin && preservesScopedGain)
+            {
+                model.guidance =
+                    "Supported sequential round robins will be preserved and grouped into native Round Robin pools, and supported SFZ gain scopes will stay separated across authored master, group, and zone gains. Review-only findings still need acknowledgement before final import.";
+            }
+            else if (preservesScopedGain)
+            {
+                model.guidance =
+                    "Supported SFZ gain scopes will stay separated across authored master, group, and zone gains. Review-only findings still need acknowledgement before final import.";
             }
             else
             {
@@ -130,11 +163,17 @@ inline SfzImportReportModel makeSfzImportReportModel(
         model.guidance = reportHasVelocityCrossfadeWithDisposition(
                              report,
                              drs::engine::SfzImportSupportDisposition::converted)
-            ? "No blocking or lossy findings were detected. Supported linear velocity crossfades will be preserved."
+            ? (reportHasScopedGainWithDisposition(report, drs::engine::SfzImportSupportDisposition::converted)
+                   ? "No blocking or lossy findings were detected. Supported linear velocity crossfades will be preserved, and supported SFZ gain scopes will stay separated across authored master, group, and zone gains."
+                   : "No blocking or lossy findings were detected. Supported linear velocity crossfades will be preserved.")
             : reportHasRoundRobinWithDisposition(
                   report,
                   drs::engine::SfzImportSupportDisposition::converted)
-            ? "No blocking or lossy findings were detected. Supported sequential round robins will be preserved."
+            ? (reportHasScopedGainWithDisposition(report, drs::engine::SfzImportSupportDisposition::converted)
+                   ? "No blocking or lossy findings were detected. Supported sequential round robins will be preserved, and supported SFZ gain scopes will stay separated across authored master, group, and zone gains."
+                   : "No blocking or lossy findings were detected. Supported sequential round robins will be preserved.")
+            : reportHasScopedGainWithDisposition(report, drs::engine::SfzImportSupportDisposition::converted)
+            ? "No blocking or lossy findings were detected. Supported SFZ gain scopes will stay separated across authored master, group, and zone gains."
             : "No blocking or lossy findings were detected.";
     }
 

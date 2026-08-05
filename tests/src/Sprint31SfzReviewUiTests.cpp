@@ -169,9 +169,21 @@ int main()
                                  "Approximated: 0",
                                  "Review UI should surface conversion counts.");
             requireLabelContains(component,
+                                 "sfzImportReviewGuidanceLabel",
+                                 "master, group, and zone gains",
+                                 "Review UI should explain scoped gain preservation.");
+            requireLabelContains(component,
                                  "sfzImportReviewProjectionLabel",
                                  "Zones:",
                                  "Review UI should surface native projection counts.");
+            requireLabelContains(component,
+                                 "sfzImportReviewProjectionLabel",
+                                 "Groups:",
+                                 "Review UI should surface projected group counts.");
+            requireLabelContains(component,
+                                 "sfzImportReviewProjectionLabel",
+                                 "Master gain:",
+                                 "Review UI should surface projected master gain.");
             require(requireEditor(component, "sfzImportReviewFindingsEditor").getText().contains("Findings:"),
                     "Review UI should show the SFZ findings list.");
             require(requireButton(component, "sfzImportReviewApplyButton").isEnabled(),

@@ -155,6 +155,12 @@ int main()
                     && seqLengthSummary->occurrenceCount == 225
                     && seqLengthSummary->nativeTarget == "zone.roundRobin.slotCount",
                 "The support matrix should keep round-robin sequence length as a converted region feature.");
+        const auto* masterVolumeSummary = findSupportSummary(analysis.report, SfzOpcodeScope::master, "volume");
+        require(masterVolumeSummary != nullptr
+                    && masterVolumeSummary->disposition == SfzImportSupportDisposition::converted
+                    && masterVolumeSummary->occurrenceCount == 1
+                    && masterVolumeSummary->nativeTarget == "authoring.masterGainDb",
+                "The support matrix should classify master-scope volume as authored master gain.");
         const auto* curveSummary = findSupportSummary(analysis.report, SfzOpcodeScope::curve, "curve_index");
         require(curveSummary != nullptr
                     && curveSummary->disposition == SfzImportSupportDisposition::reportedOnly
@@ -199,6 +205,51 @@ int main()
         require(invalidCrossfadeSummary != nullptr
                     && invalidCrossfadeSummary->disposition == SfzImportSupportDisposition::approximated,
                 "Unsupported crossfade topology should remain classified as approximated.");
+
+        const auto scopedGainFixturePath = invalidFixtureDirectory / "scoped-gain-report.sfz";
+        writeTextFile(
+            scopedGainFixturePath,
+            "<global>\n"
+            "volume=-1\n"
+            "<master>\n"
+            "volume=2\n"
+            "<group>\n"
+            "volume=-3\n"
+            "<region>\n"
+            "sample=" + samplePath.generic_string() + "\n"
+            "pitch_keycenter=60\n"
+            "lokey=60\n"
+            "hikey=60\n"
+            "volume=4\n");
+        const auto scopedGainAnalysis = analyzeSfzImportDocument(scopedGainFixturePath.generic_string());
+        require(scopedGainAnalysis.analyzed && scopedGainAnalysis.report.available,
+                "Scoped gain topology should still produce a compatibility report.");
+        require(countFindingsWithCode(scopedGainAnalysis.report, "sfz.gain.global_volume.approximated") == 1,
+                "Global SFZ volume should now surface a scoped-gain approximation finding.");
+        const auto* globalVolumeSummary =
+            findSupportSummary(scopedGainAnalysis.report, SfzOpcodeScope::global, "volume");
+        require(globalVolumeSummary != nullptr
+                    && globalVolumeSummary->disposition == SfzImportSupportDisposition::approximated
+                    && globalVolumeSummary->nativeTarget == "report.gain.globalScope",
+                "Global SFZ volume should remain visible as a review-time approximation.");
+        const auto* scopedMasterVolumeSummary =
+            findSupportSummary(scopedGainAnalysis.report, SfzOpcodeScope::master, "volume");
+        require(scopedMasterVolumeSummary != nullptr
+                    && scopedMasterVolumeSummary->disposition == SfzImportSupportDisposition::converted
+                    && scopedMasterVolumeSummary->nativeTarget == "authoring.masterGainDb",
+                "Master-scope volume should map into authored master gain.");
+        const auto* scopedGroupVolumeSummary =
+            findSupportSummary(scopedGainAnalysis.report, SfzOpcodeScope::group, "volume");
+        require(scopedGroupVolumeSummary != nullptr
+                    && scopedGroupVolumeSummary->disposition == SfzImportSupportDisposition::converted
+                    && scopedGroupVolumeSummary->nativeTarget == "authoring.groups.gainDb",
+                "Group-scope volume should map into authored group gain.");
+        const auto* scopedRegionVolumeSummary =
+            findSupportSummary(scopedGainAnalysis.report, SfzOpcodeScope::region, "volume");
+        require(scopedRegionVolumeSummary != nullptr
+                    && scopedRegionVolumeSummary->disposition == SfzImportSupportDisposition::converted
+                    && scopedRegionVolumeSummary->nativeTarget == "authoring.zones.gainDb",
+                "Region-local volume should map into authored zone gain.");
 
         const auto sparseFixturePath = invalidFixtureDirectory / "sparse-round-robin.sfz";
         writeTextFile(

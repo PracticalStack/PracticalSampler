@@ -987,9 +987,35 @@ OpcodeClassification classifyOpcode(const SfzResolvedOpcode& opcode)
 
     if (opcodeName == "volume")
     {
-        return { SfzImportSupportDisposition::converted,
-                 "instrument.gainDb",
-                 "Document-level gain can map into native authored gain metadata." };
+        switch (opcode.location.scope)
+        {
+            case SfzOpcodeScope::master:
+                return { SfzImportSupportDisposition::converted,
+                         "authoring.masterGainDb",
+                         "Master-scope gain now maps into the authored project master gain control." };
+            case SfzOpcodeScope::group:
+                return { SfzImportSupportDisposition::converted,
+                         "authoring.groups.gainDb",
+                         "Group-scope gain now maps into authored group gain without being flattened into zones." };
+            case SfzOpcodeScope::region:
+                return { SfzImportSupportDisposition::converted,
+                         "authoring.zones.gainDb",
+                         "Region-local gain now maps into authored zone gain without carrying inherited master or group gain." };
+            case SfzOpcodeScope::global:
+                return { SfzImportSupportDisposition::approximated,
+                         "report.gain.globalScope",
+                         "Global gain does not yet have a first-class authored scope, so it remains a review-time approximation.",
+                         "sfz.gain.global_volume.approximated",
+                         "Global SFZ volume will require review",
+                         "The importer preserves master, group, and region-local volume scopes directly, but <global> volume does not yet map one-to-one into the authored gain model." };
+            default:
+                return { SfzImportSupportDisposition::reportedOnly,
+                         "report.gain.unsupportedScope",
+                         "This gain scope remains review-only until the importer can map it into authored gain metadata.",
+                         "sfz.gain.unsupported_scope.reported",
+                         "Unsupported SFZ volume scope will be reported",
+                         "The importer recognizes this SFZ volume opcode, but its current scope does not yet map directly into the authored gain model." };
+        }
     }
 
     if (opcodeName == "ampeg_release")

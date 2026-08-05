@@ -459,6 +459,23 @@ std::vector<std::string> buildProjectNotes(const SfzImportReport& report)
             << report.summary.reportedOnlyOpcodeCount << " review-only, "
             << report.summary.blockingOpcodeCount << " blocking.";
     notes.push_back(summary.str());
+
+    const auto hasConvertedScopedGain = std::any_of(
+        report.opcodeSupport.begin(),
+        report.opcodeSupport.end(),
+        [](const SfzImportOpcodeSupportSummary& summary)
+        {
+            return summary.opcodeName == "volume"
+                && summary.disposition == SfzImportSupportDisposition::converted
+                && (summary.scope == SfzOpcodeScope::master
+                    || summary.scope == SfzOpcodeScope::group
+                    || summary.scope == SfzOpcodeScope::region);
+        });
+    if (hasConvertedScopedGain)
+    {
+        notes.push_back(
+            "SFZ gain mapping preserves supported master, group, and region-local volume scopes in authored gain metadata.");
+    }
     return notes;
 }
 
@@ -489,6 +506,20 @@ std::vector<std::string> buildAuthoringNotes(const SfzImportReport& report)
         notes.push_back("SFZ import omitted "
                         + std::to_string(report.summary.suppressedFindingCount)
                         + " additional findings after reaching the diagnostic safety limit.");
+    }
+
+    const auto hasApproximatedGainScope = std::any_of(
+        report.opcodeSupport.begin(),
+        report.opcodeSupport.end(),
+        [](const SfzImportOpcodeSupportSummary& summary)
+        {
+            return summary.opcodeName == "volume"
+                && summary.disposition == SfzImportSupportDisposition::approximated;
+        });
+    if (hasApproximatedGainScope)
+    {
+        notes.push_back(
+            "SFZ gain review: at least one source gain scope still requires approximation; review compatibility findings before trusting loudness parity.");
     }
 
     return notes;

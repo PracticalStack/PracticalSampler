@@ -1,6 +1,7 @@
 #include "shared/SfzImportWorkflow.h"
 
 #include <algorithm>
+#include <cmath>
 #include <map>
 #include <sstream>
 
@@ -20,6 +21,12 @@ const auto reviewDanger = juce::Colour::fromRGB(139, 53, 53);
 juce::String toDisplayString(const std::string& text)
 {
     return juce::String::fromUTF8(text.c_str());
+}
+
+juce::String formatGainDb(const double gainDb)
+{
+    const auto roundedGain = std::abs(gainDb) < 1.0e-9 ? 0.0 : gainDb;
+    return juce::String(roundedGain, 2) + " dB";
 }
 
 std::string summarizeFinding(const drs::engine::SfzImportFinding& finding)
@@ -164,7 +171,9 @@ juce::String buildSfzImportAppliedSummary(const SfzImportReviewPreparationResult
 {
     juce::String summary("Imported SFZ into the current project.");
     summary += "\nZones: " + juce::String(static_cast<int>(review.projection.zones.size()));
+    summary += "\nGroups: " + juce::String(static_cast<int>(review.projection.groups.size()));
     summary += "\nSample sources: " + juce::String(static_cast<int>(review.projection.sampleSources.size()));
+    summary += "\nMaster gain: " + formatGainDb(review.projection.masterGainDb);
     summary += "\nWarnings: " + juce::String(static_cast<int>(review.analysis.report.summary.warningFindingCount));
 
     if (!review.projection.authoringNotes.empty())
@@ -285,10 +294,12 @@ juce::String SfzImportReviewComponent::buildProjectionText() const
 {
     juce::String text("Native projection");
     text += "\nZones: " + juce::String(static_cast<int>(review.projection.zones.size()));
+    text += " | Groups: " + juce::String(static_cast<int>(review.projection.groups.size()));
     text += " | Sample sources: " + juce::String(static_cast<int>(review.projection.sampleSources.size()));
+    text += "\nMaster gain: " + formatGainDb(review.projection.masterGainDb);
     text += " | Playable draft: " + juce::String(review.projection.playable ? "Yes" : "No");
     text += " | Saved notes: " + juce::String(static_cast<int>(review.projection.projectNotes.size()
-                                                                + review.projection.authoringNotes.size()));
+                                                                 + review.projection.authoringNotes.size()));
     return text;
 }
 

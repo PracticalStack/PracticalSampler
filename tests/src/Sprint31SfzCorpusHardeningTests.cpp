@@ -276,6 +276,25 @@ int main()
                     std::string("Fixture projected zone count changed unexpectedly: ") + fixture.label);
             require(!projection.projectNotes.empty() && !projection.authoringNotes.empty(),
                     std::string("Fixture projection should preserve import notes: ") + fixture.label);
+            require(std::abs(projection.masterGainDb - 6.0) < 0.0001,
+                    std::string("Fixture projection should preserve the shared Rhodes master gain at project scope: ")
+                        + fixture.label);
+            require(std::all_of(projection.groups.begin(),
+                                projection.groups.end(),
+                                [](const RuntimeProjectGroupDefinition& group)
+                                {
+                                    return std::abs(group.gainDb) < 0.0001;
+                                }),
+                    std::string("Fixture projection should keep zero-dB group gain when the source uses only master gain: ")
+                        + fixture.label);
+            require(std::all_of(projection.zones.begin(),
+                                projection.zones.end(),
+                                [](const RuntimeProjectZoneDefinition& zone)
+                                {
+                                    return std::abs(zone.gainDb) < 0.0001;
+                                }),
+                    std::string("Fixture projection should no longer flatten shared master gain into zone gain: ")
+                        + fixture.label);
             require(std::all_of(projection.sampleSources.begin(),
                                 projection.sampleSources.end(),
                                 [&](const RuntimeProjectSampleSource& sampleSource)
@@ -313,6 +332,8 @@ int main()
                 std::string("Sprint 3.1.6 import ") + fixture.label);
             require(applyResult.applied,
                     std::string("Corpus fixtures should stay applyable after review: ") + fixture.label);
+            require(std::abs(session.getProject().authoring.masterGainDb - projection.masterGainDb) < 0.0001,
+                    std::string("Corpus fixture apply should preserve projected master gain: ") + fixture.label);
 
             const auto tempDirectory =
                 fs::temp_directory_path() / "drs-sprint31-sfz-corpus-hardening" / fixture.label;
