@@ -513,6 +513,13 @@ MainComponent::MainComponent(bool enableAudioOutput)
     workspaceTabs.setComponentID("workspaceTabs");
     addAndMakeVisible(workspaceTabs);
     addAndMakeVisible(restoreBanner);
+    performancePackageExportProgress.setCancelCallback([this]
+    {
+        if (performancePackageExportClient.has_value())
+            performancePackageExportClient->cancel("Canceled by user");
+    });
+    performancePackageExportProgress.setVisible(false);
+    addChildComponent(performancePackageExportProgress);
     wavImportProgress.setCancelCallback([this]
     {
         if (wavImportClient.has_value())
@@ -541,6 +548,11 @@ MainComponent::MainComponent(bool enableAudioOutput)
 MainComponent::~MainComponent()
 {
     stopTimer();
+    if (performancePackageExportClient.has_value())
+    {
+        performancePackageExportClient->cancel("Standalone shell closed");
+        performancePackageExportClient->waitForTerminal(std::chrono::seconds(10));
+    }
     if (sfzImportClient.has_value())
     {
         sfzImportClient->cancel("Standalone shell closed");
@@ -558,6 +570,10 @@ void MainComponent::resized()
     menuBar.setBounds(area.removeFromTop(28));
     sessionStatusLabel.setBounds(area.removeFromTop(24).reduced(8, 0));
     updateWorkspaceStatusLabel();
+    if (performancePackageExportProgress.isVisible())
+        performancePackageExportProgress.setBounds(area.removeFromTop(72).reduced(8, 2));
+    else
+        performancePackageExportProgress.setBounds({});
     if (restoreBanner.isVisible())
         restoreBanner.setBounds(area.removeFromTop(42));
     else
@@ -714,6 +730,7 @@ void MainComponent::timerCallback()
     if (processor.getWorkspaceDocumentState().authoringAvailable)
         authoringPanel.refreshNow();
     updateWindowTitle();
+    pollPerformancePackageExportService();
     pollWavImportService();
     pollSfzImportReviewService();
 }
@@ -939,25 +956,105 @@ void MainComponent::exportPerformancePackage()
         if (safeThis == nullptr || selectedFile == juce::File())
             return;
 
-        const auto exportResult = safeThis->processor.exportPerformancePackage(selectedFile);
-        if (!exportResult.exported)
-        {
-            juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-                                                   "Export Playable Instrument Failed",
-                                                   safeThis->buildProjectIssueSummary(exportResult.issues));
+        const auto& session = safeThis->processor.getAuthoringSession();
+        auto request = drs::app::PerformancePackageExportRequest {};
+        request.project = session.getProject();
+        request.sessionState = safeThis->processor.getEngineFacade().getCurrentSessionState();
+        request.projectId = safeThis->currentProjectFile != juce::File()
+            ? safeThis->currentProjectFile.getFullPathName().toStdString()
+            : session.getProject().displayName;
+        request.baseRevision = session.getDocumentState().revision;
+        request.packagePath = selectedFile.getFullPathName().toStdString();
+        safeThis->performancePackageExportClient.emplace(
+            safeThis->processor.getPerformancePackageExportService().openClient());
+        const auto submitted = safeThis->performancePackageExportClient->submit(std::move(request));
+        if (submitted.disposition == drs::app::PerformancePackageExportSubmitDisposition::accepted)
             return;
-        }
 
-        safeThis->setRecentProjectDirectory(selectedFile.getParentDirectory());
+        safeThis->performancePackageExportClient.reset();
+        if (safeThis->performancePackageExportProgress.isVisible())
+        {
+            safeThis->performancePackageExportProgress.setVisible(false);
+            safeThis->resized();
+        }
         juce::AlertWindow::showMessageBoxAsync(
-            juce::AlertWindow::InfoIcon,
-            "Playable Instrument Exported",
-            "Exported playable package:\n"
-                + juce::String::fromUTF8(exportResult.packagePath.c_str())
-                + "\n\nPackage size: "
-                + juce::File::descriptionOfSizeInBytes(static_cast<int64_t>(exportResult.packageBytes))
-                + "\nPayload count: " + juce::String(static_cast<int>(exportResult.payloadCount)));
+            juce::AlertWindow::WarningIcon,
+            "Export Playable Instrument Failed",
+            submitted.disposition == drs::app::PerformancePackageExportSubmitDisposition::busy
+                ? "A playable package export is already in progress."
+                : "Playable package export could not be started.");
     });
+}
+
+void MainComponent::pollPerformancePackageExportService()
+{
+    if (!performancePackageExportClient.has_value())
+        return;
+
+    const auto snapshot = performancePackageExportClient->getSnapshot();
+    if (!snapshot)
+        return;
+
+    const auto progressWasVisible = performancePackageExportProgress.isVisible();
+    performancePackageExportProgress.update(*snapshot);
+    if (progressWasVisible != performancePackageExportProgress.isVisible())
+        resized();
+
+    const auto clearState = [this]
+    {
+        const auto progressVisible = performancePackageExportProgress.isVisible();
+        performancePackageExportClient.reset();
+        performancePackageExportProgress.setVisible(false);
+        if (progressVisible)
+            resized();
+    };
+
+    if (snapshot->stage == drs::app::PerformancePackageExportStage::failed)
+    {
+        const auto message = snapshot->result != nullptr
+            ? buildProjectIssueSummary(snapshot->result->issues)
+            : juce::String(snapshot->detail);
+        performancePackageExportClient->consume();
+        clearState();
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Export Playable Instrument Failed",
+                                               message);
+        return;
+    }
+
+    if (snapshot->stage == drs::app::PerformancePackageExportStage::canceled)
+    {
+        performancePackageExportClient->consume();
+        clearState();
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon,
+                                               "Export Playable Instrument Canceled",
+                                               juce::String(snapshot->detail.empty()
+                                                                ? snapshot->status
+                                                                : snapshot->detail));
+        return;
+    }
+
+    if (snapshot->stage == drs::app::PerformancePackageExportStage::consumed)
+    {
+        clearState();
+        return;
+    }
+
+    if (snapshot->stage != drs::app::PerformancePackageExportStage::completed || snapshot->result == nullptr)
+        return;
+
+    const auto exportResult = snapshot->result;
+    performancePackageExportClient->consume();
+    clearState();
+    setRecentProjectDirectory(juce::File(exportResult->packagePath).getParentDirectory());
+    juce::AlertWindow::showMessageBoxAsync(
+        juce::AlertWindow::InfoIcon,
+        "Playable Instrument Exported",
+        "Exported playable package:\n"
+            + juce::String::fromUTF8(exportResult->packagePath.c_str())
+            + "\n\nPackage size: "
+            + juce::File::descriptionOfSizeInBytes(static_cast<int64_t>(exportResult->packageBytes))
+            + "\nPayload count: " + juce::String(static_cast<int>(exportResult->payloadCount)));
 }
 
 void MainComponent::importWavFiles()

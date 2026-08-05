@@ -1167,6 +1167,7 @@ Processor::Processor(drs::app::WaveformPreviewServiceOptions waveformPreviewServ
 Processor::~Processor()
 {
     stopTimer();
+    performancePackageExportService.shutdown();
     sfzImportReviewService.shutdown();
     wavImportService.shutdown();
     projectSourceValidationService.shutdown();

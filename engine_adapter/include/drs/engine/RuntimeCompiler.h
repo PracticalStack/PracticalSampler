@@ -4,6 +4,7 @@
 #include "drs/engine/SampleImport.h"
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -127,8 +128,37 @@ struct RuntimeStreamWriteResult
     std::string payloadFileChecksumHex;
 };
 
+enum class RuntimeStreamWriteStage
+{
+    preparing,
+    decodingSample,
+    writingSample,
+    completed,
+    canceled,
+    failed
+};
+
+struct RuntimeStreamWriteProgress
+{
+    RuntimeStreamWriteStage stage = RuntimeStreamWriteStage::preparing;
+    std::size_t completedSampleCount = 0;
+    std::size_t totalSampleCount = 0;
+    std::uint64_t bytesProcessed = 0;
+    std::uint64_t totalBytes = 0;
+    std::string sampleId;
+    std::string status;
+};
+
+struct RuntimeStreamWriteOptions
+{
+    std::function<void(const RuntimeStreamWriteProgress&)> progressSink;
+    std::function<bool()> cancellationProbe;
+    std::uint64_t progressFrameInterval = 16384;
+};
+
 RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan);
 std::string buildCompiledStreamPayloadPath(const std::string& containerPath);
-RuntimeStreamWriteResult writeCompiledStreamAssets(RuntimeCompileResult& result);
+RuntimeStreamWriteResult writeCompiledStreamAssets(RuntimeCompileResult& result,
+                                                  const RuntimeStreamWriteOptions& options = {});
 std::string serializeCompiledStreamIndex(const RuntimeCompileResult& result, const std::string& containerPath);
 } // namespace drs::engine

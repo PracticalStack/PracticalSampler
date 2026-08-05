@@ -112,6 +112,59 @@ std::vector<std::uint8_t> readBinaryFile(const fs::path& path, std::string& issu
     return std::vector<std::uint8_t>(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
 }
 
+std::vector<std::uint8_t> readBinaryFileChunked(
+    const fs::path& path,
+    std::string& issue,
+    const std::function<void(std::uint64_t, std::uint64_t)>& progressSink,
+    const std::function<bool()>& cancellationProbe)
+{
+    std::ifstream input(path, std::ios::binary);
+    if (!input.good())
+    {
+        issue = "Could not open file for reading: " + path.generic_string();
+        return {};
+    }
+
+    input.seekg(0, std::ios::end);
+    const auto fileSize = static_cast<std::uint64_t>(input.tellg());
+    input.seekg(0, std::ios::beg);
+
+    std::vector<std::uint8_t> bytes;
+    bytes.reserve(static_cast<std::size_t>(fileSize));
+    std::array<char, 64 * 1024> buffer {};
+    std::uint64_t bytesReadTotal = 0;
+
+    while (input.good())
+    {
+        if (cancellationProbe && cancellationProbe())
+        {
+            issue = "canceled";
+            return {};
+        }
+
+        input.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+        const auto bytesRead = input.gcount();
+        if (bytesRead <= 0)
+            break;
+
+        bytes.insert(bytes.end(),
+                     reinterpret_cast<const std::uint8_t*>(buffer.data()),
+                     reinterpret_cast<const std::uint8_t*>(buffer.data() + bytesRead));
+        bytesReadTotal += static_cast<std::uint64_t>(bytesRead);
+        if (progressSink)
+            progressSink(bytesReadTotal, fileSize);
+    }
+
+    if (!input.eof() && input.fail())
+    {
+        issue = "Could not finish reading file: " + path.generic_string();
+        return {};
+    }
+
+    issue.clear();
+    return bytes;
+}
+
 bool writeBinaryFile(const fs::path& path, const std::vector<std::uint8_t>& bytes, std::string& issue)
 {
     std::error_code errorCode;
@@ -129,6 +182,54 @@ bool writeBinaryFile(const fs::path& path, const std::vector<std::uint8_t>& byte
     {
         issue = "Could not finish writing package file: " + path.generic_string();
         return false;
+    }
+
+    issue.clear();
+    return true;
+}
+
+bool writeBinaryFileChunked(const fs::path& path,
+                            const std::vector<std::uint8_t>& bytes,
+                            std::string& issue,
+                            const std::function<void(std::uint64_t, std::uint64_t)>& progressSink,
+                            const std::function<bool()>& cancellationProbe)
+{
+    std::error_code errorCode;
+    fs::create_directories(path.parent_path(), errorCode);
+
+    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    if (!output.good())
+    {
+        issue = "Could not open package file for writing: " + path.generic_string();
+        return false;
+    }
+
+    constexpr std::size_t chunkBytes = 64 * 1024;
+    std::uint64_t bytesWritten = 0;
+    while (bytesWritten < bytes.size())
+    {
+        if (cancellationProbe && cancellationProbe())
+        {
+            issue = "canceled";
+            output.close();
+            std::error_code removeError;
+            fs::remove(path, removeError);
+            return false;
+        }
+
+        const auto remaining = bytes.size() - static_cast<std::size_t>(bytesWritten);
+        const auto writeNow = std::min<std::size_t>(chunkBytes, remaining);
+        output.write(reinterpret_cast<const char*>(bytes.data() + bytesWritten),
+                     static_cast<std::streamsize>(writeNow));
+        if (!output.good())
+        {
+            issue = "Could not finish writing package file: " + path.generic_string();
+            return false;
+        }
+
+        bytesWritten += writeNow;
+        if (progressSink)
+            progressSink(bytesWritten, bytes.size());
     }
 
     issue.clear();
@@ -345,7 +446,10 @@ PerformancePackagePayloadSource buildRuntimeStreamIndexPayload(const RuntimeComp
     return payload;
 }
 
-PerformancePackagePayloadSource buildRuntimeStreamPayloadPayload(const RuntimeCompileResult& compiledRuntime)
+PerformancePackagePayloadSource buildRuntimeStreamPayloadPayload(
+    const RuntimeCompileResult& compiledRuntime,
+    const std::function<void(std::uint64_t, std::uint64_t)>& progressSink,
+    const std::function<bool()>& cancellationProbe)
 {
     PerformancePackagePayloadSource payload;
     payload.payloadId = "runtime-stream-payload";
@@ -354,8 +458,37 @@ PerformancePackagePayloadSource buildRuntimeStreamPayloadPayload(const RuntimeCo
     payload.mediaType = "application/octet-stream";
 
     std::string issue;
-    payload.plaintextBytes = readBinaryFile(fs::path(compiledRuntime.payloadFilePath), issue);
+    payload.plaintextBytes = readBinaryFileChunked(fs::path(compiledRuntime.payloadFilePath),
+                                                   issue,
+                                                   progressSink,
+                                                   cancellationProbe);
     return payload;
+}
+
+bool isCancellationRequested(const PerformancePackageWriteOptions& options)
+{
+    return options.cancellationProbe && options.cancellationProbe();
+}
+
+void publishWriteProgress(const PerformancePackageWriteOptions& options,
+                          const PerformancePackageWriteStage stage,
+                          const std::size_t completedPayloadCount,
+                          const std::size_t totalPayloadCount,
+                          const std::uint64_t bytesProcessed,
+                          const std::uint64_t totalBytes,
+                          const std::string& payloadId,
+                          const std::string& status)
+{
+    if (!options.progressSink)
+        return;
+
+    options.progressSink(PerformancePackageWriteProgress { stage,
+                                                           completedPayloadCount,
+                                                           totalPayloadCount,
+                                                           bytesProcessed,
+                                                           totalBytes,
+                                                           payloadId,
+                                                           status });
 }
 
 bool validateWritePlan(const PerformancePackageWritePlan& plan, PerformancePackageWriteResult& result)
@@ -489,7 +622,8 @@ const char* toString(const PerformancePackagePayloadKind kind) noexcept
     return "unknown";
 }
 
-PerformancePackageWritePlan buildPerformancePackageWritePlan(const PerformancePackageCompileWritePlan& plan)
+PerformancePackageWritePlan buildPerformancePackageWritePlan(const PerformancePackageCompileWritePlan& plan,
+                                                             const PerformancePackageWriteOptions& options)
 {
     PerformancePackageWritePlan writePlan;
     writePlan.manifest = plan.manifest;
@@ -505,12 +639,34 @@ PerformancePackageWritePlan buildPerformancePackageWritePlan(const PerformancePa
     writePlan.payloads.push_back(buildPackageManifestPayload(writePlan.manifest));
     writePlan.payloads.push_back(buildRuntimeInstrumentPayload(packagedRuntime));
     writePlan.payloads.push_back(buildRuntimeStreamIndexPayload(packagedRuntime));
-    writePlan.payloads.push_back(buildRuntimeStreamPayloadPayload(plan.compiledRuntime));
+    publishWriteProgress(options,
+                         PerformancePackageWriteStage::loadingPayloads,
+                         3,
+                         4,
+                         0,
+                         plan.compiledRuntime.alignedPayloadBytes,
+                         "runtime-stream-payload",
+                         "Loading compiled stream payload");
+    writePlan.payloads.push_back(buildRuntimeStreamPayloadPayload(
+        plan.compiledRuntime,
+        [options](const std::uint64_t bytesProcessed, const std::uint64_t totalBytes)
+        {
+            publishWriteProgress(options,
+                                 PerformancePackageWriteStage::loadingPayloads,
+                                 3,
+                                 4,
+                                 bytesProcessed,
+                                 totalBytes,
+                                 "runtime-stream-payload",
+                                 "Loading compiled stream payload");
+        },
+        options.cancellationProbe));
     return writePlan;
 }
 
 PerformancePackageWriteResult writePerformancePackage(const PerformancePackageWritePlan& plan,
-                                                      const PackageCryptoProvider& cryptoProvider)
+                                                      const PackageCryptoProvider& cryptoProvider,
+                                                      const PerformancePackageWriteOptions& options)
 {
     PerformancePackageWriteResult result;
     result.packagePath = plan.outputPackagePath;
@@ -518,9 +674,26 @@ PerformancePackageWriteResult writePerformancePackage(const PerformancePackageWr
     result.payloadCount = static_cast<std::uint32_t>(plan.payloads.size());
     result.state = "Performance package write not attempted";
 
+    std::uint64_t totalPlaintextBytes = 0;
+    for (const auto& payload : plan.payloads)
+        totalPlaintextBytes += payload.plaintextBytes.size();
+    publishWriteProgress(options,
+                         PerformancePackageWriteStage::preparing,
+                         0,
+                         plan.payloads.size(),
+                         0,
+                         totalPlaintextBytes,
+                         {},
+                         "Preparing playable package");
+
     if (!validateWritePlan(plan, result))
     {
         result.state = "Performance package write rejected";
+        return result;
+    }
+    if (isCancellationRequested(options))
+    {
+        result.state = "Performance package write canceled";
         return result;
     }
 
@@ -531,9 +704,25 @@ PerformancePackageWriteResult writePerformancePackage(const PerformancePackageWr
 
     std::vector<SealedPayload> sealedPayloads;
     sealedPayloads.reserve(plan.payloads.size());
+    std::uint64_t sealedPlaintextBytes = 0;
 
-    for (const auto& payload : plan.payloads)
+    for (std::size_t payloadIndex = 0; payloadIndex < plan.payloads.size(); ++payloadIndex)
     {
+        if (isCancellationRequested(options))
+        {
+            result.state = "Performance package write canceled";
+            return result;
+        }
+
+        const auto& payload = plan.payloads[payloadIndex];
+        publishWriteProgress(options,
+                             PerformancePackageWriteStage::sealingPayloads,
+                             payloadIndex,
+                             plan.payloads.size(),
+                             sealedPlaintextBytes,
+                             totalPlaintextBytes,
+                             payload.payloadId,
+                             "Sealing " + payload.payloadId);
         SealedPayload sealedPayload;
         sealedPayload.source = payload;
         sealedPayload.plaintextChecksumHex = computeFnv1a64Hex(payload.plaintextBytes);
@@ -557,6 +746,15 @@ PerformancePackageWriteResult writePerformancePackage(const PerformancePackageWr
             return result;
         }
 
+        sealedPlaintextBytes += payload.plaintextBytes.size();
+        publishWriteProgress(options,
+                             PerformancePackageWriteStage::sealingPayloads,
+                             payloadIndex + 1u,
+                             plan.payloads.size(),
+                             sealedPlaintextBytes,
+                             totalPlaintextBytes,
+                             payload.payloadId,
+                             "Sealed " + payload.payloadId);
         sealedPayloads.push_back(std::move(sealedPayload));
     }
 
@@ -600,6 +798,14 @@ PerformancePackageWriteResult writePerformancePackage(const PerformancePackageWr
 
     PackageSealedBlob sealedToc;
     std::string issue;
+    publishWriteProgress(options,
+                         PerformancePackageWriteStage::sealingToc,
+                         plan.payloads.size(),
+                         plan.payloads.size(),
+                         totalPlaintextBytes,
+                         totalPlaintextBytes,
+                         "encrypted-toc",
+                         "Sealing package table of contents");
     if (!cryptoProvider.seal(tocSealRequest, sealedToc, issue))
     {
         addIssue(result, "Could not seal package TOC: " + issue);
@@ -635,8 +841,36 @@ PerformancePackageWriteResult writePerformancePackage(const PerformancePackageWr
         fileBytes.insert(fileBytes.end(), sealedBytes.begin(), sealedBytes.end());
     }
 
-    if (!writeBinaryFile(fs::path(plan.outputPackagePath), fileBytes, issue))
+    publishWriteProgress(options,
+                         PerformancePackageWriteStage::writingPackage,
+                         plan.payloads.size(),
+                         plan.payloads.size(),
+                         0,
+                         fileBytes.size(),
+                         {},
+                         "Writing playable package file");
+    if (!writeBinaryFileChunked(fs::path(plan.outputPackagePath),
+                                fileBytes,
+                                issue,
+                                [options, payloadCount = plan.payloads.size()](const std::uint64_t bytesProcessed,
+                                                                              const std::uint64_t totalBytes)
+                                {
+                                    publishWriteProgress(options,
+                                                         PerformancePackageWriteStage::writingPackage,
+                                                         payloadCount,
+                                                         payloadCount,
+                                                         bytesProcessed,
+                                                         totalBytes,
+                                                         {},
+                                                         "Writing playable package file");
+                                },
+                                options.cancellationProbe))
     {
+        if (issue == "canceled")
+        {
+            result.state = "Performance package write canceled";
+            return result;
+        }
         addIssue(result, issue);
         result.state = "Performance package write failed";
         return result;
@@ -645,11 +879,20 @@ PerformancePackageWriteResult writePerformancePackage(const PerformancePackageWr
     result.packageBytes = fileBytes.size();
     result.written = true;
     result.state = "Performance package written";
+    publishWriteProgress(options,
+                         PerformancePackageWriteStage::completed,
+                         plan.payloads.size(),
+                         plan.payloads.size(),
+                         result.packageBytes,
+                         result.packageBytes,
+                         {},
+                         result.state);
     return result;
 }
 
 PerformancePackageWriteResult writePerformancePackage(const PerformancePackageCompileWritePlan& plan,
-                                                      const PackageCryptoProvider& cryptoProvider)
+                                                      const PackageCryptoProvider& cryptoProvider,
+                                                      const PerformancePackageWriteOptions& options)
 {
     if (!plan.compiledRuntime.compiled)
     {
@@ -671,7 +914,16 @@ PerformancePackageWriteResult writePerformancePackage(const PerformancePackageCo
         return result;
     }
 
-    auto writePlan = buildPerformancePackageWritePlan(plan);
+    if (isCancellationRequested(options))
+    {
+        PerformancePackageWriteResult result;
+        result.packagePath = plan.outputPackagePath;
+        result.cryptoAlgorithm = cryptoProvider.algorithmId();
+        result.state = "Performance package write canceled";
+        return result;
+    }
+
+    auto writePlan = buildPerformancePackageWritePlan(plan, options);
     const auto payloadIterator = std::find_if(writePlan.payloads.begin(),
                                               writePlan.payloads.end(),
                                               [](const PerformancePackagePayloadSource& payload)
@@ -692,7 +944,16 @@ PerformancePackageWriteResult writePerformancePackage(const PerformancePackageCo
         return result;
     }
 
-    return writePerformancePackage(writePlan, cryptoProvider);
+    if (isCancellationRequested(options))
+    {
+        PerformancePackageWriteResult result;
+        result.packagePath = plan.outputPackagePath;
+        result.cryptoAlgorithm = cryptoProvider.algorithmId();
+        result.state = "Performance package write canceled";
+        return result;
+    }
+
+    return writePerformancePackage(writePlan, cryptoProvider, options);
 }
 
 std::size_t getPerformancePackageHeaderSizeBytes() noexcept

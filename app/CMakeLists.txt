@@ -12,6 +12,8 @@ set(DRS_APP_SHARED_SOURCES
     src/shared/PerformanceMixer.h
     src/shared/PerformancePanel.cpp
     src/shared/PerformancePanel.h
+    src/shared/PerformancePackageExportService.cpp
+    src/shared/PerformancePackageExportService.h
     src/shared/ProjectSourceValidationService.cpp
     src/shared/ProjectSourceValidationService.h
     src/shared/ProjectStorage.cpp

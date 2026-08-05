@@ -5,6 +5,7 @@
 #include "drs/engine/RuntimeCompiler.h"
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -57,6 +58,35 @@ struct PerformancePackageWriteResult
     std::uint32_t payloadCount = 0;
 };
 
+enum class PerformancePackageWriteStage
+{
+    preparing,
+    loadingPayloads,
+    sealingPayloads,
+    sealingToc,
+    writingPackage,
+    completed,
+    canceled,
+    failed
+};
+
+struct PerformancePackageWriteProgress
+{
+    PerformancePackageWriteStage stage = PerformancePackageWriteStage::preparing;
+    std::size_t completedPayloadCount = 0;
+    std::size_t totalPayloadCount = 0;
+    std::uint64_t bytesProcessed = 0;
+    std::uint64_t totalBytes = 0;
+    std::string payloadId;
+    std::string status;
+};
+
+struct PerformancePackageWriteOptions
+{
+    std::function<void(const PerformancePackageWriteProgress&)> progressSink;
+    std::function<bool()> cancellationProbe;
+};
+
 struct PerformancePackageHeaderView
 {
     std::uint32_t formatVersion = 0;
@@ -103,15 +133,19 @@ struct PerformancePackageInspectionResult
 
 const char* toString(PerformancePackagePayloadKind kind) noexcept;
 
-PerformancePackageWritePlan buildPerformancePackageWritePlan(const PerformancePackageCompileWritePlan& plan);
+PerformancePackageWritePlan buildPerformancePackageWritePlan(
+    const PerformancePackageCompileWritePlan& plan,
+    const PerformancePackageWriteOptions& options = {});
 
 PerformancePackageWriteResult writePerformancePackage(
     const PerformancePackageWritePlan& plan,
-    const PackageCryptoProvider& cryptoProvider = getDeterministicPackageCryptoProvider());
+    const PackageCryptoProvider& cryptoProvider = getDeterministicPackageCryptoProvider(),
+    const PerformancePackageWriteOptions& options = {});
 
 PerformancePackageWriteResult writePerformancePackage(
     const PerformancePackageCompileWritePlan& plan,
-    const PackageCryptoProvider& cryptoProvider = getDeterministicPackageCryptoProvider());
+    const PackageCryptoProvider& cryptoProvider = getDeterministicPackageCryptoProvider(),
+    const PerformancePackageWriteOptions& options = {});
 
 std::size_t getPerformancePackageHeaderSizeBytes() noexcept;
 std::size_t getPerformancePackageHeaderPayloadCountOffsetBytes() noexcept;

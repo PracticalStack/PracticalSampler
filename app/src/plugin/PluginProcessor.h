@@ -12,6 +12,7 @@
 #include "drs/engine/SamplerPlaybackContext.h"
 #include "plugin/RealtimeGuard.h"
 #include "shared/AuthoringPreviewModel.h"
+#include "shared/PerformancePackageExportService.h"
 #include "shared/ProjectSourceValidationService.h"
 #include "shared/SfzImportReviewService.h"
 #include "shared/WaveformPreviewService.h"
@@ -187,6 +188,14 @@ public:
     const drs::app::SfzImportReviewService& getSfzImportReviewService() const { return sfzImportReviewService; }
     drs::app::WavImportService& getWavImportService() { return wavImportService; }
     const drs::app::WavImportService& getWavImportService() const { return wavImportService; }
+    drs::app::PerformancePackageExportService& getPerformancePackageExportService()
+    {
+        return performancePackageExportService;
+    }
+    const drs::app::PerformancePackageExportService& getPerformancePackageExportService() const
+    {
+        return performancePackageExportService;
+    }
     bool requestAuthoringSourceValidation();
     bool cancelAuthoringSourceValidation();
     drs::app::AuthoringSourceValidationSnapshot getAuthoringSourceValidationSnapshot() const;
@@ -511,6 +520,7 @@ private:
     drs::engine::ProjectRestoreCoordinator projectRestoreCoordinator;
     drs::app::SfzImportReviewService sfzImportReviewService;
     drs::app::WavImportService wavImportService;
+    drs::app::PerformancePackageExportService performancePackageExportService;
     drs::app::ProjectSourceValidationService projectSourceValidationService;
     drs::app::WaveformPreviewService waveformPreviewService;
     std::shared_ptr<const std::string> serializedHostStatePublication;

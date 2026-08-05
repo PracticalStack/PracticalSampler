@@ -3520,6 +3520,40 @@ add_test(
     COMMAND drs_phase1_performance_package_session_tests
 )
 
+juce_add_console_app(drs_performance_package_export_lifecycle_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Playable Package Export Lifecycle Tests"
+)
+
+target_sources(drs_performance_package_export_lifecycle_tests
+    PRIVATE
+        src/PerformancePackageExportLifecycleTests.cpp
+)
+
+target_link_libraries(drs_performance_package_export_lifecycle_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+        drs_sample_import
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_performance_package_export_lifecycle_tests PRIVATE cxx_std_17)
+
+target_include_directories(drs_performance_package_export_lifecycle_tests
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
+        ${CMAKE_SOURCE_DIR}/third_party/juce/modules
+)
+
+add_test(
+    NAME drs.performance_package.export_lifecycle
+    COMMAND drs_performance_package_export_lifecycle_tests
+)
+
 juce_add_console_app(drs_phase1_performance_package_host_validation_tests
     PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Performance Package Host Validation Tests"
 )
@@ -4050,6 +4084,7 @@ add_dependencies(drs_all_tests
     drs_phase1_performance_package_tests
     drs_phase1_performance_package_loader_tests
     drs_phase1_performance_package_session_tests
+    drs_performance_package_export_lifecycle_tests
     drs_phase1_performance_package_host_validation_tests
     drs_phase1_performance_package_release_gate
 )

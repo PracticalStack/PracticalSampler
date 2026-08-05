@@ -87,6 +87,7 @@ private:
     void synchronizeWorkspacePresentation();
     void updateWorkspaceStatusLabel();
     void updateWindowTitle();
+    void pollPerformancePackageExportService();
     void pollWavImportService();
     void pollSfzImportReviewService();
     drs::engine::RuntimeProjectModel buildUnloadedProjectState() const;
@@ -130,6 +131,7 @@ private:
     drs::app::PerformancePanel performancePanel;
     drs::app::AuthoringPanel authoringPanel;
     drs::app::HostStateRecoveryBanner restoreBanner;
+    drs::app::PerformancePackageExportProgressComponent performancePackageExportProgress;
     drs::app::WavImportProgressComponent wavImportProgress;
     drs::app::SfzImportProgressComponent sfzImportProgress;
     juce::AudioDeviceManager audioDeviceManager;
@@ -139,6 +141,7 @@ private:
     juce::File currentProjectFile;
     bool audioOutputEnabled = false;
     juce::String audioDeviceError;
+    std::optional<drs::app::PerformancePackageExportService::Client> performancePackageExportClient;
     std::optional<drs::app::WavImportService::Client> wavImportClient;
     std::shared_ptr<drs::app::PreparedWavImportBatch> wavImportPreparedBatch;
     std::string wavImportProjectId;

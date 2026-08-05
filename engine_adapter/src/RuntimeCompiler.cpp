@@ -627,7 +627,8 @@ std::string buildCompiledStreamPayloadPath(const std::string& containerPath)
     return containerPath + ".bin";
 }
 
-RuntimeStreamWriteResult writeCompiledStreamAssets(RuntimeCompileResult& result)
+RuntimeStreamWriteResult writeCompiledStreamAssets(RuntimeCompileResult& result,
+                                                  const RuntimeStreamWriteOptions& options)
 {
     RuntimeStreamWriteResult writeResult;
     writeResult.containerPath = result.instrument.compiledStreamAssetPath;
@@ -657,6 +658,39 @@ RuntimeStreamWriteResult writeCompiledStreamAssets(RuntimeCompileResult& result)
     std::error_code errorCode;
     fs::create_directories(payloadFsPath.parent_path(), errorCode);
 
+    const auto publishProgress = [&](const RuntimeStreamWriteStage stage,
+                                     const std::size_t completedSampleCount,
+                                     const std::uint64_t bytesProcessed,
+                                     const std::string& sampleId,
+                                     const std::string& status)
+    {
+        if (!options.progressSink)
+            return;
+
+        options.progressSink(RuntimeStreamWriteProgress { stage,
+                                                          completedSampleCount,
+                                                          result.streamSamples.size(),
+                                                          bytesProcessed,
+                                                          result.alignedPayloadBytes,
+                                                          sampleId,
+                                                          status });
+    };
+    const auto canceled = [&options]
+    {
+        return options.cancellationProbe && options.cancellationProbe();
+    };
+
+    publishProgress(RuntimeStreamWriteStage::preparing,
+                    0,
+                    0,
+                    {},
+                    "Preparing compiled stream payload");
+    if (canceled())
+    {
+        writeResult.state = "Compiled stream payload write canceled";
+        return writeResult;
+    }
+
     std::ofstream output(payloadFsPath, std::ios::binary | std::ios::trunc);
     if (!output.good())
     {
@@ -668,13 +702,25 @@ RuntimeStreamWriteResult writeCompiledStreamAssets(RuntimeCompileResult& result)
     std::uint64_t fileHash = kFnv1aOffsetBasis;
     std::uint64_t currentOffsetBytes = 0;
 
-    for (auto& sample : result.streamSamples)
+    for (std::size_t sampleIndex = 0; sampleIndex < result.streamSamples.size(); ++sampleIndex)
     {
+        auto& sample = result.streamSamples[sampleIndex];
         if (sample.payloadOffsetBytes < currentOffsetBytes)
         {
             addIssue(writeResult,
                      "Compiled stream sample '" + sample.sampleId + "' regressed payload offsets while writing.");
             writeResult.state = "Compiled stream payload write failed";
+            return writeResult;
+        }
+
+        publishProgress(RuntimeStreamWriteStage::decodingSample,
+                        sampleIndex,
+                        currentOffsetBytes,
+                        sample.sampleId,
+                        "Decoding " + sample.sampleId);
+        if (canceled())
+        {
+            writeResult.state = "Compiled stream payload write canceled";
             return writeResult;
         }
 
@@ -730,6 +776,13 @@ RuntimeStreamWriteResult writeCompiledStreamAssets(RuntimeCompileResult& result)
         }
 
         std::uint64_t sampleHash = kFnv1aOffsetBasis;
+        std::uint64_t sampleBytesWritten = 0;
+        const auto progressFrameInterval = std::max<std::uint64_t>(options.progressFrameInterval, 1);
+        publishProgress(RuntimeStreamWriteStage::writingSample,
+                        sampleIndex,
+                        currentOffsetBytes,
+                        sample.sampleId,
+                        "Writing " + sample.sampleId);
         for (std::uint64_t frameIndex = 0; frameIndex < sample.frameCount; ++frameIndex)
         {
             for (std::uint32_t channelIndex = 0; channelIndex < sample.channelCount; ++channelIndex)
@@ -752,6 +805,22 @@ RuntimeStreamWriteResult writeCompiledStreamAssets(RuntimeCompileResult& result)
                     writeResult.state = "Compiled stream payload write failed";
                     return writeResult;
                 }
+
+                sampleBytesWritten += sizeof(float);
+            }
+
+            if ((frameIndex + 1u) % progressFrameInterval == 0u)
+            {
+                publishProgress(RuntimeStreamWriteStage::writingSample,
+                                sampleIndex,
+                                currentOffsetBytes + sampleBytesWritten,
+                                sample.sampleId,
+                                "Writing " + sample.sampleId);
+                if (canceled())
+                {
+                    writeResult.state = "Compiled stream payload write canceled";
+                    return writeResult;
+                }
             }
         }
 
@@ -766,6 +835,16 @@ RuntimeStreamWriteResult writeCompiledStreamAssets(RuntimeCompileResult& result)
         }
 
         currentOffsetBytes = alignedEndBytes;
+        publishProgress(RuntimeStreamWriteStage::writingSample,
+                        sampleIndex + 1u,
+                        currentOffsetBytes,
+                        sample.sampleId,
+                        "Wrote " + sample.sampleId);
+        if (canceled())
+        {
+            writeResult.state = "Compiled stream payload write canceled";
+            return writeResult;
+        }
     }
 
     output.flush();
@@ -783,6 +862,11 @@ RuntimeStreamWriteResult writeCompiledStreamAssets(RuntimeCompileResult& result)
     writeResult.payloadFileChecksumHex = result.payloadFileChecksumHex;
     writeResult.written = true;
     writeResult.state = "Compiled stream payload written";
+    publishProgress(RuntimeStreamWriteStage::completed,
+                    result.streamSamples.size(),
+                    result.alignedPayloadBytes,
+                    {},
+                    writeResult.state);
     return writeResult;
 }
 
