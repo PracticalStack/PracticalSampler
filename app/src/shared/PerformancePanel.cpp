@@ -252,27 +252,42 @@ void PerformancePanel::resized()
     loadIndicatorLabel.setBounds(statusRow.removeFromRight(260));
 
     area.removeFromTop(14);
-    const auto artworkHeight = std::clamp(area.getHeight() / 3, 180, 320);
-    artworkPanel.setBounds(area.removeFromTop(artworkHeight));
 
-    area.removeFromTop(18);
-    macroStripLabel.setBounds(area.removeFromTop(24));
-    area.removeFromTop(8);
+    const auto keyboardHeight = std::clamp(area.getHeight() / 7, 96, 124);
+    auto keyboardArea = area.removeFromBottom(keyboardHeight);
+    keyboardComponent.setBounds(keyboardArea);
+
+    area.removeFromBottom(16);
+
+    const auto macroRowsHeight = static_cast<int>(macroControls.size()) * 34;
+    int controlSectionHeight = 32;
+
+    if (showingPublishedMixer)
+    {
+        controlSectionHeight += publishedMixer.getControlCount() == 0
+            ? 64
+            : std::min(420, std::max(220, area.getHeight() / 3));
+    }
+    else if (!macroControls.empty())
+    {
+        controlSectionHeight += macroRowsHeight + 8;
+    }
+
+    auto controlArea = area.removeFromBottom(std::min(controlSectionHeight, area.getHeight()));
+    macroStripLabel.setBounds(controlArea.removeFromTop(24));
+    controlArea.removeFromTop(8);
 
     if (showingPublishedMixer)
     {
         if (publishedMixer.getControlCount() == 0)
         {
             publishedMixer.setBounds({});
-            mixerEmptyStateLabel.setBounds(area.removeFromTop(56));
-            area.removeFromTop(8);
+            mixerEmptyStateLabel.setBounds(controlArea.removeFromTop(56));
         }
         else
         {
-            const auto mixerHeight = std::min(396, std::max(184, area.getHeight() - 180));
-            publishedMixer.setBounds(area.removeFromTop(mixerHeight));
-
-            area.removeFromTop(10);
+            mixerEmptyStateLabel.setBounds({});
+            publishedMixer.setBounds(controlArea);
         }
     }
     else
@@ -281,23 +296,29 @@ void PerformancePanel::resized()
         mixerEmptyStateLabel.setBounds({});
         for (auto& control : macroControls)
         {
-            auto macroRow = area.removeFromTop(28);
+            auto macroRow = controlArea.removeFromTop(28);
             control->nameLabel.setBounds(macroRow.removeFromLeft(110));
             control->slider.setBounds(macroRow.removeFromLeft(220));
             macroRow.removeFromLeft(10);
             control->valueLabel.setBounds(macroRow.removeFromLeft(190));
-            area.removeFromTop(6);
+            controlArea.removeFromTop(6);
         }
     }
 
-    area.removeFromTop(16);
-    keyboardComponent.setBounds(area.removeFromTop(92));
-
     if (diagnosticsPanel.isVisible())
     {
-        area.removeFromTop(14);
-        diagnosticsPanel.setBounds(area);
+        area.removeFromBottom(14);
+        auto diagnosticsArea = area.removeFromBottom(std::min(220, std::max(120, area.getHeight() / 3)));
+        diagnosticsPanel.setBounds(diagnosticsArea);
+        area.removeFromBottom(14);
     }
+    else
+    {
+        diagnosticsPanel.setBounds({});
+    }
+
+    area.removeFromBottom(18);
+    artworkPanel.setBounds(area);
 }
 
 void PerformancePanel::refreshNow()
