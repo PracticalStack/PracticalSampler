@@ -17,6 +17,8 @@ struct SfzImportProjectionResult
     std::string state;
     std::vector<std::string> issues;
     std::vector<RuntimeProjectSampleSource> sampleSources;
+    double masterGainDb = 0.0;
+    std::vector<RuntimeProjectGroupDefinition> groups;
     std::vector<RuntimeProjectZoneDefinition> zones;
     std::vector<std::string> projectNotes;
     std::vector<std::string> authoringNotes;

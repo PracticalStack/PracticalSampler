@@ -190,6 +190,45 @@ std::optional<double> parseDoubleValue(const std::string& text)
     }
 }
 
+const SfzResolvedOpcode* findLocalOpcode(const SfzNormalizedSection& section,
+                                         const std::string& opcodeName) noexcept
+{
+    const auto lowered = toLowerAscii(opcodeName);
+    const auto iterator = std::find_if(section.localOpcodes.begin(),
+                                       section.localOpcodes.end(),
+                                       [&](const SfzResolvedOpcode& opcode)
+                                       {
+                                           return opcode.name == lowered;
+                                       });
+    return iterator == section.localOpcodes.end() ? nullptr : &(*iterator);
+}
+
+struct ScopedGainState
+{
+    double masterGainDb = 0.0;
+    double groupGainDb = 0.0;
+    bool hasMasterGain = false;
+    bool hasGroupGain = false;
+};
+
+struct ScopedGainContribution
+{
+    double masterGainDb = 0.0;
+    double groupGainDb = 0.0;
+    bool hasMasterGain = false;
+    bool hasGroupGain = false;
+};
+
+ScopedGainContribution buildScopedGainContribution(const ScopedGainState& state)
+{
+    ScopedGainContribution contribution;
+    contribution.masterGainDb = state.masterGainDb;
+    contribution.groupGainDb = state.groupGainDb;
+    contribution.hasMasterGain = state.hasMasterGain;
+    contribution.hasGroupGain = state.hasGroupGain;
+    return contribution;
+}
+
 std::string makeUniqueId(std::set<std::string>& usedIds, const std::string& base)
 {
     auto candidate = base.empty() ? std::string("sfz") : base;
@@ -454,6 +493,13 @@ RuntimeProjectModel buildProvisionalProject(const RuntimeProjectModel& baseProje
     project.sampleSources.insert(project.sampleSources.end(),
                                  projection.sampleSources.begin(),
                                  projection.sampleSources.end());
+    project.authoring.masterGainDb += projection.masterGainDb;
+    if (project.schemaVersion >= 4 && project.authoring.schemaVersion >= 3)
+    {
+        project.authoring.groups.insert(project.authoring.groups.end(),
+                                        projection.groups.begin(),
+                                        projection.groups.end());
+    }
     project.authoring.zones.insert(project.authoring.zones.end(),
                                    projection.zones.begin(),
                                    projection.zones.end());
@@ -707,6 +753,7 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
 
     const auto unsupportedCrossfadeOpcodes = collectUnsupportedVelocityCrossfadeOpcodes(analysis);
     std::map<std::string, std::string> roundRobinPoolIdsBySignature;
+    ScopedGainState scopedGainState;
 
     result.projectNotes = buildProjectNotes(analysis.report);
     result.authoringNotes = buildAuthoringNotes(analysis.report);
@@ -719,6 +766,7 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
             result.projected = false;
             result.playable = false;
             result.sampleSources.clear();
+            result.groups.clear();
             result.zones.clear();
             result.projectNotes.clear();
             result.authoringNotes.clear();
@@ -729,9 +777,42 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
             return result;
         }
 
+        if (section.scope == SfzOpcodeScope::master)
+        {
+            if (const auto* volumeOpcode = findLocalOpcode(section, "volume"))
+            {
+                scopedGainState.masterGainDb = parseDoubleValue(volumeOpcode->value).value_or(0.0);
+                scopedGainState.hasMasterGain = true;
+            }
+            else
+            {
+                scopedGainState.masterGainDb = 0.0;
+                scopedGainState.hasMasterGain = false;
+            }
+
+            continue;
+        }
+
+        if (section.scope == SfzOpcodeScope::group)
+        {
+            if (const auto* volumeOpcode = findLocalOpcode(section, "volume"))
+            {
+                scopedGainState.groupGainDb = parseDoubleValue(volumeOpcode->value).value_or(0.0);
+                scopedGainState.hasGroupGain = true;
+            }
+            else
+            {
+                scopedGainState.groupGainDb = 0.0;
+                scopedGainState.hasGroupGain = false;
+            }
+
+            continue;
+        }
+
         if (section.scope != SfzOpcodeScope::region)
             continue;
 
+        const auto scopedGainContribution = buildScopedGainContribution(scopedGainState);
         const auto* sampleOpcode = findEffectiveOpcode(section, "sample");
         if (sampleOpcode == nullptr || sampleOpcode->value.empty())
         {
@@ -860,6 +941,33 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
                 zone.triggerMode = ZoneTriggerMode::oneShot;
         }
 
+        if (scopedGainContribution.hasMasterGain)
+            result.masterGainDb = scopedGainContribution.masterGainDb;
+
+        if (!zone.groupId.empty())
+        {
+            const auto existingGroup = std::find_if(
+                result.groups.begin(),
+                result.groups.end(),
+                [&](const RuntimeProjectGroupDefinition& group)
+                {
+                    return group.id == zone.groupId;
+                });
+
+            if (existingGroup == result.groups.end())
+            {
+                RuntimeProjectGroupDefinition group;
+                group.id = zone.groupId;
+                group.displayName = zone.groupId;
+                group.displayOrder = static_cast<int>(result.groups.size());
+                group.workspaceVisible = true;
+                group.gainDb = scopedGainContribution.hasGroupGain ? scopedGainContribution.groupGainDb : 0.0;
+                group.pan = 0.0;
+                group.auditionAnchorZoneId = zone.id;
+                result.groups.push_back(std::move(group));
+            }
+        }
+
         result.zones.push_back(std::move(zone));
     }
 
@@ -875,6 +983,7 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
     if (finalCancellationReason != SfzImportCancellationReason::none)
     {
         result.sampleSources.clear();
+        result.groups.clear();
         result.zones.clear();
         result.projectNotes.clear();
         result.authoringNotes.clear();

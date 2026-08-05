@@ -49,6 +49,19 @@ std::size_t countDistinctGroupIds(const std::vector<drs::engine::RuntimeProjectZ
     return groupIds.size();
 }
 
+const drs::engine::RuntimeProjectGroupDefinition* findGroupById(
+    const std::vector<drs::engine::RuntimeProjectGroupDefinition>& groups,
+    const std::string& groupId)
+{
+    const auto iterator = std::find_if(groups.begin(),
+                                       groups.end(),
+                                       [&](const drs::engine::RuntimeProjectGroupDefinition& group)
+                                       {
+                                           return group.id == groupId;
+                                       });
+    return iterator == groups.end() ? nullptr : &(*iterator);
+}
+
 fs::path resolveFirstFixturePath()
 {
     const auto sourceRoot = fs::path(DRS_SOURCE_ROOT);
@@ -221,11 +234,16 @@ int main()
                 "Schema 6 SFZ projection should produce the same zone and sample counts as the legacy authoring baseline.");
         require(phase6Projection.issues.empty(),
                 "Schema 6 SFZ projection should synthesize any required articulation metadata.");
+        require(projection.masterGainDb == 6.0,
+                "Stage 1 should surface the SFZ master volume on the projection contract.");
+        require(projection.groups.size() == countDistinctGroupIds(projection.zones),
+                "Stage 1 should surface one projected group per distinct imported groupId.");
 
         const auto& firstZone = projection.zones.at(0);
         const auto& secondZone = projection.zones.at(1);
         const auto& thirdZone = projection.zones.at(2);
         const auto& secondLayerFirstZone = projection.zones.at(45);
+        const auto* firstProjectedGroup = findGroupById(projection.groups, firstZone.groupId);
         require(firstZone.roundRobinLength == 3
                     && secondZone.roundRobinLength == 3
                     && thirdZone.roundRobinLength == 3,
@@ -244,7 +262,13 @@ int main()
                     && thirdZone.roundRobin->mode == RoundRobinMode::sequential,
                 "The first projected SFZ regions should now share one explicit sequential round-robin pool descriptor.");
         require(firstZone.gainDb == 6.0,
-                "The projected SFZ master volume should map into native zone gain.");
+                "Stage 1 should preserve the current flattened zone-gain behavior until scope-aware remapping lands.");
+        require(firstProjectedGroup != nullptr
+                    && firstProjectedGroup->displayName == firstZone.groupId
+                    && firstProjectedGroup->displayOrder == 0
+                    && firstProjectedGroup->auditionAnchorZoneId == firstZone.id
+                    && firstProjectedGroup->gainDb == 0.0,
+                "Stage 1 should project a deterministic authored group for the first imported zone.");
         require(firstZone.releaseSeconds == 0.5,
                 "The projected SFZ ampeg_release should land on the first region.");
         require(firstZone.sampleSourceId != secondZone.sampleSourceId
@@ -262,6 +286,48 @@ int main()
                                61,
                                84,
                                "The second projected SFZ layer crossfade metadata");
+
+        const auto firstSamplePath = resolveFirstSamplePath(fixturePath);
+        const auto scopedVolumeTempDirectory = fs::temp_directory_path() / "drs-sprint31-sfz-stage1";
+        const auto scopedVolumeFixturePath = scopedVolumeTempDirectory / "scoped-volume-stage1.sfz";
+        writeTextFile(scopedVolumeFixturePath,
+                      "<master>\n"
+                      "volume=2\n"
+                      "\n"
+                      "<group> volume=-3 lovel=1 hivel=63\n"
+                      "<region> sample=" + firstSamplePath.generic_string()
+                          + " lokey=C4 hikey=C4 pitch_keycenter=C4 volume=1\n"
+                            "\n"
+                            "<group> volume=-6 lovel=64 hivel=127\n"
+                            "<region> sample="
+                          + firstSamplePath.generic_string()
+                          + " lokey=C4 hikey=C4 pitch_keycenter=C4 volume=4\n");
+        const auto scopedVolumeProjection =
+            projectSfzImportDocument(blankPhase6Project, scopedVolumeFixturePath.generic_string());
+        require(scopedVolumeProjection.projected && scopedVolumeProjection.playable,
+                "Stage 1 should keep the scoped-volume fixture projectable and playable.");
+        require(scopedVolumeProjection.masterGainDb == 2.0,
+                "Stage 1 should capture master volume on the projection result.");
+        require(scopedVolumeProjection.groups.size() == 2,
+                "Stage 1 should create one projected group per imported scoped-volume layer.");
+        require(scopedVolumeProjection.zones.size() == 2,
+                "Stage 1 should still create one zone per scoped-volume region.");
+        const auto* lowVelocityGroup =
+            findGroupById(scopedVolumeProjection.groups, scopedVolumeProjection.zones[0].groupId);
+        const auto* highVelocityGroup =
+            findGroupById(scopedVolumeProjection.groups, scopedVolumeProjection.zones[1].groupId);
+        require(lowVelocityGroup != nullptr
+                    && highVelocityGroup != nullptr
+                    && lowVelocityGroup->gainDb == -3.0
+                    && highVelocityGroup->gainDb == -6.0,
+                "Stage 1 should preserve distinct group-local gain values on projected groups.");
+        require(lowVelocityGroup != nullptr
+                    && highVelocityGroup != nullptr
+                    && lowVelocityGroup->displayOrder == 0
+                    && highVelocityGroup->displayOrder == 1
+                    && lowVelocityGroup->auditionAnchorZoneId == scopedVolumeProjection.zones[0].id
+                    && highVelocityGroup->auditionAnchorZoneId == scopedVolumeProjection.zones[1].id,
+                "Stage 1 should keep projected group identity, order, and anchor zones deterministic.");
 
         AuthoringSession phase5Session(blankPhase5Project);
         const auto phase5ApplyResult = applySfzImportProjection(

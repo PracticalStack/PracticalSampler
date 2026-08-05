@@ -118,6 +118,21 @@ void requireSampleSourceEquals(const drs::engine::RuntimeProjectSampleSource& ex
             context);
 }
 
+void requireGroupEquals(const drs::engine::RuntimeProjectGroupDefinition& expected,
+                        const drs::engine::RuntimeProjectGroupDefinition& actual,
+                        const std::string& context)
+{
+    require(expected.id == actual.id
+                && expected.displayName == actual.displayName
+                && expected.displayOrder == actual.displayOrder
+                && expected.workspaceVisible == actual.workspaceVisible
+                && expected.gainDb == actual.gainDb
+                && expected.pan == actual.pan
+                && expected.routingBusId == actual.routingBusId
+                && expected.auditionAnchorZoneId == actual.auditionAnchorZoneId,
+            context);
+}
+
 void requireZoneEquals(const drs::engine::RuntimeProjectZoneDefinition& expected,
                        const drs::engine::RuntimeProjectZoneDefinition& actual,
                        const std::string& context)
@@ -159,9 +174,11 @@ void requireProjectionEquals(const drs::engine::SfzImportProjectionResult& expec
                 && expected.blocking == actual.blocking
                 && expected.state == actual.state
                 && expected.issues == actual.issues
+                && expected.masterGainDb == actual.masterGainDb
                 && expected.projectNotes == actual.projectNotes
                 && expected.authoringNotes == actual.authoringNotes
                 && expected.sampleSources.size() == actual.sampleSources.size()
+                && expected.groups.size() == actual.groups.size()
                 && expected.zones.size() == actual.zones.size(),
             context);
 
@@ -169,6 +186,11 @@ void requireProjectionEquals(const drs::engine::SfzImportProjectionResult& expec
         requireSampleSourceEquals(expected.sampleSources[index],
                                   actual.sampleSources[index],
                                   context + " sample source mismatch at index " + std::to_string(index));
+
+    for (std::size_t index = 0; index < expected.groups.size(); ++index)
+        requireGroupEquals(expected.groups[index],
+                           actual.groups[index],
+                           context + " group mismatch at index " + std::to_string(index));
 
     for (std::size_t index = 0; index < expected.zones.size(); ++index)
         requireZoneEquals(expected.zones[index],
