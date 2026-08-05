@@ -215,17 +215,25 @@ struct ScopedGainContribution
 {
     double masterGainDb = 0.0;
     double groupGainDb = 0.0;
+    double regionGainDb = 0.0;
     bool hasMasterGain = false;
     bool hasGroupGain = false;
+    bool hasRegionGain = false;
 };
 
-ScopedGainContribution buildScopedGainContribution(const ScopedGainState& state)
+ScopedGainContribution buildScopedGainContribution(const SfzNormalizedSection& section,
+                                                   const ScopedGainState& state)
 {
     ScopedGainContribution contribution;
     contribution.masterGainDb = state.masterGainDb;
     contribution.groupGainDb = state.groupGainDb;
     contribution.hasMasterGain = state.hasMasterGain;
     contribution.hasGroupGain = state.hasGroupGain;
+    if (const auto* volumeOpcode = findLocalOpcode(section, "volume"))
+    {
+        contribution.regionGainDb = parseDoubleValue(volumeOpcode->value).value_or(0.0);
+        contribution.hasRegionGain = true;
+    }
     return contribution;
 }
 
@@ -812,7 +820,7 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         if (section.scope != SfzOpcodeScope::region)
             continue;
 
-        const auto scopedGainContribution = buildScopedGainContribution(scopedGainState);
+        const auto scopedGainContribution = buildScopedGainContribution(section, scopedGainState);
         const auto* sampleOpcode = findEffectiveOpcode(section, "sample");
         if (sampleOpcode == nullptr || sampleOpcode->value.empty())
         {
@@ -894,10 +902,7 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
             zone.velocityHigh = crossfade.fadeOutHighVelocity;
         if (preserveVelocityCrossfade)
             zone.velocityCrossfade = crossfade;
-        zone.gainDb = parseDoubleValue(findEffectiveOpcode(section, "volume") != nullptr
-                                           ? findEffectiveOpcode(section, "volume")->value
-                                           : "0")
-                          .value_or(0.0);
+        zone.gainDb = scopedGainContribution.hasRegionGain ? scopedGainContribution.regionGainDb : 0.0;
         zone.releaseSeconds = parseDoubleValue(findEffectiveOpcode(section, "ampeg_release") != nullptr
                                                    ? findEffectiveOpcode(section, "ampeg_release")->value
                                                    : "0")

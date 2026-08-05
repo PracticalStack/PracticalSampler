@@ -261,14 +261,14 @@ int main()
                     && secondZone.roundRobin->slotIndex == 2
                     && thirdZone.roundRobin->mode == RoundRobinMode::sequential,
                 "The first projected SFZ regions should now share one explicit sequential round-robin pool descriptor.");
-        require(firstZone.gainDb == 6.0,
-                "Stage 1 should preserve the current flattened zone-gain behavior until scope-aware remapping lands.");
+        require(firstZone.gainDb == 0.0,
+                "Stage 2 should stop flattening inherited master gain into projected zone gain.");
         require(firstProjectedGroup != nullptr
                     && firstProjectedGroup->displayName == firstZone.groupId
                     && firstProjectedGroup->displayOrder == 0
                     && firstProjectedGroup->auditionAnchorZoneId == firstZone.id
                     && firstProjectedGroup->gainDb == 0.0,
-                "Stage 1 should project a deterministic authored group for the first imported zone.");
+                "Stage 2 should keep projecting a deterministic authored group for the first imported zone.");
         require(firstZone.releaseSeconds == 0.5,
                 "The projected SFZ ampeg_release should land on the first region.");
         require(firstZone.sampleSourceId != secondZone.sampleSourceId
@@ -309,9 +309,9 @@ int main()
         require(scopedVolumeProjection.masterGainDb == 2.0,
                 "Stage 1 should capture master volume on the projection result.");
         require(scopedVolumeProjection.groups.size() == 2,
-                "Stage 1 should create one projected group per imported scoped-volume layer.");
+                "Stage 2 should create one projected group per imported scoped-volume layer.");
         require(scopedVolumeProjection.zones.size() == 2,
-                "Stage 1 should still create one zone per scoped-volume region.");
+                "Stage 2 should still create one zone per scoped-volume region.");
         const auto* lowVelocityGroup =
             findGroupById(scopedVolumeProjection.groups, scopedVolumeProjection.zones[0].groupId);
         const auto* highVelocityGroup =
@@ -327,7 +327,10 @@ int main()
                     && highVelocityGroup->displayOrder == 1
                     && lowVelocityGroup->auditionAnchorZoneId == scopedVolumeProjection.zones[0].id
                     && highVelocityGroup->auditionAnchorZoneId == scopedVolumeProjection.zones[1].id,
-                "Stage 1 should keep projected group identity, order, and anchor zones deterministic.");
+                "Stage 2 should keep projected group identity, order, and anchor zones deterministic.");
+        require(scopedVolumeProjection.zones[0].gainDb == 1.0
+                    && scopedVolumeProjection.zones[1].gainDb == 4.0,
+                "Stage 2 should map only region-local volume to projected zone gain.");
 
         AuthoringSession phase5Session(blankPhase5Project);
         const auto phase5ApplyResult = applySfzImportProjection(
