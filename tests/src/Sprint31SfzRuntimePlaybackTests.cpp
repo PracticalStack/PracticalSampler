@@ -421,6 +421,26 @@ int main()
         require(selectedZone.has_value(),
                 "Imported SFZ fixture must keep a selected zone after apply.");
         const auto previewPayload = preparePreviewPayload(reloadedProject.project, 1);
+        drs::engine::SamplerRenderModelBuildOptions publishedSelectionOptions;
+        publishedSelectionOptions.selectedArticulationId = "sustain";
+        const auto publishedSelectionModel = drs::engine::buildSamplerRenderModel(
+            previewPayload,
+            publishedSelectionOptions);
+        require(publishedSelectionModel.built && publishedSelectionModel.model != nullptr,
+                "Imported SFZ full-project sustain render model must build successfully.");
+        require(!publishedSelectionModel.model->getRoutes().empty(),
+                "Imported SFZ full-project sustain render model must retain playable routes.");
+        require(
+            publishedSelectionModel.model->getPerformanceProgram().defaultArticulationIndex
+                == publishedSelectionModel.model->getRoutes().front().performanceArticulationIndex,
+            "Imported SFZ full-project sustain render model must seed the active articulation from the selected authored sustain routes.");
+        const auto publishedSelectionPeak = renderModelPeak(
+            publishedSelectionModel.model,
+            selectedZone->rootKey,
+            static_cast<float>(selectedZone->velocityHigh) / 127.0f,
+            8);
+        require(std::isfinite(publishedSelectionPeak) && publishedSelectionPeak > 0.0f,
+                "Imported SFZ full-project sustain render model must produce finite nonzero audio even when the placeholder default articulation remains in the authored schema.");
         drs::engine::AuthoringPreviewRequest directSelectedZoneRequest;
         directSelectedZoneRequest.identity.draftRevision = 1;
         directSelectedZoneRequest.identity.scope = drs::engine::AuthoringPreviewScope::selectedZone;

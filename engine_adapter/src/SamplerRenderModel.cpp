@@ -62,6 +62,25 @@ bool containsZoneId(const std::vector<std::string>& zoneIds, const std::string& 
     return std::find(zoneIds.begin(), zoneIds.end(), zoneId) != zoneIds.end();
 }
 
+std::uint32_t resolveSelectedArticulationIndex(const SamplerRenderModelBuildOptions& options,
+                                               const std::vector<SamplerRenderRoute>& routes,
+                                               const CompiledPerformanceProgram& program) noexcept
+{
+    if (options.selectedArticulationId.empty())
+        return program.defaultArticulationIndex;
+
+    const auto selectedRoute = std::find_if(
+        routes.begin(),
+        routes.end(),
+        [](const SamplerRenderRoute& route)
+        {
+            return route.performanceArticulationIndex < kInvalidPerformanceProgramIndex;
+        });
+    return selectedRoute != routes.end()
+        ? selectedRoute->performanceArticulationIndex
+        : program.defaultArticulationIndex;
+}
+
 double combineRouteGainDb(double zoneGainDb, double groupGainDb, double masterGainDb) noexcept
 {
     return zoneGainDb + groupGainDb + masterGainDb;
@@ -593,6 +612,10 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
                                   triggerRoute == prepared.performanceProgram.triggerRoutes.end()
                                       ? 0.0f : triggerRoute->chokeReleaseSeconds });
     }
+    model->performanceProgram.defaultArticulationIndex = resolveSelectedArticulationIndex(
+        options,
+        model->routes,
+        model->performanceProgram);
 
     result.built = true;
     result.model = std::move(model);
