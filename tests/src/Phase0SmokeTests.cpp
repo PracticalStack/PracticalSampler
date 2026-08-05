@@ -223,6 +223,39 @@ int main()
                 "Saving a one-shot zone should preserve trigger mode in both project manifests.");
         require(selfContainedProjectFile.getParentDirectory().getChildFile("Samples").isDirectory(),
                 "New project storage should create a Samples directory beside the project manifest.");
+
+        const auto backgroundSourceFile = storageTestRoot.getChildFile("felt-background-source.jpg");
+        {
+            juce::Image sourceImage(juce::Image::RGB, 24, 12, true);
+            juce::Graphics graphics(sourceImage);
+            graphics.fillAll(juce::Colours::burlywood);
+            graphics.setColour(juce::Colours::black);
+            graphics.drawLine(0.0f, 0.0f, 23.0f, 11.0f, 2.0f);
+
+            juce::JPEGImageFormat jpegFormat;
+            auto stream = backgroundSourceFile.createOutputStream();
+            require(stream != nullptr && jpegFormat.writeImageToStream(sourceImage, *stream),
+                    "Project storage smoke test should be able to author a valid JPEG fixture.");
+        }
+
+        const auto importedBackground = drs::app::importProjectBackgroundImage(backgroundSourceFile,
+                                                                               selfContainedProjectFile);
+        require(importedBackground.imported,
+                "Importing a valid project background image should succeed.");
+        require(importedBackground.targetFile
+                    == selfContainedProjectFile.getParentDirectory().getChildFile("Images").getChildFile("background.jpg")
+                    && importedBackground.targetFile.existsAsFile(),
+                "Importing a project background image should copy it to Images/background.jpg.");
+
+        const auto invalidBackgroundFile = storageTestRoot.getChildFile("invalid-background.jpg");
+        require(invalidBackgroundFile.replaceWithText("not a jpeg"),
+                "Project storage smoke test should be able to author an invalid JPEG fixture.");
+        const auto invalidImport = drs::app::importProjectBackgroundImage(invalidBackgroundFile,
+                                                                          selfContainedProjectFile);
+        require(!invalidImport.imported,
+                "Importing an invalid JPEG file should be rejected.");
+        require(invalidImport.errorMessage.containsIgnoreCase("valid JPG"),
+                "Invalid background import should report JPG validation failure.");
         require(storageTestRoot.deleteRecursively(),
                 "Project storage smoke-test cleanup failed.");
 

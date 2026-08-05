@@ -35,6 +35,7 @@ private:
         exportPerformancePackageCommandId,
         importWavCommandId,
         importSfzCommandId,
+        importBackgroundImageCommandId,
         preferencesCommandId
     };
 
@@ -51,6 +52,7 @@ private:
     void exportPerformancePackage();
     void importWavFiles();
     void importSfzFile();
+    void importBackgroundImage();
     void importSampleFiles(std::vector<juce::File> selectedFiles);
     void reviewSfzImportFile(const juce::File& selectedFile);
     void showPreferencesDialog();
@@ -92,6 +94,7 @@ private:
     void launchExportPerformancePackageChooser(std::function<void(juce::File)> completion);
     void launchImportWavChooser(std::function<void(std::vector<juce::File>)> completion);
     void launchImportSfzChooser(std::function<void(juce::File)> completion);
+    void launchImportBackgroundImageChooser(std::function<void(juce::File)> completion);
     void promptForRootKeySelection(const juce::String& title,
                                    const juce::String& message,
                                    int initialRootKey,

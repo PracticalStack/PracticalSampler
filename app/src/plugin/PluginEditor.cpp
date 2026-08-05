@@ -636,6 +636,7 @@ void Editor::showFileMenu()
         menu.addItem(exportPerformancePackageCommandId, drs::app::exportPerformancePackageMenuLabel);
         menu.addItem(importWavCommandId, drs::app::importWavMenuLabel);
         menu.addItem(importSfzCommandId, drs::app::importSfzMenuLabel);
+        menu.addItem(importBackgroundImageCommandId, drs::app::importBackgroundImageMenuLabel);
     }
 
     auto safeThis = juce::Component::SafePointer<Editor>(this);
@@ -695,6 +696,9 @@ void Editor::handleMenuCommand(int menuItemId)
             break;
         case importSfzCommandId:
             importSfzFile();
+            break;
+        case importBackgroundImageCommandId:
+            importBackgroundImage();
             break;
         case preferencesCommandId:
             showPreferencesDialog();
@@ -984,6 +988,46 @@ void Editor::importSfzFile()
     {
         if (safeThis != nullptr && selectedFile != juce::File())
             safeThis->reviewSfzImportFile(selectedFile);
+    });
+}
+
+void Editor::importBackgroundImage()
+{
+    if (!processor.getWorkspaceDocumentState().authoringAvailable)
+        return;
+
+    if (processor.getAuthoringProjectFile() == juce::File())
+    {
+        auto safeThis = juce::Component::SafePointer<Editor>(this);
+        saveProjectAs([safeThis](bool saved)
+        {
+            if (saved && safeThis != nullptr)
+                safeThis->importBackgroundImage();
+        });
+        return;
+    }
+
+    auto safeThis = juce::Component::SafePointer<Editor>(this);
+    launchImportBackgroundImageChooser([safeThis](juce::File selectedFile)
+    {
+        if (safeThis == nullptr || selectedFile == juce::File())
+            return;
+
+        const auto importResult = drs::app::importProjectBackgroundImage(
+            selectedFile, safeThis->processor.getAuthoringProjectFile());
+        if (!importResult.imported)
+        {
+            juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                                   "Import Background Image Failed",
+                                                   importResult.errorMessage);
+            return;
+        }
+
+        safeThis->performancePanel.refreshArtworkNow();
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon,
+                                               "Background Image Imported",
+                                               "Imported background image to:\n"
+                                                   + importResult.targetFile.getFullPathName());
     });
 }
 
@@ -2017,6 +2061,37 @@ void Editor::launchImportSfzChooser(std::function<void(juce::File)> completion)
     activeFileChooser = std::make_unique<juce::FileChooser>("Import SFZ document into the current project",
                                                             initialDirectory,
                                                             "*.sfz",
+                                                            true,
+                                                            false,
+                                                            this);
+    auto safeThis = juce::Component::SafePointer<Editor>(this);
+    activeFileChooser->launchAsync(juce::FileBrowserComponent::openMode
+                                       | juce::FileBrowserComponent::canSelectFiles,
+                                   [safeThis, completion = std::move(completion)](const juce::FileChooser& chooser) mutable
+                                   {
+                                       if (safeThis == nullptr)
+                                           return;
+
+                                       const auto selectedFile = chooser.getResult();
+                                       safeThis->activeFileChooser.reset();
+                                       if (completion)
+                                           completion(selectedFile);
+                                   });
+}
+
+void Editor::launchImportBackgroundImageChooser(std::function<void(juce::File)> completion)
+{
+    auto initialDirectory = buildChooserBaseDirectory();
+    if (processor.getAuthoringProjectFile() != juce::File())
+    {
+        const auto projectImagesDirectory = processor.getAuthoringProjectFile().getParentDirectory().getChildFile("Images");
+        if (projectImagesDirectory.isDirectory())
+            initialDirectory = projectImagesDirectory;
+    }
+
+    activeFileChooser = std::make_unique<juce::FileChooser>("Import background image into the current project",
+                                                            initialDirectory,
+                                                            "*.jpg;*.jpeg",
                                                             true,
                                                             false,
                                                             this);

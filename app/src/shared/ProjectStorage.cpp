@@ -2,6 +2,8 @@
 
 #include "drs/engine/RuntimeLoader.h"
 
+#include <juce_graphics/juce_graphics.h>
+
 #include <algorithm>
 #include <sstream>
 #include <string_view>
@@ -182,6 +184,13 @@ bool checkpointAllowed(const ProjectFilesSaveOptions& options,
                        const ProjectFilesSaveCheckpoint checkpoint)
 {
     return !options.allowCommitAtCheckpoint || options.allowCommitAtCheckpoint(checkpoint);
+}
+
+ProjectBackgroundImageImportResult buildBackgroundImageImportError(const juce::String& message)
+{
+    ProjectBackgroundImageImportResult result;
+    result.errorMessage = message;
+    return result;
 }
 } // namespace
 
@@ -415,6 +424,86 @@ ProjectFilesRecoveryResult recoverProjectFilesTransaction(const juce::File& proj
     removeFileIfPresent(files.projectBackup);
     removeFileIfPresent(files.instrumentBackup);
     result.recovered = true;
+    return result;
+}
+
+ProjectBackgroundImageImportResult importProjectBackgroundImage(const juce::File& sourceImageFile,
+                                                               const juce::File& projectFile)
+{
+    const auto targetProjectFile = ensureProjectFileExtension(projectFile);
+    if (targetProjectFile == juce::File())
+    {
+        return buildBackgroundImageImportError(
+            "Save the project before importing a background image.");
+    }
+
+    if (!sourceImageFile.existsAsFile())
+    {
+        return buildBackgroundImageImportError(
+            "The selected background image file does not exist.");
+    }
+
+    if (!sourceImageFile.hasFileExtension(".jpg;.jpeg"))
+    {
+        return buildBackgroundImageImportError(
+            "The selected file must be a JPG image.");
+    }
+
+    auto inputStream = sourceImageFile.createInputStream();
+    if (inputStream == nullptr)
+    {
+        return buildBackgroundImageImportError(
+            "The selected background image could not be opened.");
+    }
+
+    auto* imageFormat = juce::ImageFileFormat::findImageFormatForStream(*inputStream);
+    if (imageFormat == nullptr || dynamic_cast<juce::JPEGImageFormat*>(imageFormat) == nullptr)
+    {
+        return buildBackgroundImageImportError(
+            "The selected file is not a valid JPG image.");
+    }
+
+    inputStream->setPosition(0);
+    const auto image = imageFormat->decodeImage(*inputStream);
+    if (!image.isValid())
+    {
+        return buildBackgroundImageImportError(
+            "The selected file is not a valid JPG image.");
+    }
+
+    const auto projectDirectory = targetProjectFile.getParentDirectory();
+    if ((!projectDirectory.exists() && !projectDirectory.createDirectory()) || !projectDirectory.isDirectory())
+    {
+        return buildBackgroundImageImportError(
+            "The project directory could not be created.");
+    }
+
+    const auto imagesDirectory = projectDirectory.getChildFile("Images");
+    if ((!imagesDirectory.exists() && !imagesDirectory.createDirectory()) || !imagesDirectory.isDirectory())
+    {
+        return buildBackgroundImageImportError(
+            "The project Images directory could not be created.");
+    }
+
+    ProjectBackgroundImageImportResult result;
+    result.targetFile = imagesDirectory.getChildFile("background.jpg");
+
+    if (sourceImageFile.getFullPathName() != result.targetFile.getFullPathName()
+        && result.targetFile.exists()
+        && !result.targetFile.deleteFile())
+    {
+        return buildBackgroundImageImportError(
+            "The existing background image could not be replaced.");
+    }
+
+    if (sourceImageFile.getFullPathName() != result.targetFile.getFullPathName()
+        && !sourceImageFile.copyFileTo(result.targetFile))
+    {
+        return buildBackgroundImageImportError(
+            "The background image could not be copied into the project.");
+    }
+
+    result.imported = true;
     return result;
 }
 

@@ -38,6 +38,13 @@ struct ProjectFilesRecoveryResult
     juce::String errorMessage;
 };
 
+struct ProjectBackgroundImageImportResult
+{
+    bool imported = false;
+    juce::File targetFile;
+    juce::String errorMessage;
+};
+
 drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
     const drs::engine::RuntimeProjectModel& project,
     const juce::File& projectFile);
@@ -47,4 +54,6 @@ ProjectFilesSaveResult saveProjectFiles(const drs::engine::RuntimeProjectModel& 
                                         const juce::File& projectFile,
                                         const ProjectFilesSaveOptions& options);
 ProjectFilesRecoveryResult recoverProjectFilesTransaction(const juce::File& projectFile);
+ProjectBackgroundImageImportResult importProjectBackgroundImage(const juce::File& sourceImageFile,
+                                                               const juce::File& projectFile);
 } // namespace drs::app

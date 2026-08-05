@@ -327,6 +327,12 @@ void PerformancePanel::refreshNow()
     diagnosticsPanel.refreshNow();
 }
 
+void PerformancePanel::refreshArtworkNow()
+{
+    loadedArtworkContentRoot.clear();
+    refreshArtwork();
+}
+
 void PerformancePanel::timerCallback()
 {
     if (lastObservedStateRevision != engineFacade.getStateRevision())

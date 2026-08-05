@@ -36,6 +36,7 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
     void refreshNow();
+    void refreshArtworkNow();
     juce::MidiKeyboardState& getKeyboardState() noexcept { return keyboardState; }
 
 private:
