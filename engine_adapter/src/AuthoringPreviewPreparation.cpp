@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <numeric>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 
@@ -24,6 +25,140 @@ void addError(AuthoringPreviewPreparationResult& result,
 bool containsZoneId(const std::vector<std::string>& zoneIds, const std::string& zoneId)
 {
     return std::find(zoneIds.begin(), zoneIds.end(), zoneId) != zoneIds.end();
+}
+
+void retainZoneId(std::vector<std::string>& zoneIds, const std::string& zoneId, bool& changed)
+{
+    if (zoneId.empty() || containsZoneId(zoneIds, zoneId))
+        return;
+
+    zoneIds.push_back(zoneId);
+    changed = true;
+}
+
+void expandRetainedZoneDependencies(const ImmutablePreparedPlayback& prepared,
+                                    std::vector<std::string>& retainedZoneIds)
+{
+    bool changed = true;
+    while (changed)
+    {
+        changed = false;
+        for (const auto& zone : prepared.zones)
+        {
+            if (!containsZoneId(retainedZoneIds, zone.zoneId))
+                continue;
+
+            retainZoneId(retainedZoneIds, zone.velocityCrossfadeRuntime.fadeInNeighborZoneId, changed);
+            retainZoneId(retainedZoneIds, zone.velocityCrossfadeRuntime.fadeOutNeighborZoneId, changed);
+
+            if (!zone.roundRobin.has_value() || zone.roundRobin->poolId.empty())
+                continue;
+
+            for (const auto& candidate : prepared.zones)
+            {
+                if (!candidate.roundRobin.has_value()
+                    || candidate.roundRobin->poolId != zone.roundRobin->poolId)
+                {
+                    continue;
+                }
+
+                retainZoneId(retainedZoneIds, candidate.zoneId, changed);
+            }
+        }
+    }
+}
+
+std::uint64_t stableIdHash(std::string_view text) noexcept
+{
+    std::uint64_t hash = 14695981039346656037ull;
+    for (const auto character : text)
+    {
+        hash ^= static_cast<unsigned char>(character);
+        hash *= 1099511628211ull;
+    }
+    return hash;
+}
+
+CompiledPerformanceProgram remapPerformanceProgramForScopedZones(
+    const CompiledPerformanceProgram& sourceProgram,
+    const std::vector<std::size_t>& retainedZoneIndices,
+    const std::unordered_map<std::size_t, std::size_t>& zoneIndexMap,
+    const std::string& selectedArticulationId)
+{
+    auto scopedProgram = sourceProgram;
+    scopedProgram.zoneArticulationIndices.clear();
+    if (!sourceProgram.zoneArticulationIndices.empty())
+    {
+        scopedProgram.zoneArticulationIndices.reserve(retainedZoneIndices.size());
+        for (const auto retainedZoneIndex : retainedZoneIndices)
+        {
+            if (retainedZoneIndex < sourceProgram.zoneArticulationIndices.size())
+                scopedProgram.zoneArticulationIndices.push_back(
+                    sourceProgram.zoneArticulationIndices[retainedZoneIndex]);
+            else
+            scopedProgram.zoneArticulationIndices.push_back(kInvalidPerformanceProgramIndex);
+        }
+    }
+    if (!selectedArticulationId.empty())
+    {
+        const auto selectedStableId = stableIdHash(selectedArticulationId);
+        for (std::size_t articulationIndex = 0;
+             articulationIndex < scopedProgram.articulationStableIds.size();
+             ++articulationIndex)
+        {
+            if (scopedProgram.articulationStableIds[articulationIndex] == selectedStableId)
+            {
+                scopedProgram.defaultArticulationIndex
+                    = static_cast<std::uint32_t>(articulationIndex);
+                break;
+            }
+        }
+    }
+    if (scopedProgram.defaultArticulationIndex >= scopedProgram.articulationCount)
+    {
+        for (const auto articulationIndex : scopedProgram.zoneArticulationIndices)
+        {
+            if (articulationIndex < scopedProgram.articulationCount)
+            {
+                scopedProgram.defaultArticulationIndex = articulationIndex;
+                break;
+            }
+        }
+    }
+
+    scopedProgram.triggerRoutes.clear();
+    scopedProgram.triggerRoutes.reserve(sourceProgram.triggerRoutes.size());
+    for (const auto& route : sourceProgram.triggerRoutes)
+    {
+        const auto mappedZone = zoneIndexMap.find(route.zoneIndex);
+        if (mappedZone == zoneIndexMap.end())
+            continue;
+
+        auto scopedRoute = route;
+        scopedRoute.zoneIndex = static_cast<std::uint32_t>(mappedZone->second);
+        scopedProgram.triggerRoutes.push_back(std::move(scopedRoute));
+    }
+
+    for (std::size_t event = 0, first = 0; event < scopedProgram.eventRanges.size(); ++event)
+    {
+        auto& range = scopedProgram.eventRanges[event];
+        range.firstRoute = static_cast<std::uint32_t>(first);
+        while (first < scopedProgram.triggerRoutes.size()
+               && static_cast<std::size_t>(scopedProgram.triggerRoutes[first].event) == event)
+        {
+            ++first;
+        }
+        range.routeCount = static_cast<std::uint32_t>(first - range.firstRoute);
+    }
+
+    scopedProgram.retainedBytes = sizeof(CompiledPerformanceProgram)
+        + scopedProgram.triggerRoutes.size() * sizeof(CompiledPerformanceTriggerRoute)
+        + scopedProgram.roundRobinResets.size() * sizeof(CompiledPerformanceRoundRobinReset)
+        + scopedProgram.articulationStableIds.size() * sizeof(std::uint64_t)
+        + scopedProgram.exclusiveGroupStableIds.size() * sizeof(std::uint64_t)
+        + scopedProgram.roundRobinPoolStableIds.size() * sizeof(std::uint64_t)
+        + scopedProgram.zoneArticulationIndices.size() * sizeof(std::uint32_t);
+    return scopedProgram;
 }
 
 template <typename Route>
@@ -119,6 +254,7 @@ AuthoringPreviewPreparationResult prepareAuthoringPreviewRenderModel(
                 retainedZoneIds.push_back(zone.id);
         }
     }
+    expandRetainedZoneDependencies(sourcePrepared, retainedZoneIds);
     if (retainedZoneIds.empty())
     {
         addError(result,
@@ -149,6 +285,7 @@ AuthoringPreviewPreparationResult prepareAuthoringPreviewRenderModel(
                  "The requested Preview scope does not resolve to validated snapshot routes.");
         return result;
     }
+    const auto scopedArticulationId = firstRetainedSnapshotZone->articulationId;
 
     auto scopedSnapshot = sourceSnapshot;
     scopedSnapshot.zones.erase(
@@ -197,8 +334,10 @@ AuthoringPreviewPreparationResult prepareAuthoringPreviewRenderModel(
     scopedPrepared.streams.clear();
     scopedPrepared.zones.clear();
 
+    std::vector<std::size_t> retainedPreparedZoneIndices;
     std::unordered_map<std::size_t, std::size_t> sampleIndexMap;
     std::unordered_map<std::size_t, std::size_t> streamIndexMap;
+    std::unordered_map<std::size_t, std::size_t> zoneIndexMap;
     std::unordered_map<std::size_t, std::size_t> ownershipIndexMap;
     std::vector<PreparedPlaybackOwnershipRecord> retainedOwnership;
     const auto retainOwnership = [&](std::size_t oldIndex) -> std::size_t
@@ -215,8 +354,9 @@ AuthoringPreviewPreparationResult prepareAuthoringPreviewRenderModel(
         return retainedOwnership.size() - 1;
     };
 
-    for (const auto& zone : sourcePrepared.zones)
+    for (std::size_t sourceZoneIndex = 0; sourceZoneIndex < sourcePrepared.zones.size(); ++sourceZoneIndex)
     {
+        const auto& zone = sourcePrepared.zones[sourceZoneIndex];
         if (!containsZoneId(retainedZoneIds, zone.zoneId))
             continue;
 
@@ -263,9 +403,16 @@ AuthoringPreviewPreparationResult prepareAuthoringPreviewRenderModel(
             selectedPreparedZone.preparedStreamIndex = 0;
         }
 
+        zoneIndexMap.emplace(sourceZoneIndex, scopedPrepared.zones.size());
+        retainedPreparedZoneIndices.push_back(sourceZoneIndex);
         scopedPrepared.zones.push_back(std::move(selectedPreparedZone));
     }
     scopedPrepared.ownershipRecords = std::move(retainedOwnership);
+    scopedPrepared.performanceProgram = remapPerformanceProgramForScopedZones(
+        sourcePrepared.performanceProgram,
+        retainedPreparedZoneIndices,
+        zoneIndexMap,
+        scopedArticulationId);
     scopedPrepared.snapshotContentDigest = scopedSnapshot.contentDigest;
     scopedPrepared.preparedContentDigest = computePreparedPlaybackContentDigest(scopedPrepared);
 
@@ -288,7 +435,12 @@ AuthoringPreviewPreparationResult prepareAuthoringPreviewRenderModel(
     if (selectedZoneScope)
     {
         options.selectedZoneId = request.identity.selectedZoneId;
+        options.retainedZoneIds = retainedZoneIds;
         options.auditionSelectedZone = true;
+    }
+    else if (selectedGroupScope)
+    {
+        options.selectedGroupId = request.identity.selectedGroupId;
     }
     auto scopedModel = buildSamplerRenderModel(scopedPayload, options);
     if (!scopedModel.built || scopedModel.model == nullptr)

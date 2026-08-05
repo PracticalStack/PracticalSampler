@@ -307,6 +307,7 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
     result.state = "Compile not attempted";
     result.pageSizeBytes = plan.pageSizeBytes;
     result.containerId = plan.instrumentId;
+    result.masterGainDb = plan.masterGainDb;
 
     if (plan.pageSizeBytes == 0)
         addIssue(result, "Compile plan pageSizeBytes must be greater than zero.");
@@ -600,6 +601,7 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         zone.velocityLow = zonePlan.velocityLow;
         zone.velocityHigh = zonePlan.velocityHigh;
         zone.velocityCrossfade = zonePlan.velocityCrossfade;
+        zone.gainDb = zonePlan.gainDb;
         zone.streamOffsetBytes = streamOffsetBySourceId.at(zonePlan.sourceId);
         zone.prefetchBytes = clampedPrefetchBytes;
         zone.roundRobin = roundRobin;

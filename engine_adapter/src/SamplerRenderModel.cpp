@@ -483,7 +483,11 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
     {
         const auto* snapshotZone = findSnapshotZone(snapshot, zone.zoneId);
         return snapshotZone != nullptr
-            && (options.selectedZoneId.empty() || snapshotZone->id == options.selectedZoneId)
+            && (options.selectedZoneId.empty()
+                || (!options.retainedZoneIds.empty()
+                        ? containsZoneId(options.retainedZoneIds, snapshotZone->id)
+                        : snapshotZone->id == options.selectedZoneId))
+            && (options.selectedGroupId.empty() || snapshotZone->groupId == options.selectedGroupId)
             && (options.selectedArticulationId.empty()
                 || snapshotZone->articulationId == options.selectedArticulationId);
     };

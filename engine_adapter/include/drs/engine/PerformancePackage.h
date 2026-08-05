@@ -39,6 +39,12 @@ enum class WorkspaceMode
 
 struct PerformancePackageManifest
 {
+    struct GroupRoute
+    {
+        std::string groupId;
+        double gainDb = 0.0;
+    };
+
     std::string schemaName = performancePackageSchemaName;
     int schemaVersion = performancePackageSchemaVersion;
     std::string packageId;
@@ -46,6 +52,8 @@ struct PerformancePackageManifest
     std::string instrumentId;
     std::string defaultLoadProfile;
     int minimumReaderSchemaVersion = performancePackageSchemaVersion;
+    double masterGainDb = 0.0;
+    std::vector<GroupRoute> groupRoutes;
     std::vector<std::string> notes;
 };
 

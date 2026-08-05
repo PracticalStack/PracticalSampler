@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -72,6 +73,20 @@ ordered_json serializeStringArray(const std::vector<std::string>& values)
     ordered_json array = ordered_json::array();
     for (const auto& value : values)
         array.push_back(value);
+    return array;
+}
+
+ordered_json serializePackageGroupRoutes(const std::vector<PerformancePackageManifest::GroupRoute>& groupRoutes)
+{
+    ordered_json array = ordered_json::array();
+    for (const auto& groupRoute : groupRoutes)
+    {
+        ordered_json route;
+        route["groupId"] = groupRoute.groupId;
+        route["gainDb"] = groupRoute.gainDb;
+        array.push_back(std::move(route));
+    }
+
     return array;
 }
 
@@ -234,6 +249,8 @@ std::string serializePackageManifestJson(const PerformancePackageManifest& manif
     root["instrumentId"] = manifest.instrumentId;
     root["defaultLoadProfile"] = manifest.defaultLoadProfile;
     root["minimumReaderSchemaVersion"] = manifest.minimumReaderSchemaVersion;
+    root["masterGainDb"] = manifest.masterGainDb;
+    root["groupRoutes"] = serializePackageGroupRoutes(manifest.groupRoutes);
     root["notes"] = serializeStringArray(manifest.notes);
     return root.dump(2) + "\n";
 }
@@ -355,6 +372,26 @@ bool validateWritePlan(const PerformancePackageWritePlan& plan, PerformancePacka
     if (plan.manifest.instrumentId.empty())
         addIssue(result, "Performance package write plan requires manifest.instrumentId.");
 
+    if (!std::isfinite(plan.manifest.masterGainDb))
+        addIssue(result, "Performance package write plan requires manifest.masterGainDb to be finite.");
+
+    std::unordered_map<std::string, bool> groupRouteIds;
+    for (std::size_t index = 0; index < plan.manifest.groupRoutes.size(); ++index)
+    {
+        const auto& groupRoute = plan.manifest.groupRoutes[index];
+        const auto indexLabel = "manifest.groupRoutes[" + std::to_string(index) + "]";
+
+        if (groupRoute.groupId.empty())
+            addIssue(result, "Performance package write plan requires " + indexLabel + ".groupId.");
+        else if (!groupRouteIds.emplace(groupRoute.groupId, true).second)
+            addIssue(result,
+                     "Performance package write plan requires manifest.groupRoutes groupId values to be unique; duplicate groupId '"
+                         + groupRoute.groupId + "' was provided.");
+
+        if (!std::isfinite(groupRoute.gainDb))
+            addIssue(result, "Performance package write plan requires " + indexLabel + ".gainDb to be finite.");
+    }
+
     if (plan.payloads.empty())
         addIssue(result, "Performance package write plan requires at least one payload.");
 
@@ -460,6 +497,11 @@ PerformancePackageWritePlan buildPerformancePackageWritePlan(const PerformancePa
     writePlan.minimumCompatibleAppVersion = plan.minimumCompatibleAppVersion;
 
     const auto packagedRuntime = buildPackageCompileResult(plan.compiledRuntime);
+    writePlan.manifest.masterGainDb = packagedRuntime.masterGainDb;
+    writePlan.manifest.groupRoutes.clear();
+    writePlan.manifest.groupRoutes.reserve(packagedRuntime.instrument.groups.size());
+    for (const auto& group : packagedRuntime.instrument.groups)
+        writePlan.manifest.groupRoutes.push_back({ group.id, group.gainDb });
     writePlan.payloads.push_back(buildPackageManifestPayload(writePlan.manifest));
     writePlan.payloads.push_back(buildRuntimeInstrumentPayload(packagedRuntime));
     writePlan.payloads.push_back(buildRuntimeStreamIndexPayload(packagedRuntime));

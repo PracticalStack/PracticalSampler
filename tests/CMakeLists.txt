@@ -1434,6 +1434,38 @@ add_test(
     COMMAND drs_sprint31_sfz_projection_tests
 )
 
+juce_add_console_app(drs_sprint31_sfz_runtime_playback_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Sprint 3.1 SFZ Runtime Playback Tests"
+)
+
+target_sources(drs_sprint31_sfz_runtime_playback_tests
+    PRIVATE
+        src/Sprint31SfzRuntimePlaybackTests.cpp
+)
+
+target_link_libraries(drs_sprint31_sfz_runtime_playback_tests
+    PRIVATE
+        drs_app_shared
+        drs_plugin_shell
+        juce::juce_audio_processors_headless
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_definitions(drs_sprint31_sfz_runtime_playback_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_sprint31_sfz_runtime_playback_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sprint31.sfz_runtime_playback
+    COMMAND drs_sprint31_sfz_runtime_playback_tests
+)
+
 add_executable(drs_sprint31_sfz_review_ui_tests
     src/Sprint31SfzReviewUiTests.cpp
 )

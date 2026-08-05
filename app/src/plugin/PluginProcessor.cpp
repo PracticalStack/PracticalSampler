@@ -335,12 +335,6 @@ void collectPerformancePackageExportCompatibilityIssues(
 
     for (const auto& group : project.authoring.groups)
     {
-        if (std::abs(group.gainDb) > 0.000001)
-        {
-            issues.push_back("Group '" + group.id
-                             + "' uses non-default gain, which playable package export does not yet preserve.");
-        }
-
         if (std::abs(group.pan) > 0.000001)
         {
             issues.push_back("Group '" + group.id
@@ -357,12 +351,6 @@ void collectPerformancePackageExportCompatibilityIssues(
 
     for (const auto& zone : project.authoring.zones)
     {
-        if (std::abs(zone.gainDb) > 0.000001)
-        {
-            issues.push_back("Zone '" + zone.id
-                             + "' uses non-default gain, which playable package export does not yet preserve.");
-        }
-
         if (std::abs(zone.pan) > 0.000001)
         {
             issues.push_back("Zone '" + zone.id
@@ -432,6 +420,7 @@ PerformancePackageExportPreparationResult preparePerformancePackageExport(
     plan.instrumentId = plan.projectId + ".instrument";
     plan.instrumentDisplayName = displayName;
     plan.defaultLoadProfile = sessionState.loadProfileId.empty() ? "balanced" : sessionState.loadProfileId;
+    plan.masterGainDb = project.authoring.masterGainDb;
     plan.pageSizeBytes = 65536;
     plan.projectNotes = project.notes;
     plan.instrumentValidationNotes = {
@@ -508,6 +497,7 @@ PerformancePackageExportPreparationResult preparePerformancePackageExport(
         drs::engine::RuntimeGroupDefinition group;
         group.id = projectGroup.id;
         group.name = projectGroup.displayName.empty() ? projectGroup.id : projectGroup.displayName;
+        group.gainDb = projectGroup.gainDb;
         groupIndexes.emplace(group.id, plan.groups.size());
         plan.groups.push_back(std::move(group));
     }
@@ -584,6 +574,7 @@ PerformancePackageExportPreparationResult preparePerformancePackageExport(
         zone.velocityLow = projectZone.velocityLow;
         zone.velocityHigh = projectZone.velocityHigh;
         zone.velocityCrossfade = projectZone.velocityCrossfade;
+        zone.gainDb = projectZone.gainDb;
         zone.roundRobin = projectZone.roundRobin;
         zone.roundRobinLength = projectZone.roundRobinLength;
         zone.roundRobinPosition = projectZone.roundRobinPosition;
@@ -603,6 +594,7 @@ PerformancePackageExportPreparationResult preparePerformancePackageExport(
     result.manifest.instrumentId = plan.instrumentId;
     result.manifest.defaultLoadProfile = plan.defaultLoadProfile;
     result.manifest.minimumReaderSchemaVersion = drs::engine::performancePackageSchemaVersion;
+    result.manifest.masterGainDb = plan.masterGainDb;
     result.manifest.notes = {
         "Exported from the current Decent Rhapsody Studio authoring project."
     };

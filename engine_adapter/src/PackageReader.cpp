@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstring>
 #include <filesystem>
@@ -196,6 +197,180 @@ bool parseCleartextManifest(const ordered_json& metadataRoot,
     result.minimumCompatibleAppVersion = metadataRoot.value("minimumCompatibleAppVersion", std::string {});
     result.cryptoAlgorithm = metadataRoot.value("cryptoAlgorithm", std::string {});
     return true;
+}
+
+template <typename TResult>
+bool parsePackageManifestPayload(const ordered_json& manifestRoot,
+                                 TResult& result,
+                                 PerformancePackageManifest& manifest,
+                                 const std::string& context)
+{
+    if (!manifestRoot.is_object())
+    {
+        addIssue(result, context + " must be an object.");
+        return false;
+    }
+
+    auto readRequiredString = [&](const char* fieldName, std::string& target)
+    {
+        if (!manifestRoot.contains(fieldName) || !manifestRoot.at(fieldName).is_string())
+        {
+            addIssue(result, context + " must provide string field '" + std::string(fieldName) + "'.");
+            return false;
+        }
+
+        target = manifestRoot.at(fieldName).get<std::string>();
+        return true;
+    };
+
+    auto readRequiredInt = [&](const char* fieldName, int& target)
+    {
+        if (!manifestRoot.contains(fieldName) || !manifestRoot.at(fieldName).is_number_integer())
+        {
+            addIssue(result, context + " must provide integer field '" + std::string(fieldName) + "'.");
+            return false;
+        }
+
+        target = manifestRoot.at(fieldName).get<int>();
+        return true;
+    };
+
+    bool valid = true;
+    valid = readRequiredString("schemaName", manifest.schemaName) && valid;
+    valid = readRequiredInt("schemaVersion", manifest.schemaVersion) && valid;
+    valid = readRequiredString("packageId", manifest.packageId) && valid;
+    valid = readRequiredString("displayName", manifest.displayName) && valid;
+    valid = readRequiredString("instrumentId", manifest.instrumentId) && valid;
+    valid = readRequiredInt("minimumReaderSchemaVersion", manifest.minimumReaderSchemaVersion) && valid;
+
+    if (manifestRoot.contains("defaultLoadProfile"))
+    {
+        if (!manifestRoot.at("defaultLoadProfile").is_string())
+        {
+            addIssue(result, context + " field 'defaultLoadProfile' must be a string when present.");
+            valid = false;
+        }
+        else
+        {
+            manifest.defaultLoadProfile = manifestRoot.at("defaultLoadProfile").get<std::string>();
+        }
+    }
+
+    if (manifestRoot.contains("notes"))
+    {
+        if (!manifestRoot.at("notes").is_array())
+        {
+            addIssue(result, context + " field 'notes' must be an array when present.");
+            valid = false;
+        }
+        else
+        {
+            for (std::size_t index = 0; index < manifestRoot.at("notes").size(); ++index)
+            {
+                const auto& note = manifestRoot.at("notes").at(index);
+                if (!note.is_string())
+                {
+                    addIssue(result,
+                             context + " field 'notes[" + std::to_string(index) + "]' must be a string.");
+                    valid = false;
+                    continue;
+                }
+
+                manifest.notes.push_back(note.get<std::string>());
+            }
+        }
+    }
+
+    if (manifestRoot.contains("masterGainDb"))
+    {
+        if (!manifestRoot.at("masterGainDb").is_number())
+        {
+            addIssue(result, context + " field 'masterGainDb' must be numeric when present.");
+            valid = false;
+        }
+        else
+        {
+            manifest.masterGainDb = manifestRoot.at("masterGainDb").get<double>();
+            if (!std::isfinite(manifest.masterGainDb))
+            {
+                addIssue(result, context + " field 'masterGainDb' must be finite.");
+                valid = false;
+            }
+        }
+    }
+
+    if (manifestRoot.contains("groupRoutes"))
+    {
+        if (!manifestRoot.at("groupRoutes").is_array())
+        {
+            addIssue(result, context + " field 'groupRoutes' must be an array when present.");
+            valid = false;
+        }
+        else
+        {
+            std::unordered_map<std::string, bool> groupIds;
+            for (std::size_t index = 0; index < manifestRoot.at("groupRoutes").size(); ++index)
+            {
+                const auto& routeRoot = manifestRoot.at("groupRoutes").at(index);
+                const auto routeContext = context + " field 'groupRoutes[" + std::to_string(index) + "]'";
+
+                if (!routeRoot.is_object())
+                {
+                    addIssue(result, routeContext + " must be an object.");
+                    valid = false;
+                    continue;
+                }
+
+                PerformancePackageManifest::GroupRoute route;
+                if (!routeRoot.contains("groupId") || !routeRoot.at("groupId").is_string())
+                {
+                    addIssue(result, routeContext + " must provide string field 'groupId'.");
+                    valid = false;
+                }
+                else
+                {
+                    route.groupId = routeRoot.at("groupId").get<std::string>();
+                    if (route.groupId.empty())
+                    {
+                        addIssue(result, routeContext + " field 'groupId' must not be empty.");
+                        valid = false;
+                    }
+                    else if (!groupIds.emplace(route.groupId, true).second)
+                    {
+                        addIssue(result,
+                                 context + " field 'groupRoutes' must not repeat groupId '" + route.groupId + "'.");
+                        valid = false;
+                    }
+                }
+
+                if (!routeRoot.contains("gainDb") || !routeRoot.at("gainDb").is_number())
+                {
+                    addIssue(result, routeContext + " must provide numeric field 'gainDb'.");
+                    valid = false;
+                }
+                else
+                {
+                    route.gainDb = routeRoot.at("gainDb").get<double>();
+                    if (!std::isfinite(route.gainDb))
+                    {
+                        addIssue(result, routeContext + " field 'gainDb' must be finite.");
+                        valid = false;
+                    }
+                }
+
+                manifest.groupRoutes.push_back(std::move(route));
+            }
+        }
+    }
+
+    if (manifest.schemaName != performancePackageSchemaName)
+    {
+        addIssue(result,
+                 context + " field 'schemaName' must be '" + std::string(performancePackageSchemaName) + "'.");
+        valid = false;
+    }
+
+    return valid;
 }
 
 std::optional<PerformancePackagePayloadView> findPayload(const PerformancePackageReaderResult& package,
@@ -742,10 +917,27 @@ PerformancePackageLoadResult loadPerformancePackage(const std::string& packagePa
         return result;
     }
 
-    if (manifestRoot.value("schemaName", std::string {}) != performancePackageSchemaName)
+    PerformancePackageManifest packageManifest;
+    if (!parsePackageManifestPayload(manifestRoot, result, packageManifest, "Package manifest payload"))
     {
         setFailureCategory(result, PerformancePackageFailureCategory::payloadCorruption);
-        addIssue(result, "Package manifest payload schemaName must be 'drs.performancePackage'.");
+        finalizeLoadFailure(result, PerformancePackageFailureCategory::payloadCorruption);
+        return result;
+    }
+
+    result.manifest = std::move(packageManifest);
+
+    if (result.manifest.packageId != result.package.cleartextManifest.packageId)
+        addIssue(result, "Package manifest payload packageId did not match the cleartext packageId.");
+
+    if (result.manifest.instrumentId != result.package.cleartextManifest.instrumentId)
+        addIssue(result, "Package manifest payload instrumentId did not match the cleartext instrumentId.");
+
+    if (result.manifest.minimumReaderSchemaVersion
+        != result.package.cleartextManifest.minimumReaderSchemaVersion)
+    {
+        addIssue(result,
+                 "Package manifest payload minimumReaderSchemaVersion did not match the cleartext metadata.");
     }
 
     const auto instrumentOpen = openPerformancePackagePayloadFromBytes(result.package,

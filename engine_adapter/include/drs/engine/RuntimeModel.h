@@ -320,6 +320,7 @@ struct RuntimeGroupDefinition
     std::string id;
     std::string name;
     std::vector<std::string> articulationIds;
+    double gainDb = 0.0;
 };
 
 struct RuntimeZoneDefinition
@@ -336,6 +337,7 @@ struct RuntimeZoneDefinition
     int velocityHigh = 127;
     VelocityCrossfadeDescriptor velocityCrossfade;
     VelocityCrossfadeRuntimeDescriptor velocityCrossfadeRuntime;
+    double gainDb = 0.0;
     std::uint64_t streamOffsetBytes = 0;
     std::uint64_t prefetchBytes = 0;
     double releaseSeconds = 0.0;

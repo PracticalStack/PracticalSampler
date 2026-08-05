@@ -137,6 +137,7 @@ inline drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path&
     plan.instrumentId = "drs.phase1.tiny-open-instrument";
     plan.instrumentDisplayName = "DRS Tiny Open Instrument";
     plan.defaultLoadProfile = "balanced";
+    plan.masterGainDb = -1.5;
     plan.pageSizeBytes = 65536;
 
     drs::engine::RuntimeCompileSourceDefinition sineSource;
@@ -168,12 +169,14 @@ inline drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path&
     padCore.id = "pad-core";
     padCore.name = "Pad Core";
     padCore.articulationIds = { "sustain" };
+    padCore.gainDb = -3.0;
     plan.groups.push_back(std::move(padCore));
 
     drs::engine::RuntimeGroupDefinition leadCore;
     leadCore.id = "lead-core";
     leadCore.name = "Lead Core";
     leadCore.articulationIds = { "lead" };
+    leadCore.gainDb = 1.5;
     plan.groups.push_back(std::move(leadCore));
 
     drs::engine::RuntimeCompileZoneDefinition padZone;
@@ -186,6 +189,7 @@ inline drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path&
     padZone.keyHigh = 76;
     padZone.velocityLow = 1;
     padZone.velocityHigh = 95;
+    padZone.gainDb = -0.75;
     padZone.prefetchBytes = 16384;
     plan.zones.push_back(std::move(padZone));
 
@@ -199,6 +203,7 @@ inline drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path&
     padAccentZone.keyHigh = 76;
     padAccentZone.velocityLow = 96;
     padAccentZone.velocityHigh = 127;
+    padAccentZone.gainDb = 1.25;
     padAccentZone.prefetchBytes = 16384;
     plan.zones.push_back(std::move(padAccentZone));
 
@@ -212,6 +217,7 @@ inline drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path&
     leadZone.keyHigh = 96;
     leadZone.velocityLow = 1;
     leadZone.velocityHigh = 95;
+    leadZone.gainDb = -2.0;
     leadZone.prefetchBytes = 16384;
     plan.zones.push_back(std::move(leadZone));
 
@@ -225,6 +231,7 @@ inline drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path&
     leadAccentZone.keyHigh = 96;
     leadAccentZone.velocityLow = 96;
     leadAccentZone.velocityHigh = 127;
+    leadAccentZone.gainDb = 0.5;
     leadAccentZone.prefetchBytes = 16384;
     plan.zones.push_back(std::move(leadAccentZone));
 
@@ -251,6 +258,9 @@ inline drs::engine::PerformancePackageCompileWritePlan buildPackagePlan(
     manifest.instrumentId = compilePlan.instrumentId;
     manifest.defaultLoadProfile = compilePlan.defaultLoadProfile;
     manifest.minimumReaderSchemaVersion = minimumReaderSchemaVersion;
+    manifest.masterGainDb = compileResult.masterGainDb;
+    for (const auto& group : compileResult.instrument.groups)
+        manifest.groupRoutes.push_back({ group.id, group.gainDb });
     manifest.notes = {
         "Sprint 7 checked-in performance package corpus.",
         "Contains runtime-only payloads and omits the authored project manifest."
@@ -283,10 +293,11 @@ inline drs::engine::RuntimeProjectModel buildAuthoringProjectFixture()
 
     project.authoring.schemaName = "drs.authoring";
     project.authoring.schemaVersion = 5;
+    project.authoring.masterGainDb = -1.5;
     project.authoring.articulations.push_back({ "sustain", "Sustain", true, 0, std::nullopt });
     project.authoring.articulations.push_back({ "lead", "Lead", false, 1, std::nullopt });
-    project.authoring.groups.push_back({ "pad-core", "Pad Core", 0, true, 0.0, 0.0, {}, {} });
-    project.authoring.groups.push_back({ "lead-core", "Lead Core", 1, true, 0.0, 0.0, {}, {} });
+    project.authoring.groups.push_back({ "pad-core", "Pad Core", 0, true, -3.0, 0.0, {}, {} });
+    project.authoring.groups.push_back({ "lead-core", "Lead Core", 1, true, 1.5, 0.0, {}, {} });
 
     drs::engine::RuntimeProjectZoneDefinition padZone;
     padZone.id = "pad-a3";
@@ -299,6 +310,7 @@ inline drs::engine::RuntimeProjectModel buildAuthoringProjectFixture()
     padZone.keyHigh = 76;
     padZone.velocityLow = 1;
     padZone.velocityHigh = 95;
+    padZone.gainDb = -0.75;
     project.authoring.zones.push_back(std::move(padZone));
 
     drs::engine::RuntimeProjectZoneDefinition leadZone;
@@ -312,6 +324,7 @@ inline drs::engine::RuntimeProjectModel buildAuthoringProjectFixture()
     leadZone.keyHigh = 96;
     leadZone.velocityLow = 1;
     leadZone.velocityHigh = 127;
+    leadZone.gainDb = 0.5;
     project.authoring.zones.push_back(std::move(leadZone));
 
     return project;

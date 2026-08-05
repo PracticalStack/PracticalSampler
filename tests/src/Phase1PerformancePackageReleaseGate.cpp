@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -294,6 +295,18 @@ ordered_json buildReopenAndUxSection(const fs::path& scratchDirectory)
         && pluginProjectBindingSuppressed;
     return section;
 }
+
+std::string currentIsoDate()
+{
+    const auto now = std::chrono::system_clock::now();
+    const auto currentTime = std::chrono::system_clock::to_time_t(now);
+    std::tm localTime {};
+    localtime_s(&localTime, &currentTime);
+
+    char buffer[11] {};
+    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d", &localTime);
+    return buffer;
+}
 } // namespace
 
 int main(int argc, char* argv[])
@@ -311,7 +324,7 @@ int main(int argc, char* argv[])
         ordered_json report;
         report["schemaName"] = "drs.performancePackageReleaseGate";
         report["schemaVersion"] = 1;
-        report["capturedOn"] = "2026-08-04";
+        report["capturedOn"] = currentIsoDate();
         report["compatibilityPolicy"] = buildCompatibilityPolicySection();
         report["determinism"] = buildDeterminismSection(scratchDirectory / "determinism");
         report["failureReporting"] = buildFailureReportingSection();

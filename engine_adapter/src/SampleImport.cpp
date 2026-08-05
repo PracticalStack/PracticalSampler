@@ -1031,15 +1031,15 @@ SampleImportPolicyReport evaluatePhase1SamplePolicy(const ImportedSampleMetadata
         }
         else if (!pathLivesWithinDirectory(normalizedSourcePath, normalizedContentRoot))
         {
-            addPolicyError(report,
-                           "Phase 1 compile inputs must live under the configured content root: "
-                               + normalizedContentRoot.generic_string());
+            addPolicyWarning(report,
+                             "Phase 1 prefers compile inputs under the configured content root, but authoring imports may retain external sample paths: "
+                                 + normalizedContentRoot.generic_string());
         }
         else if (!pathLivesWithinDirectory(normalizedSourcePath, samplesRoot))
         {
-            addPolicyError(report,
-                           "Phase 1 compile inputs must live under the content-root Samples directory: "
-                               + samplesRoot.generic_string());
+            addPolicyWarning(report,
+                             "Phase 1 prefers compile inputs under the content-root Samples directory, but authoring imports may retain external sample paths: "
+                                 + samplesRoot.generic_string());
         }
     }
 

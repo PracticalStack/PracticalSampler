@@ -105,6 +105,23 @@ bool hasFinding(const drs::engine::AuthoringPreviewPreparationResult& result,
                        [&](const auto& finding) { return finding.code == code; });
 }
 
+std::string summarizeFindings(const drs::engine::AuthoringPreviewPreparationResult& result)
+{
+    if (result.findings.empty())
+        return "no findings";
+
+    std::string summary;
+    for (std::size_t index = 0; index < result.findings.size() && index < 3; ++index)
+    {
+        if (!summary.empty())
+            summary += " | ";
+
+        const auto& finding = result.findings[index];
+        summary += "[" + finding.code + "] " + finding.message + " (" + finding.path + ")";
+    }
+    return summary;
+}
+
 const drs::engine::PreparedPlaybackSampleHandle& findSample(
     const drs::engine::PlaybackActivationPayloadPtr& payload,
     const std::string& sourceId)
@@ -152,14 +169,23 @@ int main()
         const auto selectedRequest = makeRequest(AuthoringPreviewScope::selectedZone, 101,
                                                  "lead-a4-sustain");
         const auto selected = prepareAuthoringPreviewRenderModel(payload, selectedRequest);
-        require(selected.prepared && selected.validatedZoneCount == 3
-                    && selected.retainedZoneCount == 1 && selected.retainedSampleCount == 1
-                    && selected.scopedPayload->snapshot->zones.front().id == "lead-a4-sustain"
-                    && selected.scopedPayload->prepared->samples.front().sampleSourceId == "triangle-a4"
-                    && selected.scopedPayload->snapshot->macroDefaults.size()
-                        == payload->snapshot->macroDefaults.size()
-                    && selected.model->getRetainedActivationPayload() == selected.scopedPayload,
-                "Selected-zone preparation must validate the full topology before retaining one immutable route.");
+        require(selected.prepared,
+                "Selected-zone preparation should succeed. Findings: " + summarizeFindings(selected));
+        require(selected.validatedZoneCount == 3,
+                "Selected-zone preparation should validate the full authored topology first.");
+        require(selected.retainedZoneCount == 1,
+                "Selected-zone preparation should expose one audible route.");
+        require(selected.retainedSampleCount == 1,
+                "Selected-zone preparation should expose one retained sample for this fixture.");
+        require(selected.scopedPayload->snapshot->zones.front().id == "lead-a4-sustain",
+                "Selected-zone preparation should keep the requested zone first in the scoped snapshot.");
+        require(selected.scopedPayload->prepared->samples.front().sampleSourceId == "triangle-a4",
+                "Selected-zone preparation should keep the selected sample source.");
+        require(selected.scopedPayload->snapshot->macroDefaults.size()
+                    == payload->snapshot->macroDefaults.size(),
+                "Selected-zone preparation should preserve macro defaults.");
+        require(selected.model->getRetainedActivationPayload() == selected.scopedPayload,
+                "Selected-zone render models should retain the scoped immutable payload.");
         require(selected.scopedPayload->prepared->samples.front().decodedSampleData
                     == flacSample.decodedSampleData
                     && selected.scopedPayload->prepared->samples.front().sourceFingerprintHex

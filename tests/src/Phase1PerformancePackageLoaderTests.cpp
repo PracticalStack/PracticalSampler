@@ -1,3 +1,4 @@
+#include "drs/engine/EngineFacade.h"
 #include "drs/engine/PackageReader.h"
 #include "drs/engine/PackageWriter.h"
 #include "Phase1PerformancePackageSupport.h"
@@ -5,6 +6,7 @@
 #include <json/json.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
@@ -100,6 +102,128 @@ int main()
                 "Tampered package should report the decryption failure category.");
         require(package_support::containsIssue(tamperedLoad.issues, "authentication failed"),
                 "Tampered package load should report an authentication failure.");
+
+        const auto scopedGainPlan = package_support::buildPackagePlan(scratchDirectory / "scoped-gain",
+                                                                      scratchDirectory / "scoped-gain" / "scoped-gain.drpkg");
+        const auto scopedGainWrite = drs::engine::writePerformancePackage(scopedGainPlan, cryptoProvider);
+        require(scopedGainWrite.written, "Scoped-gain performance package should write successfully.");
+
+        const auto scopedGainLoad = drs::engine::loadPerformancePackage(scopedGainPlan.outputPackagePath,
+                                                                        cryptoProvider,
+                                                                        drs::engine::performancePackageSchemaVersion);
+        require(scopedGainLoad.loaded, "Scoped-gain performance package should load successfully.");
+        require(std::abs(scopedGainLoad.manifest.masterGainDb - scopedGainPlan.manifest.masterGainDb) < 1.0e-9,
+                "Typed package load should preserve packaged master gain.");
+        require(scopedGainLoad.manifest.groupRoutes.size() == scopedGainPlan.manifest.groupRoutes.size(),
+                "Typed package load should preserve the packaged group-route count.");
+        require(scopedGainLoad.manifest.groupRoutes.at(0).groupId == scopedGainPlan.manifest.groupRoutes.at(0).groupId
+                    && std::abs(scopedGainLoad.manifest.groupRoutes.at(0).gainDb
+                                    - scopedGainPlan.manifest.groupRoutes.at(0).gainDb)
+                        < 1.0e-9,
+                "Typed package load should preserve packaged group-route gain.");
+        require(scopedGainLoad.instrument.instrument.groups.size() == scopedGainPlan.compiledRuntime.instrument.groups.size(),
+                "Typed package load should preserve runtime group gain entries.");
+        require(std::abs(scopedGainLoad.instrument.instrument.groups.at(0).gainDb
+                             - scopedGainPlan.compiledRuntime.instrument.groups.at(0).gainDb)
+                    < 1.0e-9,
+                "Typed package load should preserve runtime group gain from the packaged instrument payload.");
+        require(std::abs(scopedGainLoad.instrument.instrument.zones.at(0).gainDb
+                             - scopedGainPlan.compiledRuntime.instrument.zones.at(0).gainDb)
+                    < 1.0e-9,
+                "Typed package load should preserve runtime zone gain from the packaged instrument payload.");
+
+        drs::engine::EngineFacade scopedGainFacade;
+        const auto scopedGainActivation = scopedGainFacade.activatePerformancePackageSession(scopedGainLoad);
+        require(scopedGainActivation.activated,
+                "Performance package activation should succeed for a package with scoped gain.");
+        const auto scopedGainPayload = scopedGainFacade.getPerformancePackageActivationPayload();
+        require(scopedGainPayload != nullptr && scopedGainPayload->snapshot != nullptr
+                    && scopedGainPayload->prepared != nullptr,
+                "Performance package activation should retain snapshot and prepared payloads.");
+        require(std::abs(scopedGainPayload->snapshot->masterGainDb - scopedGainPlan.manifest.masterGainDb) < 1.0e-9,
+                "Activated performance-package snapshot should preserve packaged master gain.");
+        require(std::abs(scopedGainPayload->snapshot->groupRoutes.at(0).gainDb
+                             - scopedGainPlan.manifest.groupRoutes.at(0).gainDb)
+                    < 1.0e-9,
+                "Activated performance-package snapshot should preserve packaged group-route gain.");
+        require(std::abs(scopedGainPayload->snapshot->zones.at(0).gainDb
+                             - scopedGainPlan.compiledRuntime.instrument.zones.at(0).gainDb)
+                    < 1.0e-9,
+                "Activated performance-package snapshot should preserve packaged zone gain.");
+        require(std::abs(scopedGainPayload->prepared->masterGainDb - scopedGainPlan.manifest.masterGainDb) < 1.0e-9,
+                "Activated prepared playback should preserve packaged master gain.");
+        require(std::abs(scopedGainPayload->prepared->groupRoutes.at(0).gainDb
+                             - scopedGainPlan.manifest.groupRoutes.at(0).gainDb)
+                    < 1.0e-9,
+                "Activated prepared playback should preserve packaged group-route gain.");
+        require(std::abs(scopedGainPayload->prepared->zones.at(0).gainDb
+                             - scopedGainPlan.compiledRuntime.instrument.zones.at(0).gainDb)
+                    < 1.0e-9,
+                "Activated prepared playback should preserve packaged zone gain.");
+
+        auto malformedManifestPlan = drs::engine::buildPerformancePackageWritePlan(
+            package_support::buildPackagePlan(scratchDirectory / "malformed-manifest",
+                                              scratchDirectory / "malformed-manifest" / "malformed-manifest.drpkg"));
+        auto packageManifestIterator = std::find_if(
+            malformedManifestPlan.payloads.begin(),
+            malformedManifestPlan.payloads.end(),
+            [](const drs::engine::PerformancePackagePayloadSource& payload)
+            {
+                return payload.kind == drs::engine::PerformancePackagePayloadKind::packageManifest;
+            });
+        require(packageManifestIterator != malformedManifestPlan.payloads.end(),
+                "Malformed-manifest package plan should include a package-manifest payload.");
+        auto malformedManifestJson = json::parse(std::string(packageManifestIterator->plaintextBytes.begin(),
+                                                             packageManifestIterator->plaintextBytes.end()));
+        malformedManifestJson["groupRoutes"][0]["gainDb"] = "not-a-number";
+        packageManifestIterator->plaintextBytes = package_support::toBytes(malformedManifestJson.dump(2) + "\n");
+        malformedManifestPlan.outputPackagePath = (scratchDirectory / "malformed-manifest" / "malformed-manifest.drpkg").generic_string();
+
+        const auto malformedManifestWrite = drs::engine::writePerformancePackage(malformedManifestPlan, cryptoProvider);
+        require(malformedManifestWrite.written, "Malformed-manifest package should still write successfully.");
+
+        const auto malformedManifestLoad = drs::engine::loadPerformancePackage(malformedManifestPlan.outputPackagePath,
+                                                                               cryptoProvider,
+                                                                               drs::engine::performancePackageSchemaVersion);
+        require(!malformedManifestLoad.loaded,
+                "Package loader should reject package manifests whose scoped gain fields are malformed.");
+        require(malformedManifestLoad.failureCategory == drs::engine::PerformancePackageFailureCategory::payloadCorruption,
+                "Malformed package-manifest gain fields should report payload corruption.");
+        require(package_support::containsIssue(malformedManifestLoad.issues, "groupRoutes[0]")
+                    && package_support::containsIssue(malformedManifestLoad.issues, "gainDb"),
+                "Malformed package-manifest gain validation should report the bad packaged group-route gain field.");
+
+        auto malformedInstrumentPlan = drs::engine::buildPerformancePackageWritePlan(
+            package_support::buildPackagePlan(scratchDirectory / "malformed-instrument",
+                                              scratchDirectory / "malformed-instrument" / "malformed-instrument.drpkg"));
+        auto malformedInstrumentIterator = std::find_if(
+            malformedInstrumentPlan.payloads.begin(),
+            malformedInstrumentPlan.payloads.end(),
+            [](const drs::engine::PerformancePackagePayloadSource& payload)
+            {
+                return payload.kind == drs::engine::PerformancePackagePayloadKind::runtimeInstrument;
+            });
+        require(malformedInstrumentIterator != malformedInstrumentPlan.payloads.end(),
+                "Malformed-instrument package plan should include a runtime-instrument payload.");
+        auto malformedInstrumentJson = json::parse(std::string(malformedInstrumentIterator->plaintextBytes.begin(),
+                                                               malformedInstrumentIterator->plaintextBytes.end()));
+        malformedInstrumentJson["zones"][0]["gainDb"] = "bad-zone-gain";
+        malformedInstrumentIterator->plaintextBytes = package_support::toBytes(malformedInstrumentJson.dump(2) + "\n");
+        malformedInstrumentPlan.outputPackagePath = (scratchDirectory / "malformed-instrument" / "malformed-instrument.drpkg").generic_string();
+
+        const auto malformedInstrumentWrite = drs::engine::writePerformancePackage(malformedInstrumentPlan, cryptoProvider);
+        require(malformedInstrumentWrite.written, "Malformed-instrument package should still write successfully.");
+
+        const auto malformedInstrumentLoad = drs::engine::loadPerformancePackage(malformedInstrumentPlan.outputPackagePath,
+                                                                                 cryptoProvider,
+                                                                                 drs::engine::performancePackageSchemaVersion);
+        require(!malformedInstrumentLoad.loaded,
+                "Package loader should reject runtime instruments whose packaged zone gain fields are malformed.");
+        require(malformedInstrumentLoad.failureCategory == drs::engine::PerformancePackageFailureCategory::payloadCorruption,
+                "Malformed packaged runtime-instrument gain fields should report payload corruption.");
+        require(package_support::containsIssue(malformedInstrumentLoad.issues, "Zone[0]")
+                    && package_support::containsIssue(malformedInstrumentLoad.issues, "gainDb"),
+                "Malformed packaged runtime-instrument gain validation should report the bad zone gain field.");
 
         const auto compatiblePlan = package_support::buildPackagePlan(scratchDirectory / "playback-incompatible",
                                                                       scratchDirectory / "playback-incompatible" / "playback-incompatible.drpkg");

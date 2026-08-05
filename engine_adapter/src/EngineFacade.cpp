@@ -1175,6 +1175,7 @@ PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
     result.snapshot.sourceAuthoringSchemaName = manifest.schemaName;
     result.snapshot.sourceAuthoringSchemaVersion = manifest.schemaVersion;
     result.snapshot.draftRevision = 0;
+    result.snapshot.masterGainDb = manifest.masterGainDb;
     result.snapshot.notes = manifest.notes;
     result.snapshot.notes.insert(result.snapshot.notes.end(),
                                  instrument.validationNotes.begin(),
@@ -1221,6 +1222,11 @@ PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
         });
     }
 
+    std::unordered_map<std::string, double> manifestGroupGainById;
+    manifestGroupGainById.reserve(manifest.groupRoutes.size());
+    for (const auto& route : manifest.groupRoutes)
+        manifestGroupGainById.emplace(route.groupId, route.gainDb);
+
     std::unordered_map<std::string, std::size_t> groupRouteIndices;
     result.snapshot.groupRoutes.reserve(instrument.groups.size());
     for (const auto& group : instrument.groups)
@@ -1231,6 +1237,9 @@ PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
         route.articulationIds = group.articulationIds;
         route.routingSourceId = "master";
         route.workspaceVisible = true;
+        route.gainDb = manifestGroupGainById.count(group.id) != 0
+            ? manifestGroupGainById.at(group.id)
+            : group.gainDb;
         route.routingBusId = "master";
         groupRouteIndices.emplace(group.id, result.snapshot.groupRoutes.size());
         result.snapshot.groupRoutes.push_back(std::move(route));
@@ -1249,6 +1258,8 @@ PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
             route.displayName = zone.groupId;
             route.routingSourceId = "master";
             route.workspaceVisible = true;
+            if (manifestGroupGainById.count(route.groupId) != 0)
+                route.gainDb = manifestGroupGainById.at(route.groupId);
             route.routingBusId = "master";
             groupRouteIndices.emplace(route.groupId, result.snapshot.groupRoutes.size());
             result.snapshot.groupRoutes.push_back(std::move(route));
@@ -1284,7 +1295,7 @@ PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
         snapshotZone.velocityHigh = zone.velocityHigh;
         snapshotZone.velocityCrossfade = zone.velocityCrossfade;
         snapshotZone.velocityCrossfadeRuntime = zone.velocityCrossfadeRuntime;
-        snapshotZone.gainDb = 0.0;
+        snapshotZone.gainDb = zone.gainDb;
         snapshotZone.pan = 0.0;
         snapshotZone.releaseSeconds = zone.releaseSeconds;
         snapshotZone.roundRobin = zone.roundRobin;

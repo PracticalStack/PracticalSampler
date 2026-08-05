@@ -168,7 +168,9 @@ struct SamplerRenderModelBuildResult;
 struct SamplerRenderModelBuildOptions
 {
     std::string selectedZoneId;
+    std::string selectedGroupId;
     std::string selectedArticulationId;
+    std::vector<std::string> retainedZoneIds;
     bool auditionSelectedZone = false;
     int midiNoteOffset = 0;
     int fixedVelocity = 0;

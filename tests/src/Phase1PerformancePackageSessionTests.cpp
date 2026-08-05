@@ -5,6 +5,7 @@
 #include <juce_audio_processors_headless/juce_audio_processors_headless.h>
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
@@ -108,10 +109,11 @@ drs::engine::RuntimeProjectModel buildAuthoringProjectFixture()
 
     project.authoring.schemaName = "drs.authoring";
     project.authoring.schemaVersion = 5;
+    project.authoring.masterGainDb = -1.5;
     project.authoring.articulations.push_back({ "sustain", "Sustain", true, 0, std::nullopt });
     project.authoring.articulations.push_back({ "lead", "Lead", false, 1, std::nullopt });
-    project.authoring.groups.push_back({ "pad-core", "Pad Core", 0, true, 0.0, 0.0, {}, {} });
-    project.authoring.groups.push_back({ "lead-core", "Lead Core", 1, true, 0.0, 0.0, {}, {} });
+    project.authoring.groups.push_back({ "pad-core", "Pad Core", 0, true, -3.0, 0.0, {}, {} });
+    project.authoring.groups.push_back({ "lead-core", "Lead Core", 1, true, 1.5, 0.0, {}, {} });
 
     drs::engine::RuntimeProjectZoneDefinition padZone;
     padZone.id = "pad-a3";
@@ -124,6 +126,7 @@ drs::engine::RuntimeProjectModel buildAuthoringProjectFixture()
     padZone.keyHigh = 76;
     padZone.velocityLow = 1;
     padZone.velocityHigh = 95;
+    padZone.gainDb = -0.75;
     project.authoring.zones.push_back(std::move(padZone));
 
     drs::engine::RuntimeProjectZoneDefinition leadZone;
@@ -137,6 +140,7 @@ drs::engine::RuntimeProjectModel buildAuthoringProjectFixture()
     leadZone.keyHigh = 96;
     leadZone.velocityLow = 1;
     leadZone.velocityHigh = 127;
+    leadZone.gainDb = 0.5;
     project.authoring.zones.push_back(std::move(leadZone));
 
     return project;
@@ -170,6 +174,22 @@ int main()
         require(standaloneLoad.loaded,
                 "Standalone shell should load a valid playable package. state="
                     + standaloneLoad.state + " issues=" + summarizeIssues(standaloneLoad.issues));
+        const auto standalonePayload = standalone.getProcessor().getEngineFacade().getPerformancePackageActivationPayload();
+        require(standalonePayload != nullptr && standalonePayload->snapshot != nullptr
+                    && standalonePayload->prepared != nullptr,
+                "Standalone package sessions should retain an activation payload after load.");
+        require(std::abs(standalonePayload->snapshot->masterGainDb - (-1.5)) < 1.0e-9,
+                "Standalone package sessions should preserve exported master gain.");
+        require(std::abs(standalonePayload->snapshot->groupRoutes.at(0).gainDb - (-3.0)) < 1.0e-9,
+                "Standalone package sessions should preserve exported group gain.");
+        require(std::abs(standalonePayload->snapshot->zones.at(0).gainDb - (-0.75)) < 1.0e-9,
+                "Standalone package sessions should preserve exported zone gain.");
+        require(std::abs(standalonePayload->prepared->masterGainDb - (-1.5)) < 1.0e-9,
+                "Standalone prepared playback should preserve exported master gain.");
+        require(std::abs(standalonePayload->prepared->groupRoutes.at(0).gainDb - (-3.0)) < 1.0e-9,
+                "Standalone prepared playback should preserve exported group gain.");
+        require(std::abs(standalonePayload->prepared->zones.at(0).gainDb - (-0.75)) < 1.0e-9,
+                "Standalone prepared playback should preserve exported zone gain.");
         standalone.resized();
         require(standalone.getProcessor().getWorkspaceDocumentState().kind
                     == drs::engine::WorkspaceDocumentKind::performancePackage,
@@ -209,6 +229,22 @@ int main()
         require(pluginLoad.loaded,
                 "Plugin shell should load a valid playable package. state="
                     + pluginLoad.state + " issues=" + summarizeIssues(pluginLoad.issues));
+        const auto pluginPayload = processor.getEngineFacade().getPerformancePackageActivationPayload();
+        require(pluginPayload != nullptr && pluginPayload->snapshot != nullptr
+                    && pluginPayload->prepared != nullptr,
+                "Plugin package sessions should retain an activation payload after load.");
+        require(std::abs(pluginPayload->snapshot->masterGainDb - (-1.5)) < 1.0e-9,
+                "Plugin package sessions should preserve exported master gain.");
+        require(std::abs(pluginPayload->snapshot->groupRoutes.at(0).gainDb - (-3.0)) < 1.0e-9,
+                "Plugin package sessions should preserve exported group gain.");
+        require(std::abs(pluginPayload->snapshot->zones.at(0).gainDb - (-0.75)) < 1.0e-9,
+                "Plugin package sessions should preserve exported zone gain.");
+        require(std::abs(pluginPayload->prepared->masterGainDb - (-1.5)) < 1.0e-9,
+                "Plugin prepared playback should preserve exported master gain.");
+        require(std::abs(pluginPayload->prepared->groupRoutes.at(0).gainDb - (-3.0)) < 1.0e-9,
+                "Plugin prepared playback should preserve exported group gain.");
+        require(std::abs(pluginPayload->prepared->zones.at(0).gainDb - (-0.75)) < 1.0e-9,
+                "Plugin prepared playback should preserve exported zone gain.");
         editor->resized();
         require(processor.getWorkspaceDocumentState().kind
                     == drs::engine::WorkspaceDocumentKind::performancePackage,

@@ -29,6 +29,7 @@ struct RuntimeCompileZoneDefinition
     int velocityLow = 1;
     int velocityHigh = 127;
     VelocityCrossfadeDescriptor velocityCrossfade;
+    double gainDb = 0.0;
     std::optional<RoundRobinDescriptor> roundRobin;
     int roundRobinLength = 0;
     int roundRobinPosition = 0;
@@ -51,6 +52,7 @@ struct RuntimeCompilePlan
     std::string instrumentId;
     std::string instrumentDisplayName;
     std::string defaultLoadProfile;
+    double masterGainDb = 0.0;
     std::uint64_t pageSizeBytes = 65536;
     std::vector<RuntimeCompileSourceDefinition> sampleSources;
     std::vector<RuntimeMacroDefinition> macros;
@@ -101,6 +103,7 @@ struct RuntimeCompileResult
     std::vector<std::string> issues;
     RuntimeProjectModel project;
     RuntimeInstrumentModel instrument;
+    double masterGainDb = 0.0;
     std::string containerId;
     std::uint64_t pageSizeBytes = 65536;
     std::uint64_t totalPayloadBytes = 0;

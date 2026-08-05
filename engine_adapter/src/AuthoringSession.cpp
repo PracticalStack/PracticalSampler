@@ -8,6 +8,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstddef>
+#include <filesystem>
 #include <string_view>
 #include <unordered_set>
 #include <utility>
@@ -16,6 +17,8 @@ namespace drs::engine
 {
 namespace
 {
+namespace fs = std::filesystem;
+
 RuntimeProjectDocumentActionResult makeRejectedResult(const RuntimeProjectDocumentState& documentState,
                                                       const std::string& state,
                                                       const std::string& issue)
@@ -915,8 +918,224 @@ void reconcilePreviouslyEnabledGroup(RuntimeProjectModel& project,
         clearGroupRoundRobin(project, groupId);
 }
 
+struct ImportedRoundRobinRepairKey
+{
+    std::string articulationId;
+    int rootKey = 60;
+    int keyLow = 0;
+    int keyHigh = 127;
+    int triggerMode = 0;
+
+    bool operator==(const ImportedRoundRobinRepairKey& other) const noexcept
+    {
+        return articulationId == other.articulationId
+            && rootKey == other.rootKey
+            && keyLow == other.keyLow
+            && keyHigh == other.keyHigh
+            && triggerMode == other.triggerMode;
+    }
+};
+
+struct ImportedRoundRobinRepairKeyHash
+{
+    std::size_t operator()(const ImportedRoundRobinRepairKey& key) const noexcept
+    {
+        std::size_t hash = std::hash<std::string> {}(key.articulationId);
+        hash ^= std::hash<int> {}(key.rootKey) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
+        hash ^= std::hash<int> {}(key.keyLow) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
+        hash ^= std::hash<int> {}(key.keyHigh) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
+        hash ^= std::hash<int> {}(key.triggerMode) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
+        return hash;
+    }
+};
+
+ImportedRoundRobinRepairKey makeImportedRoundRobinRepairKey(const RuntimeProjectZoneDefinition& zone)
+{
+    return {
+        zone.articulationId,
+        zone.rootKey,
+        zone.keyLow,
+        zone.keyHigh,
+        static_cast<int>(zone.triggerMode)
+    };
+}
+
+bool isImportedSampleSource(const RuntimeProjectSampleSource& sampleSource) noexcept
+{
+    return sampleSource.role == "sfz-region-sample";
+}
+
+std::optional<int> inferRoundRobinSlotFromSamplePath(const RuntimeProjectSampleSource& sampleSource)
+{
+    auto stem = fs::path(sampleSource.path).stem().generic_string();
+    std::transform(stem.begin(),
+                   stem.end(),
+                   stem.begin(),
+                   [](unsigned char character)
+                   {
+                       return static_cast<char>(std::tolower(character));
+                   });
+
+    for (std::size_t index = 0; index + 2 < stem.size(); ++index)
+    {
+        if (stem[index] != 'r' || stem[index + 1] != 'r')
+            continue;
+
+        std::size_t digitIndex = index + 2;
+        std::string digits;
+        while (digitIndex < stem.size()
+               && std::isdigit(static_cast<unsigned char>(stem[digitIndex])) != 0)
+        {
+            digits.push_back(stem[digitIndex]);
+            ++digitIndex;
+        }
+
+        if (digits.empty())
+            continue;
+
+        try
+        {
+            const auto slotIndex = std::stoi(digits);
+            if (slotIndex > 0)
+                return slotIndex;
+        }
+        catch (...)
+        {
+        }
+    }
+
+    return std::nullopt;
+}
+
+void repairImportedCrossGroupRoundRobin(RuntimeProjectModel& project)
+{
+    std::unordered_map<std::string, const RuntimeProjectSampleSource*> sampleSourcesById;
+    sampleSourcesById.reserve(project.sampleSources.size());
+    for (const auto& sampleSource : project.sampleSources)
+        sampleSourcesById.emplace(sampleSource.id, &sampleSource);
+
+    std::unordered_map<ImportedRoundRobinRepairKey,
+                       std::vector<std::size_t>,
+                       ImportedRoundRobinRepairKeyHash> zonesByRepairKey;
+    for (std::size_t zoneIndex = 0; zoneIndex < project.authoring.zones.size(); ++zoneIndex)
+        zonesByRepairKey[makeImportedRoundRobinRepairKey(project.authoring.zones[zoneIndex])].push_back(zoneIndex);
+
+    for (const auto& [repairKey, zoneIndices] : zonesByRepairKey)
+    {
+        static_cast<void>(repairKey);
+
+        std::optional<RoundRobinDescriptor> templateRoundRobin;
+        bool inconsistentTemplate = false;
+        for (const auto zoneIndex : zoneIndices)
+        {
+            const auto& zone = project.authoring.zones[zoneIndex];
+            if (!zone.roundRobin.has_value())
+                continue;
+
+            if (!templateRoundRobin.has_value())
+            {
+                templateRoundRobin = zone.roundRobin;
+                continue;
+            }
+
+            if (zone.roundRobin->poolId != templateRoundRobin->poolId
+                || zone.roundRobin->slotCount != templateRoundRobin->slotCount
+                || zone.roundRobin->mode != templateRoundRobin->mode)
+            {
+                inconsistentTemplate = true;
+                break;
+            }
+        }
+
+        if (inconsistentTemplate || !templateRoundRobin.has_value())
+            continue;
+
+        for (const auto zoneIndex : zoneIndices)
+        {
+            auto& zone = project.authoring.zones[zoneIndex];
+            if (zone.roundRobin.has_value())
+                continue;
+
+            const auto sampleSourceIterator = sampleSourcesById.find(zone.sampleSourceId);
+            if (sampleSourceIterator == sampleSourcesById.end()
+                || sampleSourceIterator->second == nullptr
+                || !isImportedSampleSource(*sampleSourceIterator->second))
+            {
+                continue;
+            }
+
+            const auto slotIndex = inferRoundRobinSlotFromSamplePath(*sampleSourceIterator->second);
+            if (!slotIndex.has_value()
+                || *slotIndex < 1
+                || *slotIndex > templateRoundRobin->slotCount)
+            {
+                continue;
+            }
+
+            zone.roundRobin = RoundRobinDescriptor {
+                templateRoundRobin->poolId,
+                templateRoundRobin->slotCount,
+                *slotIndex,
+                templateRoundRobin->mode
+            };
+            zone.roundRobinLength = templateRoundRobin->slotCount;
+            zone.roundRobinPosition = *slotIndex;
+        }
+    }
+}
+
+bool roundRobinPoolIsImportedVelocityStack(const RuntimeProjectModel& project, const std::string& poolId)
+{
+    if (poolId.empty())
+        return false;
+
+    std::vector<VelocityCrossfadeTopologyZoneDefinition> topologyZones;
+    topologyZones.reserve(project.authoring.zones.size());
+
+    std::unordered_set<std::string> groupIds;
+    std::optional<ImportedRoundRobinRepairKey> referenceKey;
+    bool hasCrossfade = false;
+
+    for (const auto& zone : project.authoring.zones)
+    {
+        if (!zone.roundRobin.has_value() || zone.roundRobin->poolId != poolId)
+            continue;
+
+        if (!referenceKey.has_value())
+            referenceKey = makeImportedRoundRobinRepairKey(zone);
+        else if (!(makeImportedRoundRobinRepairKey(zone) == *referenceKey))
+            return false;
+
+        groupIds.insert(zone.groupId);
+        hasCrossfade = hasCrossfade || hasAnyVelocityCrossfadeValue(zone.velocityCrossfade);
+
+        VelocityCrossfadeTopologyZoneDefinition topologyZone;
+        topologyZone.pairingKey = computeVelocityCrossfadePairingKey(zone.articulationId,
+                                                                     zone.rootKey,
+                                                                     zone.keyLow,
+                                                                     zone.keyHigh,
+                                                                     static_cast<int>(zone.triggerMode));
+        topologyZone.velocityLow = zone.velocityLow;
+        topologyZone.velocityHigh = zone.velocityHigh;
+        topologyZone.roundRobinPoolId = poolId;
+        topologyZone.roundRobinLength = zone.roundRobinLength;
+        topologyZone.roundRobinPosition = zone.roundRobinPosition;
+        topologyZone.crossfade = zone.velocityCrossfade;
+        topologyZones.push_back(std::move(topologyZone));
+    }
+
+    if (topologyZones.size() < 2 || groupIds.size() < 2 || !hasCrossfade)
+        return false;
+
+    std::vector<VelocityCrossfadeTopologyFinding> findings;
+    buildFirstPassVelocityCrossfadeRuntimeTopology(topologyZones, &findings);
+    return findings.empty();
+}
+
 RuntimeProjectModel prepareAuthoringProject(RuntimeProjectModel project)
 {
+    repairImportedCrossGroupRoundRobin(project);
+
     if (!usesExplicitZoneGroupsSchema(project))
         return project;
 
@@ -930,8 +1149,34 @@ RuntimeProjectModel prepareAuthoringProject(RuntimeProjectModel project)
             {
                 return zone.groupId == group.id && zone.roundRobin.has_value();
             });
-        if (hasRoundRobinMetadata && !assessGroupRoundRobin(project, group.id).enabled)
-            clearGroupRoundRobin(project, group.id);
+        if (!hasRoundRobinMetadata)
+            continue;
+
+        const auto status = assessGroupRoundRobin(project, group.id);
+        if (status.enabled)
+            continue;
+
+        if (status.state == "A Round Robin pool crosses group or mapping boundaries.")
+        {
+            std::unordered_set<std::string> poolIds;
+            for (const auto& zone : project.authoring.zones)
+            {
+                if (zone.groupId == group.id && zone.roundRobin.has_value())
+                    poolIds.insert(zone.roundRobin->poolId);
+            }
+
+            const auto preserveImportedVelocityStacks = !poolIds.empty()
+                && std::all_of(poolIds.begin(),
+                               poolIds.end(),
+                               [&](const std::string& poolId)
+                               {
+                                   return roundRobinPoolIsImportedVelocityStack(project, poolId);
+                               });
+            if (preserveImportedVelocityStacks)
+                continue;
+        }
+
+        clearGroupRoundRobin(project, group.id);
     }
     return project;
 }

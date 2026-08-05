@@ -2784,12 +2784,17 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
                 group.name = *name;
 
             group.articulationIds = readRequiredStringArray(groupObject, result, "articulationIds", context.c_str());
+            if (const auto gainDb = readOptional<RuntimeManifestLoadResult, double>(groupObject, result, "gainDb", context.c_str()))
+                group.gainDb = *gainDb;
 
             for (const auto& articulationId : group.articulationIds)
             {
                 if (!articulationIds.count(articulationId))
                     addIssue(result, context + " references unknown articulation '" + articulationId + "'.");
             }
+
+            if (!std::isfinite(group.gainDb))
+                addIssue(result, context + " field 'gainDb' must be finite.");
 
             if (!group.id.empty())
                 groupIds.insert(group.id);
@@ -2904,6 +2909,8 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
             {
                 zone.velocityCrossfade = *velocityCrossfade;
             }
+            if (const auto gainDb = readOptional<RuntimeManifestLoadResult, double>(zoneObject, result, "gainDb", context.c_str()))
+                zone.gainDb = *gainDb;
 
             if (const auto streamOffsetBytes = readRequired<RuntimeManifestLoadResult, std::uint64_t>(zoneObject, result, "streamOffsetBytes", context.c_str()))
                 zone.streamOffsetBytes = *streamOffsetBytes;
@@ -2990,6 +2997,9 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
 
             if (zone.releaseSeconds < 0.0)
                 addIssue(result, context + " must not have a negative releaseSeconds.");
+
+            if (!std::isfinite(zone.gainDb))
+                addIssue(result, context + " field 'gainDb' must be finite.");
 
             validateRoundRobinDescriptor(result,
                                          context,
@@ -3228,6 +3238,7 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
         groupObject["id"] = group.id;
         groupObject["name"] = group.name;
         groupObject["articulationIds"] = serializeStringArray(group.articulationIds);
+        groupObject["gainDb"] = group.gainDb;
         groups.push_back(std::move(groupObject));
     }
     root["groups"] = std::move(groups);
@@ -3250,6 +3261,7 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
             zoneObject["velocityCrossfade"] = serializeVelocityCrossfade(zone.velocityCrossfade);
         if (hasAnyVelocityCrossfadeRuntimeValue(zone.velocityCrossfadeRuntime))
             zoneObject["velocityCrossfadeRuntime"] = serializeVelocityCrossfadeRuntime(zone.velocityCrossfadeRuntime);
+        zoneObject["gainDb"] = zone.gainDb;
         zoneObject["streamOffsetBytes"] = zone.streamOffsetBytes;
         zoneObject["prefetchBytes"] = zone.prefetchBytes;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;

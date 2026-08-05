@@ -6,12 +6,14 @@
 #include <json/json.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -158,8 +160,80 @@ int main()
 
         const auto packagePlan = package_support::buildPackagePlan(scratchDirectory / "generated",
                                                                    scratchDirectory / "generated" / "tiny-open-instrument.drpkg");
+        require(std::abs(packagePlan.compiledRuntime.masterGainDb - packagePlan.manifest.masterGainDb) < 1.0e-9,
+                "Compile result should preserve package master gain before package serialization.");
+        require(packagePlan.compiledRuntime.instrument.groups.size() == packagePlan.manifest.groupRoutes.size(),
+                "Compile result should preserve packaged group-route gain before package serialization.");
+        require(packagePlan.compiledRuntime.instrument.groups.at(0).id.empty()
+                    || std::abs(packagePlan.compiledRuntime.instrument.groups.at(0).gainDb
+                                    - packagePlan.manifest.groupRoutes.at(0).gainDb)
+                        < 1.0e-9,
+                "Compile result should preserve group gain before package serialization.");
+        require(std::abs(packagePlan.compiledRuntime.instrument.zones.at(0).gainDb - (-0.75)) < 1.0e-9,
+                "Compile result should preserve zone gain before package serialization.");
+
+        const auto packageWritePlan = drs::engine::buildPerformancePackageWritePlan(packagePlan);
+        require(std::abs(packageWritePlan.manifest.masterGainDb - packagePlan.compiledRuntime.masterGainDb) < 1.0e-9,
+                "Package write planning should source package master gain from the compile result.");
+        require(packageWritePlan.manifest.groupRoutes.size() == packagePlan.compiledRuntime.instrument.groups.size(),
+                "Package write planning should carry all compile-time group gains without recomputing them later.");
+        require(packageWritePlan.manifest.groupRoutes.at(0).groupId
+                    == packagePlan.compiledRuntime.instrument.groups.at(0).id
+                    && std::abs(packageWritePlan.manifest.groupRoutes.at(0).gainDb
+                                    - packagePlan.compiledRuntime.instrument.groups.at(0).gainDb)
+                        < 1.0e-9,
+                "Package write planning should preserve compile-time group-route gain deterministically.");
+
         const auto packageWrite = drs::engine::writePerformancePackage(packagePlan, cryptoProvider);
         require(packageWrite.written, "Performance package writer should succeed for the generated reference compile result.");
+
+        const auto generatedInspection = drs::engine::inspectPerformancePackage(packagePlan.outputPackagePath,
+                                                                                cryptoProvider,
+                                                                                drs::engine::performancePackageSchemaVersion);
+        require(generatedInspection.valid, "Generated performance package should inspect successfully.");
+        const auto packageManifestPayloadIterator = std::find_if(
+            generatedInspection.payloads.begin(),
+            generatedInspection.payloads.end(),
+            [](const drs::engine::PerformancePackagePayloadView& payload)
+            {
+                return payload.payloadId == "package-manifest";
+            });
+        require(packageManifestPayloadIterator != generatedInspection.payloads.end(),
+                "Generated performance package should contain the encrypted package manifest payload.");
+
+        const auto packageManifestJson = json::parse(std::string(packageManifestPayloadIterator->plaintextBytes.begin(),
+                                                                 packageManifestPayloadIterator->plaintextBytes.end()));
+        require(std::abs(packageManifestJson.at("masterGainDb").get<double>() - packagePlan.manifest.masterGainDb) < 1.0e-9,
+                "Generated package manifest should preserve authored package master gain.");
+        require(packageManifestJson.at("groupRoutes").is_array()
+                    && packageManifestJson.at("groupRoutes").size() == packagePlan.manifest.groupRoutes.size(),
+                "Generated package manifest should serialize each packaged group route explicitly.");
+        require(packageManifestJson.at("groupRoutes").at(0).at("groupId").get<std::string>()
+                    == packagePlan.manifest.groupRoutes.at(0).groupId
+                    && std::abs(packageManifestJson.at("groupRoutes").at(0).at("gainDb").get<double>()
+                                    - packagePlan.manifest.groupRoutes.at(0).gainDb)
+                        < 1.0e-9,
+                "Generated package manifest should preserve packaged group-route gain deterministically.");
+
+        const auto generatedInstrumentPayloadIterator = std::find_if(
+            generatedInspection.payloads.begin(),
+            generatedInspection.payloads.end(),
+            [](const drs::engine::PerformancePackagePayloadView& payload)
+            {
+                return payload.payloadId == "runtime-instrument";
+            });
+        require(generatedInstrumentPayloadIterator != generatedInspection.payloads.end(),
+                "Generated performance package should expose the runtime instrument payload for inspection.");
+        const auto generatedInstrumentJson = json::parse(std::string(generatedInstrumentPayloadIterator->plaintextBytes.begin(),
+                                                                     generatedInstrumentPayloadIterator->plaintextBytes.end()));
+        require(std::abs(generatedInstrumentJson.at("groups").at(0).at("gainDb").get<double>()
+                             - packagePlan.compiledRuntime.instrument.groups.at(0).gainDb)
+                    < 1.0e-9,
+                "Generated runtime-instrument payload should expose packaged group gain for inspection.");
+        require(std::abs(generatedInstrumentJson.at("zones").at(0).at("gainDb").get<double>()
+                             - packagePlan.compiledRuntime.instrument.zones.at(0).gainDb)
+                    < 1.0e-9,
+                "Generated runtime-instrument payload should expose packaged zone gain for inspection.");
 
         auto duplicatePayloadPlan = drs::engine::buildPerformancePackageWritePlan(packagePlan);
         duplicatePayloadPlan.outputPackagePath = (scratchDirectory / "duplicate-payloads.drpkg").generic_string();
@@ -168,6 +242,15 @@ int main()
         require(!duplicatePayloadWrite.written, "Package writer should reject duplicate payload ids.");
         require(package_support::containsIssue(duplicatePayloadWrite.issues, "duplicate id"),
                 "Duplicate payload rejection should explain the duplicate id.");
+
+        auto invalidGainManifestPlan = drs::engine::buildPerformancePackageWritePlan(packagePlan);
+        invalidGainManifestPlan.outputPackagePath = (scratchDirectory / "invalid-gain-manifest.drpkg").generic_string();
+        invalidGainManifestPlan.manifest.masterGainDb = std::numeric_limits<double>::infinity();
+        const auto invalidGainManifestWrite = drs::engine::writePerformancePackage(invalidGainManifestPlan, cryptoProvider);
+        require(!invalidGainManifestWrite.written,
+                "Package writer should reject package manifests with non-finite master gain.");
+        require(package_support::containsIssue(invalidGainManifestWrite.issues, "manifest.masterGainDb"),
+                "Package writer should explain why a non-finite package master gain was rejected.");
 
         const auto referencePackageBytes = package_support::readBinaryFile(fs::path(packagePlan.outputPackagePath));
 
