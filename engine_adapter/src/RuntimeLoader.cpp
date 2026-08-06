@@ -2911,6 +2911,11 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
             }
             if (const auto gainDb = readOptional<RuntimeManifestLoadResult, double>(zoneObject, result, "gainDb", context.c_str()))
                 zone.gainDb = *gainDb;
+            if (const auto sampleStartFrame =
+                    readOptional<RuntimeManifestLoadResult, std::uint64_t>(zoneObject, result, "sampleStartFrame", context.c_str()))
+            {
+                zone.sampleStartFrame = *sampleStartFrame;
+            }
 
             if (const auto streamOffsetBytes = readRequired<RuntimeManifestLoadResult, std::uint64_t>(zoneObject, result, "streamOffsetBytes", context.c_str()))
                 zone.streamOffsetBytes = *streamOffsetBytes;
@@ -3262,6 +3267,7 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
         if (hasAnyVelocityCrossfadeRuntimeValue(zone.velocityCrossfadeRuntime))
             zoneObject["velocityCrossfadeRuntime"] = serializeVelocityCrossfadeRuntime(zone.velocityCrossfadeRuntime);
         zoneObject["gainDb"] = zone.gainDb;
+        zoneObject["sampleStartFrame"] = zone.sampleStartFrame;
         zoneObject["streamOffsetBytes"] = zone.streamOffsetBytes;
         zoneObject["prefetchBytes"] = zone.prefetchBytes;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;

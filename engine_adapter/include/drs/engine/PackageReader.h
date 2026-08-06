@@ -36,6 +36,7 @@ struct PerformancePackageLoadResult
     PerformancePackageManifest manifest;
     RuntimeManifestLoadResult instrument;
     RuntimeStreamLoadResult stream;
+    PerformancePackagePayloadLoadResult backgroundImage;
 };
 
 PerformancePackageReaderResult readPerformancePackage(
@@ -49,6 +50,11 @@ PerformancePackagePayloadLoadResult openPerformancePackagePayload(
     const PackageCryptoProvider& cryptoProvider = getDeterministicPackageCryptoProvider());
 
 PerformancePackageLoadResult loadPerformancePackage(
+    const std::string& packagePath,
+    const PackageCryptoProvider& cryptoProvider = getDeterministicPackageCryptoProvider(),
+    int supportedReaderSchemaVersion = performancePackageSchemaVersion);
+
+PerformancePackageLoadResult loadPerformancePackageMetadataOnly(
     const std::string& packagePath,
     const PackageCryptoProvider& cryptoProvider = getDeterministicPackageCryptoProvider(),
     int supportedReaderSchemaVersion = performancePackageSchemaVersion);

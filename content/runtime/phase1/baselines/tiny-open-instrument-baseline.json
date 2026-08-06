@@ -5,7 +5,7 @@
   "referenceManifestPath": "content/runtime/phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drinst",
   "timingUnits": "microseconds",
   "staticExpectations": {
-    "manifestBytes": 3353,
+    "manifestBytes": 3595,
     "sourceProjectResolved": true,
     "compiledStreamAssetResolved": true,
     "macroCount": 2,
@@ -16,9 +16,9 @@
     "totalPrefetchBytes": 65536
   },
   "latestObserved": {
-    "capturedOn": "2026-08-04",
-    "coldLoadMicros": 1983,
-    "warmLoadMicros": 1627
+    "capturedOn": "2026-08-05",
+    "coldLoadMicros": 2061,
+    "warmLoadMicros": 1519
   },
   "driftPolicy": {
     "allowedPositiveDriftMicros": 5000,

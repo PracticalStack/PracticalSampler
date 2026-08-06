@@ -9,6 +9,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_gui_extra/juce_gui_extra.h>
 
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -90,6 +91,7 @@ private:
     void updateWorkspaceStatusLabel();
     void updateWindowTitle();
     void pollPerformancePackageExportService();
+    void pollPerformancePackageOpenTask();
     void pollWavImportService();
     void pollSfzImportReviewService();
     drs::engine::RuntimeProjectModel buildUnloadedProjectState() const;
@@ -127,6 +129,14 @@ private:
                                    int initialRootKey,
                                    std::function<void(std::optional<int>)> completion) const;
 
+    struct PendingPerformancePackageOpenTask
+    {
+        juce::File file;
+        std::shared_ptr<std::atomic<bool>> ready;
+        std::shared_ptr<drs::plugin::OpenedPerformancePackageWorkspaceLoadResult> result;
+        std::uint64_t generation = 0;
+    };
+
     drs::plugin::Processor processor;
     juce::MenuBarComponent menuBar { this };
     juce::Label sessionStatusLabel;
@@ -144,6 +154,8 @@ private:
     juce::File currentProjectFile;
     bool audioOutputEnabled = false;
     juce::String audioDeviceError;
+    std::optional<PendingPerformancePackageOpenTask> pendingPerformancePackageOpenTask;
+    std::uint64_t nextPerformancePackageOpenGeneration = 0;
     std::optional<drs::app::PerformancePackageExportService::Client> performancePackageExportClient;
     std::optional<drs::app::WavImportService::Client> wavImportClient;
     std::shared_ptr<drs::app::PreparedWavImportBatch> wavImportPreparedBatch;

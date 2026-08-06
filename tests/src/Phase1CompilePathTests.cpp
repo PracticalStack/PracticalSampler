@@ -332,21 +332,21 @@ int main()
         auto invalidSampleRatePlan = tempCompilePlan;
         invalidSampleRatePlan.sampleSources.front().metadata.sampleRate = 96000.0;
         const auto invalidSampleRateCompile = drs::engine::compileRuntimeInstrument(invalidSampleRatePlan);
-        require(!invalidSampleRateCompile.compiled,
-                "Compile plan with unsupported sample rate should be rejected.");
-        requireAnyContains(invalidSampleRateCompile.issues,
-                           "44100 Hz and 48000 Hz",
-                           "Compile policy rejection should explain the supported sample rates.");
+        require(invalidSampleRateCompile.compiled,
+                "Compile plan with unusual sample rate should remain compilable under the warning-only sample-rate policy.");
+        requireAnyContains(invalidSampleRateCompile.warnings,
+                           "prefers 44100 Hz or 48000 Hz",
+                           "Compile policy warning should explain the preferred sample rates.");
 
         auto invalidLayoutPlan = tempCompilePlan;
         invalidLayoutPlan.sampleSources.front().sourcePath = (compileOutputDirectory / "outside-content-root.wav").generic_string();
         invalidLayoutPlan.sampleSources.front().metadata.sourcePath = invalidLayoutPlan.sampleSources.front().sourcePath;
         const auto invalidLayoutCompile = drs::engine::compileRuntimeInstrument(invalidLayoutPlan);
-        require(!invalidLayoutCompile.compiled,
-                "Compile plan with sample content outside the content root should be rejected.");
-        requireAnyContains(invalidLayoutCompile.issues,
+        require(invalidLayoutCompile.compiled,
+                "Compile plan with sample content outside the content root should remain compilable with a warning.");
+        requireAnyContains(invalidLayoutCompile.warnings,
                            "content root",
-                           "Compile policy rejection should explain the content-root layout rule.");
+                           "Compile policy warning should explain the content-root layout rule.");
 
         auto duplicateSourcePlan = tempCompilePlan;
         duplicateSourcePlan.sampleSources.push_back(duplicateSourcePlan.sampleSources.front());

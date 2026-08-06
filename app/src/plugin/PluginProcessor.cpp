@@ -295,14 +295,168 @@ std::string summarizeIssues(const std::vector<std::string>& issues)
     return issues.front() + " (+" + std::to_string(issues.size() - 1) + " more)";
 }
 
+PreparedPerformancePackageWorkspaceLoadResult preparePerformancePackageWorkspaceInternal(
+    const std::string& packagePath)
+{
+    PreparedPerformancePackageWorkspaceLoadResult result;
+    result.state = "Performance package open failed";
+
+    if (packagePath.empty())
+    {
+        result.issues.push_back("Select a valid .drpkg file.");
+        return result;
+    }
+
+    const auto loadStartedAt = std::chrono::steady_clock::now();
+    const auto packageLoad = drs::engine::loadPerformancePackage(
+        packagePath,
+        drs::engine::getDeterministicPackageCryptoProvider(),
+        drs::engine::performancePackageSchemaVersion);
+    result.timings.packageLoadMicros = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::steady_clock::now() - loadStartedAt).count());
+    if (!packageLoad.loaded)
+    {
+        result.failureCategory = packageLoad.failureCategory;
+        result.state = packageLoad.state;
+        result.issues = packageLoad.issues;
+        if (result.issues.empty())
+            result.issues.push_back("The playable package could not be loaded.");
+        result.timings.totalMicros = result.timings.packageLoadMicros;
+        return result;
+    }
+
+    auto activation = drs::engine::preparePerformancePackageActivation(packageLoad,
+                                                                       result.timings);
+    result.timings = activation.timings;
+    result.failureCategory = activation.failureCategory;
+    result.state = activation.state;
+    result.issues = activation.issues;
+    result.prepared = activation.prepared;
+    result.activation = std::move(activation);
+    return result;
+}
+
+OpenedPerformancePackageWorkspaceLoadResult openPerformancePackageWorkspaceInternal(
+    const std::string& packagePath)
+{
+    OpenedPerformancePackageWorkspaceLoadResult result;
+    result.state = "Performance package open failed";
+
+    if (packagePath.empty())
+    {
+        result.issues.push_back("Select a valid .drpkg file.");
+        return result;
+    }
+
+    const auto loadStartedAt = std::chrono::steady_clock::now();
+    result.packageLoad = drs::engine::loadPerformancePackageMetadataOnly(
+        packagePath,
+        drs::engine::getDeterministicPackageCryptoProvider(),
+        drs::engine::performancePackageSchemaVersion);
+    result.timings.packageLoadMicros = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::steady_clock::now() - loadStartedAt).count());
+    result.timings.totalMicros = result.timings.packageLoadMicros;
+    if (!result.packageLoad.loaded)
+    {
+        result.failureCategory = result.packageLoad.failureCategory;
+        result.state = result.packageLoad.state;
+        result.issues = result.packageLoad.issues;
+        if (result.issues.empty())
+            result.issues.push_back("The playable package could not be loaded.");
+        return result;
+    }
+
+    result.loaded = true;
+    result.failureCategory = drs::engine::PerformancePackageFailureCategory::none;
+    result.state = "Performance package loaded";
+    return result;
+}
+
 std::string resolveProjectSampleSourcePath(const drs::engine::RuntimeProjectModel& project,
-                                          const drs::engine::RuntimeProjectSampleSource& sampleSource)
+                                           const drs::engine::RuntimeProjectSampleSource& sampleSource)
 {
     const fs::path sourcePath(sampleSource.path);
     if (sourcePath.is_absolute() || project.contentRootPath.empty())
         return sourcePath.lexically_normal().generic_string();
 
     return (fs::path(project.contentRootPath) / sourcePath).lexically_normal().generic_string();
+}
+
+std::vector<std::uint8_t> readValidJpegBytes(const juce::File& imageFile, std::string& issue)
+{
+    issue.clear();
+    if (imageFile == juce::File() || !imageFile.existsAsFile())
+        return {};
+
+    if (!imageFile.hasFileExtension("jpg;jpeg"))
+    {
+        issue = "Performance background image must use a .jpg extension.";
+        return {};
+    }
+
+    std::unique_ptr<juce::InputStream> input(imageFile.createInputStream());
+    if (input == nullptr)
+    {
+        issue = "Performance background image could not be opened for export.";
+        return {};
+    }
+
+    auto* format = juce::ImageFileFormat::findImageFormatForStream(*input);
+    if (format == nullptr || dynamic_cast<juce::JPEGImageFormat*>(format) == nullptr)
+    {
+        issue = "Performance background image must be a valid JPG file.";
+        return {};
+    }
+
+    input->setPosition(0);
+    const auto image = format->decodeImage(*input);
+    if (!image.isValid())
+    {
+        issue = "Performance background image must decode as a valid JPG file.";
+        return {};
+    }
+
+    juce::MemoryBlock bytes;
+    if (!imageFile.loadFileAsData(bytes))
+    {
+        issue = "Performance background image could not be read for export.";
+        return {};
+    }
+
+    const auto* data = static_cast<const std::uint8_t*>(bytes.getData());
+    return std::vector<std::uint8_t>(data, data + bytes.getSize());
+}
+
+std::optional<drs::engine::PerformancePackagePayloadSource> resolveProjectBackgroundImagePayload(
+    const drs::engine::RuntimeProjectModel& project,
+    std::vector<std::string>& issues)
+{
+    if (project.contentRootPath.empty())
+        return std::nullopt;
+
+    const auto imageFile = juce::File(juce::String::fromUTF8(project.contentRootPath.c_str()))
+        .getChildFile("Images")
+        .getChildFile("background.jpg");
+    std::string imageIssue;
+    const auto jpgBytes = readValidJpegBytes(imageFile, imageIssue);
+    if (!imageIssue.empty())
+    {
+        issues.push_back(imageIssue);
+        return std::nullopt;
+    }
+
+    if (jpgBytes.empty())
+        return std::nullopt;
+
+    drs::engine::PerformancePackagePayloadSource payload;
+    payload.payloadId = "background-image";
+    payload.kind = drs::engine::PerformancePackagePayloadKind::backgroundImage;
+    payload.logicalPath = "images/background.jpg";
+    payload.mediaType = "image/jpeg";
+    payload.plaintextBytes = jpgBytes;
+    return payload;
 }
 
 void collectPerformancePackageExportCompatibilityIssues(
@@ -357,12 +511,6 @@ void collectPerformancePackageExportCompatibilityIssues(
                              + "' uses non-default pan, which playable package export does not yet preserve.");
         }
 
-        if (zone.sampleStartFrame != 0)
-        {
-            issues.push_back("Zone '" + zone.id
-                             + "' uses a non-zero sample start offset, which playable package export does not yet preserve.");
-        }
-
         if (zone.loopEnabled || zone.loopStartFrame != 0 || zone.loopEndFrame != 0)
         {
             issues.push_back("Zone '" + zone.id
@@ -378,6 +526,7 @@ struct PerformancePackageExportPreparationResult
     std::vector<std::string> issues;
     drs::engine::RuntimeCompilePlan compilePlan;
     drs::engine::PerformancePackageManifest manifest;
+    std::vector<drs::engine::PerformancePackagePayloadSource> additionalPayloads;
 };
 
 PerformancePackageExportPreparationResult preparePerformancePackageExport(
@@ -575,6 +724,7 @@ PerformancePackageExportPreparationResult preparePerformancePackageExport(
         zone.velocityHigh = projectZone.velocityHigh;
         zone.velocityCrossfade = projectZone.velocityCrossfade;
         zone.gainDb = projectZone.gainDb;
+        zone.sampleStartFrame = projectZone.sampleStartFrame;
         zone.roundRobin = projectZone.roundRobin;
         zone.roundRobinLength = projectZone.roundRobinLength;
         zone.roundRobinPosition = projectZone.roundRobinPosition;
@@ -598,6 +748,13 @@ PerformancePackageExportPreparationResult preparePerformancePackageExport(
     result.manifest.notes = {
         "Exported from the current Decent Rhapsody Studio authoring project."
     };
+
+    if (const auto backgroundImagePayload = resolveProjectBackgroundImagePayload(project, result.issues);
+        backgroundImagePayload.has_value())
+    {
+        result.manifest.backgroundImage.payloadId = backgroundImagePayload->payloadId;
+        result.additionalPayloads.push_back(*backgroundImagePayload);
+    }
 
     if (!result.issues.empty())
         return result;
@@ -2134,36 +2291,29 @@ bool Processor::activatePerformancePackageWorkspace(
     return true;
 }
 
-PerformancePackageWorkspaceLoadResult Processor::loadPerformancePackageWorkspace(
+PreparedPerformancePackageWorkspaceLoadResult Processor::preparePerformancePackageWorkspace(
+    const std::string& packagePath) const
+{
+    return preparePerformancePackageWorkspaceInternal(packagePath);
+}
+
+OpenedPerformancePackageWorkspaceLoadResult Processor::openPerformancePackageWorkspace(
+    const std::string& packagePath) const
+{
+    return openPerformancePackageWorkspaceInternal(packagePath);
+}
+
+PerformancePackageWorkspaceLoadResult Processor::activatePreparedPerformancePackageWorkspace(
+    drs::engine::PreparedPerformancePackageActivationResult preparedActivation,
     const juce::File& resolvedPackageFile)
 {
     PerformancePackageWorkspaceLoadResult result;
     result.state = "Performance package open failed";
+    result.timings = preparedActivation.timings;
 
-    if (resolvedPackageFile == juce::File()
-        || !resolvedPackageFile.existsAsFile()
-        || !resolvedPackageFile.getFileExtension().equalsIgnoreCase(
-            juce::String::fromUTF8(drs::engine::performancePackageFileExtension)))
-    {
-        result.issues.push_back("Select a valid .drpkg file.");
-        return result;
-    }
-
-    const auto packageLoad = drs::engine::loadPerformancePackage(
-        resolvedPackageFile.getFullPathName().toStdString(),
-        drs::engine::getDeterministicPackageCryptoProvider(),
-        drs::engine::performancePackageSchemaVersion);
-    if (!packageLoad.loaded)
-    {
-        result.failureCategory = packageLoad.failureCategory;
-        result.state = packageLoad.state;
-        result.issues = packageLoad.issues;
-        if (result.issues.empty())
-            result.issues.push_back("The playable package could not be loaded.");
-        return result;
-    }
-
-    const auto activation = engineFacade.activatePerformancePackageSession(packageLoad);
+    auto packageManifest = preparedActivation.packageLoad.manifest;
+    const auto activation = engineFacade.activatePreparedPerformancePackageSession(
+        std::move(preparedActivation));
     if (!activation.activated)
     {
         result.failureCategory = activation.failureCategory;
@@ -2193,7 +2343,7 @@ PerformancePackageWorkspaceLoadResult Processor::loadPerformancePackageWorkspace
     observedDraftPlaybackProjectRevision = authoringSession.getDocumentState().revision;
     initializeAuthoringImportMetrics();
     initializeAuthoringSourceValidationSnapshot();
-    workspaceDocumentState = buildPerformancePackageWorkspaceDocumentState(packageLoad.manifest,
+    workspaceDocumentState = buildPerformancePackageWorkspaceDocumentState(packageManifest,
                                                                           resolvedPackageFile);
     serviceMessageThreadWork();
     updateRealtimeSafetyState();
@@ -2204,6 +2354,101 @@ PerformancePackageWorkspaceLoadResult Processor::loadPerformancePackageWorkspace
     result.failureCategory = drs::engine::PerformancePackageFailureCategory::none;
     result.state = "Performance package opened";
     return result;
+}
+
+PerformancePackageWorkspaceLoadResult Processor::activateOpenedPerformancePackageWorkspace(
+    drs::engine::PerformancePackageLoadResult packageLoad,
+    const juce::File& resolvedPackageFile)
+{
+    PerformancePackageWorkspaceLoadResult result;
+    result.state = "Performance package open failed";
+
+    auto packageManifest = packageLoad.manifest;
+    const auto activation = engineFacade.openPerformancePackageSession(packageLoad);
+    if (!activation.activated)
+    {
+        result.failureCategory = activation.failureCategory;
+        result.state = activation.state;
+        result.issues = activation.issues;
+        if (result.issues.empty())
+            result.issues.push_back("The playable package could not be opened.");
+        return result;
+    }
+
+    projectSourceValidationService.cancel("Performance package opened");
+    engineFacade.cancelPreviewPreparation("Performance package opened");
+    performancePlaybackContext.cancelPendingActivation();
+    pendingPerformanceActivation.reset();
+    authoringSession.replaceProject(buildSuppressedAuthoringProjectState());
+    authoringProjectBinding = {};
+    clearAuthoringWaveformPreviewCache();
+    resetAuthoringPreviewPreparationAuthorization();
+    resetAuthoringWaveformPreviewAuthorization();
+    authoringPreviewController.reset();
+    authoringPreviewCommandAdapter.clearOwnership();
+    authoringPreviewCloseRequested.store(true, std::memory_order_release);
+    authoringPreviewDirectAuditionRequested = false;
+    authoringPreviewRequestedScope = drs::engine::AuthoringPreviewScope::selectedZone;
+    pendingAuthoringPreviewZoneId.clear();
+    pendingAuthoringPreviewGroupId.clear();
+    observedDraftPlaybackProjectRevision = authoringSession.getDocumentState().revision;
+    initializeAuthoringImportMetrics();
+    initializeAuthoringSourceValidationSnapshot();
+    workspaceDocumentState = buildPerformancePackageWorkspaceDocumentState(packageManifest,
+                                                                          resolvedPackageFile);
+    serviceMessageThreadWork();
+    updateRealtimeSafetyState();
+    publishAuthoringPreviewStatus();
+    refreshSerializedHostStatePublication(true);
+
+    result.loaded = true;
+    result.failureCategory = drs::engine::PerformancePackageFailureCategory::none;
+    result.state = activation.state.empty() ? std::string("Performance package opened") : activation.state;
+    result.issues = activation.issues;
+    return result;
+}
+
+PreparedPerformancePackageWorkspaceLoadResult preparePerformancePackageWorkspaceInBackground(
+    const std::string& packagePath)
+{
+    return preparePerformancePackageWorkspaceInternal(packagePath);
+}
+
+OpenedPerformancePackageWorkspaceLoadResult openPerformancePackageWorkspaceInBackground(
+    const std::string& packagePath)
+{
+    return openPerformancePackageWorkspaceInternal(packagePath);
+}
+
+PerformancePackageWorkspaceLoadResult Processor::loadPerformancePackageWorkspace(
+    const juce::File& resolvedPackageFile)
+{
+    PerformancePackageWorkspaceLoadResult result;
+    result.state = "Performance package open failed";
+
+    if (resolvedPackageFile == juce::File()
+        || !resolvedPackageFile.existsAsFile()
+        || !resolvedPackageFile.getFileExtension().equalsIgnoreCase(
+            juce::String::fromUTF8(drs::engine::performancePackageFileExtension)))
+    {
+        result.issues.push_back("Select a valid .drpkg file.");
+        return result;
+    }
+
+    auto prepared = preparePerformancePackageWorkspace(resolvedPackageFile.getFullPathName().toStdString());
+    if (!prepared.prepared)
+    {
+        result.failureCategory = prepared.failureCategory;
+        result.state = prepared.state;
+        result.issues = prepared.issues;
+        result.timings = prepared.timings;
+        if (result.issues.empty())
+            result.issues.push_back("The playable package could not be opened.");
+        return result;
+    }
+
+    return activatePreparedPerformancePackageWorkspace(std::move(prepared.activation),
+                                                       resolvedPackageFile);
 }
 
 PerformancePackageExportResult Processor::exportPerformancePackage(
@@ -2292,6 +2537,7 @@ PerformancePackageExportResult Processor::exportPerformancePackage(
     packagePlan.compiledRuntime = std::move(compileResult);
     packagePlan.outputPackagePath = targetPackageFile.getFullPathName().toStdString();
     packagePlan.minimumCompatibleAppVersion = "0.5.0-internal";
+    packagePlan.additionalPayloads = preparation.additionalPayloads;
 
     const auto packageWrite = drs::engine::writePerformancePackage(
         packagePlan,

@@ -13,7 +13,7 @@ RuntimeStreamLoadResult loadRuntimeStreamContainer(const std::string& containerP
 RuntimeStreamLoadResult parseRuntimeStreamContainer(const std::string& text,
                                                     const std::string& containerPath,
                                                     bool validateReferencedPaths = true,
-                                                    const std::vector<std::uint8_t>* embeddedPayloadBytes = nullptr);
+                                                    std::vector<std::uint8_t>* embeddedPayloadBytes = nullptr);
 RuntimeStreamLoadResult loadPhase1ReferenceStreamContainer();
 RuntimeStreamLoadResult loadRuntimeStreamContainerForInstrument(const RuntimeManifestLoadResult& instrumentResult);
 

@@ -45,6 +45,11 @@ struct PerformancePackageManifest
         double gainDb = 0.0;
     };
 
+    struct BackgroundImage
+    {
+        std::string payloadId;
+    };
+
     std::string schemaName = performancePackageSchemaName;
     int schemaVersion = performancePackageSchemaVersion;
     std::string packageId;
@@ -54,6 +59,7 @@ struct PerformancePackageManifest
     int minimumReaderSchemaVersion = performancePackageSchemaVersion;
     double masterGainDb = 0.0;
     std::vector<GroupRoute> groupRoutes;
+    BackgroundImage backgroundImage;
     std::vector<std::string> notes;
 };
 

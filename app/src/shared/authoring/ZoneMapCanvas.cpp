@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <unordered_set>
 
 namespace drs::app::authoring
 {
@@ -335,25 +336,28 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
 
     const auto paintOrder = buildPaintOrder();
     const auto zoneLayouts = buildZoneLayouts();
+    std::vector<juce::Rectangle<float>> visibleBoundsByZoneIndex(zoneSummaries.size());
+    std::vector<bool> hasVisibleBounds(zoneSummaries.size(), false);
+    for (const auto& layout : zoneLayouts)
+    {
+        visibleBoundsByZoneIndex[layout.index] = layout.bounds;
+        hasVisibleBounds[layout.index] = true;
+    }
+
+    std::unordered_set<std::string> selectedZoneIds;
+    selectedZoneIds.reserve(selectionState.zoneIds.size());
+    for (const auto& zoneId : selectionState.zoneIds)
+        selectedZoneIds.insert(zoneId);
 
     for (const auto zoneIndex : paintOrder)
     {
-        const auto zone = getDisplayZoneSummary(zoneIndex);
-        const auto layoutIterator = std::find_if(zoneLayouts.begin(),
-                                                 zoneLayouts.end(),
-                                                 [&](const ZoneLayout& layout)
-                                                 {
-                                                     return layout.index == zoneIndex;
-                                                 });
-        if (layoutIterator == zoneLayouts.end())
+        if (zoneIndex >= hasVisibleBounds.size() || !hasVisibleBounds[zoneIndex])
             continue;
 
-        const auto zoneBounds = layoutIterator->bounds;
+        const auto zone = getDisplayZoneSummary(zoneIndex);
+        const auto& zoneBounds = visibleBoundsByZoneIndex[zoneIndex];
         const auto primarySelected = selectionState.primaryZoneId == zone.id;
-        const auto secondarySelected = !primarySelected
-            && std::find(selectionState.zoneIds.begin(),
-                         selectionState.zoneIds.end(),
-                         zone.id) != selectionState.zoneIds.end();
+        const auto secondarySelected = !primarySelected && selectedZoneIds.count(zone.id) > 0;
         g.setColour(primarySelected
                         ? zoneMapSelectedFill
                         : (secondarySelected ? zoneMapSecondarySelectedFill : zoneMapAccentFill));
@@ -409,7 +413,7 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
 
         if (primarySelected)
         {
-            const auto handleCenters = buildHandleCenters(computeZoneBounds(getDisplayZoneSummary(zoneIndex)));
+            const auto handleCenters = buildHandleCenters(zoneBounds);
             for (const auto& [handle, center] : handleCenters)
             {
                 if (!inner.contains(center))

@@ -43,7 +43,8 @@ The Phase 1 policy rules that sit on top of decode success are documented in:
 - WAV loop and root-note metadata extraction
 - actionable failure reporting for missing and unsupported inputs
 - policy warnings for non-portable sample names
-- policy rejections for unsupported decoded formats, sample rates, and channel counts
+- policy warnings for unusual decoded sample rates
+- policy rejections for unsupported decoded formats and channel counts
 
 ## Why this is the first Sprint 2 slice
 

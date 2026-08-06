@@ -993,9 +993,9 @@ SampleImportPolicyReport evaluatePhase1SamplePolicy(const ImportedSampleMetadata
 
     if (!isPhase1SupportedSampleRate(metadata.sampleRate))
     {
-        addPolicyError(report,
-                       "Phase 1 only supports 44100 Hz and 48000 Hz source assets; sample reported "
-                           + std::to_string(static_cast<int>(metadata.sampleRate)) + " Hz.");
+        addPolicyWarning(report,
+                         "Phase 1 prefers 44100 Hz or 48000 Hz source assets, but will use unusual sample rates as-is; sample reported "
+                             + std::to_string(static_cast<int>(metadata.sampleRate)) + " Hz.");
     }
 
     if (!isPhase1SupportedChannelCount(metadata.channelCount))

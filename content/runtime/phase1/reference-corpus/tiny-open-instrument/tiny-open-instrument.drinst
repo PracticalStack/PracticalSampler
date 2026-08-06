@@ -40,14 +40,16 @@
       "name": "Pad Core",
       "articulationIds": [
         "sustain"
-      ]
+      ],
+      "gainDb": 0.0
     },
     {
       "id": "lead-core",
       "name": "Lead Core",
       "articulationIds": [
         "lead"
-      ]
+      ],
+      "gainDb": 0.0
     }
   ],
   "zones": [
@@ -62,6 +64,8 @@
       "keyHigh": 76,
       "velocityLow": 1,
       "velocityHigh": 95,
+      "gainDb": 0.0,
+      "sampleStartFrame": 0,
       "streamOffsetBytes": 0,
       "prefetchBytes": 16384,
       "releaseSeconds": 0.0,
@@ -79,6 +83,8 @@
       "keyHigh": 76,
       "velocityLow": 96,
       "velocityHigh": 127,
+      "gainDb": 0.0,
+      "sampleStartFrame": 0,
       "streamOffsetBytes": 0,
       "prefetchBytes": 16384,
       "releaseSeconds": 0.0,
@@ -96,6 +102,8 @@
       "keyHigh": 96,
       "velocityLow": 1,
       "velocityHigh": 95,
+      "gainDb": 0.0,
+      "sampleStartFrame": 0,
       "streamOffsetBytes": 393216,
       "prefetchBytes": 16384,
       "releaseSeconds": 0.0,
@@ -113,6 +121,8 @@
       "keyHigh": 96,
       "velocityLow": 96,
       "velocityHigh": 127,
+      "gainDb": 0.0,
+      "sampleStartFrame": 0,
       "streamOffsetBytes": 393216,
       "prefetchBytes": 16384,
       "releaseSeconds": 0.0,

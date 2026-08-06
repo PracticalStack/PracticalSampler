@@ -41,7 +41,35 @@ struct PerformancePackageWorkspaceLoadResult
         = drs::engine::PerformancePackageFailureCategory::none;
     std::string state;
     std::vector<std::string> issues;
+    drs::engine::PerformancePackagePreparationTimings timings;
 };
+
+struct PreparedPerformancePackageWorkspaceLoadResult
+{
+    bool prepared = false;
+    drs::engine::PerformancePackageFailureCategory failureCategory
+        = drs::engine::PerformancePackageFailureCategory::none;
+    std::string state;
+    std::vector<std::string> issues;
+    drs::engine::PreparedPerformancePackageActivationResult activation;
+    drs::engine::PerformancePackagePreparationTimings timings;
+};
+
+struct OpenedPerformancePackageWorkspaceLoadResult
+{
+    bool loaded = false;
+    drs::engine::PerformancePackageFailureCategory failureCategory
+        = drs::engine::PerformancePackageFailureCategory::none;
+    std::string state;
+    std::vector<std::string> issues;
+    drs::engine::PerformancePackageLoadResult packageLoad;
+    drs::engine::PerformancePackagePreparationTimings timings;
+};
+
+PreparedPerformancePackageWorkspaceLoadResult preparePerformancePackageWorkspaceInBackground(
+    const std::string& packagePath);
+OpenedPerformancePackageWorkspaceLoadResult openPerformancePackageWorkspaceInBackground(
+    const std::string& packagePath);
 
 struct PerformancePackageExportResult
 {
@@ -227,6 +255,16 @@ public:
     bool activatePerformancePackageWorkspace(
         const drs::engine::PerformancePackageManifest& package,
         juce::File resolvedPackageFile = {});
+    PreparedPerformancePackageWorkspaceLoadResult preparePerformancePackageWorkspace(
+        const std::string& packagePath) const;
+    OpenedPerformancePackageWorkspaceLoadResult openPerformancePackageWorkspace(
+        const std::string& packagePath) const;
+    PerformancePackageWorkspaceLoadResult activatePreparedPerformancePackageWorkspace(
+        drs::engine::PreparedPerformancePackageActivationResult preparedActivation,
+        const juce::File& resolvedPackageFile);
+    PerformancePackageWorkspaceLoadResult activateOpenedPerformancePackageWorkspace(
+        drs::engine::PerformancePackageLoadResult packageLoad,
+        const juce::File& resolvedPackageFile);
     PerformancePackageWorkspaceLoadResult loadPerformancePackageWorkspace(
         const juce::File& resolvedPackageFile);
     PerformancePackageExportResult exportPerformancePackage(

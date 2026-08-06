@@ -90,7 +90,7 @@ private:
     juce::MidiKeyboardComponent keyboardComponent;
     StatusPanel diagnosticsPanel;
     ArtworkPanel artworkPanel;
-    std::string loadedArtworkContentRoot;
+    std::string loadedArtworkSourceKey;
 
     juce::Label macroStripLabel;
     juce::Label mixerEmptyStateLabel;

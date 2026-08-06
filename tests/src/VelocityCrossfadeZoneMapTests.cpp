@@ -95,6 +95,59 @@ int main()
         require(commitCount == 2,
                 "Cancelling a crossfade gesture must not create an undoable relationship update.");
 
+        ZoneMapCanvas denseCanvas;
+        denseCanvas.setSize(960, 420);
+        denseCanvas.setVisible(true);
+
+        std::vector<drs::engine::AuthoringZoneSummary> denseZones;
+        denseZones.reserve(1024);
+        for (int key = 0; key < 128; ++key)
+        {
+            for (int layer = 0; layer < 8; ++layer)
+            {
+                drs::engine::AuthoringZoneSummary zone;
+                zone.id = "dense-" + std::to_string(key) + "-" + std::to_string(layer);
+                zone.displayName = "Dense " + std::to_string(key) + "-" + std::to_string(layer);
+                zone.articulationId = "sustain";
+                zone.rootKey = key;
+                zone.keyLow = key;
+                zone.keyHigh = key;
+                zone.velocityLow = layer == 0 ? 1 : (layer * 16);
+                zone.velocityHigh = layer == 7 ? 127 : ((layer + 1) * 16 - 1);
+                denseZones.push_back(std::move(zone));
+            }
+        }
+
+        denseCanvas.setZoneSummaries(denseZones);
+
+        std::string selectedDenseZoneId;
+        int denseSelectionCount = 0;
+        denseCanvas.setOnZoneSelectionStateRequested(
+            [&](const ZoneMapCanvas::SelectionState& selectionState)
+            {
+                selectedDenseZoneId = selectionState.primaryZoneId;
+                denseSelectionCount = static_cast<int>(selectionState.zoneIds.size());
+            });
+
+        const auto denseInner = denseCanvas.getLocalBounds().toFloat().reduced(12.0f);
+        const auto targetKey = 60;
+        const auto targetLayer = 3;
+        const auto targetLow = targetLayer * 16;
+        const auto targetHigh = (targetLayer + 1) * 16 - 1;
+        const auto targetLeft = denseInner.getX()
+            + denseInner.getWidth() * (static_cast<float>(targetKey) / 127.0f);
+        const auto targetWidth = std::max(10.0f, denseInner.getWidth() / 128.0f);
+        const auto targetTop = velocityToY(denseInner, targetHigh);
+        const auto targetHeight = std::max(
+            14.0f,
+            denseInner.getHeight() * (static_cast<float>(targetHigh - targetLow) / 127.0f));
+        const auto targetX = targetLeft + targetWidth * 0.5f;
+        const auto targetY = targetTop + targetHeight * 0.5f;
+        require(denseCanvas.requestSelectionAt({ targetX, targetY }),
+                "Dense zone maps should still resolve a direct point selection.");
+        require(selectedDenseZoneId == "dense-60-3" && denseSelectionCount == 1,
+                "Dense zone map selection should preserve the targeted primary zone.");
+
         std::cout << "Velocity crossfade Zone Map tests passed.\n";
         return 0;
     }

@@ -19,7 +19,8 @@ enum class PerformancePackagePayloadKind
     packageManifest,
     runtimeInstrument,
     runtimeStreamIndex,
-    runtimeStreamPayload
+    runtimeStreamPayload,
+    backgroundImage
 };
 
 struct PerformancePackagePayloadSource
@@ -37,6 +38,7 @@ struct PerformancePackageCompileWritePlan
     RuntimeCompileResult compiledRuntime;
     std::string outputPackagePath;
     std::string minimumCompatibleAppVersion = "0.0.0-internal";
+    std::vector<PerformancePackagePayloadSource> additionalPayloads;
 };
 
 struct PerformancePackageWritePlan

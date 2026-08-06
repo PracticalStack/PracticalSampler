@@ -111,6 +111,8 @@ struct EnginePerformanceSnapshot
     std::uint64_t publishedPreparedBuildId = 0;
     std::string instrumentDisplayName;
     std::string contentRootPath;
+    std::string backgroundArtworkSourceKey;
+    std::shared_ptr<const std::vector<std::uint8_t>> backgroundArtworkJpgBytes;
     std::string presetId;
     std::string loadProfileId;
     std::string selectedArticulationId;
@@ -327,6 +329,28 @@ struct EnginePerformancePackageActivationResult
     std::vector<std::string> issues;
 };
 
+struct PerformancePackagePreparationTimings
+{
+    std::uint64_t packageLoadMicros = 0;
+    std::uint64_t snapshotBuildMicros = 0;
+    std::uint64_t preparedBuildMicros = 0;
+    std::uint64_t activationPayloadMicros = 0;
+    std::uint64_t totalMicros = 0;
+};
+
+struct PreparedPerformancePackageActivationResult
+{
+    bool prepared = false;
+    PerformancePackageFailureCategory failureCategory = PerformancePackageFailureCategory::none;
+    std::string state;
+    std::vector<std::string> issues;
+    PerformancePackageLoadResult packageLoad;
+    PlaybackSnapshotBuildResult snapshotResult;
+    PreparedPlaybackBuildResult preparedResult;
+    PlaybackActivationPayloadPtr activationPayload;
+    PerformancePackagePreparationTimings timings;
+};
+
 enum class EngineContentFailureCategory
 {
     missingContent,
@@ -355,6 +379,10 @@ public:
     EngineStatusSnapshot getStatusSnapshot() const;
     RuntimeManifestLoadResult loadPhase1ReferenceInstrument() const;
     RuntimeStreamLoadResult loadPhase1ReferenceStream() const;
+    EnginePerformancePackageActivationResult activatePreparedPerformancePackageSession(
+        PreparedPerformancePackageActivationResult preparedActivation);
+    EnginePerformancePackageActivationResult openPerformancePackageSession(
+        const PerformancePackageLoadResult& packageLoad);
     EnginePerformancePackageActivationResult activatePerformancePackageSession(
         const PerformancePackageLoadResult& packageLoad);
     void restoreBundledReferenceRuntimeSession();
@@ -446,6 +474,7 @@ private:
     struct PendingPreparedCompletion
     {
         PreparedPlaybackWorkLane lane = PreparedPlaybackWorkLane::preview;
+        bool performancePackage = false;
         std::uint64_t contractRequestId = 0;
         PlaybackSnapshotBuildResult snapshotResult;
         PerformancePublishRequestIdentity publishIdentity;
@@ -457,6 +486,7 @@ private:
                                       const PlaybackSnapshotBuildResult& snapshotResult,
                                       PreparedPlaybackWorkLane lane,
                                       bool bootstrapPerformance = false);
+    bool enqueuePerformancePackagePreparedBuild(const PlaybackSnapshotBuildResult& snapshotResult);
     bool pumpPreparedPlaybackWorkerCompletions();
     void markStateChanged();
     void clearPendingPreparedCompletions();
@@ -473,6 +503,8 @@ private:
     RuntimeProjectLoadResult authoringProject;
     bool referenceInstrumentActive = false;
     PlaybackActivationPayloadPtr packagePerformanceActivationPayload;
+    std::string packageBackgroundArtworkPayloadId;
+    std::shared_ptr<const std::vector<std::uint8_t>> packageBackgroundArtworkJpgBytes;
     RuntimeSessionStateSnapshot currentSessionState;
     EngineDiagnosticsSnapshot diagnosticsSnapshot;
     EnginePreviewPlaybackSnapshot previewPlaybackSnapshot;
@@ -489,4 +521,8 @@ private:
     std::shared_ptr<const PerformancePublishPresentationSnapshot> performancePublishPresentation;
     std::uint64_t nextPerformancePublishPresentationSequence = 1;
 };
+
+PreparedPerformancePackageActivationResult preparePerformancePackageActivation(
+    const PerformancePackageLoadResult& packageLoad,
+    const PerformancePackagePreparationTimings& priorTimings = {});
 } // namespace drs::engine

@@ -10,7 +10,9 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <iomanip>
 #include <memory>
+#include <sstream>
 #include <thread>
 
 namespace drs::standalone
@@ -28,6 +30,33 @@ constexpr auto libraryLocationPropertyKey = "libraryLocation";
 constexpr auto projectDirectoryPropertyKey = "projectDirectory";
 constexpr auto recentProjectDirectoryPropertyKey = "recentProjectDirectory";
 constexpr auto audioDeviceStatePropertyKey = "audioDeviceState";
+
+std::string buildPerformancePackageTimingSummary(
+    const drs::engine::PerformancePackagePreparationTimings& timings)
+{
+    if (timings.packageLoadMicros == 0
+        && timings.snapshotBuildMicros == 0
+        && timings.preparedBuildMicros == 0
+        && timings.activationPayloadMicros == 0
+        && timings.totalMicros == 0)
+    {
+        return {};
+    }
+
+    const auto toMillis = [](const std::uint64_t micros)
+    {
+        return static_cast<double>(micros) / 1000.0;
+    };
+
+    std::ostringstream stream;
+    stream << std::fixed << std::setprecision(1)
+           << "Package-open timings (ms): load=" << toMillis(timings.packageLoadMicros)
+           << ", snapshot=" << toMillis(timings.snapshotBuildMicros)
+           << ", prepared=" << toMillis(timings.preparedBuildMicros)
+           << ", payload=" << toMillis(timings.activationPayloadMicros)
+           << ", total=" << toMillis(timings.totalMicros);
+    return stream.str();
+}
 
 juce::String formatMidiNoteLabel(int midiNote)
 {
@@ -730,9 +759,11 @@ void MainComponent::timerCallback()
     processor.serviceMessageThreadWork();
     if (restoreBanner.update(processor.getProjectRestoreSnapshot()))
         resized();
+    pollPerformancePackageOpenTask();
     performancePanel.refreshNow();
     if (processor.getWorkspaceDocumentState().authoringAvailable)
         authoringPanel.refreshNow();
+    updateWorkspaceStatusLabel();
     updateWindowTitle();
     pollPerformancePackageExportService();
     pollWavImportService();
@@ -822,6 +853,7 @@ void MainComponent::createNewProject()
                                                 return;
 
                                             const auto projectFile = drs::app::makeSelfContainedProjectFile(selectedFile);
+                                            safeThis->pendingPerformancePackageOpenTask.reset();
                                             safeThis->currentProjectFile = {};
                                             safeThis->processor.replaceAuthoringProject(safeThis->buildEmptyProjectTemplate());
                                             safeThis->saveProjectToFile(projectFile);
@@ -881,6 +913,7 @@ void MainComponent::closeProject()
                                     if (!shouldClose || safeThis == nullptr)
                                         return;
 
+                                    safeThis->pendingPerformancePackageOpenTask.reset();
                                     safeThis->currentProjectFile = {};
                                     if (safeThis->processor.getWorkspaceDocumentState().kind
                                         == drs::engine::WorkspaceDocumentKind::performancePackage)
@@ -1666,6 +1699,8 @@ bool MainComponent::saveProjectToFile(const juce::File& file)
 
 bool MainComponent::loadProjectFromFile(const juce::File& file)
 {
+    pendingPerformancePackageOpenTask.reset();
+
     const auto targetFile = drs::app::ensureProjectFileExtension(file);
     const auto recovery = drs::app::recoverProjectFilesTransaction(targetFile);
     if (recovery.recoveryNeeded && !recovery.recovered)
@@ -1718,19 +1753,86 @@ bool MainComponent::loadProjectFromFile(const juce::File& file)
 
 bool MainComponent::loadPerformancePackageFromFile(const juce::File& file)
 {
-    const auto loadResult = processor.loadPerformancePackageWorkspace(file);
-    if (!loadResult.loaded)
-    {
-        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-                                               "Open Playable Package Failed",
-                                               buildProjectIssueSummary(loadResult.issues));
+    if (file == juce::File())
         return false;
+
+    auto task = PendingPerformancePackageOpenTask {};
+    task.file = file;
+    task.ready = std::make_shared<std::atomic<bool>>(false);
+    task.result = std::make_shared<drs::plugin::OpenedPerformancePackageWorkspaceLoadResult>();
+    task.generation = ++nextPerformancePackageOpenGeneration;
+
+    const auto packagePath = file.getFullPathName().toStdString();
+    const auto ready = task.ready;
+    const auto result = task.result;
+    pendingPerformancePackageOpenTask = task;
+    std::thread([packagePath, ready, result]()
+    {
+        *result = drs::plugin::openPerformancePackageWorkspaceInBackground(packagePath);
+        ready->store(true, std::memory_order_release);
+    }).detach();
+    updateWorkspaceStatusLabel();
+    updateWindowTitle();
+    return true;
+}
+
+void MainComponent::pollPerformancePackageOpenTask()
+{
+    if (!pendingPerformancePackageOpenTask.has_value()
+        || pendingPerformancePackageOpenTask->ready == nullptr
+        || !pendingPerformancePackageOpenTask->ready->load(std::memory_order_acquire)
+        || pendingPerformancePackageOpenTask->result == nullptr)
+    {
+        return;
     }
 
+    auto task = std::move(*pendingPerformancePackageOpenTask);
+    pendingPerformancePackageOpenTask.reset();
+    auto prepared = std::move(*task.result);
+    const auto timingSummary = buildPerformancePackageTimingSummary(prepared.timings);
+
+    if (!prepared.loaded)
+    {
+        auto issues = prepared.issues;
+        if (!timingSummary.empty())
+        {
+            juce::Logger::writeToLog("Playable package open failed during background preparation. "
+                                     + juce::String(timingSummary));
+            issues.push_back(timingSummary);
+        }
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Open Playable Package Failed",
+                                               buildProjectIssueSummary(issues));
+        updateWorkspaceStatusLabel();
+        updateWindowTitle();
+        return;
+    }
+
+    const auto loadResult = processor.activateOpenedPerformancePackageWorkspace(
+        std::move(prepared.packageLoad),
+        task.file);
+    if (!loadResult.loaded)
+    {
+        auto issues = loadResult.issues;
+        if (!timingSummary.empty())
+        {
+            juce::Logger::writeToLog("Playable package open failed during activation. "
+                                     + juce::String(timingSummary));
+            issues.push_back(timingSummary);
+        }
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Open Playable Package Failed",
+                                               buildProjectIssueSummary(issues));
+        updateWorkspaceStatusLabel();
+        updateWindowTitle();
+        return;
+    }
+
+    if (!timingSummary.empty())
+        juce::Logger::writeToLog("Playable package opened in the background. " + juce::String(timingSummary));
     currentProjectFile = {};
-    setRecentProjectDirectory(file.getParentDirectory());
+    setRecentProjectDirectory(task.file.getParentDirectory());
     refreshProjectViews();
-    return true;
 }
 
 void MainComponent::confirmSafeToDiscardChanges(const juce::String& nextAction,
@@ -1880,6 +1982,9 @@ juce::String MainComponent::buildWorkspaceStatusText() const
     const auto& document = processor.getWorkspaceDocumentState();
     auto text = buildWorkspaceDisplayName();
 
+    if (pendingPerformancePackageOpenTask.has_value())
+        text += " | Opening playable package...";
+
     if (document.kind == drs::engine::WorkspaceDocumentKind::performancePackage)
     {
         text += " | Playable package | Read-only | Reader v";
@@ -1891,6 +1996,14 @@ juce::String MainComponent::buildWorkspaceStatusText() const
 
 juce::String MainComponent::buildWorkspaceStatusTooltip() const
 {
+    if (pendingPerformancePackageOpenTask.has_value())
+    {
+        auto tooltip = juce::String("Opening playable package in the background.");
+        if (pendingPerformancePackageOpenTask->file != juce::File())
+            tooltip += "\nSource: " + pendingPerformancePackageOpenTask->file.getFullPathName();
+        return tooltip;
+    }
+
     const auto& document = processor.getWorkspaceDocumentState();
     if (document.kind != drs::engine::WorkspaceDocumentKind::performancePackage)
         return "Editable authoring workspace.";

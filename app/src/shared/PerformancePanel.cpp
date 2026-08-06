@@ -329,7 +329,7 @@ void PerformancePanel::refreshNow()
 
 void PerformancePanel::refreshArtworkNow()
 {
-    loadedArtworkContentRoot.clear();
+    loadedArtworkSourceKey.clear();
     refreshArtwork();
 }
 
@@ -417,17 +417,35 @@ void PerformancePanel::rebuildMacroControls(
 
 void PerformancePanel::refreshArtwork()
 {
-    if (loadedArtworkContentRoot == performanceSnapshot.contentRootPath)
+    const auto artworkSourceKey = !performanceSnapshot.backgroundArtworkSourceKey.empty()
+        ? performanceSnapshot.backgroundArtworkSourceKey
+        : performanceSnapshot.contentRootPath;
+    if (loadedArtworkSourceKey == artworkSourceKey)
         return;
 
-    loadedArtworkContentRoot = performanceSnapshot.contentRootPath;
+    loadedArtworkSourceKey = artworkSourceKey;
     auto artwork = juce::Image();
     auto description = juce::String("Performance artwork unavailable. Using fallback background.");
 
-    if (!loadedArtworkContentRoot.empty())
+    if (performanceSnapshot.backgroundArtworkJpgBytes != nullptr
+        && !performanceSnapshot.backgroundArtworkJpgBytes->empty())
+    {
+        juce::MemoryInputStream input(performanceSnapshot.backgroundArtworkJpgBytes->data(),
+                                      performanceSnapshot.backgroundArtworkJpgBytes->size(),
+                                      false);
+        juce::JPEGImageFormat jpegFormat;
+        artwork = jpegFormat.decodeImage(input);
+        if (artwork.isValid())
+        {
+            description = "Performance artwork loaded from playable package payload "
+                + juce::String::fromUTF8(performanceSnapshot.backgroundArtworkSourceKey.c_str());
+        }
+    }
+
+    if (!artwork.isValid() && !performanceSnapshot.contentRootPath.empty())
     {
         const auto artworkFile = juce::File(
-            juce::String::fromUTF8(loadedArtworkContentRoot.c_str()))
+            juce::String::fromUTF8(performanceSnapshot.contentRootPath.c_str()))
             .getChildFile("Images")
             .getChildFile("background.jpg");
         if (artworkFile.existsAsFile())

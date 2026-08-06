@@ -21,8 +21,8 @@
     {
       "role": "instrumentManifest",
       "path": "tiny-open-instrument.drinst",
-      "sizeBytes": 3353,
-      "checksumHex": "95e7e568b3e65b30"
+      "sizeBytes": 3595,
+      "checksumHex": "0588512e1ed36cdc"
     },
     {
       "role": "streamContainer",

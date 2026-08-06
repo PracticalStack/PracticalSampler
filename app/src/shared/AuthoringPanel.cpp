@@ -8,6 +8,8 @@
 #include <array>
 #include <cctype>
 #include <cmath>
+#include <unordered_map>
+#include <unordered_set>
 #include <tuple>
 #include <utility>
 
@@ -6242,34 +6244,44 @@ std::vector<drs::engine::AuthoringZoneSummary> AuthoringPanel::buildVisibleZoneS
     const auto zoneSummaries = authoringSession.getZoneSummaries();
     const auto& project = authoringSession.getProject();
     const auto selectedZone = authoringSession.getSelectedZone();
+    const auto selectedZoneId = selectedZone.has_value() ? selectedZone->id : std::string {};
+
+    std::unordered_map<std::string, std::string> groupIdByZoneId;
+    groupIdByZoneId.reserve(project.authoring.zones.size());
+    for (const auto& zone : project.authoring.zones)
+        groupIdByZoneId.emplace(zone.id, zone.groupId);
+
+    std::unordered_map<std::string, bool> groupVisibilityById;
+    groupVisibilityById.reserve(project.authoring.groups.size());
+    for (const auto& group : project.authoring.groups)
+        groupVisibilityById.emplace(group.id, group.workspaceVisible);
+
+    std::unordered_set<std::string> multiSelectionIds;
+    multiSelectionIds.reserve(zoneMapSelectedZoneIds.size());
+    for (const auto& zoneId : zoneMapSelectedZoneIds)
+        multiSelectionIds.insert(zoneId);
+
     std::vector<drs::engine::AuthoringZoneSummary> visibleZones;
     visibleZones.reserve(zoneSummaries.size());
 
     for (const auto& zone : zoneSummaries)
     {
         auto visibleZone = zone;
-        visibleZone.selected = selectedZone.has_value() && selectedZone->id == zone.id;
-        visibleZone.additionallySelected
-            = std::find(zoneMapSelectedZoneIds.begin(), zoneMapSelectedZoneIds.end(), zone.id)
-            != zoneMapSelectedZoneIds.end()
-            && !visibleZone.selected;
+        visibleZone.selected = selectedZoneId == zone.id;
+        visibleZone.additionallySelected = multiSelectionIds.count(zone.id) > 0 && !visibleZone.selected;
 
-        const auto projectZoneIterator = std::find_if(project.authoring.zones.begin(),
-                                                      project.authoring.zones.end(),
-                                                      [&](const auto& projectZone)
-                                                      {
-                                                          return projectZone.id == visibleZone.id;
-                                                      });
-        const auto groupIterator = projectZoneIterator == project.authoring.zones.end()
-            ? project.authoring.groups.end()
-            : std::find_if(project.authoring.groups.begin(),
-                           project.authoring.groups.end(),
-                           [&](const auto& group)
-                           {
-                               return group.id == projectZoneIterator->groupId;
-                           });
-        if (groupIterator == project.authoring.groups.end()
-            || groupIterator->workspaceVisible
+        auto groupVisible = true;
+        if (const auto projectZoneIterator = groupIdByZoneId.find(visibleZone.id);
+            projectZoneIterator != groupIdByZoneId.end())
+        {
+            if (const auto groupIterator = groupVisibilityById.find(projectZoneIterator->second);
+                groupIterator != groupVisibilityById.end())
+            {
+                groupVisible = groupIterator->second;
+            }
+        }
+
+        if (groupVisible
             || visibleZone.selected
             || visibleZone.additionallySelected)
         {
@@ -6297,6 +6309,11 @@ void AuthoringPanel::syncZoneMapSelectionState()
         return;
     }
 
+    std::unordered_set<std::string> selectedZoneIds;
+    selectedZoneIds.reserve(zoneMapSelectedZoneIds.size());
+    for (const auto& zoneId : zoneMapSelectedZoneIds)
+        selectedZoneIds.insert(zoneId);
+
     std::vector<std::string> normalizedSelectionIds { selectedZone->id };
     normalizedSelectionIds.reserve(zoneMapSelectedZoneIds.size());
 
@@ -6305,8 +6322,7 @@ void AuthoringPanel::syncZoneMapSelectionState()
         if (zone.id == selectedZone->id)
             continue;
 
-        if (std::find(zoneMapSelectedZoneIds.begin(), zoneMapSelectedZoneIds.end(), zone.id)
-            != zoneMapSelectedZoneIds.end())
+        if (selectedZoneIds.count(zone.id) > 0)
         {
             normalizedSelectionIds.push_back(zone.id);
         }
@@ -6318,23 +6334,22 @@ void AuthoringPanel::syncZoneMapSelectionState()
 bool AuthoringPanel::applyZoneMapSelectionState(const authoring::ZoneMapCanvas::SelectionState& selectionState)
 {
     const auto& zones = authoringSession.getProject().authoring.zones;
+    std::unordered_set<std::string> validZoneIds;
+    validZoneIds.reserve(zones.size());
+    for (const auto& zone : zones)
+        validZoneIds.insert(zone.id);
+
     std::vector<std::string> normalizedSelectionIds;
     normalizedSelectionIds.reserve(selectionState.zoneIds.size());
+    std::unordered_set<std::string> seenZoneIds;
+    seenZoneIds.reserve(selectionState.zoneIds.size());
 
     for (const auto& requestedZoneId : selectionState.zoneIds)
     {
-        const auto exists = std::any_of(zones.begin(),
-                                        zones.end(),
-                                        [&](const auto& zone)
-                                        {
-                                            return zone.id == requestedZoneId;
-                                        });
-        if (!exists)
+        if (validZoneIds.count(requestedZoneId) == 0)
             continue;
 
-        if (std::find(normalizedSelectionIds.begin(),
-                      normalizedSelectionIds.end(),
-                      requestedZoneId) == normalizedSelectionIds.end())
+        if (seenZoneIds.insert(requestedZoneId).second)
         {
             normalizedSelectionIds.push_back(requestedZoneId);
         }

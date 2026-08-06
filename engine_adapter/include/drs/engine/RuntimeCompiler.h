@@ -31,6 +31,7 @@ struct RuntimeCompileZoneDefinition
     int velocityHigh = 127;
     VelocityCrossfadeDescriptor velocityCrossfade;
     double gainDb = 0.0;
+    std::uint64_t sampleStartFrame = 0;
     std::optional<RoundRobinDescriptor> roundRobin;
     int roundRobinLength = 0;
     int roundRobinPosition = 0;

@@ -309,29 +309,46 @@ int main()
                 "Stage 1 should keep the scoped-volume fixture projectable and playable.");
         require(scopedVolumeProjection.masterGainDb == 2.0,
                 "Stage 1 should capture master volume on the projection result.");
-        require(scopedVolumeProjection.groups.size() == 2,
-                "Stage 2 should create one projected group per imported scoped-volume layer.");
+        require(scopedVolumeProjection.groups.size() == 1,
+                "Stage 2 should keep velocity-layered scoped-volume content inside one projected group.");
         require(scopedVolumeProjection.zones.size() == 2,
                 "Stage 2 should still create one zone per scoped-volume region.");
-        const auto* lowVelocityGroup =
+        require(scopedVolumeProjection.zones[0].groupId == scopedVolumeProjection.zones[1].groupId,
+                "Stage 2 should not split projected groups by velocity layering.");
+        const auto* scopedVolumeGroup =
             findGroupById(scopedVolumeProjection.groups, scopedVolumeProjection.zones[0].groupId);
-        const auto* highVelocityGroup =
-            findGroupById(scopedVolumeProjection.groups, scopedVolumeProjection.zones[1].groupId);
-        require(lowVelocityGroup != nullptr
-                    && highVelocityGroup != nullptr
-                    && lowVelocityGroup->gainDb == -3.0
-                    && highVelocityGroup->gainDb == -6.0,
-                "Stage 1 should preserve distinct group-local gain values on projected groups.");
-        require(lowVelocityGroup != nullptr
-                    && highVelocityGroup != nullptr
-                    && lowVelocityGroup->displayOrder == 0
-                    && highVelocityGroup->displayOrder == 1
-                    && lowVelocityGroup->auditionAnchorZoneId == scopedVolumeProjection.zones[0].id
-                    && highVelocityGroup->auditionAnchorZoneId == scopedVolumeProjection.zones[1].id,
-                "Stage 2 should keep projected group identity, order, and anchor zones deterministic.");
-        require(scopedVolumeProjection.zones[0].gainDb == 1.0
-                    && scopedVolumeProjection.zones[1].gainDb == 4.0,
-                "Stage 2 should map only region-local volume to projected zone gain.");
+        require(scopedVolumeGroup != nullptr
+                    && scopedVolumeGroup->gainDb == 0.0
+                    && scopedVolumeGroup->displayOrder == 0
+                    && scopedVolumeGroup->auditionAnchorZoneId == scopedVolumeProjection.zones[0].id,
+                "Stage 2 should normalize mixed group-local gain into zone gain when velocity layers share one projected group.");
+        require(scopedVolumeProjection.zones[0].gainDb == -2.0
+                    && scopedVolumeProjection.zones[1].gainDb == -2.0,
+                "Stage 2 should preserve net audible gain after collapsing velocity-layered groups.");
+
+        const auto velocityLayerTempDirectory = fs::temp_directory_path() / "drs-sprint31-sfz-velocity-layers";
+        const auto velocityLayerFixturePath = velocityLayerTempDirectory / "velocity-layer-groups.sfz";
+        writeTextFile(velocityLayerFixturePath,
+                      "<group>\n"
+                      "<region> sample=" + firstSamplePath.generic_string()
+                          + " lokey=C4 hikey=C4 lovel=1 hivel=63 pitch_keycenter=C4\n"
+                            "<region> sample="
+                          + firstSamplePath.generic_string()
+                          + " lokey=C4 hikey=C4 lovel=64 hivel=127 pitch_keycenter=C4\n");
+        const auto velocityLayerProjection =
+            projectSfzImportDocument(blankPhase6Project, velocityLayerFixturePath.generic_string());
+        require(velocityLayerProjection.projected && velocityLayerProjection.playable,
+                "Stage 2 should keep a simple velocity-layer fixture projectable and playable.");
+        require(velocityLayerProjection.groups.size() == 1
+                    && velocityLayerProjection.zones.size() == 2,
+                "Stage 2 should project one DRS group with two zones for a single SFZ group with two velocity layers.");
+        require(velocityLayerProjection.zones[0].groupId == velocityLayerProjection.zones[1].groupId,
+                "Stage 2 should preserve velocity layering at the zone level instead of splitting projected groups.");
+        require(velocityLayerProjection.zones[0].velocityLow == 1
+                    && velocityLayerProjection.zones[0].velocityHigh == 63
+                    && velocityLayerProjection.zones[1].velocityLow == 64
+                    && velocityLayerProjection.zones[1].velocityHigh == 127,
+                "Stage 2 should preserve projected zone velocity ranges when collapsing velocity-layered groups.");
 
         AuthoringSession phase5Session(blankPhase5Project);
         const auto phase5ApplyResult = applySfzImportProjection(
@@ -392,18 +409,14 @@ int main()
         require(scopedVolumeSession.getProject().authoring.groups.size() == scopedVolumeProjection.groups.size()
                     && scopedVolumeSession.getProject().authoring.zones.size() == scopedVolumeProjection.zones.size(),
                 "Stage 3 should commit imported groups and zones atomically.");
-        const auto* appliedLowVelocityGroup =
+        const auto* appliedScopedVolumeGroup =
             findGroupById(scopedVolumeSession.getProject().authoring.groups, scopedVolumeProjection.groups[0].id);
-        const auto* appliedHighVelocityGroup =
-            findGroupById(scopedVolumeSession.getProject().authoring.groups, scopedVolumeProjection.groups[1].id);
-        require(appliedLowVelocityGroup != nullptr
-                    && appliedHighVelocityGroup != nullptr
-                    && appliedLowVelocityGroup->gainDb == -3.0
-                    && appliedHighVelocityGroup->gainDb == -6.0,
-                "Stage 3 should preserve imported group-local gain through apply.");
-        require(scopedVolumeSession.getProject().authoring.zones[0].gainDb == 1.0
-                    && scopedVolumeSession.getProject().authoring.zones[1].gainDb == 4.0,
-                "Stage 3 should preserve imported region-local gain through apply.");
+        require(appliedScopedVolumeGroup != nullptr
+                    && appliedScopedVolumeGroup->gainDb == 0.0,
+                "Stage 3 should preserve the normalized projected group gain through apply.");
+        require(scopedVolumeSession.getProject().authoring.zones[0].gainDb == -2.0
+                    && scopedVolumeSession.getProject().authoring.zones[1].gainDb == -2.0,
+                "Stage 3 should preserve net audible zone gain through apply after collapsing velocity-layered groups.");
         require(scopedVolumeSession.getProject().authoring.selectedZoneId
                     == scopedVolumeSession.getProject().authoring.zones.front().id
                     && scopedVolumeSession.getProject().authoring.selectedGroupId
@@ -420,7 +433,7 @@ int main()
         require(scopedRedoResult.applied,
                 "Stage 3 scoped-volume import should be redoable.");
         require(std::abs(scopedVolumeSession.getProject().authoring.masterGainDb - 2.0) < 1.0e-9
-                    && scopedVolumeSession.getProject().authoring.groups.size() == 2
+                    && scopedVolumeSession.getProject().authoring.groups.size() == 1
                     && scopedVolumeSession.getProject().authoring.zones.size() == 2,
                 "Redo should restore imported master gain, groups, and zones together.");
 

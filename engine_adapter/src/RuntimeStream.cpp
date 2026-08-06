@@ -17,6 +17,13 @@ namespace drs::engine
 namespace
 {
 namespace fs = std::filesystem;
+
+bool isPackagePayloadUri(const std::string& path)
+{
+    constexpr std::string_view prefix = "package://payload/";
+    return path.size() >= prefix.size()
+        && std::equal(prefix.begin(), prefix.end(), path.begin());
+}
 using json = nlohmann::json;
 
 void addIssue(RuntimeStreamLoadResult& result, const std::string& issue)
@@ -235,7 +242,7 @@ std::string getPhase1ReferenceStreamContainerPath()
 RuntimeStreamLoadResult parseRuntimeStreamContainer(const std::string& rawText,
                                                     const std::string& containerPath,
                                                     const bool validateReferencedPaths,
-                                                    const std::vector<std::uint8_t>* embeddedPayloadBytes)
+                                                    std::vector<std::uint8_t>* embeddedPayloadBytes)
 {
     RuntimeStreamLoadResult result;
     result.containerPath = containerPath;
@@ -571,7 +578,7 @@ RuntimeStreamLoadResult parseRuntimeStreamContainer(const std::string& rawText,
         {
             result.metrics.payloadAssetResolved = true;
             container.payloadEmbedded = true;
-            container.embeddedPayloadBytes = *embeddedPayloadBytes;
+            container.embeddedPayloadBytes = std::move(*embeddedPayloadBytes);
 
             if (container.payloadFileBytes != 0
                 && container.embeddedPayloadBytes.size() != container.payloadFileBytes)
@@ -642,6 +649,12 @@ RuntimeStreamLoadResult parseRuntimeStreamContainer(const std::string& rawText,
         }
         else if (!container.payloadAssetPath.empty())
         {
+            if (isPackagePayloadUri(container.payloadAssetPath))
+            {
+                result.metrics.payloadAssetResolved = false;
+            }
+            else
+            {
             std::error_code errorCode;
             const fs::path payloadFsPath(container.payloadAssetPath);
             if (!fs::exists(payloadFsPath, errorCode))
@@ -724,6 +737,7 @@ RuntimeStreamLoadResult parseRuntimeStreamContainer(const std::string& rawText,
                         addIssue(result, context + " must provide payloadChecksumHex when payloadAssetPath is present.");
                     }
                 }
+            }
             }
         }
     }

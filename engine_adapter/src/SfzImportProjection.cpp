@@ -296,20 +296,25 @@ std::string buildArticulationId(const SfzNormalizedSection& section)
 std::string buildGroupId(const SfzNormalizedSection& section,
                          const std::string& articulationId,
                          int keyLow,
-                         int keyHigh,
-                         int velocityLow,
-                         int velocityHigh)
+                         int keyHigh)
 {
     std::ostringstream stream;
     stream << "sfz-" << slugify(articulationId)
-           << "-k" << keyLow << "-" << keyHigh
-           << "-v" << velocityLow << "-" << velocityHigh;
+           << "-k" << keyLow << "-" << keyHigh;
 
     if (const auto* roundRobinLength = findEffectiveOpcode(section, "seq_length"))
         stream << "-rr" << roundRobinLength->value;
 
     return slugify(stream.str());
 }
+
+struct ProjectedGroupState
+{
+    std::size_t groupIndex = 0;
+    double sharedGainDb = 0.0;
+    bool bakedIntoZones = false;
+    std::vector<std::size_t> zoneIndices;
+};
 
 std::string buildRoundRobinPoolSignature(const RuntimeProjectZoneDefinition& zone)
 {
@@ -792,6 +797,7 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
 
     const auto unsupportedCrossfadeOpcodes = collectUnsupportedVelocityCrossfadeOpcodes(analysis);
     std::map<std::string, std::string> roundRobinPoolIdsBySignature;
+    std::map<std::string, ProjectedGroupState> projectedGroupStates;
     ScopedGainState scopedGainState;
 
     result.projectNotes = buildProjectNotes(analysis.report);
@@ -963,9 +969,7 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         zone.groupId = buildGroupId(section,
                                     zone.articulationId,
                                     zone.keyLow,
-                                    zone.keyHigh,
-                                    zone.velocityLow,
-                                    zone.velocityHigh);
+                                    zone.keyHigh);
         zone.roundRobin = buildSequentialRoundRobinDescriptor(zone,
                                                               usedRoundRobinPoolIds,
                                                               roundRobinPoolIdsBySignature);
@@ -982,29 +986,47 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
 
         if (!zone.groupId.empty())
         {
-            const auto existingGroup = std::find_if(
-                result.groups.begin(),
-                result.groups.end(),
-                [&](const RuntimeProjectGroupDefinition& group)
-                {
-                    return group.id == zone.groupId;
-                });
-
-            if (existingGroup == result.groups.end())
+            const auto scopedGroupGainDb = scopedGainContribution.hasGroupGain
+                ? scopedGainContribution.groupGainDb : 0.0;
+            auto projectedGroup = projectedGroupStates.find(zone.groupId);
+            if (projectedGroup == projectedGroupStates.end())
             {
                 RuntimeProjectGroupDefinition group;
                 group.id = zone.groupId;
                 group.displayName = zone.groupId;
                 group.displayOrder = static_cast<int>(result.groups.size());
                 group.workspaceVisible = true;
-                group.gainDb = scopedGainContribution.hasGroupGain ? scopedGainContribution.groupGainDb : 0.0;
+                group.gainDb = scopedGroupGainDb;
                 group.pan = 0.0;
                 group.auditionAnchorZoneId = zone.id;
                 result.groups.push_back(std::move(group));
+
+                ProjectedGroupState state;
+                state.groupIndex = result.groups.size() - 1;
+                state.sharedGainDb = scopedGroupGainDb;
+                projectedGroup = projectedGroupStates.emplace(zone.groupId, std::move(state)).first;
+            }
+            else
+            {
+                auto& state = projectedGroup->second;
+                if (!state.bakedIntoZones
+                    && std::abs(state.sharedGainDb - scopedGroupGainDb) > 1.0e-9)
+                {
+                    for (const auto zoneIndex : state.zoneIndices)
+                        result.zones[zoneIndex].gainDb += state.sharedGainDb;
+
+                    result.groups[state.groupIndex].gainDb = 0.0;
+                    state.bakedIntoZones = true;
+                }
+
+                if (state.bakedIntoZones)
+                    zone.gainDb += scopedGroupGainDb;
             }
         }
 
         result.zones.push_back(std::move(zone));
+        if (!result.zones.back().groupId.empty())
+            projectedGroupStates[result.zones.back().groupId].zoneIndices.push_back(result.zones.size() - 1);
     }
 
     if (result.zones.empty())

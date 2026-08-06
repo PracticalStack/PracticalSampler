@@ -602,6 +602,7 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         zone.velocityHigh = zonePlan.velocityHigh;
         zone.velocityCrossfade = zonePlan.velocityCrossfade;
         zone.gainDb = zonePlan.gainDb;
+        zone.sampleStartFrame = zonePlan.sampleStartFrame;
         zone.streamOffsetBytes = streamOffsetBySourceId.at(zonePlan.sourceId);
         zone.prefetchBytes = clampedPrefetchBytes;
         zone.roundRobin = roundRobin;

@@ -94,8 +94,8 @@ int main()
         require(inspection.valid, "Reference performance package should inspect successfully.");
         require(inspection.cleartextManifest.displayName == "DRS Tiny Open Instrument Package",
                 "Cleartext package display name changed unexpectedly.");
-        require(inspection.header.payloadCount == 4, "Reference performance package payload count changed unexpectedly.");
-        require(inspection.payloads.size() == 4, "Reference performance package should expose four decrypted payloads.");
+        require(inspection.header.payloadCount == 5, "Reference performance package payload count changed unexpectedly.");
+        require(inspection.payloads.size() == 5, "Reference performance package should expose five decrypted payloads.");
         require(inspection.cryptoAlgorithm == cryptoProvider.algorithmId(),
                 "Reference performance package crypto algorithm changed unexpectedly.");
         require(inspection.minimumCompatibleAppVersion == "0.5.0-internal",
@@ -173,6 +173,8 @@ int main()
                 "Compile result should preserve zone gain before package serialization.");
 
         const auto packageWritePlan = drs::engine::buildPerformancePackageWritePlan(packagePlan);
+        require(packageWritePlan.payloads.size() == 5,
+                "Package write planning should include the optional background-image payload.");
         require(std::abs(packageWritePlan.manifest.masterGainDb - packagePlan.compiledRuntime.masterGainDb) < 1.0e-9,
                 "Package write planning should source package master gain from the compile result.");
         require(packageWritePlan.manifest.groupRoutes.size() == packagePlan.compiledRuntime.instrument.groups.size(),
@@ -214,6 +216,9 @@ int main()
                                     - packagePlan.manifest.groupRoutes.at(0).gainDb)
                         < 1.0e-9,
                 "Generated package manifest should preserve packaged group-route gain deterministically.");
+        require(packageManifestJson.at("backgroundImage").at("payloadId").get<std::string>()
+                    == packagePlan.manifest.backgroundImage.payloadId,
+                "Generated package manifest should advertise the packaged background-image payload id.");
 
         const auto generatedInstrumentPayloadIterator = std::find_if(
             generatedInspection.payloads.begin(),
@@ -234,6 +239,20 @@ int main()
                              - packagePlan.compiledRuntime.instrument.zones.at(0).gainDb)
                     < 1.0e-9,
                 "Generated runtime-instrument payload should expose packaged zone gain for inspection.");
+
+        const auto backgroundImagePayloadIterator = std::find_if(
+            generatedInspection.payloads.begin(),
+            generatedInspection.payloads.end(),
+            [](const drs::engine::PerformancePackagePayloadView& payload)
+            {
+                return payload.payloadId == "background-image";
+            });
+        require(backgroundImagePayloadIterator != generatedInspection.payloads.end(),
+                "Generated performance package should expose the background-image payload for inspection.");
+        require(backgroundImagePayloadIterator->payloadKind == "backgroundImage"
+                    && backgroundImagePayloadIterator->mediaType == "image/jpeg"
+                    && !backgroundImagePayloadIterator->plaintextBytes.empty(),
+                "Generated performance package should preserve packaged background-image payload metadata and bytes.");
 
         auto duplicatePayloadPlan = drs::engine::buildPerformancePackageWritePlan(packagePlan);
         duplicatePayloadPlan.outputPackagePath = (scratchDirectory / "duplicate-payloads.drpkg").generic_string();
@@ -258,7 +277,7 @@ int main()
         const auto payloadCountOffset = drs::engine::getPerformancePackageHeaderPayloadCountOffsetBytes();
         require(payloadCountOffset + sizeof(std::uint32_t) <= tocMismatchBytes.size(),
                 "Package header payload-count offset should remain inside the package file.");
-        std::uint32_t corruptedPayloadCount = inspection.header.payloadCount + 1;
+        std::uint32_t corruptedPayloadCount = generatedInspection.header.payloadCount + 1;
         std::memcpy(tocMismatchBytes.data() + payloadCountOffset,
                     &corruptedPayloadCount,
                     sizeof(corruptedPayloadCount));

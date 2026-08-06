@@ -352,6 +352,8 @@ std::string serializePackageManifestJson(const PerformancePackageManifest& manif
     root["minimumReaderSchemaVersion"] = manifest.minimumReaderSchemaVersion;
     root["masterGainDb"] = manifest.masterGainDb;
     root["groupRoutes"] = serializePackageGroupRoutes(manifest.groupRoutes);
+    if (!manifest.backgroundImage.payloadId.empty())
+        root["backgroundImage"] = ordered_json { { "payloadId", manifest.backgroundImage.payloadId } };
     root["notes"] = serializeStringArray(manifest.notes);
     return root.dump(2) + "\n";
 }
@@ -551,6 +553,36 @@ bool validateWritePlan(const PerformancePackageWritePlan& plan, PerformancePacka
             addIssue(result, "Performance package payload '" + payload.payloadId + "' requires a mediaType.");
     }
 
+    if (!plan.manifest.backgroundImage.payloadId.empty())
+    {
+        const auto payloadIterator = std::find_if(
+            plan.payloads.begin(),
+            plan.payloads.end(),
+            [&](const PerformancePackagePayloadSource& payload)
+            {
+                return payload.payloadId == plan.manifest.backgroundImage.payloadId;
+            });
+        if (payloadIterator == plan.payloads.end())
+        {
+            addIssue(result,
+                     "Performance package manifest backgroundImage.payloadId must reference a packaged payload.");
+        }
+        else
+        {
+            if (payloadIterator->kind != PerformancePackagePayloadKind::backgroundImage)
+            {
+                addIssue(result,
+                         "Performance package manifest backgroundImage.payloadId must reference a backgroundImage payload.");
+            }
+
+            if (payloadIterator->mediaType != "image/jpeg")
+            {
+                addIssue(result,
+                         "Performance package backgroundImage payload must use mediaType 'image/jpeg'.");
+            }
+        }
+    }
+
     return result.issues.empty();
 }
 
@@ -617,6 +649,8 @@ const char* toString(const PerformancePackagePayloadKind kind) noexcept
             return "runtimeStreamIndex";
         case PerformancePackagePayloadKind::runtimeStreamPayload:
             return "runtimeStreamPayload";
+        case PerformancePackagePayloadKind::backgroundImage:
+            return "backgroundImage";
     }
 
     return "unknown";
@@ -639,22 +673,29 @@ PerformancePackageWritePlan buildPerformancePackageWritePlan(const PerformancePa
     writePlan.payloads.push_back(buildPackageManifestPayload(writePlan.manifest));
     writePlan.payloads.push_back(buildRuntimeInstrumentPayload(packagedRuntime));
     writePlan.payloads.push_back(buildRuntimeStreamIndexPayload(packagedRuntime));
+    writePlan.payloads.insert(writePlan.payloads.end(),
+                              plan.additionalPayloads.begin(),
+                              plan.additionalPayloads.end());
+    const auto totalPayloadCount = 4u + static_cast<unsigned int>(plan.additionalPayloads.size());
+    const auto completedPayloadCountBeforeStream = 3u + static_cast<unsigned int>(plan.additionalPayloads.size());
     publishWriteProgress(options,
                          PerformancePackageWriteStage::loadingPayloads,
-                         3,
-                         4,
+                         completedPayloadCountBeforeStream,
+                         totalPayloadCount,
                          0,
                          plan.compiledRuntime.alignedPayloadBytes,
                          "runtime-stream-payload",
                          "Loading compiled stream payload");
     writePlan.payloads.push_back(buildRuntimeStreamPayloadPayload(
         plan.compiledRuntime,
-        [options](const std::uint64_t bytesProcessed, const std::uint64_t totalBytes)
+        [options, completedPayloadCountBeforeStream, totalPayloadCount](
+            const std::uint64_t bytesProcessed,
+            const std::uint64_t totalBytes)
         {
             publishWriteProgress(options,
                                  PerformancePackageWriteStage::loadingPayloads,
-                                 3,
-                                 4,
+                                 completedPayloadCountBeforeStream,
+                                 totalPayloadCount,
                                  bytesProcessed,
                                  totalBytes,
                                  "runtime-stream-payload",

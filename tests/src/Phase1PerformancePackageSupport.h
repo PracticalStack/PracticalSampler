@@ -8,8 +8,10 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace drs::tests::performance_package
@@ -84,6 +86,64 @@ inline bool containsIssue(const std::vector<std::string>& issues, const std::str
 inline std::vector<std::uint8_t> toBytes(const std::string& text)
 {
     return std::vector<std::uint8_t>(text.begin(), text.end());
+}
+
+inline std::vector<std::uint8_t> decodeBase64(std::string_view encoded)
+{
+    auto decodeValue = [](const char character) -> std::optional<std::uint8_t>
+    {
+        if (character >= 'A' && character <= 'Z')
+            return static_cast<std::uint8_t>(character - 'A');
+        if (character >= 'a' && character <= 'z')
+            return static_cast<std::uint8_t>(character - 'a' + 26);
+        if (character >= '0' && character <= '9')
+            return static_cast<std::uint8_t>(character - '0' + 52);
+        if (character == '+')
+            return static_cast<std::uint8_t>(62);
+        if (character == '/')
+            return static_cast<std::uint8_t>(63);
+        if (character == '=')
+            return std::nullopt;
+        throw std::runtime_error("Invalid base64 character in package test fixture.");
+    };
+
+    std::vector<std::uint8_t> decoded;
+    decoded.reserve((encoded.size() * 3) / 4);
+
+    for (std::size_t index = 0; index < encoded.size(); index += 4)
+    {
+        const auto a = decodeValue(encoded.at(index));
+        const auto b = decodeValue(encoded.at(index + 1));
+        const auto c = decodeValue(encoded.at(index + 2));
+        const auto d = decodeValue(encoded.at(index + 3));
+        if (!a.has_value() || !b.has_value())
+            throw std::runtime_error("Invalid padded base64 in package test fixture.");
+
+        decoded.push_back(static_cast<std::uint8_t>((*a << 2u) | (*b >> 4u)));
+        if (c.has_value())
+        {
+            decoded.push_back(static_cast<std::uint8_t>(((*b & 0x0Fu) << 4u) | (*c >> 2u)));
+            if (d.has_value())
+            {
+                decoded.push_back(static_cast<std::uint8_t>(((*c & 0x03u) << 6u) | *d));
+            }
+        }
+    }
+
+    return decoded;
+}
+
+inline std::vector<std::uint8_t> buildBackgroundImageJpegFixture()
+{
+    static const auto bytes = decodeBase64(
+        "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/"
+        "2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCAABAAEDASIAAhEBAxEB/"
+        "8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2Jygg"
+        "kKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXG"
+        "x8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECA"
+        "xEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhY"
+        "aHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD1Oiiivyc/TT//2Q==");
+    return bytes;
 }
 
 inline fs::path getReferenceContentRoot()
@@ -261,6 +321,7 @@ inline drs::engine::PerformancePackageCompileWritePlan buildPackagePlan(
     manifest.masterGainDb = compileResult.masterGainDb;
     for (const auto& group : compileResult.instrument.groups)
         manifest.groupRoutes.push_back({ group.id, group.gainDb });
+    manifest.backgroundImage.payloadId = "background-image";
     manifest.notes = {
         "Sprint 7 checked-in performance package corpus.",
         "Contains runtime-only payloads and omits the authored project manifest."
@@ -271,6 +332,13 @@ inline drs::engine::PerformancePackageCompileWritePlan buildPackagePlan(
     packagePlan.compiledRuntime = std::move(compileResult);
     packagePlan.outputPackagePath = outputPackagePath.generic_string();
     packagePlan.minimumCompatibleAppVersion = "0.5.0-internal";
+    packagePlan.additionalPayloads.push_back({
+        "background-image",
+        drs::engine::PerformancePackagePayloadKind::backgroundImage,
+        "images/background.jpg",
+        "image/jpeg",
+        buildBackgroundImageJpegFixture()
+    });
     return packagePlan;
 }
 
@@ -325,6 +393,7 @@ inline drs::engine::RuntimeProjectModel buildAuthoringProjectFixture()
     leadZone.velocityLow = 1;
     leadZone.velocityHigh = 127;
     leadZone.gainDb = 0.5;
+    leadZone.sampleStartFrame = 64;
     project.authoring.zones.push_back(std::move(leadZone));
 
     return project;

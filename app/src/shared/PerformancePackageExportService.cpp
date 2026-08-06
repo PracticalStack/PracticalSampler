@@ -7,6 +7,8 @@
 #include <cmath>
 #include <exception>
 #include <filesystem>
+#include <memory>
+#include <optional>
 #include <sstream>
 #include <string_view>
 #include <unordered_map>
@@ -103,6 +105,81 @@ std::string resolveProjectSampleSourcePath(const drs::engine::RuntimeProjectMode
     return (fs::path(project.contentRootPath) / sourcePath).lexically_normal().generic_string();
 }
 
+std::vector<std::uint8_t> readValidJpegBytes(const juce::File& imageFile, std::string& issue)
+{
+    issue.clear();
+    if (imageFile == juce::File() || !imageFile.existsAsFile())
+        return {};
+
+    if (!imageFile.hasFileExtension("jpg;jpeg"))
+    {
+        issue = "Performance background image must use a .jpg extension.";
+        return {};
+    }
+
+    std::unique_ptr<juce::InputStream> input(imageFile.createInputStream());
+    if (input == nullptr)
+    {
+        issue = "Performance background image could not be opened for export.";
+        return {};
+    }
+
+    auto* format = juce::ImageFileFormat::findImageFormatForStream(*input);
+    if (format == nullptr || dynamic_cast<juce::JPEGImageFormat*>(format) == nullptr)
+    {
+        issue = "Performance background image must be a valid JPG file.";
+        return {};
+    }
+
+    input->setPosition(0);
+    const auto image = format->decodeImage(*input);
+    if (!image.isValid())
+    {
+        issue = "Performance background image must decode as a valid JPG file.";
+        return {};
+    }
+
+    juce::MemoryBlock bytes;
+    if (!imageFile.loadFileAsData(bytes))
+    {
+        issue = "Performance background image could not be read for export.";
+        return {};
+    }
+
+    const auto* data = static_cast<const std::uint8_t*>(bytes.getData());
+    return std::vector<std::uint8_t>(data, data + bytes.getSize());
+}
+
+std::optional<drs::engine::PerformancePackagePayloadSource> resolveProjectBackgroundImagePayload(
+    const drs::engine::RuntimeProjectModel& project,
+    std::vector<std::string>& issues)
+{
+    if (project.contentRootPath.empty())
+        return std::nullopt;
+
+    const auto imageFile = juce::File(juce::String::fromUTF8(project.contentRootPath.c_str()))
+        .getChildFile("Images")
+        .getChildFile("background.jpg");
+    std::string imageIssue;
+    const auto jpgBytes = readValidJpegBytes(imageFile, imageIssue);
+    if (!imageIssue.empty())
+    {
+        issues.push_back(imageIssue);
+        return std::nullopt;
+    }
+
+    if (jpgBytes.empty())
+        return std::nullopt;
+
+    drs::engine::PerformancePackagePayloadSource payload;
+    payload.payloadId = "background-image";
+    payload.kind = drs::engine::PerformancePackagePayloadKind::backgroundImage;
+    payload.logicalPath = "images/background.jpg";
+    payload.mediaType = "image/jpeg";
+    payload.plaintextBytes = jpgBytes;
+    return payload;
+}
+
 void collectPerformancePackageExportCompatibilityIssues(
     const drs::engine::RuntimeProjectModel& project,
     std::vector<std::string>& issues)
@@ -149,12 +226,6 @@ void collectPerformancePackageExportCompatibilityIssues(
                              + "' uses non-default pan, which playable package export does not yet preserve.");
         }
 
-        if (zone.sampleStartFrame != 0)
-        {
-            issues.push_back("Zone '" + zone.id
-                             + "' uses a non-zero sample start offset, which playable package does not yet preserve.");
-        }
-
         if (zone.loopEnabled || zone.loopStartFrame != 0 || zone.loopEndFrame != 0)
         {
             issues.push_back("Zone '" + zone.id
@@ -170,6 +241,7 @@ struct PerformancePackageExportPreparationResult
     std::vector<std::string> issues;
     drs::engine::RuntimeCompilePlan compilePlan;
     drs::engine::PerformancePackageManifest manifest;
+    std::vector<drs::engine::PerformancePackagePayloadSource> additionalPayloads;
 };
 
 PerformancePackageExportPreparationResult preparePerformancePackageExport(
@@ -373,6 +445,7 @@ PerformancePackageExportPreparationResult preparePerformancePackageExport(
         zone.velocityHigh = projectZone.velocityHigh;
         zone.velocityCrossfade = projectZone.velocityCrossfade;
         zone.gainDb = projectZone.gainDb;
+        zone.sampleStartFrame = projectZone.sampleStartFrame;
         zone.roundRobin = projectZone.roundRobin;
         zone.roundRobinLength = projectZone.roundRobinLength;
         zone.roundRobinPosition = projectZone.roundRobinPosition;
@@ -396,6 +469,13 @@ PerformancePackageExportPreparationResult preparePerformancePackageExport(
     result.manifest.notes = {
         "Exported from the current Decent Rhapsody Studio authoring project."
     };
+
+    if (const auto backgroundImagePayload = resolveProjectBackgroundImagePayload(project, result.issues);
+        backgroundImagePayload.has_value())
+    {
+        result.manifest.backgroundImage.payloadId = backgroundImagePayload->payloadId;
+        result.additionalPayloads.push_back(*backgroundImagePayload);
+    }
 
     if (!result.issues.empty())
         return result;
@@ -668,6 +748,7 @@ PerformancePackageExportOperationResult executePerformancePackageExport(
     packagePlan.compiledRuntime = std::move(compileResult);
     packagePlan.outputPackagePath = targetPackageFile.getFullPathName().toStdString();
     packagePlan.minimumCompatibleAppVersion = "0.5.0-internal";
+    packagePlan.additionalPayloads = preparation.additionalPayloads;
 
     const auto packageWrite = drs::engine::writePerformancePackage(
         packagePlan,

@@ -322,10 +322,24 @@ int main()
                 "Rejected metadata-only inspection must not perform a full-frame decode.");
 
         const auto highRateResult = drs::engine::importSampleFile(highRatePath.generic_string());
-        require(!highRateResult.imported, "96 kHz fixture should be rejected by the Phase 1 sample-rate policy.");
-        requireAnyContains(highRateResult.issues,
-                           "44100 Hz and 48000 Hz",
-                           "Sample-rate policy rejection should explain the supported Phase 1 rates.");
+        require(highRateResult.imported, "96 kHz fixture should import and remain usable under the sample-rate warning policy.");
+        requireAnyContains(highRateResult.warnings,
+                           "prefers 44100 Hz or 48000 Hz",
+                           "Sample-rate policy warning should explain the preferred Phase 1 rates.");
+
+        drs::engine::resetSampleImportIoCounters();
+        const auto highRateInspection = drs::engine::inspectSampleFile(highRatePath.generic_string());
+        require(highRateInspection.inspected,
+                "96 kHz fixture should still yield metadata-only inspection facts under the warning-only sample-rate policy.");
+        require(highRateInspection.accepted,
+                "96 kHz fixture should remain accepted by metadata-only inspection.");
+        require(highRateInspection.metadata.sampleRate == 96000.0,
+                "Metadata-only inspection should preserve the detected unusual sample rate.");
+        requireAnyContains(highRateInspection.warnings,
+                           "prefers 44100 Hz or 48000 Hz",
+                           "Metadata-only inspection should surface the preferred sample-rate warning.");
+        require(drs::engine::getSampleImportIoCounters().fullFrameReadCount == 0,
+                "Metadata-only inspection warning paths must not perform a full-frame decode.");
 
         const auto surroundResult = drs::engine::importSampleFile(surroundPath.generic_string());
         require(!surroundResult.imported, "Four-channel fixture should be rejected by the Phase 1 channel-count policy.");

@@ -62,6 +62,11 @@ int main()
                 "Package runtime loader payload checksum validation count changed unexpectedly.");
         require(loadedPackage.stream.container.samples.at(0).sourcePath.rfind("package://sample/", 0) == 0,
                 "Package runtime loader should preserve package-owned sample identities instead of raw file paths.");
+        require(loadedPackage.backgroundImage.loaded
+                    && loadedPackage.backgroundImage.payload.payloadId == "background-image"
+                    && loadedPackage.backgroundImage.payload.mediaType == "image/jpeg"
+                    && !loadedPackage.backgroundImage.payload.plaintextBytes.empty(),
+                "Checked-in reference package should load the packaged background image payload.");
 
         const auto checksumMismatchLoad = drs::engine::loadPerformancePackage(
             checkedInCorpus.checksumMismatch.generic_string(),
@@ -131,6 +136,11 @@ int main()
                              - scopedGainPlan.compiledRuntime.instrument.zones.at(0).gainDb)
                     < 1.0e-9,
                 "Typed package load should preserve runtime zone gain from the packaged instrument payload.");
+        require(scopedGainLoad.backgroundImage.loaded
+                    && scopedGainLoad.backgroundImage.payload.payloadId == "background-image"
+                    && scopedGainLoad.backgroundImage.payload.mediaType == "image/jpeg"
+                    && !scopedGainLoad.backgroundImage.payload.plaintextBytes.empty(),
+                "Typed package load should preserve the packaged background-image payload.");
 
         drs::engine::EngineFacade scopedGainFacade;
         const auto scopedGainActivation = scopedGainFacade.activatePerformancePackageSession(scopedGainLoad);
@@ -160,6 +170,11 @@ int main()
                              - scopedGainPlan.compiledRuntime.instrument.zones.at(0).gainDb)
                     < 1.0e-9,
                 "Activated prepared playback should preserve packaged zone gain.");
+        const auto scopedGainSnapshot = scopedGainFacade.getPerformanceSnapshot();
+        require(scopedGainSnapshot.backgroundArtworkSourceKey == "package://background-image"
+                    && scopedGainSnapshot.backgroundArtworkJpgBytes != nullptr
+                    && !scopedGainSnapshot.backgroundArtworkJpgBytes->empty(),
+                "Activated performance snapshot should surface packaged background artwork.");
 
         auto malformedManifestPlan = drs::engine::buildPerformancePackageWritePlan(
             package_support::buildPackagePlan(scratchDirectory / "malformed-manifest",

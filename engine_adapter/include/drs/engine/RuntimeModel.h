@@ -338,6 +338,7 @@ struct RuntimeZoneDefinition
     VelocityCrossfadeDescriptor velocityCrossfade;
     VelocityCrossfadeRuntimeDescriptor velocityCrossfadeRuntime;
     double gainDb = 0.0;
+    std::uint64_t sampleStartFrame = 0;
     std::uint64_t streamOffsetBytes = 0;
     std::uint64_t prefetchBytes = 0;
     double releaseSeconds = 0.0;
